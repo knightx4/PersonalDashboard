@@ -17,28 +17,34 @@ most of the way through the project. Do not front-load it.
 | Supabase account | [supabase.com](https://supabase.com) | Signup and billing |
 | Anthropic API key | [console.anthropic.com](https://console.anthropic.com), add ~$10 credit | Signup and billing |
 
-Then run these two once, in a terminal on your own machine. Both open a browser
-for you to approve:
+Then run the provisioning script **on your own machine**:
 
 ```bash
-npx supabase login
+./scripts/provision-supabase.sh
+```
+
+It signs you in, creates the project, waits for it to come up, applies every
+migration in `supabase/migrations`, and prints the block of environment
+variables to paste into `.env.local`.
+
+> **This cannot be run from a Claude Code web session.** The login step needs a
+> browser, and the sandboxed environment's network policy blocks
+> `api.supabase.com` and `api.vercel.com` outright — so project creation and
+> `db push` fail there too, not just login. Either run it locally as above, or
+> allow those hosts in the environment's network policy
+> ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)).
+
+Vercel is not needed until you actually deploy. When you get there:
+
+```bash
 npx vercel login
+npx vercel link
+npx vercel env add ...
 ```
 
-That is the whole manual portion. After that, hand the rest to the agent — it
-creates the project, links it, runs migrations, generates types, creates the
-Vercel project, sets environment variables and deploys, all from the CLI:
-
-```bash
-npx supabase projects create shopping-manager --org-id <yours> --db-password <generated> --region us-east-1
-npx supabase link --project-ref <ref>
-npx supabase db push          # applies supabase/migrations in order
-npx vercel link && npx vercel env add ...
-```
-
-Use the CLI rather than the dashboard. Both produce the same result, but the CLI
-leaves migration files in the repo, which is what makes the database
-reproducible. Anything clicked into the dashboard exists nowhere in version
+Use the CLI rather than the dashboard throughout. Both produce the same result,
+but the CLI leaves migration files in the repo, which is what makes the database
+reproducible. Anything clicked into a dashboard exists nowhere in version
 control and will not survive a rebuild.
 
 ---
