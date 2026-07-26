@@ -17,6 +17,10 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
 4. ✅ **Supabase Auth.** Sign-up, sign-in, Google sign-in, password reset,
    session refresh and route protection in `proxy.ts`.
 5. ✅ **App shell, navigation, empty states.** No data yet.
+6. ✅ **Manual order entry plus inventory CRUD.** Order form writes one
+   `inventory_items` row per physical unit via `allocateLandedCost`. Inventory
+   list/detail (search, category filter, edit, note, dispose, mark returned
+   through a refunded `returns` row). Orders list grouped by month + detail.
 
 Also done ahead of schedule because they are cheap and everything depends on
 them: `lib/fingerprint.ts`, `lib/status.ts` and the SQL/TypeScript agreement
@@ -25,10 +29,6 @@ at Tier 2.
 
 ## Next
 
-6. **Manual order entry plus inventory CRUD.** Gets the whole UI working against
-   real data without touching email, and is the fastest way to find out whether
-   the data model is right. Write the landed-cost allocation into
-   `inventory_items` here, using `allocateLandedCost`.
 7. **Dashboard** on top of that data, reading only from `lib/money.ts`.
 8. **Saved items**, URL scraping, OG tag extraction.
 9. **Email extraction as a pure function** with the fixtures test suite. No
