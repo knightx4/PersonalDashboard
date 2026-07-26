@@ -205,6 +205,10 @@ create table inventory_items (
   name text not null,
   variant text,
   image_url text,
+  -- Denormalized like name/variant above, and for the same reason: manually
+  -- added items have no order_item to join through, and the already-own check
+  -- has to work for them too. See lib/fingerprint.ts.
+  fingerprint_loose text,
   acquired_at date,
   -- landed cost: unit price + this unit's proportional share of tax and
   -- shipping, less its share of discount. See lib/money.ts allocateLandedCost.
@@ -224,6 +228,7 @@ create table inventory_items (
 create index inventory_user_status_idx on inventory_items (user_id, status);
 create index inventory_order_item_idx on inventory_items (order_item_id);
 create index inventory_category_idx on inventory_items (category_id);
+create index inventory_fp_loose_idx on inventory_items (fingerprint_loose);
 create index inventory_name_trgm_idx on inventory_items using gin (name gin_trgm_ops);
 
 -- ---------------------------------------------------------------------------

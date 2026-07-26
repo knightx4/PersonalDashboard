@@ -274,6 +274,8 @@ export const inventoryItems = pgTable(
     name: text('name').notNull(),
     variant: text('variant'),
     imageUrl: text('image_url'),
+    /** Denormalized so the already-own check works for manual items too. */
+    fingerprintLoose: text('fingerprint_loose'),
     acquiredAt: date('acquired_at'),
     /** Landed cost -- see allocateLandedCost in lib/money.ts. */
     costCents: integer('cost_cents').notNull().default(0),
@@ -288,6 +290,7 @@ export const inventoryItems = pgTable(
     index('inventory_user_status_idx').on(t.userId, t.status),
     index('inventory_order_item_idx').on(t.orderItemId),
     index('inventory_category_idx').on(t.categoryId),
+    index('inventory_fp_loose_idx').on(t.fingerprintLoose),
   ],
 );
 
