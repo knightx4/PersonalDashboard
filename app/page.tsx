@@ -1,65 +1,97 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button';
 
-export default function Home() {
+/**
+ * Public homepage. Google requires a working homepage on a verified domain
+ * before a restricted-scope app can be brand-verified, and a human reviewer
+ * reads this page, so it has to describe what the app actually does.
+ */
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-dvh">
+      <header className="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-6">
+        <div className="flex items-center gap-2">
+          <span
+            className="size-6 rounded-md"
+            style={{
+              backgroundImage:
+                'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
+            }}
+            aria-hidden
+          />
+          <span className="font-display text-[15px] font-semibold tracking-tight">
+            Shopping Manager
+          </span>
+        </div>
+        <nav className="flex items-center gap-2">
+          <Link href="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            Sign in
+          </Link>
+          <Link href="/signup" className={buttonVariants({ size: 'sm' })}>
+            Get started
+          </Link>
+        </nav>
+      </header>
+
+      <main className="mx-auto max-w-[1100px] px-6">
+        <section className="py-20 sm:py-28">
+          <h1 className="font-display max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-ink sm:text-5xl">
+            You already own two of these.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted">
+            Shopping Manager reads your order confirmations and turns them into a picture of
+            what you own and what you spend. Not a delivery tracker — a way to stop buying the
+            same thing twice.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/signup" className={buttonVariants({ size: 'lg' })}>
+              Get started
+            </Link>
+            <Link
+              href="/privacy"
+              className={buttonVariants({ variant: 'secondary', size: 'lg' })}
+            >
+              How we handle your email
+            </Link>
+          </div>
+        </section>
+
+        <section className="grid gap-4 pb-24 sm:grid-cols-3">
+          {[
+            {
+              title: 'Everything you own, in one place',
+              body: 'Each item from each order becomes its own entry, so you can search what you have before you buy it again.',
+            },
+            {
+              title: 'What you actually spent',
+              body: 'Monthly totals net of refunds, with the gross and refunded amounts shown underneath so the number is auditable.',
+            },
+            {
+              title: 'A queue instead of a cart',
+              body: 'Save things you want by pasting a link. If you buy it later, from any store, we notice and tick it off.',
+            },
+          ].map((feature) => (
+            <div key={feature.title} className="rounded-card border border-border bg-surface p-5">
+              <h2 className="text-sm font-semibold text-ink">{feature.title}</h2>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{feature.body}</p>
+            </div>
+          ))}
+        </section>
       </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-2 px-6 py-6 text-[13px] text-ink-muted">
+          <span>Shopping Manager</span>
+          <nav className="flex gap-4">
+            <Link href="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -14,8 +14,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db';
 
-/** Tables whose rows are shared by design. Everything else is fully private. */
-const SHARED_READ_TABLES = new Set(['categories', 'merchants']);
+// `categories` and `merchants` are the only tables with rows shared by design.
+// They get their own describe block below rather than a flag here, because the
+// assertion for them is different: B may see the shared rows, never A's.
 
 type SeedIds = Record<string, string>;
 

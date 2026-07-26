@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
+/**
+ * Design tokens.
+ *
+ * Light palette, neutral base, with pops of blue, orange and pink. The blue
+ * anchor is #6A82FB. Green is reserved exclusively for savings and refunds and
+ * must never be used for spend -- money leaving is not a positive event.
+ *
+ * Every category carries a colour so the dashboard donut and the inventory
+ * filters share one visual language; those live in the `categories` table and
+ * are seeded in supabase/migrations/0005.
+ */
+
+@theme {
+  /* Surfaces */
+  --color-canvas: #fafaf8;
+  --color-surface: #ffffff;
+  --color-border: #e8e6e1;
+  --color-border-strong: #d6d3cc;
+
+  /* Text */
+  --color-ink: #1a1a18;
+  --color-ink-muted: #6b6b66;
+  --color-ink-faint: #9a9a94;
+
+  /* Primary */
+  --color-brand: #6a82fb;
+  --color-brand-hover: #5a72eb;
+  --color-brand-tint: #eef1fe;
+
+  /* Accents */
+  --color-accent-orange: #ff8a4c;
+  --color-accent-orange-tint: #fff1e8;
+  --color-accent-pink: #ff6b9d;
+  --color-accent-pink-tint: #ffeef4;
+
+  /* Savings and refunds only. Never spend. */
+  --color-positive: #3fa37a;
+  --color-positive-tint: #ecf7f2;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument), var(--font-inter), ui-sans-serif, sans-serif;
+
+  --radius-card: 0.75rem;
+
+  /* 150ms ease-out everywhere. Alive, never in the way. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Anything in a column of money lines up. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ---------------------------------------------------------------------------
+ * Motion
+ *
+ * Subtle lift on card hover, 0.98 scale on press. All of it drops when the
+ * user has asked for reduced motion -- no exceptions, including the dashboard
+ * count-up.
+ * ------------------------------------------------------------------------- */
+
+@utility lift {
+  transition:
+    transform 150ms var(--ease-out-soft),
+    box-shadow 150ms var(--ease-out-soft),
+    border-color 150ms var(--ease-out-soft);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px -6px rgb(26 26 24 / 0.13);
+  }
+}
+
+@utility press {
+  transition: transform 150ms var(--ease-out-soft);
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Skeletons rather than spinners. */
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-border);
+  border-radius: 0.375rem;
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0),
+      rgb(255 255 255 / 0.6),
+      rgb(255 255 255 / 0)
+    );
+    animation: shimmer 1.6s infinite;
+    content: "";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .lift:hover {
+    transform: none;
+  }
+
+  .press:active {
+    transform: none;
+  }
+
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* Visible focus for keyboard users, invisible for mouse users. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
 }
