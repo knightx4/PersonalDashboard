@@ -33,6 +33,7 @@ REDIRECTS="$(
       .filter(Boolean);
     const urls = [
       site + '/auth/callback',
+      site + '/**',
       vercel + '/auth/callback',
       'http://localhost:3000/auth/callback',
       ...extra,

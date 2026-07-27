@@ -71,8 +71,14 @@ Or set them in the dashboard under **Authentication → URL Configuration**:
 |---|---|
 | Site URL | `https://shopping.selveyknight.com` |
 | Redirect URLs | `https://shopping.selveyknight.com/auth/callback` |
+| | `https://shopping.selveyknight.com/**` |
 | | `https://shopping-manager-amber.vercel.app/auth/callback` |
 | | `http://localhost:3000/auth/callback` |
+
+> **If Google sign-in dumps you on `localhost:3000`**, Site URL is still the
+> Supabase default. Change it to the production URL above and save — Supabase
+> falls back to Site URL whenever the `redirectTo` is missing from the allow
+> list.
 
 ### Google sign-in (optional)
 

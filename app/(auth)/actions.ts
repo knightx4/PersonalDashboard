@@ -3,8 +3,8 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { requestOrigin } from '@/lib/auth/origin';
 import { createClient } from '@/lib/auth/server';
-import { publicEnv } from '@/lib/env';
 
 /**
  * Auth server actions.
@@ -63,9 +63,10 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   const supabase = await createClient();
+  const origin = await requestOrigin();
   const { error } = await supabase.auth.signUp({
     ...parsed.data,
-    options: { emailRedirectTo: `${publicEnv.NEXT_PUBLIC_APP_URL}/auth/callback` },
+    options: { emailRedirectTo: `${origin}/auth/callback` },
   });
 
   if (error) return { error: error.message };
@@ -77,6 +78,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 export async function signInWithGoogle(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const next = safeNext(formData.get('next'));
+  const origin = await requestOrigin();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -85,7 +87,7 @@ export async function signInWithGoogle(formData: FormData): Promise<void> {
       // OAuth client and a separate consent screen, requested later during
       // onboarding -- bundling them shows every new signup an unverified-app
       // warning before they have any reason to trust us.
-      redirectTo: `${publicEnv.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(next)}`,
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
     },
   });
 
@@ -101,8 +103,9 @@ export async function requestPasswordReset(
   if (!email.success) return { error: 'Enter a valid email address.' };
 
   const supabase = await createClient();
+  const origin = await requestOrigin();
   await supabase.auth.resetPasswordForEmail(email.data, {
-    redirectTo: `${publicEnv.NEXT_PUBLIC_APP_URL}/auth/callback?next=/update-password`,
+    redirectTo: `${origin}/auth/callback?next=/update-password`,
   });
 
   // Always the same response, whether or not the address exists.
