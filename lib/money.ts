@@ -56,6 +56,77 @@ export function formatMoney(
   }).format(cents / 100);
 }
 
+/**
+ * Parse a dollars string from a form into integer cents.
+ *
+ * Accepts "12", "12.3", "12.99", "$12.99", "1,299.00". Rejects more than two
+ * decimal places -- round at the keyboard, not here. Empty / whitespace is 0
+ * so optional tax/shipping fields can be left blank.
+ *
+ * Integer arithmetic only: never `parseFloat * 100`.
+ */
+export function parseDollarsToCents(input: string): number {
+  const trimmed = input.trim();
+  if (trimmed === '') return 0;
+
+  const normalized = trimmed.replace(/[$,\s]/g, '');
+  const match = normalized.match(/^(-?)(\d+)(?:\.(\d{0,2}))?$/);
+  if (!match) {
+    throw new TypeError(
+      `expected a dollar amount with at most two decimals, got "${input}"`,
+    );
+  }
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const dollars = Number.parseInt(match[2], 10);
+  const fraction = (match[3] ?? '').padEnd(2, '0');
+  const cents = dollars * 100 + Number.parseInt(fraction || '0', 10);
+  return sign * cents;
+}
+
+/** Inverse of parseDollarsToCents for prefilling edit forms. */
+export function formatCentsAsDollarsInput(cents: number): string {
+  assertIntegerCents(cents);
+  const sign = cents < 0 ? '-' : '';
+  const abs = Math.abs(cents);
+  const dollars = Math.floor(abs / 100);
+  const fraction = String(abs % 100).padStart(2, '0');
+  return `${sign}${dollars}.${fraction}`;
+}
+
+/** Line extension: quantity × unit price, both integers. */
+export function lineSubtotalCents(quantity: number, unitPriceCents: number): number {
+  if (!Number.isInteger(quantity) || quantity < 0) {
+    throw new RangeError(`quantity must be a non-negative integer, got ${quantity}`);
+  }
+  assertIntegerCents(unitPriceCents);
+  return quantity * unitPriceCents;
+}
+
+/** Sum of line extensions. */
+export function orderSubtotalCents(
+  lines: readonly { quantity: number; unitPriceCents: number }[],
+): number {
+  return lines.reduce(
+    (sum, line) => sum + lineSubtotalCents(line.quantity, line.unitPriceCents),
+    0,
+  );
+}
+
+/** subtotal + tax + shipping - discount. The canonical order total. */
+export function computeOrderTotalCents(parts: {
+  subtotalCents: number;
+  taxCents: number;
+  shippingCents: number;
+  discountCents: number;
+}): number {
+  assertIntegerCents(parts.subtotalCents);
+  assertIntegerCents(parts.taxCents);
+  assertIntegerCents(parts.shippingCents);
+  assertIntegerCents(parts.discountCents);
+  return parts.subtotalCents + parts.taxCents + parts.shippingCents - parts.discountCents;
+}
+
 /** Signed delta as a percentage, or null when the baseline is zero. */
 export function percentChange(current: number, previous: number): number | null {
   if (previous === 0) return null;

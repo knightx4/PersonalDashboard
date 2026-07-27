@@ -24,8 +24,10 @@ Then run the provisioning script **on your own machine**:
 ```
 
 It signs you in, creates the project, waits for it to come up, applies every
-migration in `supabase/migrations`, and prints the block of environment
-variables to paste into `.env.local`.
+migration in `supabase/migrations`, and prints a ready-to-paste `.env.local`
+block (URL, anon key, service-role key, app URL, and a fresh
+`TOKEN_ENCRYPTION_KEY`). Copy that whole block into `.env.local` at the repo
+root. Do not commit `.env.local`.
 
 > **This cannot be run from a Claude Code web session.** The login step needs a
 > browser, and the sandboxed environment's network policy blocks

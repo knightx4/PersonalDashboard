@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   allocateLandedCost,
+  computeOrderTotalCents,
+  formatCentsAsDollarsInput,
   formatReconciliation,
+  parseDollarsToCents,
   periodFor,
   reconcilesToTotal,
   spend,
@@ -321,5 +324,36 @@ describe('period boundaries', () => {
   it('handles February in a leap year', () => {
     const now = new Date('2028-02-10T12:00:00Z');
     expect(periodFor('this_month', 'UTC', now).end).toBe('2028-02-29');
+  });
+});
+
+describe('parseDollarsToCents', () => {
+  it('parses common form inputs without floats', () => {
+    expect(parseDollarsToCents('')).toBe(0);
+    expect(parseDollarsToCents('12')).toBe(1_200);
+    expect(parseDollarsToCents('12.3')).toBe(1_230);
+    expect(parseDollarsToCents('12.99')).toBe(1_299);
+    expect(parseDollarsToCents('$1,299.00')).toBe(129_900);
+    expect(parseDollarsToCents('-4.50')).toBe(-450);
+  });
+
+  it('rejects more than two decimal places', () => {
+    expect(() => parseDollarsToCents('1.234')).toThrow(/dollar amount/);
+  });
+
+  it('round-trips with formatCentsAsDollarsInput', () => {
+    expect(formatCentsAsDollarsInput(1_299)).toBe('12.99');
+    expect(parseDollarsToCents(formatCentsAsDollarsInput(45_800))).toBe(45_800);
+  });
+
+  it('computes order totals as integer cents', () => {
+    expect(
+      computeOrderTotalCents({
+        subtotalCents: 10_000,
+        taxCents: 800,
+        shippingCents: 500,
+        discountCents: 200,
+      }),
+    ).toBe(11_100);
   });
 });

@@ -10,7 +10,7 @@ month.
 
 ## Status
 
-Build order steps 1–5 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
+Build order steps 1–6 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
 for what is next.
 
 | | |
@@ -20,7 +20,8 @@ for what is next.
 | `lib/money.ts` + spend fixture | done |
 | Auth (email/password, Google sign-in, route protection) | done |
 | App shell, design system, empty states | done |
-| Manual order entry, dashboard, saved items, email ingestion | not started |
+| Manual order entry + inventory CRUD | done |
+| Dashboard, saved items, email ingestion | not started |
 
 ## Getting started
 

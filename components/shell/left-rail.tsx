@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -74,25 +75,24 @@ export function RailItem({
   count,
   swatch,
   onClick,
+  href,
 }: {
   label: string;
   active?: boolean;
   count?: number;
   swatch?: string;
   onClick?: () => void;
+  href?: string;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors duration-150',
-        active
-          ? 'bg-brand-tint font-medium text-brand'
-          : 'text-ink-muted hover:bg-surface hover:text-ink',
-      )}
-    >
+  const className = cn(
+    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors duration-150',
+    active
+      ? 'bg-brand-tint font-medium text-brand'
+      : 'text-ink-muted hover:bg-surface hover:text-ink',
+  );
+
+  const body = (
+    <>
       {swatch && (
         <span
           className="size-2.5 shrink-0 rounded-full"
@@ -102,6 +102,20 @@ export function RailItem({
       )}
       <span className="flex-1 truncate">{label}</span>
       {count !== undefined && <span className="tabular text-ink-faint">{count}</span>}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} aria-current={active ? 'page' : undefined} className={className}>
+        {body}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} aria-pressed={active} className={className}>
+      {body}
     </button>
   );
 }
