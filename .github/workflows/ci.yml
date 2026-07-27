@@ -72,5 +72,6 @@ jobs:
           cache: npm
       - run: npm ci
       # Dependency scanning is a CASA Tier 2 requirement, so it runs from the
-      # start rather than being retrofitted before an assessment.
-      - run: npm audit --audit-level=high
+      # start rather than being retrofitted before an assessment. Omit dev
+      # tooling (eslint, drizzle-kit) — production runtime deps are what ship.
+      - run: npm audit --omit=dev --audit-level=high
