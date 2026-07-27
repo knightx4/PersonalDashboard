@@ -53,6 +53,29 @@ control and will not survive a rebuild.
 
 ## Tier 1 — before build step 4 (auth). ~15 minutes.
 
+### Site URL and redirect allow-list (required for password reset / OAuth)
+
+Email/password sign-up works with the defaults, but production redirects
+(password reset, Google sign-in callback) need the allow-list pointed at the
+deployed app. Prefer the script (needs a [personal access
+token](https://supabase.com/dashboard/account/tokens)):
+
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_...
+./scripts/configure-supabase-auth.sh
+```
+
+Or set them in the dashboard under **Authentication → URL Configuration**:
+
+| Field | Value |
+|---|---|
+| Site URL | `https://shopping.selveyknight.com` |
+| Redirect URLs | `https://shopping.selveyknight.com/auth/callback` |
+| | `https://shopping-manager-amber.vercel.app/auth/callback` |
+| | `http://localhost:3000/auth/callback` |
+
+### Google sign-in (optional)
+
 Only needed for the "Sign in with Google" button. Email/password works without
 it, so this is skippable if you want to move faster.
 
@@ -68,7 +91,7 @@ it, so this is skippable if you want to move faster.
 > performs that OAuth exchange, which is why no `GOOGLE_SIGNIN_*` variable
 > appears in `.env.example`.
 
-There is no API for creating OAuth client IDs, so this part is genuinely
+There is no API for creating OAuth client IDs, so that part is genuinely
 console-only.
 
 ---
