@@ -27,6 +27,8 @@ const PUBLIC_PATHS = [
   // and read by a human reviewer during brand verification.
   '/privacy',
   '/terms',
+  // HMAC-authenticated Gmail backfill continuation (no user session).
+  '/api/inbox/sync/continue',
 ];
 
 function isPublic(pathname: string): boolean {
