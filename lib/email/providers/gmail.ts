@@ -144,13 +144,4 @@ export async function resolveGmailAddress(
   return profile.emailAddress.toLowerCase();
 }
 
-/** Gmail search for likely order mail within the backfill window. */
-export function orderCandidateQuery(backfillWindowDays: number): string {
-  const days = Math.min(730, Math.max(30, backfillWindowDays));
-  return [
-    `newer_than:${days}d`,
-    '(',
-    'subject:("order confirmation" OR "thanks for your order" OR "your order of" OR "ordered:" OR "order received" OR "order #" OR "order number")',
-    ')',
-  ].join(' ');
-}
+export { orderCandidateQuery } from '@/lib/email/providers/gmail-query';

@@ -6,7 +6,8 @@ import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/cla
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
 import { PARSER_VERSION } from '@/lib/email/extract/schema';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
-import { gmailProvider, orderCandidateQuery } from '@/lib/email/providers/gmail';
+import { orderCandidateQuery } from '@/lib/email/providers/gmail-query';
+import { gmailProvider } from '@/lib/email/providers/gmail';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
 
 export interface SyncProgress {
@@ -18,6 +19,8 @@ export interface SyncProgress {
   skipped: number;
   errors: number;
   done: boolean;
+  /** Gmail search used for this batch — useful when seen=0. */
+  query?: string;
   error?: string;
 }
 
@@ -154,9 +157,16 @@ export async function syncEmailAccountBatch(
     const accessToken = await ensureAccessToken(supabase, account as AccountRow, encryptionKey);
     const merchants = await loadMerchants(supabase);
     const query = orderCandidateQuery(account.backfill_window_days);
+    progress.query = query;
+    console.info('gmail sync query', { accountId: account.id, query });
     const listed = await gmailProvider.listMessages(accessToken, {
       query,
       maxResults: maxMessages,
+    });
+    console.info('gmail sync list', {
+      accountId: account.id,
+      count: listed.messages.length,
+      nextPageToken: Boolean(listed.nextPageToken),
     });
 
     for (const ref of listed.messages) {

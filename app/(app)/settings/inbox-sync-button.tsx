@@ -12,6 +12,7 @@ type Progress = {
   skipped: number;
   errors: number;
   done: boolean;
+  query?: string;
   error?: string;
 };
 
@@ -59,6 +60,13 @@ export function InboxSyncButton({ accountId }: { accountId: string }) {
           {progress.ordersCreated} · skipped {progress.skipped}
           {progress.errors ? ` · errors ${progress.errors}` : ''}
           {progress.done ? ' · done' : ' · continuing…'}
+        </p>
+      )}
+      {progress?.done && progress.messagesSeen === 0 && (
+        <p className="text-xs text-amber-900">
+          No matching mail in the last ~180 days. Confirm order emails exist in this Gmail
+          account (Primary/Updates), then try again. If you only shop from other addresses,
+          connect that inbox instead.
         </p>
       )}
       {error && <p className="text-xs text-red-700">{error}</p>}
