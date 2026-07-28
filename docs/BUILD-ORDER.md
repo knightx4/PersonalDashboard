@@ -21,6 +21,9 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
    `inventory_items` row per physical unit via `allocateLandedCost`. Inventory
    list/detail (search, category filter, edit, note, dispose, mark returned
    through a refunded `returns` row). Orders list grouped by month + detail.
+7. ✅ **Gmail OAuth grant and connection management (build step 10).** Connect /
+   disconnect / reconnect on Settings; tokens encrypted at rest. Sync/backfill is
+   step 12.
 
 Also done ahead of schedule because they are cheap and everything depends on
 them: `lib/fingerprint.ts`, `lib/status.ts` and the SQL/TypeScript agreement
@@ -29,13 +32,11 @@ at Tier 2.
 
 ## Next
 
-7. **Dashboard** on top of that data, reading only from `lib/money.ts`.
-8. **Saved items**, URL scraping, OG tag extraction.
-9. **Email extraction as a pure function** with the fixtures test suite. No
-   database, no OAuth. Get this correct in isolation — it determines whether the
-   product works at all.
-10. **Gmail OAuth grant**, connection management, token encryption, reauth
-    handling. Needs [SETUP.md](SETUP.md) Tier 2 done first.
+8. **Dashboard** on top of that data, reading only from `lib/money.ts`.
+9. **Saved items**, URL scraping, OG tag extraction.
+10. **Email extraction as a pure function** with the fixtures test suite. No
+    database, no OAuth. Get this correct in isolation — it determines whether the
+    product works at all.
 11. **Onboarding flow** including the pre-consent explanation screen.
 12. **Inngest backfill job** wiring stages 1–5 together.
 13. **Incremental sync.**

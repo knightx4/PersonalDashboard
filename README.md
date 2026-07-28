@@ -21,7 +21,8 @@ for what is next.
 | Auth (email/password, Google sign-in, route protection) | done |
 | App shell, design system, empty states | done |
 | Manual order entry + inventory CRUD | done |
-| Dashboard, saved items, email ingestion | not started |
+| Gmail inbox connect (OAuth, encrypted tokens) | done |
+| Dashboard, saved items, email sync/backfill | not started |
 
 ## Getting started
 

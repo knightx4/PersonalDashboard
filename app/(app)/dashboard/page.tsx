@@ -52,7 +52,7 @@ export default async function DashboardPage() {
             icon={LayoutDashboard}
             title="No spending to show yet"
             description="Connect an inbox and we will pull in your past orders automatically, or add one by hand to see how this looks."
-            action={{ label: 'Connect an inbox', href: '/settings/email' }}
+            action={{ label: 'Connect an inbox', href: '/settings#inboxes' }}
             secondaryAction={{ label: 'Add an order', href: '/orders/new' }}
           />
         )}

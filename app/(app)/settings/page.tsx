@@ -4,12 +4,18 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
+import { InboxSection } from './inbox-section';
 
 export const metadata = { title: 'Settings' };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ inbox?: string }>;
+}) {
   const user = await requireUser();
   const supabase = await createClient();
+  const params = await searchParams;
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -50,21 +56,7 @@ export default async function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardBody>
-            {accounts && accounts.length > 0 ? (
-              <ul className="space-y-2 text-sm">
-                {accounts.map((account) => (
-                  <li key={account.id} className="flex items-center justify-between">
-                    <span className="text-ink">{account.email_address}</span>
-                    <span className="text-ink-muted">{account.status}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-ink-muted">
-                No inbox connected. The app works without one — you can add orders by hand.
-                Connecting Gmail arrives with build step 10.
-              </p>
-            )}
+            <InboxSection accounts={accounts ?? []} bannerCode={params.inbox} />
           </CardBody>
         </Card>
 
