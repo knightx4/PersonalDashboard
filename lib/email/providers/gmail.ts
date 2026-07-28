@@ -2,6 +2,7 @@ import 'server-only';
 
 import { OAuth2Client } from 'google-auth-library';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
+import { formatGmailApiError } from '@/lib/email/providers/gmail-api-error';
 import { emailFromIdToken } from '@/lib/email/id-token';
 import { gmailPayloadToText, headerValue } from '@/lib/email/mime';
 import {
@@ -43,7 +44,7 @@ async function gmailJson<T>(accessToken: string, path: string): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Gmail API ${path} failed (${res.status}): ${body.slice(0, 300)}`);
+    throw new Error(formatGmailApiError(res.status, body));
   }
   return res.json() as Promise<T>;
 }
