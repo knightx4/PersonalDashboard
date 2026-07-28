@@ -29,6 +29,15 @@ describe('classifyMessage', () => {
     expect(result.tier).toBe('A');
   });
 
+  it('matches Amazon order subjects via ORDER_SUBJECT without relying on merchant', () => {
+    const result = classifyMessage({
+      fromAddress: 'ship-confirm@amazon.com',
+      subject: 'Your Amazon.com order of USB-C Hub',
+      merchants: [],
+    });
+    expect(result.classification).toBe('order_confirmation');
+  });
+
   it('marks unknown personal mail as not_relevant', () => {
     const result = classifyMessage({
       fromAddress: 'friend@gmail.com',

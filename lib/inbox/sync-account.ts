@@ -19,6 +19,8 @@ export interface SyncProgress {
   skipped: number;
   errors: number;
   done: boolean;
+  /** Pass back on the next /api/inbox/sync call to advance Gmail pages. */
+  nextPageToken?: string | null;
   /** Gmail search used for this batch — useful when seen=0. */
   query?: string;
   error?: string;
@@ -101,6 +103,7 @@ export async function syncEmailAccountBatch(
     accountId: string;
     maxMessages?: number;
     jobId?: string;
+    pageToken?: string | null;
   },
 ): Promise<SyncProgress> {
   const encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
@@ -120,6 +123,10 @@ export async function syncEmailAccountBatch(
   }
 
   let jobId = opts.jobId;
+  let priorSeen = 0;
+  let priorClassified = 0;
+  let priorParsed = 0;
+
   if (!jobId) {
     const { data: job, error: jobError } = await supabase
       .from('sync_jobs')
@@ -134,23 +141,29 @@ export async function syncEmailAccountBatch(
     if (jobError || !job) throw new Error(jobError?.message ?? 'Could not start sync job.');
     jobId = job.id as string;
   } else {
-    await supabase
+    const { data: existingJob } = await supabase
       .from('sync_jobs')
-      .update({ status: 'running', started_at: new Date().toISOString() })
-      .eq('id', jobId);
+      .select('messages_seen, messages_classified, messages_parsed')
+      .eq('id', jobId)
+      .maybeSingle();
+    priorSeen = existingJob?.messages_seen ?? 0;
+    priorClassified = existingJob?.messages_classified ?? 0;
+    priorParsed = existingJob?.messages_parsed ?? 0;
+    await supabase.from('sync_jobs').update({ status: 'running' }).eq('id', jobId);
   }
 
   const activeJobId: string = jobId;
 
   const progress: SyncProgress = {
     jobId: activeJobId,
-    messagesSeen: 0,
-    messagesClassified: 0,
-    messagesParsed: 0,
+    messagesSeen: priorSeen,
+    messagesClassified: priorClassified,
+    messagesParsed: priorParsed,
     ordersCreated: 0,
     skipped: 0,
     errors: 0,
     done: false,
+    nextPageToken: null,
   };
 
   try {
@@ -158,10 +171,15 @@ export async function syncEmailAccountBatch(
     const merchants = await loadMerchants(supabase);
     const query = orderCandidateQuery(account.backfill_window_days);
     progress.query = query;
-    console.info('gmail sync query', { accountId: account.id, query });
+    console.info('gmail sync query', {
+      accountId: account.id,
+      query,
+      pageToken: Boolean(opts.pageToken),
+    });
     const listed = await gmailProvider.listMessages(accessToken, {
       query,
       maxResults: maxMessages,
+      pageToken: opts.pageToken ?? undefined,
     });
     console.info('gmail sync list', {
       accountId: account.id,
@@ -197,13 +215,13 @@ export async function syncEmailAccountBatch(
           await supabase.from('ingested_messages').insert({
             email_account_id: account.id,
             provider_message_id: message.id,
+            thread_id: message.threadId,
             received_at: message.internalDate?.toISOString() ?? null,
+            from_address: message.fromAddress,
+            subject: message.subject,
             classification: 'not_relevant',
             parse_status: 'skipped',
             parser_version: PARSER_VERSION,
-            subject: null,
-            from_address: null,
-            thread_id: null,
           });
           progress.skipped += 1;
           continue;
@@ -353,7 +371,9 @@ export async function syncEmailAccountBatch(
       }
     }
 
-    progress.done = listed.nextPageToken == null || listed.messages.length < maxMessages;
+    // Advance with Gmail's page token; empty result ends the backfill.
+    progress.nextPageToken = listed.nextPageToken;
+    progress.done = listed.nextPageToken == null || listed.messages.length === 0;
 
     await supabase
       .from('sync_jobs')
@@ -370,7 +390,9 @@ export async function syncEmailAccountBatch(
       .from('email_accounts')
       .update({
         last_synced_at: new Date().toISOString(),
-        ...(progress.done ? { backfill_completed_at: new Date().toISOString() } : {}),
+        ...(progress.done
+          ? { backfill_completed_at: new Date().toISOString(), sync_cursor: null }
+          : { sync_cursor: progress.nextPageToken }),
       })
       .eq('id', account.id)
       .eq('user_id', opts.userId);
@@ -391,6 +413,7 @@ export async function syncEmailAccountBatch(
       .eq('id', activeJobId);
     progress.done = true;
     progress.error = message;
+    progress.nextPageToken = null;
     return progress;
   }
 }

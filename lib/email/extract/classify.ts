@@ -41,7 +41,7 @@ function findMerchant(
 }
 
 const ORDER_SUBJECT =
-  /\b(order\s*confirmation|thanks for (your )?order|your order (of|has been|is confirmed)|ordered:|order\s*#|order received|we[’']?ve received your order)\b/i;
+  /\b(order\s*confirmation|thanks for (your )?order|your (?:[\w.'-]+\s+){0,3}order\s+(?:of|has been|is confirmed)|ordered:|order\s*#|order\s*number|order received|we[’']?ve received your order)\b/i;
 
 const SHIPPING_SUBJECT = /\b(shipped|on the way|out for delivery|tracking)\b/i;
 const DELIVERY_SUBJECT = /\b(delivered|delivery confirmation)\b/i;

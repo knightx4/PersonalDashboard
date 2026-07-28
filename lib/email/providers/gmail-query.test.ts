@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { orderCandidateQuery } from './gmail-query';
 
 describe('orderCandidateQuery', () => {
-  it('matches common Amazon confirmation subjects', () => {
+  it('requires order-ish subjects and avoids bare from:amazon', () => {
     const q = orderCandidateQuery(180);
     expect(q).toMatch(/subject:order/);
-    expect(q).toMatch(/from:amazon\.com/);
     expect(q).toMatch(/newer_than:180d/);
+    expect(q).not.toMatch(/from:amazon\.com/);
     expect(q).not.toMatch(/"your order of"/);
   });
 

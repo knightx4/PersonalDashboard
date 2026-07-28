@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     accountId?: string;
     jobId?: string;
+    pageToken?: string;
     maxMessages?: number;
   };
 
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       accountId,
       jobId: body.jobId,
+      pageToken: body.pageToken,
       maxMessages: body.maxMessages ?? 15,
     });
     return NextResponse.json(progress);
