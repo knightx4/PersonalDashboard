@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { applyExtraction } from './apply';
+import { classifyMessage } from './classify';
+import { heuristicExtractOrder } from './heuristic';
+
+const amazonFixture = readFileSync(
+  resolve(__dirname, '../../../fixtures/emails/amazon-order-confirmation.txt'),
+  'utf8',
+);
+
+describe('classifyMessage', () => {
+  const amazon = {
+    id: 'm1',
+    slug: 'amazon',
+    name: 'Amazon',
+    domains: ['amazon.com', 'order-update.amazon.com'],
+  };
+
+  it('marks known-merchant order subjects as order_confirmation', () => {
+    const result = classifyMessage({
+      fromAddress: 'auto-confirm@amazon.com',
+      subject: 'Your Amazon.com order of Headphones',
+      merchants: [amazon],
+    });
+    expect(result.classification).toBe('order_confirmation');
+    expect(result.merchant?.slug).toBe('amazon');
+    expect(result.tier).toBe('A');
+  });
+
+  it('marks unknown personal mail as not_relevant', () => {
+    const result = classifyMessage({
+      fromAddress: 'friend@gmail.com',
+      subject: 'Dinner plans?',
+      merchants: [amazon],
+    });
+    expect(result.classification).toBe('not_relevant');
+  });
+});
+
+describe('heuristicExtractOrder + applyExtraction', () => {
+  it('extracts the Amazon fixture and reconciles', () => {
+    const firstLine = amazonFixture.split('\n')[0] ?? '';
+    const subject = firstLine.replace(/^Subject:\s*/i, '');
+    const body = amazonFixture.replace(/^Subject:.*\n\n?/, '');
+    const raw = heuristicExtractOrder({
+      subject,
+      text: body,
+      merchantSlug: 'amazon',
+      merchantName: 'Amazon',
+      receivedAt: new Date('2026-01-15T12:00:00Z'),
+    });
+    expect(raw).not.toBeNull();
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
+    if (applied.ok) {
+      expect(applied.order.externalOrderNumber).toBe('123-4567890-1234567');
+      expect(applied.order.totalCents).toBe(37584);
+      expect(applied.order.lines[0]?.name).toMatch(/Sony/i);
+    }
+  });
+
+  it('rejects extractions totals that do not reconcile', () => {
+    const applied = applyExtraction({
+      merchantSlug: 'amazon',
+      orderDate: '2026-01-15',
+      taxCents: 0,
+      shippingCents: 0,
+      discountCents: 0,
+      totalCents: 99999,
+      lines: [{ name: 'Widget', quantity: 1, unitPriceCents: 100 }],
+    });
+    expect(applied.ok).toBe(false);
+    if (!applied.ok) expect(applied.reason).toBe('reconcile');
+  });
+});

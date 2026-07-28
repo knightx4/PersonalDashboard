@@ -22,7 +22,8 @@ for what is next.
 | App shell, design system, empty states | done |
 | Manual order entry + inventory CRUD | done |
 | Gmail inbox connect (OAuth, encrypted tokens) | done |
-| Dashboard, saved items, email sync/backfill | not started |
+| Email extraction + order import sync | done |
+| Dashboard, saved items, incremental sync | not started |
 
 ## Getting started
 
