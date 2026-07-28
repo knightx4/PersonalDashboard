@@ -31,13 +31,40 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'no_refresh':
       return {
         tone: 'warn',
-        text: 'Google did not issue a refresh token. Disconnect in Google account settings, then connect again.',
+        text: 'Google did not issue a refresh token. Disconnect Shopping Manager under Google Account → Security → Third-party access, then connect again.',
       };
     case 'unconfigured':
       return {
         tone: 'err',
         text: 'Gmail OAuth is not configured on this deployment yet.',
       };
+    case 'state':
+      return {
+        tone: 'err',
+        text: 'The sign-in session expired during Google consent. Stay signed in and try Connect Gmail again.',
+      };
+    case 'exchange':
+      return {
+        tone: 'err',
+        text: 'Google rejected the token exchange. Confirm the OAuth client redirect URI is exactly https://shopping.selveyknight.com/api/auth/gmail/callback',
+      };
+    case 'profile':
+      return {
+        tone: 'err',
+        text: 'Connected to Google but could not read the Gmail address. Enable the Gmail API on the Google Cloud project, then try again.',
+      };
+    case 'db_write':
+    case 'db_lookup':
+      return {
+        tone: 'err',
+        text: 'Google connected, but saving the inbox failed. Try again; if it persists, check Supabase RLS on email_accounts.',
+      };
+    case 'encrypt':
+      return {
+        tone: 'err',
+        text: 'Token encryption key is invalid on this server (must be 32 bytes, base64).',
+      };
+    case 'missing_code':
     case 'error':
       return { tone: 'err', text: 'Something went wrong connecting Gmail. Try again.' };
     default:
