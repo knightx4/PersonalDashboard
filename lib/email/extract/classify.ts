@@ -41,12 +41,15 @@ function findMerchant(
 }
 
 const ORDER_SUBJECT =
-  /\b(order\s*confirmation|thanks for (your )?order|your (?:[\w.'-]+\s+){0,3}order\s+(?:of|has been|is confirmed)|ordered:|order\s*#|order\s*number|order received|we[’']?ve received your order)\b/i;
+  /\b(order\s*confirmation|thanks for (your )?order|your (?:[\w.'-]+\s+){0,3}order\s+(?:of|has been|is confirmed|from)|ordered:|order\s*#|order\s*number|order received|we[’']?ve received your order|order\s+\S+\s+confirmed)\b/i;
 
 const SHIPPING_SUBJECT = /\b(shipped|on the way|out for delivery|tracking)\b/i;
 const DELIVERY_SUBJECT = /\b(delivered|delivery confirmation)\b/i;
 const RETURN_SUBJECT = /\b(return|refund|credited back)\b/i;
 const CANCEL_SUBJECT = /\b(cancel(led|lation)?|order canceled)\b/i;
+/** Reviews, promos, and price-drop mail that mention "order" but are not confirmations. */
+const NOT_ORDER_SUBJECT =
+  /\b(review (it|your)|meet your expectations|pre-order now|saved additional money|off your .{0,40}order|catering order of|rate your|how was your|feedback|survey|unsubscribe)\b/i;
 
 /**
  * Tier A classifier: known merchant domains first, then subject heuristics.
@@ -57,6 +60,9 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
   const merchant = findMerchant(domain, input.merchants);
   const subject = input.subject ?? '';
 
+  if (NOT_ORDER_SUBJECT.test(subject)) {
+    return { classification: 'not_relevant', merchant, tier: merchant ? 'A' : 'none' };
+  }
   if (CANCEL_SUBJECT.test(subject)) {
     return { classification: 'cancellation', merchant, tier: merchant ? 'A' : 'subject_heuristic' };
   }

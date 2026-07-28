@@ -20,7 +20,7 @@ export default async function OrderDetailPage({
     .from('orders')
     .select(
       `
-      id, order_date, status, source, external_order_number, return_deadline,
+      id, order_date, status, source, external_order_number, return_deadline, needs_review,
       subtotal_cents, tax_cents, shipping_cents, discount_cents, total_cents, currency,
       merchants ( id, name ),
       order_items (
@@ -36,23 +36,52 @@ export default async function OrderDetailPage({
 
   if (!order) notFound();
 
+  const { data: sourceMessage } = await supabase
+    .from('ingested_messages')
+    .select('provider_message_id, thread_id, subject, from_address')
+    .eq('resulting_order_id', id)
+    .maybeSingle();
+
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
+  const gmailHref = sourceMessage?.thread_id
+    ? `https://mail.google.com/mail/u/0/#all/${sourceMessage.thread_id}`
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
-        title={merchant?.name ?? 'Order'}
+        title={merchant?.name ?? sourceMessage?.subject?.slice(0, 48) ?? 'Order'}
         description={`${order.order_date}${
           order.external_order_number ? ` · #${order.external_order_number}` : ''
-        } · ${order.status.replaceAll('_', ' ')}`}
+        } · ${order.status.replaceAll('_', ' ')}${
+          order.needs_review ? ' · needs review' : ''
+        }`}
         actions={
-          <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            All orders
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {gmailHref && (
+              <a
+                href={gmailHref}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                Open in Gmail
+              </a>
+            )}
+            <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              All orders
+            </Link>
+          </div>
         }
       />
 
+      {sourceMessage?.subject && (
+        <p className="text-sm text-ink-muted">
+          From email: {sourceMessage.subject}
+          {sourceMessage.from_address ? ` · ${sourceMessage.from_address}` : ''}
+        </p>
+      )}
       <section className="overflow-hidden rounded-card border border-border bg-surface">
         <table className="w-full text-sm">
           <thead className="border-b border-border text-left text-[12px] uppercase tracking-wider text-ink-faint">

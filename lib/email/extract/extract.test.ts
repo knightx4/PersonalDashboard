@@ -38,6 +38,15 @@ describe('classifyMessage', () => {
     expect(result.classification).toBe('order_confirmation');
   });
 
+  it('marks Amazon review prompts as not_relevant', () => {
+    const result = classifyMessage({
+      fromAddress: 'no-reply@amazon.com',
+      subject: 'Did your recent Amazon order meet your expectations? Review it on Amazon',
+      merchants: [amazon],
+    });
+    expect(result.classification).toBe('not_relevant');
+  });
+
   it('marks unknown personal mail as not_relevant', () => {
     const result = classifyMessage({
       fromAddress: 'friend@gmail.com',
@@ -68,6 +77,22 @@ describe('heuristicExtractOrder + applyExtraction', () => {
       expect(applied.order.totalCents).toBe(37584);
       expect(applied.order.lines[0]?.name).toMatch(/Sony/i);
     }
+  });
+
+  it('names DoorDash-style orders from the subject when line items are missing', () => {
+    const raw = heuristicExtractOrder({
+      subject: 'Your order from bb.q Chicken (order #350db292)',
+      text: 'Thanks for ordering.\nTotal: $4.39\n',
+      merchantSlug: 'doordash',
+      merchantName: 'DoorDash',
+      fromAddress: '"bb.q Chicken" <noreply@order.online>',
+      receivedAt: new Date('2026-06-17T12:00:00Z'),
+    });
+    expect(raw).not.toBeNull();
+    expect(raw?.externalOrderNumber).toBe('350db292');
+    expect(raw?.lines[0]?.name).toMatch(/bb\.q Chicken/i);
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
   });
 
   it('rejects extractions totals that do not reconcile', () => {
