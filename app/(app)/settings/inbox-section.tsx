@@ -171,8 +171,9 @@ export function InboxSection({
       {accounts.length > 0 && configured && (
         <p className="mt-3 text-xs text-ink-faint">
           We request read-only Gmail access. Email bodies are never stored — only parsed order
-          metadata. For best accuracy, set ANTHROPIC_API_KEY on Vercel (Haiku); without it a
-          simpler heuristic parser still runs.
+          metadata. For accurate product names and line items, set{' '}
+          <code className="text-[11px]">ANTHROPIC_API_KEY</code> on Vercel (Haiku). Without it
+          we still import totals from a simpler heuristic parser.
         </p>
       )}
     </section>

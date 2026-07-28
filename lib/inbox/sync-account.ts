@@ -248,6 +248,7 @@ export async function syncEmailAccountBatch(
           text: message.text,
           merchantSlug: classified.merchant?.slug,
           merchantName: classified.merchant?.name,
+          fromAddress: message.fromAddress,
           receivedAt: message.internalDate,
         });
 

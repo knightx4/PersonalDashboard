@@ -27,6 +27,7 @@ export async function extractOrderFromEmail(input: {
   text: string;
   merchantSlug?: string | null;
   merchantName?: string | null;
+  fromAddress?: string | null;
   receivedAt?: Date | null;
   apiKey?: string | null;
 }): Promise<{
