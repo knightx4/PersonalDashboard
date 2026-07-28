@@ -85,19 +85,26 @@ export async function pumpInboxBackfill(opts: {
   }
 
   const token = signContinue(opts);
-  // Fire-and-forget so this invocation can exit; the continue route runs the next pump.
-  void fetch(`${opts.origin}/api/inbox/sync/continue`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      userId: opts.userId,
-      accountId: opts.accountId,
-      jobId: opts.jobId,
-    }),
-  }).catch((err) => {
+  // Await the hop so the platform does not freeze before the request leaves.
+  // The continue route returns immediately and resumes via `after()`.
+  try {
+    const res = await fetch(`${opts.origin}/api/inbox/sync/continue`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        userId: opts.userId,
+        accountId: opts.accountId,
+        jobId: opts.jobId,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error('inbox backfill continue failed', res.status, text.slice(0, 200));
+    }
+  } catch (err) {
     console.error('inbox backfill continue fetch failed', err);
-  });
+  }
 }

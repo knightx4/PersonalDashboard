@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 import {
   pumpInboxBackfill,
   verifyInboxContinueToken,
@@ -39,13 +39,8 @@ export async function POST(request: NextRequest) {
       ? `https://${process.env.VERCEL_URL}`
       : new URL(request.url).origin;
 
-  // Await the pump in this invocation (fire-and-forget chain happens inside).
-  await pumpInboxBackfill({
-    userId: body.userId,
-    accountId: body.accountId,
-    jobId: body.jobId,
-    origin,
-  });
+  const { userId, accountId, jobId } = body;
+  after(() => pumpInboxBackfill({ userId, accountId, jobId, origin }));
 
   return NextResponse.json({ ok: true, continued: true });
 }
