@@ -28,6 +28,52 @@ export default async function SettingsPage({
     .select('id, email_address, status, last_synced_at')
     .eq('user_id', user.id);
 
+  const accountIds = (accounts ?? []).map((a) => a.id as string);
+  const latestJobs: Record<
+    string,
+    {
+      jobId: string;
+      status: string;
+      messagesSeen: number;
+      messagesClassified: number;
+      messagesParsed: number;
+      ordersCreated: number;
+      skipped: number;
+      errors: number;
+      done: boolean;
+      error?: string;
+    } | null
+  > = {};
+
+  if (accountIds.length > 0) {
+    const { data: jobs } = await supabase
+      .from('sync_jobs')
+      .select(
+        'id, email_account_id, status, messages_seen, messages_classified, messages_parsed, error',
+      )
+      .in('email_account_id', accountIds)
+      .eq('type', 'backfill')
+      .order('created_at', { ascending: false });
+
+    for (const job of jobs ?? []) {
+      const accountId = job.email_account_id as string;
+      if (latestJobs[accountId]) continue;
+      const done = job.status === 'completed' || job.status === 'failed';
+      latestJobs[accountId] = {
+        jobId: job.id as string,
+        status: job.status as string,
+        messagesSeen: job.messages_seen as number,
+        messagesClassified: job.messages_classified as number,
+        messagesParsed: job.messages_parsed as number,
+        ordersCreated: job.messages_parsed as number,
+        skipped: Math.max(0, (job.messages_seen as number) - (job.messages_parsed as number)),
+        errors: 0,
+        done,
+        error: (job.error as string | null) ?? undefined,
+      };
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Settings" />
@@ -56,7 +102,11 @@ export default async function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardBody>
-            <InboxSection accounts={accounts ?? []} bannerCode={params.inbox} />
+            <InboxSection
+              accounts={accounts ?? []}
+              bannerCode={params.inbox}
+              latestJobs={latestJobs}
+            />
           </CardBody>
         </Card>
 

@@ -1,24 +1,100 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 import { createClient, getUser } from '@/lib/auth/server';
-import { syncEmailAccountBatch } from '@/lib/inbox/sync-account';
+import { pumpInboxBackfill } from '@/inngest/inbox-backfill';
+
+export const maxDuration = 60;
+
+type JobRow = {
+  id: string;
+  status: string;
+  messages_seen: number;
+  messages_classified: number;
+  messages_parsed: number;
+  error: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  updated_at: string;
+};
+
+function requestOrigin(request: NextRequest): string {
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') ?? 'https';
+  if (host) return `${proto}://${host}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return new URL(request.url).origin;
+}
+
+function jobToProgress(job: JobRow) {
+  const done = job.status === 'completed' || job.status === 'failed';
+  return {
+    jobId: job.id,
+    status: job.status,
+    messagesSeen: job.messages_seen,
+    messagesClassified: job.messages_classified,
+    messagesParsed: job.messages_parsed,
+    ordersCreated: job.messages_parsed,
+    skipped: Math.max(0, job.messages_seen - job.messages_parsed),
+    errors: 0,
+    done,
+    error: job.error ?? undefined,
+  };
+}
+
+const STALE_RUNNING_MS = 15 * 60 * 1000;
 
 /**
- * Run one backfill batch for a connected inbox (session-scoped, RLS applies).
- * Call repeatedly until `done` is true for a full window.
+ * GET — poll the latest backfill job for an account (session-scoped).
+ * POST — start a background backfill; returns immediately and keeps working
+ * after the response via `after()` + continue chaining.
  */
+export async function GET(request: NextRequest) {
+  const user = await getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  }
+
+  const accountId = request.nextUrl.searchParams.get('accountId');
+  if (!accountId) {
+    return NextResponse.json({ error: 'accountId required' }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const { data: account } = await supabase
+    .from('email_accounts')
+    .select('id')
+    .eq('id', accountId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!account) {
+    return NextResponse.json({ error: 'Inbox not found.' }, { status: 404 });
+  }
+
+  const { data: job } = await supabase
+    .from('sync_jobs')
+    .select(
+      'id, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at',
+    )
+    .eq('email_account_id', accountId)
+    .eq('type', 'backfill')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!job) {
+    return NextResponse.json({ job: null });
+  }
+
+  return NextResponse.json({ job: jobToProgress(job as JobRow) });
+}
+
 export async function POST(request: NextRequest) {
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as {
-    accountId?: string;
-    jobId?: string;
-    pageToken?: string;
-    maxMessages?: number;
-  };
-
+  const body = (await request.json().catch(() => ({}))) as { accountId?: string };
   const supabase = await createClient();
 
   let accountId = body.accountId;
@@ -38,20 +114,99 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No connected inbox.' }, { status: 400 });
   }
 
-  try {
-    const progress = await syncEmailAccountBatch(supabase, {
-      userId: user.id,
-      accountId,
-      jobId: body.jobId,
-      pageToken: body.pageToken,
-      maxMessages: body.maxMessages ?? 15,
+  const { data: account } = await supabase
+    .from('email_accounts')
+    .select('id, status')
+    .eq('id', accountId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!account || account.status !== 'active') {
+    return NextResponse.json({ error: 'Inbox not found or inactive.' }, { status: 400 });
+  }
+
+  const { data: latest } = await supabase
+    .from('sync_jobs')
+    .select(
+      'id, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at',
+    )
+    .eq('email_account_id', accountId)
+    .eq('type', 'backfill')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const latestJob = latest as JobRow | null;
+  const updatedAt = latestJob?.updated_at ? new Date(latestJob.updated_at).getTime() : 0;
+  const isFreshActive =
+    latestJob &&
+    (latestJob.status === 'running' || latestJob.status === 'queued') &&
+    Date.now() - updatedAt < STALE_RUNNING_MS;
+
+  if (isFreshActive && latestJob) {
+    return NextResponse.json({
+      ...jobToProgress(latestJob),
+      alreadyRunning: true,
     });
-    return NextResponse.json(progress);
-  } catch (err) {
-    console.error('inbox sync', err);
+  }
+
+  if (
+    latestJob &&
+    (latestJob.status === 'running' || latestJob.status === 'queued') &&
+    Date.now() - updatedAt >= STALE_RUNNING_MS
+  ) {
+    await supabase
+      .from('sync_jobs')
+      .update({
+        status: 'failed',
+        error: 'Stale job superseded by a new import.',
+        finished_at: new Date().toISOString(),
+      })
+      .eq('id', latestJob.id);
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from('sync_jobs')
+    .insert({
+      email_account_id: accountId,
+      type: 'backfill',
+      status: 'queued',
+      started_at: new Date().toISOString(),
+    })
+    .select(
+      'id, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at',
+    )
+    .single();
+
+  if (jobError || !job) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Sync failed' },
+      { error: jobError?.message ?? 'Could not start sync job.' },
       { status: 500 },
     );
   }
+
+  // Fresh backfill pages from the start of the Gmail query.
+  await supabase
+    .from('email_accounts')
+    .update({ sync_cursor: null })
+    .eq('id', accountId)
+    .eq('user_id', user.id);
+
+  const origin = requestOrigin(request);
+  const jobId = job.id as string;
+  const userId = user.id;
+
+  after(() =>
+    pumpInboxBackfill({
+      userId,
+      accountId: accountId!,
+      jobId,
+      origin,
+    }),
+  );
+
+  return NextResponse.json({
+    ...jobToProgress(job as JobRow),
+    alreadyRunning: false,
+  });
 }

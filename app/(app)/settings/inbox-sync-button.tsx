@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
-type Progress = {
+export type InboxSyncProgress = {
   jobId: string;
+  status?: string;
   messagesSeen: number;
   messagesClassified: number;
   messagesParsed: number;
@@ -12,117 +13,87 @@ type Progress = {
   skipped: number;
   errors: number;
   done: boolean;
-  nextPageToken?: string | null;
-  query?: string;
   error?: string;
+  alreadyRunning?: boolean;
 };
 
-const MAX_BATCHES = 40;
-
-export function InboxSyncButton({ accountId }: { accountId: string }) {
-  const [progress, setProgress] = useState<Progress | null>(null);
+export function InboxSyncButton({
+  accountId,
+  initialJob = null,
+}: {
+  accountId: string;
+  initialJob?: InboxSyncProgress | null;
+}) {
+  const [progress, setProgress] = useState<InboxSyncProgress | null>(initialJob);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const cancelledRef = useRef(false);
+  const [starting, setStarting] = useState(false);
 
-  async function runBatch(
-    jobId?: string,
-    pageToken?: string | null,
-  ): Promise<Progress> {
-    const res = await fetch('/api/inbox/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accountId,
-        jobId,
-        pageToken: pageToken ?? undefined,
-        maxMessages: 15,
-      }),
-    });
-    const data = (await res.json()) as Progress & { error?: string };
-    if (!res.ok) throw new Error(data.error ?? 'Sync failed');
-    return data;
-  }
+  const active =
+    progress != null &&
+    !progress.done &&
+    (progress.status === 'running' || progress.status === 'queued');
+
+  const refresh = useCallback(async () => {
+    const res = await fetch(`/api/inbox/sync?accountId=${encodeURIComponent(accountId)}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as { job: InboxSyncProgress | null };
+    if (data.job) setProgress(data.job);
+  }, [accountId]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void refresh();
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [refresh]);
 
   async function startSync() {
     setError(null);
-    setPending(true);
-    cancelledRef.current = false;
-
-    let ordersCreated = 0;
-    let skipped = 0;
-    let errors = 0;
-
+    setStarting(true);
     try {
-      let batch = await runBatch();
-      ordersCreated += batch.ordersCreated;
-      skipped += batch.skipped;
-      errors += batch.errors;
-      setProgress({ ...batch, ordersCreated, skipped, errors });
-
-      let batches = 1;
-      while (
-        !batch.done &&
-        !batch.error &&
-        !cancelledRef.current &&
-        batches < MAX_BATCHES
-      ) {
-        batch = await runBatch(batch.jobId, batch.nextPageToken);
-        batches += 1;
-        ordersCreated += batch.ordersCreated;
-        skipped += batch.skipped;
-        errors += batch.errors;
-        setProgress({ ...batch, ordersCreated, skipped, errors });
-        if (batch.error) break;
-      }
-
-      if (!batch.done && !batch.error && batches >= MAX_BATCHES) {
-        setProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                done: true,
-                error: 'Stopped after many batches — click Import again to continue.',
-              }
-            : prev,
-        );
-      } else if (cancelledRef.current && !batch.done) {
-        setProgress((prev) => (prev ? { ...prev, done: true } : prev));
-      }
+      const res = await fetch('/api/inbox/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = (await res.json()) as InboxSyncProgress & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Sync failed');
+      setProgress(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
-      setPending(false);
+      setStarting(false);
     }
   }
 
-  function stopSync() {
-    cancelledRef.current = true;
-  }
+  const busy = starting || active;
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={startSync}>
-          {pending ? 'Importing…' : 'Import orders from Gmail'}
-        </Button>
-        {pending && (
-          <Button type="button" variant="ghost" size="sm" onClick={stopSync}>
-            Stop
-          </Button>
-        )}
-      </div>
+      <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={startSync}>
+        {busy ? 'Importing in background…' : 'Import orders from Gmail'}
+      </Button>
       {progress && (
-        <p className="text-xs text-ink-muted">
-          Seen {progress.messagesSeen} · parsed {progress.messagesParsed} · orders{' '}
-          {progress.ordersCreated} · skipped {progress.skipped}
-          {progress.errors ? ` · errors ${progress.errors}` : ''}
-          {progress.done && !progress.error ? ' · done' : ''}
-          {pending && !progress.done ? ' · continuing…' : ''}
+        <p className="text-xs text-ink-muted" aria-live="polite">
+          Seen {progress.messagesSeen} · parsed {progress.messagesParsed}
+          {progress.messagesClassified
+            ? ` · classified ${progress.messagesClassified}`
+            : ''}
+          {progress.done && !progress.error
+            ? ' · done'
+            : active
+              ? ' · running in background…'
+              : ''}
         </p>
       )}
       {(error || progress?.error) && (
         <p className="text-xs text-red-700">{error ?? progress?.error}</p>
+      )}
+      {active && (
+        <p className="text-xs text-ink-faint">
+          You can leave this page — import keeps going on the server. Come back anytime to
+          check progress.
+        </p>
       )}
       {progress?.done &&
         progress.messagesSeen === 0 &&

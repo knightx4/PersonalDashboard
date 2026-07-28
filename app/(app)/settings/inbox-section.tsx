@@ -4,7 +4,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { disconnectInbox } from './actions';
-import { InboxSyncButton } from './inbox-sync-button';
+import { InboxSyncButton, type InboxSyncProgress } from './inbox-sync-button';
 
 type Account = {
   id: string;
@@ -76,9 +76,11 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
 export function InboxSection({
   accounts,
   bannerCode,
+  latestJobs = {},
 }: {
   accounts: Account[];
   bannerCode?: string;
+  latestJobs?: Record<string, InboxSyncProgress | null>;
 }) {
   const configured = isGmailOAuthConfigured();
   const banner = inboxBanner(bannerCode);
@@ -133,7 +135,12 @@ export function InboxSection({
                   </form>
                 </div>
               </div>
-              {account.status === 'active' && <InboxSyncButton accountId={account.id} />}
+              {account.status === 'active' && (
+                <InboxSyncButton
+                  accountId={account.id}
+                  initialJob={latestJobs[account.id] ?? null}
+                />
+              )}
             </li>
           ))}
         </ul>
