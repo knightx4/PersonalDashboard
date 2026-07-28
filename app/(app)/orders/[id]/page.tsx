@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
+import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
 
 export const metadata = { title: 'Order' };
@@ -38,15 +39,22 @@ export default async function OrderDetailPage({
 
   const { data: sourceMessage } = await supabase
     .from('ingested_messages')
-    .select('provider_message_id, thread_id, subject, from_address')
+    .select(
+      'provider_message_id, thread_id, subject, from_address, email_accounts ( email_address )',
+    )
     .eq('resulting_order_id', id)
     .maybeSingle();
 
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
-  const gmailHref = sourceMessage?.thread_id
-    ? `https://mail.google.com/mail/u/0/#all/${sourceMessage.thread_id}`
-    : null;
+  const inbox = Array.isArray(sourceMessage?.email_accounts)
+    ? sourceMessage?.email_accounts[0]
+    : sourceMessage?.email_accounts;
+  const gmailHref = gmailOpenUrl({
+    emailAddress: inbox?.email_address,
+    threadId: sourceMessage?.thread_id,
+    messageId: sourceMessage?.provider_message_id,
+  });
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -80,6 +88,7 @@ export default async function OrderDetailPage({
         <p className="text-sm text-ink-muted">
           From email: {sourceMessage.subject}
           {sourceMessage.from_address ? ` · ${sourceMessage.from_address}` : ''}
+          {inbox?.email_address ? ` · inbox ${inbox.email_address}` : ''}
         </p>
       )}
       <section className="overflow-hidden rounded-card border border-border bg-surface">
