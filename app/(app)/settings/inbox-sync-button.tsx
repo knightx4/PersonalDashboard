@@ -59,17 +59,23 @@ export function InboxSyncButton({ accountId }: { accountId: string }) {
           Seen {progress.messagesSeen} · parsed {progress.messagesParsed} · orders{' '}
           {progress.ordersCreated} · skipped {progress.skipped}
           {progress.errors ? ` · errors ${progress.errors}` : ''}
-          {progress.done ? ' · done' : ' · continuing…'}
+          {progress.done && !progress.error ? ' · done' : ''}
+          {!progress.done ? ' · continuing…' : ''}
         </p>
       )}
-      {progress?.done && progress.messagesSeen === 0 && (
-        <p className="text-xs text-amber-900">
-          No matching mail in the last ~180 days. Confirm order emails exist in this Gmail
-          account (Primary/Updates), then try again. If you only shop from other addresses,
-          connect that inbox instead.
-        </p>
+      {(error || progress?.error) && (
+        <p className="text-xs text-red-700">{error ?? progress?.error}</p>
       )}
-      {error && <p className="text-xs text-red-700">{error}</p>}
+      {progress?.done &&
+        progress.messagesSeen === 0 &&
+        !progress.error &&
+        !error && (
+          <p className="text-xs text-amber-900">
+            No matching mail in the last ~180 days. Confirm order emails exist in this Gmail
+            account (Primary/Updates), then try again. If you only shop from other addresses,
+            connect that inbox instead.
+          </p>
+        )}
     </div>
   );
 }

@@ -119,11 +119,15 @@ This is the real setup work, and the only part that is more than clicking.
 4. **Create the second OAuth client**, Web application, for the Gmail grant.
    Redirect URI `https://yourdomain.com/api/auth/gmail/callback`. Keep this
    separate from the sign-in client.
-5. **Add the `gmail.readonly` scope** to the consent screen. It will be marked
+5. **Enable the Gmail API** on that same Google Cloud project
+   ([API overview](https://console.developers.google.com/apis/api/gmail.googleapis.com/overview)).
+   Connect can succeed without this (openid/email), but **Import orders** calls
+   `users.messages.list` and fails with 403 until the API is enabled.
+6. **Add the `gmail.readonly` scope** to the consent screen. It will be marked
    Restricted. That is expected.
-6. **Set publishing status to "In production."** Single most important click in
+7. **Set publishing status to "In production."** Single most important click in
    this list — see below.
-7. Paste the two client values into `.env.local` as `GOOGLE_GMAIL_CLIENT_ID`
+8. Paste the two client values into `.env.local` as `GOOGLE_GMAIL_CLIENT_ID`
    and `GOOGLE_GMAIL_CLIENT_SECRET`, then have the agent push them to Vercel.
 
 ### Publishing status: set it to "In production" immediately
