@@ -1,92 +1,124 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient, getUser } from '@/lib/auth/server';
-import { requestOrigin } from '@/lib/auth/origin';
 import { encryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
+import { gmailRedirectUri } from '@/lib/email/gmail-redirect';
 import { verifyGmailOAuthState } from '@/lib/email/oauth-state';
-import { gmailProvider } from '@/lib/email/providers/gmail';
+import { gmailProvider, resolveGmailAddress } from '@/lib/email/providers/gmail';
+
+function settingsRedirect(request: NextRequest, code: string) {
+  const url = new URL('/settings', request.url);
+  url.searchParams.set('inbox', code);
+  return NextResponse.redirect(url);
+}
 
 /**
  * Gmail read-grant callback. Stores encrypted tokens on email_accounts.
  * Sync/backfill arrives in build step 12.
  */
 export async function GET(request: NextRequest) {
-  const settingsUrl = new URL('/settings', request.url);
-  settingsUrl.hash = 'inboxes';
-
   const user = await getUser();
   if (!user) {
     return NextResponse.redirect(new URL('/login?next=/settings', request.url));
   }
 
   const { searchParams } = request.nextUrl;
-  const error = searchParams.get('error');
-  if (error) {
-    settingsUrl.searchParams.set('inbox', 'denied');
-    return NextResponse.redirect(settingsUrl);
+  const oauthError = searchParams.get('error');
+  if (oauthError) {
+    console.error('gmail oauth denied', oauthError, searchParams.get('error_description'));
+    return settingsRedirect(request, 'denied');
   }
 
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   if (!code || !state) {
-    settingsUrl.searchParams.set('inbox', 'error');
-    return NextResponse.redirect(settingsUrl);
+    return settingsRedirect(request, 'missing_code');
   }
 
-  const { TOKEN_ENCRYPTION_KEY } = gmailOAuthEnv();
-  if (!verifyGmailOAuthState(state, user.id, TOKEN_ENCRYPTION_KEY)) {
-    settingsUrl.searchParams.set('inbox', 'error');
-    return NextResponse.redirect(settingsUrl);
+  let encryptionKey: string;
+  try {
+    encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
+  } catch (err) {
+    console.error('gmail oauth env', err);
+    return settingsRedirect(request, 'unconfigured');
+  }
+
+  if (!verifyGmailOAuthState(state, user.id, encryptionKey)) {
+    console.error('gmail oauth state mismatch', { userId: user.id });
+    return settingsRedirect(request, 'state');
   }
 
   try {
-    const origin = await requestOrigin();
-    const redirectUri = `${origin}/api/auth/gmail/callback`;
+    // Must match the redirect_uri from the authorize step AND the URL Google hit.
+    // Prefer the live callback origin; fall back to the configured app URL.
+    const liveRedirect = `${request.nextUrl.origin}/api/auth/gmail/callback`;
+    const configuredRedirect = await gmailRedirectUri();
+    const redirectUri = liveRedirect;
+
+    console.info('gmail oauth exchange', {
+      liveRedirect,
+      configuredRedirect,
+      match: liveRedirect === configuredRedirect,
+    });
+
     const tokens = await gmailProvider.exchangeCode(code, redirectUri);
 
     if (!tokens.refreshToken) {
-      // Google omits refresh_token when the user already consented without prompt=consent.
-      settingsUrl.searchParams.set('inbox', 'no_refresh');
-      return NextResponse.redirect(settingsUrl);
+      console.error('gmail oauth missing refresh_token');
+      return settingsRedirect(request, 'no_refresh');
     }
 
-    const profile = await gmailProvider.fetchProfile(tokens.accessToken);
-    const supabase = await createClient();
+    const emailAddress = await resolveGmailAddress(tokens.accessToken, tokens.idToken);
 
+    const supabase = await createClient();
     const payload = {
       provider: 'gmail' as const,
-      email_address: profile.emailAddress,
-      oauth_refresh_token: encryptToken(tokens.refreshToken, TOKEN_ENCRYPTION_KEY),
-      oauth_access_token: encryptToken(tokens.accessToken, TOKEN_ENCRYPTION_KEY),
+      email_address: emailAddress,
+      oauth_refresh_token: encryptToken(tokens.refreshToken, encryptionKey),
+      oauth_access_token: encryptToken(tokens.accessToken, encryptionKey),
       token_expires_at: tokens.expiresAt?.toISOString() ?? null,
       status: 'active' as const,
       last_synced_at: null,
     };
 
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from('email_accounts')
       .select('id')
       .eq('user_id', user.id)
-      .ilike('email_address', profile.emailAddress)
+      .eq('email_address', emailAddress)
       .maybeSingle();
 
-    const writeError = existing
-      ? (
-          await supabase.from('email_accounts').update(payload).eq('id', existing.id)
-        ).error
-      : (
-          await supabase.from('email_accounts').insert({ ...payload, user_id: user.id })
-        ).error;
-
-    if (writeError) {
-      settingsUrl.searchParams.set('inbox', 'error');
-      return NextResponse.redirect(settingsUrl);
+    if (lookupError) {
+      console.error('gmail account lookup', lookupError);
+      return settingsRedirect(request, 'db_lookup');
     }
 
-    settingsUrl.searchParams.set('inbox', 'connected');
-    return NextResponse.redirect(settingsUrl);
-  } catch {
-    settingsUrl.searchParams.set('inbox', 'error');
-    return NextResponse.redirect(settingsUrl);
+    const write = existing
+      ? await supabase.from('email_accounts').update(payload).eq('id', existing.id)
+      : await supabase.from('email_accounts').insert({ ...payload, user_id: user.id });
+
+    if (write.error) {
+      console.error('gmail account write', write.error);
+      return settingsRedirect(request, 'db_write');
+    }
+
+    return settingsRedirect(request, 'connected');
+  } catch (err) {
+    console.error('gmail oauth callback', err);
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('Gmail profile')) {
+      return settingsRedirect(request, 'profile');
+    }
+    if (
+      message.includes('invalid_grant') ||
+      message.includes('redirect_uri') ||
+      message.includes('unauthorized_client')
+    ) {
+      return settingsRedirect(request, 'exchange');
+    }
+    if (message.includes('TOKEN_ENCRYPTION_KEY')) {
+      return settingsRedirect(request, 'encrypt');
+    }
+    return settingsRedirect(request, 'error');
   }
 }

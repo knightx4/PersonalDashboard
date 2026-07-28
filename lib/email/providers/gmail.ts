@@ -2,11 +2,15 @@ import 'server-only';
 
 import { OAuth2Client } from 'google-auth-library';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
+import { emailFromIdToken } from '@/lib/email/id-token';
 import {
   GMAIL_READONLY_SCOPE,
   type GmailOAuthProvider,
   type OAuthTokens,
 } from '@/lib/email/providers/types';
+
+/** Read-only Gmail + enough identity to learn which address was connected. */
+const SCOPES = [GMAIL_READONLY_SCOPE, 'openid', 'email'];
 
 function client(redirectUri: string): OAuth2Client {
   const { GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET } = gmailOAuthEnv();
@@ -17,6 +21,7 @@ function toTokens(tokens: {
   access_token?: string | null;
   refresh_token?: string | null;
   expiry_date?: number | null;
+  id_token?: string | null;
 }): OAuthTokens {
   if (!tokens.access_token) {
     throw new Error('Google did not return an access token');
@@ -25,6 +30,7 @@ function toTokens(tokens: {
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token ?? null,
     expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+    idToken: tokens.id_token ?? null,
   };
 }
 
@@ -33,7 +39,7 @@ export const gmailProvider: GmailOAuthProvider = {
     return client(redirectUri).generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
-      scope: [GMAIL_READONLY_SCOPE],
+      scope: SCOPES,
       state,
       include_granted_scopes: true,
     });
@@ -50,7 +56,8 @@ export const gmailProvider: GmailOAuthProvider = {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) {
-      throw new Error(`Gmail profile request failed (${res.status})`);
+      const body = await res.text().catch(() => '');
+      throw new Error(`Gmail profile request failed (${res.status}): ${body.slice(0, 200)}`);
     }
     const data = (await res.json()) as { emailAddress?: string };
     if (!data.emailAddress) {
@@ -65,3 +72,15 @@ export const gmailProvider: GmailOAuthProvider = {
     await oauth.revokeToken(token);
   },
 };
+
+/** Resolve the connected address: ID token first, Gmail API as fallback. */
+export async function resolveGmailAddress(
+  accessToken: string,
+  idToken: string | null,
+): Promise<string> {
+  const fromId = idToken ? emailFromIdToken(idToken) : null;
+  if (fromId) return fromId.toLowerCase();
+
+  const profile = await gmailProvider.fetchProfile(accessToken);
+  return profile.emailAddress.toLowerCase();
+}

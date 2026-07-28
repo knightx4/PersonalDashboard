@@ -4,6 +4,8 @@ export interface OAuthTokens {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date | null;
+  /** Present when openid was requested; used to read the account email. */
+  idToken: string | null;
 }
 
 export interface GmailProfile {
