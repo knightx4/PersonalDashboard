@@ -4,6 +4,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { disconnectInbox } from './actions';
+import { InboxSyncButton } from './inbox-sync-button';
 
 type Account = {
   id: string;
@@ -24,7 +25,7 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'connected':
       return {
         tone: 'ok',
-        text: 'Gmail connected. Order import starts once backfill is wired (build step 12).',
+        text: 'Gmail connected. Import is starting — you can also tap Import orders below.',
       };
     case 'denied':
       return { tone: 'warn', text: 'Google access was not granted. Your inbox was not connected.' };
@@ -81,6 +82,7 @@ export function InboxSection({
 }) {
   const configured = isGmailOAuthConfigured();
   const banner = inboxBanner(bannerCode);
+  const autoStart = bannerCode === 'connected';
 
   return (
     <section id="inboxes" className="scroll-mt-6">
@@ -99,37 +101,42 @@ export function InboxSection({
 
       {accounts.length > 0 ? (
         <ul className="space-y-3">
-          {accounts.map((account) => (
+          {accounts.map((account, index) => (
             <li
               key={account.id}
-              className="flex flex-col gap-3 rounded-lg border border-border bg-canvas px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-lg border border-border bg-canvas px-3 py-3"
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-ink">{account.email_address}</p>
-                <p className="text-xs text-ink-muted">
-                  {STATUS_LABEL[account.status] ?? account.status}
-                  {account.last_synced_at
-                    ? ` · Last synced ${new Date(account.last_synced_at).toLocaleDateString()}`
-                    : ' · Not synced yet'}
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">{account.email_address}</p>
+                  <p className="text-xs text-ink-muted">
+                    {STATUS_LABEL[account.status] ?? account.status}
+                    {account.last_synced_at
+                      ? ` · Last synced ${new Date(account.last_synced_at).toLocaleString()}`
+                      : ' · Not synced yet'}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {account.status === 'needs_reauth' && configured && (
+                    <Link
+                      href="/api/auth/gmail/connect"
+                      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                    >
+                      <RefreshCw className="size-3.5" strokeWidth={1.75} />
+                      Reconnect
+                    </Link>
+                  )}
+                  <form action={disconnectInbox}>
+                    <input type="hidden" name="id" value={account.id} />
+                    <Button variant="ghost" size="sm" type="submit">
+                      Disconnect
+                    </Button>
+                  </form>
+                </div>
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                {account.status === 'needs_reauth' && configured && (
-                  <Link
-                    href="/api/auth/gmail/connect"
-                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                  >
-                    <RefreshCw className="size-3.5" strokeWidth={1.75} />
-                    Reconnect
-                  </Link>
-                )}
-                <form action={disconnectInbox}>
-                  <input type="hidden" name="id" value={account.id} />
-                  <Button variant="ghost" size="sm" type="submit">
-                    Disconnect
-                  </Button>
-                </form>
-              </div>
+              {account.status === 'active' && (
+                <InboxSyncButton accountId={account.id} autoStart={autoStart && index === 0} />
+              )}
             </li>
           ))}
         </ul>
@@ -137,10 +144,13 @@ export function InboxSection({
         <div className="space-y-3 text-sm text-ink-muted">
           <p>
             No inbox connected. The app works without one — you can add orders by hand. Connect Gmail
-            to import order confirmations automatically (sync arrives in build step 12).
+            to import order confirmations.
           </p>
           {configured ? (
-            <Link href="/api/auth/gmail/connect" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+            <Link
+              href="/api/auth/gmail/connect"
+              className={buttonVariants({ variant: 'primary', size: 'sm' })}
+            >
               <Mail className="size-4" strokeWidth={1.75} />
               Connect Gmail
             </Link>
@@ -157,7 +167,8 @@ export function InboxSection({
       {accounts.length > 0 && configured && (
         <p className="mt-3 text-xs text-ink-faint">
           We request read-only Gmail access. Email bodies are never stored — only parsed order
-          metadata after sync runs.
+          metadata. For best accuracy, set ANTHROPIC_API_KEY on Vercel (Haiku); without it a
+          simpler heuristic parser still runs.
         </p>
       )}
     </section>

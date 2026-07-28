@@ -22,8 +22,11 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
    list/detail (search, category filter, edit, note, dispose, mark returned
    through a refunded `returns` row). Orders list grouped by month + detail.
 7. ✅ **Gmail OAuth grant and connection management (build step 10).** Connect /
-   disconnect / reconnect on Settings; tokens encrypted at rest. Sync/backfill is
-   step 12.
+   disconnect / reconnect on Settings; tokens encrypted at rest.
+8. ✅ **Email extraction + inbox sync.** Classifier (merchant domains), Zod
+   extraction with arithmetic gate, Gmail message fetch, and session-scoped
+   `/api/inbox/sync` batches that write orders + inventory. LLM via Anthropic
+   Haiku when `ANTHROPIC_API_KEY` is set; heuristic fallback otherwise.
 
 Also done ahead of schedule because they are cheap and everything depends on
 them: `lib/fingerprint.ts`, `lib/status.ts` and the SQL/TypeScript agreement
@@ -32,14 +35,12 @@ at Tier 2.
 
 ## Next
 
-8. **Dashboard** on top of that data, reading only from `lib/money.ts`.
-9. **Saved items**, URL scraping, OG tag extraction.
-10. **Email extraction as a pure function** with the fixtures test suite. No
-    database, no OAuth. Get this correct in isolation — it determines whether the
-    product works at all.
+9. **Dashboard** on top of that data, reading only from `lib/money.ts`.
+10. **Saved items**, URL scraping, OG tag extraction.
 11. **Onboarding flow** including the pre-consent explanation screen.
-12. **Inngest backfill job** wiring stages 1–5 together.
-13. **Incremental sync.**
+12. **Inngest durable backfill** (optional hardening — sync already works via
+    `/api/inbox/sync`).
+13. **Incremental sync** (Gmail historyId).
 14. **Review queue.**
 15. **Account deletion** with token revocation and full cascade.
 16. **Phase 2** — the anti-spending layer. No migrations needed; the schema

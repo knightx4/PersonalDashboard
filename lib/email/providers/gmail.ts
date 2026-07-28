@@ -3,8 +3,11 @@ import 'server-only';
 import { OAuth2Client } from 'google-auth-library';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { emailFromIdToken } from '@/lib/email/id-token';
+import { gmailPayloadToText, headerValue } from '@/lib/email/mime';
 import {
   GMAIL_READONLY_SCOPE,
+  type GmailMessageContent,
+  type GmailMessageRef,
   type GmailOAuthProvider,
   type OAuthTokens,
 } from '@/lib/email/providers/types';
@@ -12,7 +15,7 @@ import {
 /** Read-only Gmail + enough identity to learn which address was connected. */
 const SCOPES = [GMAIL_READONLY_SCOPE, 'openid', 'email'];
 
-function client(redirectUri: string): OAuth2Client {
+function client(redirectUri?: string): OAuth2Client {
   const { GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET } = gmailOAuthEnv();
   return new OAuth2Client(GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET, redirectUri);
 }
@@ -34,6 +37,17 @@ function toTokens(tokens: {
   };
 }
 
+async function gmailJson<T>(accessToken: string, path: string): Promise<T> {
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Gmail API ${path} failed (${res.status}): ${body.slice(0, 300)}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export const gmailProvider: GmailOAuthProvider = {
   authorizationUrl(state, redirectUri) {
     return client(redirectUri).generateAuthUrl({
@@ -52,14 +66,10 @@ export const gmailProvider: GmailOAuthProvider = {
   },
 
   async fetchProfile(accessToken) {
-    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`Gmail profile request failed (${res.status}): ${body.slice(0, 200)}`);
-    }
-    const data = (await res.json()) as { emailAddress?: string };
+    const data = await gmailJson<{ emailAddress?: string }>(
+      accessToken,
+      'users/me/profile',
+    );
     if (!data.emailAddress) {
       throw new Error('Gmail profile did not include an email address');
     }
@@ -67,9 +77,58 @@ export const gmailProvider: GmailOAuthProvider = {
   },
 
   async revokeToken(token) {
-    const { GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET } = gmailOAuthEnv();
-    const oauth = new OAuth2Client(GOOGLE_GMAIL_CLIENT_ID, GOOGLE_GMAIL_CLIENT_SECRET);
+    const oauth = client();
     await oauth.revokeToken(token);
+  },
+
+  async refreshAccessToken(refreshToken) {
+    const oauth = client();
+    oauth.setCredentials({ refresh_token: refreshToken });
+    const { credentials } = await oauth.refreshAccessToken();
+    return toTokens({
+      ...credentials,
+      refresh_token: credentials.refresh_token ?? refreshToken,
+    });
+  },
+
+  async listMessages(accessToken, opts) {
+    const params = new URLSearchParams({
+      q: opts.query,
+      maxResults: String(opts.maxResults ?? 25),
+    });
+    if (opts.pageToken) params.set('pageToken', opts.pageToken);
+    const data = await gmailJson<{
+      messages?: GmailMessageRef[];
+      nextPageToken?: string;
+    }>(accessToken, `users/me/messages?${params}`);
+    return {
+      messages: data.messages ?? [],
+      nextPageToken: data.nextPageToken ?? null,
+    };
+  },
+
+  async getMessage(accessToken, messageId): Promise<GmailMessageContent> {
+    const data = await gmailJson<{
+      id: string;
+      threadId?: string;
+      internalDate?: string;
+      payload?: {
+        mimeType?: string;
+        headers?: Array<{ name?: string; value?: string }>;
+        body?: { data?: string };
+        parts?: unknown[];
+      };
+    }>(accessToken, `users/me/messages/${encodeURIComponent(messageId)}?format=full`);
+
+    const headers = data.payload?.headers;
+    return {
+      id: data.id,
+      threadId: data.threadId ?? null,
+      internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+      fromAddress: headerValue(headers, 'From'),
+      subject: headerValue(headers, 'Subject'),
+      text: gmailPayloadToText(data.payload as never),
+    };
   },
 };
 
@@ -83,4 +142,15 @@ export async function resolveGmailAddress(
 
   const profile = await gmailProvider.fetchProfile(accessToken);
   return profile.emailAddress.toLowerCase();
+}
+
+/** Gmail search for likely order mail within the backfill window. */
+export function orderCandidateQuery(backfillWindowDays: number): string {
+  const days = Math.min(730, Math.max(30, backfillWindowDays));
+  return [
+    `newer_than:${days}d`,
+    '(',
+    'subject:("order confirmation" OR "thanks for your order" OR "your order of" OR "ordered:" OR "order received" OR "order #" OR "order number")',
+    ')',
+  ].join(' ');
 }
