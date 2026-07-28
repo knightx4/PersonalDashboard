@@ -25,7 +25,7 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'connected':
       return {
         tone: 'ok',
-        text: 'Gmail connected. Import is starting — you can also tap Import orders below.',
+        text: 'Gmail connected. Click Import orders from Gmail below to pull in confirmations.',
       };
     case 'denied':
       return { tone: 'warn', text: 'Google access was not granted. Your inbox was not connected.' };
@@ -82,7 +82,6 @@ export function InboxSection({
 }) {
   const configured = isGmailOAuthConfigured();
   const banner = inboxBanner(bannerCode);
-  const autoStart = bannerCode === 'connected';
 
   return (
     <section id="inboxes" className="scroll-mt-6">
@@ -101,7 +100,7 @@ export function InboxSection({
 
       {accounts.length > 0 ? (
         <ul className="space-y-3">
-          {accounts.map((account, index) => (
+          {accounts.map((account) => (
             <li
               key={account.id}
               className="flex flex-col gap-3 rounded-lg border border-border bg-canvas px-3 py-3"
@@ -134,9 +133,7 @@ export function InboxSection({
                   </form>
                 </div>
               </div>
-              {account.status === 'active' && (
-                <InboxSyncButton accountId={account.id} autoStart={autoStart && index === 0} />
-              )}
+              {account.status === 'active' && <InboxSyncButton accountId={account.id} />}
             </li>
           ))}
         </ul>

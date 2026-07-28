@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 
 type Progress = {
@@ -15,13 +15,7 @@ type Progress = {
   error?: string;
 };
 
-export function InboxSyncButton({
-  accountId,
-  autoStart = false,
-}: {
-  accountId: string;
-  autoStart?: boolean;
-}) {
+export function InboxSyncButton({ accountId }: { accountId: string }) {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -54,20 +48,9 @@ export function InboxSyncButton({
     });
   }
 
-  useEffect(() => {
-    if (autoStart) startSync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount when autoStart
-  }, [autoStart]);
-
   return (
     <div className="space-y-2">
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        disabled={pending}
-        onClick={startSync}
-      >
+      <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={startSync}>
         {pending ? 'Importing…' : 'Import orders from Gmail'}
       </Button>
       {progress && (
