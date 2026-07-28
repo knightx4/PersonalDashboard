@@ -47,3 +47,111 @@ export async function disconnectInbox(formData: FormData): Promise<void> {
 
   revalidatePath('/settings');
 }
+
+/**
+ * Wipe import state for one inbox so a fresh backfill can re-read Gmail.
+ * Deletes email-sourced orders created from this inbox (and cascaded inventory),
+ * clears ingested_messages / sync cursor, and leaves the Gmail connection intact.
+ */
+export async function resetInboxImport(accountId: string): Promise<{
+  ok: boolean;
+  deletedOrders: number;
+  error?: string;
+}> {
+  const user = await requireUser();
+  const parsed = z.string().uuid().safeParse(accountId);
+  if (!parsed.success) return { ok: false, deletedOrders: 0, error: 'Invalid inbox.' };
+
+  const supabase = await createClient();
+  const { data: account } = await supabase
+    .from('email_accounts')
+    .select('id')
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!account) return { ok: false, deletedOrders: 0, error: 'Inbox not found.' };
+
+  const { data: linked } = await supabase
+    .from('ingested_messages')
+    .select('resulting_order_id')
+    .eq('email_account_id', account.id)
+    .not('resulting_order_id', 'is', null);
+
+  const orderIds = [
+    ...new Set(
+      (linked ?? [])
+        .map((row) => row.resulting_order_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  await supabase
+    .from('sync_jobs')
+    .update({
+      status: 'failed',
+      error: 'Superseded by reset & re-scan',
+      finished_at: new Date().toISOString(),
+    })
+    .eq('email_account_id', account.id)
+    .in('status', ['queued', 'running']);
+
+  const { error: ingestError } = await supabase
+    .from('ingested_messages')
+    .delete()
+    .eq('email_account_id', account.id);
+  if (ingestError) {
+    return { ok: false, deletedOrders: 0, error: ingestError.message };
+  }
+
+  // Prefer deleting orders this inbox created; also remove orphan email orders
+  // no longer referenced by any inbox (e.g. duplicates from earlier imports).
+  const { data: stillLinked } = await supabase
+    .from('ingested_messages')
+    .select('resulting_order_id')
+    .not('resulting_order_id', 'is', null);
+  const keep = new Set(
+    (stillLinked ?? [])
+      .map((row) => row.resulting_order_id as string | null)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const { data: emailOrders } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('source', 'email');
+
+  const toDelete = (emailOrders ?? [])
+    .map((row) => row.id as string)
+    .filter((id) => orderIds.includes(id) || !keep.has(id));
+
+  if (toDelete.length > 0) {
+    const { error: orderError } = await supabase
+      .from('orders')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source', 'email')
+      .in('id', toDelete);
+    if (orderError) {
+      return { ok: false, deletedOrders: 0, error: orderError.message };
+    }
+  }
+
+  await supabase
+    .from('email_accounts')
+    .update({
+      sync_cursor: null,
+      backfill_completed_at: null,
+      last_synced_at: null,
+    })
+    .eq('id', account.id)
+    .eq('user_id', user.id);
+
+  revalidatePath('/settings');
+  revalidatePath('/orders');
+  revalidatePath('/inventory');
+  revalidatePath('/dashboard');
+
+  return { ok: true, deletedOrders: toDelete.length };
+}
