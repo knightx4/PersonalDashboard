@@ -58,11 +58,12 @@ type InventoryQueryRow = {
     | {
         order_id: string;
         orders:
-          | {
+            | {
               id: string;
               status: string;
               return_deadline: string | null;
               merchant_id: string | null;
+              deleted_at?: string | null;
               merchants: { id: string; name: string; default_return_window_days: number | null } | null;
             }
           | {
@@ -70,6 +71,7 @@ type InventoryQueryRow = {
               status: string;
               return_deadline: string | null;
               merchant_id: string | null;
+              deleted_at?: string | null;
               merchants: { id: string; name: string; default_return_window_days: number | null } | null;
             }[]
           | null;
@@ -82,6 +84,7 @@ type InventoryQueryRow = {
               status: string;
               return_deadline: string | null;
               merchant_id: string | null;
+              deleted_at?: string | null;
               merchants: { id: string; name: string; default_return_window_days: number | null } | null;
             }
           | {
@@ -89,6 +92,7 @@ type InventoryQueryRow = {
               status: string;
               return_deadline: string | null;
               merchant_id: string | null;
+              deleted_at?: string | null;
               merchants: { id: string; name: string; default_return_window_days: number | null } | null;
             }[]
           | null;
@@ -173,14 +177,15 @@ export async function loadReturnsTracker(
       order_items!inner (
         order_id,
         orders!inner (
-          id, status, return_deadline, merchant_id,
+          id, status, return_deadline, merchant_id, deleted_at,
           merchants ( id, name, default_return_window_days )
         )
       )
     `,
     )
     .eq('user_id', userId)
-    .eq('status', 'owned');
+    .eq('status', 'owned')
+    .is('order_items.orders.deleted_at', null);
 
   if (error) throw error;
 

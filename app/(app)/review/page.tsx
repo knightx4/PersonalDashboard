@@ -18,7 +18,8 @@ export default async function ReviewPage() {
     .from('orders')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
-    .eq('needs_review', true);
+    .eq('needs_review', true)
+    .is('deleted_at', null);
 
   return (
     <div className="min-w-0">

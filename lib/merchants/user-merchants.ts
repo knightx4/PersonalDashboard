@@ -23,6 +23,7 @@ export async function loadUserMerchants(
     .from('orders')
     .select('merchant_id, merchants!inner ( id, name )')
     .eq('user_id', userId)
+    .is('deleted_at', null)
     .not('merchant_id', 'is', null);
 
   if (error) throw error;

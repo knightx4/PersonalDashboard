@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
 import { loadMerchantReturnPolicies } from '@/lib/returns/policies';
 import { CategoriesSection } from './categories-section';
+import { DeletedOrdersSection, DeletedOrdersTitle } from './deleted-orders-section';
 import { InboxSection } from './inbox-section';
 import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
@@ -50,6 +51,16 @@ export default async function SettingsPage({
     .select('id, name, slug, color')
     .eq('user_id', user.id)
     .order('name');
+
+  const { data: deletedOrders } = await supabase
+    .from('orders')
+    .select(
+      'id, order_date, total_cents, currency, external_order_number, deleted_at, merchants ( name )',
+    )
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+    .limit(50);
 
   const returnPolicies = await loadMerchantReturnPolicies(supabase, user.id);
 
@@ -144,6 +155,21 @@ export default async function SettingsPage({
           </CardHeader>
           <CardBody>
             <MutedMerchantsSection exclusions={mutedMerchants ?? []} />
+          </CardBody>
+        </Card>
+
+        <Card id="deleted-orders">
+          <CardHeader>
+            <CardTitle>
+              <DeletedOrdersTitle />
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <DeletedOrdersSection
+              orders={(deletedOrders ?? []).filter(
+                (row): row is typeof row & { deleted_at: string } => Boolean(row.deleted_at),
+              )}
+            />
           </CardBody>
         </Card>
 

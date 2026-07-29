@@ -25,7 +25,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     supabase
       .from('orders')
       .select('id', { count: 'exact', head: true })
-      .eq('needs_review', true),
+      .eq('needs_review', true)
+      .is('deleted_at', null),
     supabase.from('email_accounts').select('id').eq('user_id', user.id).eq('status', 'active'),
   ]);
 

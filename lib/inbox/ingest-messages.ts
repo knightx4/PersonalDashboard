@@ -322,6 +322,7 @@ async function handleOrderConfirmation(
         .select('id')
         .eq('user_id', userId)
         .eq('external_order_number', bundle.order.externalOrderNumber)
+        .is('deleted_at', null)
         .limit(1);
       if (bundle.order.merchantId) {
         existingQuery = existingQuery.eq('merchant_id', bundle.order.merchantId);

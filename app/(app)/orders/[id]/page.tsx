@@ -6,6 +6,9 @@ import { buttonVariants } from '@/components/ui/button';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
 import { ExcludeMerchantButton } from './exclude-merchant-button';
+import { DeleteOrderButton } from './delete-order-button';
+import { restoreDeletedOrder } from '@/app/(app)/orders/actions';
+import { Button } from '@/components/ui/button';
 
 export const metadata = { title: 'Order' };
 
@@ -24,6 +27,7 @@ export default async function OrderDetailPage({
       `
       id, order_date, status, source, external_order_number, return_deadline, needs_review,
       subtotal_cents, tax_cents, shipping_cents, discount_cents, total_cents, currency,
+      deleted_at,
       merchants ( id, name ),
       order_items (
         id, name, variant, quantity, unit_price_cents, category_id, product_url, image_url,
@@ -37,6 +41,8 @@ export default async function OrderDetailPage({
     .maybeSingle();
 
   if (!order) notFound();
+
+  const isDeleted = Boolean(order.deleted_at);
 
   const { data: sourceMessages } = await supabase
     .from('ingested_messages')
@@ -82,7 +88,7 @@ export default async function OrderDetailPage({
           order.external_order_number ? ` · #${order.external_order_number}` : ''
         } · ${order.status.replaceAll('_', ' ')}${
           order.needs_review ? ' · needs review' : ''
-        }`}
+        }${isDeleted ? ' · deleted' : ''}`}
         actions={
           <div className="flex flex-wrap gap-2">
             {gmailHref && (
@@ -95,16 +101,43 @@ export default async function OrderDetailPage({
                 Open in Gmail
               </a>
             )}
-            <ExcludeMerchantButton
-              orderId={order.id}
-              merchantName={merchant?.name ?? 'this sender'}
-            />
+            {!isDeleted && (
+              <>
+                <ExcludeMerchantButton
+                  orderId={order.id}
+                  merchantName={merchant?.name ?? 'this sender'}
+                />
+                <DeleteOrderButton
+                  orderId={order.id}
+                  merchantName={merchant?.name ?? 'this order'}
+                />
+              </>
+            )}
+            {isDeleted && (
+              <form action={restoreDeletedOrder}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <Button type="submit" size="sm">
+                  Restore order
+                </Button>
+              </form>
+            )}
             <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               All orders
             </Link>
           </div>
         }
       />
+
+      {isDeleted && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          This order is in Deleted orders. Its inventory is hidden from your owned list until you
+          restore it. Manage it in{' '}
+          <Link href="/settings#deleted-orders" className="underline underline-offset-2">
+            Settings
+          </Link>
+          .
+        </p>
+      )}
 
       {sourceMessage?.subject && (
         <p className="text-sm text-ink-muted">

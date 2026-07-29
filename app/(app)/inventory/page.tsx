@@ -171,7 +171,7 @@ export default async function InventoryPage({
         ${membershipJoin},
         order_items!inner (
           orders!inner (
-            merchant_id, return_deadline,
+            merchant_id, return_deadline, deleted_at,
             merchants ( name )
           )
         )
@@ -182,7 +182,7 @@ export default async function InventoryPage({
         ${membershipJoin},
         order_items (
           orders (
-            merchant_id, return_deadline,
+            merchant_id, return_deadline, deleted_at,
             merchants ( name )
           )
         )
@@ -197,7 +197,9 @@ export default async function InventoryPage({
 
   if (categoryId) query = query.eq('category_id', categoryId);
   if (activeMerchant) {
-    query = query.eq('order_items.orders.merchant_id', activeMerchant);
+    query = query
+      .eq('order_items.orders.merchant_id', activeMerchant)
+      .is('order_items.orders.deleted_at', null);
   }
   if (activeList) {
     query = query.eq('inventory_item_lists.list_id', activeList);
@@ -225,10 +227,12 @@ export default async function InventoryPage({
           orders:
             | {
                 return_deadline?: string | null;
+                deleted_at?: string | null;
                 merchants: { name: string } | { name: string }[] | null;
               }
             | {
                 return_deadline?: string | null;
+                deleted_at?: string | null;
                 merchants: { name: string } | { name: string }[] | null;
               }[]
             | null;
@@ -237,10 +241,12 @@ export default async function InventoryPage({
           orders:
             | {
                 return_deadline?: string | null;
+                deleted_at?: string | null;
                 merchants: { name: string } | { name: string }[] | null;
               }
             | {
                 return_deadline?: string | null;
+                deleted_at?: string | null;
                 merchants: { name: string } | { name: string }[] | null;
               }[]
             | null;
@@ -248,7 +254,15 @@ export default async function InventoryPage({
       | null;
   };
 
-  const items = (rows ?? []) as unknown as InventoryRow[];
+  const items = ((rows ?? []) as unknown as InventoryRow[]).filter((item) => {
+    const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+    const order = orderItem
+      ? Array.isArray(orderItem.orders)
+        ? orderItem.orders[0]
+        : orderItem.orders
+      : null;
+    return !order?.deleted_at;
+  });
   const today = todayInTimezone(timezone);
 
   const filtered = Boolean(

@@ -56,6 +56,7 @@ export async function loadMerchantReturnPolicies(
       .from('orders')
       .select('merchant_id')
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .not('merchant_id', 'is', null),
     supabase
       .from('merchant_return_policies')

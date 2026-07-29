@@ -38,6 +38,7 @@ export async function findOrderForLifecycleEmail(
         .select('id, merchant_id, external_order_number, cancelled_at')
         .eq('id', threadHit.resulting_order_id)
         .eq('user_id', opts.userId)
+        .is('deleted_at', null)
         .maybeSingle();
       if (order) {
         return {
@@ -58,6 +59,7 @@ export async function findOrderForLifecycleEmail(
     .select('id, merchant_id, external_order_number, cancelled_at')
     .eq('user_id', opts.userId)
     .eq('external_order_number', orderNumber)
+    .is('deleted_at', null)
     .order('order_date', { ascending: false })
     .limit(5);
 
@@ -73,6 +75,7 @@ export async function findOrderForLifecycleEmail(
       .select('id, merchant_id, external_order_number, cancelled_at')
       .eq('user_id', opts.userId)
       .ilike('external_order_number', orderNumber)
+      .is('deleted_at', null)
       .order('order_date', { ascending: false })
       .limit(5);
     if (!loose || loose.length === 0) return null;
