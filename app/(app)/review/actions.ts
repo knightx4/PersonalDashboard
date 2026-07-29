@@ -92,16 +92,17 @@ export async function discardOrderReview(
 
   if (messageError) return { error: messageError.message };
 
+  // Soft-delete so it can be restored from Settings → Deleted orders.
   const { error: deleteError } = await supabase
     .from('orders')
-    .delete()
+    .update({ deleted_at: new Date().toISOString(), needs_review: false })
     .eq('id', orderId)
     .eq('user_id', user.id);
 
   if (deleteError) return { error: deleteError.message };
 
   revalidateReviewSurfaces();
-  // Leave the order detail URL — the row is gone and would 404 on refresh.
+  revalidatePath('/settings');
   redirect('/review');
 }
 

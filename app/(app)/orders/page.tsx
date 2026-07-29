@@ -119,6 +119,7 @@ export default async function OrdersPage({
     `,
     )
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .gte('order_date', period.start)
     .lte('order_date', period.end)
     .order('order_date', { ascending: false });

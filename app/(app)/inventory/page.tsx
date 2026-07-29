@@ -154,7 +154,7 @@ export default async function InventoryPage({
         order_items!inner (
           image_url,
           orders!inner (
-            merchant_id,
+            merchant_id, deleted_at,
             merchants ( name )
           )
         )
@@ -167,7 +167,7 @@ export default async function InventoryPage({
         order_items (
           image_url,
           orders (
-            merchant_id,
+            merchant_id, deleted_at,
             merchants ( name )
           )
         )
@@ -182,7 +182,9 @@ export default async function InventoryPage({
 
   if (categoryId) query = query.eq('category_id', categoryId);
   if (activeMerchant) {
-    query = query.eq('order_items.orders.merchant_id', activeMerchant);
+    query = query
+      .eq('order_items.orders.merchant_id', activeMerchant)
+      .is('order_items.orders.deleted_at', null);
   }
   if (activeList) {
     query = query.eq('inventory_item_lists.list_id', activeList);
@@ -214,21 +216,41 @@ export default async function InventoryPage({
       | {
           image_url: string | null;
           orders:
-            | { merchants: { name: string } | { name: string }[] | null }
-            | { merchants: { name: string } | { name: string }[] | null }[]
+            | {
+                deleted_at?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }
+            | {
+                deleted_at?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }[]
             | null;
         }
       | {
           image_url: string | null;
           orders:
-            | { merchants: { name: string } | { name: string }[] | null }
-            | { merchants: { name: string } | { name: string }[] | null }[]
+            | {
+                deleted_at?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }
+            | {
+                deleted_at?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }[]
             | null;
         }[]
       | null;
   };
 
-  const rawItems = (rows ?? []) as unknown as InventoryRow[];
+  const rawItems = ((rows ?? []) as unknown as InventoryRow[]).filter((item) => {
+    const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+    const order = orderItem
+      ? Array.isArray(orderItem.orders)
+        ? orderItem.orders[0]
+        : orderItem.orders
+      : null;
+    return !order?.deleted_at;
+  });
 
   const mapped: (InventoryRowItem & {
     search_tags: string[] | null;

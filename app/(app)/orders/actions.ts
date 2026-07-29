@@ -339,3 +339,98 @@ export async function restoreMerchantExclusion(formData: FormData): Promise<void
   revalidatePath('/settings');
   revalidatePath('/orders');
 }
+
+/**
+ * Soft-delete an order (and its inventory from active views). Restorable from
+ * Settings → Deleted orders.
+ */
+export async function softDeleteOrder(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const orderId = String(formData.get('orderId') ?? '');
+  if (!z.string().uuid().safeParse(orderId).success) {
+    throw new Error('Invalid order.');
+  }
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', orderId)
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/orders');
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/inventory');
+  revalidatePath('/dashboard');
+  revalidatePath('/returns');
+  revalidatePath('/review');
+  revalidatePath('/settings');
+  redirect('/orders');
+}
+
+export async function restoreDeletedOrder(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const orderId = String(formData.get('orderId') ?? '');
+  if (!z.string().uuid().safeParse(orderId).success) {
+    throw new Error('Invalid order.');
+  }
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ deleted_at: null })
+    .eq('id', orderId)
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/orders');
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/inventory');
+  revalidatePath('/dashboard');
+  revalidatePath('/returns');
+  revalidatePath('/review');
+  revalidatePath('/settings');
+  redirect(`/orders/${orderId}`);
+}
+
+/** Permanently remove a soft-deleted order (cascades items + inventory). */
+export async function permanentlyDeleteOrder(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const orderId = String(formData.get('orderId') ?? '');
+  if (!z.string().uuid().safeParse(orderId).success) {
+    throw new Error('Invalid order.');
+  }
+
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('id', orderId)
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .maybeSingle();
+  if (!order) throw new Error('Deleted order not found.');
+
+  await supabase
+    .from('ingested_messages')
+    .update({ resulting_order_id: null })
+    .eq('resulting_order_id', orderId);
+
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .eq('id', orderId)
+    .eq('user_id', user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/orders');
+  revalidatePath('/inventory');
+  revalidatePath('/dashboard');
+  revalidatePath('/settings');
+}

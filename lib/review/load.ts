@@ -99,6 +99,7 @@ export async function loadReviewQueue(
       )
       .eq('user_id', userId)
       .eq('needs_review', true)
+      .is('deleted_at', null)
       .order('order_date', { ascending: false }),
     accountIds.length > 0
       ? supabase
@@ -241,7 +242,8 @@ export async function countReviewItems(
       .from('orders')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('needs_review', true),
+      .eq('needs_review', true)
+      .is('deleted_at', null),
     supabase.from('email_accounts').select('id').eq('user_id', userId),
   ]);
 

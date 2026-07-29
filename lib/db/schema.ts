@@ -249,6 +249,11 @@ export const orders = pgTable(
     currency: text('currency').notNull().default('USD'),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     /**
+     * Soft-delete. Null means active. Hidden from orders/inventory lists;
+     * restore from Settings → Deleted orders.
+     */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    /**
      * DERIVED. Written only by the sync_order_state() Postgres function.
      * Never assign this from application code -- see lib/status.ts.
      */

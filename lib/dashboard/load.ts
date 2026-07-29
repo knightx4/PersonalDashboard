@@ -113,12 +113,14 @@ type InventoryRow = {
               id: string;
               status: string;
               return_deadline: string | null;
+              deleted_at: string | null;
               merchants: { name: string } | { name: string }[] | null;
             }
           | {
               id: string;
               status: string;
               return_deadline: string | null;
+              deleted_at: string | null;
               merchants: { name: string } | { name: string }[] | null;
             }[]
           | null;
@@ -130,12 +132,14 @@ type InventoryRow = {
               id: string;
               status: string;
               return_deadline: string | null;
+              deleted_at: string | null;
               merchants: { name: string } | { name: string }[] | null;
             }
           | {
               id: string;
               status: string;
               return_deadline: string | null;
+              deleted_at: string | null;
               merchants: { name: string } | { name: string }[] | null;
             }[]
           | null;
@@ -273,6 +277,7 @@ function returnableFromInventory(
     if (item.status !== 'owned') continue;
     const orderItem = one(item.order_items);
     const order = one(orderItem?.orders);
+    if (order?.deleted_at) continue;
     if (!order?.return_deadline) continue;
     if (order.return_deadline < today) continue;
     if (order.status === 'cancelled' || order.status === 'returned') continue;
@@ -328,7 +333,8 @@ export async function loadDashboard(
     supabase
       .from('orders')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId),
+      .eq('user_id', userId)
+      .is('deleted_at', null),
     supabase.from('categories').select('id, name, color, parent_id'),
     supabase
       .from('orders')
@@ -342,6 +348,7 @@ export async function loadDashboard(
       `,
       )
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .gte('order_date', earliest)
       .lte('order_date', latest),
     supabase
@@ -359,7 +366,7 @@ export async function loadDashboard(
         order_items (
           order_id,
           orders (
-            id, status, return_deadline,
+            id, status, return_deadline, deleted_at,
             merchants ( name )
           )
         )
@@ -375,7 +382,11 @@ export async function loadDashboard(
 
   const orders = (orderRows ?? []) as OrderRow[];
   const returns = (returnRows ?? []) as ReturnRow[];
-  const inventory = (inventoryRows ?? []) as InventoryRow[];
+  const inventory = ((inventoryRows ?? []) as InventoryRow[]).filter((item) => {
+    const orderItem = one(item.order_items);
+    const order = one(orderItem?.orders);
+    return !order?.deleted_at;
+  });
   const categories = new Map(
     ((categoryRows ?? []) as CategoryRow[]).map((row) => [row.id, row]),
   );
