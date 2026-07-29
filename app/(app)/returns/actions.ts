@@ -155,6 +155,85 @@ export async function saveMerchantReturnPolicy(
   };
 }
 
+/**
+ * Create a user-scoped merchant and set its return window in one step.
+ * Used when the retailer isn't already in the catalog.
+ */
+export async function createMerchantReturnPolicy(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const nameParsed = z
+    .string()
+    .trim()
+    .min(2, 'Name needs at least 2 characters.')
+    .max(80)
+    .safeParse(formData.get('name'));
+  if (!nameParsed.success) {
+    return { error: nameParsed.error.issues[0]?.message ?? 'Enter a merchant name.' };
+  }
+
+  const rawDays = String(formData.get('return_window_days') ?? '').trim();
+  let days: number | null;
+  if (rawDays === '') {
+    days = null;
+  } else {
+    const parsedDays = z.coerce.number().int().min(1).max(730).safeParse(rawDays);
+    if (!parsedDays.success) {
+      return { error: 'Return window must be between 1 and 730 days, or blank for none.' };
+    }
+    days = parsedDays.data;
+  }
+
+  const baseSlug =
+    nameParsed.data
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 50) || 'merchant';
+  const slug = `${baseSlug}-${user.id.slice(0, 8)}`;
+
+  const { data: conflict } = await supabase
+    .from('merchants')
+    .select('id')
+    .eq('created_by_user_id', user.id)
+    .eq('slug', slug)
+    .maybeSingle();
+  if (conflict) {
+    return { error: 'You already have a merchant with that name.' };
+  }
+
+  const { data: created, error: createError } = await supabase
+    .from('merchants')
+    .insert({
+      name: nameParsed.data,
+      slug,
+      domains: [],
+      created_by_user_id: user.id,
+      is_global: false,
+      default_return_window_days: days,
+    })
+    .select('id, name')
+    .single();
+
+  if (createError || !created) {
+    return { error: createError?.message ?? 'Could not create that merchant.' };
+  }
+
+  revalidatePaths();
+  return {
+    message:
+      days == null
+        ? `Added ${created.name} with no return window.`
+        : `Added ${created.name} with a ${days}-day window.`,
+  };
+}
+
 function revalidatePaths() {
   revalidatePath('/settings');
   revalidatePath('/returns');

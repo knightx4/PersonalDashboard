@@ -12,12 +12,14 @@ export function Label({
   );
 }
 
-export function Input({
+export const Input = function Input({
   className,
+  ref,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+}: React.ComponentProps<'input'>) {
   return (
     <input
+      ref={ref}
       className={cn(
         'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink',
         'placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
@@ -27,7 +29,7 @@ export function Input({
       {...props}
     />
   );
-}
+};
 
 export function Select({
   className,
