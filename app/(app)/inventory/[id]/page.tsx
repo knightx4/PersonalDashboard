@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/(app)/returns/plan-return-button';
+import { displayVariant } from '@/lib/inventory/display';
 import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
 
 export const metadata = { title: 'Inventory item' };
@@ -113,7 +114,9 @@ export default async function InventoryItemPage({
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
         title={item.name}
-        description={[item.variant, category?.name, item.status].filter(Boolean).join(' · ')}
+        description={[displayVariant(item.variant), category?.name, item.status]
+          .filter(Boolean)
+          .join(' · ')}
         actions={
           <div className="flex flex-wrap gap-2">
             {productUrl && (

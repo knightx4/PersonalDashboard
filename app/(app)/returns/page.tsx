@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMoney } from '@/lib/money';
 import { deadlineLabel } from '@/lib/returns/deadline';
+import { displayVariant } from '@/lib/inventory/display';
 import {
   filterReturnsRows,
   loadReturnsTracker,
@@ -150,7 +151,9 @@ export default async function ReturnsPage({
                           )}
                         </p>
                         <p className="truncate text-[13px] text-ink-muted">
-                          {[row.merchantName, row.variant].filter(Boolean).join(' · ')}
+                          {[row.merchantName, displayVariant(row.variant)]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </p>
                       </div>
                       <p className="tabular shrink-0 text-sm font-medium text-ink">
