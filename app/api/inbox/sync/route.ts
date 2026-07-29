@@ -1,6 +1,11 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { createClient, getUser } from '@/lib/auth/server';
 import { pumpInboxBackfill } from '@/inngest/inbox-backfill';
+import {
+  failStaleSyncJob,
+  isFreshActiveJob,
+  type SyncJobStaleRow,
+} from '@/lib/inbox/sync-job-stale';
 
 export const maxDuration = 60;
 
@@ -37,10 +42,9 @@ function jobToProgress(job: JobRow) {
     errors: 0,
     done,
     error: job.error ?? undefined,
+    updatedAt: job.updated_at,
   };
 }
-
-const STALE_RUNNING_MS = 15 * 60 * 1000;
 
 /**
  * GET — poll the latest backfill job for an account (session-scoped).
@@ -85,7 +89,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ job: null });
   }
 
-  return NextResponse.json({ job: jobToProgress(job as JobRow) });
+  let row = job as JobRow;
+  const stale = await failStaleSyncJob(supabase, row as SyncJobStaleRow);
+  if (stale) {
+    row = { ...row, ...stale };
+  }
+
+  return NextResponse.json({ job: jobToProgress(row) });
 }
 
 export async function POST(request: NextRequest) {
@@ -137,32 +147,16 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   const latestJob = latest as JobRow | null;
-  const updatedAt = latestJob?.updated_at ? new Date(latestJob.updated_at).getTime() : 0;
-  const isFreshActive =
-    latestJob &&
-    (latestJob.status === 'running' || latestJob.status === 'queued') &&
-    Date.now() - updatedAt < STALE_RUNNING_MS;
 
-  if (isFreshActive && latestJob) {
+  if (isFreshActiveJob(latestJob)) {
     return NextResponse.json({
-      ...jobToProgress(latestJob),
+      ...jobToProgress(latestJob!),
       alreadyRunning: true,
     });
   }
 
-  if (
-    latestJob &&
-    (latestJob.status === 'running' || latestJob.status === 'queued') &&
-    Date.now() - updatedAt >= STALE_RUNNING_MS
-  ) {
-    await supabase
-      .from('sync_jobs')
-      .update({
-        status: 'failed',
-        error: 'Stale job superseded by a new import.',
-        finished_at: new Date().toISOString(),
-      })
-      .eq('id', latestJob.id);
+  if (latestJob) {
+    await failStaleSyncJob(supabase, latestJob as SyncJobStaleRow);
   }
 
   const { data: job, error: jobError } = await supabase

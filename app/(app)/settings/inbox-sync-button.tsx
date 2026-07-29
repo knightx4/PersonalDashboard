@@ -16,6 +16,7 @@ export type InboxSyncProgress = {
   done: boolean;
   error?: string;
   alreadyRunning?: boolean;
+  updatedAt?: string;
 };
 
 export function InboxSyncButton({
@@ -33,6 +34,7 @@ export function InboxSyncButton({
   const active =
     progress != null &&
     !progress.done &&
+    !progress.error &&
     (progress.status === 'running' || progress.status === 'queued');
 
   const refresh = useCallback(async () => {
