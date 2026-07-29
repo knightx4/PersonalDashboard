@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
 import { TopNav } from '@/components/shell/top-nav';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
+import { onboardingNeeded } from '@/lib/onboarding';
 
 /**
  * Shell for every signed-in section.
@@ -14,6 +15,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/login');
 
   const supabase = await createClient();
+
+  if (await onboardingNeeded(supabase, user)) {
+    redirect('/onboarding');
+  }
 
   const [{ data: profile }, { count: reviewCount }, { data: accounts }] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),

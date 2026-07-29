@@ -1,16 +1,19 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 import { getUser } from '@/lib/auth/server';
 import { requestOrigin } from '@/lib/auth/origin';
 import { isGmailOAuthConfigured, gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { signGmailOAuthState } from '@/lib/email/oauth-state';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import { safeAppPath } from '@/lib/paths';
+
+const RETURN_COOKIE = 'gmail_oauth_return';
 
 /**
- * Start the Gmail read grant (build step 10). Separate from Google sign-in —
- * see docs/SETUP.md Tier 2.
+ * Start the Gmail read grant. Separate from Google sign-in — see docs/SETUP.md.
  *
- * redirect_uri is the live request origin so it matches the callback URL Google
- * hits (and the Authorized redirect URI on the Gmail OAuth client).
+ * Optional `return_to` (relative path) is stored in an httpOnly cookie so the
+ * callback can send the user back to onboarding or Settings.
  */
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -19,8 +22,22 @@ export async function GET(request: NextRequest) {
   }
 
   if (!isGmailOAuthConfigured()) {
-    return NextResponse.redirect(new URL('/settings?inbox=unconfigured', request.url));
+    const failTo = safeAppPath(request.nextUrl.searchParams.get('return_to'), '/settings');
+    const url = new URL(failTo, request.url);
+    url.searchParams.set('inbox', 'unconfigured');
+    return NextResponse.redirect(url);
   }
+
+  const returnTo = safeAppPath(request.nextUrl.searchParams.get('return_to'), '/settings');
+
+  const cookieStore = await cookies();
+  cookieStore.set(RETURN_COOKIE, returnTo, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 15 * 60,
+  });
 
   const origin = await requestOrigin();
   const redirectUri = `${origin.replace(/\/$/, '')}/api/auth/gmail/callback`;
@@ -28,6 +45,6 @@ export async function GET(request: NextRequest) {
   const state = signGmailOAuthState(user.id, TOKEN_ENCRYPTION_KEY);
   const url = gmailProvider.authorizationUrl(state, redirectUri);
 
-  console.info('gmail oauth connect', { redirectUri, userId: user.id });
+  console.info('gmail oauth connect', { redirectUri, userId: user.id, returnTo });
   return NextResponse.redirect(url);
 }

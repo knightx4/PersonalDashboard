@@ -33,6 +33,9 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
     preview/edit → save. List by status, detail edit, dismiss / purchased /
     delete. Loose fingerprint already-own warning. Merchant match from URL
     host. No paid unfurl vendor yet.
+11. ✅ **Onboarding flow.** Welcome → Gmail pre-consent explanation → connect
+    or skip. Uses `profiles.onboarding_completed_at`; app shell redirects
+    incomplete users. Existing users with inbox/orders are grandfathered.
 
 Also done ahead of schedule because they are cheap and everything depends on
 them: `lib/fingerprint.ts`, `lib/status.ts` and the SQL/TypeScript agreement
@@ -41,7 +44,6 @@ at Tier 2.
 
 ## Next
 
-11. **Onboarding flow** including the pre-consent explanation screen.
 12. ✅ **Background Gmail backfill.** Import starts on the server (`after` +
     continue chain), survives navigation, and Settings/Dashboard poll
     `sync_jobs` for progress. Full Inngest remains optional further hardening.
