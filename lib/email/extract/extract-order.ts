@@ -8,9 +8,25 @@ import {
   enrichLinesWithProductLinks,
   extractProductLinksFromEmail,
 } from './product-links';
-import { CATEGORY_SLUGS, PARSER_VERSION, type ExtractedOrder } from './schema';
+import {
+  CATEGORY_SLUGS,
+  PARSER_VERSION,
+  restrictCategorySlugs,
+  type CategoryOption,
+  type ExtractedOrder,
+} from './schema';
 
-const SYSTEM = `You extract structured purchase order data from retailer order-confirmation emails.
+function defaultCategoryOptions(): CategoryOption[] {
+  return CATEGORY_SLUGS.map((slug) => ({
+    slug,
+    name: slug.charAt(0).toUpperCase() + slug.slice(1),
+  }));
+}
+
+function buildSystemPrompt(categories: readonly CategoryOption[]): string {
+  const slugList = categories.map((c) => c.slug).join(', ');
+  const namedList = categories.map((c) => `${c.slug}="${c.name}"`).join('; ');
+  return `You extract structured purchase order data from retailer order-confirmation emails.
 Return ONLY a JSON object with these fields:
 - merchantName (string|null)
 - merchantSlug (string|null) — lowercase kebab if known (amazon, target, …)
@@ -21,8 +37,9 @@ Return ONLY a JSON object with these fields:
 - lines: [{ name, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
 - confidence (0-1)
 
-categorySlug must be one of: ${CATEGORY_SLUGS.join(', ')}.
-Use books for books/ebooks/audiobooks; electronics for gadgets; home for furniture/kitchen/decor; clothing for apparel; groceries for food/drink; hobby for games/crafts/sports gear; pet for pet supplies; beauty/health as appropriate; other if unsure.
+categorySlug must be one of: ${slugList}.
+Category labels: ${namedList}.
+Prefer a custom/user category when the product clearly fits that label; otherwise use the best system fit. Use other only when unsure and other is available.
 
 Rules:
 - Money is integer cents only (12.99 → 1299).
@@ -33,6 +50,7 @@ Rules:
 - merchantName: prefer the store/From display name (e.g. "Ms Betters"), not "Unknown".
 - productUrl: only a real product page URL from the email (amazon.com/dp/…, etc). Never invent.
 - If this is not an order confirmation, return {"error":"not_an_order"}.`;
+}
 
 function attachProductLinks(
   order: ExtractedOrder,
@@ -50,7 +68,12 @@ function attachProductLinks(
 
 function fillMissingCategories(
   order: ExtractedOrder,
-  input: { subject: string; text?: string; merchantSlug?: string | null },
+  input: {
+    subject: string;
+    text?: string;
+    merchantSlug?: string | null;
+    customCategories?: readonly CategoryOption[];
+  },
 ): ExtractedOrder {
   return {
     ...order,
@@ -61,6 +84,7 @@ function fillMissingCategories(
         merchantSlug: input.merchantSlug ?? order.merchantSlug,
         subject: input.subject,
         text: input.text,
+        customCategories: input.customCategories,
       });
       return guessed ? { ...line, categorySlug: guessed } : line;
     }),
@@ -74,11 +98,19 @@ function enrichExtractedOrder(
     text: string;
     html?: string | null;
     merchantSlug?: string | null;
+    categoryOptions: readonly CategoryOption[];
   },
 ): ExtractedOrder {
-  return fillMissingCategories(
-    attachProductLinks(order, input.html, input.text),
-    input,
+  const allowed = new Set(input.categoryOptions.map((c) => c.slug));
+  const customCategories = input.categoryOptions.filter(
+    (c) => !(CATEGORY_SLUGS as readonly string[]).includes(c.slug),
+  );
+  return restrictCategorySlugs(
+    fillMissingCategories(attachProductLinks(order, input.html, input.text), {
+      ...input,
+      customCategories,
+    }),
+    allowed,
   );
 }
 
@@ -91,12 +123,21 @@ export async function extractOrderFromEmail(input: {
   fromAddress?: string | null;
   receivedAt?: Date | null;
   apiKey?: string | null;
+  /** System + user category slugs the model may assign. */
+  categoryOptions?: readonly CategoryOption[];
 }): Promise<{
   result: ApplyExtractionResult;
   source: 'llm' | 'heuristic';
   parserVersion: string;
   raw?: unknown;
 }> {
+  const categoryOptions =
+    input.categoryOptions && input.categoryOptions.length > 0
+      ? input.categoryOptions
+      : defaultCategoryOptions();
+  const customCategories = categoryOptions.filter(
+    (c) => !(CATEGORY_SLUGS as readonly string[]).includes(c.slug),
+  );
   const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
 
   if (apiKey) {
@@ -106,7 +147,7 @@ export async function extractOrderFromEmail(input: {
       const message = await client.messages.create({
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 1800,
-        system: SYSTEM,
+        system: buildSystemPrompt(categoryOptions),
         messages: [
           {
             role: 'user',
@@ -137,7 +178,10 @@ export async function extractOrderFromEmail(input: {
           return {
             result: {
               ...result,
-              order: enrichExtractedOrder(result.order, input),
+              order: enrichExtractedOrder(result.order, {
+                ...input,
+                categoryOptions,
+              }),
             },
             source: 'llm',
             parserVersion: PARSER_VERSION,
@@ -151,7 +195,10 @@ export async function extractOrderFromEmail(input: {
     }
   }
 
-  const heuristic = heuristicExtractOrder(input);
+  const heuristic = heuristicExtractOrder({
+    ...input,
+    customCategories,
+  });
   if (!heuristic) {
     return {
       result: { ok: false, reason: 'schema', issues: ['no_extraction'] },
@@ -171,7 +218,10 @@ export async function extractOrderFromEmail(input: {
   return {
     result: {
       ...applied,
-      order: enrichExtractedOrder(applied.order, input),
+      order: enrichExtractedOrder(applied.order, {
+        ...input,
+        categoryOptions,
+      }),
     },
     source: 'heuristic',
     parserVersion: PARSER_VERSION,

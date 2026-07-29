@@ -1,4 +1,4 @@
-import type { CategorySlug } from '@/lib/email/extract/schema';
+import type { CategoryOption } from '@/lib/email/extract/schema';
 
 /** Cheap deterministic category guesses when LLM is unavailable. */
 export function guessCategorySlug(input: {
@@ -6,8 +6,20 @@ export function guessCategorySlug(input: {
   merchantSlug?: string | null;
   subject?: string | null;
   text?: string | null;
-}): CategorySlug | null {
+  /** User-created categories — preferred when the name clearly matches. */
+  customCategories?: readonly CategoryOption[];
+}): string | null {
   const blob = `${input.name} ${input.subject ?? ''} ${input.text ?? ''}`.toLowerCase();
+
+  for (const category of input.customCategories ?? []) {
+    const label = category.name.trim().toLowerCase();
+    if (label.length < 3) continue;
+    if (blob.includes(label)) return category.slug;
+    const tokens = label.split(/[^a-z0-9]+/).filter((token) => token.length >= 4);
+    if (tokens.length > 0 && tokens.every((token) => blob.includes(token))) {
+      return category.slug;
+    }
+  }
 
   if (/\b(book|novel|paperback|hardcover|kindle|audiobook|isbn)\b/.test(blob)) {
     return 'books';

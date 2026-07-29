@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
+import { CategoriesSection } from './categories-section';
 import { InboxSection } from './inbox-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
 
@@ -34,6 +35,12 @@ export default async function SettingsPage({
     .select('id, match_domain, merchants ( name )')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
+
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name, slug, color, user_id')
+    .is('parent_id', null)
+    .order('name');
 
   const accountIds = (accounts ?? []).map((a) => a.id as string);
   const latestJobs: Record<
@@ -136,10 +143,7 @@ export default async function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardBody>
-            <p className="text-sm text-ink-muted">
-              Built-in categories are shared and read-only. Your own categories live alongside
-              them.
-            </p>
+            <CategoriesSection categories={categories ?? []} />
           </CardBody>
         </Card>
 
