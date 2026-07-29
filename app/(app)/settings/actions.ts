@@ -11,6 +11,7 @@ import {
   isCategoryColor,
   slugifyCategoryName,
 } from '@/lib/categories/slugify';
+import { pickListGradient } from '@/lib/lists/gradients';
 
 export type CategoryActionState = {
   error?: string;
@@ -267,7 +268,6 @@ export type ListActionState = {
 
 const createListSchema = z.object({
   name: z.string().trim().min(2).max(40),
-  color: z.string().refine(isCategoryColor, 'Pick a color.'),
 });
 
 export async function createItemList(
@@ -277,7 +277,6 @@ export async function createItemList(
   const user = await requireUser();
   const parsed = createListSchema.safeParse({
     name: formData.get('name'),
-    color: formData.get('color') ?? CATEGORY_COLOR_OPTIONS[0],
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
@@ -295,11 +294,17 @@ export async function createItemList(
     .maybeSingle();
   if (conflict) return { error: 'That list name is already used. Try another.' };
 
+  const { data: existing } = await supabase
+    .from('item_lists')
+    .select('color')
+    .eq('user_id', user.id);
+  const color = pickListGradient((existing ?? []).map((row) => row.color));
+
   const { error } = await supabase.from('item_lists').insert({
     user_id: user.id,
     name: parsed.data.name,
     slug,
-    color: parsed.data.color,
+    color,
   });
   if (error) return { error: error.message };
 

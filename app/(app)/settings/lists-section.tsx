@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import {
   createItemList,
   deleteItemList,
@@ -8,8 +8,8 @@ import {
   type ListActionState,
 } from '@/app/(app)/settings/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label } from '@/components/ui/field';
-import { CATEGORY_COLOR_OPTIONS } from '@/lib/categories/slugify';
+import { FieldError, Input } from '@/components/ui/field';
+import { listSwatchStyle } from '@/lib/lists/gradients';
 
 const initial: ListActionState = {};
 
@@ -22,6 +22,11 @@ export type SettingsList = {
 
 export function ListsSection({ lists }: { lists: SettingsList[] }) {
   const [createState, createAction, createPending] = useActionState(createItemList, initial);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (createState.message) setCreating(false);
+  }, [createState.message]);
 
   return (
     <div className="space-y-5">
@@ -34,63 +39,52 @@ export function ListsSection({ lists }: { lists: SettingsList[] }) {
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
           Your lists
         </h3>
-        {lists.length === 0 ? (
+        {lists.length === 0 && !creating ? (
           <p className="text-sm text-ink-faint">None yet — create one below.</p>
-        ) : (
+        ) : lists.length > 0 ? (
           <ul className="divide-y divide-border rounded-lg border border-border">
             {lists.map((list) => (
               <ListRow key={list.id} list={list} />
             ))}
           </ul>
-        )}
+        ) : null}
       </div>
 
-      <form action={createAction} className="space-y-3 rounded-lg border border-border p-3">
-        <p className="text-sm font-medium text-ink">Add a list</p>
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div>
-            <Label htmlFor="list_name">Name</Label>
-            <Input
-              id="list_name"
-              name="name"
-              required
-              maxLength={40}
-              placeholder="To return, Gift ideas, Cabin…"
-            />
-          </div>
-          <div>
-            <Label htmlFor="list_color">Color</Label>
-            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="List color">
-              {CATEGORY_COLOR_OPTIONS.map((color, index) => (
-                <label key={color} className="cursor-pointer">
-                  <input
-                    type="radio"
-                    name="color"
-                    value={color}
-                    defaultChecked={index === 0}
-                    className="peer sr-only"
-                  />
-                  <span
-                    className="block size-7 rounded-full border-2 border-transparent peer-checked:border-ink peer-focus-visible:ring-2 peer-focus-visible:ring-brand/30"
-                    style={{ backgroundColor: color }}
-                    aria-hidden
-                  />
-                  <span className="sr-only">{color}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
+      {creating ? (
+        <form action={createAction} className="flex flex-wrap items-center gap-2">
+          <Input
+            name="name"
+            required
+            maxLength={40}
+            autoFocus
+            placeholder="To return, Gift ideas, Cabin…"
+            className="min-w-[12rem] flex-1"
+            aria-label="New list name"
+          />
           <Button type="submit" size="sm" disabled={createPending}>
-            {createPending ? 'Adding…' : 'Add list'}
+            {createPending ? 'Adding…' : 'Add'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setCreating(false)}
+            disabled={createPending}
+          >
+            Cancel
+          </Button>
+          <FieldError>{createState.error}</FieldError>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
+            New list
           </Button>
           {createState.message && (
             <p className="text-sm text-positive">{createState.message}</p>
           )}
         </div>
-        <FieldError>{createState.error}</FieldError>
-      </form>
+      )}
     </div>
   );
 }
@@ -104,7 +98,7 @@ function ListRow({ list }: { list: SettingsList }) {
         <input type="hidden" name="id" value={list.id} />
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: list.color ?? '#cfcfc8' }}
+          style={listSwatchStyle(list.color)}
           aria-hidden
         />
         <Input
