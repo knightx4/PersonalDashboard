@@ -106,6 +106,7 @@ export const disposalMethod = pgEnum('disposal_method', [
   'sold',
   'gifted',
   'recycled',
+  'consumed',
 ]);
 
 export const savedItemStatus = pgEnum('saved_item_status', ['saved', 'purchased', 'dismissed']);
