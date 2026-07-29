@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { decryptToken, encryptToken } from '@/lib/crypto/tokens';
 import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/classify';
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
+import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { PARSER_VERSION } from '@/lib/email/extract/schema';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { orderCandidateQuery } from '@/lib/email/providers/gmail-query';
@@ -13,6 +14,10 @@ import {
   isExcludedSender,
   loadMerchantExclusions,
 } from '@/lib/inbox/merchant-exclusions';
+import {
+  loadMerchantsForUser,
+  resolveOrderMerchant,
+} from '@/lib/merchants/resolve-order-merchant';
 
 export interface SyncProgress {
   jobId: string;
@@ -41,17 +46,16 @@ type AccountRow = {
   status: string;
 };
 
-async function loadMerchants(supabase: SupabaseClient): Promise<MerchantDomainHit[]> {
-  const { data, error } = await supabase
-    .from('merchants')
-    .select('id, slug, name, domains')
-    .eq('is_global', true);
-  if (error) throw error;
-  return (data ?? []).map((m) => ({
+async function loadMerchants(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<MerchantDomainHit[]> {
+  const rows = await loadMerchantsForUser(supabase, userId);
+  return rows.map((m) => ({
     id: m.id,
     slug: m.slug,
     name: m.name,
-    domains: (m.domains as string[]) ?? [],
+    domains: m.domains,
   }));
 }
 
@@ -172,7 +176,7 @@ export async function syncEmailAccountBatch(
 
   try {
     const accessToken = await ensureAccessToken(supabase, account as AccountRow, encryptionKey);
-    const merchants = await loadMerchants(supabase);
+    const merchants = await loadMerchants(supabase, opts.userId);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
     const { data: systemCategories } = await supabase
       .from('categories')
@@ -284,7 +288,8 @@ export async function syncEmailAccountBatch(
           text: message.text,
           html: message.html,
           merchantSlug: classified.merchant?.slug,
-          merchantName: classified.merchant?.name,
+          merchantName:
+            classified.merchant?.name ?? displayNameFromAddress(message.fromAddress),
           fromAddress: message.fromAddress,
           receivedAt: message.internalDate,
         });
@@ -306,10 +311,17 @@ export async function syncEmailAccountBatch(
           continue;
         }
 
+        const resolvedMerchant = await resolveOrderMerchant(supabase, {
+          userId: opts.userId,
+          classified: classified.merchant,
+          fromAddress: message.fromAddress,
+          extractedName: extraction.result.order.merchantName,
+        });
+
         const bundle = buildEmailOrder({
           userId: opts.userId,
-          merchantId: classified.merchant?.id ?? null,
-          merchantSlug: classified.merchant?.slug ?? null,
+          merchantId: resolvedMerchant?.id ?? null,
+          merchantSlug: resolvedMerchant?.slug ?? classified.merchant?.slug ?? null,
           extraction: extraction.result.order,
           categoryIdsBySlug,
           needsReview: extraction.source === 'heuristic',

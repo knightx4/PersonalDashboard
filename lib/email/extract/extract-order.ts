@@ -29,6 +29,8 @@ Rules:
 - quantity * unitPriceCents + tax + shipping - discount must equal totalCents (±2 cents).
 - Prefer line items that appear in the email; do not invent products.
 - Always emit a separate lines[] entry for every ordered product. Never collapse "and N more item" subjects into a single line.
+- Shopify-style bodies list "Product name × qty" then optional variant then "$12.00" — use the product name, not the store name.
+- merchantName: prefer the store/From display name (e.g. "Ms Betters"), not "Unknown".
 - productUrl: only a real product page URL from the email (amazon.com/dp/…, etc). Never invent.
 - If this is not an order confirmation, return {"error":"not_an_order"}.`;
 

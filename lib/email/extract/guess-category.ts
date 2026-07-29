@@ -19,7 +19,7 @@ export function guessCategorySlug(input: {
     return 'clothing';
   }
   if (/\b(dog|cat|pet |litter|kibble)\b/.test(blob)) return 'pet';
-  if (/\b(vitamin|supplement|toothpaste|shampoo|serum|moisturizer)\b/.test(blob)) {
+  if (/\b(foam|foamer|cleanser|serum|moisturizer|shampoo|toothpaste|vitamin|supplement)\b/.test(blob)) {
     return /\b(vitamin|supplement)\b/.test(blob) ? 'health' : 'beauty';
   }
   if (/\b(grocery|organic|snack|coffee beans|olive oil)\b/.test(blob)) return 'groceries';

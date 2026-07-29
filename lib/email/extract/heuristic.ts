@@ -1,5 +1,6 @@
 import { parseAmazonQuantityLines } from './amazon-lines';
 import { guessCategorySlug } from './guess-category';
+import { parseShopifyQuantityLines } from './shopify-lines';
 import type { ExtractedOrder } from './schema';
 
 /** Dollars like $1,234.56 → cents. */
@@ -41,11 +42,36 @@ export function displayNameFromAddress(fromAddress: string | null | undefined): 
 
 function extractOrderNumber(blob: string): string | null {
   return (
-    blob.match(/\b(?:order\s*#|order\s*number[:\s]*|order\s*id[:\s]*)([A-Z0-9][A-Z0-9-]{4,})\b/i)?.[1] ??
-    blob.match(/\(\s*order\s*#\s*([A-Z0-9][A-Z0-9-]{4,})\s*\)/i)?.[1] ??
+    blob.match(/\b(?:order\s*#|order\s*number[:\s]*|order\s*id[:\s]*)([A-Z0-9][A-Z0-9-]{3,})\b/i)?.[1] ??
+    blob.match(/\(\s*order\s*#\s*([A-Z0-9][A-Z0-9-]{3,})\s*\)/i)?.[1] ??
+    blob.match(/\border\s+(\d{3,})\s+confirmed\b/i)?.[1] ??
+    blob.match(/\border\s+(\d{3,})\b/i)?.[1] ??
     blob.match(/\b(\d{3}-\d{7}-\d{7})\b/)?.[1] ??
     null
   );
+}
+
+/** Store name printed near the top of many Shopify confirmations. */
+export function merchantNameFromBody(text: string): string | null {
+  const lines = text
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const thankIdx = lines.findIndex((line) => /thank you for your purchase/i.test(line));
+  if (thankIdx >= 0) {
+    const candidate = lines[thankIdx + 1];
+    if (
+      candidate &&
+      candidate.length >= 2 &&
+      candidate.length <= 60 &&
+      !/^order\b/i.test(candidate) &&
+      !/^https?:/i.test(candidate) &&
+      !/-{3,}/.test(candidate)
+    ) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function fallbackLineName(input: {
@@ -91,7 +117,9 @@ export function heuristicExtractOrder(input: {
   if (totalCents == null) return null;
 
   let taxCents =
-    parseMoneyToCents(blob.match(/\bTax[:\s]*\$?\s*([0-9,]+\.\d{2})/i)?.[1] ?? '') ?? 0;
+    parseMoneyToCents(
+      blob.match(/\bTaxes?[:\s]*\$?\s*([0-9,]+\.\d{2})/i)?.[1] ?? '',
+    ) ?? 0;
   const shippingCents =
     parseMoneyToCents(
       blob.match(/\b(?:Shipping|Delivery|Delivery\s*Fee)[:\s]*\$?\s*([0-9,]+\.\d{2})/i)?.[1] ??
@@ -121,6 +149,18 @@ export function heuristicExtractOrder(input: {
   }
 
   if (lines.length === 0) {
+    for (const shopifyLine of parseShopifyQuantityLines(input.text)) {
+      lines.push({
+        name: shopifyLine.name,
+        quantity: shopifyLine.quantity,
+        unitPriceCents: shopifyLine.unitPriceCents,
+        variant: shopifyLine.variant,
+        blockText: shopifyLine.blockText,
+      });
+    }
+  }
+
+  if (lines.length === 0) {
     const lineRe = /^(?:Qty\s*)?(\d+)\s*[x×]\s+(.+?)\s+\$([0-9,]+\.\d{2})\s*$/gim;
     let m: RegExpExecArray | null;
     while ((m = lineRe.exec(input.text)) !== null) {
@@ -136,11 +176,13 @@ export function heuristicExtractOrder(input: {
   }
 
   const subjectMerchant = merchantNameFromSubject(input.subject);
+  const bodyMerchant = merchantNameFromBody(input.text);
   const fromDisplay = displayNameFromAddress(input.fromAddress);
   const merchantName =
     input.merchantName ??
     subjectMerchant ??
-    (fromDisplay && !/no-?reply|order|doordash|notification/i.test(fromDisplay)
+    bodyMerchant ??
+    (fromDisplay && !/no-?reply|notification|do.?not.?reply/i.test(fromDisplay)
       ? fromDisplay
       : null);
 
