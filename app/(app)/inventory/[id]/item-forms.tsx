@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useState } from 'react';
 import {
   disposeInventoryItem,
   markInventoryReturned,
@@ -177,16 +177,16 @@ export function ItemListsForm({
     updateInventoryItemLists,
     initial,
   );
+  const [creating, setCreating] = useState(false);
   const [createState, createAction, createPending] = useActionState(
-    createItemListAndAssign,
+    async (prev: ActionState, formData: FormData) => {
+      const next = await createItemListAndAssign(prev, formData);
+      if (next.message) setCreating(false);
+      return next;
+    },
     initial,
   );
-  const [creating, setCreating] = useState(false);
   const selected = new Set(selectedListIds);
-
-  useEffect(() => {
-    if (createState.message) setCreating(false);
-  }, [createState.message]);
 
   return (
     <div className="space-y-3 rounded-card border border-border bg-surface p-4">

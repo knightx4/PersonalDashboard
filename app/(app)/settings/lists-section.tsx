@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useState } from 'react';
 import {
   createItemList,
   deleteItemList,
@@ -21,12 +21,15 @@ export type SettingsList = {
 };
 
 export function ListsSection({ lists }: { lists: SettingsList[] }) {
-  const [createState, createAction, createPending] = useActionState(createItemList, initial);
   const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    if (createState.message) setCreating(false);
-  }, [createState.message]);
+  const [createState, createAction, createPending] = useActionState(
+    async (prev: ListActionState, formData: FormData) => {
+      const next = await createItemList(prev, formData);
+      if (next.message) setCreating(false);
+      return next;
+    },
+    initial,
+  );
 
   return (
     <div className="space-y-5">

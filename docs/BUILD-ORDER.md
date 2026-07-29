@@ -52,7 +52,9 @@ at Tier 2.
     cron at `/api/cron/inbox-incremental` (Hobby limit) plus Settings
     “Sync now”. Expired history falls back to a bounded `messages.list`
     catch-up.
-14. **Review queue.**
+14. ✅ **Review queue.** Heuristic orders (`needs_review`) and failed /
+    unmatched emails (`parse_status = needs_review`). Confirm, discard, or
+    dismiss; Open in Gmail; nav badge counts both.
 15. **Account deletion** with token revocation and full cascade.
 16. **Phase 2** — the anti-spending layer. No migrations needed; the schema
     already carries `item_uses`, the budget columns and `cooldown_until`.
