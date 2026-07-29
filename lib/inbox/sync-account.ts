@@ -217,13 +217,14 @@ export async function syncEmailAccountBatch(
         progress.messagesClassified += 1;
 
         if (classified.classification === 'not_relevant') {
+          // CHECK ingested_not_relevant_is_bare_ck: no subject/from/thread for not_relevant.
           await supabase.from('ingested_messages').insert({
             email_account_id: account.id,
             provider_message_id: message.id,
-            thread_id: message.threadId,
+            thread_id: null,
             received_at: message.internalDate?.toISOString() ?? null,
-            from_address: message.fromAddress,
-            subject: message.subject,
+            from_address: null,
+            subject: null,
             classification: 'not_relevant',
             parse_status: 'skipped',
             parser_version: PARSER_VERSION,
@@ -396,6 +397,18 @@ export async function syncEmailAccountBatch(
       } catch (err) {
         console.error('sync message failed', ref.id, err);
         progress.errors += 1;
+        // Best-effort ledger so a hard failure does not leave the message invisible forever.
+        const { error: ledgerError } = await supabase.from('ingested_messages').insert({
+          email_account_id: account.id,
+          provider_message_id: ref.id,
+          classification: 'order_confirmation',
+          parse_status: 'failed',
+          parser_version: PARSER_VERSION,
+          error: err instanceof Error ? err.message.slice(0, 500) : 'Sync failed',
+        });
+        if (ledgerError && !/duplicate|unique/i.test(ledgerError.message)) {
+          console.error('sync ledger insert failed', ref.id, ledgerError.message);
+        }
       }
     }
 

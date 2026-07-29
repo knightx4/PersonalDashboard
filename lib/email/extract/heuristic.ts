@@ -50,6 +50,8 @@ function fallbackLineName(input: {
   subject: string;
   merchantName?: string | null;
 }): string {
+  const orderedTitle = input.subject.match(/^ordered:\s*[“"']?(.+?)[”"']?\s*$/i)?.[1]?.trim();
+  if (orderedTitle) return orderedTitle.replace(/\.\.\.$/, '').slice(0, 200);
   const fromSubject = merchantNameFromSubject(input.subject);
   if (fromSubject) return fromSubject;
   const ofMatch = input.subject.match(/order of\s+(.+)$/i)?.[1]?.trim();
@@ -76,7 +78,9 @@ export function heuristicExtractOrder(input: {
   const totalMatch =
     blob.match(
       /\b(?:Order\s*Total|Grand\s*Total|Total\s*Charged|Amount\s*Paid|Total)[:\s]*\$?\s*([0-9,]+\.\d{2})/i,
-    ) ?? blob.match(/\$([0-9,]+\.\d{2})\s*(?:total|charged)/i);
+    ) ??
+    blob.match(/\b(?:Order\s*Total|Grand\s*Total|Total\s*Charged|Amount\s*Paid)\s*[:\s]*\n\s*([0-9,]+\.\d{2})\s*USD/i) ??
+    blob.match(/\$([0-9,]+\.\d{2})\s*(?:total|charged)/i);
   const totalCents = totalMatch ? parseMoneyToCents(totalMatch[1]) : null;
   if (totalCents == null) return null;
 

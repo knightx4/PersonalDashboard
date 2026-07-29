@@ -38,6 +38,16 @@ describe('classifyMessage', () => {
     expect(result.classification).toBe('order_confirmation');
   });
 
+  it('marks Amazon Ordered: title subjects as order_confirmation', () => {
+    const result = classifyMessage({
+      fromAddress: 'Amazon.com <auto-confirm@amazon.com>',
+      subject: 'Ordered: "The Well-Tempered City:..."',
+      merchants: [amazon],
+    });
+    expect(result.classification).toBe('order_confirmation');
+    expect(result.merchant?.slug).toBe('amazon');
+  });
+
   it('marks Amazon review prompts as not_relevant', () => {
     const result = classifyMessage({
       fromAddress: 'no-reply@amazon.com',
@@ -93,6 +103,30 @@ describe('heuristicExtractOrder + applyExtraction', () => {
     expect(raw?.lines[0]?.name).toMatch(/bb\.q Chicken/i);
     const applied = applyExtraction(raw);
     expect(applied.ok).toBe(true);
+  });
+
+  it('parses Amazon Ordered: subjects with Grand Total in USD', () => {
+    const raw = heuristicExtractOrder({
+      subject: 'Ordered: "The Well-Tempered City:..."',
+      text: [
+        'Thanks for your order!',
+        'Order #',
+        '114-1276134-9911401',
+        '* The Well-Tempered City: What Modern Science',
+        '  Quantity: 1',
+        '  15.19 USD',
+        'Grand Total:',
+        '16.15 USD',
+      ].join('\n'),
+      merchantSlug: 'amazon',
+      merchantName: 'Amazon',
+      fromAddress: '"Amazon.com" <auto-confirm@amazon.com>',
+      receivedAt: new Date('2026-06-11T02:53:10Z'),
+    });
+    expect(raw).not.toBeNull();
+    expect(raw?.externalOrderNumber).toBe('114-1276134-9911401');
+    expect(raw?.totalCents).toBe(1615);
+    expect(raw?.lines[0]?.name).toMatch(/Well-Tempered City/i);
   });
 
   it('rejects extractions totals that do not reconcile', () => {
