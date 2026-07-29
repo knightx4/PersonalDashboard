@@ -258,3 +258,94 @@ export async function deleteCustomCategory(formData: FormData): Promise<void> {
   revalidatePath('/orders');
   revalidatePath('/dashboard');
 }
+
+export type ListActionState = {
+  error?: string;
+  message?: string;
+};
+
+const createListSchema = z.object({
+  name: z.string().trim().min(2).max(40),
+  color: z.string().refine(isCategoryColor, 'Pick a color.'),
+});
+
+export async function createItemList(
+  _prev: ListActionState,
+  formData: FormData,
+): Promise<ListActionState> {
+  const user = await requireUser();
+  const parsed = createListSchema.safeParse({
+    name: formData.get('name'),
+    color: formData.get('color') ?? CATEGORY_COLOR_OPTIONS[0],
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
+  }
+
+  const slug = slugifyCategoryName(parsed.data.name);
+  if (!slug) return { error: 'Use letters or numbers in the list name.' };
+
+  const supabase = await createClient();
+  const { data: conflict } = await supabase
+    .from('item_lists')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('slug', slug)
+    .maybeSingle();
+  if (conflict) return { error: 'That list name is already used. Try another.' };
+
+  const { error } = await supabase.from('item_lists').insert({
+    user_id: user.id,
+    name: parsed.data.name,
+    slug,
+    color: parsed.data.color,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+  return { message: 'List created. Add items from any inventory detail page.' };
+}
+
+export async function renameItemList(
+  _prev: ListActionState,
+  formData: FormData,
+): Promise<ListActionState> {
+  const user = await requireUser();
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(2).max(40),
+    })
+    .safeParse({
+      id: formData.get('id'),
+      name: formData.get('name'),
+    });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('item_lists')
+    .update({ name: parsed.data.name })
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+  return { message: 'List renamed.' };
+}
+
+export async function deleteItemList(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  await supabase.from('item_lists').delete().eq('id', parsed.data.id).eq('user_id', user.id);
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+}

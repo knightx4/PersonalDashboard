@@ -5,6 +5,7 @@ import {
   disposeInventoryItem,
   markInventoryReturned,
   updateInventoryItem,
+  updateInventoryItemLists,
   type ActionState,
 } from '@/app/(app)/inventory/actions';
 import { Button } from '@/components/ui/button';
@@ -153,6 +154,70 @@ export function ReturnForm({
       </div>
       <Button type="submit" variant="secondary" disabled={pending}>
         {pending ? 'Saving…' : 'Mark returned'}
+      </Button>
+      {state.message && <p className="text-sm text-positive">{state.message}</p>}
+      <FieldError>{state.error}</FieldError>
+    </form>
+  );
+}
+
+export function ItemListsForm({
+  itemId,
+  lists,
+  selectedListIds,
+}: {
+  itemId: string;
+  lists: Array<{ id: string; name: string; color: string | null }>;
+  selectedListIds: string[];
+}) {
+  const [state, action, pending] = useActionState(updateInventoryItemLists, initial);
+  const selected = new Set(selectedListIds);
+
+  if (lists.length === 0) {
+    return (
+      <div className="rounded-card border border-border bg-surface p-4">
+        <h3 className="text-sm font-semibold text-ink">Lists</h3>
+        <p className="mt-2 text-[13px] text-ink-muted">
+          No lists yet. Create one in{' '}
+          <a href="/settings" className="text-brand hover:underline">
+            Settings
+          </a>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form action={action} className="space-y-3 rounded-card border border-border bg-surface p-4">
+      <input type="hidden" name="id" value={itemId} />
+      <h3 className="text-sm font-semibold text-ink">Lists</h3>
+      <p className="text-[13px] text-ink-muted">
+        Personal trackers — not categories. Filter inventory by any list you check here.
+      </p>
+      <ul className="space-y-2">
+        {lists.map((list) => (
+          <li key={list.id}>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                name="list_id"
+                value={list.id}
+                defaultChecked={selected.has(list.id)}
+                className="size-4 rounded border-border text-brand focus:ring-brand/30"
+              />
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: list.color ?? '#cfcfc8' }}
+                aria-hidden
+              />
+              {list.name}
+            </label>
+          </li>
+        ))}
+      </ul>
+      <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+        {pending ? 'Saving…' : 'Save lists'}
       </Button>
       {state.message && <p className="text-sm text-positive">{state.message}</p>}
       <FieldError>{state.error}</FieldError>

@@ -321,6 +321,44 @@ export const inventoryItems = pgTable(
   ],
 );
 
+/** User-owned trackers (not taxonomy). Items can belong to many lists. */
+export const itemLists = pgTable(
+  'item_lists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    color: text('color'),
+    ...timestamps,
+  },
+  (t) => [
+    index('item_lists_user_idx').on(t.userId),
+    uniqueIndex('item_lists_user_slug_key').on(t.userId, t.slug),
+  ],
+);
+
+export const inventoryItemLists = pgTable(
+  'inventory_item_lists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    listId: uuid('list_id')
+      .notNull()
+      .references(() => itemLists.id, { onDelete: 'cascade' }),
+    ...timestamps,
+  },
+  (t) => [
+    index('inventory_item_lists_item_idx').on(t.inventoryItemId),
+    index('inventory_item_lists_list_idx').on(t.listId),
+    uniqueIndex('inventory_item_lists_item_list_uidx').on(t.inventoryItemId, t.listId),
+  ],
+);
+
 /** Phase 2. Empty until then, but present so cost-per-use needs no migration. */
 export const itemUses = pgTable(
   'item_uses',

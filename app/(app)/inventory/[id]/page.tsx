@@ -4,7 +4,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { formatMoney } from '@/lib/money';
-import { DisposeForm, EditInventoryForm, ReturnForm } from './item-forms';
+import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -17,11 +17,12 @@ export default async function InventoryItemPage({
   const supabase = await createClient();
   const { id } = await params;
 
-  const [{ data: item }, { data: categories }] = await Promise.all([
-    supabase
-      .from('inventory_items')
-      .select(
-        `
+  const [{ data: item }, { data: categories }, { data: lists }, { data: memberships }] =
+    await Promise.all([
+      supabase
+        .from('inventory_items')
+        .select(
+          `
         id, name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
         categories ( id, name, color ),
@@ -30,16 +31,25 @@ export default async function InventoryItemPage({
           orders ( id, external_order_number, merchants ( name ) )
         )
       `,
-      )
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .maybeSingle(),
-    supabase
-      .from('categories')
-      .select('id, name')
-      .is('parent_id', null)
-      .order('name'),
-  ]);
+        )
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('categories')
+        .select('id, name')
+        .is('parent_id', null)
+        .order('name'),
+      supabase
+        .from('item_lists')
+        .select('id, name, color')
+        .eq('user_id', user.id)
+        .order('name'),
+      supabase
+        .from('inventory_item_lists')
+        .select('list_id')
+        .eq('inventory_item_id', id),
+    ]);
 
   if (!item) notFound();
 
@@ -56,6 +66,7 @@ export default async function InventoryItemPage({
       : order.merchants
     : null;
   const productUrl = orderItem?.product_url ?? null;
+  const selectedListIds = (memberships ?? []).map((row) => row.list_id as string);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -138,6 +149,12 @@ export default async function InventoryItemPage({
           categories={categories ?? []}
         />
       </section>
+
+      <ItemListsForm
+        itemId={item.id}
+        lists={lists ?? []}
+        selectedListIds={selectedListIds}
+      />
 
       {item.status === 'owned' && (
         <div className="grid gap-4 lg:grid-cols-2">

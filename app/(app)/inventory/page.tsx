@@ -19,10 +19,20 @@ const RANGES: { id: PresetRange | 'all'; label: string }[] = [
   { id: 'last_12_months', label: 'Last 12 months' },
 ];
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseListId(raw: string | undefined): string | undefined {
+  const value = raw?.trim();
+  if (!value || !UUID_RE.test(value)) return undefined;
+  return value;
+}
+
 function inventoryHref(opts: {
   q?: string;
   category?: string;
   merchant?: string;
+  list?: string;
   range?: string;
 }): string {
   const params = new URLSearchParams();
@@ -30,6 +40,7 @@ function inventoryHref(opts: {
   if (opts.q) params.set('q', opts.q);
   if (opts.category) params.set('category', opts.category);
   if (opts.merchant) params.set('merchant', opts.merchant);
+  if (opts.list) params.set('list', opts.list);
   const qs = params.toString();
   return qs ? `/inventory?${qs}` : '/inventory';
 }
@@ -72,6 +83,7 @@ export default async function InventoryPage({
     q?: string;
     category?: string;
     merchant?: string;
+    list?: string;
     range?: string;
   }>;
 }) {
@@ -82,14 +94,20 @@ export default async function InventoryPage({
   const q = (params.q ?? '').trim().replace(/[%_,*()]/g, ' ').replace(/\s+/g, ' ').trim();
   const categoryId = params.category?.trim() || undefined;
   const merchantId = parseMerchantId(params.merchant);
+  const listId = parseListId(params.list);
   const range =
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
 
-  const [{ data: categories }, merchants, { data: profile }] = await Promise.all([
+  const [{ data: categories }, { data: lists }, merchants, { data: profile }] = await Promise.all([
     supabase
       .from('categories')
       .select('id, name, color')
       .is('parent_id', null)
+      .order('name'),
+    supabase
+      .from('item_lists')
+      .select('id, name, color')
+      .eq('user_id', user.id)
       .order('name'),
     loadUserMerchants(supabase, user.id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
@@ -100,12 +118,19 @@ export default async function InventoryPage({
     merchantId && merchants.some((entry) => entry.id === merchantId)
       ? merchantId
       : undefined;
+  const activeList =
+    listId && (lists ?? []).some((entry) => entry.id === listId) ? listId : undefined;
   const period = range === 'all' ? null : periodFor(range, timezone);
+
+  const membershipJoin = activeList
+    ? `inventory_item_lists!inner ( list_id )`
+    : `inventory_item_lists ( list_id )`;
 
   const selectWithOptionalInner = activeMerchant
     ? `
         id, name, variant, cost_cents, acquired_at, status, category_id,
         categories(name, color),
+        ${membershipJoin},
         order_items!inner (
           orders!inner (
             merchant_id,
@@ -116,6 +141,7 @@ export default async function InventoryPage({
     : `
         id, name, variant, cost_cents, acquired_at, status, category_id,
         categories(name, color),
+        ${membershipJoin},
         order_items (
           orders (
             merchant_id,
@@ -135,15 +161,47 @@ export default async function InventoryPage({
   if (activeMerchant) {
     query = query.eq('order_items.orders.merchant_id', activeMerchant);
   }
+  if (activeList) {
+    query = query.eq('inventory_item_lists.list_id', activeList);
+  }
   if (period) {
     query = query.gte('acquired_at', period.start).lte('acquired_at', period.end);
   }
   if (q) query = query.or(`name.ilike.%${q}%,variant.ilike.%${q}%`);
 
-  const { data: items, error } = await query;
+  const { data: rows, error } = await query;
   if (error) throw error;
 
-  const filtered = Boolean(q || categoryId || activeMerchant || range !== 'all');
+  type InventoryRow = {
+    id: string;
+    name: string;
+    variant: string | null;
+    cost_cents: number;
+    acquired_at: string | null;
+    status: string;
+    category_id: string | null;
+    categories: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
+    order_items:
+      | {
+          orders:
+            | { merchants: { name: string } | { name: string }[] | null }
+            | { merchants: { name: string } | { name: string }[] | null }[]
+            | null;
+        }
+      | {
+          orders:
+            | { merchants: { name: string } | { name: string }[] | null }
+            | { merchants: { name: string } | { name: string }[] | null }[]
+            | null;
+        }[]
+      | null;
+  };
+
+  const items = (rows ?? []) as unknown as InventoryRow[];
+
+  const filtered = Boolean(
+    q || categoryId || activeMerchant || activeList || range !== 'all',
+  );
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -159,6 +217,34 @@ export default async function InventoryPage({
                 q: q || undefined,
                 category: categoryId,
                 merchant: activeMerchant,
+                list: activeList,
+              })}
+            />
+          ))}
+        </RailGroup>
+        <RailGroup label="List">
+          <RailItem
+            label="Any"
+            active={!activeList}
+            href={inventoryHref({
+              range,
+              q: q || undefined,
+              category: categoryId,
+              merchant: activeMerchant,
+            })}
+          />
+          {(lists ?? []).map((list) => (
+            <RailItem
+              key={list.id}
+              label={list.name}
+              swatch={list.color ?? undefined}
+              active={list.id === activeList}
+              href={inventoryHref({
+                range,
+                q: q || undefined,
+                category: categoryId,
+                merchant: activeMerchant,
+                list: list.id,
               })}
             />
           ))}
@@ -171,6 +257,7 @@ export default async function InventoryPage({
               range,
               q: q || undefined,
               category: categoryId,
+              list: activeList,
             })}
           />
           {merchants.map((merchant) => (
@@ -183,6 +270,7 @@ export default async function InventoryPage({
                 q: q || undefined,
                 category: categoryId,
                 merchant: merchant.id,
+                list: activeList,
               })}
             />
           ))}
@@ -195,6 +283,7 @@ export default async function InventoryPage({
               range,
               q: q || undefined,
               merchant: activeMerchant,
+              list: activeList,
             })}
           />
           {(categories ?? []).map((category) => (
@@ -208,6 +297,7 @@ export default async function InventoryPage({
                 q: q || undefined,
                 category: category.id,
                 merchant: activeMerchant,
+                list: activeList,
               })}
             />
           ))}
@@ -226,6 +316,7 @@ export default async function InventoryPage({
           {activeMerchant && (
             <input type="hidden" name="merchant" value={activeMerchant} />
           )}
+          {activeList && <input type="hidden" name="list" value={activeList} />}
           <Input
             name="q"
             defaultValue={q}
@@ -234,13 +325,13 @@ export default async function InventoryPage({
           />
         </form>
 
-        {(items ?? []).length === 0 ? (
+        {items.length === 0 ? (
           <EmptyState
             icon={Package}
             title={filtered ? 'No matching items' : 'Nothing in your inventory yet'}
             description={
               filtered
-                ? 'Try a different search, merchant, category, or date range.'
+                ? 'Try a different search, list, merchant, category, or date range.'
                 : 'Every item from an order lands here as its own entry, so you can search what you own, mark things returned, or record that you got rid of them.'
             }
             action={
@@ -254,7 +345,7 @@ export default async function InventoryPage({
           />
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            {items!.map((item) => {
+            {items.map((item) => {
               const category = Array.isArray(item.categories)
                 ? item.categories[0]
                 : item.categories;

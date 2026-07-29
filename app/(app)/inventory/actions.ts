@@ -185,3 +185,55 @@ export async function markInventoryReturned(
   revalidatePath(`/orders/${orderItem.order_id}`);
   return { message: 'Marked as returned.' };
 }
+
+/** Replace list memberships for one inventory item with the submitted checklist. */
+export async function updateInventoryItemLists(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const itemId = z.string().uuid().safeParse(formData.get('id'));
+  if (!itemId.success) return { error: 'Missing item.' };
+
+  const selected = formData
+    .getAll('list_id')
+    .map((value) => String(value))
+    .filter((value) => z.string().uuid().safeParse(value).success);
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('id', itemId.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) return { error: 'That item could not be found.' };
+
+  const { data: ownedLists } = await supabase
+    .from('item_lists')
+    .select('id')
+    .eq('user_id', user.id);
+  const ownedIds = new Set((ownedLists ?? []).map((row) => row.id as string));
+  const nextIds = selected.filter((id) => ownedIds.has(id));
+
+  const { error: deleteError } = await supabase
+    .from('inventory_item_lists')
+    .delete()
+    .eq('inventory_item_id', item.id);
+  if (deleteError) return { error: deleteError.message };
+
+  if (nextIds.length > 0) {
+    const { error: insertError } = await supabase.from('inventory_item_lists').insert(
+      nextIds.map((listId) => ({
+        inventory_item_id: item.id,
+        list_id: listId,
+      })),
+    );
+    if (insertError) return { error: insertError.message };
+  }
+
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${item.id}`);
+  return { message: 'Lists updated.' };
+}
