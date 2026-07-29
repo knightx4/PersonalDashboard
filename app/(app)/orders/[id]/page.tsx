@@ -110,8 +110,10 @@ export default async function OrderDetailPage({
         <p className="text-sm text-ink-muted">
           From email: {sourceMessage.subject}
           {sourceMessage.from_address ? ` · ${sourceMessage.from_address}` : ''}
-          {inbox?.email_address ? ` · inbox ${inbox.email_address}` : ''}
         </p>
+      )}
+      {inbox?.email_address && (
+        <p className="text-[13px] text-ink-faint">Via {inbox.email_address}</p>
       )}
 
       {(shipments?.length ?? 0) > 0 && (
@@ -286,7 +288,14 @@ export default async function OrderDetailPage({
         )}
         <div className="flex justify-between gap-4 sm:col-span-2">
           <dt className="text-ink-muted">Source</dt>
-          <dd className="text-ink">{order.source.replaceAll('_', ' ')}</dd>
+          <dd className="text-right text-ink">
+            {order.source.replaceAll('_', ' ')}
+            {inbox?.email_address ? (
+              <span className="mt-0.5 block text-[13px] font-normal text-ink-faint">
+                {inbox.email_address}
+              </span>
+            ) : null}
+          </dd>
         </div>
       </dl>
     </div>

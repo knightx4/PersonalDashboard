@@ -26,7 +26,7 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'connected':
       return {
         tone: 'ok',
-        text: 'Gmail connected. Click Import orders from Gmail below to pull in confirmations.',
+        text: 'Gmail connected. Import orders from each inbox below — you can connect more than one.',
       };
     case 'denied':
       return { tone: 'warn', text: 'Google access was not granted. Your inbox was not connected.' };
@@ -107,55 +107,66 @@ export function InboxSection({
       )}
 
       {accounts.length > 0 ? (
-        <ul className="space-y-3">
-          {accounts.map((account) => (
-            <li
-              key={account.id}
-              className="flex flex-col gap-3 rounded-lg border border-border bg-canvas px-3 py-3"
+        <div className="space-y-3">
+          <ul className="space-y-3">
+            {accounts.map((account) => (
+              <li
+                key={account.id}
+                className="flex flex-col gap-3 rounded-lg border border-border bg-canvas px-3 py-3"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">{account.email_address}</p>
+                    <p className="text-xs text-ink-muted">
+                      {STATUS_LABEL[account.status] ?? account.status}
+                      {account.last_synced_at
+                        ? ` · Last synced ${new Date(account.last_synced_at).toLocaleString()}`
+                        : ' · Not synced yet'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {account.status === 'needs_reauth' && configured && (
+                      <Link
+                        href="/api/auth/gmail/connect?return_to=%2Fsettings"
+                        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                      >
+                        <RefreshCw className="size-3.5" strokeWidth={1.75} />
+                        Reconnect
+                      </Link>
+                    )}
+                    <form action={disconnectInbox}>
+                      <input type="hidden" name="id" value={account.id} />
+                      <Button variant="ghost" size="sm" type="submit">
+                        Disconnect
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+                {account.status === 'active' && (
+                  <InboxSyncButton
+                    accountId={account.id}
+                    initialJob={latestJobs[account.id] ?? null}
+                    backfillCompleted={Boolean(account.backfill_completed_at)}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+          {configured && (
+            <Link
+              href="/api/auth/gmail/connect?return_to=%2Fsettings"
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
             >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink">{account.email_address}</p>
-                  <p className="text-xs text-ink-muted">
-                    {STATUS_LABEL[account.status] ?? account.status}
-                    {account.last_synced_at
-                      ? ` · Last synced ${new Date(account.last_synced_at).toLocaleString()}`
-                      : ' · Not synced yet'}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {account.status === 'needs_reauth' && configured && (
-                    <Link
-                      href="/api/auth/gmail/connect?return_to=%2Fsettings"
-                      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                    >
-                      <RefreshCw className="size-3.5" strokeWidth={1.75} />
-                      Reconnect
-                    </Link>
-                  )}
-                  <form action={disconnectInbox}>
-                    <input type="hidden" name="id" value={account.id} />
-                    <Button variant="ghost" size="sm" type="submit">
-                      Disconnect
-                    </Button>
-                  </form>
-                </div>
-              </div>
-              {account.status === 'active' && (
-                <InboxSyncButton
-                  accountId={account.id}
-                  initialJob={latestJobs[account.id] ?? null}
-                  backfillCompleted={Boolean(account.backfill_completed_at)}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
+              <Mail className="size-4" strokeWidth={1.75} />
+              Connect another Gmail
+            </Link>
+          )}
+        </div>
       ) : (
         <div className="space-y-3 text-sm text-ink-muted">
           <p>
             No inbox connected. The app works without one — you can add orders by hand. Connect Gmail
-            to import order confirmations.
+            to import order confirmations from one or more inboxes.
           </p>
           {configured ? (
             <Link
@@ -177,8 +188,8 @@ export function InboxSection({
 
       {accounts.length > 0 && configured && (
         <p className="mt-3 text-xs text-ink-faint">
-          We request read-only Gmail access. Email bodies are never stored — only parsed order
-          metadata. For accurate product names and line items, set{' '}
+          We request read-only Gmail access on each inbox you connect. Email bodies are never
+          stored — only parsed order metadata. For accurate product names and line items, set{' '}
           <code className="text-[11px]">ANTHROPIC_API_KEY</code> on Vercel (Haiku). Without it
           we still import totals from a simpler heuristic parser.
         </p>

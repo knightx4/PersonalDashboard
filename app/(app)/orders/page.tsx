@@ -10,6 +10,7 @@ import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchan
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import {
   matchingItemHint,
+  orderInboxAddress,
   orderItemsSummary,
   orderMatchesQuery,
   sanitizeOrdersQuery,
@@ -91,9 +92,13 @@ export default async function OrdersPage({
   const merchantId = parseMerchantId(params.merchant);
   const q = sanitizeOrdersQuery(params.q);
 
-  const [{ data: profile }, merchants] = await Promise.all([
+  const [{ data: profile }, merchants, { count: inboxCount }] = await Promise.all([
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
     loadUserMerchants(supabase, user.id),
+    supabase
+      .from('email_accounts')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id),
   ]);
   const timezone = profile?.timezone ?? 'UTC';
   const period = periodFor(range, timezone);
@@ -101,6 +106,7 @@ export default async function OrdersPage({
     merchantId && merchants.some((entry) => entry.id === merchantId)
       ? merchantId
       : undefined;
+  const showInbox = (inboxCount ?? 0) > 1;
 
   let query = supabase
     .from('orders')
@@ -109,7 +115,7 @@ export default async function OrdersPage({
       id, order_date, total_cents, currency, status, external_order_number,
       merchants ( name ),
       order_items ( name, variant, quantity, categories ( name ) ),
-      ingested_messages ( subject, from_address )
+      ingested_messages ( subject, from_address, classification, email_accounts ( email_address ) )
     `,
     )
     .eq('user_id', user.id)
@@ -215,7 +221,7 @@ export default async function OrdersPage({
           <Input
             name="q"
             defaultValue={q}
-            placeholder="Search merchant, item, order #, email subject…"
+            placeholder="Search merchant, item, order #, inbox…"
             aria-label="Search orders"
           />
         </form>
@@ -227,7 +233,7 @@ export default async function OrdersPage({
             description={
               filteredEmpty
                 ? 'Try a different search, merchant, status, or time range.'
-                : 'Orders appear here as we find them in your inbox, grouped by month. You can also add one by hand at any time.'
+                : 'Orders appear here as we find them in your inboxes, grouped by month. You can also add one by hand at any time.'
             }
             action={
               filteredEmpty
@@ -235,7 +241,7 @@ export default async function OrdersPage({
                 : { label: 'Add an order', href: '/orders/new' }
             }
             secondaryAction={
-              filteredEmpty ? undefined : { label: 'Connect an inbox', href: '/settings' }
+              filteredEmpty ? undefined : { label: 'Connect an inbox', href: '/settings#inboxes' }
             }
           />
         ) : (
@@ -252,6 +258,7 @@ export default async function OrdersPage({
                       : order.merchants;
                     const itemsSummary = orderItemsSummary(order);
                     const itemHint = q ? matchingItemHint(order, q) : null;
+                    const inbox = showInbox ? orderInboxAddress(order) : null;
                     return (
                       <li key={order.id}>
                         <Link
@@ -274,6 +281,7 @@ export default async function OrdersPage({
                                 ? ` · #${order.external_order_number}`
                                 : ''}
                               {` · ${order.status.replaceAll('_', ' ')}`}
+                              {inbox ? ` · ${inbox}` : ''}
                             </p>
                           </div>
                           <p className="tabular shrink-0 font-medium text-ink">
