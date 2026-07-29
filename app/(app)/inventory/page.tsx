@@ -5,7 +5,6 @@ import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input, Select } from '@/components/ui/field';
-import { categoryIcon } from '@/lib/categories/icons';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
 import {
@@ -330,7 +329,7 @@ export default async function InventoryPage({
               key={category.id}
               label={category.name}
               swatch={category.color ?? undefined}
-              icon={categoryIcon(category.slug)}
+              iconSlug={category.slug}
               active={category.id === categoryId}
               href={inventoryHref({ ...hrefBase, category: category.id })}
             />

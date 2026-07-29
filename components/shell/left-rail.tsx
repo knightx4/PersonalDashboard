@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { createElement, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { CategoryGlyph } from '@/lib/categories/icons';
 import { cn } from '@/lib/cn';
 
 /**
@@ -75,7 +75,8 @@ export function RailItem({
   active = false,
   count,
   swatch,
-  icon,
+  /** Category slug — resolved to an icon inside this client component. */
+  iconSlug,
   onClick,
   href,
 }: {
@@ -83,7 +84,7 @@ export function RailItem({
   active?: boolean;
   count?: number;
   swatch?: string;
-  icon?: LucideIcon;
+  iconSlug?: string | null;
   onClick?: () => void;
   href?: string;
 }) {
@@ -96,7 +97,7 @@ export function RailItem({
 
   const body = (
     <>
-      {icon ? (
+      {iconSlug ? (
         <span
           className="flex size-5 shrink-0 items-center justify-center rounded-md"
           style={
@@ -106,7 +107,7 @@ export function RailItem({
           }
           aria-hidden
         >
-          {createElement(icon, { className: 'size-3.5', strokeWidth: 1.75 })}
+          <CategoryGlyph slug={iconSlug} className="size-3.5" />
         </span>
       ) : swatch ? (
         <span
