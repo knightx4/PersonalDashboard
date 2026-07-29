@@ -126,7 +126,7 @@ export function InboxSection({
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {account.status === 'needs_reauth' && configured && (
                     <Link
-                      href="/api/auth/gmail/connect"
+                      href="/api/auth/gmail/connect?return_to=%2Fsettings"
                       className={buttonVariants({ variant: 'secondary', size: 'sm' })}
                     >
                       <RefreshCw className="size-3.5" strokeWidth={1.75} />
@@ -159,7 +159,7 @@ export function InboxSection({
           </p>
           {configured ? (
             <Link
-              href="/api/auth/gmail/connect"
+              href="/api/auth/gmail/connect?return_to=%2Fsettings"
               className={buttonVariants({ variant: 'primary', size: 'sm' })}
             >
               <Mail className="size-4" strokeWidth={1.75} />

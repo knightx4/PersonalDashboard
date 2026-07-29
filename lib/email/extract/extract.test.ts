@@ -48,6 +48,16 @@ describe('classifyMessage', () => {
     expect(result.merchant?.slug).toBe('amazon');
   });
 
+  it('marks Shopify-style Order N confirmed subjects as order_confirmation', () => {
+    const result = classifyMessage({
+      fromAddress: 'Ms Betters <hello@msbetters.us>',
+      subject: 'Order 5781 confirmed',
+      merchants: [],
+    });
+    expect(result.classification).toBe('order_confirmation');
+    expect(result.merchant).toBeNull();
+  });
+
   it('marks Amazon review prompts as not_relevant', () => {
     const result = classifyMessage({
       fromAddress: 'no-reply@amazon.com',
@@ -162,6 +172,35 @@ describe('heuristicExtractOrder + applyExtraction', () => {
     expect(raw?.lines[1]?.name).toMatch(/T Shirt/i);
     expect(raw?.lines[1]?.unitPriceCents).toBe(1999);
     expect(raw?.lines[1]?.categorySlug).toBe('clothing');
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
+  });
+
+  it('parses Shopify Order confirmed emails with store From + product × qty', () => {
+    const fixture = readFileSync(
+      resolve(__dirname, '../../../fixtures/emails/shopify-ms-betters-order.txt'),
+      'utf8',
+    );
+    const subject = (fixture.match(/^Subject:\s*(.*)$/im)?.[1] ?? '').trim();
+    const from = (fixture.match(/^From:\s*(.*)$/im)?.[1] ?? '').trim();
+    const body = fixture.replace(/^Subject:.*\nFrom:.*\n\n?/i, '');
+    const raw = heuristicExtractOrder({
+      subject,
+      text: body,
+      fromAddress: from,
+      receivedAt: new Date('2026-04-01T12:00:00Z'),
+    });
+    expect(raw).not.toBeNull();
+    expect(raw?.merchantName).toMatch(/Ms Betters/i);
+    expect(raw?.externalOrderNumber).toBe('5781');
+    expect(raw?.totalCents).toBe(3999);
+    expect(raw?.shippingCents).toBe(799);
+    expect(raw?.lines).toHaveLength(1);
+    expect(raw?.lines[0]?.name).toMatch(/Miraculous Foamer/i);
+    expect(raw?.lines[0]?.variant).toMatch(/4 oz/i);
+    expect(raw?.lines[0]?.unitPriceCents).toBe(3200);
+    expect(raw?.lines[0]?.quantity).toBe(1);
+    expect(raw?.lines[0]?.categorySlug).toBe('beauty');
     const applied = applyExtraction(raw);
     expect(applied.ok).toBe(true);
   });

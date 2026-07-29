@@ -14,6 +14,7 @@ import {
   type IngestCounters,
 } from '@/lib/inbox/ingest-messages';
 import { loadMerchantExclusions } from '@/lib/inbox/merchant-exclusions';
+import { loadMerchantsForUser } from '@/lib/merchants/resolve-order-merchant';
 
 export { incrementalFallbackQuery } from '@/lib/email/providers/gmail-query';
 
@@ -48,17 +49,16 @@ type AccountRow = {
   status: string;
 };
 
-async function loadMerchants(supabase: SupabaseClient): Promise<MerchantDomainHit[]> {
-  const { data, error } = await supabase
-    .from('merchants')
-    .select('id, slug, name, domains')
-    .eq('is_global', true);
-  if (error) throw error;
-  return (data ?? []).map((m) => ({
+async function loadMerchants(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<MerchantDomainHit[]> {
+  const rows = await loadMerchantsForUser(supabase, userId);
+  return rows.map((m) => ({
     id: m.id,
     slug: m.slug,
     name: m.name,
-    domains: (m.domains as string[]) ?? [],
+    domains: m.domains,
   }));
 }
 
@@ -237,7 +237,7 @@ export async function syncEmailAccountBatch(
 
   try {
     const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
-    const merchants = await loadMerchants(supabase);
+    const merchants = await loadMerchants(supabase, opts.userId);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
     const categoryIdsBySlug = await loadCategoryMap(supabase);
     const query = orderCandidateQuery(account.backfill_window_days);
@@ -350,7 +350,7 @@ export async function syncEmailAccountIncrementalBatch(
 
   try {
     const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
-    const merchants = await loadMerchants(supabase);
+    const merchants = await loadMerchants(supabase, opts.userId);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
     const categoryIdsBySlug = await loadCategoryMap(supabase);
 

@@ -31,7 +31,7 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
        * onboarding with its own explanation screen.
        */}
       <form action={signInWithGoogle}>
-        <input type="hidden" name="next" value={next ?? '/dashboard'} />
+        <input type="hidden" name="next" value={next ?? '/onboarding'} />
         <Button type="submit" variant="secondary" className="w-full">
           <svg className="size-4" viewBox="0 0 24 24" aria-hidden>
             <path
@@ -62,7 +62,7 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
       </div>
 
       <form action={formAction} className="space-y-3">
-        <input type="hidden" name="next" value={next ?? '/dashboard'} />
+        <input type="hidden" name="next" value={next ?? '/onboarding'} />
 
         <div>
           <label htmlFor="email" className="mb-1 block text-[13px] font-medium text-ink">

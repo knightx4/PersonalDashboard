@@ -1,20 +1,27 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 import { createClient, getUser } from '@/lib/auth/server';
 import { encryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailRedirectUri } from '@/lib/email/gmail-redirect';
 import { verifyGmailOAuthState } from '@/lib/email/oauth-state';
 import { gmailProvider, hasGmailReadonlyScope } from '@/lib/email/providers/gmail';
+import { safeAppPath } from '@/lib/paths';
 
-function settingsRedirect(request: NextRequest, code: string) {
-  const url = new URL('/settings', request.url);
+const RETURN_COOKIE = 'gmail_oauth_return';
+
+async function finishRedirect(request: NextRequest, code: string) {
+  const cookieStore = await cookies();
+  const returnTo = safeAppPath(cookieStore.get(RETURN_COOKIE)?.value, '/settings');
+  cookieStore.delete(RETURN_COOKIE);
+
+  const url = new URL(returnTo, request.url);
   url.searchParams.set('inbox', code);
   return NextResponse.redirect(url);
 }
 
 /**
  * Gmail read-grant callback. Stores encrypted tokens on email_accounts.
- * Sync/backfill arrives in build step 12.
  */
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -26,13 +33,13 @@ export async function GET(request: NextRequest) {
   const oauthError = searchParams.get('error');
   if (oauthError) {
     console.error('gmail oauth denied', oauthError, searchParams.get('error_description'));
-    return settingsRedirect(request, 'denied');
+    return finishRedirect(request, 'denied');
   }
 
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   if (!code || !state) {
-    return settingsRedirect(request, 'missing_code');
+    return finishRedirect(request, 'missing_code');
   }
 
   let encryptionKey: string;
@@ -40,20 +47,17 @@ export async function GET(request: NextRequest) {
     encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
   } catch (err) {
     console.error('gmail oauth env', err);
-    return settingsRedirect(request, 'unconfigured');
+    return finishRedirect(request, 'unconfigured');
   }
 
   if (!verifyGmailOAuthState(state, user.id, encryptionKey)) {
     console.error('gmail oauth state mismatch', { userId: user.id });
-    return settingsRedirect(request, 'state');
+    return finishRedirect(request, 'state');
   }
 
   try {
-    // Must match the redirect_uri from the authorize step AND the URL Google hit.
-    // Prefer the live callback origin; fall back to the configured app URL.
     const liveRedirect = `${request.nextUrl.origin}/api/auth/gmail/callback`;
     const configuredRedirect = await gmailRedirectUri();
-    const redirectUri = liveRedirect;
 
     console.info('gmail oauth exchange', {
       liveRedirect,
@@ -61,18 +65,16 @@ export async function GET(request: NextRequest) {
       match: liveRedirect === configuredRedirect,
     });
 
-    const tokens = await gmailProvider.exchangeCode(code, redirectUri);
+    const tokens = await gmailProvider.exchangeCode(code, liveRedirect);
 
     if (!tokens.refreshToken) {
       console.error('gmail oauth missing refresh_token');
-      return settingsRedirect(request, 'no_refresh');
+      return finishRedirect(request, 'no_refresh');
     }
 
-    // Google granular consent can return openid/email without gmail.readonly.
-    // Do not trust the ID token alone — Connect must prove Gmail API access.
     if (tokens.scope && !hasGmailReadonlyScope(tokens.scope)) {
       console.error('gmail oauth missing readonly scope', { scope: tokens.scope });
-      return settingsRedirect(request, 'scope_denied');
+      return finishRedirect(request, 'scope_denied');
     }
 
     let emailAddress: string;
@@ -81,7 +83,7 @@ export async function GET(request: NextRequest) {
       emailAddress = profile.emailAddress.toLowerCase();
     } catch (profileErr) {
       console.error('gmail oauth profile/scope check failed', profileErr);
-      return settingsRedirect(request, 'scope_denied');
+      return finishRedirect(request, 'scope_denied');
     }
 
     const supabase = await createClient();
@@ -104,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     if (lookupError) {
       console.error('gmail account lookup', lookupError);
-      return settingsRedirect(request, 'db_lookup');
+      return finishRedirect(request, 'db_lookup');
     }
 
     const write = existing
@@ -113,26 +115,26 @@ export async function GET(request: NextRequest) {
 
     if (write.error) {
       console.error('gmail account write', write.error);
-      return settingsRedirect(request, 'db_write');
+      return finishRedirect(request, 'db_write');
     }
 
-    return settingsRedirect(request, 'connected');
+    return finishRedirect(request, 'connected');
   } catch (err) {
     console.error('gmail oauth callback', err);
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('Gmail profile')) {
-      return settingsRedirect(request, 'profile');
+      return finishRedirect(request, 'profile');
     }
     if (
       message.includes('invalid_grant') ||
       message.includes('redirect_uri') ||
       message.includes('unauthorized_client')
     ) {
-      return settingsRedirect(request, 'exchange');
+      return finishRedirect(request, 'exchange');
     }
     if (message.includes('TOKEN_ENCRYPTION_KEY')) {
-      return settingsRedirect(request, 'encrypt');
+      return finishRedirect(request, 'encrypt');
     }
-    return settingsRedirect(request, 'error');
+    return finishRedirect(request, 'error');
   }
 }

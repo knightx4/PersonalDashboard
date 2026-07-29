@@ -3,6 +3,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { classifyMessage, type MerchantDomainHit } from '@/lib/email/extract/classify';
 import { extractOrderFromEmail } from '@/lib/email/extract/extract-order';
+import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { PARSER_VERSION } from '@/lib/email/extract/schema';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
@@ -10,6 +11,7 @@ import {
   isExcludedSender,
   type MerchantExclusionRow,
 } from '@/lib/inbox/merchant-exclusions';
+import { resolveOrderMerchant } from '@/lib/merchants/resolve-order-merchant';
 
 export type IngestCounters = {
   messagesSeen: number;
@@ -132,7 +134,8 @@ export async function ingestGmailMessageIds(
         text: message.text,
         html: message.html,
         merchantSlug: classified.merchant?.slug,
-        merchantName: classified.merchant?.name,
+        merchantName:
+          classified.merchant?.name ?? displayNameFromAddress(message.fromAddress),
         fromAddress: message.fromAddress,
         receivedAt: message.internalDate,
       });
@@ -154,10 +157,17 @@ export async function ingestGmailMessageIds(
         continue;
       }
 
+      const resolvedMerchant = await resolveOrderMerchant(supabase, {
+        userId,
+        classified: classified.merchant,
+        fromAddress: message.fromAddress,
+        extractedName: extraction.result.order.merchantName,
+      });
+
       const bundle = buildEmailOrder({
         userId,
-        merchantId: classified.merchant?.id ?? null,
-        merchantSlug: classified.merchant?.slug ?? null,
+        merchantId: resolvedMerchant?.id ?? null,
+        merchantSlug: resolvedMerchant?.slug ?? classified.merchant?.slug ?? null,
         extraction: extraction.result.order,
         categoryIdsBySlug,
         needsReview: extraction.source === 'heuristic',
