@@ -5,7 +5,13 @@ import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/field';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
+import {
+  matchingItemHint,
+  orderMatchesQuery,
+  sanitizeOrdersQuery,
+} from '@/lib/orders/search';
 
 export const metadata = { title: 'Orders' };
 
@@ -50,16 +56,17 @@ function monthLabel(key: string): string {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
-function hrefFor(range: PresetRange, status?: string): string {
-  const params = new URLSearchParams({ range });
-  if (status) params.set('status', status);
+function hrefFor(opts: { range: PresetRange; status?: string; q?: string }): string {
+  const params = new URLSearchParams({ range: opts.range });
+  if (opts.status) params.set('status', opts.status);
+  if (opts.q) params.set('q', opts.q);
   return `/orders?${params.toString()}`;
 }
 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; status?: string }>;
+  searchParams: Promise<{ range?: string; status?: string; q?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -68,6 +75,7 @@ export default async function OrdersPage({
   const range =
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'last_12_months';
   const status = STATUSES.find((entry) => entry.id === params.status)?.id;
+  const q = sanitizeOrdersQuery(params.q);
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -80,7 +88,12 @@ export default async function OrdersPage({
   let query = supabase
     .from('orders')
     .select(
-      'id, order_date, total_cents, currency, status, external_order_number, merchants(name)',
+      `
+      id, order_date, total_cents, currency, status, external_order_number,
+      merchants ( name ),
+      order_items ( name, variant ),
+      ingested_messages ( subject, from_address )
+    `,
     )
     .eq('user_id', user.id)
     .gte('order_date', period.start)
@@ -89,16 +102,20 @@ export default async function OrdersPage({
 
   if (status) query = query.eq('status', status);
 
-  const { data: orders, error } = await query;
+  const { data: rows, error } = await query;
   if (error) throw error;
 
-  const grouped = new Map<string, NonNullable<typeof orders>>();
-  for (const order of orders ?? []) {
+  const orders = q ? (rows ?? []).filter((order) => orderMatchesQuery(order, q)) : (rows ?? []);
+
+  const grouped = new Map<string, typeof orders>();
+  for (const order of orders) {
     const key = monthKey(order.order_date);
     const bucket = grouped.get(key) ?? [];
     bucket.push(order);
     grouped.set(key, bucket);
   }
+
+  const filteredEmpty = orders.length === 0 && Boolean(q || status);
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -109,18 +126,22 @@ export default async function OrdersPage({
               key={entry.id}
               label={entry.label}
               active={entry.id === range}
-              href={hrefFor(entry.id, status)}
+              href={hrefFor({ range: entry.id, status, q: q || undefined })}
             />
           ))}
         </RailGroup>
         <RailGroup label="Status">
-          <RailItem label="Any" active={!status} href={hrefFor(range)} />
+          <RailItem
+            label="Any"
+            active={!status}
+            href={hrefFor({ range, q: q || undefined })}
+          />
           {STATUSES.map((entry) => (
             <RailItem
               key={entry.id}
               label={entry.label}
               active={entry.id === status}
-              href={hrefFor(range, entry.id)}
+              href={hrefFor({ range, status: entry.id, q: q || undefined })}
             />
           ))}
         </RailGroup>
@@ -137,13 +158,34 @@ export default async function OrdersPage({
           }
         />
 
-        {(orders ?? []).length === 0 ? (
+        <form className="mb-5" action="/orders" method="get">
+          <input type="hidden" name="range" value={range} />
+          {status && <input type="hidden" name="status" value={status} />}
+          <Input
+            name="q"
+            defaultValue={q}
+            placeholder="Search merchant, item, order #, email subject…"
+            aria-label="Search orders"
+          />
+        </form>
+
+        {orders.length === 0 ? (
           <EmptyState
             icon={Receipt}
-            title="No orders yet"
-            description="Orders appear here as we find them in your inbox, grouped by month. You can also add one by hand at any time."
-            action={{ label: 'Add an order', href: '/orders/new' }}
-            secondaryAction={{ label: 'Connect an inbox', href: '/settings' }}
+            title={filteredEmpty ? 'No matching orders' : 'No orders yet'}
+            description={
+              filteredEmpty
+                ? 'Try a different search, status, or time range.'
+                : 'Orders appear here as we find them in your inbox, grouped by month. You can also add one by hand at any time.'
+            }
+            action={
+              filteredEmpty
+                ? { label: 'Clear filters', href: hrefFor({ range: 'last_12_months' }) }
+                : { label: 'Add an order', href: '/orders/new' }
+            }
+            secondaryAction={
+              filteredEmpty ? undefined : { label: 'Connect an inbox', href: '/settings' }
+            }
           />
         ) : (
           <div className="space-y-8">
@@ -157,6 +199,7 @@ export default async function OrdersPage({
                     const merchant = Array.isArray(order.merchants)
                       ? order.merchants[0]
                       : order.merchants;
+                    const itemHint = q ? matchingItemHint(order, q) : null;
                     return (
                       <li key={order.id}>
                         <Link
@@ -173,6 +216,7 @@ export default async function OrdersPage({
                                 ? ` · #${order.external_order_number}`
                                 : ''}
                               {` · ${order.status.replaceAll('_', ' ')}`}
+                              {itemHint ? ` · ${itemHint}` : ''}
                             </p>
                           </div>
                           <p className="tabular shrink-0 font-medium text-ink">
