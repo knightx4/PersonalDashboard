@@ -370,6 +370,7 @@ async function handleOrderConfirmation(
       order_id: item.orderId,
       category_id: item.categoryId,
       name: item.name,
+      short_name: item.shortName,
       variant: item.variant,
       quantity: item.quantity,
       unit_price_cents: item.unitPriceCents,
@@ -393,11 +394,13 @@ async function handleOrderConfirmation(
       order_item_id: item.orderItemId,
       category_id: item.categoryId,
       name: item.name,
+      short_name: item.shortName,
       variant: item.variant,
       fingerprint_loose: item.fingerprintLoose,
       acquired_at: item.acquiredAt,
       cost_cents: item.costCents,
       image_url: item.imageUrl,
+      search_tags: item.searchTags,
     })),
   );
 

@@ -35,6 +35,13 @@ export function guessCategorySlug(input: {
     return /\b(vitamin|supplement)\b/.test(blob) ? 'health' : 'beauty';
   }
   if (/\b(grocery|organic|snack|coffee beans|olive oil)\b/.test(blob)) return 'groceries';
-  if (/\b(sofa|chair|desk|lamp|pillow|towel|pan|knife|mug)\b/.test(blob)) return 'home';
+  if (
+    /\b(pan|skillet|saucepan|dutch oven|cutting board|chef'?s knife|kitchen|cookware|bakeware|spatula|whisk|mug|plate|bowl|blender|toaster|air fryer)\b/.test(
+      blob,
+    )
+  ) {
+    return 'kitchen';
+  }
+  if (/\b(sofa|chair|desk|lamp|pillow|towel)\b/.test(blob)) return 'home';
   return null;
 }

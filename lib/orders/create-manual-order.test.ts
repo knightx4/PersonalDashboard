@@ -31,6 +31,8 @@ describe('buildManualOrder', () => {
     expect(coat.acquiredAt).toBe('2026-03-15');
     expect(coat.categoryId).toBe('cat-1');
     expect(coat.userId).toBe('user-1');
+    expect(coat.shortName).toBe('Coat');
+    expect(coat.searchTags).toContain('coat');
   });
 
   it('does not invent status fields', () => {

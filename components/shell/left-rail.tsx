@@ -74,6 +74,7 @@ export function RailItem({
   active = false,
   count,
   swatch,
+  icon: Icon,
   onClick,
   href,
 }: {
@@ -81,6 +82,7 @@ export function RailItem({
   active?: boolean;
   count?: number;
   swatch?: string;
+  icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   onClick?: () => void;
   href?: string;
 }) {
@@ -93,7 +95,19 @@ export function RailItem({
 
   const body = (
     <>
-      {swatch && (
+      {Icon ? (
+        <span
+          className="flex size-5 shrink-0 items-center justify-center rounded-md"
+          style={
+            swatch && !swatch.includes('gradient')
+              ? { backgroundColor: `${swatch}22`, color: swatch }
+              : undefined
+          }
+          aria-hidden
+        >
+          <Icon className="size-3.5" strokeWidth={1.75} />
+        </span>
+      ) : swatch ? (
         <span
           className="size-2.5 shrink-0 rounded-full"
           style={
@@ -103,7 +117,7 @@ export function RailItem({
           }
           aria-hidden
         />
-      )}
+      ) : null}
       <span className="flex-1 truncate">{label}</span>
       {count !== undefined && <span className="tabular text-ink-faint">{count}</span>}
     </>

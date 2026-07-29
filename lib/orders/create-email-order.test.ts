@@ -34,6 +34,8 @@ describe('buildEmailOrder', () => {
     expect(bundle.orderItems[0]?.productUrl).toBe('https://www.amazon.com/dp/0062234730');
     expect(bundle.inventoryItems).toHaveLength(2);
     expect(bundle.inventoryItems[0]?.categoryId).toBe('cat-books');
+    expect(bundle.inventoryItems[0]?.shortName).toBeTruthy();
+    expect(bundle.inventoryItems[0]?.searchTags.length).toBeGreaterThan(0);
     expect(bundle.inventoryItems.reduce((s, i) => s + i.costCents, 0)).toBe(2100);
   });
 

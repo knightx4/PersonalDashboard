@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-export const PARSER_VERSION = 'extract-v2';
+export const PARSER_VERSION = 'extract-v3';
 
 /** Top-level system category slugs (always allowed). */
 export const CATEGORY_SLUGS = [
   'clothing',
   'electronics',
   'home',
+  'kitchen',
   'beauty',
   'health',
   'groceries',
@@ -39,6 +40,8 @@ export function isSystemCategorySlug(slug: string): slug is CategorySlug {
 
 export const extractedLineSchema = z.object({
   name: z.string().trim().min(1),
+  /** Short human title for list UIs (2–6 words). */
+  shortName: z.string().trim().min(1).max(80).nullable().optional(),
   variant: z.string().trim().nullable().optional(),
   quantity: z.number().int().positive(),
   /** Unit price in integer cents. */
@@ -59,6 +62,15 @@ export const extractedLineSchema = z.object({
     (value) => normalizeCategorySlug(value),
     z.string().nullable().optional(),
   ),
+  /**
+   * Synonym-friendly search tokens (makeup, lipstick, …).
+   * Optional — server also derives tags heuristically.
+   */
+  searchTags: z
+    .array(z.string().trim().min(1).max(32))
+    .max(24)
+    .nullable()
+    .optional(),
 });
 
 export const extractedOrderSchema = z.object({

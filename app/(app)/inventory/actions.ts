@@ -10,6 +10,7 @@ import {
 } from '@/lib/inventory/status-actions';
 import { parseDollarsToCents, todayInTimezone } from '@/lib/money';
 import { slugifyCategoryName } from '@/lib/categories/slugify';
+import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import { pickListGradient } from '@/lib/lists/gradients';
 
 export interface ActionState {
@@ -53,13 +54,34 @@ export async function updateInventoryItem(
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
   }
 
+  let categorySlug: string | null = null;
+  let categoryName: string | null = null;
+  if (parsed.data.categoryId) {
+    const { data: category } = await supabase
+      .from('categories')
+      .select('slug, name')
+      .eq('id', parsed.data.categoryId)
+      .maybeSingle();
+    categorySlug = category?.slug ?? null;
+    categoryName = category?.name ?? null;
+  }
+
+  const enriched = enrichItemDisplay({
+    name: parsed.data.name,
+    variant: parsed.data.variant || null,
+    categorySlug,
+    categoryName,
+  });
+
   const { error } = await supabase
     .from('inventory_items')
     .update({
       name: parsed.data.name,
+      short_name: enriched.shortName,
       variant: parsed.data.variant || null,
       category_id: parsed.data.categoryId ?? null,
       notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
+      search_tags: enriched.searchTags,
     })
     .eq('id', parsed.data.id)
     .eq('user_id', user.id);

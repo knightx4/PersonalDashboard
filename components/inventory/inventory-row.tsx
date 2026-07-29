@@ -1,0 +1,99 @@
+import Link from 'next/link';
+import { Package, RotateCcw } from 'lucide-react';
+import { categoryIcon } from '@/lib/categories/icons';
+import { formatMoney } from '@/lib/money';
+import { displayNameOf } from '@/lib/inventory/sort-group';
+import { displayVariant } from '@/lib/inventory/display';
+import { cn } from '@/lib/cn';
+
+export type InventoryRowItem = {
+  id: string;
+  name: string;
+  short_name: string | null;
+  variant: string | null;
+  cost_cents: number;
+  acquired_at: string | null;
+  image_url: string | null;
+  return_planned: boolean;
+  category_name: string | null;
+  category_color: string | null;
+  category_slug: string | null;
+  merchant_name: string | null;
+};
+
+export function InventoryRow({ item }: { item: InventoryRowItem }) {
+  const title = displayNameOf(item);
+  const variant = displayVariant(item.variant);
+  const CategoryIcon = categoryIcon(item.category_slug);
+  const accent = item.category_color ?? '#cfcfc8';
+
+  return (
+    <li>
+      <Link
+        href={`/inventory/${item.id}`}
+        className={cn(
+          'group flex items-center gap-3 px-3 py-2.5 transition-colors duration-150',
+          'hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none',
+        )}
+      >
+        <span
+          className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-canvas"
+          style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
+        >
+          {item.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
+            <img
+              src={item.image_url}
+              alt=""
+              className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <span className="flex size-full items-center justify-center text-ink-faint">
+              <CategoryIcon className="size-4" strokeWidth={1.75} />
+            </span>
+          )}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-ink">
+            {title}
+            {item.return_planned && (
+              <span className="ml-2 inline-flex items-center gap-1 align-middle text-[11px] font-semibold uppercase tracking-wide text-brand">
+                <RotateCcw className="size-3" strokeWidth={2} aria-hidden />
+                To return
+              </span>
+            )}
+          </p>
+          <p className="truncate text-[13px] text-ink-muted">
+            {[item.merchant_name, variant, item.acquired_at].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <p className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</p>
+          {item.category_name && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-ink-faint">
+              <CategoryIcon className="size-3" strokeWidth={1.75} aria-hidden />
+              {item.category_name}
+            </span>
+          )}
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+export function InventoryImageFallback({
+  categorySlug,
+  className,
+}: {
+  categorySlug?: string | null;
+  className?: string;
+}) {
+  const Icon = categoryIcon(categorySlug) ?? Package;
+  return (
+    <span className={cn('flex items-center justify-center bg-canvas text-ink-faint', className)}>
+      <Icon className="size-8" strokeWidth={1.5} />
+    </span>
+  );
+}
