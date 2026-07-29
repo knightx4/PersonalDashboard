@@ -9,11 +9,8 @@ import {
   type DisposalMethod,
 } from '@/lib/inventory/status-actions';
 import { parseDollarsToCents, todayInTimezone } from '@/lib/money';
-import {
-  CATEGORY_COLOR_OPTIONS,
-  isCategoryColor,
-  slugifyCategoryName,
-} from '@/lib/categories/slugify';
+import { slugifyCategoryName } from '@/lib/categories/slugify';
+import { pickListGradient } from '@/lib/lists/gradients';
 
 export interface ActionState {
   error?: string;
@@ -264,8 +261,6 @@ export async function createItemListAndAssign(
     return { error: nameParsed.error.issues[0]?.message ?? 'Enter a list name.' };
   }
 
-  const colorRaw = String(formData.get('color') ?? CATEGORY_COLOR_OPTIONS[0]);
-  const color = isCategoryColor(colorRaw) ? colorRaw : CATEGORY_COLOR_OPTIONS[0];
   const slug = slugifyCategoryName(nameParsed.data);
   if (!slug) return { error: 'Use letters or numbers in the list name.' };
 
@@ -284,6 +279,12 @@ export async function createItemListAndAssign(
     .eq('slug', slug)
     .maybeSingle();
   if (conflict) return { error: 'That list name is already used. Try another.' };
+
+  const { data: existing } = await supabase
+    .from('item_lists')
+    .select('color')
+    .eq('user_id', user.id);
+  const color = pickListGradient((existing ?? []).map((row) => row.color));
 
   const { data: created, error: createError } = await supabase
     .from('item_lists')

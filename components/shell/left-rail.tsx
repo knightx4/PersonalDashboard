@@ -96,7 +96,11 @@ export function RailItem({
       {swatch && (
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: swatch }}
+          style={
+            swatch.includes('gradient')
+              ? { backgroundImage: swatch }
+              : { backgroundColor: swatch }
+          }
           aria-hidden
         />
       )}
