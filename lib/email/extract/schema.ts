@@ -1,6 +1,22 @@
 import { z } from 'zod';
 
-export const PARSER_VERSION = 'extract-v1';
+export const PARSER_VERSION = 'extract-v2';
+
+/** Top-level system category slugs the model may assign. */
+export const CATEGORY_SLUGS = [
+  'clothing',
+  'electronics',
+  'home',
+  'beauty',
+  'health',
+  'groceries',
+  'hobby',
+  'pet',
+  'books',
+  'other',
+] as const;
+
+export type CategorySlug = (typeof CATEGORY_SLUGS)[number];
 
 export const extractedLineSchema = z.object({
   name: z.string().trim().min(1),
@@ -8,6 +24,30 @@ export const extractedLineSchema = z.object({
   quantity: z.number().int().positive(),
   /** Unit price in integer cents. */
   unitPriceCents: z.number().int().nonnegative(),
+  /** Canonical product page when present in the email. */
+  productUrl: z.preprocess((value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  }, z.string().url().nullable().optional()),
+  imageUrl: z.preprocess((value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  }, z.string().url().nullable().optional()),
+  /** Top-level system category slug (clothing, books, …). */
+  categorySlug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .nullable()
+    .optional()
+    .transform((value) => {
+      if (!value) return null;
+      return (CATEGORY_SLUGS as readonly string[]).includes(value)
+        ? (value as CategorySlug)
+        : 'other';
+    }),
 });
 
 export const extractedOrderSchema = z.object({

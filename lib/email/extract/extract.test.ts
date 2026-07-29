@@ -113,6 +113,7 @@ describe('heuristicExtractOrder + applyExtraction', () => {
         'Order #',
         '114-1276134-9911401',
         '* The Well-Tempered City: What Modern Science',
+        '  Paperback',
         '  Quantity: 1',
         '  15.19 USD',
         'Grand Total:',
@@ -127,6 +128,7 @@ describe('heuristicExtractOrder + applyExtraction', () => {
     expect(raw?.externalOrderNumber).toBe('114-1276134-9911401');
     expect(raw?.totalCents).toBe(1615);
     expect(raw?.lines[0]?.name).toMatch(/Well-Tempered City/i);
+    expect(raw?.lines[0]?.categorySlug).toBe('books');
   });
 
   it('rejects extractions totals that do not reconcile', () => {

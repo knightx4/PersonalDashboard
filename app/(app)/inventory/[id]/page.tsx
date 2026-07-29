@@ -23,9 +23,12 @@ export default async function InventoryItemPage({
       .select(
         `
         id, name, variant, notes, status, cost_cents, acquired_at, disposed_at,
-        disposal_method, disposal_proceeds_cents, category_id, order_item_id,
+        disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
         categories ( id, name, color ),
-        order_items ( order_id, orders ( id, external_order_number, merchants ( name ) ) )
+        order_items (
+          order_id, product_url, image_url,
+          orders ( id, external_order_number, merchants ( name ) )
+        )
       `,
       )
       .eq('id', id)
@@ -52,6 +55,7 @@ export default async function InventoryItemPage({
       ? order.merchants[0]
       : order.merchants
     : null;
+  const productUrl = orderItem?.product_url ?? null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -59,12 +63,24 @@ export default async function InventoryItemPage({
         title={item.name}
         description={[item.variant, category?.name, item.status].filter(Boolean).join(' · ')}
         actions={
-          <Link
-            href="/inventory"
-            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-          >
-            All inventory
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {productUrl && (
+              <a
+                href={productUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+              >
+                View product
+              </a>
+            )}
+            <Link
+              href="/inventory"
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              All inventory
+            </Link>
+          </div>
         }
       />
 
