@@ -131,12 +131,24 @@ export async function pumpInboxSync(opts: {
 
     const jobType = (opts.type ?? jobRow.type) as InboxSyncJobType;
 
-    const { data: account } = await supabase
+    const { data: account, error: accountError } = await supabase
       .from('email_accounts')
       .select('id, sync_page_token, user_id')
       .eq('id', opts.accountId)
       .eq('user_id', opts.userId)
       .maybeSingle();
+
+    if (accountError) {
+      console.error('inbox sync: account lookup failed', accountError);
+      await failJob(
+        supabase,
+        opts.jobId,
+        accountError.message.includes('sync_page_token')
+          ? 'Database is missing a required column (sync_page_token). Apply pending migrations, then try Import again.'
+          : `Could not load inbox: ${accountError.message}`,
+      );
+      return;
+    }
 
     if (!account) {
       await failJob(supabase, opts.jobId, 'Inbox account missing during sync.');
