@@ -5,6 +5,10 @@ import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
+import {
+  ConfirmOrderButton,
+  DiscardOrderButton,
+} from '@/app/(app)/review/review-buttons';
 import { ExcludeMerchantButton } from './exclude-merchant-button';
 
 export const metadata = { title: 'Order' };
@@ -99,12 +103,31 @@ export default async function OrderDetailPage({
               orderId={order.id}
               merchantName={merchant?.name ?? 'this sender'}
             />
+            <Link href="/review" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              Review queue
+            </Link>
             <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               All orders
             </Link>
           </div>
         }
       />
+
+      {order.needs_review && (
+        <div className="flex flex-col gap-3 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-950">Needs review</p>
+            <p className="text-[13px] text-amber-900/80">
+              Imported with the fallback parser. Confirm the totals and items, or discard if this
+              should not count toward spend.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ConfirmOrderButton orderId={order.id} />
+            <DiscardOrderButton orderId={order.id} />
+          </div>
+        </div>
+      )}
 
       {sourceMessage?.subject && (
         <p className="text-sm text-ink-muted">
