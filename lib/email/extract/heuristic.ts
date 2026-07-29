@@ -1,7 +1,7 @@
 import { parseAmazonQuantityLines } from './amazon-lines';
 import { guessCategorySlug } from './guess-category';
 import { parseShopifyQuantityLines } from './shopify-lines';
-import type { ExtractedOrder } from './schema';
+import type { CategoryOption, ExtractedOrder } from './schema';
 
 /** Dollars like $1,234.56 → cents. */
 export function parseMoneyToCents(raw: string): number | null {
@@ -103,6 +103,7 @@ export function heuristicExtractOrder(input: {
   merchantName?: string | null;
   fromAddress?: string | null;
   receivedAt?: Date | null;
+  customCategories?: readonly CategoryOption[];
 }): ExtractedOrder | null {
   const blob = `${input.subject}\n${input.text}`;
   const orderNumber = extractOrderNumber(blob);
@@ -215,6 +216,7 @@ export function heuristicExtractOrder(input: {
         merchantSlug: input.merchantSlug,
         subject: input.subject,
         text: line.blockText ?? line.name,
+        customCategories: input.customCategories,
       }) ?? null,
   }));
 

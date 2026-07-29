@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const PARSER_VERSION = 'extract-v2';
 
-/** Top-level system category slugs the model may assign. */
+/** Top-level system category slugs (always allowed). */
 export const CATEGORY_SLUGS = [
   'clothing',
   'electronics',
@@ -17,6 +17,25 @@ export const CATEGORY_SLUGS = [
 ] as const;
 
 export type CategorySlug = (typeof CATEGORY_SLUGS)[number];
+
+export type CategoryOption = {
+  slug: string;
+  name: string;
+};
+
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Normalize a model/heuristic category slug; keep kebab-case, else null. */
+export function normalizeCategorySlug(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, '-');
+  if (!normalized || !SLUG_RE.test(normalized)) return null;
+  return normalized;
+}
+
+export function isSystemCategorySlug(slug: string): slug is CategorySlug {
+  return (CATEGORY_SLUGS as readonly string[]).includes(slug);
+}
 
 export const extractedLineSchema = z.object({
   name: z.string().trim().min(1),
@@ -35,19 +54,11 @@ export const extractedLineSchema = z.object({
     const trimmed = value.trim();
     return /^https?:\/\//i.test(trimmed) ? trimmed : null;
   }, z.string().url().nullable().optional()),
-  /** Top-level system category slug (clothing, books, …). */
-  categorySlug: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .nullable()
-    .optional()
-    .transform((value) => {
-      if (!value) return null;
-      return (CATEGORY_SLUGS as readonly string[]).includes(value)
-        ? (value as CategorySlug)
-        : 'other';
-    }),
+  /** System or user category slug (clothing, books, camping, …). */
+  categorySlug: z.preprocess(
+    (value) => normalizeCategorySlug(value),
+    z.string().nullable().optional(),
+  ),
 });
 
 export const extractedOrderSchema = z.object({
@@ -74,3 +85,21 @@ export type MessageClassification =
   | 'return'
   | 'cancellation'
   | 'not_relevant';
+
+/** Drop category slugs that are not in the allowed set (system + user's custom). */
+export function restrictCategorySlugs(
+  order: ExtractedOrder,
+  allowedSlugs: ReadonlySet<string>,
+): ExtractedOrder {
+  return {
+    ...order,
+    lines: order.lines.map((line) => {
+      const slug = line.categorySlug ?? null;
+      if (!slug) return { ...line, categorySlug: null };
+      if (allowedSlugs.has(slug)) return line;
+      // Legacy models sometimes emit unknown labels → fall back to other when present.
+      if (allowedSlugs.has('other')) return { ...line, categorySlug: 'other' };
+      return { ...line, categorySlug: null };
+    }),
+  };
+}

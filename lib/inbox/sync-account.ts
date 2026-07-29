@@ -178,14 +178,18 @@ export async function syncEmailAccountBatch(
     const accessToken = await ensureAccessToken(supabase, account as AccountRow, encryptionKey);
     const merchants = await loadMerchants(supabase, opts.userId);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
-    const { data: systemCategories } = await supabase
+    const { data: categoryRows } = await supabase
       .from('categories')
-      .select('id, slug')
-      .is('user_id', null)
-      .is('parent_id', null);
+      .select('id, slug, name, user_id')
+      .is('parent_id', null)
+      .or(`user_id.is.null,user_id.eq.${opts.userId}`);
     const categoryIdsBySlug = new Map<string, string>(
-      (systemCategories ?? []).map((row) => [row.slug as string, row.id as string]),
+      (categoryRows ?? []).map((row) => [row.slug as string, row.id as string]),
     );
+    const categoryOptions = (categoryRows ?? []).map((row) => ({
+      slug: row.slug as string,
+      name: row.name as string,
+    }));
     const query = orderCandidateQuery(account.backfill_window_days);
     progress.query = query;
     console.info('gmail sync query', {
@@ -292,6 +296,7 @@ export async function syncEmailAccountBatch(
             classified.merchant?.name ?? displayNameFromAddress(message.fromAddress),
           fromAddress: message.fromAddress,
           receivedAt: message.internalDate,
+          categoryOptions,
         });
 
         if (!extraction.result.ok) {
