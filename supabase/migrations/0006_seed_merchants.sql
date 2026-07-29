@@ -40,6 +40,7 @@ insert into merchants (name, slug, domains, default_return_window_days, is_globa
   ('Madewell',          'madewell',          array['madewell.com','e.madewell.com'],                                  30,   true),
   ('Everlane',          'everlane',          array['everlane.com'],                                                   30,   true),
   ('ASOS',              'asos',              array['asos.com'],                                                       28,   true),
+  ('Revolve',           'revolve',           array['revolve.com','email.revolve.com'],                                30,   true),
   ('Anthropologie',     'anthropologie',     array['anthropologie.com'],                                              30,   true),
   ('Urban Outfitters',  'urban-outfitters',  array['urbanoutfitters.com'],                                            30,   true),
   ('Free People',       'free-people',       array['freepeople.com'],                                                 30,   true),
