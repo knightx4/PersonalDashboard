@@ -34,6 +34,11 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
         tone: 'warn',
         text: 'Google did not issue a refresh token. Disconnect Shopping Manager under Google Account → Security → Third-party access, then connect again.',
       };
+    case 'scope_denied':
+      return {
+        tone: 'warn',
+        text: 'Gmail read access was not granted. Connect again and leave “See and download your email” checked on Google’s consent screen (do not uncheck it).',
+      };
     case 'unconfigured':
       return {
         tone: 'err',

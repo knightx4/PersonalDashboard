@@ -13,6 +13,8 @@ import {
   type OAuthTokens,
 } from '@/lib/email/providers/types';
 
+export { hasGmailReadonlyScope } from '@/lib/email/providers/types';
+
 /** Read-only Gmail + enough identity to learn which address was connected. */
 const SCOPES = [GMAIL_READONLY_SCOPE, 'openid', 'email'];
 
@@ -26,6 +28,7 @@ function toTokens(tokens: {
   refresh_token?: string | null;
   expiry_date?: number | null;
   id_token?: string | null;
+  scope?: string | null;
 }): OAuthTokens {
   if (!tokens.access_token) {
     throw new Error('Google did not return an access token');
@@ -35,6 +38,7 @@ function toTokens(tokens: {
     refreshToken: tokens.refresh_token ?? null,
     expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
     idToken: tokens.id_token ?? null,
+    scope: tokens.scope ?? null,
   };
 }
 
@@ -44,6 +48,7 @@ async function gmailJson<T>(accessToken: string, path: string): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    console.error('gmail api error', { path, status: res.status, body: body.slice(0, 500) });
     throw new Error(formatGmailApiError(res.status, body));
   }
   return res.json() as Promise<T>;

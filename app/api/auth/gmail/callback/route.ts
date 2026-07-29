@@ -4,7 +4,7 @@ import { encryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailRedirectUri } from '@/lib/email/gmail-redirect';
 import { verifyGmailOAuthState } from '@/lib/email/oauth-state';
-import { gmailProvider, resolveGmailAddress } from '@/lib/email/providers/gmail';
+import { gmailProvider, hasGmailReadonlyScope } from '@/lib/email/providers/gmail';
 
 function settingsRedirect(request: NextRequest, code: string) {
   const url = new URL('/settings', request.url);
@@ -68,7 +68,21 @@ export async function GET(request: NextRequest) {
       return settingsRedirect(request, 'no_refresh');
     }
 
-    const emailAddress = await resolveGmailAddress(tokens.accessToken, tokens.idToken);
+    // Google granular consent can return openid/email without gmail.readonly.
+    // Do not trust the ID token alone — Connect must prove Gmail API access.
+    if (tokens.scope && !hasGmailReadonlyScope(tokens.scope)) {
+      console.error('gmail oauth missing readonly scope', { scope: tokens.scope });
+      return settingsRedirect(request, 'scope_denied');
+    }
+
+    let emailAddress: string;
+    try {
+      const profile = await gmailProvider.fetchProfile(tokens.accessToken);
+      emailAddress = profile.emailAddress.toLowerCase();
+    } catch (profileErr) {
+      console.error('gmail oauth profile/scope check failed', profileErr);
+      return settingsRedirect(request, 'scope_denied');
+    }
 
     const supabase = await createClient();
     const payload = {

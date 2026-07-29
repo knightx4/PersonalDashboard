@@ -1,11 +1,19 @@
 export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
+/** True when the grant includes Gmail read-only (granular consent can omit it). */
+export function hasGmailReadonlyScope(scope: string | null | undefined): boolean {
+  if (!scope) return false;
+  return scope.split(/[\s,]+/).includes(GMAIL_READONLY_SCOPE);
+}
+
 export interface OAuthTokens {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date | null;
   /** Present when openid was requested; used to read the account email. */
   idToken: string | null;
+  /** Space-separated scopes Google granted (may omit gmail.readonly under granular consent). */
+  scope?: string | null;
 }
 
 export interface GmailProfile {
