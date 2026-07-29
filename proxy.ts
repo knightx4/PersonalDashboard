@@ -76,7 +76,7 @@ export default async function proxy(request: NextRequest) {
 
   if (user && (pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = '/onboarding';
     url.search = '';
     return NextResponse.redirect(url);
   }

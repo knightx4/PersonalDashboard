@@ -11,10 +11,10 @@ import { createClient } from '@/lib/auth/server';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get('code');
-  const rawNext = searchParams.get('next') ?? '/dashboard';
+  const rawNext = searchParams.get('next') ?? '/onboarding';
 
   // Never redirect to an absolute URL supplied in the query string.
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard';
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/onboarding';
 
   if (!code) {
     return NextResponse.redirect(`${origin}/auth/auth-code-error`);
