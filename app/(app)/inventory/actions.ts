@@ -115,6 +115,8 @@ export async function disposeInventoryItem(
   revalidatePath('/inventory');
   revalidatePath(`/inventory/${id.data}`);
   revalidatePath('/orders');
+  if (status === 'sold') return { message: 'Marked as sold.' };
+  if (status === 'gifted') return { message: 'Marked as gifted.' };
   return { message: 'Marked as disposed.' };
 }
 
