@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
+import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import {
   matchingItemHint,
@@ -56,9 +57,15 @@ function monthLabel(key: string): string {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
-function hrefFor(opts: { range: PresetRange; status?: string; q?: string }): string {
+function hrefFor(opts: {
+  range: PresetRange;
+  status?: string;
+  merchant?: string;
+  q?: string;
+}): string {
   const params = new URLSearchParams({ range: opts.range });
   if (opts.status) params.set('status', opts.status);
+  if (opts.merchant) params.set('merchant', opts.merchant);
   if (opts.q) params.set('q', opts.q);
   return `/orders?${params.toString()}`;
 }
@@ -66,7 +73,12 @@ function hrefFor(opts: { range: PresetRange; status?: string; q?: string }): str
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; status?: string; q?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    status?: string;
+    merchant?: string;
+    q?: string;
+  }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -75,15 +87,19 @@ export default async function OrdersPage({
   const range =
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'last_12_months';
   const status = STATUSES.find((entry) => entry.id === params.status)?.id;
+  const merchantId = parseMerchantId(params.merchant);
   const q = sanitizeOrdersQuery(params.q);
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('timezone')
-    .eq('id', user.id)
-    .single();
+  const [{ data: profile }, merchants] = await Promise.all([
+    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    loadUserMerchants(supabase, user.id),
+  ]);
   const timezone = profile?.timezone ?? 'UTC';
   const period = periodFor(range, timezone);
+  const activeMerchant =
+    merchantId && merchants.some((entry) => entry.id === merchantId)
+      ? merchantId
+      : undefined;
 
   let query = supabase
     .from('orders')
@@ -101,6 +117,7 @@ export default async function OrdersPage({
     .order('order_date', { ascending: false });
 
   if (status) query = query.eq('status', status);
+  if (activeMerchant) query = query.eq('merchant_id', activeMerchant);
 
   const { data: rows, error } = await query;
   if (error) throw error;
@@ -115,7 +132,7 @@ export default async function OrdersPage({
     grouped.set(key, bucket);
   }
 
-  const filteredEmpty = orders.length === 0 && Boolean(q || status);
+  const filteredEmpty = orders.length === 0 && Boolean(q || status || activeMerchant);
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -126,7 +143,32 @@ export default async function OrdersPage({
               key={entry.id}
               label={entry.label}
               active={entry.id === range}
-              href={hrefFor({ range: entry.id, status, q: q || undefined })}
+              href={hrefFor({
+                range: entry.id,
+                status,
+                merchant: activeMerchant,
+                q: q || undefined,
+              })}
+            />
+          ))}
+        </RailGroup>
+        <RailGroup label="Merchant">
+          <RailItem
+            label="Any"
+            active={!activeMerchant}
+            href={hrefFor({ range, status, q: q || undefined })}
+          />
+          {merchants.map((merchant) => (
+            <RailItem
+              key={merchant.id}
+              label={merchant.name}
+              active={merchant.id === activeMerchant}
+              href={hrefFor({
+                range,
+                status,
+                merchant: merchant.id,
+                q: q || undefined,
+              })}
             />
           ))}
         </RailGroup>
@@ -134,14 +176,19 @@ export default async function OrdersPage({
           <RailItem
             label="Any"
             active={!status}
-            href={hrefFor({ range, q: q || undefined })}
+            href={hrefFor({ range, merchant: activeMerchant, q: q || undefined })}
           />
           {STATUSES.map((entry) => (
             <RailItem
               key={entry.id}
               label={entry.label}
               active={entry.id === status}
-              href={hrefFor({ range, status: entry.id, q: q || undefined })}
+              href={hrefFor({
+                range,
+                status: entry.id,
+                merchant: activeMerchant,
+                q: q || undefined,
+              })}
             />
           ))}
         </RailGroup>
@@ -161,6 +208,9 @@ export default async function OrdersPage({
         <form className="mb-5" action="/orders" method="get">
           <input type="hidden" name="range" value={range} />
           {status && <input type="hidden" name="status" value={status} />}
+          {activeMerchant && (
+            <input type="hidden" name="merchant" value={activeMerchant} />
+          )}
           <Input
             name="q"
             defaultValue={q}
@@ -175,7 +225,7 @@ export default async function OrdersPage({
             title={filteredEmpty ? 'No matching orders' : 'No orders yet'}
             description={
               filteredEmpty
-                ? 'Try a different search, status, or time range.'
+                ? 'Try a different search, merchant, status, or time range.'
                 : 'Orders appear here as we find them in your inbox, grouped by month. You can also add one by hand at any time.'
             }
             action={
