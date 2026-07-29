@@ -11,6 +11,7 @@ type Account = {
   email_address: string;
   status: string;
   last_synced_at: string | null;
+  backfill_completed_at?: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -144,6 +145,7 @@ export function InboxSection({
                 <InboxSyncButton
                   accountId={account.id}
                   initialJob={latestJobs[account.id] ?? null}
+                  backfillCompleted={Boolean(account.backfill_completed_at)}
                 />
               )}
             </li>

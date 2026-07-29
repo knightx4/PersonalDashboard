@@ -142,6 +142,7 @@ export async function resetInboxImport(accountId: string): Promise<{
     .from('email_accounts')
     .update({
       sync_cursor: null,
+      sync_page_token: null,
       backfill_completed_at: null,
       last_synced_at: null,
     })

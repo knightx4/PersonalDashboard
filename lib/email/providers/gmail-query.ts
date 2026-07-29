@@ -21,3 +21,18 @@ export function orderCandidateQuery(backfillWindowDays: number): string {
   ].join(' OR ');
   return `newer_than:${days}d (${subjects})`;
 }
+
+/** Gmail search for a bounded catch-up when historyId is expired. */
+export function incrementalFallbackQuery(lastSyncedAt: string | null, now = new Date()): string {
+  const fallbackDays = 7;
+  let days = fallbackDays;
+  if (lastSyncedAt) {
+    const synced = new Date(lastSyncedAt);
+    if (Number.isFinite(synced.getTime())) {
+      const elapsedDays = Math.ceil((now.getTime() - synced.getTime()) / (24 * 60 * 60 * 1000));
+      // One extra day of cushion; clamp to a sane window.
+      days = Math.min(30, Math.max(fallbackDays, elapsedDays + 1));
+    }
+  }
+  return orderCandidateQuery(days);
+}

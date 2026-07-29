@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 type JobProgress = {
   jobId: string;
+  type?: string;
   status: string;
   messagesSeen: number;
   messagesParsed: number;
@@ -13,7 +14,7 @@ type JobProgress = {
 };
 
 /**
- * Lightweight poller so Dashboard/Orders stay usable while Gmail import runs.
+ * Lightweight poller so Dashboard/Orders stay usable while Gmail sync runs.
  */
 export function InboxSyncBanner({
   accountIds,
@@ -55,12 +56,13 @@ export function InboxSyncBanner({
 
   if (!job || job.done) return null;
 
+  const label = job.type === 'incremental' ? 'Checking Gmail for new orders' : 'Importing from Gmail';
+
   return (
     <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-950">
       <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2">
         <p>
-          Importing from Gmail in the background — seen {job.messagesSeen}, parsed{' '}
-          {job.messagesParsed}.
+          {label} in the background — seen {job.messagesSeen}, parsed {job.messagesParsed}.
         </p>
         <Link href="/settings#inboxes" className="underline underline-offset-2">
           View progress

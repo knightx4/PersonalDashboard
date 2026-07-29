@@ -216,8 +216,10 @@ export const emailAccounts = pgTable(
     oauthRefreshToken: text('oauth_refresh_token'),
     oauthAccessToken: text('oauth_access_token'),
     tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
-    /** Gmail historyId or Graph delta token. */
+    /** Durable mailbox cursor: Gmail historyId or Graph delta token. */
     syncCursor: text('sync_cursor'),
+    /** Transient pagination token for an in-flight backfill or incremental sync. */
+    syncPageToken: text('sync_page_token'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     status: emailAccountStatus('status').notNull().default('active'),
     backfillWindowDays: integer('backfill_window_days').notNull().default(180),

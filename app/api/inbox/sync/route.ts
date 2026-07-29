@@ -1,6 +1,10 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { createClient, getUser } from '@/lib/auth/server';
-import { pumpInboxBackfill } from '@/inngest/inbox-backfill';
+import {
+  pumpInboxSync,
+  startIncrementalSync,
+  type InboxSyncJobType,
+} from '@/inngest/inbox-backfill';
 import {
   failStaleSyncJob,
   isFreshActiveJob,
@@ -11,6 +15,7 @@ export const maxDuration = 60;
 
 type JobRow = {
   id: string;
+  type?: string;
   status: string;
   messages_seen: number;
   messages_classified: number;
@@ -33,6 +38,7 @@ function jobToProgress(job: JobRow) {
   const done = job.status === 'completed' || job.status === 'failed';
   return {
     jobId: job.id,
+    type: job.type ?? 'backfill',
     status: job.status,
     messagesSeen: job.messages_seen,
     messagesClassified: job.messages_classified,
@@ -46,10 +52,13 @@ function jobToProgress(job: JobRow) {
   };
 }
 
+const JOB_SELECT =
+  'id, type, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at';
+
 /**
- * GET — poll the latest backfill job for an account (session-scoped).
- * POST — start a background backfill; returns immediately and keeps working
- * after the response via `after()` + continue chaining.
+ * GET — poll the latest sync job for an account (session-scoped).
+ * Optional `type=backfill|incremental`; default prefers an active job, else latest.
+ * POST — start a background sync; `mode: 'backfill' | 'incremental'` (default backfill).
  */
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -61,6 +70,8 @@ export async function GET(request: NextRequest) {
   if (!accountId) {
     return NextResponse.json({ error: 'accountId required' }, { status: 400 });
   }
+
+  const typeFilter = request.nextUrl.searchParams.get('type') as InboxSyncJobType | null;
 
   const supabase = await createClient();
   const { data: account } = await supabase
@@ -74,22 +85,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Inbox not found.' }, { status: 404 });
   }
 
-  const { data: job } = await supabase
+  let query = supabase
     .from('sync_jobs')
-    .select(
-      'id, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at',
-    )
+    .select(JOB_SELECT)
     .eq('email_account_id', accountId)
-    .eq('type', 'backfill')
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
 
-  if (!job) {
+  if (typeFilter === 'backfill' || typeFilter === 'incremental') {
+    query = query.eq('type', typeFilter);
+  }
+
+  const { data: jobs } = await query;
+  const rows = (jobs ?? []) as JobRow[];
+
+  // Prefer a live job so the UI keeps showing progress.
+  const selected =
+    rows.find((j) => j.status === 'running' || j.status === 'queued') ?? rows[0] ?? null;
+
+  if (!selected) {
     return NextResponse.json({ job: null });
   }
 
-  let row = job as JobRow;
+  let row = selected;
   const stale = await failStaleSyncJob(supabase, row as SyncJobStaleRow);
   if (stale) {
     row = { ...row, ...stale };
@@ -104,8 +122,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { accountId?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    accountId?: string;
+    mode?: InboxSyncJobType;
+  };
+  const mode: InboxSyncJobType = body.mode === 'incremental' ? 'incremental' : 'backfill';
   const supabase = await createClient();
+  const origin = requestOrigin(request);
 
   let accountId = body.accountId;
   if (!accountId) {
@@ -126,7 +149,7 @@ export async function POST(request: NextRequest) {
 
   const { data: account } = await supabase
     .from('email_accounts')
-    .select('id, status')
+    .select('id, status, backfill_completed_at')
     .eq('id', accountId)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -135,11 +158,58 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Inbox not found or inactive.' }, { status: 400 });
   }
 
+  if (mode === 'incremental') {
+    if (!account.backfill_completed_at) {
+      return NextResponse.json(
+        { error: 'Finish the initial Gmail import before Sync now.' },
+        { status: 400 },
+      );
+    }
+
+    try {
+      const started = await startIncrementalSync({
+        userId: user.id,
+        accountId,
+        origin,
+      });
+      if ('skipped' in started) {
+        return NextResponse.json({ error: started.skipped }, { status: 400 });
+      }
+
+      if (!started.alreadyRunning) {
+        const jobId = started.jobId;
+        after(() =>
+          pumpInboxSync({
+            userId: user.id,
+            accountId: accountId!,
+            jobId,
+            origin,
+            type: 'incremental',
+          }),
+        );
+      }
+
+      const { data: job } = await supabase
+        .from('sync_jobs')
+        .select(JOB_SELECT)
+        .eq('id', started.jobId)
+        .single();
+
+      return NextResponse.json({
+        ...jobToProgress(job as JobRow),
+        alreadyRunning: started.alreadyRunning,
+      });
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'Could not start sync.' },
+        { status: 500 },
+      );
+    }
+  }
+
   const { data: latest } = await supabase
     .from('sync_jobs')
-    .select(
-      'id, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at',
-    )
+    .select(JOB_SELECT)
     .eq('email_account_id', accountId)
     .eq('type', 'backfill')
     .order('created_at', { ascending: false })
@@ -159,6 +229,22 @@ export async function POST(request: NextRequest) {
     await failStaleSyncJob(supabase, latestJob as SyncJobStaleRow);
   }
 
+  // Don't start a full backfill while incremental is mid-flight.
+  const { data: activeOther } = await supabase
+    .from('sync_jobs')
+    .select('id')
+    .eq('email_account_id', accountId)
+    .eq('type', 'incremental')
+    .in('status', ['queued', 'running'])
+    .limit(1)
+    .maybeSingle();
+  if (activeOther) {
+    return NextResponse.json(
+      { error: 'An incremental sync is still running. Wait for it to finish.' },
+      { status: 409 },
+    );
+  }
+
   const { data: job, error: jobError } = await supabase
     .from('sync_jobs')
     .insert({
@@ -167,9 +253,7 @@ export async function POST(request: NextRequest) {
       status: 'queued',
       started_at: new Date().toISOString(),
     })
-    .select(
-      'id, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at',
-    )
+    .select(JOB_SELECT)
     .single();
 
   if (jobError || !job) {
@@ -179,23 +263,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fresh backfill pages from the start of the Gmail query.
+  // Fresh backfill pages from the start; clear durable cursor until complete.
   await supabase
     .from('email_accounts')
-    .update({ sync_cursor: null })
+    .update({ sync_page_token: null, sync_cursor: null })
     .eq('id', accountId)
     .eq('user_id', user.id);
 
-  const origin = requestOrigin(request);
   const jobId = job.id as string;
   const userId = user.id;
 
   after(() =>
-    pumpInboxBackfill({
+    pumpInboxSync({
       userId,
       accountId: accountId!,
       jobId,
       origin,
+      type: 'backfill',
     }),
   );
 

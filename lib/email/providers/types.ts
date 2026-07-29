@@ -18,6 +18,16 @@ export interface OAuthTokens {
 
 export interface GmailProfile {
   emailAddress: string;
+  /** Mailbox history cursor — persist after backfill / incremental sync. */
+  historyId: string | null;
+}
+
+export interface GmailHistoryPage {
+  messageIds: string[];
+  /** Page token for the next history.list call, if any. */
+  nextPageToken: string | null;
+  /** Latest historyId from this page (use when paging finishes). */
+  historyId: string | null;
 }
 
 export interface GmailMessageRef {
@@ -46,5 +56,10 @@ export interface GmailOAuthProvider {
     accessToken: string,
     opts: { query: string; maxResults?: number; pageToken?: string },
   ): Promise<{ messages: GmailMessageRef[]; nextPageToken: string | null }>;
+  /** users.history.list — throws GmailHistoryExpiredError when startHistoryId is stale. */
+  listHistory(
+    accessToken: string,
+    opts: { startHistoryId: string; maxResults?: number; pageToken?: string },
+  ): Promise<GmailHistoryPage>;
   getMessage(accessToken: string, messageId: string): Promise<GmailMessageContent>;
 }

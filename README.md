@@ -10,7 +10,7 @@ month.
 
 ## Status
 
-Build order steps 1–10 and 12 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
+Build order steps 1–10 and 12–13 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
 for what is next.
 
 | | |
@@ -25,7 +25,7 @@ for what is next.
 | Email extraction + order import sync | done |
 | Dashboard | done |
 | Saved items (URL unfurl + queue CRUD) | done |
-| Incremental sync | not started |
+| Incremental sync | done |
 
 ## Getting started
 
