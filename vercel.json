@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/inbox-incremental",
-      "schedule": "0 * * * *"
+      "schedule": "0 12 * * *"
     }
   ]
 }
