@@ -133,17 +133,24 @@ export default async function OrderDetailPage({
                     )}
                     {units.length > 0 && (
                       <ul className="mt-2 space-y-1">
-                        {units.map((unit) => (
-                          <li key={unit.id}>
-                            <Link
-                              href={`/inventory/${unit.id}`}
-                              className="text-[13px] text-brand hover:underline"
-                            >
-                              Unit · {formatMoney(unit.cost_cents, order.currency)} ·{' '}
-                              {unit.status}
-                            </Link>
-                          </li>
-                        ))}
+                        {units.map((unit, index) => {
+                          const parts = [
+                            'View in inventory',
+                            units.length > 1 ? `${index + 1} of ${units.length}` : null,
+                            formatMoney(unit.cost_cents, order.currency),
+                            unit.status.replaceAll('_', ' '),
+                          ].filter(Boolean);
+                          return (
+                            <li key={unit.id}>
+                              <Link
+                                href={`/inventory/${unit.id}`}
+                                className="text-[13px] text-brand hover:underline"
+                              >
+                                {parts.join(' · ')}
+                              </Link>
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </td>
