@@ -127,8 +127,43 @@ describe('heuristicExtractOrder + applyExtraction', () => {
     expect(raw).not.toBeNull();
     expect(raw?.externalOrderNumber).toBe('114-1276134-9911401');
     expect(raw?.totalCents).toBe(1615);
+    expect(raw?.taxCents).toBe(96);
+    expect(raw?.lines).toHaveLength(1);
     expect(raw?.lines[0]?.name).toMatch(/Well-Tempered City/i);
+    expect(raw?.lines[0]?.unitPriceCents).toBe(1519);
     expect(raw?.lines[0]?.categorySlug).toBe('books');
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
+  });
+
+  it('parses Amazon multi-item Ordered: confirmations into separate lines', () => {
+    const fixture = readFileSync(
+      resolve(__dirname, '../../../fixtures/emails/amazon-multi-item-ordered.txt'),
+      'utf8',
+    );
+    const subject = (fixture.split('\n')[0] ?? '').replace(/^Subject:\s*/i, '');
+    const body = fixture.replace(/^Subject:.*\n\n?/, '');
+    const raw = heuristicExtractOrder({
+      subject,
+      text: body,
+      merchantSlug: 'amazon',
+      merchantName: 'Amazon',
+      fromAddress: '"Amazon.com" <auto-confirm@amazon.com>',
+      receivedAt: new Date('2026-03-30T04:37:57Z'),
+    });
+    expect(raw).not.toBeNull();
+    expect(raw?.externalOrderNumber).toBe('114-9014714-4960229');
+    expect(raw?.totalCents).toBe(4996);
+    expect(raw?.taxCents).toBe(298);
+    expect(raw?.lines).toHaveLength(2);
+    expect(raw?.lines[0]?.name).toMatch(/Baseball Hat/i);
+    expect(raw?.lines[0]?.unitPriceCents).toBe(2699);
+    expect(raw?.lines[0]?.categorySlug).toBe('clothing');
+    expect(raw?.lines[1]?.name).toMatch(/T Shirt/i);
+    expect(raw?.lines[1]?.unitPriceCents).toBe(1999);
+    expect(raw?.lines[1]?.categorySlug).toBe('clothing');
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
   });
 
   it('rejects extractions totals that do not reconcile', () => {

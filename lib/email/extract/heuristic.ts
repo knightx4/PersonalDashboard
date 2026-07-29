@@ -1,5 +1,6 @@
-import type { ExtractedOrder } from './schema';
+import { parseAmazonQuantityLines } from './amazon-lines';
 import { guessCategorySlug } from './guess-category';
+import type { ExtractedOrder } from './schema';
 
 /** Dollars like $1,234.56 → cents. */
 export function parseMoneyToCents(raw: string): number | null {
@@ -51,6 +52,10 @@ function fallbackLineName(input: {
   subject: string;
   merchantName?: string | null;
 }): string {
+  const orderedMulti = input.subject.match(
+    /^ordered:\s*[“"'](.+?)[”"'](?:\s+and\s+\d+\s+more\s+items?)?\s*$/i,
+  )?.[1]?.trim();
+  if (orderedMulti) return orderedMulti.replace(/\.\.\.$/, '').slice(0, 200);
   const orderedTitle = input.subject.match(/^ordered:\s*[“"']?(.+?)[”"']?\s*$/i)?.[1]?.trim();
   if (orderedTitle) return orderedTitle.replace(/\.\.\.$/, '').slice(0, 200);
   const fromSubject = merchantNameFromSubject(input.subject);
@@ -85,7 +90,7 @@ export function heuristicExtractOrder(input: {
   const totalCents = totalMatch ? parseMoneyToCents(totalMatch[1]) : null;
   if (totalCents == null) return null;
 
-  const taxCents =
+  let taxCents =
     parseMoneyToCents(blob.match(/\bTax[:\s]*\$?\s*([0-9,]+\.\d{2})/i)?.[1] ?? '') ?? 0;
   const shippingCents =
     parseMoneyToCents(
@@ -102,18 +107,32 @@ export function heuristicExtractOrder(input: {
     quantity: number;
     unitPriceCents: number;
     variant: string | null;
+    blockText?: string;
   }> = [];
-  const lineRe = /^(?:Qty\s*)?(\d+)\s*[x×]\s+(.+?)\s+\$([0-9,]+\.\d{2})\s*$/gim;
-  let m: RegExpExecArray | null;
-  while ((m = lineRe.exec(input.text)) !== null) {
-    const unit = parseMoneyToCents(m[3]);
-    if (unit == null) continue;
+
+  for (const amazonLine of parseAmazonQuantityLines(input.text)) {
     lines.push({
-      name: m[2].trim().slice(0, 200),
-      quantity: Number(m[1]),
-      unitPriceCents: unit,
-      variant: null,
+      name: amazonLine.name,
+      quantity: amazonLine.quantity,
+      unitPriceCents: amazonLine.unitPriceCents,
+      variant: amazonLine.variant,
+      blockText: amazonLine.blockText,
     });
+  }
+
+  if (lines.length === 0) {
+    const lineRe = /^(?:Qty\s*)?(\d+)\s*[x×]\s+(.+?)\s+\$([0-9,]+\.\d{2})\s*$/gim;
+    let m: RegExpExecArray | null;
+    while ((m = lineRe.exec(input.text)) !== null) {
+      const unit = parseMoneyToCents(m[3]);
+      if (unit == null) continue;
+      lines.push({
+        name: m[2].trim().slice(0, 200),
+        quantity: Number(m[1]),
+        unitPriceCents: unit,
+        variant: null,
+      });
+    }
   }
 
   const subjectMerchant = merchantNameFromSubject(input.subject);
@@ -135,14 +154,25 @@ export function heuristicExtractOrder(input: {
     });
   }
 
+  const lineSubtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0);
+  if (taxCents === 0) {
+    const impliedTax = totalCents - lineSubtotal - shippingCents + discountCents;
+    if (impliedTax > 0 && impliedTax < totalCents) {
+      taxCents = impliedTax;
+    }
+  }
+
   const linesWithCategory: ExtractedOrder['lines'] = lines.map((line) => ({
-    ...line,
+    name: line.name,
+    quantity: line.quantity,
+    unitPriceCents: line.unitPriceCents,
+    variant: line.variant,
     categorySlug:
       guessCategorySlug({
         name: line.name,
         merchantSlug: input.merchantSlug,
         subject: input.subject,
-        text: input.text,
+        text: line.blockText ?? line.name,
       }) ?? null,
   }));
 
