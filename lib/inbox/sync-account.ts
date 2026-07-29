@@ -11,6 +11,7 @@ import {
 } from '@/lib/email/providers/gmail';
 import {
   ingestGmailMessageIds,
+  reprocessPendingLifecycleMessages,
   type IngestCounters,
 } from '@/lib/inbox/ingest-messages';
 import { loadMerchantExclusions } from '@/lib/inbox/merchant-exclusions';
@@ -284,6 +285,17 @@ export async function syncEmailAccountBatch(
       counters: progress,
     });
 
+    await reprocessPendingLifecycleMessages(supabase, {
+      userId: opts.userId,
+      accountId: account.id,
+      accessToken,
+      merchants,
+      exclusions,
+      categoryIdsBySlug,
+      categoryOptions,
+      counters: progress,
+    });
+
     progress.nextPageToken = listed.nextPageToken;
     progress.done = listed.nextPageToken == null || listed.messages.length === 0;
 
@@ -431,6 +443,17 @@ export async function syncEmailAccountIncrementalBatch(
       accountId: account.id,
       accessToken,
       messageIds,
+      merchants,
+      exclusions,
+      categoryIdsBySlug,
+      categoryOptions,
+      counters: progress,
+    });
+
+    await reprocessPendingLifecycleMessages(supabase, {
+      userId: opts.userId,
+      accountId: account.id,
+      accessToken,
       merchants,
       exclusions,
       categoryIdsBySlug,
