@@ -8,7 +8,13 @@
  */
 import type { InventoryStatus } from '@/lib/status';
 
-export type DisposalMethod = 'donated' | 'trashed' | 'sold' | 'gifted' | 'recycled';
+export type DisposalMethod =
+  | 'donated'
+  | 'trashed'
+  | 'sold'
+  | 'gifted'
+  | 'recycled'
+  | 'consumed';
 
 /** Map a disposal method onto the inventory status it implies. */
 export function inventoryStatusForDisposal(method: DisposalMethod): InventoryStatus {
@@ -20,6 +26,7 @@ export function inventoryStatusForDisposal(method: DisposalMethod): InventorySta
     case 'donated':
     case 'trashed':
     case 'recycled':
+    case 'consumed':
       return 'disposed';
   }
 }
@@ -30,4 +37,5 @@ export const DISPOSAL_METHODS = [
   'sold',
   'gifted',
   'recycled',
+  'consumed',
 ] as const satisfies readonly DisposalMethod[];

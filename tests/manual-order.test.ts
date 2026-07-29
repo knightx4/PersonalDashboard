@@ -167,5 +167,6 @@ describe('manual order + inventory write paths', () => {
     expect(inventoryStatusForDisposal('donated')).toBe('disposed');
     expect(inventoryStatusForDisposal('trashed')).toBe('disposed');
     expect(inventoryStatusForDisposal('recycled')).toBe('disposed');
+    expect(inventoryStatusForDisposal('consumed')).toBe('disposed');
   });
 });

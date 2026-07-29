@@ -93,7 +93,8 @@ export function DisposeForm({
       <input type="hidden" name="id" value={itemId} />
       <h3 className="text-sm font-semibold text-ink">Mark disposed</h3>
       <p className="text-[13px] text-ink-muted">
-        Record that you no longer own this. Sold and gifted update status to match.
+        Record that you no longer own this. Sold and gifted update status to match;
+        consumed / donated / trashed / recycled mark it disposed.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
