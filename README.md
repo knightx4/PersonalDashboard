@@ -10,7 +10,7 @@ month.
 
 ## Status
 
-Build order steps 1–8 and 10 + 12 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
+Build order steps 1–10 and 12 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
 for what is next.
 
 | | |
@@ -23,8 +23,9 @@ for what is next.
 | Manual order entry + inventory CRUD | done |
 | Gmail inbox connect (OAuth, encrypted tokens) | done |
 | Email extraction + order import sync | done |
+| Dashboard | done |
 | Saved items (URL unfurl + queue CRUD) | done |
-| Dashboard, incremental sync | not started |
+| Incremental sync | not started |
 
 ## Getting started
 

@@ -4,11 +4,18 @@ export function sanitizeOrdersQuery(raw: string | undefined): string {
   return (raw ?? '').trim().replace(/[%_,*()]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+export type OrderListItem = {
+  name: string;
+  variant: string | null;
+  quantity?: number | null;
+  categories?: { name: string } | { name: string }[] | null;
+};
+
 export type OrderSearchRow = {
   status: string;
   external_order_number: string | null;
   merchants: { name: string } | { name: string }[] | null;
-  order_items: Array<{ name: string; variant: string | null }> | null;
+  order_items: OrderListItem[] | null;
   ingested_messages:
     | Array<{ subject: string | null; from_address: string | null }>
     | null;
@@ -25,6 +32,8 @@ export function orderMatchesQuery(order: OrderSearchRow, q: string): boolean {
   ];
   for (const item of order.order_items ?? []) {
     parts.push(item.name, item.variant);
+    const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
+    parts.push(category?.name);
   }
   for (const message of order.ingested_messages ?? []) {
     parts.push(message.subject, message.from_address);
@@ -44,4 +53,65 @@ export function matchingItemHint(
     }
   }
   return null;
+}
+
+/** Shorten long retailer titles for list rows (prefer text before first comma). */
+export function shortItemLabel(name: string, max = 48): string {
+  const cleaned = name.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return 'Item';
+  const beforeComma = cleaned.split(',')[0]?.trim() || cleaned;
+  const base = beforeComma.length >= 12 ? beforeComma : cleaned;
+  if (base.length <= max) return base;
+  return `${base.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
+}
+
+export type OrderItemsSummary = {
+  itemCount: number;
+  lineCount: number;
+  /** e.g. "2 items · Clothing · Baseball Hat, NYU T Shirt" */
+  label: string;
+};
+
+/**
+ * Compact list-row summary: unit count, optional category kinds, short item names.
+ */
+export function orderItemsSummary(
+  order: Pick<OrderSearchRow, 'order_items'>,
+): OrderItemsSummary {
+  const items = order.order_items ?? [];
+  const lineCount = items.length;
+  const itemCount = items.reduce((sum, item) => {
+    const qty = item.quantity == null || item.quantity < 1 ? 1 : item.quantity;
+    return sum + qty;
+  }, 0);
+
+  if (itemCount === 0) {
+    return { itemCount: 0, lineCount: 0, label: 'No items' };
+  }
+
+  const countLabel = itemCount === 1 ? '1 item' : `${itemCount} items`;
+
+  const kinds = new Set<string>();
+  for (const item of items) {
+    const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
+    if (category?.name) kinds.add(category.name);
+  }
+  const kindLabel =
+    kinds.size > 0 && kinds.size <= 3 ? [...kinds].join(', ') : null;
+
+  const maxNames = 2;
+  const names = items.slice(0, maxNames).map((item) => shortItemLabel(item.name));
+  const remaining = Math.max(0, lineCount - maxNames);
+  const namesLabel =
+    remaining > 0 ? `${names.join(', ')} +${remaining} more` : names.join(', ');
+
+  const parts = [countLabel];
+  if (kindLabel) parts.push(kindLabel);
+  if (namesLabel) parts.push(namesLabel);
+
+  return {
+    itemCount,
+    lineCount,
+    label: parts.join(' · '),
+  };
 }

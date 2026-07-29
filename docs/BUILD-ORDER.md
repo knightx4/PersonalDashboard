@@ -27,6 +27,8 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
    extraction with arithmetic gate, Gmail message fetch, and session-scoped
    `/api/inbox/sync` batches that write orders + inventory. LLM via Anthropic
    Haiku when `ANTHROPIC_API_KEY` is set; heuristic fallback otherwise.
+9. ✅ **Dashboard** on top of order/inventory data, reading only from
+   `lib/money.ts`.
 10. ✅ **Saved items.** Paste URL → JSON-LD then Open Graph enrichment →
     preview/edit → save. List by status, detail edit, dismiss / purchased /
     delete. Loose fingerprint already-own warning. Merchant match from URL
@@ -39,8 +41,6 @@ at Tier 2.
 
 ## Next
 
-9. **Dashboard** on top of existing order/inventory data, reading only from
-   `lib/money.ts`.
 11. **Onboarding flow** including the pre-consent explanation screen.
 12. ✅ **Background Gmail backfill.** Import starts on the server (`after` +
     continue chain), survives navigation, and Settings/Dashboard poll
@@ -58,8 +58,8 @@ at Tier 2.
 - Step 3 early, because every screen depends on those numbers and they are cheap
   to test in isolation and expensive to correct once six components compute them
   inline.
-- Step 9 can wait behind step 10; they do not share a data path. Dashboard
-  reads orders/inventory spend; saved items are an independent queue.
+- Steps 9 and 10 are independent: dashboard reads spend; saved items are a
+  separate queue. Either order is fine.
 
 ## Open questions, still open
 

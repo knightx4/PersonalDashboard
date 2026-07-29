@@ -133,6 +133,18 @@ export function percentChange(current: number, previous: number): number | null 
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
+/**
+ * Display form of percentChange for the dashboard delta line.
+ * Returns null when there is no comparable baseline (caller renders an em dash).
+ */
+export function formatPercentChange(change: number | null): string | null {
+  if (change === null) return null;
+  const rounded = Math.round(change);
+  if (rounded === 0) return '0%';
+  const sign = rounded > 0 ? '+' : '−';
+  return `${sign}${Math.abs(rounded)}%`;
+}
+
 // ---------------------------------------------------------------------------
 // Landed cost allocation
 // ---------------------------------------------------------------------------
@@ -352,6 +364,117 @@ export function valueOwned(
 }
 
 // ---------------------------------------------------------------------------
+// Period breakdowns (where spend went)
+// ---------------------------------------------------------------------------
+
+export interface CategorySpendSlice {
+  categoryId: string | null;
+  name: string;
+  color: string;
+  cents: number;
+}
+
+export interface CategorizedUnit {
+  /** YYYY-MM-DD of the parent order. */
+  orderDate: string;
+  cancelled: boolean;
+  /** Landed cost for this unit -- from allocateLandedCost. */
+  costCents: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryColor: string | null;
+}
+
+const UNCATEGORIZED: Omit<CategorySpendSlice, 'cents'> = {
+  categoryId: null,
+  name: 'Uncategorized',
+  color: '#9a9a94',
+};
+
+/**
+ * Landed cost of units from orders placed in the period, grouped by category.
+ *
+ * This answers "where did the money go", not "what do I still own". It uses
+ * order-date filtering (same as spend gross) and landed costs so tax/shipping
+ * are included. Refunds are intentionally absent -- they belong on the
+ * headline via spend(), not redistributed across categories after the fact.
+ */
+export function spendByCategory(
+  units: readonly CategorizedUnit[],
+  period: Period,
+): CategorySpendSlice[] {
+  const totals = new Map<string, CategorySpendSlice>();
+
+  for (const unit of units) {
+    if (unit.cancelled || !withinPeriod(unit.orderDate, period)) continue;
+    assertIntegerCents(unit.costCents);
+
+    const key = unit.categoryId ?? '__uncategorized__';
+    const existing = totals.get(key);
+    if (existing) {
+      existing.cents += unit.costCents;
+      continue;
+    }
+    totals.set(key, {
+      categoryId: unit.categoryId,
+      name: unit.categoryName ?? UNCATEGORIZED.name,
+      color: unit.categoryColor ?? UNCATEGORIZED.color,
+      cents: unit.costCents,
+    });
+  }
+
+  return [...totals.values()].sort(
+    (a, b) => b.cents - a.cents || a.name.localeCompare(b.name),
+  );
+}
+
+export interface MerchantSpendSlice {
+  merchantId: string | null;
+  name: string;
+  cents: number;
+}
+
+export interface MerchantSpendOrder {
+  orderDate: string;
+  totalCents: number;
+  cancelled: boolean;
+  merchantId: string | null;
+  merchantName: string | null;
+}
+
+/**
+ * Gross order totals placed in the period, grouped by merchant.
+ * Same order-date / cancelled rules as spend() gross.
+ */
+export function spendByMerchant(
+  orders: readonly MerchantSpendOrder[],
+  period: Period,
+): MerchantSpendSlice[] {
+  const totals = new Map<string, MerchantSpendSlice>();
+
+  for (const order of orders) {
+    if (order.cancelled || !withinPeriod(order.orderDate, period)) continue;
+    assertIntegerCents(order.totalCents);
+
+    const key = order.merchantId ?? '__unknown__';
+    const existing = totals.get(key);
+    if (existing) {
+      existing.cents += order.totalCents;
+      continue;
+    }
+    totals.set(key, {
+      merchantId: order.merchantId,
+      name: order.merchantName ?? 'Unknown merchant',
+      cents: order.totalCents,
+    });
+  }
+
+  return [...totals.values()].sort(
+    (a, b) => b.cents - a.cents || a.name.localeCompare(b.name),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Period boundaries
 // ---------------------------------------------------------------------------
 
@@ -415,5 +538,81 @@ export function periodFor(
       const month = (total % 12) + 1;
       return { start: ymd(year, month, 1), end: ymd(y, m, d) };
     }
+  }
+}
+
+/**
+ * The comparable window immediately before `periodFor(preset)`.
+ *
+ * Calendar presets compare against the prior calendar month / prior year-to-date
+ * span. Rolling presets shift back by the same number of months so the
+ * dashboard delta is apples-to-apples.
+ */
+export function previousPeriodFor(
+  preset: PresetRange,
+  timezone: string,
+  now: Date = new Date(),
+): Period {
+  const today = todayInTimezone(timezone, now);
+  const [y, m, d] = today.split('-').map(Number);
+
+  switch (preset) {
+    case 'this_month':
+      return periodFor('last_month', timezone, now);
+    case 'last_month': {
+      const total = y * 12 + (m - 1) - 2;
+      const year = Math.floor(total / 12);
+      const month = (total % 12) + 1;
+      return {
+        start: ymd(year, month, 1),
+        end: ymd(year, month, lastDayOfMonth(year, month)),
+      };
+    }
+    case 'last_3_months': {
+      // Current window starts two months back; previous is the three months
+      // before that, ending on the last day of the month before current start.
+      const curStart = y * 12 + (m - 1) - 2;
+      const prevStart = curStart - 3;
+      const prevEnd = curStart - 1;
+      const startYear = Math.floor(prevStart / 12);
+      const startMonth = (prevStart % 12) + 1;
+      const endYear = Math.floor(prevEnd / 12);
+      const endMonth = (prevEnd % 12) + 1;
+      return {
+        start: ymd(startYear, startMonth, 1),
+        end: ymd(endYear, endMonth, lastDayOfMonth(endYear, endMonth)),
+      };
+    }
+    case 'ytd': {
+      const endDay = Math.min(d, lastDayOfMonth(y - 1, m));
+      return { start: ymd(y - 1, 1, 1), end: ymd(y - 1, m, endDay) };
+    }
+    case 'last_12_months': {
+      const curStart = y * 12 + (m - 1) - 11;
+      const prevStart = curStart - 12;
+      const startYear = Math.floor(prevStart / 12);
+      const startMonth = (prevStart % 12) + 1;
+      const endDay = Math.min(d, lastDayOfMonth(y - 1, m));
+      return {
+        start: ymd(startYear, startMonth, 1),
+        end: ymd(y - 1, m, endDay),
+      };
+    }
+  }
+}
+
+/** Human label for a preset, shared by the rail and the delta copy. */
+export function labelForPreset(preset: PresetRange): string {
+  switch (preset) {
+    case 'this_month':
+      return 'This month';
+    case 'last_month':
+      return 'Last month';
+    case 'last_3_months':
+      return 'Last 3 months';
+    case 'ytd':
+      return 'Year to date';
+    case 'last_12_months':
+      return 'Last 12 months';
   }
 }
