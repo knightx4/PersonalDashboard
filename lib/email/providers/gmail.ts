@@ -6,6 +6,11 @@ import { formatGmailApiError } from '@/lib/email/providers/gmail-api-error';
 import { emailFromIdToken } from '@/lib/email/id-token';
 import { gmailPayloadToHtml, gmailPayloadToText, headerValue } from '@/lib/email/mime';
 import {
+  GmailHistoryExpiredError,
+  messageIdsFromHistory,
+  type GmailHistoryListResponse,
+} from '@/lib/email/providers/gmail-history';
+import {
   GMAIL_READONLY_SCOPE,
   type GmailMessageContent,
   type GmailMessageRef,
@@ -14,6 +19,11 @@ import {
 } from '@/lib/email/providers/types';
 
 export { hasGmailReadonlyScope } from '@/lib/email/providers/types';
+export {
+  GmailHistoryExpiredError,
+  isGmailHistoryExpiredError,
+  messageIdsFromHistory,
+} from '@/lib/email/providers/gmail-history';
 
 /** Read-only Gmail + enough identity to learn which address was connected. */
 const SCOPES = [GMAIL_READONLY_SCOPE, 'openid', 'email'];
@@ -42,13 +52,20 @@ function toTokens(tokens: {
   };
 }
 
-async function gmailJson<T>(accessToken: string, path: string): Promise<T> {
+async function gmailJson<T>(
+  accessToken: string,
+  path: string,
+  opts?: { historyNotFound?: boolean },
+): Promise<T> {
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     console.error('gmail api error', { path, status: res.status, body: body.slice(0, 500) });
+    if (opts?.historyNotFound && res.status === 404) {
+      throw new GmailHistoryExpiredError();
+    }
     throw new Error(formatGmailApiError(res.status, body));
   }
   return res.json() as Promise<T>;
@@ -72,14 +89,17 @@ export const gmailProvider: GmailOAuthProvider = {
   },
 
   async fetchProfile(accessToken) {
-    const data = await gmailJson<{ emailAddress?: string }>(
+    const data = await gmailJson<{ emailAddress?: string; historyId?: string | number }>(
       accessToken,
       'users/me/profile',
     );
     if (!data.emailAddress) {
       throw new Error('Gmail profile did not include an email address');
     }
-    return { emailAddress: data.emailAddress };
+    return {
+      emailAddress: data.emailAddress,
+      historyId: data.historyId != null ? String(data.historyId) : null,
+    };
   },
 
   async revokeToken(token) {
@@ -110,6 +130,26 @@ export const gmailProvider: GmailOAuthProvider = {
     return {
       messages: data.messages ?? [],
       nextPageToken: data.nextPageToken ?? null,
+    };
+  },
+
+  async listHistory(accessToken, opts) {
+    const params = new URLSearchParams({
+      startHistoryId: opts.startHistoryId,
+      maxResults: String(opts.maxResults ?? 100),
+      // Only message additions — enough for new order confirmations.
+      historyTypes: 'messageAdded',
+    });
+    if (opts.pageToken) params.set('pageToken', opts.pageToken);
+    const data = await gmailJson<GmailHistoryListResponse>(
+      accessToken,
+      `users/me/history?${params}`,
+      { historyNotFound: true },
+    );
+    return {
+      messageIds: messageIdsFromHistory(data.history),
+      nextPageToken: data.nextPageToken ?? null,
+      historyId: data.historyId != null ? String(data.historyId) : null,
     };
   },
 

@@ -28,7 +28,7 @@ export default async function SettingsPage({
 
   const { data: accounts } = await supabase
     .from('email_accounts')
-    .select('id, email_address, status, last_synced_at')
+    .select('id, email_address, status, last_synced_at, backfill_completed_at')
     .eq('user_id', user.id);
 
   const { data: mutedMerchants } = await supabase
@@ -54,6 +54,7 @@ export default async function SettingsPage({
     string,
     {
       jobId: string;
+      type?: string;
       status: string;
       messagesSeen: number;
       messagesClassified: number;
@@ -70,10 +71,9 @@ export default async function SettingsPage({
     const { data: jobs } = await supabase
       .from('sync_jobs')
       .select(
-        'id, email_account_id, status, messages_seen, messages_classified, messages_parsed, error',
+        'id, email_account_id, type, status, messages_seen, messages_classified, messages_parsed, error',
       )
       .in('email_account_id', accountIds)
-      .eq('type', 'backfill')
       .order('created_at', { ascending: false });
 
     for (const job of jobs ?? []) {
@@ -82,6 +82,7 @@ export default async function SettingsPage({
       const done = job.status === 'completed' || job.status === 'failed';
       latestJobs[accountId] = {
         jobId: job.id as string,
+        type: job.type as string,
         status: job.status as string,
         messagesSeen: job.messages_seen as number,
         messagesClassified: job.messages_classified as number,

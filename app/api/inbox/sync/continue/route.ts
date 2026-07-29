@@ -1,13 +1,10 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
-import {
-  pumpInboxBackfill,
-  verifyInboxContinueToken,
-} from '@/inngest/inbox-backfill';
+import { pumpInboxSync, verifyInboxContinueToken } from '@/inngest/inbox-backfill';
 
 export const maxDuration = 60;
 
 /**
- * Internal continuation for background Gmail backfill.
+ * Internal continuation for background Gmail sync (backfill or incremental).
  * Authenticated via HMAC token, not the user session — so work survives
  * navigation and cookie-less chained invocations.
  */
@@ -40,7 +37,7 @@ export async function POST(request: NextRequest) {
       : new URL(request.url).origin;
 
   const { userId, accountId, jobId } = body;
-  after(() => pumpInboxBackfill({ userId, accountId, jobId, origin }));
+  after(() => pumpInboxSync({ userId, accountId, jobId, origin }));
 
   return NextResponse.json({ ok: true, continued: true });
 }

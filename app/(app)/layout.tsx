@@ -32,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const accountIds = (accounts ?? []).map((a) => a.id as string);
   let initialBannerJob: {
     jobId: string;
+    type?: string;
     status: string;
     messagesSeen: number;
     messagesParsed: number;
@@ -41,9 +42,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (accountIds.length > 0) {
     const { data: activeJob } = await supabase
       .from('sync_jobs')
-      .select('id, status, messages_seen, messages_parsed')
+      .select('id, type, status, messages_seen, messages_parsed')
       .in('email_account_id', accountIds)
-      .eq('type', 'backfill')
       .in('status', ['running', 'queued'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -51,6 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (activeJob) {
       initialBannerJob = {
         jobId: activeJob.id as string,
+        type: activeJob.type as string,
         status: activeJob.status as string,
         messagesSeen: activeJob.messages_seen as number,
         messagesParsed: activeJob.messages_parsed as number,

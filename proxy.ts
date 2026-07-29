@@ -29,6 +29,8 @@ const PUBLIC_PATHS = [
   '/terms',
   // HMAC-authenticated Gmail backfill continuation (no user session).
   '/api/inbox/sync/continue',
+  // Vercel Cron — authenticated via CRON_SECRET Bearer token.
+  '/api/cron/inbox-incremental',
 ];
 
 function isPublic(pathname: string): boolean {

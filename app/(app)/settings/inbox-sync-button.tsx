@@ -6,6 +6,7 @@ import { resetInboxImport } from './actions';
 
 export type InboxSyncProgress = {
   jobId: string;
+  type?: string;
   status?: string;
   messagesSeen: number;
   messagesClassified: number;
@@ -22,13 +23,17 @@ export type InboxSyncProgress = {
 export function InboxSyncButton({
   accountId,
   initialJob = null,
+  backfillCompleted = false,
 }: {
   accountId: string;
   initialJob?: InboxSyncProgress | null;
+  /** True once the initial Gmail import finished — enables Sync now. */
+  backfillCompleted?: boolean;
 }) {
   const [progress, setProgress] = useState<InboxSyncProgress | null>(initialJob);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [syncingNow, setSyncingNow] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   const active =
@@ -51,14 +56,15 @@ export function InboxSyncButton({
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  async function startSync() {
+  async function startMode(mode: 'backfill' | 'incremental') {
     setError(null);
-    setStarting(true);
+    if (mode === 'backfill') setStarting(true);
+    else setSyncingNow(true);
     try {
       const res = await fetch('/api/inbox/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, mode }),
       });
       const data = (await res.json()) as InboxSyncProgress & { error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Sync failed');
@@ -67,6 +73,7 @@ export function InboxSyncButton({
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setStarting(false);
+      setSyncingNow(false);
     }
   }
 
@@ -82,7 +89,7 @@ export function InboxSyncButton({
       const result = await resetInboxImport(accountId);
       if (!result.ok) throw new Error(result.error ?? 'Reset failed');
       setProgress(null);
-      await startSync();
+      await startMode('backfill');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Reset failed');
     } finally {
@@ -90,14 +97,34 @@ export function InboxSyncButton({
     }
   }
 
-  const busy = starting || resetting || active;
+  const busy = starting || syncingNow || resetting || active;
+  const isIncremental = progress?.type === 'incremental';
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={startSync}>
-          {starting || active ? 'Importing in background…' : 'Import orders from Gmail'}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={busy}
+          onClick={() => startMode('backfill')}
+        >
+          {starting || (active && !isIncremental)
+            ? 'Importing in background…'
+            : 'Import orders from Gmail'}
         </Button>
+        {backfillCompleted && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={busy}
+            onClick={() => startMode('incremental')}
+          >
+            {syncingNow || (active && isIncremental) ? 'Syncing…' : 'Sync now'}
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"
@@ -110,7 +137,8 @@ export function InboxSyncButton({
       </div>
       {progress && (
         <p className="text-xs text-ink-muted" aria-live="polite">
-          Seen {progress.messagesSeen} · parsed {progress.messagesParsed}
+          {isIncremental ? 'Sync' : 'Import'} — seen {progress.messagesSeen} · parsed{' '}
+          {progress.messagesParsed}
           {progress.messagesClassified
             ? ` · classified ${progress.messagesClassified}`
             : ''}
@@ -126,16 +154,18 @@ export function InboxSyncButton({
       )}
       {active && (
         <p className="text-xs text-ink-faint">
-          You can leave this page — import keeps going on the server. Come back anytime to
-          check progress.
+          You can leave this page — work keeps going on the server. Come back anytime to check
+          progress.
         </p>
       )}
       <p className="text-xs text-ink-faint">
-        Import skips messages it already saw. Use <span className="text-ink-muted">Reset &amp;
-        re-scan</span> to delete this inbox’s email orders and parse Gmail again with the latest
-        parser.
+        Import skips messages it already saw. After the first import, Sync now (or the hourly
+        cron) picks up new mail via Gmail history. Use{' '}
+        <span className="text-ink-muted">Reset &amp; re-scan</span> to delete this inbox’s email
+        orders and parse Gmail again with the latest parser.
       </p>
       {progress?.done &&
+        progress.type !== 'incremental' &&
         progress.messagesSeen === 0 &&
         !progress.error &&
         !error && (
