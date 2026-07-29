@@ -48,9 +48,10 @@ at Tier 2.
     continue chain), survives navigation, and Settings/Dashboard poll
     `sync_jobs` for progress. Full Inngest remains optional further hardening.
 13. ✅ **Incremental sync** (Gmail historyId). Durable cursor on
-    `email_accounts.sync_cursor`; page tokens on `sync_page_token`. Hourly
-    cron at `/api/cron/inbox-incremental` plus Settings “Sync now”. Expired
-    history falls back to a bounded `messages.list` catch-up.
+    `email_accounts.sync_cursor`; page tokens on `sync_page_token`. Daily
+    cron at `/api/cron/inbox-incremental` (Hobby limit) plus Settings
+    “Sync now”. Expired history falls back to a bounded `messages.list`
+    catch-up.
 14. **Review queue.**
 15. **Account deletion** with token revocation and full cascade.
 16. **Phase 2** — the anti-spending layer. No migrations needed; the schema

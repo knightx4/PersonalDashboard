@@ -6,6 +6,16 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import {
+  CATEGORY_COLOR_OPTIONS,
+  isCategoryColor,
+  slugifyCategoryName,
+} from '@/lib/categories/slugify';
+
+export type CategoryActionState = {
+  error?: string;
+  message?: string;
+};
 
 /** Revoke Google's grant and remove the email_accounts row (cascades sync data). */
 export async function disconnectInbox(formData: FormData): Promise<void> {
@@ -155,4 +165,97 @@ export async function resetInboxImport(accountId: string): Promise<{
   revalidatePath('/dashboard');
 
   return { ok: true, deletedOrders: toDelete.length };
+}
+
+const createCategorySchema = z.object({
+  name: z.string().trim().min(2).max(40),
+  color: z.string().refine(isCategoryColor, 'Pick a color.'),
+});
+
+export async function createCustomCategory(
+  _prev: CategoryActionState,
+  formData: FormData,
+): Promise<CategoryActionState> {
+  const user = await requireUser();
+  const parsed = createCategorySchema.safeParse({
+    name: formData.get('name'),
+    color: formData.get('color') ?? CATEGORY_COLOR_OPTIONS[0],
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
+  }
+
+  const slug = slugifyCategoryName(parsed.data.name);
+  if (!slug) return { error: 'Use letters or numbers in the category name.' };
+
+  const supabase = await createClient();
+  const { data: conflicts } = await supabase
+    .from('categories')
+    .select('id, user_id')
+    .eq('slug', slug);
+  if ((conflicts ?? []).some((row) => row.user_id == null || row.user_id === user.id)) {
+    return { error: 'That category name is already used. Try another.' };
+  }
+
+  const { error } = await supabase.from('categories').insert({
+    user_id: user.id,
+    parent_id: null,
+    name: parsed.data.name,
+    slug,
+    color: parsed.data.color,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+  revalidatePath('/orders');
+  revalidatePath('/dashboard');
+  return { message: 'Category added. New imports can use it automatically.' };
+}
+
+export async function renameCustomCategory(
+  _prev: CategoryActionState,
+  formData: FormData,
+): Promise<CategoryActionState> {
+  const user = await requireUser();
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(2).max(40),
+    })
+    .safeParse({
+      id: formData.get('id'),
+      name: formData.get('name'),
+    });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('categories')
+    .update({ name: parsed.data.name })
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+  revalidatePath('/orders');
+  revalidatePath('/dashboard');
+  return { message: 'Category renamed.' };
+}
+
+export async function deleteCustomCategory(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  await supabase.from('categories').delete().eq('id', parsed.data.id).eq('user_id', user.id);
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+  revalidatePath('/orders');
+  revalidatePath('/dashboard');
 }

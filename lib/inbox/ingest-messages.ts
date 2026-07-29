@@ -36,6 +36,7 @@ export async function ingestGmailMessageIds(
     merchants: MerchantDomainHit[];
     exclusions: MerchantExclusionRow[];
     categoryIdsBySlug: Map<string, string>;
+    categoryOptions?: Array<{ slug: string; name: string }>;
     counters: IngestCounters;
   },
 ): Promise<void> {
@@ -47,6 +48,7 @@ export async function ingestGmailMessageIds(
     merchants,
     exclusions,
     categoryIdsBySlug,
+    categoryOptions,
     counters,
   } = opts;
 
@@ -138,6 +140,7 @@ export async function ingestGmailMessageIds(
           classified.merchant?.name ?? displayNameFromAddress(message.fromAddress),
         fromAddress: message.fromAddress,
         receivedAt: message.internalDate,
+        categoryOptions,
       });
 
       if (!extraction.result.ok) {

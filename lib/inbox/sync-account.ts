@@ -62,15 +62,26 @@ async function loadMerchants(
   }));
 }
 
-async function loadCategoryMap(supabase: SupabaseClient): Promise<Map<string, string>> {
-  const { data: systemCategories } = await supabase
+async function loadCategoryContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{
+  categoryIdsBySlug: Map<string, string>;
+  categoryOptions: Array<{ slug: string; name: string }>;
+}> {
+  const { data: categoryRows } = await supabase
     .from('categories')
-    .select('id, slug')
-    .is('user_id', null)
-    .is('parent_id', null);
-  return new Map<string, string>(
-    (systemCategories ?? []).map((row) => [row.slug as string, row.id as string]),
+    .select('id, slug, name, user_id')
+    .is('parent_id', null)
+    .or(`user_id.is.null,user_id.eq.${userId}`);
+  const categoryIdsBySlug = new Map<string, string>(
+    (categoryRows ?? []).map((row) => [row.slug as string, row.id as string]),
   );
+  const categoryOptions = (categoryRows ?? []).map((row) => ({
+    slug: row.slug as string,
+    name: row.name as string,
+  }));
+  return { categoryIdsBySlug, categoryOptions };
 }
 
 async function ensureAccessToken(
@@ -239,7 +250,10 @@ export async function syncEmailAccountBatch(
     const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
     const merchants = await loadMerchants(supabase, opts.userId);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
-    const categoryIdsBySlug = await loadCategoryMap(supabase);
+    const { categoryIdsBySlug, categoryOptions } = await loadCategoryContext(
+      supabase,
+      opts.userId,
+    );
     const query = orderCandidateQuery(account.backfill_window_days);
     progress.query = query;
     console.info('gmail sync query', {
@@ -266,6 +280,7 @@ export async function syncEmailAccountBatch(
       merchants,
       exclusions,
       categoryIdsBySlug,
+      categoryOptions,
       counters: progress,
     });
 
@@ -352,7 +367,10 @@ export async function syncEmailAccountIncrementalBatch(
     const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
     const merchants = await loadMerchants(supabase, opts.userId);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
-    const categoryIdsBySlug = await loadCategoryMap(supabase);
+    const { categoryIdsBySlug, categoryOptions } = await loadCategoryContext(
+      supabase,
+      opts.userId,
+    );
 
     let messageIds: string[] = [];
     let nextPageToken: string | null = null;
@@ -416,6 +434,7 @@ export async function syncEmailAccountIncrementalBatch(
       merchants,
       exclusions,
       categoryIdsBySlug,
+      categoryOptions,
       counters: progress,
     });
 
