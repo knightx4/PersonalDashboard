@@ -44,6 +44,10 @@ npx vercel link
 npx vercel env add ...
 ```
 
+For hourly incremental Gmail sync (`vercel.json` cron → `/api/cron/inbox-incremental`),
+set `CRON_SECRET` in Vercel env. Vercel Cron sends it as `Authorization: Bearer …`.
+If unset, the route accepts `TOKEN_ENCRYPTION_KEY` as a local fallback.
+
 Use the CLI rather than the dashboard throughout. Both produce the same result,
 but the CLI leaves migration files in the repo, which is what makes the database
 reproducible. Anything clicked into a dashboard exists nowhere in version
