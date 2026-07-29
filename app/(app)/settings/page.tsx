@@ -1,4 +1,4 @@
-import { Mail, ShieldCheck, Tags, User } from 'lucide-react';
+import { ListChecks, Mail, ShieldCheck, Tags, User } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
 import { CategoriesSection } from './categories-section';
 import { InboxSection } from './inbox-section';
+import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
 
 export const metadata = { title: 'Settings' };
@@ -40,6 +41,12 @@ export default async function SettingsPage({
     .from('categories')
     .select('id, name, slug, color, user_id')
     .is('parent_id', null)
+    .order('name');
+
+  const { data: lists } = await supabase
+    .from('item_lists')
+    .select('id, name, slug, color')
+    .eq('user_id', user.id)
     .order('name');
 
   const accountIds = (accounts ?? []).map((a) => a.id as string);
@@ -144,6 +151,18 @@ export default async function SettingsPage({
           </CardHeader>
           <CardBody>
             <CategoriesSection categories={categories ?? []} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ListChecks className="size-4 text-ink-muted" strokeWidth={1.75} />
+              Lists
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <ListsSection lists={lists ?? []} />
           </CardBody>
         </Card>
 

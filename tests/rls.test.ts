@@ -119,6 +119,18 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.merchant_exclusions = exclusion.id;
 
+  const [itemList] = await admin<{ id: string }[]>`
+    insert into item_lists (user_id, name, slug, color)
+    values (${userId}, ${`${tag} list`}, ${`${tag}-list`}, '#6A82FB')
+    returning id`;
+  ids.item_lists = itemList.id;
+
+  const [membership] = await admin<{ id: string }[]>`
+    insert into inventory_item_lists (inventory_item_id, list_id)
+    values (${inventoryItem.id}, ${itemList.id})
+    returning id`;
+  ids.inventory_item_lists = membership.id;
+
   return ids;
 }
 
