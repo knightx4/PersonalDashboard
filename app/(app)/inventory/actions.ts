@@ -9,6 +9,11 @@ import {
   type DisposalMethod,
 } from '@/lib/inventory/status-actions';
 import { parseDollarsToCents, todayInTimezone } from '@/lib/money';
+import {
+  CATEGORY_COLOR_OPTIONS,
+  isCategoryColor,
+  slugifyCategoryName,
+} from '@/lib/categories/slugify';
 
 export interface ActionState {
   error?: string;
@@ -236,4 +241,72 @@ export async function updateInventoryItemLists(
   revalidatePath('/inventory');
   revalidatePath(`/inventory/${item.id}`);
   return { message: 'Lists updated.' };
+}
+
+/** Create a list from an inventory item page and add this item to it. */
+export async function createItemListAndAssign(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const itemId = z.string().uuid().safeParse(formData.get('id'));
+  if (!itemId.success) return { error: 'Missing item.' };
+
+  const nameParsed = z
+    .string()
+    .trim()
+    .min(2, 'Name needs at least 2 characters.')
+    .max(40)
+    .safeParse(formData.get('name'));
+  if (!nameParsed.success) {
+    return { error: nameParsed.error.issues[0]?.message ?? 'Enter a list name.' };
+  }
+
+  const colorRaw = String(formData.get('color') ?? CATEGORY_COLOR_OPTIONS[0]);
+  const color = isCategoryColor(colorRaw) ? colorRaw : CATEGORY_COLOR_OPTIONS[0];
+  const slug = slugifyCategoryName(nameParsed.data);
+  if (!slug) return { error: 'Use letters or numbers in the list name.' };
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('id', itemId.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) return { error: 'That item could not be found.' };
+
+  const { data: conflict } = await supabase
+    .from('item_lists')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('slug', slug)
+    .maybeSingle();
+  if (conflict) return { error: 'That list name is already used. Try another.' };
+
+  const { data: created, error: createError } = await supabase
+    .from('item_lists')
+    .insert({
+      user_id: user.id,
+      name: nameParsed.data,
+      slug,
+      color,
+    })
+    .select('id')
+    .single();
+  if (createError || !created) {
+    return { error: createError?.message ?? 'Could not create that list.' };
+  }
+
+  const { error: membershipError } = await supabase.from('inventory_item_lists').insert({
+    inventory_item_id: item.id,
+    list_id: created.id,
+  });
+  if (membershipError) return { error: membershipError.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${item.id}`);
+  return { message: `Added to “${nameParsed.data}”.` };
 }
