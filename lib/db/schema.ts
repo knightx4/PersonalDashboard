@@ -22,6 +22,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // Supabase's auth schema. Declared so foreign keys type-check; never written to
 // from application code.
@@ -174,6 +175,32 @@ export const merchants = pgTable(
     ...timestamps,
   },
   (t) => [index('merchants_domains_idx').using('gin', t.domains)],
+);
+
+/**
+ * User-owned mute list for import. Survives Reset & re-scan.
+ * Either merchant_id or match_domain (or both) identifies the sender.
+ */
+export const merchantExclusions = pgTable(
+  'merchant_exclusions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    merchantId: uuid('merchant_id').references(() => merchants.id, { onDelete: 'cascade' }),
+    matchDomain: text('match_domain'),
+    ...timestamps,
+  },
+  (t) => [
+    index('merchant_exclusions_user_idx').on(t.userId),
+    uniqueIndex('merchant_exclusions_user_merchant_uidx')
+      .on(t.userId, t.merchantId)
+      .where(sql`merchant_id is not null`),
+    uniqueIndex('merchant_exclusions_user_domain_uidx')
+      .on(t.userId, t.matchDomain)
+      .where(sql`match_domain is not null`),
+  ],
 );
 
 export const emailAccounts = pgTable(

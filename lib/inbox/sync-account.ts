@@ -9,6 +9,10 @@ import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { orderCandidateQuery } from '@/lib/email/providers/gmail-query';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
+import {
+  isExcludedSender,
+  loadMerchantExclusions,
+} from '@/lib/inbox/merchant-exclusions';
 
 export interface SyncProgress {
   jobId: string;
@@ -169,6 +173,7 @@ export async function syncEmailAccountBatch(
   try {
     const accessToken = await ensureAccessToken(supabase, account as AccountRow, encryptionKey);
     const merchants = await loadMerchants(supabase);
+    const exclusions = await loadMerchantExclusions(supabase, opts.userId);
     const query = orderCandidateQuery(account.backfill_window_days);
     progress.query = query;
     console.info('gmail sync query', {
@@ -238,6 +243,28 @@ export async function syncEmailAccountBatch(
             classification: classified.classification,
             parse_status: 'skipped',
             parser_version: PARSER_VERSION,
+          });
+          progress.skipped += 1;
+          continue;
+        }
+
+        if (
+          isExcludedSender(exclusions, {
+            merchantId: classified.merchant?.id ?? null,
+            fromAddress: message.fromAddress,
+          })
+        ) {
+          await supabase.from('ingested_messages').insert({
+            email_account_id: account.id,
+            provider_message_id: message.id,
+            thread_id: message.threadId,
+            received_at: message.internalDate?.toISOString() ?? null,
+            from_address: message.fromAddress,
+            subject: message.subject,
+            classification: 'order_confirmation',
+            parse_status: 'skipped',
+            parser_version: PARSER_VERSION,
+            error: 'Excluded by user merchant mute',
           });
           progress.skipped += 1;
           continue;

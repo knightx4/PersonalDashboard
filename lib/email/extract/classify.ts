@@ -26,6 +26,8 @@ function domainFromAddress(from: string | null): string | null {
   return match?.[1] ?? null;
 }
 
+export { domainFromAddress };
+
 function findMerchant(
   domain: string | null,
   merchants: readonly MerchantDomainHit[],

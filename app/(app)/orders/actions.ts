@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { domainFromAddress } from '@/lib/email/extract/classify';
 import { parseDollarsToCents } from '@/lib/money';
 import { buildManualOrder } from '@/lib/orders/create-manual-order';
 
@@ -204,4 +205,115 @@ export async function createManualOrder(
   revalidatePath('/inventory');
   revalidatePath('/dashboard');
   redirect(`/orders/${built.order.id}`);
+}
+
+/**
+ * Mute a merchant forever + remove their existing orders.
+ * One click from order detail: clear the noise and don't bring it back on import.
+ */
+export async function excludeMerchantFromOrder(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const orderId = String(formData.get('orderId') ?? '');
+  if (!z.string().uuid().safeParse(orderId).success) {
+    throw new Error('Invalid order.');
+  }
+
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, merchant_id, merchants ( id, name, domains )')
+    .eq('id', orderId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!order) throw new Error('Order not found.');
+
+  const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
+  const merchantId = (order.merchant_id as string | null) ?? merchant?.id ?? null;
+
+  const { data: sourceMessage } = await supabase
+    .from('ingested_messages')
+    .select('from_address')
+    .eq('resulting_order_id', orderId)
+    .maybeSingle();
+
+  const fromDomain = domainFromAddress(sourceMessage?.from_address ?? null);
+  const merchantDomain =
+    Array.isArray(merchant?.domains) && merchant.domains.length > 0
+      ? String(merchant.domains[0]).toLowerCase()
+      : null;
+  const matchDomain = fromDomain ?? merchantDomain;
+
+  if (!merchantId && !matchDomain) {
+    throw new Error('This order has no merchant to mute. Delete it manually if needed.');
+  }
+
+  let existingQuery = supabase
+    .from('merchant_exclusions')
+    .select('id')
+    .eq('user_id', user.id);
+  if (merchantId) existingQuery = existingQuery.eq('merchant_id', merchantId);
+  else existingQuery = existingQuery.eq('match_domain', matchDomain!);
+
+  const { data: existing } = await existingQuery.maybeSingle();
+  if (!existing) {
+    const { error: insertError } = await supabase.from('merchant_exclusions').insert({
+      user_id: user.id,
+      merchant_id: merchantId,
+      match_domain: matchDomain,
+    });
+    if (insertError && !/duplicate|unique/i.test(insertError.message)) {
+      throw new Error(insertError.message);
+    }
+  }
+
+  // Remove every order from this merchant (or just this one if domain-only).
+  let orderIds: string[] = [orderId];
+  if (merchantId) {
+    const { data: peers } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('merchant_id', merchantId);
+    orderIds = (peers ?? []).map((row) => row.id as string);
+  }
+
+  if (orderIds.length > 0) {
+    await supabase
+      .from('ingested_messages')
+      .update({
+        parse_status: 'skipped',
+        resulting_order_id: null,
+        error: 'Excluded by user merchant mute',
+      })
+      .in('resulting_order_id', orderIds);
+    await supabase.from('orders').delete().eq('user_id', user.id).in('id', orderIds);
+  }
+
+  revalidatePath('/orders');
+  revalidatePath('/inventory');
+  revalidatePath('/dashboard');
+  revalidatePath('/settings');
+  revalidatePath('/review');
+  redirect('/orders');
+}
+
+export async function restoreMerchantExclusion(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const exclusionId = String(formData.get('exclusionId') ?? '');
+  if (!z.string().uuid().safeParse(exclusionId).success) {
+    throw new Error('Invalid exclusion.');
+  }
+
+  const { error } = await supabase
+    .from('merchant_exclusions')
+    .delete()
+    .eq('id', exclusionId)
+    .eq('user_id', user.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/settings');
+  revalidatePath('/orders');
 }

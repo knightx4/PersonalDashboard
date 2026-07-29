@@ -113,6 +113,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${account.id}, 'backfill', 'completed') returning id`;
   ids.sync_jobs = job.id;
 
+  const [exclusion] = await admin<{ id: string }[]>`
+    insert into merchant_exclusions (user_id, merchant_id, match_domain)
+    values (${userId}, ${merchant.id}, ${`${tag}.example`})
+    returning id`;
+  ids.merchant_exclusions = exclusion.id;
+
   return ids;
 }
 

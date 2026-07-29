@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
+import { ExcludeMerchantButton } from './exclude-merchant-button';
 
 export const metadata = { title: 'Order' };
 
@@ -77,6 +78,10 @@ export default async function OrderDetailPage({
                 Open in Gmail
               </a>
             )}
+            <ExcludeMerchantButton
+              orderId={order.id}
+              merchantName={merchant?.name ?? 'this sender'}
+            />
             <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               All orders
             </Link>

@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
 import { InboxSection } from './inbox-section';
+import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
 
 export const metadata = { title: 'Settings' };
 
@@ -27,6 +28,12 @@ export default async function SettingsPage({
     .from('email_accounts')
     .select('id, email_address, status, last_synced_at')
     .eq('user_id', user.id);
+
+  const { data: mutedMerchants } = await supabase
+    .from('merchant_exclusions')
+    .select('id, match_domain, merchants ( name )')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
 
   const accountIds = (accounts ?? []).map((a) => a.id as string);
   const latestJobs: Record<
@@ -107,6 +114,17 @@ export default async function SettingsPage({
               bannerCode={params.inbox}
               latestJobs={latestJobs}
             />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <MutedMerchantsTitle />
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <MutedMerchantsSection exclusions={mutedMerchants ?? []} />
           </CardBody>
         </Card>
 
