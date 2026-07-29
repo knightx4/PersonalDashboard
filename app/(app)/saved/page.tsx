@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
-import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatMoney } from '@/lib/money';
+import { SaveForm } from './save-form';
 
 export const metadata = { title: 'Saved' };
 
@@ -51,7 +51,7 @@ export default async function SavedPage({
     saved: {
       title: 'Nothing saved yet',
       description:
-        'Paste a product URL and we will pull in the title, image and price. If you buy it later, mark it purchased here for now.',
+        'Paste a product URL above and we will pull in the title, image and price.',
     },
     purchased: {
       title: 'No purchased saves',
@@ -62,6 +62,8 @@ export default async function SavedPage({
       description: 'Items you decide against land here so they stay out of the active queue.',
     },
   };
+
+  const showComposer = status === 'saved';
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -82,12 +84,13 @@ export default async function SavedPage({
         <PageHeader
           title="Saved"
           description="Things you want, held in a queue instead of a cart."
-          actions={
-            <Link href="/saved/new" className={buttonVariants({ size: 'sm' })}>
-              Save something
-            </Link>
-          }
         />
+
+        {showComposer && (
+          <div className="mb-6">
+            <SaveForm compact />
+          </div>
+        )}
 
         {(items ?? []).length === 0 ? (
           <EmptyState
@@ -96,7 +99,7 @@ export default async function SavedPage({
             description={emptyCopy[status].description}
             action={
               status === 'saved'
-                ? { label: 'Save something', href: '/saved/new' }
+                ? undefined
                 : { label: 'Back to saved', href: '/saved' }
             }
           />
