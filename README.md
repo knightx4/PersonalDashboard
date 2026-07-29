@@ -23,7 +23,7 @@ for what is next.
 | Manual order entry + inventory CRUD | done |
 | Gmail inbox connect (OAuth, encrypted tokens) | done |
 | Email extraction + order import sync | done |
-| Dashboard, saved items, incremental sync | not started |
+| Dashboard, saved items, incremental sync | dashboard done; saved + incremental sync not started |
 
 ## Getting started
 

@@ -35,7 +35,7 @@ at Tier 2.
 
 ## Next
 
-9. **Dashboard** on top of that data, reading only from `lib/money.ts`.
+9. ✅ **Dashboard** on top of that data, reading only from `lib/money.ts`.
 10. **Saved items**, URL scraping, OG tag extraction.
 11. **Onboarding flow** including the pre-consent explanation screen.
 12. ✅ **Background Gmail backfill.** Import starts on the server (`after` +

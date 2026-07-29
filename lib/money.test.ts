@@ -3,11 +3,16 @@ import {
   allocateLandedCost,
   computeOrderTotalCents,
   formatCentsAsDollarsInput,
+  formatPercentChange,
   formatReconciliation,
   parseDollarsToCents,
+  percentChange,
   periodFor,
+  previousPeriodFor,
   reconcilesToTotal,
   spend,
+  spendByCategory,
+  spendByMerchant,
   todayInTimezone,
   valueOwned,
   type OrderTotals,
@@ -324,6 +329,149 @@ describe('period boundaries', () => {
   it('handles February in a leap year', () => {
     const now = new Date('2028-02-10T12:00:00Z');
     expect(periodFor('this_month', 'UTC', now).end).toBe('2028-02-29');
+  });
+
+  it('computes the comparable previous window for each preset', () => {
+    const now = new Date('2026-07-15T12:00:00Z');
+    expect(previousPeriodFor('this_month', 'UTC', now)).toEqual({
+      start: '2026-06-01',
+      end: '2026-06-30',
+    });
+    expect(previousPeriodFor('last_month', 'UTC', now)).toEqual({
+      start: '2026-05-01',
+      end: '2026-05-31',
+    });
+    expect(previousPeriodFor('last_3_months', 'UTC', now)).toEqual({
+      start: '2026-02-01',
+      end: '2026-04-30',
+    });
+    expect(previousPeriodFor('ytd', 'UTC', now)).toEqual({
+      start: '2025-01-01',
+      end: '2025-07-15',
+    });
+    expect(previousPeriodFor('last_12_months', 'UTC', now)).toEqual({
+      start: '2024-08-01',
+      end: '2025-07-15',
+    });
+  });
+});
+
+describe('percentChange', () => {
+  it('returns null when the baseline is zero', () => {
+    expect(percentChange(100, 0)).toBeNull();
+    expect(formatPercentChange(null)).toBeNull();
+  });
+
+  it('formats signed whole percentages with a proper minus', () => {
+    expect(formatPercentChange(percentChange(120, 100))).toBe('+20%');
+    expect(formatPercentChange(percentChange(80, 100))).toBe('−20%');
+    expect(formatPercentChange(percentChange(100, 100))).toBe('0%');
+  });
+});
+
+describe('spendByCategory / spendByMerchant', () => {
+  it('groups landed costs by category for orders in the period', () => {
+    const slices = spendByCategory(
+      [
+        {
+          orderDate: '2026-07-02',
+          cancelled: false,
+          costCents: 4_000,
+          categoryId: 'clothing',
+          categoryName: 'Clothing',
+          categoryColor: '#6A82FB',
+        },
+        {
+          orderDate: '2026-07-03',
+          cancelled: false,
+          costCents: 2_000,
+          categoryId: 'clothing',
+          categoryName: 'Clothing',
+          categoryColor: '#6A82FB',
+        },
+        {
+          orderDate: '2026-07-04',
+          cancelled: false,
+          costCents: 1_500,
+          categoryId: null,
+          categoryName: null,
+          categoryColor: null,
+        },
+        {
+          orderDate: '2026-06-01',
+          cancelled: false,
+          costCents: 9_999,
+          categoryId: 'home',
+          categoryName: 'Home',
+          categoryColor: '#FF8A4C',
+        },
+        {
+          orderDate: '2026-07-05',
+          cancelled: true,
+          costCents: 500,
+          categoryId: 'clothing',
+          categoryName: 'Clothing',
+          categoryColor: '#6A82FB',
+        },
+      ],
+      { start: '2026-07-01', end: '2026-07-31' },
+    );
+
+    expect(slices).toEqual([
+      {
+        categoryId: 'clothing',
+        name: 'Clothing',
+        color: '#6A82FB',
+        cents: 6_000,
+      },
+      {
+        categoryId: null,
+        name: 'Uncategorized',
+        color: '#9a9a94',
+        cents: 1_500,
+      },
+    ]);
+  });
+
+  it('groups gross order totals by merchant', () => {
+    const slices = spendByMerchant(
+      [
+        {
+          orderDate: '2026-07-02',
+          totalCents: 5_000,
+          cancelled: false,
+          merchantId: 'nike',
+          merchantName: 'Nike',
+        },
+        {
+          orderDate: '2026-07-10',
+          totalCents: 3_000,
+          cancelled: false,
+          merchantId: 'nike',
+          merchantName: 'Nike',
+        },
+        {
+          orderDate: '2026-07-12',
+          totalCents: 8_000,
+          cancelled: false,
+          merchantId: 'amazon',
+          merchantName: 'Amazon',
+        },
+        {
+          orderDate: '2026-07-15',
+          totalCents: 1_000,
+          cancelled: true,
+          merchantId: 'amazon',
+          merchantName: 'Amazon',
+        },
+      ],
+      { start: '2026-07-01', end: '2026-07-31' },
+    );
+
+    expect(slices).toEqual([
+      { merchantId: 'amazon', name: 'Amazon', cents: 8_000 },
+      { merchantId: 'nike', name: 'Nike', cents: 8_000 },
+    ]);
   });
 });
 
