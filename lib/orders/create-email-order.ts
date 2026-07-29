@@ -41,6 +41,8 @@ export interface EmailOrderBundle {
     unitPriceCents: number;
     fingerprintStrict: string;
     fingerprintLoose: string;
+    productUrl: string | null;
+    imageUrl: string | null;
   }>;
   inventoryItems: Array<{
     id: string;
@@ -52,6 +54,7 @@ export interface EmailOrderBundle {
     fingerprintLoose: string;
     acquiredAt: string;
     costCents: number;
+    imageUrl: string | null;
   }>;
   allocated: AllocatedUnit[];
   totals: OrderTotals;
@@ -62,6 +65,8 @@ export function buildEmailOrder(input: {
   merchantId: string | null;
   merchantSlug: string | null;
   extraction: ExtractedOrder;
+  /** Map of system category slug → id for auto-categorize. */
+  categoryIdsBySlug?: ReadonlyMap<string, string>;
   needsReview?: boolean;
 }): EmailOrderBundle {
   const { extraction } = input;
@@ -97,16 +102,23 @@ export function buildEmailOrder(input: {
       name: line.name,
       variant: line.variant,
     });
+    const categorySlug = line.categorySlug ?? null;
+    const categoryId =
+      categorySlug && input.categoryIdsBySlug
+        ? (input.categoryIdsBySlug.get(categorySlug) ?? null)
+        : null;
     return {
       id: randomUUID(),
       orderId,
-      categoryId: null as string | null,
+      categoryId,
       name: line.name.trim(),
       variant: line.variant?.trim() ? line.variant.trim() : null,
       quantity: line.quantity,
       unitPriceCents: line.unitPriceCents,
       fingerprintStrict: fps.strict,
       fingerprintLoose: fps.loose,
+      productUrl: line.productUrl?.trim() ? line.productUrl.trim() : null,
+      imageUrl: line.imageUrl?.trim() ? line.imageUrl.trim() : null,
     };
   });
 
@@ -135,6 +147,7 @@ export function buildEmailOrder(input: {
       fingerprintLoose: item.fingerprintLoose,
       acquiredAt: extraction.orderDate,
       costCents: unit.costCents,
+      imageUrl: item.imageUrl,
     };
   });
 

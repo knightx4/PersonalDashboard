@@ -4,7 +4,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { formatGmailApiError } from '@/lib/email/providers/gmail-api-error';
 import { emailFromIdToken } from '@/lib/email/id-token';
-import { gmailPayloadToText, headerValue } from '@/lib/email/mime';
+import { gmailPayloadToHtml, gmailPayloadToText, headerValue } from '@/lib/email/mime';
 import {
   GMAIL_READONLY_SCOPE,
   type GmailMessageContent,
@@ -134,6 +134,7 @@ export const gmailProvider: GmailOAuthProvider = {
       fromAddress: headerValue(headers, 'From'),
       subject: headerValue(headers, 'Subject'),
       text: gmailPayloadToText(data.payload as never),
+      html: gmailPayloadToHtml(data.payload as never),
     };
   },
 };

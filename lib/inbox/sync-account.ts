@@ -174,6 +174,14 @@ export async function syncEmailAccountBatch(
     const accessToken = await ensureAccessToken(supabase, account as AccountRow, encryptionKey);
     const merchants = await loadMerchants(supabase);
     const exclusions = await loadMerchantExclusions(supabase, opts.userId);
+    const { data: systemCategories } = await supabase
+      .from('categories')
+      .select('id, slug')
+      .is('user_id', null)
+      .is('parent_id', null);
+    const categoryIdsBySlug = new Map<string, string>(
+      (systemCategories ?? []).map((row) => [row.slug as string, row.id as string]),
+    );
     const query = orderCandidateQuery(account.backfill_window_days);
     progress.query = query;
     console.info('gmail sync query', {
@@ -274,6 +282,7 @@ export async function syncEmailAccountBatch(
         const extraction = await extractOrderFromEmail({
           subject: message.subject ?? '',
           text: message.text,
+          html: message.html,
           merchantSlug: classified.merchant?.slug,
           merchantName: classified.merchant?.name,
           fromAddress: message.fromAddress,
@@ -302,6 +311,7 @@ export async function syncEmailAccountBatch(
           merchantId: classified.merchant?.id ?? null,
           merchantSlug: classified.merchant?.slug ?? null,
           extraction: extraction.result.order,
+          categoryIdsBySlug,
           needsReview: extraction.source === 'heuristic',
         });
 
@@ -349,6 +359,8 @@ export async function syncEmailAccountBatch(
             unit_price_cents: item.unitPriceCents,
             fingerprint_strict: item.fingerprintStrict,
             fingerprint_loose: item.fingerprintLoose,
+            product_url: item.productUrl,
+            image_url: item.imageUrl,
           })),
         );
 
@@ -369,6 +381,7 @@ export async function syncEmailAccountBatch(
             fingerprint_loose: item.fingerprintLoose,
             acquired_at: item.acquiredAt,
             cost_cents: item.costCents,
+            image_url: item.imageUrl,
           })),
         );
 

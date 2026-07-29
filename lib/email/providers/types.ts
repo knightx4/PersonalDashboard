@@ -32,6 +32,8 @@ export interface GmailMessageContent {
   fromAddress: string | null;
   subject: string | null;
   text: string;
+  /** Ephemeral HTML for product-link extraction; never persisted. */
+  html: string;
 }
 
 export interface GmailOAuthProvider {

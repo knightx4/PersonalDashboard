@@ -52,6 +52,13 @@ export function gmailPayloadToText(payload: MimePart | undefined): string {
   return '';
 }
 
+/** Raw HTML parts when present (ephemeral — never persist). */
+export function gmailPayloadToHtml(payload: MimePart | undefined): string {
+  const out = { text: [] as string[], html: [] as string[] };
+  collectParts(payload, out);
+  return out.html.join('\n');
+}
+
 export function headerValue(
   headers: Array<{ name?: string; value?: string }> | undefined,
   name: string,

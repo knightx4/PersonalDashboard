@@ -26,7 +26,7 @@ export default async function OrderDetailPage({
       subtotal_cents, tax_cents, shipping_cents, discount_cents, total_cents, currency,
       merchants ( id, name ),
       order_items (
-        id, name, variant, quantity, unit_price_cents, category_id,
+        id, name, variant, quantity, unit_price_cents, category_id, product_url, image_url,
         categories ( name ),
         inventory_items ( id, cost_cents, status )
       )
@@ -119,6 +119,18 @@ export default async function OrderDetailPage({
                     <p className="text-[13px] text-ink-muted">
                       {[item.variant, category?.name].filter(Boolean).join(' · ') || '—'}
                     </p>
+                    {item.product_url && (
+                      <p className="mt-1.5">
+                        <a
+                          href={item.product_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[13px] text-brand hover:underline"
+                        >
+                          View product
+                        </a>
+                      </p>
+                    )}
                     {units.length > 0 && (
                       <ul className="mt-2 space-y-1">
                         {units.map((unit) => (

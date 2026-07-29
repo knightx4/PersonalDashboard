@@ -1,4 +1,5 @@
 import type { ExtractedOrder } from './schema';
+import { guessCategorySlug } from './guess-category';
 
 /** Dollars like $1,234.56 → cents. */
 export function parseMoneyToCents(raw: string): number | null {
@@ -96,7 +97,12 @@ export function heuristicExtractOrder(input: {
       blob.match(/\b(?:Discount|Savings|Promo)[:\s]*\$?\s*-?\$?\s*([0-9,]+\.\d{2})/i)?.[1] ?? '',
     ) ?? 0;
 
-  const lines: ExtractedOrder['lines'] = [];
+  const lines: Array<{
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+    variant: string | null;
+  }> = [];
   const lineRe = /^(?:Qty\s*)?(\d+)\s*[x×]\s+(.+?)\s+\$([0-9,]+\.\d{2})\s*$/gim;
   let m: RegExpExecArray | null;
   while ((m = lineRe.exec(input.text)) !== null) {
@@ -129,6 +135,17 @@ export function heuristicExtractOrder(input: {
     });
   }
 
+  const linesWithCategory: ExtractedOrder['lines'] = lines.map((line) => ({
+    ...line,
+    categorySlug:
+      guessCategorySlug({
+        name: line.name,
+        merchantSlug: input.merchantSlug,
+        subject: input.subject,
+        text: input.text,
+      }) ?? null,
+  }));
+
   const received = input.receivedAt ?? new Date();
   const orderDate = received.toISOString().slice(0, 10);
 
@@ -142,7 +159,7 @@ export function heuristicExtractOrder(input: {
     shippingCents,
     discountCents,
     totalCents,
-    lines,
+    lines: linesWithCategory,
     confidence: 0.55,
   };
 }
