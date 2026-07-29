@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { applyExtraction } from './apply';
+import { heuristicExtractOrder } from './heuristic';
 import { parseShopifyQuantityLines } from './shopify-lines';
 
 describe('parseShopifyQuantityLines', () => {
@@ -40,5 +44,74 @@ Customer information
       unitPriceCents: 3200,
       variant: '4 oz',
     });
+  });
+
+  it('allows Kickstarter-style attribute lines before the price', () => {
+    const text = `
+Order summary
+-------------
+
+Your Pandora's Legacy Pledge - 3 × 1
+
+The Ultimate Bundle
+
+_Kickstarter:
+
+Pledge
+
+$99.00
+
+Subtotal
+
+$99.00
+
+Shipping
+
+$17.00
+
+Total
+
+$116.00 USD
+
+Customer information
+--------------------
+`;
+    const lines = parseShopifyQuantityLines(text);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.name).toBe("Your Pandora's Legacy Pledge - 3");
+    expect(lines[0]?.quantity).toBe(1);
+    expect(lines[0]?.unitPriceCents).toBe(9900);
+    expect(lines[0]?.variant).toMatch(/Ultimate Bundle/i);
+    expect(lines[0]?.variant).toMatch(/Kickstarter/i);
+  });
+});
+
+describe('heuristicExtractOrder Allplay fixture', () => {
+  it('extracts the pledge line instead of a generic merchant fallback', () => {
+    const fixture = readFileSync(
+      resolve(__dirname, '../../../fixtures/emails/shopify-allplay-order.txt'),
+      'utf8',
+    );
+    const subject = (fixture.split('\n')[0] ?? '').replace(/^Subject:\s*/i, '');
+    const body = fixture.replace(/^Subject:.*\nFrom:.*\n\n?/, '');
+    const raw = heuristicExtractOrder({
+      subject,
+      text: body,
+      merchantName: 'Allplay',
+      fromAddress: 'Allplay <help@allplay.com>',
+      receivedAt: new Date('2026-05-22T13:59:33Z'),
+    });
+    expect(raw).not.toBeNull();
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
+    if (applied.ok) {
+      expect(applied.order.externalOrderNumber).toBe('431949');
+      expect(applied.order.totalCents).toBe(11600);
+      expect(applied.order.shippingCents).toBe(1700);
+      expect(applied.order.lines).toHaveLength(1);
+      expect(applied.order.lines[0]?.name).toMatch(/Pandora/i);
+      expect(applied.order.lines[0]?.unitPriceCents).toBe(9900);
+      expect(applied.order.lines[0]?.name).not.toMatch(/^Allplay order$/i);
+    }
   });
 });
