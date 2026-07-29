@@ -10,6 +10,7 @@ import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchan
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import {
   matchingItemHint,
+  orderItemsSummary,
   orderMatchesQuery,
   sanitizeOrdersQuery,
 } from '@/lib/orders/search';
@@ -107,7 +108,7 @@ export default async function OrdersPage({
       `
       id, order_date, total_cents, currency, status, external_order_number,
       merchants ( name ),
-      order_items ( name, variant ),
+      order_items ( name, variant, quantity, categories ( name ) ),
       ingested_messages ( subject, from_address )
     `,
     )
@@ -249,6 +250,7 @@ export default async function OrdersPage({
                     const merchant = Array.isArray(order.merchants)
                       ? order.merchants[0]
                       : order.merchants;
+                    const itemsSummary = orderItemsSummary(order);
                     const itemHint = q ? matchingItemHint(order, q) : null;
                     return (
                       <li key={order.id}>
@@ -260,13 +262,18 @@ export default async function OrdersPage({
                             <p className="truncate font-medium text-ink">
                               {merchant?.name ?? 'Unknown merchant'}
                             </p>
+                            <p className="truncate text-[13px] text-ink">
+                              {itemsSummary.label}
+                              {itemHint && !itemsSummary.label.includes(itemHint)
+                                ? ` · ${itemHint}`
+                                : ''}
+                            </p>
                             <p className="truncate text-[13px] text-ink-muted">
                               {order.order_date}
                               {order.external_order_number
                                 ? ` · #${order.external_order_number}`
                                 : ''}
                               {` · ${order.status.replaceAll('_', ' ')}`}
-                              {itemHint ? ` · ${itemHint}` : ''}
                             </p>
                           </div>
                           <p className="tabular shrink-0 font-medium text-ink">
