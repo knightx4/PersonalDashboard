@@ -1,0 +1,13 @@
+Subject: Your Amazon.com package was delivered
+
+Hello,
+
+Your package was delivered.
+
+Order #123-4567890-1234567
+Delivered on January 18, 2026
+
+Tracking number: TBA312345678901
+Carrier: Amazon Logistics
+
+Thanks for shopping with us.

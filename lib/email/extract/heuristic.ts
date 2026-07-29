@@ -40,7 +40,8 @@ export function displayNameFromAddress(fromAddress: string | null | undefined): 
   return null;
 }
 
-function extractOrderNumber(blob: string): string | null {
+/** Pull an order # / Amazon 123-… id from subject+body text. */
+export function extractOrderNumber(blob: string): string | null {
   return (
     blob.match(/\b(?:order\s*#|order\s*number[:\s]*|order\s*id[:\s]*)([A-Z0-9][A-Z0-9-]{3,})\b/i)?.[1] ??
     blob.match(/\(\s*order\s*#\s*([A-Z0-9][A-Z0-9-]{3,})\s*\)/i)?.[1] ??

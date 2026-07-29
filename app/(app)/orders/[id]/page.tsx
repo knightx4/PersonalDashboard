@@ -38,13 +38,30 @@ export default async function OrderDetailPage({
 
   if (!order) notFound();
 
-  const { data: sourceMessage } = await supabase
+  const { data: sourceMessages } = await supabase
     .from('ingested_messages')
     .select(
-      'provider_message_id, thread_id, subject, from_address, email_accounts ( email_address )',
+      'provider_message_id, thread_id, subject, from_address, classification, parse_status, email_accounts ( email_address )',
     )
     .eq('resulting_order_id', id)
-    .maybeSingle();
+    .order('received_at', { ascending: true });
+
+  const sourceMessage =
+    sourceMessages?.find((row) => row.classification === 'order_confirmation') ??
+    sourceMessages?.[0] ??
+    null;
+
+  const { data: shipments } = await supabase
+    .from('shipments')
+    .select('id, carrier, tracking_number, tracking_url, status, shipped_at, delivered_at')
+    .eq('order_id', id)
+    .order('created_at', { ascending: true });
+
+  const { data: returnRows } = await supabase
+    .from('returns')
+    .select('id, status, refund_amount_cents, initiated_at, refunded_at')
+    .eq('order_id', id)
+    .order('initiated_at', { ascending: false });
 
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
@@ -96,6 +113,71 @@ export default async function OrderDetailPage({
           {inbox?.email_address ? ` · inbox ${inbox.email_address}` : ''}
         </p>
       )}
+
+      {(shipments?.length ?? 0) > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
+            Shipments
+          </h2>
+          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+            {(shipments ?? []).map((shipment) => (
+              <li key={shipment.id} className="px-4 py-3 text-sm">
+                <p className="font-medium text-ink">
+                  {shipment.status.replaceAll('_', ' ')}
+                  {shipment.carrier ? ` · ${shipment.carrier}` : ''}
+                </p>
+                <p className="mt-1 text-[13px] text-ink-muted">
+                  {[
+                    shipment.tracking_number ? `Tracking ${shipment.tracking_number}` : null,
+                    shipment.shipped_at
+                      ? `Shipped ${new Date(shipment.shipped_at).toLocaleDateString()}`
+                      : null,
+                    shipment.delivered_at
+                      ? `Delivered ${new Date(shipment.delivered_at).toLocaleDateString()}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'No tracking details yet'}
+                </p>
+                {shipment.tracking_url && (
+                  <p className="mt-1.5">
+                    <a
+                      href={shipment.tracking_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[13px] text-brand hover:underline"
+                    >
+                      Track package
+                    </a>
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(returnRows?.length ?? 0) > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
+            Returns
+          </h2>
+          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+            {(returnRows ?? []).map((row) => (
+              <li key={row.id} className="flex justify-between gap-4 px-4 py-3 text-sm">
+                <span className="text-ink">
+                  {row.status.replaceAll('_', ' ')}
+                  {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
+                </span>
+                <span className="tabular text-ink-muted">
+                  {formatMoney(row.refund_amount_cents, order.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="overflow-hidden rounded-card border border-border bg-surface">
         <table className="w-full text-sm">
           <thead className="border-b border-border text-left text-[12px] uppercase tracking-wider text-ink-faint">
