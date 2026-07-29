@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Package, RotateCcw } from 'lucide-react';
-import { categoryIcon } from '@/lib/categories/icons';
+import { RotateCcw } from 'lucide-react';
+import { CategoryGlyph } from '@/lib/categories/icons';
 import { formatMoney } from '@/lib/money';
 import { displayNameOf } from '@/lib/inventory/sort-group';
 import { displayVariant } from '@/lib/inventory/display';
@@ -24,7 +24,6 @@ export type InventoryRowItem = {
 export function InventoryRow({ item }: { item: InventoryRowItem }) {
   const title = displayNameOf(item);
   const variant = displayVariant(item.variant);
-  const CategoryIcon = categoryIcon(item.category_slug);
   const accent = item.category_color ?? '#cfcfc8';
 
   return (
@@ -49,7 +48,7 @@ export function InventoryRow({ item }: { item: InventoryRowItem }) {
             />
           ) : (
             <span className="flex size-full items-center justify-center text-ink-faint">
-              <CategoryIcon className="size-4" strokeWidth={1.75} />
+              <CategoryGlyph slug={item.category_slug} className="size-4" />
             </span>
           )}
         </span>
@@ -73,7 +72,7 @@ export function InventoryRow({ item }: { item: InventoryRowItem }) {
           <p className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</p>
           {item.category_name && (
             <span className="inline-flex items-center gap-1 text-[11px] text-ink-faint">
-              <CategoryIcon className="size-3" strokeWidth={1.75} aria-hidden />
+              <CategoryGlyph slug={item.category_slug} className="size-3" />
               {item.category_name}
             </span>
           )}
@@ -90,10 +89,9 @@ export function InventoryImageFallback({
   categorySlug?: string | null;
   className?: string;
 }) {
-  const Icon = categoryIcon(categorySlug) ?? Package;
   return (
     <span className={cn('flex items-center justify-center bg-canvas text-ink-faint', className)}>
-      <Icon className="size-8" strokeWidth={1.5} />
+      <CategoryGlyph slug={categorySlug} className="size-8" strokeWidth={1.5} />
     </span>
   );
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { createElement, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -74,7 +75,7 @@ export function RailItem({
   active = false,
   count,
   swatch,
-  icon: Icon,
+  icon,
   onClick,
   href,
 }: {
@@ -82,7 +83,7 @@ export function RailItem({
   active?: boolean;
   count?: number;
   swatch?: string;
-  icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon?: LucideIcon;
   onClick?: () => void;
   href?: string;
 }) {
@@ -95,7 +96,7 @@ export function RailItem({
 
   const body = (
     <>
-      {Icon ? (
+      {icon ? (
         <span
           className="flex size-5 shrink-0 items-center justify-center rounded-md"
           style={
@@ -105,7 +106,7 @@ export function RailItem({
           }
           aria-hidden
         >
-          <Icon className="size-3.5" strokeWidth={1.75} />
+          {createElement(icon, { className: 'size-3.5', strokeWidth: 1.75 })}
         </span>
       ) : swatch ? (
         <span
