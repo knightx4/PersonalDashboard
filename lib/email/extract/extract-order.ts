@@ -8,6 +8,7 @@ import {
   enrichLinesWithProductLinks,
   extractProductLinksFromEmail,
 } from './product-links';
+import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import {
   CATEGORY_SLUGS,
   PARSER_VERSION,
@@ -34,12 +35,17 @@ Return ONLY a JSON object with these fields:
 - orderDate (YYYY-MM-DD)
 - currency (default USD)
 - taxCents, shippingCents, discountCents, totalCents (integers, cents)
-- lines: [{ name, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
+- lines: [{ name, shortName, searchTags, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
 - confidence (0-1)
 
 categorySlug must be one of: ${slugList}.
 Category labels: ${namedList}.
 Prefer a custom/user category when the product clearly fits that label; otherwise use the best system fit. Use other only when unsure and other is available.
+Use kitchen for cookware, utensils, bakeware, and small kitchen appliances (not groceries).
+
+For each line also provide:
+- shortName: a clear 2–6 word product title people would scan in a list. Strip SEO filler, brand spam, and comma-lists. Keep the distinctive product identity (e.g. "Wood furniture repair kit", "Soft Pinch liquid blush").
+- searchTags: 4–12 lowercase synonym tokens for finding this item later (e.g. lipstick → ["makeup","lipstick","cosmetics","beauty","lip"]). Include category-adjacent words even when absent from the title.
 
 Rules:
 - Money is integer cents only (12.99 → 1299).
@@ -49,6 +55,7 @@ Rules:
 - Shopify-style bodies list "Product name × qty" then optional variant then "$12.00" — use the product name, not the store name.
 - merchantName: prefer the store/From display name (e.g. "Ms Betters"), not "Unknown".
 - productUrl: only a real product page URL from the email (amazon.com/dp/…, etc). Never invent.
+- name: keep the merchant's full product title; put the cleaned title in shortName.
 - If this is not an order confirmation, return {"error":"not_an_order"}.`;
 }
 
@@ -105,13 +112,30 @@ function enrichExtractedOrder(
   const customCategories = input.categoryOptions.filter(
     (c) => !(CATEGORY_SLUGS as readonly string[]).includes(c.slug),
   );
-  return restrictCategorySlugs(
+  const categorized = restrictCategorySlugs(
     fillMissingCategories(attachProductLinks(order, input.html, input.text), {
       ...input,
       customCategories,
     }),
     allowed,
   );
+  return {
+    ...categorized,
+    lines: categorized.lines.map((line) => {
+      const enriched = enrichItemDisplay({
+        name: line.name,
+        shortName: line.shortName,
+        variant: line.variant,
+        categorySlug: line.categorySlug,
+        searchTags: line.searchTags,
+      });
+      return {
+        ...line,
+        shortName: enriched.shortName,
+        searchTags: enriched.searchTags,
+      };
+    }),
+  };
 }
 
 export async function extractOrderFromEmail(input: {

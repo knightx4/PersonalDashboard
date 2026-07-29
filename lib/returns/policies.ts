@@ -1,6 +1,6 @@
 /**
- * Load merchants the user can edit return windows for:
- * merchants on their orders, plus common seeded globals with a known window.
+ * Merchant return-policy catalog for Settings.
+ * Searchable list of every merchant the user can see, plus override state.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { effectiveReturnWindowDays } from '@/lib/returns/deadline';
@@ -17,28 +17,51 @@ export type MerchantPolicyRow = {
   isGlobal: boolean;
 };
 
+function buildRow(input: {
+  id: string;
+  name: string;
+  seededDays: number | null;
+  isGlobal: boolean;
+  onOrders: boolean;
+  overrideMap: Map<string, number | null>;
+}): MerchantPolicyRow {
+  const hasOverride = input.overrideMap.has(input.id);
+  const overrideDays = hasOverride ? (input.overrideMap.get(input.id) ?? null) : null;
+  return {
+    merchantId: input.id,
+    name: input.name,
+    seededDays: input.seededDays,
+    overrideDays,
+    hasOverride,
+    effectiveDays: effectiveReturnWindowDays({
+      seededDays: input.seededDays,
+      override: hasOverride ? { returnWindowDays: overrideDays } : null,
+    }),
+    onOrders: input.onOrders,
+    isGlobal: input.isGlobal,
+  };
+}
+
 export async function loadMerchantReturnPolicies(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<MerchantPolicyRow[]> {
-  const [{ data: orderMerchants }, { data: commonMerchants }, { data: overrides }] =
-    await Promise.all([
-      supabase
-        .from('orders')
-        .select('merchant_id, merchants!inner ( id, name, default_return_window_days, is_global )')
-        .eq('user_id', userId)
-        .not('merchant_id', 'is', null),
-      supabase
-        .from('merchants')
-        .select('id, name, default_return_window_days, is_global')
-        .eq('is_global', true)
-        .not('default_return_window_days', 'is', null)
-        .order('name'),
-      supabase
-        .from('merchant_return_policies')
-        .select('merchant_id, return_window_days')
-        .eq('user_id', userId),
-    ]);
+  const [{ data: merchants }, { data: orderRows }, { data: overrides }] = await Promise.all([
+    supabase
+      .from('merchants')
+      .select('id, name, default_return_window_days, is_global, created_by_user_id')
+      .or(`is_global.eq.true,created_by_user_id.eq.${userId}`)
+      .order('name'),
+    supabase
+      .from('orders')
+      .select('merchant_id')
+      .eq('user_id', userId)
+      .not('merchant_id', 'is', null),
+    supabase
+      .from('merchant_return_policies')
+      .select('merchant_id, return_window_days')
+      .eq('user_id', userId),
+  ]);
 
   const overrideMap = new Map(
     (overrides ?? []).map((row) => [
@@ -47,53 +70,29 @@ export async function loadMerchantReturnPolicies(
     ]),
   );
 
+  const onOrderIds = new Set(
+    (orderRows ?? [])
+      .map((row) => row.merchant_id as string | null)
+      .filter((id): id is string => Boolean(id)),
+  );
+
   const byId = new Map<string, MerchantPolicyRow>();
 
-  for (const row of orderMerchants ?? []) {
-    const merchant = Array.isArray(row.merchants) ? row.merchants[0] : row.merchants;
-    if (!merchant?.id) continue;
-    const seeded = (merchant.default_return_window_days as number | null) ?? null;
-    const hasOverride = overrideMap.has(merchant.id);
-    const overrideDays = hasOverride ? (overrideMap.get(merchant.id) ?? null) : null;
-    byId.set(merchant.id, {
-      merchantId: merchant.id,
-      name: merchant.name as string,
-      seededDays: seeded,
-      overrideDays,
-      hasOverride,
-      effectiveDays: effectiveReturnWindowDays({
-        seededDays: seeded,
-        override: hasOverride ? { returnWindowDays: overrideDays } : null,
+  for (const merchant of merchants ?? []) {
+    byId.set(
+      merchant.id,
+      buildRow({
+        id: merchant.id,
+        name: merchant.name as string,
+        seededDays: (merchant.default_return_window_days as number | null) ?? null,
+        isGlobal: Boolean(merchant.is_global),
+        onOrders: onOrderIds.has(merchant.id),
+        overrideMap,
       }),
-      onOrders: true,
-      isGlobal: Boolean(merchant.is_global),
-    });
+    );
   }
 
-  for (const merchant of commonMerchants ?? []) {
-    if (byId.has(merchant.id)) continue;
-    const seeded = merchant.default_return_window_days as number | null;
-    const hasOverride = overrideMap.has(merchant.id);
-    // Only surface unused commons when they have a seeded window (preload),
-    // or the user already saved an override.
-    if (!hasOverride && seeded == null) continue;
-    const overrideDays = hasOverride ? (overrideMap.get(merchant.id) ?? null) : null;
-    byId.set(merchant.id, {
-      merchantId: merchant.id,
-      name: merchant.name as string,
-      seededDays: seeded,
-      overrideDays,
-      hasOverride,
-      effectiveDays: effectiveReturnWindowDays({
-        seededDays: seeded,
-        override: hasOverride ? { returnWindowDays: overrideDays } : null,
-      }),
-      onOrders: false,
-      isGlobal: true,
-    });
-  }
-
-  // Overrides for merchants that fell out of the lists above (e.g. seed cleared).
+  // Overrides pointing at merchants that somehow aren't in the visible set.
   const missingOverrideIds = [...overrideMap.keys()].filter((id) => !byId.has(id));
   if (missingOverrideIds.length > 0) {
     const { data: orphanMerchants } = await supabase
@@ -101,23 +100,19 @@ export async function loadMerchantReturnPolicies(
       .select('id, name, default_return_window_days, is_global')
       .in('id', missingOverrideIds);
     for (const merchant of orphanMerchants ?? []) {
-      const overrideDays = overrideMap.get(merchant.id) ?? null;
-      const seeded = merchant.default_return_window_days as number | null;
-      byId.set(merchant.id, {
-        merchantId: merchant.id,
-        name: merchant.name as string,
-        seededDays: seeded,
-        overrideDays,
-        hasOverride: true,
-        effectiveDays: overrideDays,
-        onOrders: false,
-        isGlobal: Boolean(merchant.is_global),
-      });
+      byId.set(
+        merchant.id,
+        buildRow({
+          id: merchant.id,
+          name: merchant.name as string,
+          seededDays: (merchant.default_return_window_days as number | null) ?? null,
+          isGlobal: Boolean(merchant.is_global),
+          onOrders: onOrderIds.has(merchant.id),
+          overrideMap,
+        }),
+      );
     }
   }
 
-  return [...byId.values()].sort((a, b) => {
-    if (a.onOrders !== b.onOrders) return a.onOrders ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

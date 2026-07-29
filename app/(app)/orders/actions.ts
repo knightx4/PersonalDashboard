@@ -131,6 +131,20 @@ export async function createManualOrder(
     merchantSlug = created.slug;
   }
 
+  const categoryIds = [
+    ...new Set(data.lines.map((line) => line.categoryId).filter(Boolean)),
+  ] as string[];
+  const categoryMeta = new Map<string, { slug: string; name: string }>();
+  if (categoryIds.length > 0) {
+    const { data: cats } = await supabase
+      .from('categories')
+      .select('id, slug, name')
+      .in('id', categoryIds);
+    for (const cat of cats ?? []) {
+      categoryMeta.set(cat.id, { slug: cat.slug, name: cat.name });
+    }
+  }
+
   const built = buildManualOrder({
     userId: user.id,
     merchantId,
@@ -140,13 +154,18 @@ export async function createManualOrder(
     taxCents: data.tax,
     shippingCents: data.shipping,
     discountCents: data.discount,
-    lines: data.lines.map((line) => ({
-      name: line.name,
-      variant: line.variant,
-      quantity: line.quantity,
-      unitPriceCents: line.unitPrice,
-      categoryId: line.categoryId,
-    })),
+    lines: data.lines.map((line) => {
+      const meta = line.categoryId ? categoryMeta.get(line.categoryId) : undefined;
+      return {
+        name: line.name,
+        variant: line.variant,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPrice,
+        categoryId: line.categoryId,
+        categorySlug: meta?.slug ?? null,
+        categoryName: meta?.name ?? null,
+      };
+    }),
   });
 
   const { error: orderError } = await supabase.from('orders').insert({
@@ -171,6 +190,7 @@ export async function createManualOrder(
       order_id: item.orderId,
       category_id: item.categoryId,
       name: item.name,
+      short_name: item.shortName,
       variant: item.variant,
       quantity: item.quantity,
       unit_price_cents: item.unitPriceCents,
@@ -190,10 +210,12 @@ export async function createManualOrder(
       order_item_id: item.orderItemId,
       category_id: item.categoryId,
       name: item.name,
+      short_name: item.shortName,
       variant: item.variant,
       fingerprint_loose: item.fingerprintLoose,
       acquired_at: item.acquiredAt,
       cost_cents: item.costCents,
+      search_tags: item.searchTags,
     })),
   );
   if (inventoryError) {

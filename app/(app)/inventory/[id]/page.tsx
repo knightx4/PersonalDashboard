@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { InventoryImageFallback } from '@/components/inventory/inventory-row';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/(app)/returns/plan-return-button';
+import { displayVariant } from '@/lib/inventory/display';
+import { displayNameOf } from '@/lib/inventory/sort-group';
 import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
 
 export const metadata = { title: 'Inventory item' };
@@ -30,10 +33,10 @@ export default async function InventoryItemPage({
       .from('inventory_items')
       .select(
         `
-        id, name, variant, notes, status, cost_cents, acquired_at, disposed_at,
+        id, name, short_name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
         return_planned,
-        categories ( id, name, color ),
+        categories ( id, name, color, slug ),
         order_items (
           order_id, product_url, image_url,
           orders (
@@ -78,6 +81,8 @@ export default async function InventoryItemPage({
       : order.merchants
     : null;
   const productUrl = orderItem?.product_url ?? null;
+  const imageUrl = item.image_url ?? orderItem?.image_url ?? null;
+  const title = displayNameOf({ short_name: item.short_name, name: item.name });
   const selectedListIds = (memberships ?? []).map((row) => row.list_id as string);
 
   const timezone = profile?.timezone ?? 'UTC';
@@ -112,8 +117,10 @@ export default async function InventoryItemPage({
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
-        title={item.name}
-        description={[item.variant, category?.name, item.status].filter(Boolean).join(' · ')}
+        title={title}
+        description={[displayVariant(item.variant), category?.name, item.status]
+          .filter(Boolean)
+          .join(' · ')}
         actions={
           <div className="flex flex-wrap gap-2">
             {productUrl && (
@@ -135,6 +142,25 @@ export default async function InventoryItemPage({
           </div>
         }
       />
+
+      <div className="overflow-hidden rounded-card border border-border bg-surface">
+        <div className="aspect-[16/9] bg-canvas sm:aspect-[2/1]">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
+            <img src={imageUrl} alt="" className="size-full object-cover" />
+          ) : (
+            <InventoryImageFallback
+              categorySlug={category?.slug}
+              className="size-full"
+            />
+          )}
+        </div>
+        {item.short_name && item.short_name !== item.name && (
+          <p className="border-t border-border px-4 py-2 text-[13px] text-ink-muted">
+            Full title: <span className="text-ink">{item.name}</span>
+          </p>
+        )}
+      </div>
 
       <dl className="grid gap-3 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
         <div>

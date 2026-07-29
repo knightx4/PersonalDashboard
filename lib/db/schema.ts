@@ -275,6 +275,8 @@ export const orderItems = pgTable(
     /** The classifier's output. Never user-edited -- edits go to inventory. */
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
+    /** Human-readable title for list UIs; raw name stays for search/audit. */
+    shortName: text('short_name'),
     variant: text('variant'),
     quantity: integer('quantity').notNull().default(1),
     unitPriceCents: integer('unit_price_cents').notNull().default(0),
@@ -302,8 +304,15 @@ export const inventoryItems = pgTable(
     /** User-editable, and the value every UI surface reads. */
     categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
+    /** Short title for list UIs; raw name stays for search/audit. */
+    shortName: text('short_name'),
     variant: text('variant'),
     imageUrl: text('image_url'),
+    /**
+     * Tokens for smart search (synonyms like makeup→lipstick).
+     * Filled at ingest; see lib/inventory/search-tags.ts.
+     */
+    searchTags: text('search_tags').array().notNull().default([]),
     /** Denormalized so the already-own check works for manual items too. */
     fingerprintLoose: text('fingerprint_loose'),
     acquiredAt: date('acquired_at'),

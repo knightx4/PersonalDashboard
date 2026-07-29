@@ -17,9 +17,29 @@ export type OrderSearchRow = {
   merchants: { name: string } | { name: string }[] | null;
   order_items: OrderListItem[] | null;
   ingested_messages:
-    | Array<{ subject: string | null; from_address: string | null }>
+    | Array<{
+        subject: string | null;
+        from_address: string | null;
+        classification?: string | null;
+        email_accounts?:
+          | { email_address: string }
+          | Array<{ email_address: string }>
+          | null;
+      }>
     | null;
 };
+
+/** Inbox address that produced this order (prefer confirmation message). */
+export function orderInboxAddress(order: Pick<OrderSearchRow, 'ingested_messages'>): string | null {
+  const messages = order.ingested_messages ?? [];
+  const preferred =
+    messages.find((message) => message.classification === 'order_confirmation') ?? messages[0];
+  if (!preferred) return null;
+  const account = Array.isArray(preferred.email_accounts)
+    ? preferred.email_accounts[0]
+    : preferred.email_accounts;
+  return account?.email_address ?? null;
+}
 
 export function orderMatchesQuery(order: OrderSearchRow, q: string): boolean {
   const needle = q.toLowerCase();
@@ -29,6 +49,7 @@ export function orderMatchesQuery(order: OrderSearchRow, q: string): boolean {
     order.external_order_number,
     order.status,
     order.status.replaceAll('_', ' '),
+    orderInboxAddress(order),
   ];
   for (const item of order.order_items ?? []) {
     parts.push(item.name, item.variant);

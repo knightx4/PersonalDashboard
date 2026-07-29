@@ -5,6 +5,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { fingerprints } from '@/lib/fingerprint';
+import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import {
   allocateLandedCost,
   assertIntegerCents,
@@ -36,6 +37,7 @@ export interface EmailOrderBundle {
     orderId: string;
     categoryId: string | null;
     name: string;
+    shortName: string;
     variant: string | null;
     quantity: number;
     unitPriceCents: number;
@@ -43,6 +45,7 @@ export interface EmailOrderBundle {
     fingerprintLoose: string;
     productUrl: string | null;
     imageUrl: string | null;
+    searchTags: string[];
   }>;
   inventoryItems: Array<{
     id: string;
@@ -50,11 +53,13 @@ export interface EmailOrderBundle {
     orderItemId: string;
     categoryId: string | null;
     name: string;
+    shortName: string;
     variant: string | null;
     fingerprintLoose: string;
     acquiredAt: string;
     costCents: number;
     imageUrl: string | null;
+    searchTags: string[];
   }>;
   allocated: AllocatedUnit[];
   totals: OrderTotals;
@@ -107,11 +112,19 @@ export function buildEmailOrder(input: {
       categorySlug && input.categoryIdsBySlug
         ? (input.categoryIdsBySlug.get(categorySlug) ?? null)
         : null;
+    const enriched = enrichItemDisplay({
+      name: line.name,
+      shortName: line.shortName,
+      variant: line.variant,
+      categorySlug,
+      searchTags: line.searchTags,
+    });
     return {
       id: randomUUID(),
       orderId,
       categoryId,
       name: line.name.trim(),
+      shortName: enriched.shortName,
       variant: line.variant?.trim() ? line.variant.trim() : null,
       quantity: line.quantity,
       unitPriceCents: line.unitPriceCents,
@@ -119,6 +132,7 @@ export function buildEmailOrder(input: {
       fingerprintLoose: fps.loose,
       productUrl: line.productUrl?.trim() ? line.productUrl.trim() : null,
       imageUrl: line.imageUrl?.trim() ? line.imageUrl.trim() : null,
+      searchTags: enriched.searchTags,
     };
   });
 
@@ -143,11 +157,13 @@ export function buildEmailOrder(input: {
       orderItemId: item.id,
       categoryId: item.categoryId,
       name: item.name,
+      shortName: item.shortName,
       variant: item.variant,
       fingerprintLoose: item.fingerprintLoose,
       acquiredAt: extraction.orderDate,
       costCents: unit.costCents,
       imageUrl: item.imageUrl,
+      searchTags: item.searchTags,
     };
   });
 

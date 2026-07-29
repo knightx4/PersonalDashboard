@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   matchingItemHint,
+  orderInboxAddress,
   orderItemsSummary,
   orderMatchesQuery,
   sanitizeOrdersQuery,
@@ -14,7 +15,11 @@ describe('orders search', () => {
     merchants: { name: 'Amazon' },
     order_items: [{ name: 'The Well-Tempered City', variant: null, quantity: 1 }],
     ingested_messages: [
-      { subject: 'Ordered: "The Well-Tempered City:..."', from_address: 'auto-confirm@amazon.com' },
+      {
+        subject: 'Ordered: "The Well-Tempered City:..."',
+        from_address: 'auto-confirm@amazon.com',
+        email_accounts: { email_address: 'home@example.com' },
+      },
     ],
   };
 
@@ -28,6 +33,11 @@ describe('orders search', () => {
     expect(orderMatchesQuery(order, '114-1276134')).toBe(true);
     expect(orderMatchesQuery(order, 'ordered:')).toBe(true);
     expect(orderMatchesQuery(order, 'nike')).toBe(false);
+  });
+
+  it('matches inbox address', () => {
+    expect(orderMatchesQuery(order, 'home@example.com')).toBe(true);
+    expect(orderInboxAddress(order)).toBe('home@example.com');
   });
 
   it('returns a matching line hint', () => {

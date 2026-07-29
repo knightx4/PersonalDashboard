@@ -3,6 +3,7 @@ import { createClient, getUser } from '@/lib/auth/server';
 import { TopNav } from '@/components/shell/top-nav';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/onboarding';
+import { countReviewItems } from '@/lib/review/load';
 
 /**
  * Shell for every signed-in section.
@@ -20,12 +21,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding');
   }
 
-  const [{ data: profile }, { count: reviewCount }, { data: accounts }] = await Promise.all([
+  const [{ data: profile }, reviewCount, { data: accounts }] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-    supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('needs_review', true),
+    countReviewItems(supabase, user.id),
     supabase.from('email_accounts').select('id').eq('user_id', user.id).eq('status', 'active'),
   ]);
 
@@ -65,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <TopNav
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
-        reviewCount={reviewCount ?? 0}
+        reviewCount={reviewCount}
       />
       <InboxSyncBanner accountIds={accountIds} initialJob={initialBannerJob} />
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>

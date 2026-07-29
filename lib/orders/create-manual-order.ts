@@ -11,6 +11,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { fingerprints } from '@/lib/fingerprint';
+import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import {
   allocateLandedCost,
   assertIntegerCents,
@@ -26,6 +27,8 @@ export interface ManualOrderLineInput {
   quantity: number;
   unitPriceCents: number;
   categoryId?: string | null;
+  categorySlug?: string | null;
+  categoryName?: string | null;
 }
 
 export interface ManualOrderInput {
@@ -46,11 +49,13 @@ export interface ManualOrderItemRow {
   orderId: string;
   categoryId: string | null;
   name: string;
+  shortName: string;
   variant: string | null;
   quantity: number;
   unitPriceCents: number;
   fingerprintStrict: string;
   fingerprintLoose: string;
+  searchTags: string[];
 }
 
 export interface ManualInventoryItemRow {
@@ -59,10 +64,12 @@ export interface ManualInventoryItemRow {
   orderItemId: string;
   categoryId: string | null;
   name: string;
+  shortName: string;
   variant: string | null;
   fingerprintLoose: string;
   acquiredAt: string;
   costCents: number;
+  searchTags: string[];
 }
 
 export interface ManualOrderBundle {
@@ -129,16 +136,24 @@ export function buildManualOrder(input: ManualOrderInput): ManualOrderBundle {
       name: line.name,
       variant: line.variant,
     });
+    const enriched = enrichItemDisplay({
+      name: line.name,
+      variant: line.variant,
+      categorySlug: line.categorySlug,
+      categoryName: line.categoryName,
+    });
     return {
       id: randomUUID(),
       orderId,
       categoryId: line.categoryId ?? null,
       name: line.name.trim(),
+      shortName: enriched.shortName,
       variant: line.variant?.trim() ? line.variant.trim() : null,
       quantity: line.quantity,
       unitPriceCents: line.unitPriceCents,
       fingerprintStrict: fps.strict,
       fingerprintLoose: fps.loose,
+      searchTags: enriched.searchTags,
     };
   });
 
@@ -160,10 +175,12 @@ export function buildManualOrder(input: ManualOrderInput): ManualOrderBundle {
       orderItemId: item.id,
       categoryId: item.categoryId,
       name: item.name,
+      shortName: item.shortName,
       variant: item.variant,
       fingerprintLoose: item.fingerprintLoose,
       acquiredAt: input.orderDate,
       costCents: unit.costCents,
+      searchTags: item.searchTags,
     };
   });
 

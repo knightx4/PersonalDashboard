@@ -5,6 +5,10 @@ import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
+import {
+  ConfirmOrderButton,
+  DiscardOrderButton,
+} from '@/app/(app)/review/review-buttons';
 import { ExcludeMerchantButton } from './exclude-merchant-button';
 
 export const metadata = { title: 'Order' };
@@ -99,6 +103,9 @@ export default async function OrderDetailPage({
               orderId={order.id}
               merchantName={merchant?.name ?? 'this sender'}
             />
+            <Link href="/review" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              Review queue
+            </Link>
             <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
               All orders
             </Link>
@@ -106,12 +113,30 @@ export default async function OrderDetailPage({
         }
       />
 
+      {order.needs_review && (
+        <div className="flex flex-col gap-3 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-950">Needs review</p>
+            <p className="text-[13px] text-amber-900/80">
+              Imported with the fallback parser. Confirm the totals and items, or discard if this
+              should not count toward spend.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ConfirmOrderButton orderId={order.id} />
+            <DiscardOrderButton orderId={order.id} />
+          </div>
+        </div>
+      )}
+
       {sourceMessage?.subject && (
         <p className="text-sm text-ink-muted">
           From email: {sourceMessage.subject}
           {sourceMessage.from_address ? ` · ${sourceMessage.from_address}` : ''}
-          {inbox?.email_address ? ` · inbox ${inbox.email_address}` : ''}
         </p>
+      )}
+      {inbox?.email_address && (
+        <p className="text-[13px] text-ink-faint">Via {inbox.email_address}</p>
       )}
 
       {(shipments?.length ?? 0) > 0 && (
@@ -286,7 +311,14 @@ export default async function OrderDetailPage({
         )}
         <div className="flex justify-between gap-4 sm:col-span-2">
           <dt className="text-ink-muted">Source</dt>
-          <dd className="text-ink">{order.source.replaceAll('_', ' ')}</dd>
+          <dd className="text-right text-ink">
+            {order.source.replaceAll('_', ' ')}
+            {inbox?.email_address ? (
+              <span className="mt-0.5 block text-[13px] font-normal text-ink-faint">
+                {inbox.email_address}
+              </span>
+            ) : null}
+          </dd>
         </div>
       </dl>
     </div>

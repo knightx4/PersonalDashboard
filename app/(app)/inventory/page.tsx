@@ -1,13 +1,23 @@
-import { Package } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/field';
+import { Input, Select } from '@/components/ui/field';
+import { categoryIcon } from '@/lib/categories/icons';
+import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
+import { filterAndRankBySearch } from '@/lib/inventory/search';
+import {
+  GROUP_OPTIONS,
+  groupInventoryItems,
+  parseGroupId,
+  parseSortId,
+  SORT_OPTIONS,
+  sortInventoryItems,
+} from '@/lib/inventory/sort-group';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
-import { formatMoney, periodFor, todayInTimezone, type PresetRange } from '@/lib/money';
-import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
+import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 
 export const metadata = { title: 'Inventory' };
 
@@ -35,6 +45,8 @@ function inventoryHref(opts: {
   merchant?: string;
   list?: string;
   range?: string;
+  sort?: string;
+  group?: string;
 }): string {
   const params = new URLSearchParams();
   if (opts.range && opts.range !== 'all') params.set('range', opts.range);
@@ -42,6 +54,8 @@ function inventoryHref(opts: {
   if (opts.category) params.set('category', opts.category);
   if (opts.merchant) params.set('merchant', opts.merchant);
   if (opts.list) params.set('list', opts.list);
+  if (opts.sort && opts.sort !== 'newest') params.set('sort', opts.sort);
+  if (opts.group && opts.group !== 'none') params.set('group', opts.group);
   const qs = params.toString();
   return qs ? `/inventory?${qs}` : '/inventory';
 }
@@ -50,26 +64,14 @@ function merchantNameFromItem(item: {
   order_items:
     | {
         orders:
-          | {
-              return_deadline?: string | null;
-              merchants: { name: string } | { name: string }[] | null;
-            }
-          | {
-              return_deadline?: string | null;
-              merchants: { name: string } | { name: string }[] | null;
-            }[]
+          | { merchants: { name: string } | { name: string }[] | null }
+          | { merchants: { name: string } | { name: string }[] | null }[]
           | null;
       }
     | {
         orders:
-          | {
-              return_deadline?: string | null;
-              merchants: { name: string } | { name: string }[] | null;
-            }
-          | {
-              return_deadline?: string | null;
-              merchants: { name: string } | { name: string }[] | null;
-            }[]
+          | { merchants: { name: string } | { name: string }[] | null }
+          | { merchants: { name: string } | { name: string }[] | null }[]
           | null;
       }[]
     | null;
@@ -88,31 +90,6 @@ function merchantNameFromItem(item: {
   return merchant?.name ?? null;
 }
 
-function returnDeadlineFromItem(item: {
-  order_items:
-    | {
-        orders:
-          | { return_deadline?: string | null }
-          | { return_deadline?: string | null }[]
-          | null;
-      }
-    | {
-        orders:
-          | { return_deadline?: string | null }
-          | { return_deadline?: string | null }[]
-          | null;
-      }[]
-    | null;
-}): string | null {
-  const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
-  const order = orderItem
-    ? Array.isArray(orderItem.orders)
-      ? orderItem.orders[0]
-      : orderItem.orders
-    : null;
-  return order?.return_deadline ?? null;
-}
-
 /** Everything currently owned: inventory_items where status is 'owned'. */
 export default async function InventoryPage({
   searchParams,
@@ -123,23 +100,28 @@ export default async function InventoryPage({
     merchant?: string;
     list?: string;
     range?: string;
+    sort?: string;
+    group?: string;
   }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
   const params = await searchParams;
-  // Strip PostgREST filter metacharacters so a typed comma cannot widen the OR.
   const q = (params.q ?? '').trim().replace(/[%_,*()]/g, ' ').replace(/\s+/g, ' ').trim();
   const categoryId = params.category?.trim() || undefined;
   const merchantId = parseMerchantId(params.merchant);
   const listId = parseListId(params.list);
   const range =
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
+  const sort = parseSortId(params.sort);
+  const group = parseGroupId(params.group);
+
+  await backfillUserInventoryDisplay(supabase, user.id);
 
   const [{ data: categories }, { data: lists }, merchants, { data: profile }] = await Promise.all([
     supabase
       .from('categories')
-      .select('id, name, color')
+      .select('id, name, color, slug')
       .is('parent_id', null)
       .order('name'),
     supabase
@@ -166,23 +148,27 @@ export default async function InventoryPage({
 
   const selectWithOptionalInner = activeMerchant
     ? `
-        id, name, variant, cost_cents, acquired_at, status, category_id, return_planned,
-        categories(name, color),
+        id, name, short_name, variant, cost_cents, acquired_at, status, category_id,
+        image_url, return_planned, search_tags,
+        categories(name, color, slug),
         ${membershipJoin},
         order_items!inner (
+          image_url,
           orders!inner (
-            merchant_id, return_deadline,
+            merchant_id,
             merchants ( name )
           )
         )
       `
     : `
-        id, name, variant, cost_cents, acquired_at, status, category_id, return_planned,
-        categories(name, color),
+        id, name, short_name, variant, cost_cents, acquired_at, status, category_id,
+        image_url, return_planned, search_tags,
+        categories(name, color, slug),
         ${membershipJoin},
         order_items (
+          image_url,
           orders (
-            merchant_id, return_deadline,
+            merchant_id,
             merchants ( name )
           )
         )
@@ -205,7 +191,6 @@ export default async function InventoryPage({
   if (period) {
     query = query.gte('acquired_at', period.start).lte('acquired_at', period.end);
   }
-  if (q) query = query.or(`name.ilike.%${q}%,variant.ilike.%${q}%`);
 
   const { data: rows, error } = await query;
   if (error) throw error;
@@ -213,47 +198,82 @@ export default async function InventoryPage({
   type InventoryRow = {
     id: string;
     name: string;
+    short_name: string | null;
     variant: string | null;
     cost_cents: number;
     acquired_at: string | null;
     status: string;
     category_id: string | null;
+    image_url: string | null;
     return_planned: boolean;
-    categories: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
+    search_tags: string[] | null;
+    categories:
+      | { name: string; color: string | null; slug: string }
+      | { name: string; color: string | null; slug: string }[]
+      | null;
     order_items:
       | {
+          image_url: string | null;
           orders:
-            | {
-                return_deadline?: string | null;
-                merchants: { name: string } | { name: string }[] | null;
-              }
-            | {
-                return_deadline?: string | null;
-                merchants: { name: string } | { name: string }[] | null;
-              }[]
+            | { merchants: { name: string } | { name: string }[] | null }
+            | { merchants: { name: string } | { name: string }[] | null }[]
             | null;
         }
       | {
+          image_url: string | null;
           orders:
-            | {
-                return_deadline?: string | null;
-                merchants: { name: string } | { name: string }[] | null;
-              }
-            | {
-                return_deadline?: string | null;
-                merchants: { name: string } | { name: string }[] | null;
-              }[]
+            | { merchants: { name: string } | { name: string }[] | null }
+            | { merchants: { name: string } | { name: string }[] | null }[]
             | null;
         }[]
       | null;
   };
 
-  const items = (rows ?? []) as unknown as InventoryRow[];
-  const today = todayInTimezone(timezone);
+  const rawItems = (rows ?? []) as unknown as InventoryRow[];
+
+  const mapped: (InventoryRowItem & {
+    search_tags: string[] | null;
+    merchant_name: string | null;
+    category_name: string | null;
+  })[] = rawItems.map((item) => {
+    const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
+    const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+    const merchantName = merchantNameFromItem(item);
+    return {
+      id: item.id,
+      name: item.name,
+      short_name: item.short_name,
+      variant: item.variant,
+      cost_cents: item.cost_cents,
+      acquired_at: item.acquired_at,
+      image_url: item.image_url ?? orderItem?.image_url ?? null,
+      return_planned: item.return_planned,
+      search_tags: item.search_tags,
+      category_name: category?.name ?? null,
+      category_color: category?.color ?? null,
+      category_slug: category?.slug ?? null,
+      merchant_name: merchantName,
+    };
+  });
+
+  const searched = q ? filterAndRankBySearch(mapped, q) : mapped;
+  // Relevance wins while searching; otherwise honor the sort control.
+  const finalItems = q ? searched : sortInventoryItems(searched, sort);
+  const groups = groupInventoryItems(finalItems, group);
 
   const filtered = Boolean(
     q || categoryId || activeMerchant || activeList || range !== 'all',
   );
+
+  const hrefBase = {
+    range,
+    q: q || undefined,
+    category: categoryId,
+    merchant: activeMerchant,
+    list: activeList,
+    sort,
+    group,
+  };
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -264,13 +284,7 @@ export default async function InventoryPage({
               key={entry.id}
               label={entry.label}
               active={entry.id === range}
-              href={inventoryHref({
-                range: entry.id,
-                q: q || undefined,
-                category: categoryId,
-                merchant: activeMerchant,
-                list: activeList,
-              })}
+              href={inventoryHref({ ...hrefBase, range: entry.id })}
             />
           ))}
         </RailGroup>
@@ -278,12 +292,7 @@ export default async function InventoryPage({
           <RailItem
             label="Any"
             active={!activeList}
-            href={inventoryHref({
-              range,
-              q: q || undefined,
-              category: categoryId,
-              merchant: activeMerchant,
-            })}
+            href={inventoryHref({ ...hrefBase, list: undefined })}
           />
           {(lists ?? []).map((list) => (
             <RailItem
@@ -291,13 +300,7 @@ export default async function InventoryPage({
               label={list.name}
               swatch={list.color ?? undefined}
               active={list.id === activeList}
-              href={inventoryHref({
-                range,
-                q: q || undefined,
-                category: categoryId,
-                merchant: activeMerchant,
-                list: list.id,
-              })}
+              href={inventoryHref({ ...hrefBase, list: list.id })}
             />
           ))}
         </RailGroup>
@@ -305,25 +308,14 @@ export default async function InventoryPage({
           <RailItem
             label="Any"
             active={!activeMerchant}
-            href={inventoryHref({
-              range,
-              q: q || undefined,
-              category: categoryId,
-              list: activeList,
-            })}
+            href={inventoryHref({ ...hrefBase, merchant: undefined })}
           />
           {merchants.map((merchant) => (
             <RailItem
               key={merchant.id}
               label={merchant.name}
               active={merchant.id === activeMerchant}
-              href={inventoryHref({
-                range,
-                q: q || undefined,
-                category: categoryId,
-                merchant: merchant.id,
-                list: activeList,
-              })}
+              href={inventoryHref({ ...hrefBase, merchant: merchant.id })}
             />
           ))}
         </RailGroup>
@@ -331,26 +323,16 @@ export default async function InventoryPage({
           <RailItem
             label="All"
             active={!categoryId}
-            href={inventoryHref({
-              range,
-              q: q || undefined,
-              merchant: activeMerchant,
-              list: activeList,
-            })}
+            href={inventoryHref({ ...hrefBase, category: undefined })}
           />
           {(categories ?? []).map((category) => (
             <RailItem
               key={category.id}
               label={category.name}
               swatch={category.color ?? undefined}
+              icon={categoryIcon(category.slug)}
               active={category.id === categoryId}
-              href={inventoryHref({
-                range,
-                q: q || undefined,
-                category: category.id,
-                merchant: activeMerchant,
-                list: activeList,
-              })}
+              href={inventoryHref({ ...hrefBase, category: category.id })}
             />
           ))}
         </RailGroup>
@@ -362,28 +344,86 @@ export default async function InventoryPage({
           description="Everything you currently own, so you can check before buying it again."
         />
 
-        <form className="mb-5" action="/inventory" method="get">
+        <form className="mb-4 space-y-3" action="/inventory" method="get">
           {range !== 'all' && <input type="hidden" name="range" value={range} />}
           {categoryId && <input type="hidden" name="category" value={categoryId} />}
           {activeMerchant && (
             <input type="hidden" name="merchant" value={activeMerchant} />
           )}
           {activeList && <input type="hidden" name="list" value={activeList} />}
-          <Input
-            name="q"
-            defaultValue={q}
-            placeholder="Search what you own…"
-            aria-label="Search inventory"
-          />
+
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <Input
+              name="q"
+              defaultValue={q}
+              placeholder="Search what you own — try makeup, lipstick, kitchen…"
+              aria-label="Search inventory"
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
+              <ArrowUpDown className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Sort</span>
+              <Select
+                name="sort"
+                defaultValue={sort}
+                className="h-9 w-auto min-w-[10rem]"
+                aria-label="Sort inventory"
+                disabled={Boolean(q)}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
+              <Layers className="size-3.5" strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Group</span>
+              <Select
+                name="group"
+                defaultValue={group}
+                className="h-9 w-auto min-w-[10rem]"
+                aria-label="Group inventory"
+              >
+                {GROUP_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <button
+              type="submit"
+              className="press h-9 rounded-lg border border-border bg-surface px-3 text-[13px] font-medium text-ink-muted hover:text-ink"
+            >
+              Apply
+            </button>
+            {q && (
+              <p className="text-[12px] text-ink-faint">
+                Sorted by relevance while searching
+              </p>
+            )}
+          </div>
         </form>
 
-        {items.length === 0 ? (
+        {finalItems.length === 0 ? (
           <EmptyState
-            icon={Package}
+            icon={filtered ? SearchX : Package}
             title={filtered ? 'No matching items' : 'Nothing in your inventory yet'}
             description={
               filtered
-                ? 'Try a different search, list, merchant, category, or date range.'
+                ? q
+                  ? 'Nothing matched that search across names, tags, and categories. You probably don’t own it.'
+                  : 'Try a different search, list, merchant, category, or date range.'
                 : 'Every item from an order lands here as its own entry, so you can search what you own, mark things returned, or record that you got rid of them.'
             }
             action={
@@ -396,63 +436,33 @@ export default async function InventoryPage({
             }
           />
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            {items.map((item) => {
-              const category = Array.isArray(item.categories)
-                ? item.categories[0]
-                : item.categories;
-              const merchantName = merchantNameFromItem(item);
-              const returnDeadline = returnDeadlineFromItem(item);
-              const daysLeft = returnDeadline ? daysBetween(today, returnDeadline) : null;
-              const dueHint =
-                returnDeadline && daysLeft != null
-                  ? deadlineLabel(daysLeft, returnDeadline)
-                  : null;
+          <div className="space-y-5">
+            {groups.map((section) => {
+              const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
               return (
-                <li key={item.id}>
-                  <Link
-                    href={`/inventory/${item.id}`}
-                    className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-canvas"
-                  >
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: category?.color ?? '#cfcfc8' }}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">
-                        {item.name}
-                        {item.return_planned && (
-                          <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
-                            To return
-                          </span>
-                        )}
+                <section key={section.key} className="space-y-2">
+                  {group !== 'none' && (
+                    <div className="flex items-baseline justify-between gap-3 px-1">
+                      <h2 className="text-[13px] font-semibold text-ink">
+                        {section.label}
+                        <span className="ml-2 font-normal text-ink-faint">
+                          {section.items.length}
+                        </span>
+                      </h2>
+                      <p className="tabular text-[12px] text-ink-muted">
+                        {formatMoney(subtotal)}
                       </p>
-                      <p className="truncate text-[13px] text-ink-muted">
-                        {[merchantName, item.variant, category?.name, item.acquired_at]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </p>
-                      {dueHint && (
-                        <p
-                          className={
-                            daysLeft != null && daysLeft <= 7
-                              ? 'mt-0.5 text-[12px] font-medium text-accent-orange'
-                              : 'mt-0.5 text-[12px] text-ink-muted'
-                          }
-                        >
-                          Return {dueHint.toLowerCase()}
-                        </p>
-                      )}
                     </div>
-                    <p className="tabular shrink-0 font-medium text-ink">
-                      {formatMoney(item.cost_cents)}
-                    </p>
-                  </Link>
-                </li>
+                  )}
+                  <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                    {section.items.map((item) => (
+                      <InventoryRow key={item.id} item={item} />
+                    ))}
+                  </ul>
+                </section>
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
     </div>
