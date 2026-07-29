@@ -6,12 +6,14 @@ import {
   markInventoryReturned,
   updateInventoryItem,
   updateInventoryItemLists,
+  createItemListAndAssign,
   type ActionState,
 } from '@/app/(app)/inventory/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { formatCentsAsDollarsInput } from '@/lib/money';
+import { CATEGORY_COLOR_OPTIONS } from '@/lib/categories/slugify';
 
 const initial: ActionState = {};
 
@@ -170,57 +172,107 @@ export function ItemListsForm({
   lists: Array<{ id: string; name: string; color: string | null }>;
   selectedListIds: string[];
 }) {
-  const [state, action, pending] = useActionState(updateInventoryItemLists, initial);
+  const [saveState, saveAction, savePending] = useActionState(
+    updateInventoryItemLists,
+    initial,
+  );
+  const [createState, createAction, createPending] = useActionState(
+    createItemListAndAssign,
+    initial,
+  );
   const selected = new Set(selectedListIds);
 
-  if (lists.length === 0) {
-    return (
-      <div className="rounded-card border border-border bg-surface p-4">
+  return (
+    <div className="space-y-3 rounded-card border border-border bg-surface p-4">
+      <div>
         <h3 className="text-sm font-semibold text-ink">Lists</h3>
-        <p className="mt-2 text-[13px] text-ink-muted">
-          No lists yet. Create one in{' '}
-          <a href="/settings" className="text-brand hover:underline">
-            Settings
-          </a>
-          .
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Personal trackers — not categories. Filter inventory by any list you add here.
         </p>
       </div>
-    );
-  }
 
-  return (
-    <form action={action} className="space-y-3 rounded-card border border-border bg-surface p-4">
-      <input type="hidden" name="id" value={itemId} />
-      <h3 className="text-sm font-semibold text-ink">Lists</h3>
-      <p className="text-[13px] text-ink-muted">
-        Personal trackers — not categories. Filter inventory by any list you check here.
-      </p>
-      <ul className="space-y-2">
-        {lists.map((list) => (
-          <li key={list.id}>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                name="list_id"
-                value={list.id}
-                defaultChecked={selected.has(list.id)}
-                className="size-4 rounded border-border text-brand focus:ring-brand/30"
-              />
-              <span
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: list.color ?? '#cfcfc8' }}
-                aria-hidden
-              />
-              {list.name}
-            </label>
-          </li>
-        ))}
-      </ul>
-      <Button type="submit" variant="secondary" size="sm" disabled={pending}>
-        {pending ? 'Saving…' : 'Save lists'}
-      </Button>
-      {state.message && <p className="text-sm text-positive">{state.message}</p>}
-      <FieldError>{state.error}</FieldError>
-    </form>
+      {lists.length > 0 ? (
+        <form action={saveAction} className="space-y-3">
+          <input type="hidden" name="id" value={itemId} />
+          <ul className="space-y-2">
+            {lists.map((list) => (
+              <li key={list.id}>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    name="list_id"
+                    value={list.id}
+                    defaultChecked={selected.has(list.id)}
+                    className="size-4 rounded border-border text-brand focus:ring-brand/30"
+                  />
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: list.color ?? '#cfcfc8' }}
+                    aria-hidden
+                  />
+                  {list.name}
+                </label>
+              </li>
+            ))}
+          </ul>
+          <Button type="submit" variant="secondary" size="sm" disabled={savePending}>
+            {savePending ? 'Saving…' : 'Save lists'}
+          </Button>
+          {saveState.message && <p className="text-sm text-positive">{saveState.message}</p>}
+          <FieldError>{saveState.error}</FieldError>
+        </form>
+      ) : (
+        <p className="text-[13px] text-ink-faint">No lists yet — create one below.</p>
+      )}
+
+      <form
+        action={createAction}
+        className="space-y-3 border-t border-border pt-3"
+      >
+        <input type="hidden" name="id" value={itemId} />
+        <p className="text-sm font-medium text-ink">New list</p>
+        <div>
+          <Label htmlFor="new_list_name">Name</Label>
+          <Input
+            id="new_list_name"
+            name="name"
+            required
+            maxLength={40}
+            placeholder="To return, Gift ideas, Cabin…"
+          />
+        </div>
+        <div>
+          <Label>Color</Label>
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="List color">
+            {CATEGORY_COLOR_OPTIONS.map((color, index) => (
+              <label key={color} className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="color"
+                  value={color}
+                  defaultChecked={index === 0}
+                  className="peer sr-only"
+                />
+                <span
+                  className="block size-7 rounded-full border-2 border-transparent peer-checked:border-ink peer-focus-visible:ring-2 peer-focus-visible:ring-brand/30"
+                  style={{ backgroundColor: color }}
+                  aria-hidden
+                />
+                <span className="sr-only">{color}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button type="submit" size="sm" disabled={createPending}>
+            {createPending ? 'Adding…' : 'Create list & add item'}
+          </Button>
+          {createState.message && (
+            <p className="text-sm text-positive">{createState.message}</p>
+          )}
+        </div>
+        <FieldError>{createState.error}</FieldError>
+      </form>
+    </div>
   );
 }
