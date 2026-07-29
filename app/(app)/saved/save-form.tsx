@@ -14,45 +14,68 @@ import { formatMoney } from '@/lib/money';
 const previewInitial: PreviewState = {};
 const saveInitial: ActionState = {};
 
-export function SaveForm() {
+/**
+ * Inline composer for /saved: paste a URL in place, preview, then confirm.
+ */
+export function SaveForm({ compact = false }: { compact?: boolean }) {
   const [preview, previewAction, previewPending] = useActionState(
     previewSavedUrl,
     previewInitial,
   );
   const [saveState, saveAction, savePending] = useActionState(createSavedItem, saveInitial);
   const [urlDraft, setUrlDraft] = useState('');
+  const [dismissedPreview, setDismissedPreview] = useState(false);
 
-  const ready = Boolean(preview.url && !preview.error);
-  const urlInputValue = urlDraft || preview.url || '';
+  const ready = Boolean(preview.url && !preview.error) && !dismissedPreview;
+  const urlInputValue = urlDraft || (!dismissedPreview && preview.url) || '';
 
   return (
-    <div className="space-y-8">
-      <form action={previewAction} className="space-y-3">
-        <div>
-          <Label htmlFor="url">Product URL</Label>
+    <div className={compact ? 'space-y-4' : 'space-y-8'}>
+      <form
+        action={(formData) => {
+          setDismissedPreview(false);
+          previewAction(formData);
+        }}
+        className="flex flex-col gap-2 sm:flex-row sm:items-start"
+      >
+        <div className="min-w-0 flex-1">
+          {!compact && <Label htmlFor="url">Product URL</Label>}
           <Input
             id="url"
             name="url"
             type="url"
             required
-            placeholder="https://…"
+            placeholder="Paste a product URL…"
             value={urlInputValue}
-            onChange={(event) => setUrlDraft(event.target.value)}
-            autoFocus
+            onChange={(event) => {
+              setUrlDraft(event.target.value);
+              setDismissedPreview(true);
+            }}
+            aria-label="Product URL"
+            autoFocus={compact}
           />
-          <p className="mt-1.5 text-[13px] text-ink-muted">
-            We pull title, image and price from the page when we can. You can edit
-            everything before saving.
-          </p>
+          {!compact && (
+            <p className="mt-1.5 text-[13px] text-ink-muted">
+              We pull title, image and price from the page when we can. You can edit
+              everything before saving.
+            </p>
+          )}
+          <FieldError>{!dismissedPreview ? preview.error : undefined}</FieldError>
         </div>
-        <Button type="submit" disabled={previewPending || !urlInputValue.trim()}>
+        <Button
+          type="submit"
+          disabled={previewPending || !urlInputValue.trim()}
+          className="sm:mt-0 shrink-0"
+        >
           {previewPending ? 'Looking up…' : 'Look up'}
         </Button>
-        <FieldError>{preview.error}</FieldError>
       </form>
 
       {ready && (
-        <form action={saveAction} className="space-y-5 border-t border-border pt-8">
+        <form
+          action={saveAction}
+          className="space-y-5 rounded-card border border-border bg-surface p-4"
+        >
           <input type="hidden" name="url" value={preview.url} />
           <input type="hidden" name="merchant_id" value={preview.merchantId ?? ''} />
           <input type="hidden" name="currency" value={preview.currency ?? 'USD'} />
@@ -84,7 +107,7 @@ export function SaveForm() {
           )}
 
           <div className="flex flex-col gap-5 sm:flex-row">
-            <div className="sm:w-40">
+            <div className="sm:w-36">
               {preview.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
                 <img
@@ -152,9 +175,19 @@ export function SaveForm() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={savePending}>
               {savePending ? 'Saving…' : 'Save to queue'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setDismissedPreview(true);
+                setUrlDraft('');
+              }}
+            >
+              Cancel
             </Button>
             <FieldError>{saveState.error}</FieldError>
           </div>
