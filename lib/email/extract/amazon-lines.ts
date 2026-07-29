@@ -50,7 +50,10 @@ export function parseAmazonQuantityLines(text: string): ParsedAmazonLine[] {
           !/^Quantity:\s*\d+\b/i.test(line) &&
           !/^[0-9,]+\.\d{2}\s*USD\b/i.test(line) &&
           !/^\$\s*[0-9,]+\.\d{2}\b/.test(line) &&
-          !/^(sold by|shipped by|arriving|delivery)/i.test(line),
+          !/^(sold by|shipped by|arriving|delivery)/i.test(line) &&
+          !/^(grand\s*total|order\s*total|subtotal|shipping|taxes?|total)\s*:?\s*$/i.test(
+            line,
+          ),
       );
 
     const name = metaLines[0]?.replace(/\s+/g, ' ').trim();
@@ -60,7 +63,14 @@ export function parseAmazonQuantityLines(text: string): ParsedAmazonLine[] {
       metaLines
         .slice(1)
         .map((line) => line.replace(/\s+/g, ' ').trim())
-        .find((line) => line.length > 0 && line.length <= 80) ?? null;
+        .find(
+          (line) =>
+            line.length > 0 &&
+            line.length <= 80 &&
+            !/^(grand\s*total|order\s*total|subtotal|shipping|taxes?|total)\s*:?\s*$/i.test(
+              line,
+            ),
+        ) ?? null;
 
     lines.push({
       name: name.slice(0, 200),
