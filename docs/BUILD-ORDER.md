@@ -4,8 +4,8 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
 
 ## Done
 
-0. **Google Cloud setup** — *deferred deliberately.* Not needed until step 10.
-   See [SETUP.md](SETUP.md) Tier 2.
+0. **Google Cloud setup** — *deferred deliberately.* Not needed until Gmail
+   OAuth (done as step 7 below). See [SETUP.md](SETUP.md) Tier 2.
 1. ✅ **Schema and migrations.** All tables, `profiles` and its insert trigger,
    `item_uses`, both fingerprint columns. RLS on every table, with `categories`
    and `merchants` written by hand rather than from the template. Categories and
@@ -27,6 +27,10 @@ Do not hand the whole spec over at once. One phase at a time, in this order.
    extraction with arithmetic gate, Gmail message fetch, and session-scoped
    `/api/inbox/sync` batches that write orders + inventory. LLM via Anthropic
    Haiku when `ANTHROPIC_API_KEY` is set; heuristic fallback otherwise.
+10. ✅ **Saved items.** Paste URL → JSON-LD then Open Graph enrichment →
+    preview/edit → save. List by status, detail edit, dismiss / purchased /
+    delete. Loose fingerprint already-own warning. Merchant match from URL
+    host. No paid unfurl vendor yet.
 
 Also done ahead of schedule because they are cheap and everything depends on
 them: `lib/fingerprint.ts`, `lib/status.ts` and the SQL/TypeScript agreement
@@ -35,8 +39,8 @@ at Tier 2.
 
 ## Next
 
-9. **Dashboard** on top of that data, reading only from `lib/money.ts`.
-10. **Saved items**, URL scraping, OG tag extraction.
+9. **Dashboard** on top of existing order/inventory data, reading only from
+   `lib/money.ts`.
 11. **Onboarding flow** including the pre-consent explanation screen.
 12. ✅ **Background Gmail backfill.** Import starts on the server (`after` +
     continue chain), survives navigation, and Settings/Dashboard poll
@@ -46,6 +50,7 @@ at Tier 2.
 15. **Account deletion** with token revocation and full cascade.
 16. **Phase 2** — the anti-spending layer. No migrations needed; the schema
     already carries `item_uses`, the budget columns and `cooldown_until`.
+    `price_checks` for saved items also waits until then.
 
 ### Ordering notes worth respecting
 
@@ -53,8 +58,8 @@ at Tier 2.
 - Step 3 early, because every screen depends on those numbers and they are cheap
   to test in isolation and expensive to correct once six components compute them
   inline.
-- Step 9 before step 10. Debugging a parser and an OAuth flow simultaneously is
-  miserable.
+- Step 9 can wait behind step 10; they do not share a data path. Dashboard
+  reads orders/inventory spend; saved items are an independent queue.
 
 ## Open questions, still open
 
