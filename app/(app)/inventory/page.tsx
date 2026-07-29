@@ -6,7 +6,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/field';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
-import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
+import { formatMoney, periodFor, todayInTimezone, type PresetRange } from '@/lib/money';
+import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 
 export const metadata = { title: 'Inventory' };
 
@@ -49,14 +50,26 @@ function merchantNameFromItem(item: {
   order_items:
     | {
         orders:
-          | { merchants: { name: string } | { name: string }[] | null }
-          | { merchants: { name: string } | { name: string }[] | null }[]
+          | {
+              return_deadline?: string | null;
+              merchants: { name: string } | { name: string }[] | null;
+            }
+          | {
+              return_deadline?: string | null;
+              merchants: { name: string } | { name: string }[] | null;
+            }[]
           | null;
       }
     | {
         orders:
-          | { merchants: { name: string } | { name: string }[] | null }
-          | { merchants: { name: string } | { name: string }[] | null }[]
+          | {
+              return_deadline?: string | null;
+              merchants: { name: string } | { name: string }[] | null;
+            }
+          | {
+              return_deadline?: string | null;
+              merchants: { name: string } | { name: string }[] | null;
+            }[]
           | null;
       }[]
     | null;
@@ -73,6 +86,31 @@ function merchantNameFromItem(item: {
       : order.merchants
     : null;
   return merchant?.name ?? null;
+}
+
+function returnDeadlineFromItem(item: {
+  order_items:
+    | {
+        orders:
+          | { return_deadline?: string | null }
+          | { return_deadline?: string | null }[]
+          | null;
+      }
+    | {
+        orders:
+          | { return_deadline?: string | null }
+          | { return_deadline?: string | null }[]
+          | null;
+      }[]
+    | null;
+}): string | null {
+  const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
+  const order = orderItem
+    ? Array.isArray(orderItem.orders)
+      ? orderItem.orders[0]
+      : orderItem.orders
+    : null;
+  return order?.return_deadline ?? null;
 }
 
 /** Everything currently owned: inventory_items where status is 'owned'. */
@@ -128,23 +166,23 @@ export default async function InventoryPage({
 
   const selectWithOptionalInner = activeMerchant
     ? `
-        id, name, variant, cost_cents, acquired_at, status, category_id,
+        id, name, variant, cost_cents, acquired_at, status, category_id, return_planned,
         categories(name, color),
         ${membershipJoin},
         order_items!inner (
           orders!inner (
-            merchant_id,
+            merchant_id, return_deadline,
             merchants ( name )
           )
         )
       `
     : `
-        id, name, variant, cost_cents, acquired_at, status, category_id,
+        id, name, variant, cost_cents, acquired_at, status, category_id, return_planned,
         categories(name, color),
         ${membershipJoin},
         order_items (
           orders (
-            merchant_id,
+            merchant_id, return_deadline,
             merchants ( name )
           )
         )
@@ -180,24 +218,38 @@ export default async function InventoryPage({
     acquired_at: string | null;
     status: string;
     category_id: string | null;
+    return_planned: boolean;
     categories: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
     order_items:
       | {
           orders:
-            | { merchants: { name: string } | { name: string }[] | null }
-            | { merchants: { name: string } | { name: string }[] | null }[]
+            | {
+                return_deadline?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }
+            | {
+                return_deadline?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }[]
             | null;
         }
       | {
           orders:
-            | { merchants: { name: string } | { name: string }[] | null }
-            | { merchants: { name: string } | { name: string }[] | null }[]
+            | {
+                return_deadline?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }
+            | {
+                return_deadline?: string | null;
+                merchants: { name: string } | { name: string }[] | null;
+              }[]
             | null;
         }[]
       | null;
   };
 
   const items = (rows ?? []) as unknown as InventoryRow[];
+  const today = todayInTimezone(timezone);
 
   const filtered = Boolean(
     q || categoryId || activeMerchant || activeList || range !== 'all',
@@ -350,6 +402,12 @@ export default async function InventoryPage({
                 ? item.categories[0]
                 : item.categories;
               const merchantName = merchantNameFromItem(item);
+              const returnDeadline = returnDeadlineFromItem(item);
+              const daysLeft = returnDeadline ? daysBetween(today, returnDeadline) : null;
+              const dueHint =
+                returnDeadline && daysLeft != null
+                  ? deadlineLabel(daysLeft, returnDeadline)
+                  : null;
               return (
                 <li key={item.id}>
                   <Link
@@ -362,12 +420,30 @@ export default async function InventoryPage({
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">{item.name}</p>
+                      <p className="truncate font-medium text-ink">
+                        {item.name}
+                        {item.return_planned && (
+                          <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
+                            To return
+                          </span>
+                        )}
+                      </p>
                       <p className="truncate text-[13px] text-ink-muted">
                         {[merchantName, item.variant, category?.name, item.acquired_at]
                           .filter(Boolean)
                           .join(' · ')}
                       </p>
+                      {dueHint && (
+                        <p
+                          className={
+                            daysLeft != null && daysLeft <= 7
+                              ? 'mt-0.5 text-[12px] font-medium text-accent-orange'
+                              : 'mt-0.5 text-[12px] text-ink-muted'
+                          }
+                        >
+                          Return {dueHint.toLowerCase()}
+                        </p>
+                      )}
                     </div>
                     <p className="tabular shrink-0 font-medium text-ink">
                       {formatMoney(item.cost_cents)}

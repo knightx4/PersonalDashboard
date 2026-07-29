@@ -149,6 +149,8 @@ function one<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function daysBetween(from: string, to: string): number {
+  // Local helper kept here so dashboard load stays free of returns-module coupling
+  // for this stock metric; tracker UI uses lib/returns/deadline.ts.
   const a = Date.UTC(
     Number(from.slice(0, 4)),
     Number(from.slice(5, 7)) - 1,

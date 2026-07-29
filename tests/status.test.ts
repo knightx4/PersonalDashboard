@@ -268,4 +268,61 @@ describe('the SQL derivation and the TypeScript derivation agree', () => {
       select return_deadline from orders where id = ${order.id}`;
     expect(row.return_deadline).toBeNull();
   });
+
+  it('prefers a user return-policy override when computing the deadline', async () => {
+    const [order] = await admin<{ id: string }[]>`
+      insert into orders (user_id, merchant_id, order_date, external_order_number,
+                          subtotal_cents, total_cents)
+      values (${userId}, ${merchantId}, current_date, 'deadline-override', 1000, 1000)
+      returning id`;
+
+    await admin`
+      insert into shipments (order_id, status, delivered_at)
+      values (${order.id}, 'delivered', '2026-03-01T12:00:00Z')`;
+
+    // Nike seed is 60; override to 10.
+    await admin`
+      insert into merchant_return_policies (user_id, merchant_id, return_window_days)
+      values (${userId}, ${merchantId}, 10)`;
+
+    const [row] = await admin<{ return_deadline: Date | string | null }[]>`
+      select return_deadline from orders where id = ${order.id}`;
+    const asString =
+      row.return_deadline instanceof Date
+        ? row.return_deadline.toISOString().slice(0, 10)
+        : row.return_deadline;
+    expect(asString).toBe(
+      deriveReturnDeadline({
+        deliveredAt: '2026-03-01T12:00:00Z',
+        merchantReturnWindowDays: 10,
+      }),
+    );
+  });
+
+  it('clears return_planned when a unit is refunded', async () => {
+    const [order] = await admin<{ id: string }[]>`
+      insert into orders (user_id, merchant_id, order_date, external_order_number,
+                          subtotal_cents, total_cents)
+      values (${userId}, ${merchantId}, current_date, 'planned-clear', 1000, 1000)
+      returning id`;
+    const [orderItem] = await admin<{ id: string }[]>`
+      insert into order_items (order_id, name, quantity, unit_price_cents)
+      values (${order.id}, 'boot', 1, 1000) returning id`;
+    const [item] = await admin<{ id: string }[]>`
+      insert into inventory_items (user_id, order_item_id, name, cost_cents,
+                                   status, return_planned)
+      values (${userId}, ${orderItem.id}, 'boot', 1000, 'owned', true)
+      returning id`;
+
+    await admin`
+      insert into returns (user_id, order_id, inventory_item_id, initiated_at,
+                           refund_amount_cents, status, refunded_at)
+      values (${userId}, ${order.id}, ${item.id}, current_date, 1000,
+              'refunded', current_date)`;
+
+    const [row] = await admin<{ status: string; return_planned: boolean }[]>`
+      select status, return_planned from inventory_items where id = ${item.id}`;
+    expect(row.status).toBe('returned');
+    expect(row.return_planned).toBe(false);
+  });
 });

@@ -1,21 +1,18 @@
 import Link from 'next/link';
 import type { ReturnableRow } from '@/lib/dashboard/load';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
-
-function deadlineLabel(daysLeft: number, deadline: string): string {
-  if (daysLeft === 0) return 'Due today';
-  if (daysLeft === 1) return '1 day left';
-  if (daysLeft <= 7) return `${daysLeft} days left`;
-  return `Until ${deadline}`;
-}
+import { deadlineLabel } from '@/lib/returns/deadline';
 
 export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
   const shown = rows.slice(0, 8);
 
   return (
     <Card className="h-full">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Still returnable</CardTitle>
+        <Link href="/returns" className="text-[12px] font-medium text-brand hover:underline">
+          Returns tracker
+        </Link>
       </CardHeader>
       <CardBody className="pt-0">
         {shown.length === 0 ? (
@@ -50,7 +47,10 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
         )}
         {rows.length > shown.length && (
           <p className="mt-2 text-[12px] text-ink-faint">
-            +{rows.length - shown.length} more with open windows
+            +{rows.length - shown.length} more ·{' '}
+            <Link href="/returns?view=all" className="text-brand hover:underline">
+              see all
+            </Link>
           </p>
         )}
       </CardBody>

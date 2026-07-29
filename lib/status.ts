@@ -80,14 +80,17 @@ export function deriveOrderStatus(input: OrderStateInput): OrderStatus {
 }
 
 /**
- * Return deadline = delivery date + the merchant's seeded return window.
+ * Return deadline = delivery date + the merchant's return window.
  *
- * Null when the merchant has no seeded window, or nothing has been delivered.
+ * Window resolution: a per-user merchant_return_policies row wins (including
+ * when its days are null = no window); otherwise merchants.default_return_window_days.
+ *
+ * Null when there is no effective window, or nothing has been delivered.
  * Show nothing rather than guessing: a wrong return deadline is worse than no
  * return deadline, because the user acts on it.
  *
  * Confirmation emails almost never state the return window, which is why this
- * comes from merchants.default_return_window_days and not from the parser.
+ * comes from merchant policy and not from the parser.
  */
 export function deriveReturnDeadline(input: {
   deliveredAt: Date | string | null;

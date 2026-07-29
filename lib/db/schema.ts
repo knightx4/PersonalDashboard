@@ -314,6 +314,8 @@ export const inventoryItems = pgTable(
     disposalMethod: disposalMethod('disposal_method'),
     disposalProceedsCents: integer('disposal_proceeds_cents'),
     notes: text('notes'),
+    /** User intent: show on the returns tracker “to return” filter. */
+    returnPlanned: boolean('return_planned').notNull().default(false),
     ...timestamps,
   },
   (t) => [
@@ -321,6 +323,31 @@ export const inventoryItems = pgTable(
     index('inventory_order_item_idx').on(t.orderItemId),
     index('inventory_category_idx').on(t.categoryId),
     index('inventory_fp_loose_idx').on(t.fingerprintLoose),
+  ],
+);
+
+/**
+ * Per-user override of a merchant's return window.
+ * Global merchants are read-only; this is how users edit policies.
+ * Presence of a row wins over merchants.default_return_window_days
+ * (including when return_window_days is null = no window for this user).
+ */
+export const merchantReturnPolicies = pgTable(
+  'merchant_return_policies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    merchantId: uuid('merchant_id')
+      .notNull()
+      .references(() => merchants.id, { onDelete: 'cascade' }),
+    returnWindowDays: integer('return_window_days'),
+    ...timestamps,
+  },
+  (t) => [
+    index('merchant_return_policies_user_idx').on(t.userId),
+    uniqueIndex('merchant_return_policies_user_merchant_uidx').on(t.userId, t.merchantId),
   ],
 );
 

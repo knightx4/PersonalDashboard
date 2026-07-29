@@ -1,13 +1,15 @@
-import { ListChecks, Mail, ShieldCheck, Tags, User } from 'lucide-react';
+import { ListChecks, Mail, RotateCcw, ShieldCheck, Tags, User } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
+import { loadMerchantReturnPolicies } from '@/lib/returns/policies';
 import { CategoriesSection } from './categories-section';
 import { InboxSection } from './inbox-section';
 import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
+import { ReturnPoliciesSection } from './return-policies-section';
 
 export const metadata = { title: 'Settings' };
 
@@ -48,6 +50,8 @@ export default async function SettingsPage({
     .select('id, name, slug, color')
     .eq('user_id', user.id)
     .order('name');
+
+  const returnPolicies = await loadMerchantReturnPolicies(supabase, user.id);
 
   const accountIds = (accounts ?? []).map((a) => a.id as string);
   const latestJobs: Record<
@@ -164,6 +168,18 @@ export default async function SettingsPage({
           </CardHeader>
           <CardBody>
             <ListsSection lists={lists ?? []} />
+          </CardBody>
+        </Card>
+
+        <Card id="return-policies">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RotateCcw className="size-4 text-ink-muted" strokeWidth={1.75} />
+              Return policies
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <ReturnPoliciesSection policies={returnPolicies} />
           </CardBody>
         </Card>
 

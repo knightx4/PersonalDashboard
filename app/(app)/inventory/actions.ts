@@ -188,6 +188,8 @@ export async function markInventoryReturned(
   revalidatePath(`/inventory/${item.id}`);
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderItem.order_id}`);
+  revalidatePath('/returns');
+  revalidatePath('/dashboard');
   return { message: 'Marked as returned.' };
 }
 

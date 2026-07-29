@@ -131,6 +131,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.inventory_item_lists = membership.id;
 
+  const [policy] = await admin<{ id: string }[]>`
+    insert into merchant_return_policies (user_id, merchant_id, return_window_days)
+    values (${userId}, ${merchant.id}, 30)
+    returning id`;
+  ids.merchant_return_policies = policy.id;
+
   return ids;
 }
 
