@@ -15,7 +15,7 @@ export function guessCategorySlug(input: {
   if (/\b(iphone|ipad|macbook|usb|hdmi|charger|cable|laptop|headphone|earbuds|ssd|gpu)\b/.test(blob)) {
     return 'electronics';
   }
-  if (/\b(shirt|pants|jeans|dress|hoodie|sneakers|shoes|jacket|socks)\b/.test(blob)) {
+  if (/\b(shirt|pants|jeans|dress|hoodie|sneakers|shoes|jacket|socks|hat|cap|tee)\b/.test(blob)) {
     return 'clothing';
   }
   if (/\b(dog|cat|pet |litter|kibble)\b/.test(blob)) return 'pet';

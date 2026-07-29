@@ -28,6 +28,7 @@ Rules:
 - Money is integer cents only (12.99 → 1299).
 - quantity * unitPriceCents + tax + shipping - discount must equal totalCents (±2 cents).
 - Prefer line items that appear in the email; do not invent products.
+- Always emit a separate lines[] entry for every ordered product. Never collapse "and N more item" subjects into a single line.
 - productUrl: only a real product page URL from the email (amazon.com/dp/…, etc). Never invent.
 - If this is not an order confirmation, return {"error":"not_an_order"}.`;
 
@@ -36,11 +37,12 @@ function attachProductLinks(
   html?: string | null,
   text?: string,
 ): ExtractedOrder {
-  const hints = extractProductLinksFromEmail(`${html ?? ''}\n${text ?? ''}`);
+  const blob = `${html ?? ''}\n${text ?? ''}`;
+  const hints = extractProductLinksFromEmail(blob);
   if (hints.length === 0) return order;
   return {
     ...order,
-    lines: enrichLinesWithProductLinks(order.lines, hints),
+    lines: enrichLinesWithProductLinks(order.lines, hints, blob),
   };
 }
 
