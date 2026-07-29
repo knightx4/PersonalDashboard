@@ -311,6 +311,43 @@ async function handleOrderConfirmation(
   });
 
   if (orderError) {
+    // Same order # from another inbox (or a re-sync) — link this message to the
+    // existing order instead of failing the ledger row.
+    const isUnique =
+      /duplicate|unique|orders_external_number/i.test(orderError.message) ||
+      orderError.code === '23505';
+    if (isUnique && bundle.order.externalOrderNumber) {
+      let existingQuery = supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('external_order_number', bundle.order.externalOrderNumber)
+        .limit(1);
+      if (bundle.order.merchantId) {
+        existingQuery = existingQuery.eq('merchant_id', bundle.order.merchantId);
+      }
+      const { data: existingRows } = await existingQuery;
+      const existingOrder = existingRows?.[0];
+      if (existingOrder) {
+        await supabase.from('ingested_messages').insert({
+          email_account_id: accountId,
+          provider_message_id: message.id,
+          thread_id: message.threadId,
+          received_at: message.internalDate?.toISOString() ?? null,
+          from_address: message.fromAddress,
+          subject: message.subject,
+          classification: 'order_confirmation',
+          parse_status: 'parsed',
+          parse_confidence: extraction.result.order.confidence ?? null,
+          parser_version: extraction.parserVersion,
+          resulting_order_id: existingOrder.id,
+          error: 'Linked to existing order (already imported)',
+        });
+        counters.messagesParsed += 1;
+        return;
+      }
+    }
+
     await supabase.from('ingested_messages').insert({
       email_account_id: accountId,
       provider_message_id: message.id,
