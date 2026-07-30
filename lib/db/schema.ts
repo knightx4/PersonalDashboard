@@ -137,6 +137,8 @@ export const profiles = pgTable('profiles', {
   avatarUrl: text('avatar_url'),
   /** Period boundaries are computed in this zone, never the server's. */
   timezone: text('timezone').notNull().default('UTC'),
+  /** Preferred currency for dashboard / list display (orders keep native). */
+  displayCurrency: text('display_currency').notNull().default('USD'),
   /** Phase 2. Present now so Phase 2 needs no migration. */
   monthlyBudgetCents: integer('monthly_budget_cents'),
   defaultCooldownDays: integer('default_cooldown_days').notNull().default(7),
@@ -599,5 +601,23 @@ export const orderItemTags = pgTable(
     uniqueIndex('order_item_tags_unique').on(t.orderItemId, t.tagId),
     index('order_item_tags_item_idx').on(t.orderItemId),
     index('order_item_tags_tag_idx').on(t.tagId),
+  ],
+);
+
+/** Historical FX quotes (Frankfurter). Shared reference data, not user-scoped. */
+export const fxRates = pgTable(
+  'fx_rates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    rateDate: date('rate_date').notNull(),
+    baseCurrency: text('base_currency').notNull(),
+    quoteCurrency: text('quote_currency').notNull(),
+    rate: numeric('rate').notNull(),
+    source: text('source').notNull().default('frankfurter'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('fx_rates_pair_date_key').on(t.rateDate, t.baseCurrency, t.quoteCurrency),
+    index('fx_rates_lookup_idx').on(t.baseCurrency, t.quoteCurrency, t.rateDate),
   ],
 );

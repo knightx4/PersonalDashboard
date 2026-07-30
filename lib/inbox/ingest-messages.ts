@@ -14,6 +14,7 @@ import {
   isExcludedSender,
   type MerchantExclusionRow,
 } from '@/lib/inbox/merchant-exclusions';
+import { isPlatformMerchantSlug } from '@/lib/merchants/platform';
 import { resolveOrderMerchant } from '@/lib/merchants/resolve-order-merchant';
 import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
 import { mapPool } from '@/lib/async/map-pool';
@@ -256,13 +257,15 @@ async function handleOrderConfirmation(
     return;
   }
 
+  const platformSender = isPlatformMerchantSlug(classified.merchant?.slug);
   const extraction = await extractOrderFromEmail({
     subject: message.subject ?? '',
     text: message.text,
     html: message.html,
-    merchantSlug: classified.merchant?.slug,
-    merchantName:
-      classified.merchant?.name ?? displayNameFromAddress(message.fromAddress),
+    merchantSlug: platformSender ? null : classified.merchant?.slug,
+    merchantName: platformSender
+      ? displayNameFromAddress(message.fromAddress)
+      : (classified.merchant?.name ?? displayNameFromAddress(message.fromAddress)),
     fromAddress: message.fromAddress,
     receivedAt: message.internalDate,
     categoryOptions,
@@ -295,7 +298,10 @@ async function handleOrderConfirmation(
   const bundle = buildEmailOrder({
     userId,
     merchantId: resolvedMerchant?.id ?? null,
-    merchantSlug: resolvedMerchant?.slug ?? classified.merchant?.slug ?? null,
+    merchantSlug:
+      resolvedMerchant?.slug ??
+      (platformSender ? null : classified.merchant?.slug) ??
+      null,
     extraction: extraction.result.order,
     categoryIdsBySlug,
     needsReview: extraction.source === 'heuristic' && !extraction.trusted,

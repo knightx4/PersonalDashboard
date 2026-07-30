@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
+import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
+import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import {
@@ -99,15 +101,17 @@ export default async function OrdersPage({
   const tagId = parseTagId(params.tag);
   const q = sanitizeOrdersQuery(params.q);
 
-  const [{ data: profile }, merchants, tags, { count: inboxCount }] = await Promise.all([
-    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
-    loadUserMerchants(supabase, user.id),
-    loadUserTags(supabase, user.id),
-    supabase
-      .from('email_accounts')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id),
-  ]);
+  const [{ data: profile }, merchants, tags, { count: inboxCount }, displayCurrency] =
+    await Promise.all([
+      supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+      loadUserMerchants(supabase, user.id),
+      loadUserTags(supabase, user.id),
+      supabase
+        .from('email_accounts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      loadDisplayCurrency(supabase, user.id),
+    ]);
   const timezone = profile?.timezone ?? 'UTC';
   const period = periodFor(range, timezone);
   const activeMerchant =
@@ -151,6 +155,19 @@ export default async function OrdersPage({
     orders = orders.filter((order) => orderMatchesQuery(order, q));
   }
 
+  const displayTotals =
+    orders.length > 0
+      ? await convertToDisplayCents(
+          supabase,
+          orders.map((order) => ({
+            cents: order.total_cents,
+            currency: order.currency,
+            date: order.order_date,
+          })),
+          displayCurrency,
+        )
+      : [];
+
   const grouped = new Map<string, typeof orders>();
   for (const order of orders) {
     const key = monthKey(order.order_date);
@@ -161,6 +178,9 @@ export default async function OrdersPage({
 
   const filteredEmpty =
     orders.length === 0 && Boolean(q || status || activeMerchant || activeTag);
+  const displayById = new Map(
+    orders.map((order, index) => [order.id, displayTotals[index] ?? order.total_cents]),
+  );
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -313,7 +333,10 @@ export default async function OrdersPage({
         ) : (
           <div className="space-y-8">
             {[...grouped.entries()].map(([key, monthOrders]) => {
-              const monthTotal = monthOrders.reduce((sum, order) => sum + order.total_cents, 0);
+              const monthTotal = monthOrders.reduce(
+                (sum, order) => sum + (displayById.get(order.id) ?? order.total_cents),
+                0,
+              );
               return (
                 <section key={key}>
                   <div className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
@@ -324,7 +347,7 @@ export default async function OrdersPage({
                       </span>
                     </h2>
                     <p className="tabular text-[12px] text-ink-muted">
-                      {formatMoney(monthTotal)}
+                      {formatMoney(monthTotal, displayCurrency)}
                     </p>
                   </div>
                   <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
@@ -335,14 +358,20 @@ export default async function OrdersPage({
                       const itemsSummary = orderItemsSummary(order);
                       const itemHint = q ? matchingItemHint(order, q) : null;
                       const inbox = showInbox ? orderInboxAddress(order) : null;
+                      const displayTotal = displayById.get(order.id) ?? order.total_cents;
+                      const nativeDiffers =
+                        normalizeCurrencyCode(order.currency) !==
+                        normalizeCurrencyCode(displayCurrency);
                       return (
                         <OrderRow
                           key={order.id}
                           order={{
                             id: order.id,
                             order_date: order.order_date,
-                            total_cents: order.total_cents,
-                            currency: order.currency,
+                            total_cents: displayTotal,
+                            currency: displayCurrency,
+                            native_total_cents: nativeDiffers ? order.total_cents : undefined,
+                            native_currency: nativeDiffers ? order.currency : undefined,
                             status: order.status,
                             external_order_number: order.external_order_number,
                             merchant_name: merchant?.name ?? 'Unknown merchant',
