@@ -3,6 +3,10 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { domainFromAddress } from '@/lib/email/extract/classify';
 import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
+import {
+  isPlatformMerchantSlug,
+  isPlatformSenderDomain,
+} from '@/lib/merchants/platform';
 
 export type ResolvedMerchant = {
   id: string;
@@ -51,6 +55,9 @@ export async function loadMerchantsForUser(
 /**
  * Prefer a classified/seeded merchant; otherwise find-or-create a user merchant
  * from the From display name and sender domain (Shopify boutiques, etc.).
+ *
+ * Platform senders (Shopify email relay) classify as "Shopify" for filtering,
+ * but the order merchant should be the boutique name from From/body.
  */
 export async function resolveOrderMerchant(
   supabase: SupabaseClient,
@@ -61,7 +68,7 @@ export async function resolveOrderMerchant(
     extractedName?: string | null;
   },
 ): Promise<ResolvedMerchant | null> {
-  if (input.classified?.id) {
+  if (input.classified?.id && !isPlatformMerchantSlug(input.classified.slug)) {
     return {
       id: input.classified.id,
       slug: input.classified.slug,
@@ -74,14 +81,17 @@ export async function resolveOrderMerchant(
   const name = (
     input.extractedName?.trim() ||
     display?.trim() ||
-    (domain ? titleFromDomain(domain) : '')
+    (domain && !isPlatformSenderDomain(domain) ? titleFromDomain(domain) : '')
   ).trim();
 
   if (!name && !domain) return null;
 
-  if (domain) {
+  // Shared platform relays (shopifyemail.com) must not map every boutique to
+  // the same merchant via domain match.
+  if (domain && !isPlatformSenderDomain(domain)) {
     const merchants = await loadMerchantsForUser(supabase, input.userId);
     for (const merchant of merchants) {
+      if (isPlatformMerchantSlug(merchant.slug)) continue;
       for (const d of merchant.domains) {
         const needle = d.toLowerCase();
         if (domain === needle || domain.endsWith(`.${needle}`)) {
@@ -95,7 +105,7 @@ export async function resolveOrderMerchant(
 
   const baseSlug = slugify(name) || (domain ? slugify(domain) : 'merchant') || 'merchant';
   const slug = `${baseSlug}-${input.userId.slice(0, 8)}`;
-  const domains = domain ? [domain] : [];
+  const domains = domain && !isPlatformSenderDomain(domain) ? [domain] : [];
 
   const { data: existing } = await supabase
     .from('merchants')
@@ -105,7 +115,7 @@ export async function resolveOrderMerchant(
     .maybeSingle();
 
   if (existing) {
-    if (domain) {
+    if (domains.length > 0) {
       await supabase
         .from('merchants')
         .update({ domains })

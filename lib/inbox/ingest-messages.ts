@@ -14,7 +14,9 @@ import {
   isExcludedSender,
   type MerchantExclusionRow,
 } from '@/lib/inbox/merchant-exclusions';
+import { isPlatformMerchantSlug } from '@/lib/merchants/platform';
 import { resolveOrderMerchant } from '@/lib/merchants/resolve-order-merchant';
+import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
 import { mapPool } from '@/lib/async/map-pool';
 
 /** Parallel Gmail metadata fetches — well under user rate quota. */
@@ -255,13 +257,15 @@ async function handleOrderConfirmation(
     return;
   }
 
+  const platformSender = isPlatformMerchantSlug(classified.merchant?.slug);
   const extraction = await extractOrderFromEmail({
     subject: message.subject ?? '',
     text: message.text,
     html: message.html,
-    merchantSlug: classified.merchant?.slug,
-    merchantName:
-      classified.merchant?.name ?? displayNameFromAddress(message.fromAddress),
+    merchantSlug: platformSender ? null : classified.merchant?.slug,
+    merchantName: platformSender
+      ? displayNameFromAddress(message.fromAddress)
+      : (classified.merchant?.name ?? displayNameFromAddress(message.fromAddress)),
     fromAddress: message.fromAddress,
     receivedAt: message.internalDate,
     categoryOptions,
@@ -294,7 +298,10 @@ async function handleOrderConfirmation(
   const bundle = buildEmailOrder({
     userId,
     merchantId: resolvedMerchant?.id ?? null,
-    merchantSlug: resolvedMerchant?.slug ?? classified.merchant?.slug ?? null,
+    merchantSlug:
+      resolvedMerchant?.slug ??
+      (platformSender ? null : classified.merchant?.slug) ??
+      null,
     extraction: extraction.result.order,
     categoryIdsBySlug,
     needsReview: extraction.source === 'heuristic' && !extraction.trusted,
@@ -392,6 +399,20 @@ async function handleOrderConfirmation(
     await supabase.from('orders').delete().eq('id', bundle.order.id);
     counters.errors += 1;
     return;
+  }
+
+  for (const item of bundle.orderItems) {
+    if (item.tags.length === 0) continue;
+    try {
+      const resolved = await ensureItemTags(supabase, userId, item.tags);
+      await linkOrderItemTags(
+        supabase,
+        item.id,
+        resolved.map((tag) => tag.id),
+      );
+    } catch (error) {
+      console.error('linkOrderItemTags failed', error);
+    }
   }
 
   const { error: invError } = await supabase.from('inventory_items').insert(

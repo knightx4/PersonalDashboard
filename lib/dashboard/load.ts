@@ -2,6 +2,10 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  convertToDisplayCents,
+  loadDisplayCurrency,
+} from '@/lib/fx/display';
+import {
   allocateLandedCost,
   periodFor,
   previousPeriodFor,
@@ -97,6 +101,10 @@ type ReturnRow = {
   refunded_at: string | null;
   refund_amount_cents: number;
   status: string;
+  orders:
+    | { currency: string; order_date: string; deleted_at: string | null }
+    | { currency: string; order_date: string; deleted_at: string | null }[]
+    | null;
 };
 
 type InventoryRow = {
@@ -114,6 +122,8 @@ type InventoryRow = {
               status: string;
               return_deadline: string | null;
               deleted_at: string | null;
+              currency: string;
+              order_date: string;
               merchants: { name: string } | { name: string }[] | null;
             }
           | {
@@ -121,6 +131,8 @@ type InventoryRow = {
               status: string;
               return_deadline: string | null;
               deleted_at: string | null;
+              currency: string;
+              order_date: string;
               merchants: { name: string } | { name: string }[] | null;
             }[]
           | null;
@@ -133,6 +145,8 @@ type InventoryRow = {
               status: string;
               return_deadline: string | null;
               deleted_at: string | null;
+              currency: string;
+              order_date: string;
               merchants: { name: string } | { name: string }[] | null;
             }
           | {
@@ -140,6 +154,8 @@ type InventoryRow = {
               status: string;
               return_deadline: string | null;
               deleted_at: string | null;
+              currency: string;
+              order_date: string;
               merchants: { name: string } | { name: string }[] | null;
             }[]
           | null;
@@ -301,6 +317,9 @@ function returnableFromInventory(
 /**
  * Load every figure the dashboard needs. All aggregation goes through
  * lib/money.ts; this file only fetches and shapes rows.
+ *
+ * Mixed-currency orders are converted to the user's display_currency using
+ * Frankfurter rates on each order's purchase date before aggregation.
  */
 export async function loadDashboard(
   supabase: SupabaseClient,
@@ -309,11 +328,12 @@ export async function loadDashboard(
 ): Promise<DashboardData> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('timezone')
+    .select('timezone, display_currency')
     .eq('id', userId)
     .single();
 
   const timezone = profile?.timezone ?? 'UTC';
+  const displayCurrency = await loadDisplayCurrency(supabase, userId);
   const today = todayInTimezone(timezone);
   const period = periodFor(range, timezone);
   const previous = previousPeriodFor(range, timezone);
@@ -353,7 +373,9 @@ export async function loadDashboard(
       .lte('order_date', latest),
     supabase
       .from('returns')
-      .select('refunded_at, refund_amount_cents, status')
+      .select(
+        'refunded_at, refund_amount_cents, status, orders ( currency, order_date, deleted_at )',
+      )
       .eq('user_id', userId)
       .eq('status', 'refunded')
       .gte('refunded_at', earliest)
@@ -366,7 +388,7 @@ export async function loadDashboard(
         order_items (
           order_id,
           orders (
-            id, status, return_deadline, deleted_at,
+            id, status, return_deadline, deleted_at, currency, order_date,
             merchants ( name )
           )
         )
@@ -380,9 +402,9 @@ export async function loadDashboard(
   if (returnsError) throw returnsError;
   if (inventoryError) throw inventoryError;
 
-  const orders = (orderRows ?? []) as OrderRow[];
-  const returns = (returnRows ?? []) as ReturnRow[];
-  const inventory = ((inventoryRows ?? []) as InventoryRow[]).filter((item) => {
+  const ordersNative = (orderRows ?? []) as OrderRow[];
+  const returnsNative = (returnRows ?? []) as ReturnRow[];
+  const inventoryNative = ((inventoryRows ?? []) as InventoryRow[]).filter((item) => {
     const orderItem = one(item.order_items);
     const order = one(orderItem?.orders);
     return !order?.deleted_at;
@@ -391,16 +413,138 @@ export async function loadDashboard(
     ((categoryRows ?? []) as CategoryRow[]).map((row) => [row.id, row]),
   );
 
+  const orderAmountSpecs: Array<{ cents: number; currency: string; date: string }> = [];
+  const orderAmountIndex: Array<{
+    orderId: string;
+    field: 'subtotal' | 'tax' | 'shipping' | 'discount' | 'total' | 'unit';
+    itemId?: string;
+  }> = [];
+
+  for (const order of ordersNative) {
+    for (const [field, cents] of [
+      ['subtotal', order.subtotal_cents],
+      ['tax', order.tax_cents],
+      ['shipping', order.shipping_cents],
+      ['discount', order.discount_cents],
+      ['total', order.total_cents],
+    ] as const) {
+      orderAmountSpecs.push({
+        cents,
+        currency: order.currency,
+        date: order.order_date,
+      });
+      orderAmountIndex.push({ orderId: order.id, field });
+    }
+    const items = Array.isArray(order.order_items)
+      ? order.order_items
+      : order.order_items
+        ? [order.order_items]
+        : [];
+    for (const item of items) {
+      orderAmountSpecs.push({
+        cents: item.unit_price_cents,
+        currency: order.currency,
+        date: order.order_date,
+      });
+      orderAmountIndex.push({ orderId: order.id, field: 'unit', itemId: item.id });
+    }
+  }
+
+  const convertedOrderAmounts =
+    orderAmountSpecs.length > 0
+      ? await convertToDisplayCents(supabase, orderAmountSpecs, displayCurrency)
+      : [];
+
+  const byOrder = new Map<
+    string,
+    {
+      subtotal: number;
+      tax: number;
+      shipping: number;
+      discount: number;
+      total: number;
+      units: Map<string, number>;
+    }
+  >();
+  for (let i = 0; i < orderAmountIndex.length; i++) {
+    const meta = orderAmountIndex[i]!;
+    const cents = convertedOrderAmounts[i] ?? 0;
+    const bucket = byOrder.get(meta.orderId) ?? {
+      subtotal: 0,
+      tax: 0,
+      shipping: 0,
+      discount: 0,
+      total: 0,
+      units: new Map<string, number>(),
+    };
+    if (meta.field === 'unit' && meta.itemId) {
+      bucket.units.set(meta.itemId, cents);
+    } else if (meta.field !== 'unit') {
+      bucket[meta.field] = cents;
+    }
+    byOrder.set(meta.orderId, bucket);
+  }
+
+  const orders: OrderRow[] = ordersNative.map((order) => {
+    const converted = byOrder.get(order.id);
+    const items = Array.isArray(order.order_items)
+      ? order.order_items
+      : order.order_items
+        ? [order.order_items]
+        : [];
+    return {
+      ...order,
+      currency: displayCurrency,
+      subtotal_cents: converted?.subtotal ?? order.subtotal_cents,
+      tax_cents: converted?.tax ?? order.tax_cents,
+      shipping_cents: converted?.shipping ?? order.shipping_cents,
+      discount_cents: converted?.discount ?? order.discount_cents,
+      total_cents: converted?.total ?? order.total_cents,
+      order_items: items.map((item) => ({
+        ...item,
+        unit_price_cents: converted?.units.get(item.id) ?? item.unit_price_cents,
+      })),
+    };
+  });
+
+  const returnSpecs = returnsNative.map((row) => {
+    const order = one(row.orders);
+    return {
+      cents: row.refund_amount_cents,
+      currency: order?.currency ?? displayCurrency,
+      date: (row.refunded_at ?? order?.order_date ?? today).slice(0, 10),
+    };
+  });
+  const convertedRefunds =
+    returnSpecs.length > 0
+      ? await convertToDisplayCents(supabase, returnSpecs, displayCurrency)
+      : [];
+  const returns: ReturnRow[] = returnsNative.map((row, i) => ({
+    ...row,
+    refund_amount_cents: convertedRefunds[i] ?? row.refund_amount_cents,
+  }));
+
+  const inventorySpecs = inventoryNative.map((item) => {
+    const order = one(one(item.order_items)?.orders);
+    return {
+      cents: item.cost_cents,
+      currency: order?.currency ?? displayCurrency,
+      date: order?.order_date ?? today,
+    };
+  });
+  const convertedInventory =
+    inventorySpecs.length > 0
+      ? await convertToDisplayCents(supabase, inventorySpecs, displayCurrency)
+      : [];
+  const inventory = inventoryNative.map((item, i) => ({
+    ...item,
+    cost_cents: convertedInventory[i] ?? item.cost_cents,
+  }));
+
   const spendOrders = toSpendOrders(orders);
   const spendRefunds = toSpendRefunds(returns);
   const current = spend(spendOrders, spendRefunds, period);
   const previousBreakdown = spend(spendOrders, spendRefunds, previous);
-
-  const currency =
-    orders.find((order) => order.order_date >= period.start && order.order_date <= period.end)
-      ?.currency ??
-    orders[0]?.currency ??
-    'USD';
 
   return {
     timezone,
@@ -409,7 +553,7 @@ export async function loadDashboard(
     period,
     previousPeriod: previous,
     orderCount: orderCount ?? 0,
-    currency,
+    currency: displayCurrency,
     current,
     previous: previousBreakdown,
     categories: spendByCategory(toCategorizedUnits(orders, categories), period),

@@ -4,6 +4,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
+import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
+import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
 import {
   ConfirmOrderButton,
@@ -11,8 +13,10 @@ import {
 } from '@/app/(app)/review/review-buttons';
 import { ExcludeMerchantButton } from './exclude-merchant-button';
 import { DeleteOrderButton } from './delete-order-button';
+import { OrderItemTags } from '../order-item-tags';
 import { restoreDeletedOrder } from '@/app/(app)/orders/actions';
 import { Button } from '@/components/ui/button';
+import { orderItemTags } from '@/lib/orders/search';
 
 export const metadata = { title: 'Order' };
 
@@ -36,7 +40,8 @@ export default async function OrderDetailPage({
       order_items (
         id, name, variant, quantity, unit_price_cents, category_id, product_url, image_url,
         categories ( name ),
-        inventory_items ( id, cost_cents, status )
+        inventory_items ( id, cost_cents, status ),
+        order_item_tags ( id, tag_id, item_tags ( id, name, slug ) )
       )
     `,
     )
@@ -85,6 +90,73 @@ export default async function OrderDetailPage({
 
   // Pair lifecycle emails to shipment rows (nearest by date, each email used once).
   const shipmentEmailLinks = pairShipmentEmails(shipments ?? [], shippingMessages, deliveryMessages);
+
+  const displayCurrency = await loadDisplayCurrency(supabase, user.id);
+  const nativeCurrency = order.currency;
+  const showNative =
+    normalizeCurrencyCode(nativeCurrency) !== normalizeCurrencyCode(displayCurrency);
+
+  const moneySpecs: Array<{ cents: number; currency: string; date: string }> = [
+    { cents: order.subtotal_cents, currency: nativeCurrency, date: order.order_date },
+    { cents: order.tax_cents, currency: nativeCurrency, date: order.order_date },
+    { cents: order.shipping_cents, currency: nativeCurrency, date: order.order_date },
+    { cents: order.discount_cents, currency: nativeCurrency, date: order.order_date },
+    { cents: order.total_cents, currency: nativeCurrency, date: order.order_date },
+  ];
+  for (const item of items) {
+    moneySpecs.push({
+      cents: item.unit_price_cents,
+      currency: nativeCurrency,
+      date: order.order_date,
+    });
+    moneySpecs.push({
+      cents: lineSubtotalCents(item.quantity, item.unit_price_cents),
+      currency: nativeCurrency,
+      date: order.order_date,
+    });
+    for (const unit of item.inventory_items ?? []) {
+      moneySpecs.push({
+        cents: unit.cost_cents,
+        currency: nativeCurrency,
+        date: order.order_date,
+      });
+    }
+  }
+  for (const row of returnRows ?? []) {
+    moneySpecs.push({
+      cents: row.refund_amount_cents,
+      currency: nativeCurrency,
+      date: (row.refunded_at ?? row.initiated_at ?? order.order_date).slice(0, 10),
+    });
+  }
+
+  const converted = await convertToDisplayCents(supabase, moneySpecs, displayCurrency);
+  let cursor = 0;
+  const next = () => converted[cursor++] ?? 0;
+  const displaySubtotal = next();
+  const displayTax = next();
+  const displayShipping = next();
+  const displayDiscount = next();
+  const displayTotal = next();
+  const displayItems = items.map((item) => {
+    const unit = next();
+    const line = next();
+    const units = (item.inventory_items ?? []).map((inv) => ({
+      ...inv,
+      display_cost_cents: next(),
+    }));
+    return { ...item, display_unit_cents: unit, display_line_cents: line, display_units: units };
+  });
+  const displayReturns = (returnRows ?? []).map((row) => ({
+    ...row,
+    display_refund_cents: next(),
+  }));
+
+  function moneyLabel(displayCents: number, nativeCents: number): string {
+    const primary = formatMoney(displayCents, displayCurrency);
+    if (!showNative) return primary;
+    return `${primary} · ${formatMoney(nativeCents, nativeCurrency)}`;
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -236,14 +308,14 @@ export default async function OrderDetailPage({
             Returns
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            {(returnRows ?? []).map((row) => (
+            {(displayReturns ?? []).map((row) => (
               <li key={row.id} className="flex justify-between gap-4 px-4 py-3 text-sm">
                 <span className="text-ink">
                   {row.status.replaceAll('_', ' ')}
                   {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
                 </span>
                 <span className="tabular text-ink-muted">
-                  {formatMoney(row.refund_amount_cents, order.currency)}
+                  {moneyLabel(row.display_refund_cents, row.refund_amount_cents)}
                 </span>
               </li>
             ))}
@@ -262,11 +334,11 @@ export default async function OrderDetailPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {items.map((item) => {
+            {displayItems.map((item) => {
               const category = Array.isArray(item.categories)
                 ? item.categories[0]
                 : item.categories;
-              const units = item.inventory_items ?? [];
+              const units = item.display_units;
               return (
                 <tr key={item.id}>
                   <td className="px-4 py-3">
@@ -274,6 +346,15 @@ export default async function OrderDetailPage({
                     <p className="text-[13px] text-ink-muted">
                       {[item.variant, category?.name].filter(Boolean).join(' · ') || '—'}
                     </p>
+                    <OrderItemTags
+                      orderId={order.id}
+                      orderItemId={item.id}
+                      tags={orderItemTags(item).map((tag) => ({
+                        id: tag.id ?? '',
+                        name: tag.name,
+                      })).filter((tag) => tag.id)}
+                      readOnly={isDeleted}
+                    />
                     {item.product_url && (
                       <p className="mt-1.5">
                         <a
@@ -301,7 +382,7 @@ export default async function OrderDetailPage({
                               {units.length > 1 ? ` (${index + 1} of ${units.length})` : ''}
                             </Link>
                             <span className="tabular text-[13px] text-ink-muted">
-                              Landed {formatMoney(unit.cost_cents, order.currency)}
+                              Landed {moneyLabel(unit.display_cost_cents, unit.cost_cents)}
                             </span>
                             <span className="rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
                               {unit.status.replaceAll('_', ' ')}
@@ -313,12 +394,12 @@ export default async function OrderDetailPage({
                   </td>
                   <td className="tabular px-4 py-3 align-top text-ink-muted">{item.quantity}</td>
                   <td className="tabular px-4 py-3 align-top text-right text-ink">
-                    {formatMoney(item.unit_price_cents, order.currency)}
+                    {moneyLabel(item.display_unit_cents, item.unit_price_cents)}
                   </td>
                   <td className="tabular px-4 py-3 align-top text-right text-ink">
-                    {formatMoney(
+                    {moneyLabel(
+                      item.display_line_cents,
                       lineSubtotalCents(item.quantity, item.unit_price_cents),
-                      order.currency,
                     )}
                   </td>
                 </tr>
@@ -331,28 +412,38 @@ export default async function OrderDetailPage({
       <dl className="grid gap-2 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
         <div className="flex justify-between gap-4 sm:col-span-2">
           <dt className="text-ink-muted">Subtotal</dt>
-          <dd className="tabular text-ink">{formatMoney(order.subtotal_cents, order.currency)}</dd>
+          <dd className="tabular text-ink">
+            {moneyLabel(displaySubtotal, order.subtotal_cents)}
+          </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">Tax</dt>
-          <dd className="tabular text-ink">{formatMoney(order.tax_cents, order.currency)}</dd>
+          <dd className="tabular text-ink">{moneyLabel(displayTax, order.tax_cents)}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">Shipping</dt>
-          <dd className="tabular text-ink">{formatMoney(order.shipping_cents, order.currency)}</dd>
+          <dd className="tabular text-ink">
+            {moneyLabel(displayShipping, order.shipping_cents)}
+          </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">Discount</dt>
           <dd className="tabular text-ink">
-            {formatMoney(order.discount_cents, order.currency)}
+            {moneyLabel(displayDiscount, order.discount_cents)}
           </dd>
         </div>
         <div className="flex justify-between gap-4 border-t border-border pt-2 sm:col-span-2">
           <dt className="font-medium text-ink">Total</dt>
           <dd className="tabular font-semibold text-ink">
-            {formatMoney(order.total_cents, order.currency)}
+            {moneyLabel(displayTotal, order.total_cents)}
           </dd>
         </div>
+        {showNative && (
+          <div className="flex justify-between gap-4 sm:col-span-2">
+            <dt className="text-ink-muted">Order currency</dt>
+            <dd className="text-ink">{nativeCurrency}</dd>
+          </div>
+        )}
         {order.return_deadline && (
           <div className="flex justify-between gap-4 sm:col-span-2">
             <dt className="text-ink-muted">Return deadline</dt>

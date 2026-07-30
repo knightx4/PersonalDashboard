@@ -1,14 +1,28 @@
-/** Shared orders list search matching (merchant, items, email subject, …). */
+/** Shared orders list search matching (merchant, items, tags, email subject, …). */
 
 export function sanitizeOrdersQuery(raw: string | undefined): string {
   return (raw ?? '').trim().replace(/[%_,*()]/g, ' ').replace(/\s+/g, ' ').trim();
 }
+
+export type OrderListItemTag = {
+  id?: string;
+  name: string;
+  slug?: string;
+};
 
 export type OrderListItem = {
   name: string;
   variant: string | null;
   quantity?: number | null;
   categories?: { name: string } | { name: string }[] | null;
+  /** Nested join shape from PostgREST, or a flat tag list after normalizing. */
+  order_item_tags?:
+    | Array<{
+        tag_id?: string;
+        item_tags: OrderListItemTag | OrderListItemTag[] | null;
+      }>
+    | null;
+  tags?: OrderListItemTag[] | null;
 };
 
 export type OrderSearchRow = {
@@ -28,6 +42,39 @@ export type OrderSearchRow = {
       }>
     | null;
 };
+
+function one<T>(value: T | T[] | null | undefined): T | null {
+  if (value == null) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+/** Flatten PostgREST order_item_tags → item_tags into a simple tag list. */
+export function orderItemTags(item: OrderListItem): OrderListItemTag[] {
+  if (item.tags && item.tags.length > 0) return item.tags;
+  const out: OrderListItemTag[] = [];
+  for (const row of item.order_item_tags ?? []) {
+    const tag = one(row.item_tags);
+    if (tag?.name) out.push(tag);
+  }
+  return out;
+}
+
+/** True when any line on the order carries this tag id. */
+export function orderHasTagId(
+  order: Pick<OrderSearchRow, 'order_items'>,
+  tagId: string,
+): boolean {
+  for (const item of order.order_items ?? []) {
+    for (const row of item.order_item_tags ?? []) {
+      const tag = one(row.item_tags);
+      if (row.tag_id === tagId || tag?.id === tagId) return true;
+    }
+    for (const tag of item.tags ?? []) {
+      if (tag.id === tagId) return true;
+    }
+  }
+  return false;
+}
 
 /** Inbox address that produced this order (prefer confirmation message). */
 export function orderInboxAddress(order: Pick<OrderSearchRow, 'ingested_messages'>): string | null {
@@ -55,6 +102,9 @@ export function orderMatchesQuery(order: OrderSearchRow, q: string): boolean {
     parts.push(item.name, item.variant);
     const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
     parts.push(category?.name);
+    for (const tag of orderItemTags(item)) {
+      parts.push(tag.name, tag.slug ?? null);
+    }
   }
   for (const message of order.ingested_messages ?? []) {
     parts.push(message.subject, message.from_address);
@@ -71,6 +121,11 @@ export function matchingItemHint(
     if (item.name.toLowerCase().includes(needle)) return item.name;
     if (item.variant?.toLowerCase().includes(needle)) {
       return `${item.name} · ${item.variant}`;
+    }
+    for (const tag of orderItemTags(item)) {
+      if (tag.name.toLowerCase().includes(needle) || tag.slug?.toLowerCase().includes(needle)) {
+        return `${item.name} · ${tag.name}`;
+      }
     }
   }
   return null;
@@ -89,12 +144,12 @@ export function shortItemLabel(name: string, max = 48): string {
 export type OrderItemsSummary = {
   itemCount: number;
   lineCount: number;
-  /** e.g. "2 items · Clothing · Baseball Hat, NYU T Shirt" */
+  /** e.g. "2 items · Clothing · shoes · Baseball Hat, NYU T Shirt" */
   label: string;
 };
 
 /**
- * Compact list-row summary: unit count, optional category kinds, short item names.
+ * Compact list-row summary: unit count, optional category kinds, tags, short item names.
  */
 export function orderItemsSummary(
   order: Pick<OrderSearchRow, 'order_items'>,
@@ -113,12 +168,20 @@ export function orderItemsSummary(
   const countLabel = itemCount === 1 ? '1 item' : `${itemCount} items`;
 
   const kinds = new Set<string>();
+  const tagNames = new Set<string>();
   for (const item of items) {
     const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
     if (category?.name) kinds.add(category.name);
+    for (const tag of orderItemTags(item)) {
+      if (tag.name) tagNames.add(tag.name);
+    }
   }
   const kindLabel =
     kinds.size > 0 && kinds.size <= 3 ? [...kinds].join(', ') : null;
+  const tagLabel =
+    tagNames.size > 0
+      ? [...tagNames].sort((a, b) => a.localeCompare(b)).slice(0, 3).join(', ')
+      : null;
 
   const maxNames = 2;
   const names = items.slice(0, maxNames).map((item) => shortItemLabel(item.name));
@@ -128,6 +191,7 @@ export function orderItemsSummary(
 
   const parts = [countLabel];
   if (kindLabel) parts.push(kindLabel);
+  if (tagLabel) parts.push(tagLabel);
   if (namesLabel) parts.push(namesLabel);
 
   return {

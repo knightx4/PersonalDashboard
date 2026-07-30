@@ -164,6 +164,86 @@ export async function resetInboxImport(accountId: string): Promise<{
   return { ok: true, deletedOrders: toDelete.length };
 }
 
+/**
+ * Re-run the latest parser on already-imported confirmation emails for this
+ * inbox. Re-fetches Gmail bodies and updates orders in place — does not delete
+ * orders or reset the sync cursor.
+ */
+export async function reparseInboxOrders(accountId: string): Promise<{
+  ok: boolean;
+  considered: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  error?: string;
+}> {
+  const user = await requireUser();
+  const parsed = z.string().uuid().safeParse(accountId);
+  if (!parsed.success) {
+    return { ok: false, considered: 0, updated: 0, skipped: 0, errors: 0, error: 'Invalid inbox.' };
+  }
+
+  const supabase = await createClient();
+  const { data: account } = await supabase
+    .from('email_accounts')
+    .select(
+      'id, user_id, email_address, oauth_refresh_token, oauth_access_token, token_expires_at, backfill_window_days, sync_cursor, last_synced_at, status',
+    )
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!account) {
+    return { ok: false, considered: 0, updated: 0, skipped: 0, errors: 0, error: 'Inbox not found.' };
+  }
+
+  try {
+    const { TOKEN_ENCRYPTION_KEY } = gmailOAuthEnv();
+    const { ensureAccessToken, loadCategoryContext } = await import('@/lib/inbox/sync-account');
+    const { loadMerchantsForUser } = await import('@/lib/merchants/resolve-order-merchant');
+    const { loadMerchantExclusions } = await import('@/lib/inbox/merchant-exclusions');
+    const { reparseInboxConfirmations } = await import('@/lib/inbox/reparse-confirmations');
+
+    const accessToken = await ensureAccessToken(supabase, account, TOKEN_ENCRYPTION_KEY);
+    const merchants = (await loadMerchantsForUser(supabase, user.id)).map((m) => ({
+      id: m.id,
+      slug: m.slug,
+      name: m.name,
+      domains: m.domains,
+    }));
+    const exclusions = await loadMerchantExclusions(supabase, user.id);
+    const { categoryIdsBySlug, categoryOptions } = await loadCategoryContext(supabase, user.id);
+
+    const counters = await reparseInboxConfirmations(supabase, {
+      userId: user.id,
+      accountId: account.id,
+      accessToken,
+      merchants,
+      exclusions,
+      categoryIdsBySlug,
+      categoryOptions,
+      onlyOutdated: true,
+    });
+
+    revalidatePath('/settings');
+    revalidatePath('/orders');
+    revalidatePath('/inventory');
+    revalidatePath('/dashboard');
+    revalidatePath('/review');
+
+    return { ok: true, ...counters };
+  } catch (err) {
+    return {
+      ok: false,
+      considered: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+      error: err instanceof Error ? err.message : 'Reparse failed',
+    };
+  }
+}
+
 const createCategorySchema = z.object({
   name: z.string().trim().min(2).max(40),
 });
@@ -354,4 +434,58 @@ export async function deleteItemList(formData: FormData): Promise<void> {
 
   revalidatePath('/settings');
   revalidatePath('/inventory');
+}
+
+export async function deleteItemTag(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  await supabase.from('item_tags').delete().eq('id', parsed.data.id).eq('user_id', user.id);
+
+  revalidatePath('/settings');
+  revalidatePath('/orders');
+}
+
+export type DisplayCurrencyState = {
+  error?: string;
+  message?: string;
+};
+
+export async function updateDisplayCurrency(
+  _prev: DisplayCurrencyState,
+  formData: FormData,
+): Promise<DisplayCurrencyState> {
+  const user = await requireUser();
+  const { isSupportedDisplayCurrency, normalizeCurrencyCode } = await import(
+    '@/lib/fx/money-fx'
+  );
+  const parsed = z
+    .object({
+      display_currency: z
+        .string()
+        .trim()
+        .transform((value) => normalizeCurrencyCode(value))
+        .refine((value) => isSupportedDisplayCurrency(value), 'Unsupported currency'),
+    })
+    .safeParse({ display_currency: formData.get('display_currency') });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Pick a valid currency.' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_currency: parsed.data.display_currency })
+    .eq('id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  revalidatePath('/orders');
+  revalidatePath('/review');
+  revalidatePath('/inventory');
+  return { message: `Display currency set to ${parsed.data.display_currency}.` };
 }

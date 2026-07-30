@@ -10,6 +10,7 @@ import {
   extractProductLinksFromEmail,
 } from './product-links';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { guessItemTags } from '@/lib/tags/guess';
 import { parseShopifyQuantityLines } from './shopify-lines';
 import {
   CATEGORY_SLUGS,
@@ -35,9 +36,9 @@ Return ONLY a JSON object with these fields:
 - merchantSlug (string|null) — lowercase kebab if known (amazon, target, …)
 - externalOrderNumber (string|null)
 - orderDate (YYYY-MM-DD)
-- currency (default USD)
-- taxCents, shippingCents, discountCents, totalCents (integers, cents)
-- lines: [{ name, shortName, searchTags, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
+- currency — ISO 4217 from the email (HKD, EUR, USD, …). Default USD only when unspecified.
+- taxCents, shippingCents, discountCents, totalCents (integers, cents) in that currency
+- lines: [{ name, shortName, searchTags, tags, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
 - confidence (0-1)
 
 categorySlug must be one of: ${slugList}.
@@ -48,6 +49,7 @@ Use kitchen for cookware, utensils, bakeware, and small kitchen appliances (not 
 For each line also provide:
 - shortName: a clear 2–6 word product title people would scan in a list. Strip SEO filler, brand spam, and comma-lists. Keep the distinctive product identity (e.g. "Wood furniture repair kit", "Soft Pinch liquid blush").
 - searchTags: 4–12 lowercase synonym tokens for finding this item later (e.g. lipstick → ["makeup","lipstick","cosmetics","beauty","lip"]). Include category-adjacent words even when absent from the title.
+- tags: 1–4 short human labels for filtering (e.g. shoes, sneakers, makeup). Keep the high-level categorySlug separate — sneakers stay categorySlug=clothing with tags=["shoes","sneakers"].
 
 Rules:
 - Money is integer cents only (12.99 → 1299).
@@ -55,7 +57,9 @@ Rules:
 - Prefer line items that appear in the email; do not invent products.
 - Always emit a separate lines[] entry for every ordered product. Never collapse "and N more item" subjects into a single line.
 - Shopify-style bodies list "Product name × qty" then optional variant then "$12.00" — use the product name, not the store name.
-- merchantName: prefer the store/From display name (e.g. "Ms Betters"), not "Unknown".
+- Some Shopify plain-text mails use "SKU - 1pc x Product name for / $180.00 each" — extract the product name and unit price, not "Shopify order".
+- merchantName: prefer the boutique/store From display name or "order with …" body text (e.g. "Goods of Desire", "Ms Betters"). Never use "Shopify" — that is the email platform, not the merchant.
+- currency: if totals say "$396.33 HKD" (or EUR/GBP/…), set currency to that ISO code.
 - productUrl: only a real product page URL from the email (amazon.com/dp/…, etc). Never invent.
 - name: keep the merchant's full product title; put the cleaned title in shortName.
 - If this is not an order confirmation, return {"error":"not_an_order"}.`;
@@ -131,10 +135,17 @@ function enrichExtractedOrder(
         categorySlug: line.categorySlug,
         searchTags: line.searchTags,
       });
+      const tags = guessItemTags({
+        name: line.name,
+        variant: line.variant,
+        categorySlug: line.categorySlug,
+        modelTags: line.tags,
+      });
       return {
         ...line,
         shortName: enriched.shortName,
         searchTags: enriched.searchTags,
+        tags,
       };
     }),
   };

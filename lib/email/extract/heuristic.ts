@@ -1,6 +1,9 @@
+import { isPlatformMerchantName, isPlatformMerchantSlug } from '@/lib/merchants/platform';
 import { parseAmazonQuantityLines } from './amazon-lines';
+import { extractCurrencyCode } from './currency';
 import { guessCategorySlug } from './guess-category';
 import { parseShopifyQuantityLines } from './shopify-lines';
+import { guessItemTags } from '@/lib/tags/guess';
 import type { CategoryOption, ExtractedOrder } from './schema';
 
 /** Dollars like $1,234.56 → cents. */
@@ -54,6 +57,20 @@ export function extractOrderNumber(blob: string): string | null {
 
 /** Store name printed near the top of many Shopify confirmations. */
 export function merchantNameFromBody(text: string): string | null {
+  const withStore = text.match(
+    /thank you for (?:placing your )?order with\s+([^!\n.]+)/i,
+  )?.[1]
+    ?.replace(/\s+/g, ' ')
+    .trim();
+  if (
+    withStore &&
+    withStore.length >= 2 &&
+    withStore.length <= 80 &&
+    !isPlatformMerchantName(withStore)
+  ) {
+    return withStore;
+  }
+
   const lines = text
     .split(/\n/)
     .map((line) => line.trim())
@@ -67,7 +84,8 @@ export function merchantNameFromBody(text: string): string | null {
       candidate.length <= 60 &&
       !/^order\b/i.test(candidate) &&
       !/^https?:/i.test(candidate) &&
-      !/-{3,}/.test(candidate)
+      !/-{3,}/.test(candidate) &&
+      !isPlatformMerchantName(candidate)
     ) {
       return candidate;
     }
@@ -180,11 +198,17 @@ export function heuristicExtractOrder(input: {
   const subjectMerchant = merchantNameFromSubject(input.subject);
   const bodyMerchant = merchantNameFromBody(input.text);
   const fromDisplay = displayNameFromAddress(input.fromAddress);
+  const classifiedName =
+    input.merchantName && !isPlatformMerchantName(input.merchantName)
+      ? input.merchantName
+      : null;
   const merchantName =
-    input.merchantName ??
+    classifiedName ??
     subjectMerchant ??
     bodyMerchant ??
-    (fromDisplay && !/no-?reply|notification|do.?not.?reply/i.test(fromDisplay)
+    (fromDisplay &&
+    !isPlatformMerchantName(fromDisplay) &&
+    !/no-?reply|notification|do.?not.?reply/i.test(fromDisplay)
       ? fromDisplay
       : null);
 
@@ -206,30 +230,43 @@ export function heuristicExtractOrder(input: {
     }
   }
 
-  const linesWithCategory: ExtractedOrder['lines'] = lines.map((line) => ({
-    name: line.name,
-    quantity: line.quantity,
-    unitPriceCents: line.unitPriceCents,
-    variant: line.variant,
-    categorySlug:
+  const merchantSlug = isPlatformMerchantSlug(input.merchantSlug)
+    ? null
+    : (input.merchantSlug ?? null);
+
+  const linesWithCategory: ExtractedOrder['lines'] = lines.map((line) => {
+    const categorySlug =
       guessCategorySlug({
         name: line.name,
-        merchantSlug: input.merchantSlug,
+        merchantSlug,
         subject: input.subject,
         text: line.blockText ?? line.name,
         customCategories: input.customCategories,
-      }) ?? null,
-  }));
+      }) ?? null;
+    return {
+      name: line.name,
+      quantity: line.quantity,
+      unitPriceCents: line.unitPriceCents,
+      variant: line.variant,
+      categorySlug,
+      tags: guessItemTags({
+        name: line.name,
+        variant: line.variant,
+        categorySlug,
+      }),
+    };
+  });
 
   const received = input.receivedAt ?? new Date();
   const orderDate = received.toISOString().slice(0, 10);
+  const currency = extractCurrencyCode(blob) ?? 'USD';
 
   return {
     merchantName,
-    merchantSlug: input.merchantSlug ?? null,
+    merchantSlug,
     externalOrderNumber: orderNumber,
     orderDate,
-    currency: 'USD',
+    currency,
     taxCents,
     shippingCents,
     discountCents,

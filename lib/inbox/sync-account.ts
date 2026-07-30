@@ -37,7 +37,7 @@ export interface SyncProgress {
   historyExpired?: boolean;
 }
 
-type AccountRow = {
+export type AccountRow = {
   id: string;
   user_id: string;
   email_address: string;
@@ -63,7 +63,7 @@ async function loadMerchants(
   }));
 }
 
-async function loadCategoryContext(
+export async function loadCategoryContext(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{
@@ -85,7 +85,7 @@ async function loadCategoryContext(
   return { categoryIdsBySlug, categoryOptions };
 }
 
-async function ensureAccessToken(
+export async function ensureAccessToken(
   supabase: SupabaseClient,
   account: AccountRow,
   encryptionKey: string,

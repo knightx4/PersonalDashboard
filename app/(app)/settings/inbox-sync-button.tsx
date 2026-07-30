@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { resetInboxImport } from './actions';
+import { reparseInboxOrders, resetInboxImport } from './actions';
 
 export type InboxSyncProgress = {
   jobId: string;
@@ -32,9 +32,11 @@ export function InboxSyncButton({
 }) {
   const [progress, setProgress] = useState<InboxSyncProgress | null>(initialJob);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [syncingNow, setSyncingNow] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [reparsing, setReparsing] = useState(false);
 
   const active =
     progress != null &&
@@ -58,6 +60,7 @@ export function InboxSyncButton({
 
   async function startMode(mode: 'backfill' | 'incremental') {
     setError(null);
+    setMessage(null);
     if (mode === 'backfill') setStarting(true);
     else setSyncingNow(true);
     try {
@@ -77,6 +80,32 @@ export function InboxSyncButton({
     }
   }
 
+  async function reparseWithLatest() {
+    const confirmed = window.confirm(
+      'Re-parse already-imported order emails from this inbox with the latest parser? Orders and inventory stay in place — only merchant, items, and totals are refreshed from Gmail.',
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    setMessage(null);
+    setReparsing(true);
+    try {
+      const result = await reparseInboxOrders(accountId);
+      if (!result.ok) throw new Error(result.error ?? 'Reparse failed');
+      setMessage(
+        result.considered === 0
+          ? 'Nothing to reparse — all confirmations already use the latest parser.'
+          : `Reparsed ${result.updated} of ${result.considered} order email${result.considered === 1 ? '' : 's'}${
+              result.errors ? ` · ${result.errors} error${result.errors === 1 ? '' : 's'}` : ''
+            }.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reparse failed');
+    } finally {
+      setReparsing(false);
+    }
+  }
+
   async function resetAndRescan() {
     const confirmed = window.confirm(
       'Delete email-imported orders from this inbox and re-scan Gmail from scratch? Manual orders are kept. This cannot be undone.',
@@ -84,6 +113,7 @@ export function InboxSyncButton({
     if (!confirmed) return;
 
     setError(null);
+    setMessage(null);
     setResetting(true);
     try {
       const result = await resetInboxImport(accountId);
@@ -97,7 +127,7 @@ export function InboxSyncButton({
     }
   }
 
-  const busy = starting || syncingNow || resetting || active;
+  const busy = starting || syncingNow || resetting || reparsing || active;
   const isIncremental = progress?.type === 'incremental';
 
   return (
@@ -125,13 +155,18 @@ export function InboxSyncButton({
             {syncingNow || (active && isIncremental) ? 'Syncing…' : 'Sync now'}
           </Button>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={resetAndRescan}
-        >
+        {backfillCompleted && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={busy}
+            onClick={reparseWithLatest}
+          >
+            {reparsing ? 'Reparsing…' : 'Re-parse with latest parser'}
+          </Button>
+        )}
+        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={resetAndRescan}>
           {resetting ? 'Resetting…' : 'Reset & re-scan'}
         </Button>
       </div>
@@ -149,6 +184,11 @@ export function InboxSyncButton({
               : ''}
         </p>
       )}
+      {message && (
+        <p className="text-xs text-ink-muted" aria-live="polite">
+          {message}
+        </p>
+      )}
       {(error || progress?.error) && (
         <p className="text-xs text-red-700">{error ?? progress?.error}</p>
       )}
@@ -161,8 +201,10 @@ export function InboxSyncButton({
       <p className="text-xs text-ink-faint">
         Import skips messages it already saw. After the first import, Sync now (or the hourly
         cron) picks up new mail via Gmail history. Use{' '}
-        <span className="text-ink-muted">Reset &amp; re-scan</span> to delete this inbox’s email
-        orders and parse Gmail again with the latest parser.
+        <span className="text-ink-muted">Re-parse with latest parser</span> to refresh existing
+        orders in place when we improve extraction — prefer that over{' '}
+        <span className="text-ink-muted">Reset &amp; re-scan</span>, which deletes this inbox’s
+        email orders and starts over.
       </p>
       {progress?.done &&
         progress.type !== 'incremental' &&

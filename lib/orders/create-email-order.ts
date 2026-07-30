@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { fingerprints } from '@/lib/fingerprint';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { guessItemTags } from '@/lib/tags/guess';
 import {
   allocateLandedCost,
   assertIntegerCents,
@@ -46,6 +47,8 @@ export interface EmailOrderBundle {
     productUrl: string | null;
     imageUrl: string | null;
     searchTags: string[];
+    /** Human-facing filter tags (shoes, …). */
+    tags: string[];
   }>;
   inventoryItems: Array<{
     id: string;
@@ -119,6 +122,12 @@ export function buildEmailOrder(input: {
       categorySlug,
       searchTags: line.searchTags,
     });
+    const tags = guessItemTags({
+      name: line.name,
+      variant: line.variant,
+      categorySlug,
+      modelTags: line.tags,
+    });
     return {
       id: randomUUID(),
       orderId,
@@ -133,6 +142,7 @@ export function buildEmailOrder(input: {
       productUrl: line.productUrl?.trim() ? line.productUrl.trim() : null,
       imageUrl: line.imageUrl?.trim() ? line.imageUrl.trim() : null,
       searchTags: enriched.searchTags,
+      tags,
     };
   });
 

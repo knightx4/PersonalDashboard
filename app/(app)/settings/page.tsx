@@ -1,4 +1,4 @@
-import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tags, User } from 'lucide-react';
+import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User, Wallet } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,10 +7,12 @@ import { signOut } from '@/app/(auth)/actions';
 import { loadMerchantReturnPolicies } from '@/lib/returns/policies';
 import { CategoriesSection } from './categories-section';
 import { DeletedOrdersSection, DeletedOrdersTitle } from './deleted-orders-section';
+import { DisplayCurrencySection } from './display-currency-section';
 import { InboxSection } from './inbox-section';
 import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
 import { ReturnPoliciesSection } from './return-policies-section';
+import { TagsSection } from './tags-section';
 
 /** Stripe Payment Link — customers choose what to pay. Override via env if needed. */
 const DONATE_URL =
@@ -30,7 +32,7 @@ export default async function SettingsPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, timezone')
+    .select('display_name, timezone, display_currency')
     .eq('id', user.id)
     .single();
 
@@ -54,6 +56,12 @@ export default async function SettingsPage({
   const { data: lists } = await supabase
     .from('item_lists')
     .select('id, name, slug, color')
+    .eq('user_id', user.id)
+    .order('name');
+
+  const { data: itemTags } = await supabase
+    .from('item_tags')
+    .select('id, name, slug')
     .eq('user_id', user.id)
     .order('name');
 
@@ -163,6 +171,20 @@ export default async function SettingsPage({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
+              <Wallet className="size-4 text-ink-muted" strokeWidth={1.75} />
+              Currency
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <DisplayCurrencySection
+              displayCurrency={profile?.display_currency ?? 'USD'}
+            />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
               <Mail className="size-4 text-ink-muted" strokeWidth={1.75} />
               Connected inboxes
             </CardTitle>
@@ -211,6 +233,18 @@ export default async function SettingsPage({
           </CardHeader>
           <CardBody>
             <CategoriesSection categories={categories ?? []} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Tag className="size-4 text-ink-muted" strokeWidth={1.75} />
+              Tags
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <TagsSection tags={itemTags ?? []} />
           </CardBody>
         </Card>
 

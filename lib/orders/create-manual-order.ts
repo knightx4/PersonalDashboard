@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto';
 import { fingerprints } from '@/lib/fingerprint';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { guessItemTags } from '@/lib/tags/guess';
 import {
   allocateLandedCost,
   assertIntegerCents,
@@ -56,6 +57,7 @@ export interface ManualOrderItemRow {
   fingerprintStrict: string;
   fingerprintLoose: string;
   searchTags: string[];
+  tags: string[];
 }
 
 export interface ManualInventoryItemRow {
@@ -154,6 +156,11 @@ export function buildManualOrder(input: ManualOrderInput): ManualOrderBundle {
       fingerprintStrict: fps.strict,
       fingerprintLoose: fps.loose,
       searchTags: enriched.searchTags,
+      tags: guessItemTags({
+        name: line.name,
+        variant: line.variant,
+        categorySlug: line.categorySlug,
+      }),
     };
   });
 

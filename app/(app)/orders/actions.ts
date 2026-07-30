@@ -7,6 +7,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { domainFromAddress } from '@/lib/email/extract/classify';
 import { parseDollarsToCents } from '@/lib/money';
 import { buildManualOrder } from '@/lib/orders/create-manual-order';
+import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
 
 export interface ActionState {
   error?: string;
@@ -201,6 +202,20 @@ export async function createManualOrder(
   if (itemsError) {
     await supabase.from('orders').delete().eq('id', built.order.id);
     return { error: itemsError.message };
+  }
+
+  for (const item of built.orderItems) {
+    if (item.tags.length === 0) continue;
+    try {
+      const resolved = await ensureItemTags(supabase, user.id, item.tags);
+      await linkOrderItemTags(
+        supabase,
+        item.id,
+        resolved.map((tag) => tag.id),
+      );
+    } catch {
+      // Tag linking is best-effort; the order itself already saved.
+    }
   }
 
   const { error: inventoryError } = await supabase.from('inventory_items').insert(
@@ -432,5 +447,74 @@ export async function permanentlyDeleteOrder(formData: FormData): Promise<void> 
   revalidatePath('/orders');
   revalidatePath('/inventory');
   revalidatePath('/dashboard');
+  revalidatePath('/settings');
+}
+
+export async function addOrderItemTag(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = z
+    .object({
+      orderId: z.string().uuid(),
+      orderItemId: z.string().uuid(),
+      tag: z.string().trim().min(2).max(40),
+    })
+    .safeParse({
+      orderId: formData.get('orderId'),
+      orderItemId: formData.get('orderItemId'),
+      tag: formData.get('tag'),
+    });
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  const { data: item } = await supabase
+    .from('order_items')
+    .select('id, orders!inner ( id, user_id )')
+    .eq('id', parsed.data.orderItemId)
+    .eq('order_id', parsed.data.orderId)
+    .eq('orders.user_id', user.id)
+    .maybeSingle();
+  if (!item) return;
+
+  const [tag] = await ensureItemTags(supabase, user.id, [parsed.data.tag]);
+  if (!tag) return;
+  await linkOrderItemTags(supabase, parsed.data.orderItemId, [tag.id]);
+
+  revalidatePath(`/orders/${parsed.data.orderId}`);
+  revalidatePath('/orders');
+  revalidatePath('/settings');
+}
+
+export async function removeOrderItemTag(input: {
+  orderId: string;
+  orderItemId: string;
+  tagId: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const parsed = z
+    .object({
+      orderId: z.string().uuid(),
+      orderItemId: z.string().uuid(),
+      tagId: z.string().uuid(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  const { data: owned } = await supabase
+    .from('item_tags')
+    .select('id')
+    .eq('id', parsed.data.tagId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!owned) return;
+
+  await supabase
+    .from('order_item_tags')
+    .delete()
+    .eq('order_item_id', parsed.data.orderItemId)
+    .eq('tag_id', parsed.data.tagId);
+
+  revalidatePath(`/orders/${parsed.data.orderId}`);
+  revalidatePath('/orders');
   revalidatePath('/settings');
 }

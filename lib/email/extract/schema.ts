@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PARSER_VERSION = 'extract-v3';
+export const PARSER_VERSION = 'extract-v4';
 
 /** Top-level system category slugs (always allowed). */
 export const CATEGORY_SLUGS = [
@@ -69,6 +69,15 @@ export const extractedLineSchema = z.object({
   searchTags: z
     .array(z.string().trim().min(1).max(32))
     .max(24)
+    .nullable()
+    .optional(),
+  /**
+   * Human-facing labels (shoes, sneakers) — distinct from categorySlug
+   * (clothing) and from searchTags synonyms.
+   */
+  tags: z
+    .array(z.string().trim().min(1).max(40))
+    .max(8)
     .nullable()
     .optional(),
 });

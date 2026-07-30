@@ -35,6 +35,23 @@ describe('orders search', () => {
     expect(orderMatchesQuery(order, 'nike')).toBe(false);
   });
 
+  it('matches item tags', () => {
+    const tagged = {
+      ...order,
+      order_items: [
+        {
+          name: 'Nike Air Max 90',
+          variant: null,
+          quantity: 1,
+          categories: { name: 'Clothing' },
+          order_item_tags: [{ tag_id: 't1', item_tags: { id: 't1', name: 'shoes', slug: 'shoes' } }],
+        },
+      ],
+    };
+    expect(orderMatchesQuery(tagged, 'shoes')).toBe(true);
+    expect(matchingItemHint(tagged, 'shoes')).toMatch(/Nike Air Max/);
+  });
+
   it('matches inbox address', () => {
     expect(orderMatchesQuery(order, 'home@example.com')).toBe(true);
     expect(orderInboxAddress(order)).toBe('home@example.com');
