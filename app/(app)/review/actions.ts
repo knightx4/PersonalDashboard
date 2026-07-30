@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 
@@ -100,7 +101,8 @@ export async function discardOrderReview(
   if (deleteError) return { error: deleteError.message };
 
   revalidateReviewSurfaces();
-  return { message: 'Order discarded.' };
+  // Leave the order detail URL — the row is gone and would 404 on refresh.
+  redirect('/review');
 }
 
 /**
