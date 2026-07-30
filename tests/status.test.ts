@@ -195,11 +195,28 @@ describe('the SQL derivation and the TypeScript derivation agree', () => {
         returning id`;
 
       for (const status of c.inventoryStatuses) {
-        await admin`
-          insert into inventory_items (user_id, order_item_id, name, cost_cents,
-                                       status, disposed_at)
-          values (${userId}, ${orderItem.id}, 'widget', 1000, ${status},
-                  ${status === 'disposed' ? admin`current_date` : null})`;
+        // Always insert as owned first. 'returned' is owned by a refunded
+        // returns row + sync_order_state — writing it directly gets reverted.
+        const [unit] = await admin<{ id: string }[]>`
+          insert into inventory_items (user_id, order_item_id, name, cost_cents, status)
+          values (${userId}, ${orderItem.id}, 'widget', 1000, 'owned')
+          returning id`;
+
+        if (status === 'returned') {
+          await admin`
+            insert into returns (user_id, order_id, inventory_item_id, initiated_at,
+                                 refund_amount_cents, status, refunded_at)
+            values (${userId}, ${order.id}, ${unit.id}, current_date, 1000,
+                    'refunded', current_date)`;
+        } else if (status === 'disposed') {
+          await admin`
+            update inventory_items
+               set status = 'disposed', disposed_at = current_date
+             where id = ${unit.id}`;
+        } else if (status !== 'owned') {
+          await admin`
+            update inventory_items set status = ${status} where id = ${unit.id}`;
+        }
       }
 
       for (const status of c.shipmentStatuses) {
@@ -324,5 +341,41 @@ describe('the SQL derivation and the TypeScript derivation agree', () => {
       select status, return_planned from inventory_items where id = ${item.id}`;
     expect(row.status).toBe('returned');
     expect(row.return_planned).toBe(false);
+  });
+
+  it('restores owned when the refunded return is deleted (undo)', async () => {
+    const [order] = await admin<{ id: string }[]>`
+      insert into orders (user_id, merchant_id, order_date, external_order_number,
+                          subtotal_cents, total_cents)
+      values (${userId}, ${merchantId}, current_date, 'undo-return', 1000, 1000)
+      returning id`;
+    const [orderItem] = await admin<{ id: string }[]>`
+      insert into order_items (order_id, name, quantity, unit_price_cents)
+      values (${order.id}, 'jacket', 1, 1000) returning id`;
+    const [item] = await admin<{ id: string }[]>`
+      insert into inventory_items (user_id, order_item_id, name, cost_cents, status)
+      values (${userId}, ${orderItem.id}, 'jacket', 1000, 'owned')
+      returning id`;
+
+    const [ret] = await admin<{ id: string }[]>`
+      insert into returns (user_id, order_id, inventory_item_id, initiated_at,
+                           refund_amount_cents, status, refunded_at)
+      values (${userId}, ${order.id}, ${item.id}, current_date, 1000,
+              'refunded', current_date)
+      returning id`;
+
+    const [returned] = await admin<{ status: string }[]>`
+      select status from inventory_items where id = ${item.id}`;
+    expect(returned.status).toBe('returned');
+
+    await admin`delete from returns where id = ${ret.id}`;
+
+    const [restored] = await admin<{ status: string }[]>`
+      select status from inventory_items where id = ${item.id}`;
+    expect(restored.status).toBe('owned');
+
+    const [orderRow] = await admin<{ status: string }[]>`
+      select status from orders where id = ${order.id}`;
+    expect(orderRow.status).not.toBe('returned');
   });
 });

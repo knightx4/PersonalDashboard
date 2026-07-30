@@ -3,11 +3,26 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { todayInTimezone } from '@/lib/money';
 
 export type ActionState = {
   error?: string;
   message?: string;
 };
+
+async function userTimezone(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase.from('profiles').select('timezone').eq('id', userId).single();
+  return data?.timezone ?? 'UTC';
+}
+
+function revalidateReturnSurfaces(itemId: string, orderId?: string) {
+  revalidatePath('/returns');
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${itemId}`);
+  revalidatePath('/orders');
+  if (orderId) revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/dashboard');
+}
 
 /** Toggle whether an owned inventory unit is planned for return. */
 export async function setReturnPlanned(
@@ -54,11 +69,123 @@ export async function setReturnPlanned(
 
   if (error) return { error: error.message };
 
-  revalidatePath('/returns');
-  revalidatePath('/inventory');
-  revalidatePath(`/inventory/${item.id}`);
-  revalidatePath('/dashboard');
+  revalidateReturnSurfaces(item.id);
   return { message: planned ? 'Marked to return.' : 'Removed from to-return list.' };
+}
+
+/**
+ * One-click mark returned from the tracker.
+ * Inserts a refunded `returns` row; sync_order_state moves the unit to returned.
+ * Refund defaults to landed cost.
+ */
+export async function markItemReturned(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing item.' };
+
+  const { data: item, error: itemError } = await supabase
+    .from('inventory_items')
+    .select('id, cost_cents, status, order_item_id')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (itemError || !item) return { error: 'That item could not be found.' };
+  if (item.status !== 'owned') return { error: 'Only owned items can be marked returned.' };
+  if (!item.order_item_id) {
+    return { error: 'This item is not linked to an order, so it cannot be returned.' };
+  }
+
+  const { data: orderItem, error: orderItemError } = await supabase
+    .from('order_items')
+    .select('order_id')
+    .eq('id', item.order_item_id)
+    .maybeSingle();
+  if (orderItemError || !orderItem) return { error: 'Could not find the parent order.' };
+
+  const timezone = await userTimezone(supabase, user.id);
+  const today = todayInTimezone(timezone);
+
+  const { error } = await supabase.from('returns').insert({
+    user_id: user.id,
+    order_id: orderItem.order_id,
+    inventory_item_id: item.id,
+    initiated_at: today,
+    refund_amount_cents: item.cost_cents,
+    status: 'refunded',
+    refunded_at: today,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidateReturnSurfaces(item.id, orderItem.order_id);
+  return { message: 'Marked as returned.' };
+}
+
+/**
+ * Undo a return: delete the refunded returns row so sync_order_state restores owned.
+ */
+export async function undoItemReturned(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      returnId: z.string().uuid(),
+    })
+    .safeParse({
+      id: formData.get('id'),
+      returnId: formData.get('return_id'),
+    });
+
+  if (!parsed.success) return { error: 'Missing return.' };
+
+  const { data: item, error: itemError } = await supabase
+    .from('inventory_items')
+    .select('id, status, order_item_id')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (itemError || !item) return { error: 'That item could not be found.' };
+  if (item.status !== 'returned') {
+    return { error: 'Only returned items can be restored.' };
+  }
+
+  const { data: ret, error: retError } = await supabase
+    .from('returns')
+    .select('id, order_id, inventory_item_id, status')
+    .eq('id', parsed.data.returnId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (retError || !ret) return { error: 'That return could not be found.' };
+  if (ret.inventory_item_id !== item.id) {
+    return { error: 'That return does not match this item.' };
+  }
+  if (ret.status !== 'refunded') {
+    return { error: 'Only completed returns can be undone.' };
+  }
+
+  const { error } = await supabase
+    .from('returns')
+    .delete()
+    .eq('id', ret.id)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  revalidateReturnSurfaces(item.id, ret.order_id as string);
+  return { message: 'Restored to inventory.' };
 }
 
 /**

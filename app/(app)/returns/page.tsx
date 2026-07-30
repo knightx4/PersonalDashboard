@@ -14,7 +14,11 @@ import {
   RETURNS_VIEWS,
   type ReturnsView,
 } from '@/lib/returns/load';
-import { PlanReturnButton } from './plan-return-button';
+import {
+  MarkReturnedButton,
+  PlanReturnButton,
+  UndoReturnedButton,
+} from './plan-return-button';
 
 export const metadata = { title: 'Returns' };
 
@@ -40,6 +44,7 @@ export default async function ReturnsPage({
     ...new Map(
       data.rows
         .filter((row) => row.merchantId)
+        .filter((row) => (view === 'returned' ? row.status === 'returned' : row.status === 'owned'))
         .map((row) => [row.merchantId!, row.merchantName] as const),
     ).entries(),
   ].sort((a, b) => a[1].localeCompare(b[1]));
@@ -63,6 +68,11 @@ export default async function ReturnsPage({
       title: 'No returnable items',
       description:
         'Owned items from your orders show up here with deadlines from each merchant’s return policy.',
+    },
+    returned: {
+      title: 'Nothing returned yet',
+      description:
+        'When you mark something Returned it leaves inventory and lands here — you can undo if that was a mistake.',
     },
   };
 
@@ -95,7 +105,7 @@ export default async function ReturnsPage({
       <div className="min-w-0 flex-1">
         <PageHeader
           title="Returns"
-          description="Deadlines from each merchant’s return policy — mark what you plan to send back."
+          description="Track deadlines, mark what you’re sending back, and keep returned items undoable."
           actions={
             <Link
               href="/settings#return-policies"
@@ -114,7 +124,7 @@ export default async function ReturnsPage({
             action={
               merchantFilter
                 ? { label: 'Clear merchant', href: returnsHref(view) }
-                : view !== 'all'
+                : view !== 'all' && view !== 'returned'
                   ? { label: 'See all items', href: returnsHref('all') }
                   : { label: 'Open inventory', href: '/inventory' }
             }
@@ -131,22 +141,25 @@ export default async function ReturnsPage({
                 row.daysLeft != null && row.daysLeft <= 7
                   ? 'text-accent-orange font-medium'
                   : 'text-ink-muted';
+              const returned = row.status === 'returned';
               return (
                 <li
                   key={row.inventoryItemId}
                   className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
                 >
-                  <Link
-                    href={`/inventory/${row.inventoryItemId}`}
-                    className="min-w-0 flex-1 transition-colors hover:opacity-80"
-                  >
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-ink">
                           {row.name}
-                          {row.returnPlanned && (
+                          {row.returnPlanned && !returned && (
                             <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
                               To return
+                            </span>
+                          )}
+                          {returned && (
+                            <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                              Returned
                             </span>
                           )}
                         </p>
@@ -160,19 +173,33 @@ export default async function ReturnsPage({
                         {formatMoney(row.costCents)}
                       </p>
                     </div>
-                    <p className={`mt-1 text-[12px] ${urgency}`}>
-                      {row.returnDeadline && row.daysLeft != null
-                        ? deadlineLabel(row.daysLeft, row.returnDeadline)
-                        : row.returnWindowDays == null
-                          ? 'No return window set for this merchant'
-                          : 'Awaiting delivery for deadline'}
+                    <p className={`mt-1 text-[12px] ${returned ? 'text-ink-muted' : urgency}`}>
+                      {returned
+                        ? row.refundedAt
+                          ? `Returned ${row.refundedAt}`
+                          : 'Returned'
+                        : row.returnDeadline && row.daysLeft != null
+                          ? deadlineLabel(row.daysLeft, row.returnDeadline)
+                          : row.returnWindowDays == null
+                            ? 'No return window set for this merchant'
+                            : 'Awaiting delivery for deadline'}
                     </p>
-                  </Link>
-                  <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
-                    <PlanReturnButton
-                      itemId={row.inventoryItemId}
-                      planned={row.returnPlanned}
-                    />
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+                    {returned && row.returnId ? (
+                      <UndoReturnedButton
+                        itemId={row.inventoryItemId}
+                        returnId={row.returnId}
+                      />
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        <PlanReturnButton
+                          itemId={row.inventoryItemId}
+                          planned={row.returnPlanned}
+                        />
+                        <MarkReturnedButton itemId={row.inventoryItemId} />
+                      </div>
+                    )}
                     <Link
                       href={`/orders/${row.orderId}`}
                       className="text-[12px] text-ink-muted hover:text-brand hover:underline"
