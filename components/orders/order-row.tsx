@@ -33,6 +33,9 @@ export type OrderRowData = {
   order_date: string;
   total_cents: number;
   currency: string;
+  /** When set and different from currency, shown as a muted native amount. */
+  native_total_cents?: number;
+  native_currency?: string;
   status: string;
   external_order_number: string | null;
   merchant_name: string;
@@ -87,8 +90,15 @@ export function OrderRow({ order }: { order: OrderRowData }) {
           <p className="mt-0.5 truncate text-[12px] text-ink-faint">{meta.join(' · ')}</p>
         </div>
 
-        <p className="tabular shrink-0 text-[15px] font-semibold text-ink">
+        <p className="tabular shrink-0 text-right text-[15px] font-semibold text-ink">
           {formatMoney(order.total_cents, order.currency)}
+          {order.native_currency &&
+            order.native_total_cents != null &&
+            order.native_currency !== order.currency && (
+              <span className="mt-0.5 block text-[11px] font-normal text-ink-faint">
+                {formatMoney(order.native_total_cents, order.native_currency)}
+              </span>
+            )}
         </p>
       </Link>
     </li>

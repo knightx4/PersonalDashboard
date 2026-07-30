@@ -137,6 +137,18 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.merchant_return_policies = policy.id;
 
+  const [fxRate] = await admin<{ id: string }[]>`
+    insert into fx_rates (rate_date, base_currency, quote_currency, rate, source)
+    values (
+      current_date,
+      'USD',
+      ${tag === 'alice' ? 'EUR' : 'HKD'},
+      ${tag === 'alice' ? 0.92 : 7.8},
+      'test'
+    )
+    returning id`;
+  ids.fx_rates = fxRate.id;
+
   return ids;
 }
 
@@ -191,10 +203,14 @@ describe('RLS coverage', () => {
 });
 
 describe('cross-user reads', () => {
+  /** Shared market-data tables: every authenticated user may read every row. */
+  const SHARED_REFERENCE_TABLES = new Set(['fx_rates']);
+
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
 
     for (const table of tables) {
+      if (SHARED_REFERENCE_TABLES.has(table)) continue;
       const id = seedA[table];
       const [row] = await asUser(userB, (tx) =>
         tx.unsafe<{ count: string }[]>(`select count(*)::int as count from ${table} where id = $1`, [id]),
@@ -216,6 +232,13 @@ describe('cross-user reads', () => {
     }
 
     expect(empty).toEqual([]);
+  });
+
+  it('lets every authenticated user read cached FX rates', async () => {
+    const rows = await asUser(userB, (tx) =>
+      tx<{ id: string }[]>`select id from fx_rates where id = ${seedA.fx_rates}`,
+    );
+    expect(rows).toHaveLength(1);
   });
 });
 

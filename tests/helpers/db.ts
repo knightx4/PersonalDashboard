@@ -46,6 +46,7 @@ export async function truncateAll(): Promise<void> {
   await admin`delete from auth.users`;
   // user-scoped merchants cascade with their creator; global seed rows stay
   await admin`delete from merchants where not is_global`;
+  await admin`delete from fx_rates`;
 }
 
 export async function closeDb(): Promise<void> {

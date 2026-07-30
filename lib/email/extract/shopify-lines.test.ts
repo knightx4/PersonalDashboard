@@ -115,3 +115,39 @@ describe('heuristicExtractOrder Allplay fixture', () => {
     }
   });
 });
+
+describe('heuristicExtractOrder Goods of Desire fixture', () => {
+  it('reads boutique merchant, SKU line item, and HKD totals (not Shopify/USD)', () => {
+    const fixture = readFileSync(
+      resolve(__dirname, '../../../fixtures/emails/shopify-goods-of-desire-order.txt'),
+      'utf8',
+    );
+    const subject = (fixture.split('\n')[0] ?? '').replace(/^Subject:\s*/i, '');
+    const body = fixture.replace(/^Subject:.*\nFrom:.*\n\n?/, '');
+    const raw = heuristicExtractOrder({
+      subject,
+      text: body,
+      merchantSlug: 'shopify',
+      merchantName: 'Shopify',
+      fromAddress: 'Goods of Desire <store+7386935@t.shopifyemail.com>',
+      receivedAt: new Date('2026-05-22T04:20:32Z'),
+    });
+    expect(raw).not.toBeNull();
+    expect(raw?.merchantName).toMatch(/Goods of Desire/i);
+    expect(raw?.merchantSlug).toBeNull();
+    expect(raw?.currency).toBe('HKD');
+    expect(raw?.totalCents).toBe(39633);
+    expect(raw?.shippingCents).toBe(21633);
+    const applied = applyExtraction(raw);
+    expect(applied.ok).toBe(true);
+    if (applied.ok) {
+      expect(applied.order.externalOrderNumber).toBe('11888');
+      expect(applied.order.currency).toBe('HKD');
+      expect(applied.order.lines).toHaveLength(1);
+      expect(applied.order.lines[0]?.name).toMatch(/Mahjong/i);
+      expect(applied.order.lines[0]?.quantity).toBe(1);
+      expect(applied.order.lines[0]?.unitPriceCents).toBe(18000);
+      expect(applied.order.lines[0]?.name).not.toMatch(/Shopify/i);
+    }
+  });
+});

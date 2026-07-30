@@ -355,3 +355,45 @@ export async function deleteItemList(formData: FormData): Promise<void> {
   revalidatePath('/settings');
   revalidatePath('/inventory');
 }
+
+export type DisplayCurrencyState = {
+  error?: string;
+  message?: string;
+};
+
+export async function updateDisplayCurrency(
+  _prev: DisplayCurrencyState,
+  formData: FormData,
+): Promise<DisplayCurrencyState> {
+  const user = await requireUser();
+  const { isSupportedDisplayCurrency, normalizeCurrencyCode } = await import(
+    '@/lib/fx/money-fx'
+  );
+  const parsed = z
+    .object({
+      display_currency: z
+        .string()
+        .trim()
+        .transform((value) => normalizeCurrencyCode(value))
+        .refine((value) => isSupportedDisplayCurrency(value), 'Unsupported currency'),
+    })
+    .safeParse({ display_currency: formData.get('display_currency') });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Pick a valid currency.' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_currency: parsed.data.display_currency })
+    .eq('id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/dashboard');
+  revalidatePath('/orders');
+  revalidatePath('/review');
+  revalidatePath('/inventory');
+  return { message: `Display currency set to ${parsed.data.display_currency}.` };
+}
