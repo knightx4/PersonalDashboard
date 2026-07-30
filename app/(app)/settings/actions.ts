@@ -164,6 +164,86 @@ export async function resetInboxImport(accountId: string): Promise<{
   return { ok: true, deletedOrders: toDelete.length };
 }
 
+/**
+ * Re-run the latest parser on already-imported confirmation emails for this
+ * inbox. Re-fetches Gmail bodies and updates orders in place — does not delete
+ * orders or reset the sync cursor.
+ */
+export async function reparseInboxOrders(accountId: string): Promise<{
+  ok: boolean;
+  considered: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  error?: string;
+}> {
+  const user = await requireUser();
+  const parsed = z.string().uuid().safeParse(accountId);
+  if (!parsed.success) {
+    return { ok: false, considered: 0, updated: 0, skipped: 0, errors: 0, error: 'Invalid inbox.' };
+  }
+
+  const supabase = await createClient();
+  const { data: account } = await supabase
+    .from('email_accounts')
+    .select(
+      'id, user_id, email_address, oauth_refresh_token, oauth_access_token, token_expires_at, backfill_window_days, sync_cursor, last_synced_at, status',
+    )
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!account) {
+    return { ok: false, considered: 0, updated: 0, skipped: 0, errors: 0, error: 'Inbox not found.' };
+  }
+
+  try {
+    const { TOKEN_ENCRYPTION_KEY } = gmailOAuthEnv();
+    const { ensureAccessToken, loadCategoryContext } = await import('@/lib/inbox/sync-account');
+    const { loadMerchantsForUser } = await import('@/lib/merchants/resolve-order-merchant');
+    const { loadMerchantExclusions } = await import('@/lib/inbox/merchant-exclusions');
+    const { reparseInboxConfirmations } = await import('@/lib/inbox/reparse-confirmations');
+
+    const accessToken = await ensureAccessToken(supabase, account, TOKEN_ENCRYPTION_KEY);
+    const merchants = (await loadMerchantsForUser(supabase, user.id)).map((m) => ({
+      id: m.id,
+      slug: m.slug,
+      name: m.name,
+      domains: m.domains,
+    }));
+    const exclusions = await loadMerchantExclusions(supabase, user.id);
+    const { categoryIdsBySlug, categoryOptions } = await loadCategoryContext(supabase, user.id);
+
+    const counters = await reparseInboxConfirmations(supabase, {
+      userId: user.id,
+      accountId: account.id,
+      accessToken,
+      merchants,
+      exclusions,
+      categoryIdsBySlug,
+      categoryOptions,
+      onlyOutdated: true,
+    });
+
+    revalidatePath('/settings');
+    revalidatePath('/orders');
+    revalidatePath('/inventory');
+    revalidatePath('/dashboard');
+    revalidatePath('/review');
+
+    return { ok: true, ...counters };
+  } catch (err) {
+    return {
+      ok: false,
+      considered: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+      error: err instanceof Error ? err.message : 'Reparse failed',
+    };
+  }
+}
+
 const createCategorySchema = z.object({
   name: z.string().trim().min(2).max(40),
 });
