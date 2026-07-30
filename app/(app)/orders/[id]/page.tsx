@@ -272,25 +272,27 @@ export default async function OrderDetailPage({
                       </p>
                     )}
                     {units.length > 0 && (
-                      <ul className="mt-2 space-y-1">
-                        {units.map((unit, index) => {
-                          const parts = [
-                            'View in inventory',
-                            units.length > 1 ? `${index + 1} of ${units.length}` : null,
-                            formatMoney(unit.cost_cents, order.currency),
-                            unit.status.replaceAll('_', ' '),
-                          ].filter(Boolean);
-                          return (
-                            <li key={unit.id}>
-                              <Link
-                                href={`/inventory/${unit.id}`}
-                                className="text-[13px] text-brand hover:underline"
-                              >
-                                {parts.join(' · ')}
-                              </Link>
-                            </li>
-                          );
-                        })}
+                      <ul className="mt-2 space-y-1.5">
+                        {units.map((unit, index) => (
+                          <li
+                            key={unit.id}
+                            className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                          >
+                            <Link
+                              href={`/inventory/${unit.id}`}
+                              className="text-[13px] font-medium text-brand hover:underline"
+                            >
+                              View in inventory
+                              {units.length > 1 ? ` (${index + 1} of ${units.length})` : ''}
+                            </Link>
+                            <span className="tabular text-[13px] text-ink-muted">
+                              Landed {formatMoney(unit.cost_cents, order.currency)}
+                            </span>
+                            <span className="rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                              {unit.status.replaceAll('_', ' ')}
+                            </span>
+                          </li>
+                        ))}
                       </ul>
                     )}
                   </td>
