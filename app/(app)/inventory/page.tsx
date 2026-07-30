@@ -208,6 +208,10 @@ export default async function InventoryPage({
     image_url: string | null;
     return_planned: boolean;
     search_tags: string[] | null;
+    inventory_item_lists:
+      | { list_id: string }
+      | { list_id: string }[]
+      | null;
     categories:
       | { name: string; color: string | null; slug: string }
       | { name: string; color: string | null; slug: string }[]
@@ -260,6 +264,11 @@ export default async function InventoryPage({
     const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
     const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
     const merchantName = merchantNameFromItem(item);
+    const memberships = Array.isArray(item.inventory_item_lists)
+      ? item.inventory_item_lists
+      : item.inventory_item_lists
+        ? [item.inventory_item_lists]
+        : [];
     return {
       id: item.id,
       name: item.name,
@@ -274,6 +283,7 @@ export default async function InventoryPage({
       category_color: category?.color ?? null,
       category_slug: category?.slug ?? null,
       merchant_name: merchantName,
+      list_ids: memberships.map((row) => row.list_id),
     };
   });
 
@@ -477,7 +487,14 @@ export default async function InventoryPage({
                   )}
                   <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
                     {section.items.map((item) => (
-                      <InventoryRow key={item.id} item={item} />
+                      <InventoryRow
+                        key={item.id}
+                        item={item}
+                        lists={(lists ?? []).map((list) => ({
+                          id: list.id,
+                          name: list.name,
+                        }))}
+                      />
                     ))}
                   </ul>
                 </section>

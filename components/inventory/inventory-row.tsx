@@ -1,5 +1,9 @@
 import Link from 'next/link';
 import { RotateCcw } from 'lucide-react';
+import {
+  InventoryRowActions,
+  type InventoryListOption,
+} from '@/components/inventory/inventory-row-actions';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { formatMoney } from '@/lib/money';
 import { displayNameOf } from '@/lib/inventory/sort-group';
@@ -19,20 +23,27 @@ export type InventoryRowItem = {
   category_color: string | null;
   category_slug: string | null;
   merchant_name: string | null;
+  list_ids?: string[];
 };
 
-export function InventoryRow({ item }: { item: InventoryRowItem }) {
+export function InventoryRow({
+  item,
+  lists = [],
+}: {
+  item: InventoryRowItem;
+  lists?: InventoryListOption[];
+}) {
   const title = displayNameOf(item);
   const variant = displayVariant(item.variant);
   const accent = item.category_color ?? '#cfcfc8';
 
   return (
-    <li>
+    <li className="group flex items-stretch hover:bg-canvas">
       <Link
         href={`/inventory/${item.id}`}
         className={cn(
-          'group flex items-center gap-3 px-3 py-2.5 transition-colors duration-150',
-          'hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none',
+          'flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 pr-2 transition-colors duration-150',
+          'focus-visible:bg-canvas focus-visible:outline-none',
         )}
       >
         <span
@@ -78,6 +89,16 @@ export function InventoryRow({ item }: { item: InventoryRowItem }) {
           )}
         </div>
       </Link>
+
+      <div className="flex shrink-0 items-center pr-1.5 sm:pr-2">
+        <InventoryRowActions
+          itemId={item.id}
+          itemName={title}
+          returnPlanned={item.return_planned}
+          listIds={item.list_ids ?? []}
+          lists={lists}
+        />
+      </div>
     </li>
   );
 }

@@ -73,6 +73,12 @@ export async function setReturnPlanned(
   return { message: planned ? 'Marked to return.' : 'Removed from to-return list.' };
 }
 
+/** Form-action friendly wrapper for list-row icon buttons. */
+export async function toggleReturnPlannedForm(formData: FormData): Promise<void> {
+  const result = await setReturnPlanned({}, formData);
+  if (result.error) throw new Error(result.error);
+}
+
 /**
  * One-click mark returned from the tracker.
  * Inserts a refunded `returns` row; sync_order_state moves the unit to returned.

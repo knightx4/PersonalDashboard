@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
+import { OrderRowMenu } from '@/components/orders/order-row-menu';
 import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/cn';
 
@@ -55,12 +56,12 @@ export function OrderRow({ order }: { order: OrderRowData }) {
   ].filter(Boolean);
 
   return (
-    <li>
+    <li className="group flex items-stretch hover:bg-canvas">
       <Link
         href={`/orders/${order.id}`}
         className={cn(
-          'group flex items-center gap-3 px-3 py-3 transition-colors duration-150',
-          'hover:bg-canvas focus-visible:bg-canvas focus-visible:outline-none',
+          'flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 pr-2 transition-colors duration-150',
+          'focus-visible:bg-canvas focus-visible:outline-none',
         )}
       >
         <MerchantAvatar
@@ -101,6 +102,10 @@ export function OrderRow({ order }: { order: OrderRowData }) {
             )}
         </p>
       </Link>
+
+      <div className="flex shrink-0 items-center pr-2">
+        <OrderRowMenu orderId={order.id} merchantName={order.merchant_name} />
+      </div>
     </li>
   );
 }

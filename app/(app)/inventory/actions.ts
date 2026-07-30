@@ -337,3 +337,107 @@ export async function createItemListAndAssign(
   revalidatePath(`/inventory/${item.id}`);
   return { message: `Added to “${nameParsed.data}”.` };
 }
+
+/** One-click dispose from a list row (defaults to trashed). */
+export async function quickDisposeInventoryItem(formData: FormData): Promise<void> {
+  const next = new FormData();
+  next.set('id', String(formData.get('id') ?? ''));
+  next.set('disposal_method', String(formData.get('disposal_method') ?? 'trashed'));
+  next.set('disposal_proceeds', String(formData.get('disposal_proceeds') ?? ''));
+  const result = await disposeInventoryItem({}, next);
+  if (result.error) throw new Error(result.error);
+}
+
+/** Add or remove one list membership without replacing the rest. */
+export async function toggleInventoryItemList(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const parsed = z
+    .object({
+      id: z.string().uuid(),
+      list_id: z.string().uuid(),
+      join: z.enum(['true', 'false']),
+    })
+    .safeParse({
+      id: formData.get('id'),
+      list_id: formData.get('list_id'),
+      join: formData.get('join'),
+    });
+  if (!parsed.success) throw new Error('Missing item or list.');
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) throw new Error('That item could not be found.');
+
+  const { data: list } = await supabase
+    .from('item_lists')
+    .select('id')
+    .eq('id', parsed.data.list_id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!list) throw new Error('That list could not be found.');
+
+  if (parsed.data.join === 'true') {
+    const { data: existing } = await supabase
+      .from('inventory_item_lists')
+      .select('id')
+      .eq('inventory_item_id', item.id)
+      .eq('list_id', list.id)
+      .maybeSingle();
+    if (!existing) {
+      const { error } = await supabase.from('inventory_item_lists').insert({
+        inventory_item_id: item.id,
+        list_id: list.id,
+      });
+      if (error) throw new Error(error.message);
+    }
+  } else {
+    const { error } = await supabase
+      .from('inventory_item_lists')
+      .delete()
+      .eq('inventory_item_id', item.id)
+      .eq('list_id', list.id);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${item.id}`);
+}
+
+/**
+ * Remove an inventory unit. Order line / spend history stay; the unit leaves
+ * owned inventory. Restoring is not supported — use dispose when you want a record.
+ */
+export async function deleteInventoryItem(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) throw new Error('Missing item.');
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) throw new Error('That item could not be found.');
+
+  const { error } = await supabase
+    .from('inventory_items')
+    .delete()
+    .eq('id', item.id)
+    .eq('user_id', user.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${item.id}`);
+  revalidatePath('/orders');
+  revalidatePath('/returns');
+  revalidatePath('/dashboard');
+}
