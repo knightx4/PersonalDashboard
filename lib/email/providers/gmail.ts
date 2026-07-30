@@ -153,7 +153,8 @@ export const gmailProvider: GmailOAuthProvider = {
     };
   },
 
-  async getMessage(accessToken, messageId): Promise<GmailMessageContent> {
+  async getMessage(accessToken, messageId, opts): Promise<GmailMessageContent> {
+    const format = opts?.format === 'metadata' ? 'metadata' : 'full';
     const data = await gmailJson<{
       id: string;
       threadId?: string;
@@ -164,17 +165,21 @@ export const gmailProvider: GmailOAuthProvider = {
         body?: { data?: string };
         parts?: unknown[];
       };
-    }>(accessToken, `users/me/messages/${encodeURIComponent(messageId)}?format=full`);
+    }>(
+      accessToken,
+      `users/me/messages/${encodeURIComponent(messageId)}?format=${format}`,
+    );
 
     const headers = data.payload?.headers;
+    const full = format === 'full';
     return {
       id: data.id,
       threadId: data.threadId ?? null,
       internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
       fromAddress: headerValue(headers, 'From'),
       subject: headerValue(headers, 'Subject'),
-      text: gmailPayloadToText(data.payload as never),
-      html: gmailPayloadToHtml(data.payload as never),
+      text: full ? gmailPayloadToText(data.payload as never) : '',
+      html: full ? gmailPayloadToHtml(data.payload as never) : '',
     };
   },
 };

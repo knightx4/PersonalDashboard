@@ -15,6 +15,12 @@ import {
   type MerchantExclusionRow,
 } from '@/lib/inbox/merchant-exclusions';
 import { resolveOrderMerchant } from '@/lib/merchants/resolve-order-merchant';
+import { mapPool } from '@/lib/async/map-pool';
+
+/** Parallel Gmail metadata fetches — well under user rate quota. */
+const METADATA_CONCURRENCY = 5;
+/** Parallel full-body + extract for confirmations / lifecycle. */
+const EXTRACT_CONCURRENCY = 2;
 
 export type IngestCounters = {
   messagesSeen: number;
@@ -291,7 +297,7 @@ async function handleOrderConfirmation(
     merchantSlug: resolvedMerchant?.slug ?? classified.merchant?.slug ?? null,
     extraction: extraction.result.order,
     categoryIdsBySlug,
-    needsReview: extraction.source === 'heuristic',
+    needsReview: extraction.source === 'heuristic' && !extraction.trusted,
   });
 
   const { error: orderError } = await supabase.from('orders').insert({
@@ -464,43 +470,85 @@ export async function ingestGmailMessageIds(
   const timezone = await userTimezone(supabase, userId);
   const deferredLifecycle: ClassifiedMessage[] = [];
 
-  for (const messageId of messageIds) {
+  if (messageIds.length === 0) return;
+
+  // One ledger lookup for the whole page instead of N round-trips.
+  const { data: existingRows } = await supabase
+    .from('ingested_messages')
+    .select('id, provider_message_id, classification, parse_status')
+    .eq('email_account_id', accountId)
+    .in('provider_message_id', messageIds);
+
+  const existingByProviderId = new Map(
+    (existingRows ?? []).map((row) => [row.provider_message_id as string, row]),
+  );
+
+  type WorkItem = {
+    messageId: string;
+    existing: {
+      id: string;
+      classification: string;
+      parse_status: string;
+    } | null;
+  };
+
+  const work: WorkItem[] = messageIds.map((messageId) => {
+    const row = existingByProviderId.get(messageId);
+    return {
+      messageId,
+      existing: row
+        ? {
+            id: row.id as string,
+            classification: row.classification as string,
+            parse_status: row.parse_status as string,
+          }
+        : null,
+    };
+  });
+
+  // Pass 1: metadata-only classify (cheap). Full MIME only when needed.
+  type NeedsBody = {
+    messageId: string;
+    existing: WorkItem['existing'];
+    meta: FetchedMessage;
+    classified: ReturnType<typeof classifyMessage>;
+  };
+
+  const needsBody: NeedsBody[] = [];
+
+  await mapPool(work, METADATA_CONCURRENCY, async (item) => {
     counters.messagesSeen += 1;
 
-    const { data: existing } = await supabase
-      .from('ingested_messages')
-      .select('id, classification, parse_status')
-      .eq('email_account_id', accountId)
-      .eq('provider_message_id', messageId)
-      .maybeSingle();
-
     const retryLifecycle =
-      existing &&
-      LIFECYCLE.has(existing.classification as MessageClassification) &&
-      (existing.parse_status === 'skipped' || existing.parse_status === 'needs_review');
+      item.existing &&
+      LIFECYCLE.has(item.existing.classification as MessageClassification) &&
+      (item.existing.parse_status === 'skipped' ||
+        item.existing.parse_status === 'needs_review');
 
-    if (existing && !retryLifecycle) {
+    if (item.existing && !retryLifecycle) {
       counters.skipped += 1;
-      continue;
+      return;
     }
 
     try {
-      const message = await gmailProvider.getMessage(accessToken, messageId);
+      const meta = await gmailProvider.getMessage(accessToken, item.messageId, {
+        format: 'metadata',
+      });
       const classified = classifyMessage({
-        fromAddress: message.fromAddress,
-        subject: message.subject,
+        fromAddress: meta.fromAddress,
+        subject: meta.subject,
         merchants,
       });
       counters.messagesClassified += 1;
 
       if (classified.classification === 'not_relevant') {
         // CHECK ingested_not_relevant_is_bare_ck: no subject/from/thread for not_relevant.
-        if (!existing) {
+        if (!item.existing) {
           await supabase.from('ingested_messages').insert({
             email_account_id: accountId,
-            provider_message_id: message.id,
+            provider_message_id: meta.id,
             thread_id: null,
-            received_at: message.internalDate?.toISOString() ?? null,
+            received_at: meta.internalDate?.toISOString() ?? null,
             from_address: null,
             subject: null,
             classification: 'not_relevant',
@@ -509,67 +557,107 @@ export async function ingestGmailMessageIds(
           });
         }
         counters.skipped += 1;
-        continue;
+        return;
       }
 
-      if (LIFECYCLE.has(classified.classification)) {
-        deferredLifecycle.push({
-          message,
-          classified,
-          ledgerId: existing?.id ?? null,
-        });
-        continue;
-      }
-
-      if (classified.classification !== 'order_confirmation') {
-        if (!existing) {
+      if (
+        classified.classification !== 'order_confirmation' &&
+        !LIFECYCLE.has(classified.classification)
+      ) {
+        if (!item.existing) {
           await supabase.from('ingested_messages').insert({
             email_account_id: accountId,
-            provider_message_id: message.id,
-            thread_id: message.threadId,
-            received_at: message.internalDate?.toISOString() ?? null,
-            from_address: message.fromAddress,
-            subject: message.subject,
+            provider_message_id: meta.id,
+            thread_id: meta.threadId,
+            received_at: meta.internalDate?.toISOString() ?? null,
+            from_address: meta.fromAddress,
+            subject: meta.subject,
             classification: classified.classification,
             parse_status: 'skipped',
             parser_version: PARSER_VERSION,
           });
         }
         counters.skipped += 1;
-        continue;
+        return;
       }
 
-      await handleOrderConfirmation(supabase, {
-        userId,
-        accountId,
-        message,
+      needsBody.push({
+        messageId: item.messageId,
+        existing: item.existing,
+        meta,
         classified,
-        exclusions,
-        categoryIdsBySlug,
-        categoryOptions,
-        counters,
       });
     } catch (err) {
-      console.error('sync message failed', messageId, err);
+      console.error('sync message metadata failed', item.messageId, err);
       counters.errors += 1;
-      if (!existing) {
+      if (!item.existing) {
         const { error: ledgerError } = await supabase.from('ingested_messages').insert({
           email_account_id: accountId,
-          provider_message_id: messageId,
+          provider_message_id: item.messageId,
           classification: 'order_confirmation',
           parse_status: 'failed',
           parser_version: PARSER_VERSION,
           error: err instanceof Error ? err.message.slice(0, 500) : 'Sync failed',
         });
         if (ledgerError && !/duplicate|unique/i.test(ledgerError.message)) {
-          console.error('sync ledger insert failed', messageId, ledgerError.message);
+          console.error('sync ledger insert failed', item.messageId, ledgerError.message);
         }
       }
     }
-  }
+  });
+
+  // Pass 2: full body + extract/lifecycle with a small concurrency cap.
+  await mapPool(needsBody, EXTRACT_CONCURRENCY, async (item) => {
+    try {
+      const message = await gmailProvider.getMessage(accessToken, item.messageId, {
+        format: 'full',
+      });
+      // Keep headers from metadata if full payload somehow omits them.
+      if (!message.fromAddress) message.fromAddress = item.meta.fromAddress;
+      if (!message.subject) message.subject = item.meta.subject;
+      if (!message.internalDate) message.internalDate = item.meta.internalDate;
+      if (!message.threadId) message.threadId = item.meta.threadId;
+
+      if (LIFECYCLE.has(item.classified.classification)) {
+        deferredLifecycle.push({
+          message,
+          classified: item.classified,
+          ledgerId: item.existing?.id ?? null,
+        });
+        return;
+      }
+
+      await handleOrderConfirmation(supabase, {
+        userId,
+        accountId,
+        message,
+        classified: item.classified,
+        exclusions,
+        categoryIdsBySlug,
+        categoryOptions,
+        counters,
+      });
+    } catch (err) {
+      console.error('sync message failed', item.messageId, err);
+      counters.errors += 1;
+      if (!item.existing) {
+        const { error: ledgerError } = await supabase.from('ingested_messages').insert({
+          email_account_id: accountId,
+          provider_message_id: item.messageId,
+          classification: 'order_confirmation',
+          parse_status: 'failed',
+          parser_version: PARSER_VERSION,
+          error: err instanceof Error ? err.message.slice(0, 500) : 'Sync failed',
+        });
+        if (ledgerError && !/duplicate|unique/i.test(ledgerError.message)) {
+          console.error('sync ledger insert failed', item.messageId, ledgerError.message);
+        }
+      }
+    }
+  });
 
   // Confirmations in this batch land first; then shipping/delivery/return/cancel.
-  for (const item of deferredLifecycle) {
+  await mapPool(deferredLifecycle, EXTRACT_CONCURRENCY, async (item) => {
     try {
       await handleLifecycleMessage(supabase, {
         userId,
@@ -582,7 +670,7 @@ export async function ingestGmailMessageIds(
       console.error('lifecycle message failed', item.message.id, err);
       counters.errors += 1;
     }
-  }
+  });
 }
 
 /**

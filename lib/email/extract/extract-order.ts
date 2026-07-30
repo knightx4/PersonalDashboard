@@ -2,6 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { applyExtraction, type ApplyExtractionResult } from './apply';
+import { parseAmazonQuantityLines } from './amazon-lines';
 import { heuristicExtractOrder } from './heuristic';
 import { guessCategorySlug } from './guess-category';
 import {
@@ -9,6 +10,7 @@ import {
   extractProductLinksFromEmail,
 } from './product-links';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { parseShopifyQuantityLines } from './shopify-lines';
 import {
   CATEGORY_SLUGS,
   PARSER_VERSION,
@@ -152,6 +154,11 @@ export async function extractOrderFromEmail(input: {
 }): Promise<{
   result: ApplyExtractionResult;
   source: 'llm' | 'heuristic';
+  /**
+   * True when a structured merchant heuristic reconciled without needing the
+   * LLM. Callers should not force needs_review for these.
+   */
+  trusted?: boolean;
   parserVersion: string;
   raw?: unknown;
 }> {
@@ -163,6 +170,37 @@ export async function extractOrderFromEmail(input: {
     (c) => !(CATEGORY_SLUGS as readonly string[]).includes(c.slug),
   );
   const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
+
+  const structuredHeuristic =
+    parseAmazonQuantityLines(input.text).length > 0 ||
+    parseShopifyQuantityLines(input.text).length > 0;
+
+  // Known-good Amazon / Shopify layouts: skip Haiku when arithmetic already
+  // reconciles. Cuts latency and Anthropic spend on the common path.
+  if (structuredHeuristic) {
+    const heuristic = heuristicExtractOrder({
+      ...input,
+      customCategories,
+    });
+    if (heuristic) {
+      const applied = applyExtraction(heuristic);
+      if (applied.ok) {
+        return {
+          result: {
+            ...applied,
+            order: enrichExtractedOrder(applied.order, {
+              ...input,
+              categoryOptions,
+            }),
+          },
+          source: 'heuristic',
+          trusted: true,
+          parserVersion: PARSER_VERSION,
+          raw: heuristic,
+        };
+      }
+    }
+  }
 
   if (apiKey) {
     try {
@@ -227,6 +265,7 @@ export async function extractOrderFromEmail(input: {
     return {
       result: { ok: false, reason: 'schema', issues: ['no_extraction'] },
       source: 'heuristic',
+      trusted: false,
       parserVersion: PARSER_VERSION,
     };
   }
@@ -235,6 +274,7 @@ export async function extractOrderFromEmail(input: {
     return {
       result: applied,
       source: 'heuristic',
+      trusted: false,
       parserVersion: PARSER_VERSION,
       raw: heuristic,
     };
@@ -248,6 +288,7 @@ export async function extractOrderFromEmail(input: {
       }),
     },
     source: 'heuristic',
+    trusted: false,
     parserVersion: PARSER_VERSION,
     raw: heuristic,
   };

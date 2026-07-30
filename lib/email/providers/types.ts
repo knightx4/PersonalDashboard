@@ -61,5 +61,9 @@ export interface GmailOAuthProvider {
     accessToken: string,
     opts: { startHistoryId: string; maxResults?: number; pageToken?: string },
   ): Promise<GmailHistoryPage>;
-  getMessage(accessToken: string, messageId: string): Promise<GmailMessageContent>;
+  getMessage(
+    accessToken: string,
+    messageId: string,
+    opts?: { format?: 'full' | 'metadata' },
+  ): Promise<GmailMessageContent>;
 }
