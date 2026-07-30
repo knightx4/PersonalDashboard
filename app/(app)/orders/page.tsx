@@ -1,6 +1,7 @@
-import { Receipt } from 'lucide-react';
+import { Receipt, Search } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -113,8 +114,8 @@ export default async function OrdersPage({
     .select(
       `
       id, order_date, total_cents, currency, status, external_order_number,
-      merchants ( name ),
-      order_items ( name, variant, quantity, categories ( name ) ),
+      merchants ( name, logo_url, domains ),
+      order_items ( name, variant, quantity, image_url, categories ( name ) ),
       ingested_messages ( subject, from_address, classification, email_accounts ( email_address ) )
     `,
     )
@@ -219,12 +220,20 @@ export default async function OrdersPage({
           {activeMerchant && (
             <input type="hidden" name="merchant" value={activeMerchant} />
           )}
-          <Input
-            name="q"
-            defaultValue={q}
-            placeholder="Search merchant, item, order #, inbox…"
-            aria-label="Search orders"
-          />
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <Input
+              name="q"
+              defaultValue={q}
+              placeholder="Search merchant, item, order #, inbox…"
+              aria-label="Search orders"
+              className="pl-9"
+            />
+          </div>
         </form>
 
         {orders.length === 0 ? (
@@ -247,54 +256,53 @@ export default async function OrdersPage({
           />
         ) : (
           <div className="space-y-8">
-            {[...grouped.entries()].map(([key, monthOrders]) => (
-              <section key={key}>
-                <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                  {monthLabel(key)}
-                </h2>
-                <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-                  {monthOrders.map((order) => {
-                    const merchant = Array.isArray(order.merchants)
-                      ? order.merchants[0]
-                      : order.merchants;
-                    const itemsSummary = orderItemsSummary(order);
-                    const itemHint = q ? matchingItemHint(order, q) : null;
-                    const inbox = showInbox ? orderInboxAddress(order) : null;
-                    return (
-                      <li key={order.id}>
-                        <Link
-                          href={`/orders/${order.id}`}
-                          className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-canvas"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-ink">
-                              {merchant?.name ?? 'Unknown merchant'}
-                            </p>
-                            <p className="truncate text-[13px] text-ink">
-                              {itemsSummary.label}
-                              {itemHint && !itemsSummary.label.includes(itemHint)
-                                ? ` · ${itemHint}`
-                                : ''}
-                            </p>
-                            <p className="truncate text-[13px] text-ink-muted">
-                              {order.order_date}
-                              {order.external_order_number
-                                ? ` · #${order.external_order_number}`
-                                : ''}
-                              {` · ${order.status.replaceAll('_', ' ')}`}
-                              {inbox ? ` · ${inbox}` : ''}
-                            </p>
-                          </div>
-                          <p className="tabular shrink-0 font-medium text-ink">
-                            {formatMoney(order.total_cents, order.currency)}
-                          </p>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
+            {[...grouped.entries()].map(([key, monthOrders]) => {
+              const monthTotal = monthOrders.reduce((sum, order) => sum + order.total_cents, 0);
+              return (
+                <section key={key}>
+                  <div className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                      {monthLabel(key)}
+                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-faint">
+                        {monthOrders.length}
+                      </span>
+                    </h2>
+                    <p className="tabular text-[12px] text-ink-muted">
+                      {formatMoney(monthTotal)}
+                    </p>
+                  </div>
+                  <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                    {monthOrders.map((order) => {
+                      const merchant = Array.isArray(order.merchants)
+                        ? order.merchants[0]
+                        : order.merchants;
+                      const itemsSummary = orderItemsSummary(order);
+                      const itemHint = q ? matchingItemHint(order, q) : null;
+                      const inbox = showInbox ? orderInboxAddress(order) : null;
+                      return (
+                        <OrderRow
+                          key={order.id}
+                          order={{
+                            id: order.id,
+                            order_date: order.order_date,
+                            total_cents: order.total_cents,
+                            currency: order.currency,
+                            status: order.status,
+                            external_order_number: order.external_order_number,
+                            merchant_name: merchant?.name ?? 'Unknown merchant',
+                            merchant_logo_url: merchant?.logo_url ?? null,
+                            merchant_domains: merchant?.domains ?? null,
+                            items_label: itemsSummary.label,
+                            item_hint: itemHint,
+                            inbox,
+                          }}
+                        />
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
           </div>
         )}
       </div>
