@@ -166,10 +166,10 @@ export default async function OrderDetailPage({
   }) {
     return (
       <MoneyWithBase
-        cents={nativeCents}
-        currency={nativeCurrency}
-        displayCents={showNative ? displayCents : undefined}
-        displayCurrency={showNative ? displayCurrency : undefined}
+        cents={displayCents}
+        currency={displayCurrency}
+        foreignCents={showNative ? nativeCents : undefined}
+        foreignCurrency={showNative ? nativeCurrency : undefined}
         className={className}
         primaryClassName={primaryClassName}
       />

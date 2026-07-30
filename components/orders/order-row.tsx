@@ -31,12 +31,12 @@ function statusLabel(status: string): string {
 export type OrderRowData = {
   id: string;
   order_date: string;
-  /** Purchase / order currency amount. */
+  /** Display / base currency amount. */
   total_cents: number;
   currency: string;
-  /** When set and different from currency, shown as a muted base-currency amount. */
-  display_total_cents?: number;
-  display_currency?: string;
+  /** When set and different from currency, shown muted underneath. */
+  native_total_cents?: number;
+  native_currency?: string;
   status: string;
   external_order_number: string | null;
   merchant_name: string;
@@ -94,8 +94,8 @@ export function OrderRow({ order }: { order: OrderRowData }) {
         <MoneyWithBase
           cents={order.total_cents}
           currency={order.currency}
-          displayCents={order.display_total_cents}
-          displayCurrency={order.display_currency}
+          foreignCents={order.native_total_cents}
+          foreignCurrency={order.native_currency}
           primaryClassName="text-[15px] font-semibold text-ink"
         />
       </Link>
