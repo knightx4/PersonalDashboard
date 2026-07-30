@@ -1,8 +1,8 @@
-import { ListChecks, Mail, RotateCcw, ShieldCheck, Tags, User } from 'lucide-react';
+import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tags, User } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { signOut } from '@/app/(auth)/actions';
 import { loadMerchantReturnPolicies } from '@/lib/returns/policies';
 import { CategoriesSection } from './categories-section';
@@ -11,6 +11,11 @@ import { InboxSection } from './inbox-section';
 import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
 import { ReturnPoliciesSection } from './return-policies-section';
+
+/** Stripe Payment Link — customers choose what to pay. Override via env if needed. */
+const DONATE_URL =
+  process.env.NEXT_PUBLIC_DONATE_URL ??
+  'https://buy.stripe.com/28E14nbwB7fX3Ys4Nrbo400';
 
 export const metadata = { title: 'Settings' };
 
@@ -116,6 +121,30 @@ export default async function SettingsPage({
       <PageHeader title="Settings" />
 
       <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="size-4 text-ink-muted" strokeWidth={1.75} />
+              Support the project
+            </CardTitle>
+          </CardHeader>
+          <CardBody className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-md text-sm text-ink-muted">
+              Shopping Manager is free. If it helps you spend less or lose less stuff, a tip
+              keeps the lights on.
+            </p>
+            <a
+              href={DONATE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ variant: 'primary', size: 'sm' })}
+            >
+              <Heart className="size-3.5" strokeWidth={1.75} />
+              Donate
+            </a>
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
