@@ -12,8 +12,9 @@ import { createServiceSupabase } from '@/inngest/supabase-admin';
 
 /** Leave headroom under the route maxDuration for the continue fetch. */
 const PUMP_BUDGET_MS = 50_000;
-const BATCH_SIZE = 10;
-const INCREMENTAL_BATCH_SIZE = 25;
+/** Backfill page size — larger pages + parallel ingest finish the 50s pump with fewer hops. */
+const BATCH_SIZE = 20;
+const INCREMENTAL_BATCH_SIZE = 40;
 
 export type InboxSyncJobType = 'backfill' | 'incremental';
 
