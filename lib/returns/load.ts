@@ -8,48 +8,38 @@ import {
   isDueSoon,
   isOverdue,
 } from '@/lib/returns/deadline';
+import type { ReturnsTrackerData, ReturnsTrackerRow, ReturnsView } from '@/lib/returns/types';
 
-export type ReturnsView = 'soon' | 'overdue' | 'marked' | 'all' | 'returned';
+export type {
+  ReturnsTrackerData,
+  ReturnsTrackerRow,
+  ReturnsView,
+} from '@/lib/returns/types';
+export {
+  filterReturnsRows,
+  parseReturnsView,
+  RETURNS_VIEWS,
+} from '@/lib/returns/types';
+export type { ReturnsGroupMode, ReturnsOrderGroup } from '@/lib/returns/grouping';
+export {
+  RETURNS_GROUPS,
+  groupReturnsByOrder,
+  parseReturnsGroup,
+} from '@/lib/returns/grouping';
 
-export const RETURNS_VIEWS: { id: ReturnsView; label: string }[] = [
-  { id: 'soon', label: 'Due soon' },
-  { id: 'overdue', label: 'Overdue' },
-  { id: 'marked', label: 'To return' },
-  { id: 'all', label: 'All items' },
-  { id: 'returned', label: 'Returned' },
-];
-
-export function parseReturnsView(raw: string | undefined): ReturnsView {
-  return RETURNS_VIEWS.find((entry) => entry.id === raw)?.id ?? 'soon';
-}
-
-export type ReturnsTrackerRow = {
-  inventoryItemId: string;
-  name: string;
-  variant: string | null;
-  costCents: number;
-  orderId: string;
-  orderStatus: string;
-  merchantId: string | null;
-  merchantName: string;
-  returnDeadline: string | null;
-  daysLeft: number | null;
-  returnPlanned: boolean;
-  returnWindowDays: number | null;
-  delivered: boolean;
-  status: 'owned' | 'returned';
-  /** When status is returned, the linked refunded return row (for undo). */
-  returnId: string | null;
-  refundedAt: string | null;
-};
-
-export type ReturnsTrackerData = {
-  timezone: string;
-  today: string;
-  view: ReturnsView;
-  dueSoonDays: number;
-  rows: ReturnsTrackerRow[];
-  counts: Record<ReturnsView, number>;
+type OrderJoin = {
+  id: string;
+  status: string;
+  order_date: string | null;
+  external_order_number: string | null;
+  return_deadline: string | null;
+  merchant_id: string | null;
+  deleted_at?: string | null;
+  merchants: {
+    id: string;
+    name: string;
+    default_return_window_days: number | null;
+  } | null;
 };
 
 type InventoryQueryRow = {
@@ -62,61 +52,11 @@ type InventoryQueryRow = {
   order_items:
     | {
         order_id: string;
-        orders:
-          | {
-              id: string;
-              status: string;
-              return_deadline: string | null;
-              merchant_id: string | null;
-              deleted_at?: string | null;
-              merchants: {
-                id: string;
-                name: string;
-                default_return_window_days: number | null;
-              } | null;
-            }
-          | {
-              id: string;
-              status: string;
-              return_deadline: string | null;
-              merchant_id: string | null;
-              deleted_at?: string | null;
-              merchants: {
-                id: string;
-                name: string;
-                default_return_window_days: number | null;
-              } | null;
-            }[]
-          | null;
+        orders: OrderJoin | OrderJoin[] | null;
       }
     | {
         order_id: string;
-        orders:
-          | {
-              id: string;
-              status: string;
-              return_deadline: string | null;
-              merchant_id: string | null;
-              deleted_at?: string | null;
-              merchants: {
-                id: string;
-                name: string;
-                default_return_window_days: number | null;
-              } | null;
-            }
-          | {
-              id: string;
-              status: string;
-              return_deadline: string | null;
-              merchant_id: string | null;
-              deleted_at?: string | null;
-              merchants: {
-                id: string;
-                name: string;
-                default_return_window_days: number | null;
-              } | null;
-            }[]
-          | null;
+        orders: OrderJoin | OrderJoin[] | null;
       }[]
     | null;
 };
@@ -143,6 +83,8 @@ function buildOwnedRow(item: InventoryQueryRow, today: string): ReturnsTrackerRo
     variant: item.variant,
     costCents: item.cost_cents,
     orderId: order.id,
+    orderDate: order.order_date,
+    externalOrderNumber: order.external_order_number,
     orderStatus: order.status,
     merchantId: order.merchant_id,
     merchantName: merchant?.name ?? 'Unknown merchant',
@@ -174,6 +116,8 @@ function buildReturnedRow(
     variant: item.variant,
     costCents: item.cost_cents,
     orderId: order.id,
+    orderDate: order.order_date,
+    externalOrderNumber: order.external_order_number,
     orderStatus: order.status,
     merchantId: order.merchant_id,
     merchantName: merchant?.name ?? 'Unknown merchant',
@@ -186,21 +130,6 @@ function buildReturnedRow(
     returnId: refund.id,
     refundedAt: refund.refunded_at,
   };
-}
-
-function matchesView(row: ReturnsTrackerRow, view: ReturnsView): boolean {
-  if (view === 'returned') return row.status === 'returned';
-  if (row.status !== 'owned') return false;
-  switch (view) {
-    case 'soon':
-      return row.daysLeft != null && isDueSoon(row.daysLeft);
-    case 'overdue':
-      return row.daysLeft != null && isOverdue(row.daysLeft);
-    case 'marked':
-      return row.returnPlanned;
-    case 'all':
-      return true;
-  }
 }
 
 function sortRows(a: ReturnsTrackerRow, b: ReturnsTrackerRow): number {
@@ -222,7 +151,7 @@ const ITEM_SELECT = `
   order_items!inner (
     order_id,
     orders!inner (
-      id, status, return_deadline, merchant_id, deleted_at,
+      id, status, order_date, external_order_number, return_deadline, merchant_id, deleted_at,
       merchants ( id, name, default_return_window_days )
     )
   )
@@ -341,14 +270,4 @@ export async function loadReturnsTracker(
     rows: allRows.sort(sortRows),
     counts,
   };
-}
-
-export function filterReturnsRows(
-  rows: ReturnsTrackerRow[],
-  view: ReturnsView,
-  merchantId?: string,
-): ReturnsTrackerRow[] {
-  return rows
-    .filter((row) => matchesView(row, view))
-    .filter((row) => !merchantId || row.merchantId === merchantId);
 }
