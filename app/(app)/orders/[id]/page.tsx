@@ -51,21 +51,19 @@ export default async function OrderDetailPage({
   const { data: sourceMessages } = await supabase
     .from('ingested_messages')
     .select(
-      'provider_message_id, thread_id, subject, from_address, classification, parse_status, received_at, email_accounts ( email_address )',
+      'provider_message_id, thread_id, subject, from_address, classification, received_at, email_accounts ( email_address )',
     )
     .eq('resulting_order_id', id)
     .order('received_at', { ascending: true });
 
   const confirmationMessage =
     sourceMessages?.find((row) => row.classification === 'order_confirmation') ?? null;
-  /** Prefer confirmation for header actions; otherwise the earliest linked mail. */
-  const primaryMessage = confirmationMessage ?? sourceMessages?.[0] ?? null;
-  const lifecycleMessages = (sourceMessages ?? []).filter(
-    (row) =>
-      row.classification === 'shipping' ||
-      row.classification === 'delivery' ||
-      row.classification === 'return' ||
-      row.classification === 'cancellation',
+  const orderEmailMessage = confirmationMessage ?? sourceMessages?.[0] ?? null;
+  const shippingMessages = (sourceMessages ?? []).filter(
+    (row) => row.classification === 'shipping',
+  );
+  const deliveryMessages = (sourceMessages ?? []).filter(
+    (row) => row.classification === 'delivery',
   );
 
   const { data: shipments } = await supabase
@@ -82,19 +80,16 @@ export default async function OrderDetailPage({
 
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
-  const inbox = Array.isArray(primaryMessage?.email_accounts)
-    ? primaryMessage?.email_accounts[0]
-    : primaryMessage?.email_accounts;
-  const gmailHref = gmailOpenUrl({
-    emailAddress: inbox?.email_address,
-    threadId: primaryMessage?.thread_id,
-    messageId: primaryMessage?.provider_message_id,
-  });
+  const inbox = messageInbox(orderEmailMessage);
+  const orderEmailHref = messageGmailHref(orderEmailMessage);
+
+  // Pair lifecycle emails to shipment rows (nearest by date, each email used once).
+  const shipmentEmailLinks = pairShipmentEmails(shipments ?? [], shippingMessages, deliveryMessages);
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
-        title={merchant?.name ?? primaryMessage?.subject?.slice(0, 48) ?? 'Order'}
+        title={merchant?.name ?? orderEmailMessage?.subject?.slice(0, 48) ?? 'Order'}
         description={`${order.order_date}${
           order.external_order_number ? ` · #${order.external_order_number}` : ''
         } · ${order.status.replaceAll('_', ' ')}${
@@ -102,14 +97,14 @@ export default async function OrderDetailPage({
         }${isDeleted ? ' · deleted' : ''}`}
         actions={
           <div className="flex flex-wrap gap-2">
-            {gmailHref && (
+            {orderEmailHref && (
               <a
-                href={gmailHref}
+                href={orderEmailHref}
                 target="_blank"
                 rel="noreferrer"
                 className={buttonVariants({ variant: 'secondary', size: 'sm' })}
               >
-                Open in Gmail
+                Open order email
               </a>
             )}
             {!isDeleted && (
@@ -169,75 +164,68 @@ export default async function OrderDetailPage({
         </div>
       )}
 
-      {(confirmationMessage || lifecycleMessages.length > 0) && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
-            Emails
-          </h2>
-
-          {confirmationMessage && (
-            <OrderEmailCard
-              message={confirmationMessage}
-              emphasis="primary"
-              label="Order confirmation"
-            />
-          )}
-
-          {lifecycleMessages.length > 0 && (
-            <ul className="divide-y divide-border overflow-hidden rounded-card border border-border/80 bg-canvas/60">
-              {lifecycleMessages.map((message) => (
-                <li key={`${message.provider_message_id}-${message.classification}`}>
-                  <OrderEmailCard message={message} emphasis="secondary" />
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {inbox?.email_address && (
-            <p className="text-[12px] text-ink-faint">Via {inbox.email_address}</p>
-          )}
-        </section>
-      )}
-
       {(shipments?.length ?? 0) > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
             Shipments
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            {(shipments ?? []).map((shipment) => (
-              <li key={shipment.id} className="px-4 py-3 text-sm">
-                <p className="font-medium text-ink">
-                  {shipment.status.replaceAll('_', ' ')}
-                  {shipment.carrier ? ` · ${shipment.carrier}` : ''}
-                </p>
-                <p className="mt-1 text-[13px] text-ink-muted">
-                  {[
-                    shipment.tracking_number ? `Tracking ${shipment.tracking_number}` : null,
-                    shipment.shipped_at
-                      ? `Shipped ${new Date(shipment.shipped_at).toLocaleDateString()}`
-                      : null,
-                    shipment.delivered_at
-                      ? `Delivered ${new Date(shipment.delivered_at).toLocaleDateString()}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || 'No tracking details yet'}
-                </p>
-                {shipment.tracking_url && (
-                  <p className="mt-1.5">
-                    <a
-                      href={shipment.tracking_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[13px] text-brand hover:underline"
-                    >
-                      Track package
-                    </a>
+            {(shipments ?? []).map((shipment) => {
+              const links = shipmentEmailLinks.get(shipment.id) ?? {};
+              return (
+                <li key={shipment.id} className="px-4 py-3 text-sm">
+                  <p className="font-medium text-ink">
+                    {shipment.status.replaceAll('_', ' ')}
+                    {shipment.carrier ? ` · ${shipment.carrier}` : ''}
                   </p>
-                )}
-              </li>
-            ))}
+                  <p className="mt-1 text-[13px] text-ink-muted">
+                    {[
+                      shipment.tracking_number ? `Tracking ${shipment.tracking_number}` : null,
+                      shipment.shipped_at
+                        ? `Shipped ${new Date(shipment.shipped_at).toLocaleDateString()}`
+                        : null,
+                      shipment.delivered_at
+                        ? `Delivered ${new Date(shipment.delivered_at).toLocaleDateString()}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'No tracking details yet'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {shipment.tracking_url && (
+                      <a
+                        href={shipment.tracking_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[13px] text-brand hover:underline"
+                      >
+                        Track package
+                      </a>
+                    )}
+                    {links.shippingHref && (
+                      <a
+                        href={links.shippingHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[13px] text-ink-faint hover:text-brand hover:underline"
+                      >
+                        Open shipping email
+                      </a>
+                    )}
+                    {links.deliveryHref && (
+                      <a
+                        href={links.deliveryHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[13px] text-ink-faint hover:text-brand hover:underline"
+                      >
+                        Open delivery email
+                      </a>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -400,94 +388,107 @@ type LinkedEmail = {
     | null;
 };
 
-const CLASSIFICATION_LABELS: Record<string, string> = {
-  order_confirmation: 'Order confirmation',
-  shipping: 'Shipped',
-  delivery: 'Delivered',
-  return: 'Return',
-  cancellation: 'Cancelled',
+type ShipmentRow = {
+  id: string;
+  status: string;
+  shipped_at: string | null;
+  delivered_at: string | null;
 };
 
-function OrderEmailCard({
-  message,
-  emphasis,
-  label,
-}: {
-  message: LinkedEmail;
-  emphasis: 'primary' | 'secondary';
-  label?: string;
-}) {
-  const account = Array.isArray(message.email_accounts)
+function messageInbox(message: LinkedEmail | null | undefined) {
+  if (!message) return null;
+  return Array.isArray(message.email_accounts)
     ? message.email_accounts[0]
     : message.email_accounts;
-  const href = gmailOpenUrl({
-    emailAddress: account?.email_address,
+}
+
+function messageGmailHref(message: LinkedEmail | null | undefined): string | null {
+  if (!message) return null;
+  const inbox = messageInbox(message);
+  return gmailOpenUrl({
+    emailAddress: inbox?.email_address,
     threadId: message.thread_id,
     messageId: message.provider_message_id,
   });
-  const kind =
-    label ??
-    CLASSIFICATION_LABELS[message.classification ?? ''] ??
-    (message.classification?.replaceAll('_', ' ') || 'Email');
-  const received = message.received_at
-    ? new Date(message.received_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
+}
 
-  if (emphasis === 'primary') {
-    return (
-      <div className="rounded-card border border-border bg-surface px-4 py-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-              {kind}
-            </p>
-            <p className="mt-1 truncate text-sm font-medium text-ink">
-              {message.subject ?? 'No subject'}
-            </p>
-            <p className="mt-0.5 truncate text-[13px] text-ink-muted">
-              {[message.from_address, received].filter(Boolean).join(' · ')}
-            </p>
-          </div>
-          {href && (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              Open in Gmail
-            </a>
-          )}
-        </div>
-      </div>
-    );
+function messageTimeMs(message: LinkedEmail): number {
+  if (!message.received_at) return Number.POSITIVE_INFINITY;
+  return new Date(message.received_at).getTime();
+}
+
+function takeNearestMessage(
+  messages: LinkedEmail[],
+  used: Set<string>,
+  targetMs: number | null,
+): LinkedEmail | null {
+  const available = messages.filter((message) => !used.has(message.provider_message_id));
+  if (available.length === 0) return null;
+  if (targetMs == null || !Number.isFinite(targetMs)) {
+    return available[0] ?? null;
+  }
+  let best: LinkedEmail | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const message of available) {
+    const delta = Math.abs(messageTimeMs(message) - targetMs);
+    if (delta < bestDelta) {
+      best = message;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+function pairShipmentEmails(
+  shipments: ShipmentRow[],
+  shippingMessages: LinkedEmail[],
+  deliveryMessages: LinkedEmail[],
+): Map<string, { shippingHref?: string; deliveryHref?: string }> {
+  const usedShipping = new Set<string>();
+  const usedDelivery = new Set<string>();
+  const result = new Map<string, { shippingHref?: string; deliveryHref?: string }>();
+
+  for (const shipment of shipments) {
+    const shippedMs = shipment.shipped_at ? new Date(shipment.shipped_at).getTime() : null;
+    const deliveredMs = shipment.delivered_at ? new Date(shipment.delivered_at).getTime() : null;
+    const links: { shippingHref?: string; deliveryHref?: string } = {};
+
+    const shipping = takeNearestMessage(shippingMessages, usedShipping, shippedMs);
+    if (shipping) {
+      usedShipping.add(shipping.provider_message_id);
+      const href = messageGmailHref(shipping);
+      if (href) links.shippingHref = href;
+    }
+
+    const isDelivered = shipment.status === 'delivered' || Boolean(shipment.delivered_at);
+    if (isDelivered) {
+      const delivery = takeNearestMessage(deliveryMessages, usedDelivery, deliveredMs ?? shippedMs);
+      if (delivery) {
+        usedDelivery.add(delivery.provider_message_id);
+        const href = messageGmailHref(delivery);
+        if (href) links.deliveryHref = href;
+      }
+    }
+
+    result.set(shipment.id, links);
   }
 
-  return (
-    <div className="flex items-start justify-between gap-3 px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">{kind}</p>
-        <p className="mt-0.5 truncate text-[13px] text-ink-muted">
-          {message.subject ?? 'No subject'}
-        </p>
-        <p className="truncate text-[12px] text-ink-faint">
-          {[message.from_address, received].filter(Boolean).join(' · ')}
-        </p>
-      </div>
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          className="shrink-0 text-[12px] text-ink-faint hover:text-brand hover:underline"
-        >
-          Open
-        </a>
-      )}
-    </div>
-  );
+  // If a single shipment has no shipping email but unused ones remain, attach the first.
+  if (shipments.length === 1) {
+    const only = shipments[0]!;
+    const links = result.get(only.id) ?? {};
+    if (!links.shippingHref) {
+      const leftover = shippingMessages.find((message) => !usedShipping.has(message.provider_message_id));
+      const href = messageGmailHref(leftover ?? null);
+      if (href) links.shippingHref = href;
+    }
+    if (!links.deliveryHref && (only.status === 'delivered' || only.delivered_at)) {
+      const leftover = deliveryMessages.find((message) => !usedDelivery.has(message.provider_message_id));
+      const href = messageGmailHref(leftover ?? null);
+      if (href) links.deliveryHref = href;
+    }
+    result.set(only.id, links);
+  }
+
+  return result;
 }
