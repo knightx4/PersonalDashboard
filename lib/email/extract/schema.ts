@@ -71,6 +71,15 @@ export const extractedLineSchema = z.object({
     .max(24)
     .nullable()
     .optional(),
+  /**
+   * Human-facing labels (shoes, sneakers) — distinct from categorySlug
+   * (clothing) and from searchTags synonyms.
+   */
+  tags: z
+    .array(z.string().trim().min(1).max(40))
+    .max(8)
+    .nullable()
+    .optional(),
 });
 
 export const extractedOrderSchema = z.object({

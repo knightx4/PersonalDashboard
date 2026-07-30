@@ -11,8 +11,10 @@ import {
 } from '@/app/(app)/review/review-buttons';
 import { ExcludeMerchantButton } from './exclude-merchant-button';
 import { DeleteOrderButton } from './delete-order-button';
+import { OrderItemTags } from '../order-item-tags';
 import { restoreDeletedOrder } from '@/app/(app)/orders/actions';
 import { Button } from '@/components/ui/button';
+import { orderItemTags } from '@/lib/orders/search';
 
 export const metadata = { title: 'Order' };
 
@@ -36,7 +38,8 @@ export default async function OrderDetailPage({
       order_items (
         id, name, variant, quantity, unit_price_cents, category_id, product_url, image_url,
         categories ( name ),
-        inventory_items ( id, cost_cents, status )
+        inventory_items ( id, cost_cents, status ),
+        order_item_tags ( id, tag_id, item_tags ( id, name, slug ) )
       )
     `,
     )
@@ -274,6 +277,15 @@ export default async function OrderDetailPage({
                     <p className="text-[13px] text-ink-muted">
                       {[item.variant, category?.name].filter(Boolean).join(' · ') || '—'}
                     </p>
+                    <OrderItemTags
+                      orderId={order.id}
+                      orderItemId={item.id}
+                      tags={orderItemTags(item).map((tag) => ({
+                        id: tag.id ?? '',
+                        name: tag.name,
+                      })).filter((tag) => tag.id)}
+                      readOnly={isDeleted}
+                    />
                     {item.product_url && (
                       <p className="mt-1.5">
                         <a

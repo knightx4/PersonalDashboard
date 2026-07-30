@@ -10,6 +10,7 @@ import {
   extractProductLinksFromEmail,
 } from './product-links';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import { guessItemTags } from '@/lib/tags/guess';
 import { parseShopifyQuantityLines } from './shopify-lines';
 import {
   CATEGORY_SLUGS,
@@ -37,7 +38,7 @@ Return ONLY a JSON object with these fields:
 - orderDate (YYYY-MM-DD)
 - currency (default USD)
 - taxCents, shippingCents, discountCents, totalCents (integers, cents)
-- lines: [{ name, shortName, searchTags, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
+- lines: [{ name, shortName, searchTags, tags, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]
 - confidence (0-1)
 
 categorySlug must be one of: ${slugList}.
@@ -48,6 +49,7 @@ Use kitchen for cookware, utensils, bakeware, and small kitchen appliances (not 
 For each line also provide:
 - shortName: a clear 2–6 word product title people would scan in a list. Strip SEO filler, brand spam, and comma-lists. Keep the distinctive product identity (e.g. "Wood furniture repair kit", "Soft Pinch liquid blush").
 - searchTags: 4–12 lowercase synonym tokens for finding this item later (e.g. lipstick → ["makeup","lipstick","cosmetics","beauty","lip"]). Include category-adjacent words even when absent from the title.
+- tags: 1–4 short human labels for filtering (e.g. shoes, sneakers, makeup). Keep the high-level categorySlug separate — sneakers stay categorySlug=clothing with tags=["shoes","sneakers"].
 
 Rules:
 - Money is integer cents only (12.99 → 1299).
@@ -131,10 +133,17 @@ function enrichExtractedOrder(
         categorySlug: line.categorySlug,
         searchTags: line.searchTags,
       });
+      const tags = guessItemTags({
+        name: line.name,
+        variant: line.variant,
+        categorySlug: line.categorySlug,
+        modelTags: line.tags,
+      });
       return {
         ...line,
         shortName: enriched.shortName,
         searchTags: enriched.searchTags,
+        tags,
       };
     }),
   };

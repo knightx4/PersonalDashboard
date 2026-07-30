@@ -11,11 +11,13 @@ import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchan
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import {
   matchingItemHint,
+  orderHasTagId,
   orderInboxAddress,
   orderItemsSummary,
   orderMatchesQuery,
   sanitizeOrdersQuery,
 } from '@/lib/orders/search';
+import { loadUserTags, parseTagId } from '@/lib/tags/ensure';
 
 export const metadata = { title: 'Orders' };
 
@@ -64,11 +66,13 @@ function hrefFor(opts: {
   range: PresetRange;
   status?: string;
   merchant?: string;
+  tag?: string;
   q?: string;
 }): string {
   const params = new URLSearchParams({ range: opts.range });
   if (opts.status) params.set('status', opts.status);
   if (opts.merchant) params.set('merchant', opts.merchant);
+  if (opts.tag) params.set('tag', opts.tag);
   if (opts.q) params.set('q', opts.q);
   return `/orders?${params.toString()}`;
 }
@@ -80,6 +84,7 @@ export default async function OrdersPage({
     range?: string;
     status?: string;
     merchant?: string;
+    tag?: string;
     q?: string;
   }>;
 }) {
@@ -91,11 +96,13 @@ export default async function OrdersPage({
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'last_12_months';
   const status = STATUSES.find((entry) => entry.id === params.status)?.id;
   const merchantId = parseMerchantId(params.merchant);
+  const tagId = parseTagId(params.tag);
   const q = sanitizeOrdersQuery(params.q);
 
-  const [{ data: profile }, merchants, { count: inboxCount }] = await Promise.all([
+  const [{ data: profile }, merchants, tags, { count: inboxCount }] = await Promise.all([
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
     loadUserMerchants(supabase, user.id),
+    loadUserTags(supabase, user.id),
     supabase
       .from('email_accounts')
       .select('id', { count: 'exact', head: true })
@@ -107,6 +114,8 @@ export default async function OrdersPage({
     merchantId && merchants.some((entry) => entry.id === merchantId)
       ? merchantId
       : undefined;
+  const activeTag =
+    tagId && tags.some((entry) => entry.id === tagId) ? tagId : undefined;
   const showInbox = (inboxCount ?? 0) > 1;
 
   let query = supabase
@@ -115,7 +124,10 @@ export default async function OrdersPage({
       `
       id, order_date, total_cents, currency, status, external_order_number,
       merchants ( name, logo_url, domains ),
-      order_items ( name, variant, quantity, image_url, categories ( name ) ),
+      order_items (
+        name, variant, quantity, image_url, categories ( name ),
+        order_item_tags ( tag_id, item_tags ( id, name, slug ) )
+      ),
       ingested_messages ( subject, from_address, classification, email_accounts ( email_address ) )
     `,
     )
@@ -131,7 +143,13 @@ export default async function OrdersPage({
   const { data: rows, error } = await query;
   if (error) throw error;
 
-  const orders = q ? (rows ?? []).filter((order) => orderMatchesQuery(order, q)) : (rows ?? []);
+  let orders = rows ?? [];
+  if (activeTag) {
+    orders = orders.filter((order) => orderHasTagId(order, activeTag));
+  }
+  if (q) {
+    orders = orders.filter((order) => orderMatchesQuery(order, q));
+  }
 
   const grouped = new Map<string, typeof orders>();
   for (const order of orders) {
@@ -141,7 +159,8 @@ export default async function OrdersPage({
     grouped.set(key, bucket);
   }
 
-  const filteredEmpty = orders.length === 0 && Boolean(q || status || activeMerchant);
+  const filteredEmpty =
+    orders.length === 0 && Boolean(q || status || activeMerchant || activeTag);
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -156,6 +175,7 @@ export default async function OrdersPage({
                 range: entry.id,
                 status,
                 merchant: activeMerchant,
+                tag: activeTag,
                 q: q || undefined,
               })}
             />
@@ -165,7 +185,7 @@ export default async function OrdersPage({
           <RailItem
             label="Any"
             active={!activeMerchant}
-            href={hrefFor({ range, status, q: q || undefined })}
+            href={hrefFor({ range, status, tag: activeTag, q: q || undefined })}
           />
           {merchants.map((merchant) => (
             <RailItem
@@ -176,16 +196,50 @@ export default async function OrdersPage({
                 range,
                 status,
                 merchant: merchant.id,
+                tag: activeTag,
                 q: q || undefined,
               })}
             />
           ))}
         </RailGroup>
+        {tags.length > 0 && (
+          <RailGroup label="Tag">
+            <RailItem
+              label="Any"
+              active={!activeTag}
+              href={hrefFor({
+                range,
+                status,
+                merchant: activeMerchant,
+                q: q || undefined,
+              })}
+            />
+            {tags.map((tag) => (
+              <RailItem
+                key={tag.id}
+                label={tag.name}
+                active={tag.id === activeTag}
+                href={hrefFor({
+                  range,
+                  status,
+                  merchant: activeMerchant,
+                  tag: tag.id,
+                  q: q || undefined,
+                })}
+              />
+            ))}
+          </RailGroup>
+        )}
         <RailGroup label="Status">
           <RailItem
             label="Any"
             active={!status}
-            href={hrefFor({ range, merchant: activeMerchant, q: q || undefined })}
+            href={hrefFor({
+              range,
+              merchant: activeMerchant,
+              tag: activeTag,
+              q: q || undefined,
+            })}
           />
           {STATUSES.map((entry) => (
             <RailItem
@@ -196,6 +250,7 @@ export default async function OrdersPage({
                 range,
                 status: entry.id,
                 merchant: activeMerchant,
+                tag: activeTag,
                 q: q || undefined,
               })}
             />
@@ -220,6 +275,7 @@ export default async function OrdersPage({
           {activeMerchant && (
             <input type="hidden" name="merchant" value={activeMerchant} />
           )}
+          {activeTag && <input type="hidden" name="tag" value={activeTag} />}
           <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
@@ -229,7 +285,7 @@ export default async function OrdersPage({
             <Input
               name="q"
               defaultValue={q}
-              placeholder="Search merchant, item, order #, inbox…"
+              placeholder="Search merchant, item, tag, order #, inbox…"
               aria-label="Search orders"
               className="pl-9"
             />
@@ -242,7 +298,7 @@ export default async function OrdersPage({
             title={filteredEmpty ? 'No matching orders' : 'No orders yet'}
             description={
               filteredEmpty
-                ? 'Try a different search, merchant, status, or time range.'
+                ? 'Try a different search, merchant, tag, status, or time range.'
                 : 'Orders appear here as we find them in your inboxes, grouped by month. You can also add one by hand at any time.'
             }
             action={

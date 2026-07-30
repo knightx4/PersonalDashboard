@@ -1,6 +1,7 @@
 import { parseAmazonQuantityLines } from './amazon-lines';
 import { guessCategorySlug } from './guess-category';
 import { parseShopifyQuantityLines } from './shopify-lines';
+import { guessItemTags } from '@/lib/tags/guess';
 import type { CategoryOption, ExtractedOrder } from './schema';
 
 /** Dollars like $1,234.56 → cents. */
@@ -206,20 +207,28 @@ export function heuristicExtractOrder(input: {
     }
   }
 
-  const linesWithCategory: ExtractedOrder['lines'] = lines.map((line) => ({
-    name: line.name,
-    quantity: line.quantity,
-    unitPriceCents: line.unitPriceCents,
-    variant: line.variant,
-    categorySlug:
+  const linesWithCategory: ExtractedOrder['lines'] = lines.map((line) => {
+    const categorySlug =
       guessCategorySlug({
         name: line.name,
         merchantSlug: input.merchantSlug,
         subject: input.subject,
         text: line.blockText ?? line.name,
         customCategories: input.customCategories,
-      }) ?? null,
-  }));
+      }) ?? null;
+    return {
+      name: line.name,
+      quantity: line.quantity,
+      unitPriceCents: line.unitPriceCents,
+      variant: line.variant,
+      categorySlug,
+      tags: guessItemTags({
+        name: line.name,
+        variant: line.variant,
+        categorySlug,
+      }),
+    };
+  });
 
   const received = input.receivedAt ?? new Date();
   const orderDate = received.toISOString().slice(0, 10);

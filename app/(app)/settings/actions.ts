@@ -355,3 +355,15 @@ export async function deleteItemList(formData: FormData): Promise<void> {
   revalidatePath('/settings');
   revalidatePath('/inventory');
 }
+
+export async function deleteItemTag(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
+  if (!parsed.success) return;
+
+  const supabase = await createClient();
+  await supabase.from('item_tags').delete().eq('id', parsed.data.id).eq('user_id', user.id);
+
+  revalidatePath('/settings');
+  revalidatePath('/orders');
+}

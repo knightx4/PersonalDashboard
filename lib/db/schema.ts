@@ -564,3 +564,40 @@ export const syncJobs = pgTable(
   },
   (t) => [index('sync_jobs_account_idx').on(t.emailAccountId, t.createdAt)],
 );
+
+/** User-facing labels on order lines (shoes) — separate from categories (clothing). */
+export const itemTags = pgTable(
+  'item_tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('item_tags_user_slug_key').on(t.userId, t.slug),
+    index('item_tags_user_idx').on(t.userId),
+  ],
+);
+
+export const orderItemTags = pgTable(
+  'order_item_tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orderItemId: uuid('order_item_id')
+      .notNull()
+      .references(() => orderItems.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => itemTags.id, { onDelete: 'cascade' }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('order_item_tags_unique').on(t.orderItemId, t.tagId),
+    index('order_item_tags_item_idx').on(t.orderItemId),
+    index('order_item_tags_tag_idx').on(t.tagId),
+  ],
+);
