@@ -51,15 +51,22 @@ export default async function OrderDetailPage({
   const { data: sourceMessages } = await supabase
     .from('ingested_messages')
     .select(
-      'provider_message_id, thread_id, subject, from_address, classification, parse_status, email_accounts ( email_address )',
+      'provider_message_id, thread_id, subject, from_address, classification, parse_status, received_at, email_accounts ( email_address )',
     )
     .eq('resulting_order_id', id)
     .order('received_at', { ascending: true });
 
-  const sourceMessage =
-    sourceMessages?.find((row) => row.classification === 'order_confirmation') ??
-    sourceMessages?.[0] ??
-    null;
+  const confirmationMessage =
+    sourceMessages?.find((row) => row.classification === 'order_confirmation') ?? null;
+  /** Prefer confirmation for header actions; otherwise the earliest linked mail. */
+  const primaryMessage = confirmationMessage ?? sourceMessages?.[0] ?? null;
+  const lifecycleMessages = (sourceMessages ?? []).filter(
+    (row) =>
+      row.classification === 'shipping' ||
+      row.classification === 'delivery' ||
+      row.classification === 'return' ||
+      row.classification === 'cancellation',
+  );
 
   const { data: shipments } = await supabase
     .from('shipments')
@@ -75,19 +82,19 @@ export default async function OrderDetailPage({
 
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
-  const inbox = Array.isArray(sourceMessage?.email_accounts)
-    ? sourceMessage?.email_accounts[0]
-    : sourceMessage?.email_accounts;
+  const inbox = Array.isArray(primaryMessage?.email_accounts)
+    ? primaryMessage?.email_accounts[0]
+    : primaryMessage?.email_accounts;
   const gmailHref = gmailOpenUrl({
     emailAddress: inbox?.email_address,
-    threadId: sourceMessage?.thread_id,
-    messageId: sourceMessage?.provider_message_id,
+    threadId: primaryMessage?.thread_id,
+    messageId: primaryMessage?.provider_message_id,
   });
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
-        title={merchant?.name ?? sourceMessage?.subject?.slice(0, 48) ?? 'Order'}
+        title={merchant?.name ?? primaryMessage?.subject?.slice(0, 48) ?? 'Order'}
         description={`${order.order_date}${
           order.external_order_number ? ` · #${order.external_order_number}` : ''
         } · ${order.status.replaceAll('_', ' ')}${
@@ -162,14 +169,34 @@ export default async function OrderDetailPage({
         </div>
       )}
 
-      {sourceMessage?.subject && (
-        <p className="text-sm text-ink-muted">
-          From email: {sourceMessage.subject}
-          {sourceMessage.from_address ? ` · ${sourceMessage.from_address}` : ''}
-        </p>
-      )}
-      {inbox?.email_address && (
-        <p className="text-[13px] text-ink-faint">Via {inbox.email_address}</p>
+      {(confirmationMessage || lifecycleMessages.length > 0) && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
+            Emails
+          </h2>
+
+          {confirmationMessage && (
+            <OrderEmailCard
+              message={confirmationMessage}
+              emphasis="primary"
+              label="Order confirmation"
+            />
+          )}
+
+          {lifecycleMessages.length > 0 && (
+            <ul className="divide-y divide-border overflow-hidden rounded-card border border-border/80 bg-canvas/60">
+              {lifecycleMessages.map((message) => (
+                <li key={`${message.provider_message_id}-${message.classification}`}>
+                  <OrderEmailCard message={message} emphasis="secondary" />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {inbox?.email_address && (
+            <p className="text-[12px] text-ink-faint">Via {inbox.email_address}</p>
+          )}
+        </section>
       )}
 
       {(shipments?.length ?? 0) > 0 && (
@@ -356,6 +383,111 @@ export default async function OrderDetailPage({
           </dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+type LinkedEmail = {
+  provider_message_id: string;
+  thread_id: string | null;
+  subject: string | null;
+  from_address: string | null;
+  classification: string | null;
+  received_at: string | null;
+  email_accounts:
+    | { email_address: string }
+    | { email_address: string }[]
+    | null;
+};
+
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  order_confirmation: 'Order confirmation',
+  shipping: 'Shipped',
+  delivery: 'Delivered',
+  return: 'Return',
+  cancellation: 'Cancelled',
+};
+
+function OrderEmailCard({
+  message,
+  emphasis,
+  label,
+}: {
+  message: LinkedEmail;
+  emphasis: 'primary' | 'secondary';
+  label?: string;
+}) {
+  const account = Array.isArray(message.email_accounts)
+    ? message.email_accounts[0]
+    : message.email_accounts;
+  const href = gmailOpenUrl({
+    emailAddress: account?.email_address,
+    threadId: message.thread_id,
+    messageId: message.provider_message_id,
+  });
+  const kind =
+    label ??
+    CLASSIFICATION_LABELS[message.classification ?? ''] ??
+    (message.classification?.replaceAll('_', ' ') || 'Email');
+  const received = message.received_at
+    ? new Date(message.received_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+
+  if (emphasis === 'primary') {
+    return (
+      <div className="rounded-card border border-border bg-surface px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+              {kind}
+            </p>
+            <p className="mt-1 truncate text-sm font-medium text-ink">
+              {message.subject ?? 'No subject'}
+            </p>
+            <p className="mt-0.5 truncate text-[13px] text-ink-muted">
+              {[message.from_address, received].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+          {href && (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Open in Gmail
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">{kind}</p>
+        <p className="mt-0.5 truncate text-[13px] text-ink-muted">
+          {message.subject ?? 'No subject'}
+        </p>
+        <p className="truncate text-[12px] text-ink-faint">
+          {[message.from_address, received].filter(Boolean).join(' · ')}
+        </p>
+      </div>
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 text-[12px] text-ink-faint hover:text-brand hover:underline"
+        >
+          Open
+        </a>
+      )}
     </div>
   );
 }
