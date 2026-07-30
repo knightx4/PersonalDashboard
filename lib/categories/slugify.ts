@@ -29,3 +29,14 @@ export type CategoryColor = (typeof CATEGORY_COLOR_OPTIONS)[number];
 export function isCategoryColor(value: string): value is CategoryColor {
   return (CATEGORY_COLOR_OPTIONS as readonly string[]).includes(value);
 }
+
+/** Pick the next unused palette color for a new custom category. */
+export function pickCategoryColor(existingColors: readonly (string | null | undefined)[]): CategoryColor {
+  const used = new Set(
+    existingColors.filter((color): color is string => Boolean(color)),
+  );
+  for (const color of CATEGORY_COLOR_OPTIONS) {
+    if (!used.has(color)) return color;
+  }
+  return CATEGORY_COLOR_OPTIONS[existingColors.length % CATEGORY_COLOR_OPTIONS.length]!;
+}

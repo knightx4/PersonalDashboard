@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import {
   createCustomCategory,
   deleteCustomCategory,
@@ -8,8 +8,7 @@ import {
   type CategoryActionState,
 } from '@/app/(app)/settings/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label } from '@/components/ui/field';
-import { CATEGORY_COLOR_OPTIONS } from '@/lib/categories/slugify';
+import { FieldError, Input } from '@/components/ui/field';
 
 const initial: CategoryActionState = {};
 
@@ -24,8 +23,13 @@ export type SettingsCategory = {
 export function CategoriesSection({ categories }: { categories: SettingsCategory[] }) {
   const system = categories.filter((c) => !c.user_id);
   const custom = categories.filter((c) => c.user_id);
+  const [creating, setCreating] = useState(false);
   const [createState, createAction, createPending] = useActionState(
-    createCustomCategory,
+    async (prev: CategoryActionState, formData: FormData) => {
+      const next = await createCustomCategory(prev, formData);
+      if (next.message) setCreating(false);
+      return next;
+    },
     initial,
   );
 
@@ -40,63 +44,52 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
           Your categories
         </h3>
-        {custom.length === 0 ? (
+        {custom.length === 0 && !creating ? (
           <p className="text-sm text-ink-faint">None yet — create one below.</p>
-        ) : (
+        ) : custom.length > 0 ? (
           <ul className="divide-y divide-border rounded-lg border border-border">
             {custom.map((category) => (
               <CustomCategoryRow key={category.id} category={category} />
             ))}
           </ul>
-        )}
+        ) : null}
       </div>
 
-      <form action={createAction} className="space-y-3 rounded-lg border border-border p-3">
-        <p className="text-sm font-medium text-ink">Add a category</p>
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div>
-            <Label htmlFor="category_name">Name</Label>
-            <Input
-              id="category_name"
-              name="name"
-              required
-              maxLength={40}
-              placeholder="Camping, Kids, Gifts…"
-            />
-          </div>
-          <div>
-            <Label htmlFor="category_color">Color</Label>
-            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Category color">
-              {CATEGORY_COLOR_OPTIONS.map((color, index) => (
-                <label key={color} className="cursor-pointer">
-                  <input
-                    type="radio"
-                    name="color"
-                    value={color}
-                    defaultChecked={index === 0}
-                    className="peer sr-only"
-                  />
-                  <span
-                    className="block size-7 rounded-full border-2 border-transparent peer-checked:border-ink peer-focus-visible:ring-2 peer-focus-visible:ring-brand/30"
-                    style={{ backgroundColor: color }}
-                    aria-hidden
-                  />
-                  <span className="sr-only">{color}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
+      {creating ? (
+        <form action={createAction} className="flex flex-wrap items-center gap-2">
+          <Input
+            name="name"
+            required
+            maxLength={40}
+            autoFocus
+            placeholder="Camping, Kids, Gifts…"
+            className="min-w-[12rem] flex-1"
+            aria-label="New category name"
+          />
           <Button type="submit" size="sm" disabled={createPending}>
-            {createPending ? 'Adding…' : 'Add category'}
+            {createPending ? 'Adding…' : 'Add'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setCreating(false)}
+            disabled={createPending}
+          >
+            Cancel
+          </Button>
+          <FieldError>{createState.error}</FieldError>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
+            New category
           </Button>
           {createState.message && (
             <p className="text-sm text-positive">{createState.message}</p>
           )}
         </div>
-        <FieldError>{createState.error}</FieldError>
-      </form>
+      )}
 
       <div>
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">

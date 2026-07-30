@@ -6,11 +6,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailProvider } from '@/lib/email/providers/gmail';
-import {
-  CATEGORY_COLOR_OPTIONS,
-  isCategoryColor,
-  slugifyCategoryName,
-} from '@/lib/categories/slugify';
+import { pickCategoryColor, slugifyCategoryName } from '@/lib/categories/slugify';
 import { pickListGradient } from '@/lib/lists/gradients';
 
 export type CategoryActionState = {
@@ -170,7 +166,6 @@ export async function resetInboxImport(accountId: string): Promise<{
 
 const createCategorySchema = z.object({
   name: z.string().trim().min(2).max(40),
-  color: z.string().refine(isCategoryColor, 'Pick a color.'),
 });
 
 export async function createCustomCategory(
@@ -180,7 +175,6 @@ export async function createCustomCategory(
   const user = await requireUser();
   const parsed = createCategorySchema.safeParse({
     name: formData.get('name'),
-    color: formData.get('color') ?? CATEGORY_COLOR_OPTIONS[0],
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
@@ -198,12 +192,18 @@ export async function createCustomCategory(
     return { error: 'That category name is already used. Try another.' };
   }
 
+  const { data: existingCustom } = await supabase
+    .from('categories')
+    .select('color')
+    .eq('user_id', user.id);
+  const color = pickCategoryColor((existingCustom ?? []).map((row) => row.color));
+
   const { error } = await supabase.from('categories').insert({
     user_id: user.id,
     parent_id: null,
     name: parsed.data.name,
     slug,
-    color: parsed.data.color,
+    color,
   });
   if (error) return { error: error.message };
 
