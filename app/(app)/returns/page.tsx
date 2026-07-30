@@ -4,39 +4,43 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { formatMoney } from '@/lib/money';
-import { deadlineLabel } from '@/lib/returns/deadline';
-import { displayVariant } from '@/lib/inventory/display';
 import {
   filterReturnsRows,
+  groupReturnsByOrder,
   loadReturnsTracker,
+  parseReturnsGroup,
   parseReturnsView,
+  RETURNS_GROUPS,
   RETURNS_VIEWS,
+  type ReturnsGroupMode,
   type ReturnsView,
 } from '@/lib/returns/load';
-import {
-  MarkReturnedButton,
-  PlanReturnButton,
-  UndoReturnedButton,
-} from './plan-return-button';
+import { ReturnItemRow } from './return-item-row';
+import { ReturnsOrderList } from './returns-order-list';
 
 export const metadata = { title: 'Returns' };
 
-function returnsHref(view: ReturnsView, merchant?: string): string {
+function returnsHref(
+  view: ReturnsView,
+  opts?: { merchant?: string; group?: ReturnsGroupMode },
+): string {
   const params = new URLSearchParams({ view });
-  if (merchant) params.set('merchant', merchant);
+  const group = opts?.group ?? 'items';
+  if (group === 'orders') params.set('group', 'orders');
+  if (opts?.merchant) params.set('merchant', opts.merchant);
   return `/returns?${params.toString()}`;
 }
 
 export default async function ReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; merchant?: string }>;
+  searchParams: Promise<{ view?: string; merchant?: string; group?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
   const params = await searchParams;
   const view = parseReturnsView(params.view);
+  const group = parseReturnsGroup(params.group);
   const merchantFilter = params.merchant?.trim() || undefined;
 
   const data = await loadReturnsTracker(supabase, user.id, view);
@@ -50,6 +54,7 @@ export default async function ReturnsPage({
   ].sort((a, b) => a[1].localeCompare(b[1]));
 
   const rows = filterReturnsRows(data.rows, view, merchantFilter);
+  const orderGroups = group === 'orders' ? groupReturnsByOrder(rows) : [];
 
   const emptyCopy: Record<ReturnsView, { title: string; description: string }> = {
     soon: {
@@ -79,24 +84,38 @@ export default async function ReturnsPage({
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
       <LeftRail>
+        <RailGroup label="Group by">
+          {RETURNS_GROUPS.map((entry) => (
+            <RailItem
+              key={entry.id}
+              label={entry.label}
+              active={entry.id === group}
+              href={returnsHref(view, { merchant: merchantFilter, group: entry.id })}
+            />
+          ))}
+        </RailGroup>
         <RailGroup label="View">
           {RETURNS_VIEWS.map((entry) => (
             <RailItem
               key={entry.id}
               label={`${entry.label}${data.counts[entry.id] ? ` (${data.counts[entry.id]})` : ''}`}
               active={entry.id === view}
-              href={returnsHref(entry.id, merchantFilter)}
+              href={returnsHref(entry.id, { merchant: merchantFilter, group })}
             />
           ))}
         </RailGroup>
         <RailGroup label="Merchant">
-          <RailItem label="Any" active={!merchantFilter} href={returnsHref(view)} />
+          <RailItem
+            label="Any"
+            active={!merchantFilter}
+            href={returnsHref(view, { group })}
+          />
           {merchantOptions.map(([id, name]) => (
             <RailItem
               key={id}
               label={name}
               active={merchantFilter === id}
-              href={returnsHref(view, id)}
+              href={returnsHref(view, { merchant: id, group })}
             />
           ))}
         </RailGroup>
@@ -123,9 +142,9 @@ export default async function ReturnsPage({
             description={emptyCopy[view].description}
             action={
               merchantFilter
-                ? { label: 'Clear merchant', href: returnsHref(view) }
+                ? { label: 'Clear merchant', href: returnsHref(view, { group }) }
                 : view !== 'all' && view !== 'returned'
-                  ? { label: 'See all items', href: returnsHref('all') }
+                  ? { label: 'See all items', href: returnsHref('all', { group }) }
                   : { label: 'Open inventory', href: '/inventory' }
             }
             secondaryAction={
@@ -134,82 +153,13 @@ export default async function ReturnsPage({
                 : undefined
             }
           />
+        ) : group === 'orders' ? (
+          <ReturnsOrderList groups={orderGroups} />
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-            {rows.map((row) => {
-              const urgency =
-                row.daysLeft != null && row.daysLeft <= 7
-                  ? 'text-accent-orange font-medium'
-                  : 'text-ink-muted';
-              const returned = row.status === 'returned';
-              return (
-                <li
-                  key={row.inventoryItemId}
-                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-ink">
-                          {row.name}
-                          {row.returnPlanned && !returned && (
-                            <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
-                              To return
-                            </span>
-                          )}
-                          {returned && (
-                            <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                              Returned
-                            </span>
-                          )}
-                        </p>
-                        <p className="truncate text-[13px] text-ink-muted">
-                          {[row.merchantName, displayVariant(row.variant)]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
-                      </div>
-                      <p className="tabular shrink-0 text-sm font-medium text-ink">
-                        {formatMoney(row.costCents)}
-                      </p>
-                    </div>
-                    <p className={`mt-1 text-[12px] ${returned ? 'text-ink-muted' : urgency}`}>
-                      {returned
-                        ? row.refundedAt
-                          ? `Returned ${row.refundedAt}`
-                          : 'Returned'
-                        : row.returnDeadline && row.daysLeft != null
-                          ? deadlineLabel(row.daysLeft, row.returnDeadline)
-                          : row.returnWindowDays == null
-                            ? 'No return window set for this merchant'
-                            : 'Awaiting delivery for deadline'}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-                    {returned && row.returnId ? (
-                      <UndoReturnedButton
-                        itemId={row.inventoryItemId}
-                        returnId={row.returnId}
-                      />
-                    ) : (
-                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                        <PlanReturnButton
-                          itemId={row.inventoryItemId}
-                          planned={row.returnPlanned}
-                        />
-                        <MarkReturnedButton itemId={row.inventoryItemId} />
-                      </div>
-                    )}
-                    <Link
-                      href={`/orders/${row.orderId}`}
-                      className="text-[12px] text-ink-muted hover:text-brand hover:underline"
-                    >
-                      View order
-                    </Link>
-                  </div>
-                </li>
-              );
-            })}
+            {rows.map((row) => (
+              <ReturnItemRow key={row.inventoryItemId} row={row} />
+            ))}
           </ul>
         )}
       </div>
