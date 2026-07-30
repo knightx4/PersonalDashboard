@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
-import { formatMoney } from '@/lib/money';
+import { MoneyWithBase } from '@/components/money/money-with-base';
 import { cn } from '@/lib/cn';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -31,9 +31,10 @@ function statusLabel(status: string): string {
 export type OrderRowData = {
   id: string;
   order_date: string;
+  /** Display / base currency amount. */
   total_cents: number;
   currency: string;
-  /** When set and different from currency, shown as a muted native amount. */
+  /** When set and different from currency, shown muted underneath. */
   native_total_cents?: number;
   native_currency?: string;
   status: string;
@@ -90,16 +91,13 @@ export function OrderRow({ order }: { order: OrderRowData }) {
           <p className="mt-0.5 truncate text-[12px] text-ink-faint">{meta.join(' · ')}</p>
         </div>
 
-        <p className="tabular shrink-0 text-right text-[15px] font-semibold text-ink">
-          {formatMoney(order.total_cents, order.currency)}
-          {order.native_currency &&
-            order.native_total_cents != null &&
-            order.native_currency !== order.currency && (
-              <span className="mt-0.5 block text-[11px] font-normal text-ink-faint">
-                {formatMoney(order.native_total_cents, order.native_currency)}
-              </span>
-            )}
-        </p>
+        <MoneyWithBase
+          cents={order.total_cents}
+          currency={order.currency}
+          foreignCents={order.native_total_cents}
+          foreignCurrency={order.native_currency}
+          primaryClassName="text-[15px] font-semibold text-ink"
+        />
       </Link>
     </li>
   );

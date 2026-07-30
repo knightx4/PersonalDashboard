@@ -6,7 +6,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
-import { formatMoney, lineSubtotalCents } from '@/lib/money';
+import { MoneyWithBase } from '@/components/money/money-with-base';
+import { lineSubtotalCents } from '@/lib/money';
 import {
   ConfirmOrderButton,
   DiscardOrderButton,
@@ -152,10 +153,27 @@ export default async function OrderDetailPage({
     display_refund_cents: next(),
   }));
 
-  function moneyLabel(displayCents: number, nativeCents: number): string {
-    const primary = formatMoney(displayCents, displayCurrency);
-    if (!showNative) return primary;
-    return `${primary} · ${formatMoney(nativeCents, nativeCurrency)}`;
+  function MoneyAmount({
+    nativeCents,
+    displayCents,
+    className,
+    primaryClassName,
+  }: {
+    nativeCents: number;
+    displayCents: number;
+    className?: string;
+    primaryClassName?: string;
+  }) {
+    return (
+      <MoneyWithBase
+        cents={displayCents}
+        currency={displayCurrency}
+        foreignCents={showNative ? nativeCents : undefined}
+        foreignCurrency={showNative ? nativeCurrency : undefined}
+        className={className}
+        primaryClassName={primaryClassName}
+      />
+    );
   }
 
   return (
@@ -314,9 +332,11 @@ export default async function OrderDetailPage({
                   {row.status.replaceAll('_', ' ')}
                   {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
                 </span>
-                <span className="tabular text-ink-muted">
-                  {moneyLabel(row.display_refund_cents, row.refund_amount_cents)}
-                </span>
+                <MoneyAmount
+                  nativeCents={row.refund_amount_cents}
+                  displayCents={row.display_refund_cents}
+                  primaryClassName="text-ink-muted"
+                />
               </li>
             ))}
           </ul>
@@ -381,8 +401,12 @@ export default async function OrderDetailPage({
                               View in inventory
                               {units.length > 1 ? ` (${index + 1} of ${units.length})` : ''}
                             </Link>
-                            <span className="tabular text-[13px] text-ink-muted">
-                              Landed {moneyLabel(unit.display_cost_cents, unit.cost_cents)}
+                            <span className="inline-flex items-baseline gap-1 text-[13px] text-ink-muted">
+                              Landed{' '}
+                              <MoneyAmount
+                                nativeCents={unit.cost_cents}
+                                displayCents={unit.display_cost_cents}
+                              />
                             </span>
                             <span className="rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
                               {unit.status.replaceAll('_', ' ')}
@@ -393,14 +417,17 @@ export default async function OrderDetailPage({
                     )}
                   </td>
                   <td className="tabular px-4 py-3 align-top text-ink-muted">{item.quantity}</td>
-                  <td className="tabular px-4 py-3 align-top text-right text-ink">
-                    {moneyLabel(item.display_unit_cents, item.unit_price_cents)}
+                  <td className="px-4 py-3 align-top text-right text-ink">
+                    <MoneyAmount
+                      nativeCents={item.unit_price_cents}
+                      displayCents={item.display_unit_cents}
+                    />
                   </td>
-                  <td className="tabular px-4 py-3 align-top text-right text-ink">
-                    {moneyLabel(
-                      item.display_line_cents,
-                      lineSubtotalCents(item.quantity, item.unit_price_cents),
-                    )}
+                  <td className="px-4 py-3 align-top text-right text-ink">
+                    <MoneyAmount
+                      nativeCents={lineSubtotalCents(item.quantity, item.unit_price_cents)}
+                      displayCents={item.display_line_cents}
+                    />
                   </td>
                 </tr>
               );
@@ -412,38 +439,47 @@ export default async function OrderDetailPage({
       <dl className="grid gap-2 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
         <div className="flex justify-between gap-4 sm:col-span-2">
           <dt className="text-ink-muted">Subtotal</dt>
-          <dd className="tabular text-ink">
-            {moneyLabel(displaySubtotal, order.subtotal_cents)}
+          <dd className="text-ink">
+            <MoneyAmount
+              nativeCents={order.subtotal_cents}
+              displayCents={displaySubtotal}
+            />
           </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">Tax</dt>
-          <dd className="tabular text-ink">{moneyLabel(displayTax, order.tax_cents)}</dd>
+          <dd className="text-ink">
+            <MoneyAmount nativeCents={order.tax_cents} displayCents={displayTax} />
+          </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">Shipping</dt>
-          <dd className="tabular text-ink">
-            {moneyLabel(displayShipping, order.shipping_cents)}
+          <dd className="text-ink">
+            <MoneyAmount
+              nativeCents={order.shipping_cents}
+              displayCents={displayShipping}
+            />
           </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-ink-muted">Discount</dt>
-          <dd className="tabular text-ink">
-            {moneyLabel(displayDiscount, order.discount_cents)}
+          <dd className="text-ink">
+            <MoneyAmount
+              nativeCents={order.discount_cents}
+              displayCents={displayDiscount}
+            />
           </dd>
         </div>
         <div className="flex justify-between gap-4 border-t border-border pt-2 sm:col-span-2">
           <dt className="font-medium text-ink">Total</dt>
-          <dd className="tabular font-semibold text-ink">
-            {moneyLabel(displayTotal, order.total_cents)}
+          <dd className="font-semibold text-ink">
+            <MoneyAmount
+              nativeCents={order.total_cents}
+              displayCents={displayTotal}
+              primaryClassName="font-semibold"
+            />
           </dd>
         </div>
-        {showNative && (
-          <div className="flex justify-between gap-4 sm:col-span-2">
-            <dt className="text-ink-muted">Order currency</dt>
-            <dd className="text-ink">{nativeCurrency}</dd>
-          </div>
-        )}
         {order.return_deadline && (
           <div className="flex justify-between gap-4 sm:col-span-2">
             <dt className="text-ink-muted">Return deadline</dt>
