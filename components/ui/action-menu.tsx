@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -71,6 +72,14 @@ function useMenuPosition(
   return pos;
 }
 
+function buildFormData(fields: Record<string, string> | undefined): FormData {
+  const formData = new FormData();
+  for (const [name, value] of Object.entries(fields ?? {})) {
+    formData.set(name, value);
+  }
+  return formData;
+}
+
 /** Icon-sized ghost button used for row quick actions and menu triggers. */
 export const IconActionButton = forwardRef<
   HTMLButtonElement,
@@ -78,11 +87,11 @@ export const IconActionButton = forwardRef<
     label: string;
     active?: boolean;
   }
->(function IconActionButton({ label, className, active, children, ...props }, ref) {
+>(function IconActionButton({ label, className, active, children, type = 'button', ...props }, ref) {
   return (
     <button
       ref={ref}
-      type="button"
+      type={type}
       aria-label={label}
       title={label}
       className={cn(
@@ -104,6 +113,9 @@ export const IconActionButton = forwardRef<
 /**
  * Three-dot overflow menu. Renders the panel in a portal with fixed
  * positioning so it is not clipped by overflow-hidden list cards.
+ *
+ * Server actions are invoked via startTransition after the menu closes —
+ * unmounting a <form> mid-submit was aborting deletes / excludes.
  */
 export function ActionMenu({
   label = 'More actions',
@@ -120,6 +132,7 @@ export function ActionMenu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -144,6 +157,24 @@ export function ActionMenu({
     };
   }, [open]);
 
+  function runItem(item: ActionMenuItem) {
+    if (item.disabled || pending) return;
+    if (item.confirm && !window.confirm(item.confirm)) return;
+
+    setOpen(false);
+
+    if (item.formAction) {
+      const formData = buildFormData(item.formFields);
+      const action = item.formAction;
+      startTransition(() => {
+        void action(formData);
+      });
+      return;
+    }
+
+    item.onSelect?.();
+  }
+
   return (
     <div className={cn('relative', className)}>
       <IconActionButton
@@ -153,6 +184,7 @@ export function ActionMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         active={open}
+        disabled={pending}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -179,49 +211,20 @@ export function ActionMenu({
                 item.destructive
                   ? 'text-red-600 hover:bg-red-50'
                   : 'text-ink hover:bg-canvas',
-                item.disabled && 'pointer-events-none opacity-40',
+                (item.disabled || pending) && 'pointer-events-none opacity-40',
               );
-
-              if (item.formAction) {
-                return (
-                  <form
-                    key={item.id}
-                    action={item.formAction}
-                    className="block"
-                    onSubmit={(event) => {
-                      if (item.confirm && !window.confirm(item.confirm)) {
-                        event.preventDefault();
-                        return;
-                      }
-                      setOpen(false);
-                    }}
-                  >
-                    {Object.entries(item.formFields ?? {}).map(([name, value]) => (
-                      <input key={name} type="hidden" name={name} value={value} />
-                    ))}
-                    <button
-                      type="submit"
-                      role="menuitem"
-                      disabled={item.disabled}
-                      className={itemClass}
-                    >
-                      {item.label}
-                    </button>
-                  </form>
-                );
-              }
 
               return (
                 <button
                   key={item.id}
                   type="button"
                   role="menuitem"
-                  disabled={item.disabled}
+                  disabled={item.disabled || pending}
                   className={itemClass}
-                  onClick={() => {
-                    if (item.confirm && !window.confirm(item.confirm)) return;
-                    item.onSelect?.();
-                    setOpen(false);
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    runItem(item);
                   }}
                 >
                   {item.label}
