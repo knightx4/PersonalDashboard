@@ -23,8 +23,10 @@ export type ActionMenuItem = {
   /** Server action (FormData). May redirect or return a result. */
   formAction?: (formData: FormData) => unknown | Promise<unknown>;
   formFields?: Record<string, string>;
-  /** Confirm before submit / select. */
+  /** Confirm before submit / select. Prefer inline confirm UIs — window.confirm is often blocked. */
   confirm?: string;
+  /** When false, keep the menu open after selecting (for multi-step menus). Default true. */
+  closeOnSelect?: boolean;
   onSelect?: () => void;
 };
 
@@ -123,6 +125,7 @@ export function ActionMenu({
   align = 'end',
   trigger,
   className,
+  onOpenChange,
 }: {
   label?: string;
   items: ActionMenuItem[];
@@ -130,6 +133,7 @@ export function ActionMenu({
   /** Custom trigger; defaults to ⋯. */
   trigger?: ReactNode;
   className?: string;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -138,16 +142,21 @@ export function ActionMenu({
   const menuId = useId();
   const pos = useMenuPosition(open, triggerRef, align);
 
+  function setMenuOpen(next: boolean) {
+    setOpen(next);
+    onOpenChange?.(next);
+  }
+
   useEffect(() => {
     if (!open) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') setMenuOpen(false);
     }
     function onPointer(event: MouseEvent) {
       const target = event.target as Node;
       if (triggerRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
-      setOpen(false);
+      setMenuOpen(false);
     }
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onPointer);
@@ -155,13 +164,16 @@ export function ActionMenu({
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onPointer);
     };
+    // setMenuOpen is stable enough for open/close listeners; recreate when open flips.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only bind while open
   }, [open]);
 
   function runItem(item: ActionMenuItem) {
     if (item.disabled || pending) return;
     if (item.confirm && !window.confirm(item.confirm)) return;
 
-    setOpen(false);
+    const shouldClose = item.closeOnSelect !== false;
+    if (shouldClose) setMenuOpen(false);
 
     if (item.formAction) {
       const formData = buildFormData(item.formFields);
@@ -200,7 +212,7 @@ export function ActionMenu({
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          setOpen((value) => !value);
+          setMenuOpen(!open);
         }}
       >
         {trigger ?? <MoreHorizontal className="size-4" strokeWidth={2} aria-hidden />}

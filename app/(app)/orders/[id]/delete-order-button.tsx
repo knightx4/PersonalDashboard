@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { softDeleteOrder } from '@/app/(app)/orders/actions';
 import { Button } from '@/components/ui/button';
@@ -14,39 +14,72 @@ export function DeleteOrderButton({
   merchantName: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const label = merchantName.trim() || 'this order';
 
-  return (
-    <div className="inline-flex flex-col items-end gap-1">
+  if (!confirming) {
+    return (
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        disabled={pending}
         onClick={() => {
-          const ok = window.confirm(
-            `Delete ${label} and its inventory items?\n\nYou can restore it later from Settings → Deleted orders.`,
-          );
-          if (!ok) return;
-
           setError(null);
-          startTransition(async () => {
-            const formData = new FormData();
-            formData.set('orderId', orderId);
-            const result = await softDeleteOrder(formData);
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            router.push('/orders');
-            router.refresh();
-          });
+          setConfirming(true);
         }}
       >
-        {pending ? 'Deleting…' : 'Delete order'}
+        Delete order
       </Button>
+    );
+  }
+
+  return (
+    <div className="inline-flex flex-col items-end gap-1">
+      <p className="max-w-[16rem] text-right text-[12px] text-ink-muted">
+        Delete {label}? You can restore it later from Settings.
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => setConfirming(false)}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          variant="danger"
+          size="sm"
+          disabled={pending}
+          onClick={() => {
+            setError(null);
+            setPending(true);
+            void (async () => {
+              const formData = new FormData();
+              formData.set('orderId', orderId);
+              try {
+                const result = await softDeleteOrder(formData);
+                if (!result.ok) {
+                  setError(result.error);
+                  setPending(false);
+                  return;
+                }
+                router.push('/orders');
+                router.refresh();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Delete failed.');
+                setPending(false);
+              }
+            })();
+          }}
+        >
+          {pending ? 'Deleting…' : 'Confirm delete'}
+        </Button>
+      </div>
       <FieldError>{error}</FieldError>
     </div>
   );
