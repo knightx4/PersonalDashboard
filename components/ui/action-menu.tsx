@@ -20,8 +20,8 @@ export type ActionMenuItem = {
   label: string;
   destructive?: boolean;
   disabled?: boolean;
-  /** Native form action (FormData-only server action). */
-  formAction?: (formData: FormData) => void | Promise<void>;
+  /** Server action (FormData). May redirect or return a result. */
+  formAction?: (formData: FormData) => unknown | Promise<unknown>;
   formFields?: Record<string, string>;
   /** Confirm before submit / select. */
   confirm?: string;
@@ -166,13 +166,25 @@ export function ActionMenu({
     if (item.formAction) {
       const formData = buildFormData(item.formFields);
       const action = item.formAction;
-      startTransition(() => {
-        void action(formData);
+      startTransition(async () => {
+        try {
+          await action(formData);
+        } catch (err) {
+          const digest =
+            typeof err === 'object' && err && 'digest' in err
+              ? String((err as { digest: unknown }).digest)
+              : '';
+          // redirect() from a server action — let Next.js navigate.
+          if (digest.startsWith('NEXT_REDIRECT')) throw err;
+          window.alert(err instanceof Error ? err.message : 'Something went wrong.');
+        }
       });
       return;
     }
 
-    item.onSelect?.();
+    startTransition(() => {
+      item.onSelect?.();
+    });
   }
 
   return (

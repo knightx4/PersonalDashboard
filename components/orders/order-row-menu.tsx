@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   excludeMerchantFromOrder,
   softDeleteOrder,
@@ -13,6 +14,7 @@ export function OrderRowMenu({
   orderId: string;
   merchantName: string;
 }) {
+  const router = useRouter();
   const label = merchantName.trim() || 'this sender';
 
   return (
@@ -30,9 +32,20 @@ export function OrderRowMenu({
           id: 'delete',
           label: 'Delete order',
           destructive: true,
-          formAction: softDeleteOrder,
-          formFields: { orderId },
           confirm: `Delete ${label} and its inventory items?\n\nYou can restore it later from Settings → Deleted orders.`,
+          onSelect: () => {
+            void (async () => {
+              const formData = new FormData();
+              formData.set('orderId', orderId);
+              const result = await softDeleteOrder(formData);
+              if (!result.ok) {
+                window.alert(result.error);
+                return;
+              }
+              router.push('/orders');
+              router.refresh();
+            })();
+          },
         },
       ]}
     />

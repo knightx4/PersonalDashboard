@@ -358,23 +358,36 @@ export async function restoreMerchantExclusion(formData: FormData): Promise<void
 /**
  * Soft-delete an order (and its inventory from active views). Restorable from
  * Settings → Deleted orders.
+ *
+ * Returns `{ ok: true }` on success so client callers can navigate/refresh.
+ * Throws only for unexpected failures; returns `{ error }` for expected ones.
  */
-export async function softDeleteOrder(formData: FormData): Promise<void> {
+export async function softDeleteOrder(
+  formData: FormData,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await requireUser();
   const supabase = await createClient();
   const orderId = String(formData.get('orderId') ?? '');
   if (!z.string().uuid().safeParse(orderId).success) {
-    throw new Error('Invalid order.');
+    return { ok: false, error: 'Invalid order.' };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('orders')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', orderId)
     .eq('user_id', user.id)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, error: error.message };
+  if (!data) {
+    return {
+      ok: false,
+      error: 'Could not delete that order. It may already be deleted, or you may need to refresh and try again.',
+    };
+  }
 
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderId}`);
@@ -383,7 +396,7 @@ export async function softDeleteOrder(formData: FormData): Promise<void> {
   revalidatePath('/returns');
   revalidatePath('/review');
   revalidatePath('/settings');
-  redirect('/orders');
+  return { ok: true };
 }
 
 export async function restoreDeletedOrder(formData: FormData): Promise<void> {
