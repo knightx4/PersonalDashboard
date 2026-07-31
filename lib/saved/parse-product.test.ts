@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parsePriceToCents, parseProductHtml } from '@/lib/saved/parse-product';
+import {
+  isGenericImageUrl,
+  isGenericTitle,
+  parsePriceToCents,
+  parseProductHtml,
+  titleFromProductUrl,
+} from '@/lib/saved/parse-product';
 import {
   findMerchantByUrl,
   hostnameFromUrl,
@@ -46,7 +52,6 @@ describe('parseProductHtml', () => {
     expect(result.source).toBe('json_ld');
     expect(result.title).toBe('JSON-LD wins for title');
     expect(result.priceCents).toBe(5550);
-    // Image only on OG — still filled as a gap.
     expect(result.imageUrl).toBe('https://cdn.example.com/og-only.jpg');
   });
 
@@ -69,6 +74,56 @@ describe('parseProductHtml', () => {
     expect(result.title).toBe('Patagonia Better Sweater');
     expect(result.priceCents).toBe(13900);
     expect(result.imageUrl).toBe('https://cdn.example.com/sweater-1.jpg');
+  });
+
+  it('rejects Amazon bot-shell OG and uses the URL slug', () => {
+    const pageUrl =
+      'https://www.amazon.com/Origin-Wealth-Remaking-Economics-Business/dp/1422121038';
+    const result = parseProductHtml(load('amazon-bot-shell.html'), pageUrl);
+    expect(result.title).toBe('Origin Wealth Remaking Economics Business');
+    expect(result.imageUrl).toBeNull();
+    expect(result.priceCents).toBeNull();
+    expect(result.source).toBe('url');
+  });
+
+  it('prefers a useful <title> over junk Amazon OG', () => {
+    const pageUrl =
+      'https://www.amazon.com/Origin-Wealth-Remaking-Economics-Business/dp/1422121038';
+    const result = parseProductHtml(load('amazon-title-tag.html'), pageUrl);
+    expect(result.title).toBe('Origin of Wealth');
+    expect(result.imageUrl).toBeNull();
+    expect(result.source).toBe('document_title');
+  });
+});
+
+describe('titleFromProductUrl', () => {
+  it('reads Amazon /slug/dp/ASIN paths', () => {
+    expect(
+      titleFromProductUrl(
+        'https://www.amazon.com/Origin-Wealth-Remaking-Economics-Business/dp/1422121038',
+      ),
+    ).toBe('Origin Wealth Remaking Economics Business');
+    expect(titleFromProductUrl('https://www.amazon.com/dp/1422121038')).toBeNull();
+  });
+
+  it('reads /products/ handles', () => {
+    expect(titleFromProductUrl('https://shop.example.com/products/sony-wh-1000xm5')).toBe(
+      'sony wh 1000xm5',
+    );
+  });
+});
+
+describe('generic detection', () => {
+  it('flags merchant-only titles and share-icon images', () => {
+    expect(isGenericTitle('Amazon', 'https://www.amazon.com/dp/1')).toBe(true);
+    expect(isGenericTitle('Amazon.com', 'https://www.amazon.com/dp/1')).toBe(true);
+    expect(isGenericTitle('Sony WH-1000XM5', 'https://www.amazon.com/dp/1')).toBe(false);
+    expect(
+      isGenericImageUrl('https://m.media-amazon.com/images/G/01/share-icons/preview.png'),
+    ).toBe(true);
+    expect(isGenericImageUrl('https://m.media-amazon.com/images/I/71abcProduct.jpg')).toBe(
+      false,
+    );
   });
 });
 

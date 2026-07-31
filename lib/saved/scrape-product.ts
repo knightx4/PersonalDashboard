@@ -74,8 +74,10 @@ export async function scrapeProductUrl(rawUrl: string): Promise<ScrapedProduct> 
       signal: controller.signal,
       headers: {
         Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        // Browser-like UA: custom bot strings often get Amazon's generic OG shell.
         'User-Agent':
-          'ShoppingManagerBot/1.0 (+https://github.com/knightx4/ShoppingManager; saved-item-unfurl)',
+          'Mozilla/5.0 (compatible; ShoppingManager/1.0; +https://github.com/knightx4/ShoppingManager)',
       },
     });
 
