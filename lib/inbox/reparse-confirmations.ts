@@ -91,7 +91,7 @@ export async function reparseInboxConfirmations(
   };
   const limit = opts.limit ?? 200;
 
-  let query = supabase
+  const query = supabase
     .from('ingested_messages')
     .select(
       'id, provider_message_id, from_address, subject, parser_version, resulting_order_id, parse_status',

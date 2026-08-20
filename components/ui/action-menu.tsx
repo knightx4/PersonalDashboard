@@ -58,10 +58,7 @@ function useMenuPosition(
   }, [align, triggerRef]);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPos(null);
-      return;
-    }
+    if (!open) return;
     update();
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
@@ -71,7 +68,8 @@ function useMenuPosition(
     };
   }, [open, update]);
 
-  return pos;
+  // Clear without setState-in-effect when closed (lint: react-hooks/set-state-in-effect).
+  return open ? pos : null;
 }
 
 function buildFormData(fields: Record<string, string> | undefined): FormData {
