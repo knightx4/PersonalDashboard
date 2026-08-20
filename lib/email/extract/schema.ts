@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const PARSER_VERSION = 'extract-v4';
+export const PARSER_VERSION = 'extract-v5';
 
 /** Top-level system category slugs (always allowed). */
 export const CATEGORY_SLUGS = [

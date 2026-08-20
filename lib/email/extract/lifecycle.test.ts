@@ -63,7 +63,8 @@ describe('extractLifecycleFromEmail', () => {
       classification: 'shipping',
       subject,
       text,
-      receivedAt: new Date('2026-01-16T15:00:00Z'),
+      // Forwarded later — body "Shipped on" must win.
+      receivedAt: new Date('2026-08-20T15:00:00Z'),
     });
     expect(extracted).not.toBeNull();
     expect(extracted?.externalOrderNumber).toBe('123-4567890-1234567');
@@ -80,7 +81,7 @@ describe('extractLifecycleFromEmail', () => {
       classification: 'delivery',
       subject,
       text,
-      receivedAt: new Date('2026-01-18T18:00:00Z'),
+      receivedAt: new Date('2026-08-20T18:00:00Z'),
     });
     expect(extracted).not.toBeNull();
     expect(extracted?.externalOrderNumber).toBe('123-4567890-1234567');

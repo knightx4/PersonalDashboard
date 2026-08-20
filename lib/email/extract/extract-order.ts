@@ -35,7 +35,7 @@ Return ONLY a JSON object with these fields:
 - merchantName (string|null)
 - merchantSlug (string|null) — lowercase kebab if known (amazon, target, …)
 - externalOrderNumber (string|null)
-- orderDate (YYYY-MM-DD)
+- orderDate (YYYY-MM-DD) — use an explicit Order Date / Placed on / Date in the body when present. Ignore forward wrappers and mailbox receive time.
 - currency — ISO 4217 from the email (HKD, EUR, USD, …). Default USD only when unspecified.
 - taxCents, shippingCents, discountCents, totalCents (integers, cents) in that currency
 - lines: [{ name, shortName, searchTags, tags, variant|null, quantity (int), unitPriceCents (int), productUrl|null, imageUrl|null, categorySlug|null }]

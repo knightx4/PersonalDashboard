@@ -87,13 +87,16 @@ describe('heuristicExtractOrder + applyExtraction', () => {
       text: body,
       merchantSlug: 'amazon',
       merchantName: 'Amazon',
-      receivedAt: new Date('2026-01-15T12:00:00Z'),
+      // Simulate a Yahoo→Gmail forward: mailbox date is today, body date is older.
+      receivedAt: new Date('2026-08-20T18:00:00Z'),
     });
     expect(raw).not.toBeNull();
+    expect(raw?.orderDate).toBe('2026-01-15');
     const applied = applyExtraction(raw);
     expect(applied.ok).toBe(true);
     if (applied.ok) {
       expect(applied.order.externalOrderNumber).toBe('123-4567890-1234567');
+      expect(applied.order.orderDate).toBe('2026-01-15');
       expect(applied.order.totalCents).toBe(37584);
       expect(applied.order.lines[0]?.name).toMatch(/Sony/i);
     }

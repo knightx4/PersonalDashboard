@@ -130,9 +130,11 @@ describe('heuristicExtractOrder Goods of Desire fixture', () => {
       merchantSlug: 'shopify',
       merchantName: 'Shopify',
       fromAddress: 'Goods of Desire <store+7386935@t.shopifyemail.com>',
-      receivedAt: new Date('2026-05-22T04:20:32Z'),
+      // Forwarded later — body "Date 05/22/2026" must win.
+      receivedAt: new Date('2026-08-20T04:20:32Z'),
     });
     expect(raw).not.toBeNull();
+    expect(raw?.orderDate).toBe('2026-05-22');
     expect(raw?.merchantName).toMatch(/Goods of Desire/i);
     expect(raw?.merchantSlug).toBeNull();
     expect(raw?.currency).toBe('HKD');

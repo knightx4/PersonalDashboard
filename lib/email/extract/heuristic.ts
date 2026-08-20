@@ -1,6 +1,7 @@
 import { isPlatformMerchantName, isPlatformMerchantSlug } from '@/lib/merchants/platform';
 import { parseAmazonQuantityLines } from './amazon-lines';
 import { extractCurrencyCode } from './currency';
+import { extractOrderDateYmd } from './email-dates';
 import { guessCategorySlug } from './guess-category';
 import { parseShopifyQuantityLines } from './shopify-lines';
 import { guessItemTags } from '@/lib/tags/guess';
@@ -257,8 +258,9 @@ export function heuristicExtractOrder(input: {
     };
   });
 
-  const received = input.receivedAt ?? new Date();
-  const orderDate = received.toISOString().slice(0, 10);
+  // Prefer "Order Date:" / Shopify "Date MM/DD/YYYY" in the body so Yahoo→Gmail
+  // forwards (new Gmail internalDate) do not stamp every order as today.
+  const orderDate = extractOrderDateYmd(blob, input.receivedAt ?? null);
   const currency = extractCurrencyCode(blob) ?? 'USD';
 
   return {

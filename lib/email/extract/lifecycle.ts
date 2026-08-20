@@ -1,5 +1,6 @@
 import type { MessageClassification } from './schema';
 import type { ShipmentStatus } from '@/lib/status';
+import { extractLifecycleEventAt } from './email-dates';
 import { extractOrderNumber, parseMoneyToCents } from './heuristic';
 
 export type LifecycleExtraction = {
@@ -56,48 +57,6 @@ function extractCarrier(blob: string): string | null {
     if (re.test(blob)) return name;
   }
   return null;
-}
-
-function parseLooseDate(raw: string, fallbackYear: number): string | null {
-  const cleaned = raw.replace(/\s+/g, ' ').trim();
-  const asIso = Date.parse(cleaned);
-  if (!Number.isNaN(asIso)) return new Date(asIso).toISOString();
-
-  const mdY = cleaned.match(
-    /\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:,?\s+\d{4})?)\b/i,
-  );
-  if (mdY?.[1]) {
-    const hasYear = /\d{4}/.test(mdY[1]);
-    const candidate = hasYear ? mdY[1] : `${mdY[1]}, ${fallbackYear}`;
-    const t = Date.parse(candidate);
-    if (!Number.isNaN(t)) return new Date(t).toISOString();
-  }
-  return null;
-}
-
-function extractEventAt(
-  blob: string,
-  kind: 'shipped' | 'delivered',
-  receivedAt: Date | null,
-): string | null {
-  const year = (receivedAt ?? new Date()).getUTCFullYear();
-  const patterns =
-    kind === 'delivered'
-      ? [
-          /\bdelivered\s+(?:on|by)?\s*[:\s]*([A-Za-z]{3,9}\.? \d{1,2}(?:,? \d{4})?)/i,
-          /\bdelivery\s+date[:\s]*([A-Za-z]{3,9}\.? \d{1,2}(?:,? \d{4})?)/i,
-        ]
-      : [
-          /\bshipped\s+(?:on)?\s*[:\s]*([A-Za-z]{3,9}\.? \d{1,2}(?:,? \d{4})?)/i,
-          /\bship\s+date[:\s]*([A-Za-z]{3,9}\.? \d{1,2}(?:,? \d{4})?)/i,
-        ];
-  for (const re of patterns) {
-    const raw = blob.match(re)?.[1];
-    if (!raw) continue;
-    const iso = parseLooseDate(raw, year);
-    if (iso) return iso;
-  }
-  return receivedAt?.toISOString() ?? null;
 }
 
 function extractRefundCents(blob: string): number | null {
@@ -165,11 +124,11 @@ export function extractLifecycleFromEmail(input: {
   const status = shipmentStatusFor(input.classification, blob);
   const shippedAt =
     input.classification === 'shipping' || input.classification === 'delivery'
-      ? extractEventAt(blob, 'shipped', input.receivedAt ?? null)
+      ? extractLifecycleEventAt(blob, 'shipped', input.receivedAt ?? null)
       : null;
   const deliveredAt =
     status === 'delivered'
-      ? extractEventAt(blob, 'delivered', input.receivedAt ?? null)
+      ? extractLifecycleEventAt(blob, 'delivered', input.receivedAt ?? null)
       : null;
   const refundAmountCents =
     input.classification === 'return' ? extractRefundCents(blob) : null;
