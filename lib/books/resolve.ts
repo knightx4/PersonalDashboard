@@ -36,7 +36,12 @@ function defaultProviders(options: ResolveBookOptions): BookMetadataProvider[] {
 
 function hitToCanonical(
   hit: BookProviderHit,
-  opts: { confidence: number; needsConfirmation: boolean },
+  opts: {
+    confidence: number;
+    needsConfirmation: boolean;
+    alternates?: BookProviderHit[];
+    confirmationReason?: string | null;
+  },
 ): CanonicalBook {
   return {
     isbn13: hit.isbn13,
@@ -51,7 +56,30 @@ function hitToCanonical(
     matchConfidence: opts.confidence,
     needsConfirmation: opts.needsConfirmation,
     resolutionSource: hit.source,
+    alternates: opts.alternates ?? [],
+    confirmationReason: opts.confirmationReason ?? null,
   };
+}
+
+/** Stable identity for an edition: ISBN when known, else title+publisher+year. */
+function editionKey(hit: BookProviderHit): string {
+  if (hit.isbn13) return hit.isbn13;
+  return `${normalizeName(hit.title)}|${hit.publisher ?? ''}|${hit.publishedYear ?? ''}`;
+}
+
+/** What to tell the user when we cannot pin the edition ourselves. */
+function confirmationReasonFor(opts: {
+  title: string;
+  editionCount: number;
+  score: number;
+}): string | null {
+  if (opts.editionCount > 1) {
+    return `${opts.editionCount} editions match “${opts.title}”. Printings differ in publisher, year, and binding, and buyback prices are quoted per ISBN — so pick the one on your shelf.`;
+  }
+  if (opts.score < 0.75) {
+    return `Closest title match scored ${Math.round(opts.score * 100)}%. Check the author, publisher, and year below against your copy.`;
+  }
+  return null;
 }
 
 function titleScore(queryTitle: string, queryAuthor: string | null | undefined, hit: BookProviderHit): number {
@@ -149,7 +177,12 @@ export async function resolveBook(
     if (!normalized) return null;
     const hit = await lookupIsbnAcrossProviders(normalized.isbn13, providers);
     if (!hit) return null;
-    return hitToCanonical(hit, { confidence: 0.98, needsConfirmation: false });
+    return hitToCanonical(hit, {
+      confidence: 0.98,
+      needsConfirmation: false,
+      alternates: [],
+      confirmationReason: null,
+    });
   }
 
   const title = input.title?.trim();
@@ -169,9 +202,29 @@ export async function resolveBook(
   const plausibleCount = countPlausibleEditions(hits, 0.35, title, author);
   const needsConfirmation = plausibleCount > 1 || best.score < 0.75;
 
+  // Runner-ups the user can pick instead, best first, one row per edition.
+  const seenEditions = new Set([editionKey(best.hit)]);
+  const alternates: BookProviderHit[] = [];
+  for (const { hit, score } of scored.slice(1)) {
+    if (score < 0.35) continue;
+    const key = editionKey(hit);
+    if (seenEditions.has(key)) continue;
+    seenEditions.add(key);
+    alternates.push(hit);
+    if (alternates.length >= 4) break;
+  }
+
   return hitToCanonical(best.hit, {
     confidence: Number(best.score.toFixed(3)),
     needsConfirmation,
+    alternates: needsConfirmation ? alternates : [],
+    confirmationReason: needsConfirmation
+      ? confirmationReasonFor({
+          title: best.hit.title,
+          editionCount: plausibleCount,
+          score: best.score,
+        })
+      : null,
   });
 }
 

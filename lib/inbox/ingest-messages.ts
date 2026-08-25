@@ -7,6 +7,7 @@ import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { extractLifecycleFromEmail } from '@/lib/email/extract/lifecycle';
 import { PARSER_VERSION, type MessageClassification } from '@/lib/email/extract/schema';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 import { findOrderForLifecycleEmail } from '@/lib/orders/find-for-lifecycle';
@@ -18,6 +19,11 @@ import { isPlatformMerchantSlug } from '@/lib/merchants/platform';
 import { resolveOrderMerchant } from '@/lib/merchants/resolve-order-merchant';
 import { ensureItemTags, linkOrderItemTags } from '@/lib/tags/ensure';
 import { mapPool } from '@/lib/async/map-pool';
+
+/** Optional key; Google Books answers without one at a lower quota. */
+function googleBooksApiKey(): string | null {
+  return process.env.GOOGLE_BOOKS_API_KEY ?? null;
+}
 
 /** Parallel Gmail metadata fetches — well under user rate quota. */
 const METADATA_CONCURRENCY = 5;
@@ -437,6 +443,37 @@ async function handleOrderConfirmation(
     await supabase.from('orders').delete().eq('id', bundle.order.id);
     counters.errors += 1;
     return;
+  }
+
+  // Books get their ISBN identity here so the sell assistant can route them
+  // without the user re-entering anything. Soft-failure: the order stands
+  // even when a metadata provider is down.
+  try {
+    const slugByCategoryId = new Map(
+      [...categoryIdsBySlug.entries()].map(([slug, id]) => [id, slug] as const),
+    );
+    const orderItemById = new Map(bundle.orderItems.map((item) => [item.id, item]));
+    await attachBookDetailsForInventory(supabase, {
+      userId,
+      autoImported: true,
+      googleBooksApiKey: googleBooksApiKey(),
+      lines: bundle.inventoryItems.map((unit) => {
+        const orderItem = orderItemById.get(unit.orderItemId);
+        return {
+          inventoryItemId: unit.id,
+          name: unit.name,
+          variant: unit.variant,
+          productUrl: orderItem?.productUrl ?? null,
+          categorySlug: unit.categoryId
+            ? (slugByCategoryId.get(unit.categoryId) ?? null)
+            : null,
+          imageUrl: unit.imageUrl,
+          searchTags: unit.searchTags,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('book auto-import failed', bundle.order.id, error);
   }
 
   await supabase.from('ingested_messages').insert({

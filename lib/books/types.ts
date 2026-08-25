@@ -11,6 +11,13 @@ export type BookResolutionSource =
   | 'isbndb'
   | 'manual';
 
+/**
+ * A runner-up edition the resolver considered. Same shape as a provider hit —
+ * this is what the confirm prompt shows so “is this the right edition?” has an
+ * answerable comparison behind it.
+ */
+export type BookEditionCandidate = BookProviderHit;
+
 export type CanonicalBook = {
   isbn13: string | null;
   isbn10: string | null;
@@ -25,6 +32,13 @@ export type CanonicalBook = {
   matchConfidence: number;
   needsConfirmation: boolean;
   resolutionSource: BookResolutionSource;
+  /**
+   * Other plausible editions, best-scoring first. Empty for ISBN lookups,
+   * which fix the edition outright.
+   */
+  alternates?: BookEditionCandidate[];
+  /** Plain-English reason the edition needs a human look; null when certain. */
+  confirmationReason?: string | null;
 };
 
 export type ResolveByIsbnInput = {

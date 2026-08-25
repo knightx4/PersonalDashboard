@@ -6,7 +6,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { buildOwnedBookRows } from '@/lib/books/create-owned-book';
 import { resolvePasteList } from '@/lib/books/paste-list';
 import { resolveBook } from '@/lib/books/resolve';
-import type { CanonicalBook } from '@/lib/books/types';
+import type { BookEditionCandidate, CanonicalBook } from '@/lib/books/types';
+import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import { serverEnv } from '@/lib/env';
 import { todayInTimezone } from '@/lib/money';
 
@@ -57,6 +58,18 @@ function envKeys() {
   }
 }
 
+const bookCandidateSchema = z.object({
+  isbn13: z.string().nullable(),
+  isbn10: z.string().nullable(),
+  title: z.string().min(1),
+  authors: z.array(z.string()),
+  publisher: z.string().nullable(),
+  publishedYear: z.number().int().nullable(),
+  edition: z.string().nullable(),
+  coverUrl: z.string().nullable(),
+  source: z.enum(['google_books', 'open_library', 'isbndb', 'manual']),
+});
+
 const canonicalBookSchema = z.object({
   isbn13: z.string().nullable(),
   isbn10: z.string().nullable(),
@@ -70,6 +83,8 @@ const canonicalBookSchema = z.object({
   matchConfidence: z.number(),
   needsConfirmation: z.boolean(),
   resolutionSource: z.enum(['google_books', 'open_library', 'isbndb', 'manual']),
+  alternates: z.array(bookCandidateSchema).optional().default([]),
+  confirmationReason: z.string().nullable().optional().default(null),
 });
 
 export async function searchOwnedBook(
@@ -176,6 +191,9 @@ export async function saveOwnedBook(
     resolution_source: bundle.bookDetails.resolutionSource,
     match_confidence: bundle.bookDetails.matchConfidence,
     needs_confirmation: bundle.bookDetails.needsConfirmation,
+    candidates: bundle.bookDetails.candidates,
+    confirmation_reason: bundle.bookDetails.confirmationReason,
+    auto_imported: false,
   });
   if (bookError) {
     await supabase.from('inventory_items').delete().eq('id', bundle.inventory.id);
@@ -298,6 +316,9 @@ export async function savePasteBookList(
       resolution_source: bundle.bookDetails.resolutionSource,
       match_confidence: bundle.bookDetails.matchConfidence,
       needs_confirmation: false,
+      candidates: [],
+      confirmation_reason: null,
+      auto_imported: false,
     });
     if (bookError) return { error: bookError.message, savedIds };
     savedIds.push(bundle.inventory.id);
@@ -330,7 +351,11 @@ export async function confirmBookEdition(
 
   const { error } = await supabase
     .from('book_details')
-    .update({ needs_confirmation: false })
+    .update({
+      needs_confirmation: false,
+      candidates: [],
+      confirmation_reason: null,
+    })
     .eq('inventory_item_id', item.id);
   if (error) return { error: error.message };
 
@@ -373,4 +398,114 @@ export async function updateBookCondition(
   revalidatePath(`/inventory/${item.id}`);
   revalidatePath('/sell');
   return { message: 'Condition saved.' };
+}
+
+
+/**
+ * Swap this unit onto one of the runner-up editions the resolver offered.
+ * Re-looks-up by ISBN when the candidate has one so the row gets full detail,
+ * then clears the confirm prompt — the user has now told us the edition.
+ */
+export async function switchBookEdition(
+  _prev: BookActionState,
+  formData: FormData,
+): Promise<BookActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('inventory_item_id'));
+  if (!id.success) return { error: 'Missing item.' };
+
+  let candidate: BookEditionCandidate;
+  try {
+    const parsed = bookCandidateSchema.safeParse(
+      JSON.parse(String(formData.get('candidate_json') ?? '')),
+    );
+    if (!parsed.success) return { error: 'Invalid edition payload.' };
+    candidate = parsed.data;
+  } catch {
+    return { error: 'Invalid edition payload.' };
+  }
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id, search_tags')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) return { error: 'Item not found.' };
+
+  const keys = envKeys();
+  const resolved = candidate.isbn13
+    ? await resolveBook(
+        { isbn: candidate.isbn13 },
+        { googleBooksApiKey: keys.googleBooksApiKey },
+      )
+    : null;
+
+  const book: CanonicalBook = resolved ?? {
+    isbn13: candidate.isbn13,
+    isbn10: candidate.isbn10,
+    title: candidate.title,
+    authors: candidate.authors,
+    publisher: candidate.publisher,
+    publishedYear: candidate.publishedYear,
+    edition: candidate.edition,
+    coverUrl: candidate.coverUrl,
+    weightGrams: null,
+    matchConfidence: 1,
+    needsConfirmation: false,
+    resolutionSource: candidate.source,
+  };
+
+  const { error: bookError } = await supabase
+    .from('book_details')
+    .update({
+      isbn_13: book.isbn13,
+      isbn_10: book.isbn10,
+      authors: book.authors,
+      edition: book.edition,
+      publisher: book.publisher,
+      published_year: book.publishedYear,
+      weight_grams: book.weightGrams,
+      resolution_source: book.resolutionSource,
+      match_confidence: 1,
+      needs_confirmation: false,
+      candidates: [],
+      confirmation_reason: null,
+    })
+    .eq('inventory_item_id', item.id);
+  if (bookError) return { error: bookError.message };
+
+  const authorsLabel = book.authors.length > 0 ? book.authors.join(', ') : null;
+  const enriched = enrichItemDisplay({
+    name: book.title,
+    variant: authorsLabel,
+    categorySlug: 'books',
+    categoryName: 'Books',
+    searchTags: [
+      'book',
+      'books',
+      ...(book.isbn13 ? [book.isbn13] : []),
+      ...book.authors.map((a) => a.toLowerCase()),
+    ],
+  });
+
+  const { error: invError } = await supabase
+    .from('inventory_items')
+    .update({
+      name: book.title,
+      short_name: enriched.shortName,
+      variant: authorsLabel,
+      search_tags: enriched.searchTags,
+      ...(book.coverUrl ? { image_url: book.coverUrl } : {}),
+    })
+    .eq('id', item.id)
+    .eq('user_id', user.id);
+  if (invError) return { error: invError.message };
+
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${item.id}`);
+  revalidatePath('/sell');
+  return { message: `Switched to the ${[book.publisher, book.publishedYear].filter(Boolean).join(' ') || 'selected'} edition.` };
 }

@@ -402,6 +402,12 @@ export const bookDetails = pgTable(
     resolutionSource: bookResolutionSource('resolution_source').notNull().default('manual'),
     matchConfidence: numeric('match_confidence', { precision: 4, scale: 3 }),
     needsConfirmation: boolean('needs_confirmation').notNull().default(false),
+    /** Runner-up editions the resolver saw, shown next to the confirm prompt. */
+    candidates: jsonb('candidates').notNull().default([]),
+    /** Plain-English reason the edition needs a human look. */
+    confirmationReason: text('confirmation_reason'),
+    /** True when order-email ingestion created this row, not a capture flow. */
+    autoImported: boolean('auto_imported').notNull().default(false),
     ...timestamps,
   },
   (t) => [

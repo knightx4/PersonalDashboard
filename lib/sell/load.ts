@@ -18,6 +18,7 @@ import {
 } from '@/lib/sell/route';
 import { mapPool } from '@/lib/async/map-pool';
 import { serverEnv } from '@/lib/env';
+import type { BookEditionCandidate } from '@/lib/books/types';
 
 export type SellBookRow = {
   inventoryItemId: string;
@@ -34,6 +35,24 @@ export type SellBookRow = {
   expectedSelfListCents: number | null;
   buyback: BuybackQuote | null;
   donateFmvCents: number;
+};
+
+/**
+ * A book the router refuses to price until the edition is settled. Carries the
+ * evidence the confirm prompt needs — printing details plus the runner-ups.
+ */
+export type SellPendingRow = {
+  inventoryItemId: string;
+  title: string;
+  imageUrl: string | null;
+  authors: string[];
+  isbn13: string | null;
+  edition: string | null;
+  publisher: string | null;
+  publishedYear: number | null;
+  confirmationReason: string | null;
+  candidates: BookEditionCandidate[];
+  autoImported: boolean;
 };
 
 function envKeys() {
@@ -136,6 +155,7 @@ export async function loadSellAssistant(input: {
   userId: string;
 }): Promise<{
   rows: SellBookRow[];
+  pending: SellPendingRow[];
   netFloorCents: number;
   effortCents: number;
   needsConfirmationCount: number;
@@ -151,22 +171,49 @@ export async function loadSellAssistant(input: {
 
   const effortCents = profile?.sell_effort_cents ?? DEFAULT_EFFORT_CENTS;
 
+  // Unconfirmed rows are fetched too — they are the queue the page shows.
   const { data: books } = await supabase
     .from('book_details')
     .select(
       `
-      isbn_13, authors, condition, needs_confirmation,
+      isbn_13, authors, condition, needs_confirmation, edition, publisher,
+      published_year, candidates, confirmation_reason, auto_imported,
       inventory_items!inner (
         id, name, short_name, image_url, status, user_id
       )
     `,
     )
     .eq('inventory_items.user_id', userId)
-    .eq('inventory_items.status', 'owned')
-    .not('isbn_13', 'is', null);
+    .eq('inventory_items.status', 'owned');
 
   const all = books ?? [];
-  const needsConfirmationCount = all.filter((b) => b.needs_confirmation).length;
+  const inventoryOf = (row: (typeof all)[number]) =>
+    Array.isArray(row.inventory_items) ? row.inventory_items[0] : row.inventory_items;
+
+  const pendingRows = all.filter((b) => b.needs_confirmation);
+  const needsConfirmationCount = pendingRows.length;
+
+  const pending: SellPendingRow[] = pendingRows.flatMap((row) => {
+    const inv = inventoryOf(row);
+    if (!inv) return [];
+    return [
+      {
+        inventoryItemId: inv.id as string,
+        title: (inv.short_name as string | null) || (inv.name as string),
+        imageUrl: (inv.image_url as string | null) ?? null,
+        authors: (row.authors as string[]) ?? [],
+        isbn13: (row.isbn_13 as string | null) ?? null,
+        edition: (row.edition as string | null) ?? null,
+        publisher: (row.publisher as string | null) ?? null,
+        publishedYear: (row.published_year as number | null) ?? null,
+        confirmationReason: (row.confirmation_reason as string | null) ?? null,
+        candidates: Array.isArray(row.candidates)
+          ? (row.candidates as BookEditionCandidate[])
+          : [],
+        autoImported: Boolean(row.auto_imported),
+      },
+    ];
+  });
 
   const confirmed = all.filter((b) => !b.needs_confirmation && b.isbn_13);
 
@@ -189,9 +236,7 @@ export async function loadSellAssistant(input: {
   };
 
   const drafts = await mapPool(confirmed, 3, async (row) => {
-    const inv = Array.isArray(row.inventory_items)
-      ? row.inventory_items[0]
-      : row.inventory_items;
+    const inv = inventoryOf(row);
     if (!inv || !row.isbn_13) return null;
     const [buyback, expectedSelfListCents] = await Promise.all([
       cachedBuyback(supabase, row.isbn_13, buybackProvider),
@@ -249,5 +294,5 @@ export async function loadSellAssistant(input: {
     };
   });
 
-  return { rows, netFloorCents, effortCents, needsConfirmationCount };
+  return { rows, pending, netFloorCents, effortCents, needsConfirmationCount };
 }

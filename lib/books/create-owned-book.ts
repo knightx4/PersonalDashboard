@@ -5,9 +5,9 @@
 import { randomUUID } from 'node:crypto';
 import { fingerprintLoose } from '@/lib/fingerprint';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
-import type { CanonicalBook } from '@/lib/books/types';
+import type { BookEditionCandidate, CanonicalBook } from '@/lib/books/types';
 
-export type OwnedBookSource = 'manual' | 'photo' | 'receipt_photo';
+export type OwnedBookSource = 'manual' | 'photo' | 'receipt_photo' | 'email';
 
 export type OwnedBookInventoryRow = {
   id: string;
@@ -40,6 +40,12 @@ export type OwnedBookDetailsRow = {
   resolutionSource: CanonicalBook['resolutionSource'];
   matchConfidence: number;
   needsConfirmation: boolean;
+  /** Runner-up editions shown next to the confirm prompt. */
+  candidates: BookEditionCandidate[];
+  /** Why we are asking; null when the ISBN pinned the edition. */
+  confirmationReason: string | null;
+  /** True when an order email produced this row rather than a capture flow. */
+  autoImported: boolean;
 };
 
 export type OwnedBookBundle = {
@@ -55,6 +61,8 @@ export function buildOwnedBookRows(input: {
   source?: OwnedBookSource;
   /** Force confirmation off after a user taps “this is the right edition”. */
   forceConfirmed?: boolean;
+  /** Set when an order email, not a capture flow, produced this book. */
+  autoImported?: boolean;
 }): OwnedBookBundle {
   const inventoryId = randomUUID();
   const authorsLabel =
@@ -109,6 +117,11 @@ export function buildOwnedBookRows(input: {
       resolutionSource: input.book.resolutionSource,
       matchConfidence: input.book.matchConfidence,
       needsConfirmation,
+      candidates: needsConfirmation ? (input.book.alternates ?? []) : [],
+      confirmationReason: needsConfirmation
+        ? (input.book.confirmationReason ?? null)
+        : null,
+      autoImported: input.autoImported ?? false,
     },
   };
 }

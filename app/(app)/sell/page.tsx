@@ -6,7 +6,12 @@ import { buttonVariants } from '@/components/ui/button';
 import { BookOpen } from 'lucide-react';
 import { loadSellAssistant } from '@/lib/sell/load';
 import { formatMoney } from '@/lib/money';
-import { SellPathGroup, SellSettingsForm } from './sell-ui';
+import {
+  ImportBooksFromOrdersButton,
+  SellConfirmQueue,
+  SellPathGroup,
+  SellSettingsForm,
+} from './sell-ui';
 import type { SellPath } from '@/lib/sell/route';
 
 export const metadata = { title: 'Sell assistant' };
@@ -21,7 +26,7 @@ const PATH_ORDER: SellPath[] = [
 export default async function SellPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const { rows, netFloorCents, effortCents, needsConfirmationCount } =
+  const { rows, pending, netFloorCents, effortCents, needsConfirmationCount } =
     await loadSellAssistant({ supabase, userId: user.id });
 
   return (
@@ -48,11 +53,15 @@ export default async function SellPage() {
           : ''}
       </p>
 
-      {rows.length === 0 ? (
+      <ImportBooksFromOrdersButton />
+
+      <SellConfirmQueue rows={pending} />
+
+      {rows.length === 0 && pending.length === 0 ? (
         <EmptyState
           icon={BookOpen}
           title="No sell-ready books yet"
-          description="Add books with an ISBN (scan or search), confirm any ambiguous editions, then come back for routing."
+          description="Books from your order emails land here automatically. You can also scan or search to add ones you already own."
           action={{ label: 'Add owned books', href: '/inventory/add' }}
         />
       ) : (

@@ -71,7 +71,8 @@ export default async function InventoryItemPage({
       .select(
         `
         inventory_item_id, isbn_13, isbn_10, authors, edition, publisher,
-        published_year, condition, needs_confirmation, match_confidence, resolution_source
+        published_year, condition, needs_confirmation, match_confidence, resolution_source,
+        candidates, confirmation_reason, auto_imported
       `,
       )
       .eq('inventory_item_id', id)
@@ -247,6 +248,8 @@ export default async function InventoryItemPage({
         <BookDetailsPanel
           book={{
             inventoryItemId: bookRow.inventory_item_id,
+            title: item.name,
+            imageUrl,
             isbn13: bookRow.isbn_13,
             isbn10: bookRow.isbn_10,
             authors: bookRow.authors ?? [],
@@ -255,6 +258,9 @@ export default async function InventoryItemPage({
             publishedYear: bookRow.published_year,
             condition: bookRow.condition,
             needsConfirmation: bookRow.needs_confirmation,
+            confirmationReason: bookRow.confirmation_reason ?? null,
+            candidates: Array.isArray(bookRow.candidates) ? bookRow.candidates : [],
+            autoImported: Boolean(bookRow.auto_imported),
             matchConfidence:
               bookRow.match_confidence != null ? Number(bookRow.match_confidence) : null,
             resolutionSource: bookRow.resolution_source,

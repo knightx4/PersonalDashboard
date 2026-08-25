@@ -16,10 +16,13 @@ import type { CanonicalBook } from '@/lib/books/types';
 function BookCard({
   book,
   onSave,
+  onPick,
   pending,
 }: {
   book: CanonicalBook;
   onSave: (forceConfirmed: boolean) => void;
+  /** Swap the previewed match for one of the runner-up editions. */
+  onPick?: (candidate: CanonicalBook) => void;
   pending: boolean;
 }) {
   return (
@@ -49,10 +52,13 @@ function BookCard({
         )}
         {book.needsConfirmation ? (
           <p className="mt-2 text-[13px] text-accent-orange">
-            Multiple editions possible — confirm this is the right one before selling.
+            {book.confirmationReason ??
+              'More than one printing matches — confirm the edition before selling.'}
           </p>
         ) : (
-          <p className="mt-2 text-[13px] text-brand">Exact match — sell-ready.</p>
+          <p className="mt-2 text-[13px] text-brand">
+            Exact ISBN match — edition is settled, sell-ready.
+          </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
@@ -61,7 +67,7 @@ function BookCard({
             disabled={pending}
             onClick={() => onSave(true)}
           >
-            {book.needsConfirmation ? 'Save & confirm edition' : 'Add to library'}
+            {book.needsConfirmation ? 'Yes — this edition' : 'Add to library'}
           </Button>
           {book.needsConfirmation && (
             <Button
@@ -71,10 +77,71 @@ function BookCard({
               disabled={pending}
               onClick={() => onSave(false)}
             >
-              Save for later confirm
+              Save, I&rsquo;ll check the ISBN later
             </Button>
           )}
         </div>
+
+        {book.needsConfirmation && (book.alternates?.length ?? 0) > 0 && (
+          <div className="mt-3">
+            <p className="text-[13px] font-medium text-ink">Other printings we found</p>
+            <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
+              {book.alternates?.map((candidate, index) => (
+                <li
+                  key={candidate.isbn13 ?? `${candidate.title}-${index}`}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-[13px] text-ink">{candidate.title}</p>
+                    <p className="text-[12px] text-ink-muted">
+                      {[
+                        candidate.authors.join(', ') || null,
+                        candidate.edition,
+                        candidate.publisher,
+                        candidate.publishedYear,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || 'Edition not stated by the catalog'}
+                    </p>
+                    {candidate.isbn13 && (
+                      <p className="font-mono text-[12px] text-ink-faint">
+                        ISBN {candidate.isbn13}
+                      </p>
+                    )}
+                  </div>
+                  {onPick && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={pending}
+                      onClick={() =>
+                        onPick({
+                          isbn13: candidate.isbn13,
+                          isbn10: candidate.isbn10,
+                          title: candidate.title,
+                          authors: candidate.authors,
+                          publisher: candidate.publisher,
+                          publishedYear: candidate.publishedYear,
+                          edition: candidate.edition,
+                          coverUrl: candidate.coverUrl,
+                          weightGrams: null,
+                          matchConfidence: 1,
+                          needsConfirmation: false,
+                          resolutionSource: candidate.source,
+                          alternates: [],
+                          confirmationReason: null,
+                        })
+                      }
+                    >
+                      This one
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -90,11 +157,13 @@ export function AddBookSearchForm() {
     {} as BookActionState,
   );
   const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<CanonicalBook | null>(null);
+  const shown = picked ?? searchState.book ?? null;
 
   function saveBook(forceConfirmed: boolean) {
-    if (!searchState.book) return;
+    if (!shown) return;
     const fd = new FormData();
-    fd.set('book_json', JSON.stringify(searchState.book));
+    fd.set('book_json', JSON.stringify(shown));
     fd.set('force_confirmed', forceConfirmed ? 'true' : 'false');
     fd.set('source', 'manual');
     saveAction(fd);
@@ -102,7 +171,11 @@ export function AddBookSearchForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <form action={searchAction} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <form
+        action={searchAction}
+        onSubmit={() => setPicked(null)}
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+      >
         <div className="flex-1">
           <Label htmlFor="query">ISBN or title</Label>
           <Input
@@ -129,8 +202,13 @@ export function AddBookSearchForm() {
           )}
         </p>
       )}
-      {searchState.book && (
-        <BookCard book={searchState.book} onSave={saveBook} pending={savePending} />
+      {shown && (
+        <BookCard
+          book={shown}
+          onSave={saveBook}
+          onPick={setPicked}
+          pending={savePending}
+        />
       )}
     </div>
   );
@@ -202,6 +280,20 @@ export function AddBookPasteForm() {
                       {row.book.authors.join(', ')}
                       {row.book.isbn13 ? ` · ${row.book.isbn13}` : ''}
                     </p>
+                    {row.book.needsConfirmation && (
+                      <p className="mt-1 text-[12px] text-ink-faint">
+                        {[
+                          row.book.edition,
+                          row.book.publisher,
+                          row.book.publishedYear,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || 'Edition not stated by the catalog'}
+                        {row.book.confirmationReason
+                          ? ` — ${row.book.confirmationReason}`
+                          : ''}
+                      </p>
+                    )}
                     {row.book.needsConfirmation && (
                       <label className="mt-2 flex items-center gap-2 text-[13px] text-accent-orange">
                         <input
