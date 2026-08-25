@@ -9,7 +9,7 @@ import {
   stripIsbn,
 } from '@/lib/books/isbn';
 import { FIXTURES } from '@/lib/books/fixtures/resolve-cases';
-import { resolveBook } from '@/lib/books/resolve';
+import { resolveBook, resolveBookDetailed } from '@/lib/books/resolve';
 import type { BookMetadataProvider, BookProviderHit } from '@/lib/books/types';
 import { createGoogleBooksProvider } from '@/lib/books/providers/google-books';
 import { createOpenLibraryProvider } from '@/lib/books/providers/open-library';
@@ -180,5 +180,36 @@ describe('provider factories', () => {
       fetch: async () => new Response('missing', { status: 404 }),
     });
     expect(await provider.lookupByIsbn('9780735211292')).toBeNull();
+  });
+});
+
+
+describe('resolve failure semantics', () => {
+  const quotaFetch: typeof fetch = async () =>
+    new Response(JSON.stringify({ error: { code: 429 } }), { status: 429 });
+
+  it('reports a rate-limited catalog instead of claiming the book does not exist', async () => {
+    const outcome = await resolveBookDetailed(
+      { isbn: '9780735211292' },
+      { fetch: quotaFetch },
+    );
+    expect(outcome.book).toBeNull();
+    expect(outcome.failures.map((f) => f.kind)).toContain('rate_limited');
+  });
+
+  it('reports no failures when the catalogs simply have nothing', async () => {
+    const emptyFetch: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes('googleapis.com/books')) {
+        return new Response(JSON.stringify({ totalItems: 0, items: [] }), { status: 200 });
+      }
+      return new Response('Not found', { status: 404 });
+    };
+    const outcome = await resolveBookDetailed(
+      { isbn: '9780735211292' },
+      { fetch: emptyFetch },
+    );
+    expect(outcome.book).toBeNull();
+    expect(outcome.failures).toEqual([]);
   });
 });

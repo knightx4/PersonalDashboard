@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { saveOwnedBook, searchOwnedBook, type BookActionState } from './actions';
+import { AddBookManualForm } from './add-book-forms';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 
@@ -122,6 +123,9 @@ export function BarcodeScanPanel() {
             </Link>
           )}
         </p>
+      )}
+      {!searchState.book && searchState.error && (
+        <AddBookManualForm compact isbn={searchState.manualIsbn ?? lastCode} />
       )}
       {searchState.book && (
         <div className="rounded-xl border border-border bg-surface p-4">

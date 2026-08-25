@@ -6,6 +6,7 @@
  */
 import type { BookMetadataProvider, BookProviderHit } from '@/lib/books/types';
 import { normalizeIsbn } from '@/lib/books/isbn';
+import { getJson } from '@/lib/books/providers/http';
 
 type GoogleVolume = {
   volumeInfo?: {
@@ -96,12 +97,13 @@ export function createGoogleBooksProvider(
     url.searchParams.set('maxResults', String(maxResults));
     if (apiKey) url.searchParams.set('key', apiKey);
 
-    const res = await fetchFn(url.toString(), {
-      headers: { Accept: 'application/json' },
+    // Quota errors surface as ProviderError rather than an empty shelf — the
+    // keyless courtesy quota runs out most days.
+    const data = await getJson<GoogleListResponse>(url.toString(), {
+      provider: 'google_books',
+      fetch: fetchFn,
     });
-    if (!res.ok) return [];
-    const data = (await res.json()) as GoogleListResponse;
-    if (!data.items?.length) return [];
+    if (!data?.items?.length) return [];
     return data.items.map(toHit).filter((h): h is BookProviderHit => h !== null);
   }
 

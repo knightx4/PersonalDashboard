@@ -457,6 +457,7 @@ async function handleOrderConfirmation(
       userId,
       autoImported: true,
       googleBooksApiKey: googleBooksApiKey(),
+      isbndbApiKey: process.env.ISBNDB_API_KEY ?? null,
       lines: bundle.inventoryItems.map((unit) => {
         const orderItem = orderItemById.get(unit.orderItemId);
         return {

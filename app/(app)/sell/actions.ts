@@ -124,6 +124,7 @@ export async function importBooksFromOrders(
     userId: user.id,
     autoImported: true,
     googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? null,
+    isbndbApiKey: process.env.ISBNDB_API_KEY ?? null,
     lines: items.map((item) => ({
       inventoryItemId: item.id as string,
       name: item.name as string,

@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/async/map-pool';
 import { bookHintFromOrderLine } from '@/lib/books/from-order-line';
-import { resolveBook } from '@/lib/books/resolve';
+import { resolveBookDetailed } from '@/lib/books/resolve';
 import type { CanonicalBook } from '@/lib/books/types';
 
 /** Book lookups are third-party HTTP; keep the fan-out small. */
@@ -68,6 +68,7 @@ export async function attachBookDetailsForInventory(
     userId: string;
     lines: InventoryLineForBooks[];
     googleBooksApiKey?: string | null;
+    isbndbApiKey?: string | null;
     /** Marks the rows as machine-created (order email) rather than captured. */
     autoImported?: boolean;
   },
@@ -93,19 +94,29 @@ export async function attachBookDetailsForInventory(
 
   const categoryId = await booksCategoryId(supabase);
 
+  const providerKeys = {
+    googleBooksApiKey: opts.googleBooksApiKey,
+    isbndbApiKey: opts.isbndbApiKey,
+  };
+
   const resolved = await mapPool(pending, RESOLVE_CONCURRENCY, async (entry) => {
     try {
-      const book: CanonicalBook | null =
+      const outcome = await resolveBookDetailed(
         entry.hint.kind === 'isbn'
-          ? await resolveBook(
-              { isbn: entry.hint.isbn13 },
-              { googleBooksApiKey: opts.googleBooksApiKey },
-            )
-          : await resolveBook(
-              { title: entry.hint.title, author: entry.hint.author },
-              { googleBooksApiKey: opts.googleBooksApiKey },
-            );
-      return { entry, book };
+          ? { isbn: entry.hint.isbn13 }
+          : { title: entry.hint.title, author: entry.hint.author },
+        providerKeys,
+      );
+      // A rate-limited catalog leaves no row, so the next scan retries it —
+      // better than writing a book with no ISBN and calling it done.
+      if (!outcome.book && outcome.failures.length > 0) {
+        console.warn(
+          'book lookup unavailable',
+          entry.line.inventoryItemId,
+          outcome.failures,
+        );
+      }
+      return { entry, book: outcome.book as CanonicalBook | null };
     } catch (error) {
       console.error('book resolve failed', entry.line.inventoryItemId, error);
       return { entry, book: null };

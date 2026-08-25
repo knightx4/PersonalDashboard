@@ -8,7 +8,9 @@
  */
 import { normalizeIsbn } from '@/lib/books/isbn';
 import { createGoogleBooksProvider } from '@/lib/books/providers/google-books';
+import { createIsbndbProvider } from '@/lib/books/providers/isbndb';
 import { createOpenLibraryProvider } from '@/lib/books/providers/open-library';
+import { ProviderError, type ProviderFailure } from '@/lib/books/providers/http';
 import {
   isIsbnInput,
   type BookMetadataProvider,
@@ -22,16 +24,36 @@ export type ResolveBookOptions = {
   providers?: BookMetadataProvider[];
   fetch?: typeof globalThis.fetch;
   googleBooksApiKey?: string | null;
+  isbndbApiKey?: string | null;
+};
+
+/**
+ * A resolve attempt, including the providers that could not answer. An empty
+ * book with no failures means "no catalog has it"; an empty book with
+ * failures means "ask again later" — very different things to tell a user.
+ */
+export type ResolveOutcome = {
+  book: CanonicalBook | null;
+  failures: ProviderFailure[];
 };
 
 function defaultProviders(options: ResolveBookOptions): BookMetadataProvider[] {
-  return [
+  const providers: BookMetadataProvider[] = [];
+  // ISBNdb first when configured: it has this week's releases, which is
+  // exactly where the free catalogs come up empty.
+  if (options.isbndbApiKey) {
+    providers.push(
+      createIsbndbProvider({ apiKey: options.isbndbApiKey, fetch: options.fetch }),
+    );
+  }
+  providers.push(
     createGoogleBooksProvider({
       fetch: options.fetch,
       apiKey: options.googleBooksApiKey,
     }),
     createOpenLibraryProvider({ fetch: options.fetch }),
-  ];
+  );
+  return providers;
 }
 
 function hitToCanonical(
@@ -131,9 +153,21 @@ function countPlausibleEditions(hits: BookProviderHit[], minScore: number, query
 async function lookupIsbnAcrossProviders(
   isbn13: string,
   providers: BookMetadataProvider[],
+  failures: ProviderFailure[],
 ): Promise<BookProviderHit | null> {
   for (const provider of providers) {
-    const hit = await provider.lookupByIsbn(isbn13);
+    let hit: BookProviderHit | null = null;
+    try {
+      hit = await provider.lookupByIsbn(isbn13);
+    } catch (error) {
+      // One provider being rate-limited must not end the lookup — but it also
+      // must not be reported as "this book does not exist".
+      if (error instanceof ProviderError) {
+        failures.push(error.failure);
+        continue;
+      }
+      throw error;
+    }
     if (hit) {
       if (!hit.isbn13) hit.isbn13 = isbn13;
       if (!hit.isbn10) hit.isbn10 = normalizeIsbn(isbn13)?.isbn10 ?? null;
@@ -147,11 +181,21 @@ async function searchTitleAcrossProviders(
   title: string,
   author: string | null | undefined,
   providers: BookMetadataProvider[],
+  failures: ProviderFailure[],
 ): Promise<BookProviderHit[]> {
   const seen = new Set<string>();
   const merged: BookProviderHit[] = [];
   for (const provider of providers) {
-    const hits = await provider.searchByTitle(title, author);
+    let hits: BookProviderHit[] = [];
+    try {
+      hits = await provider.searchByTitle(title, author);
+    } catch (error) {
+      if (error instanceof ProviderError) {
+        failures.push(error.failure);
+        continue;
+      }
+      throw error;
+    }
     for (const hit of hits) {
       const key = hit.isbn13 ?? `${normalizeName(hit.title)}|${hit.authors.join(',')}|${hit.publishedYear}`;
       if (seen.has(key)) continue;
@@ -170,34 +214,49 @@ export async function resolveBook(
   input: ResolveBookInput,
   options: ResolveBookOptions = {},
 ): Promise<CanonicalBook | null> {
+  const { book } = await resolveBookDetailed(input, options);
+  return book;
+}
+
+/**
+ * Resolve, and say what went wrong when nothing came back. Callers that face
+ * a user should prefer this: "no catalog has this ISBN yet" and "Google Books
+ * is rate-limiting us" need different words and different next steps.
+ */
+export async function resolveBookDetailed(
+  input: ResolveBookInput,
+  options: ResolveBookOptions = {},
+): Promise<ResolveOutcome> {
   const providers = options.providers ?? defaultProviders(options);
+  const failures: ProviderFailure[] = [];
 
   if (isIsbnInput(input)) {
     const normalized = normalizeIsbn(input.isbn);
-    if (!normalized) return null;
-    const hit = await lookupIsbnAcrossProviders(normalized.isbn13, providers);
-    if (!hit) return null;
-    return hitToCanonical(hit, {
+    if (!normalized) return { book: null, failures };
+    const hit = await lookupIsbnAcrossProviders(normalized.isbn13, providers, failures);
+    if (!hit) return { book: null, failures };
+    const book = hitToCanonical(hit, {
       confidence: 0.98,
       needsConfirmation: false,
       alternates: [],
       confirmationReason: null,
     });
+    return { book, failures };
   }
 
   const title = input.title?.trim();
-  if (!title) return null;
+  if (!title) return { book: null, failures };
   const author = input.author?.trim() || null;
 
-  const hits = await searchTitleAcrossProviders(title, author, providers);
-  if (hits.length === 0) return null;
+  const hits = await searchTitleAcrossProviders(title, author, providers, failures);
+  if (hits.length === 0) return { book: null, failures };
 
   const scored = hits
     .map((hit) => ({ hit, score: titleScore(title, author, hit) }))
     .sort((a, b) => b.score - a.score);
 
   const best = scored[0];
-  if (!best || best.score < 0.25) return null;
+  if (!best || best.score < 0.25) return { book: null, failures };
 
   const plausibleCount = countPlausibleEditions(hits, 0.35, title, author);
   const needsConfirmation = plausibleCount > 1 || best.score < 0.75;
@@ -214,18 +273,21 @@ export async function resolveBook(
     if (alternates.length >= 4) break;
   }
 
-  return hitToCanonical(best.hit, {
-    confidence: Number(best.score.toFixed(3)),
-    needsConfirmation,
-    alternates: needsConfirmation ? alternates : [],
-    confirmationReason: needsConfirmation
-      ? confirmationReasonFor({
-          title: best.hit.title,
-          editionCount: plausibleCount,
-          score: best.score,
-        })
-      : null,
-  });
+  return {
+    book: hitToCanonical(best.hit, {
+      confidence: Number(best.score.toFixed(3)),
+      needsConfirmation,
+      alternates: needsConfirmation ? alternates : [],
+      confirmationReason: needsConfirmation
+        ? confirmationReasonFor({
+            title: best.hit.title,
+            editionCount: plausibleCount,
+            score: best.score,
+          })
+        : null,
+    }),
+    failures,
+  };
 }
 
 /**

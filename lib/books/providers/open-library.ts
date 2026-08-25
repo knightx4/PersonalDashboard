@@ -3,6 +3,7 @@
  */
 import type { BookMetadataProvider, BookProviderHit } from '@/lib/books/types';
 import { normalizeIsbn } from '@/lib/books/isbn';
+import { getJson } from '@/lib/books/providers/http';
 
 type OlBook = {
   title?: string;
@@ -28,6 +29,17 @@ type OlSearchDoc = {
 
 type OlSearchResponse = {
   docs?: OlSearchDoc[];
+};
+
+/** Shape of /api/books?bibkeys=ISBN:… with jscmd=data. */
+type OlDataApiEntry = {
+  title?: string;
+  subtitle?: string;
+  authors?: { name?: string }[];
+  publishers?: { name?: string }[];
+  publish_date?: string;
+  cover?: { medium?: string; large?: string; small?: string };
+  identifiers?: { isbn_13?: string[]; isbn_10?: string[] };
 };
 
 function yearFromDate(raw: string | undefined): number | null {
@@ -113,17 +125,55 @@ export function createOpenLibraryProvider(
 
   return {
     async lookupByIsbn(isbn13: string): Promise<BookProviderHit | null> {
-      const url = `${baseUrl}/isbn/${isbn13}.json`;
-      const res = await fetchFn(url, { headers: { Accept: 'application/json' } });
-      if (res.status === 404) return null;
-      if (!res.ok) return null;
-      const book = (await res.json()) as OlBook;
-      const hit = toHitFromIsbnBook(book);
-      if (hit && !hit.isbn13) {
-        hit.isbn13 = isbn13;
-        hit.isbn10 = normalizeIsbn(isbn13)?.isbn10 ?? null;
+      const stamp = (hit: BookProviderHit | null): BookProviderHit | null => {
+        if (hit && !hit.isbn13) {
+          hit.isbn13 = isbn13;
+          hit.isbn10 = normalizeIsbn(isbn13)?.isbn10 ?? null;
+        }
+        return hit;
+      };
+
+      const book = await getJson<OlBook>(`${baseUrl}/isbn/${isbn13}.json`, {
+        provider: 'open_library',
+        fetch: fetchFn,
+      });
+      const direct = book ? stamp(toHitFromIsbnBook(book)) : null;
+      if (direct) return direct;
+
+      // The edition endpoint 404s for plenty of recent printings that the
+      // other two views do have. Cheap to ask; worth it for new releases.
+      const dataApi = await getJson<Record<string, OlDataApiEntry>>(
+        `${baseUrl}/api/books?bibkeys=ISBN:${isbn13}&format=json&jscmd=data`,
+        { provider: 'open_library', fetch: fetchFn },
+      );
+      const entry = dataApi?.[`ISBN:${isbn13}`];
+      if (entry?.title?.trim()) {
+        return stamp({
+          isbn13: entry.identifiers?.isbn_13?.[0] ?? null,
+          isbn10: entry.identifiers?.isbn_10?.[0] ?? null,
+          title: entry.subtitle
+            ? `${entry.title.trim()}: ${entry.subtitle.trim()}`
+            : entry.title.trim(),
+          authors: (entry.authors ?? [])
+            .map((a) => a.name?.trim() ?? '')
+            .filter(Boolean),
+          publisher: entry.publishers?.[0]?.name?.trim() || null,
+          publishedYear: yearFromDate(entry.publish_date),
+          edition: null,
+          coverUrl: entry.cover?.medium ?? entry.cover?.large ?? null,
+          source: 'open_library',
+        });
       }
-      return hit;
+
+      const search = await getJson<OlSearchResponse>(
+        `${baseUrl}/search.json?q=${isbn13}&limit=5`,
+        { provider: 'open_library', fetch: fetchFn },
+      );
+      for (const doc of search?.docs ?? []) {
+        const hit = toHitFromSearchDoc(doc);
+        if (hit) return stamp(hit);
+      }
+      return null;
     },
 
     async searchByTitle(title: string, author?: string | null): Promise<BookProviderHit[]> {
@@ -132,12 +182,11 @@ export function createOpenLibraryProvider(
       if (author?.trim()) url.searchParams.set('author', author.trim());
       url.searchParams.set('limit', '10');
 
-      const res = await fetchFn(url.toString(), {
-        headers: { Accept: 'application/json' },
+      const data = await getJson<OlSearchResponse>(url.toString(), {
+        provider: 'open_library',
+        fetch: fetchFn,
       });
-      if (!res.ok) return [];
-      const data = (await res.json()) as OlSearchResponse;
-      return (data.docs ?? [])
+      return (data?.docs ?? [])
         .map(toHitFromSearchDoc)
         .filter((h): h is BookProviderHit => h !== null);
     },

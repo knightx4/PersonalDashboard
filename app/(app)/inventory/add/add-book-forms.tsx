@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import {
   previewPasteBookList,
+  saveManualBook,
   saveOwnedBook,
   savePasteBookList,
   searchOwnedBook,
@@ -12,6 +13,100 @@ import {
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import type { CanonicalBook } from '@/lib/books/types';
+
+/**
+ * By-hand entry. The escape hatch for a book too new for any catalog — and
+ * the reason a failed lookup is never a dead end.
+ */
+export function AddBookManualForm({
+  isbn,
+  compact,
+}: {
+  isbn?: string | null;
+  compact?: boolean;
+}) {
+  const [state, action, pending] = useActionState(
+    saveManualBook,
+    {} as BookActionState,
+  );
+
+  return (
+    <form
+      action={action}
+      className={
+        compact
+          ? 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'
+          : 'flex flex-col gap-3'
+      }
+    >
+      {compact && (
+        <div>
+          <p className="text-sm font-medium text-ink">Add it by hand</p>
+          <p className="text-[13px] text-ink-muted">
+            {isbn
+              ? 'We keep the scanned ISBN, so buyback and eBay quotes still work.'
+              : 'No catalog record needed.'}
+          </p>
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <Label htmlFor="manual_title">Title</Label>
+          <Input id="manual_title" name="title" required autoComplete="off" />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="manual_authors">Authors</Label>
+          <Input
+            id="manual_authors"
+            name="authors"
+            placeholder="Comma separated"
+            autoComplete="off"
+          />
+        </div>
+        <div>
+          <Label htmlFor="manual_isbn">ISBN</Label>
+          <Input
+            id="manual_isbn"
+            name="isbn"
+            defaultValue={isbn ?? ''}
+            placeholder="From the back cover"
+            autoComplete="off"
+          />
+        </div>
+        <div>
+          <Label htmlFor="manual_publisher">Publisher</Label>
+          <Input id="manual_publisher" name="publisher" autoComplete="off" />
+        </div>
+        <div>
+          <Label htmlFor="manual_year">Year</Label>
+          <Input id="manual_year" name="published_year" inputMode="numeric" />
+        </div>
+        <div>
+          <Label htmlFor="manual_edition">Edition</Label>
+          <Input
+            id="manual_edition"
+            name="edition"
+            placeholder="First edition, revised…"
+          />
+        </div>
+      </div>
+      <Button type="submit" disabled={pending} className="self-start">
+        {pending ? 'Saving…' : 'Add to library'}
+      </Button>
+      <FieldError>{state.error}</FieldError>
+      {state.message && (
+        <p className="text-sm text-brand">
+          {state.message}{' '}
+          {state.savedIds?.[0] && (
+            <Link className="underline" href={`/inventory/${state.savedIds[0]}`}>
+              View item
+            </Link>
+          )}
+        </p>
+      )}
+    </form>
+  );
+}
 
 function BookCard({
   book,
@@ -209,6 +304,10 @@ export function AddBookSearchForm() {
           onPick={setPicked}
           pending={savePending}
         />
+      )}
+
+      {!shown && searchState.error && (
+        <AddBookManualForm compact isbn={searchState.manualIsbn} />
       )}
     </div>
   );

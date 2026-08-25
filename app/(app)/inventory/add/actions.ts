@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { buildOwnedBookRows } from '@/lib/books/create-owned-book';
 import { resolvePasteList } from '@/lib/books/paste-list';
-import { resolveBook } from '@/lib/books/resolve';
+import { resolveBook, resolveBookDetailed } from '@/lib/books/resolve';
+import type { ProviderFailure } from '@/lib/books/providers/http';
+import { normalizeIsbn } from '@/lib/books/isbn';
 import type { BookEditionCandidate, CanonicalBook } from '@/lib/books/types';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
 import { serverEnv } from '@/lib/env';
@@ -15,6 +17,13 @@ export type BookActionState = {
   error?: string;
   message?: string;
   book?: CanonicalBook | null;
+  /**
+   * Set when the lookup failed for a reason other than "no such book" — the
+   * UI says "try again" instead of sending the user off to doubt their scan.
+   */
+  lookupFailed?: boolean;
+  /** Valid ISBN we could not resolve; prefills the by-hand form. */
+  manualIsbn?: string | null;
   results?: {
     raw: string;
     book: CanonicalBook | null;
@@ -49,11 +58,13 @@ function envKeys() {
     return {
       anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
       googleBooksApiKey: env.GOOGLE_BOOKS_API_KEY ?? null,
+      isbndbApiKey: env.ISBNDB_API_KEY ?? null,
     };
   } catch {
     return {
       anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
       googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? null,
+      isbndbApiKey: process.env.ISBNDB_API_KEY ?? null,
     };
   }
 }
@@ -87,6 +98,18 @@ const canonicalBookSchema = z.object({
   confirmationReason: z.string().nullable().optional().default(null),
 });
 
+/** Turn provider trouble into something a person can act on. */
+function lookupFailureMessage(failures: ProviderFailure[]): string | null {
+  if (failures.length === 0) return null;
+  if (failures.some((f) => f.kind === 'rate_limited')) {
+    return 'The book catalogs are rate-limiting us right now, so this is not a verdict on your book. Try again in a minute — setting GOOGLE_BOOKS_API_KEY (free) makes this rare.';
+  }
+  if (failures.some((f) => f.kind === 'unauthorized')) {
+    return 'A book catalog rejected our credentials. Check GOOGLE_BOOKS_API_KEY / ISBNDB_API_KEY.';
+  }
+  return 'The book catalogs did not answer just now. Try again, or add the details by hand.';
+}
+
 export async function searchOwnedBook(
   _prev: BookActionState,
   formData: FormData,
@@ -96,24 +119,44 @@ export async function searchOwnedBook(
   if (!query) return { error: 'Enter an ISBN or a title.' };
 
   const keys = envKeys();
-  const isbnish = /^\d[\d\- Xx]{8,}\d[\dXx]?$/.test(query) || /isbn/i.test(query);
-  const book = await resolveBook(
-    isbnish || /^\d{10}(\d{3})?$/.test(query.replace(/[\s-]/g, ''))
-      ? { isbn: query }
-      : { title: query },
-    { googleBooksApiKey: keys.googleBooksApiKey },
-  );
+  const providerKeys = {
+    googleBooksApiKey: keys.googleBooksApiKey,
+    isbndbApiKey: keys.isbndbApiKey,
+  };
+  const isbn = normalizeIsbn(query);
+  const failures: ProviderFailure[] = [];
 
-  // If ISBN path failed, try as title.
-  const fallback =
-    book ??
-    (await resolveBook(
-      { title: query },
-      { googleBooksApiKey: keys.googleBooksApiKey },
-    ));
+  if (isbn) {
+    const byIsbn = await resolveBookDetailed({ isbn: isbn.isbn13 }, providerKeys);
+    failures.push(...byIsbn.failures);
+    if (byIsbn.book) return { book: byIsbn.book, message: 'Match found.' };
+  }
 
-  if (!fallback) return { error: 'No matching book found.', book: null };
-  return { book: fallback, message: 'Match found.' };
+  // A scanned ISBN that no catalog carries is still worth a title attempt only
+  // when the user typed words; digits make a useless title query.
+  if (!isbn) {
+    const byTitle = await resolveBookDetailed({ title: query }, providerKeys);
+    failures.push(...byTitle.failures);
+    if (byTitle.book) return { book: byTitle.book, message: 'Match found.' };
+  }
+
+  const failureMessage = lookupFailureMessage(failures);
+  if (failureMessage) {
+    return {
+      error: failureMessage,
+      book: null,
+      lookupFailed: true,
+      manualIsbn: isbn?.isbn13 ?? null,
+    };
+  }
+
+  return {
+    error: isbn
+      ? 'No catalog lists this ISBN yet. New releases often take weeks to appear — add the details by hand and we will keep the ISBN so pricing still works.'
+      : 'No matching book found. Try the ISBN from the back cover, or add the details by hand.',
+    book: null,
+    manualIsbn: isbn?.isbn13 ?? null,
+  };
 }
 
 export async function saveOwnedBook(
@@ -508,4 +551,124 @@ export async function switchBookEdition(
   revalidatePath(`/inventory/${item.id}`);
   revalidatePath('/sell');
   return { message: `Switched to the ${[book.publisher, book.publishedYear].filter(Boolean).join(' ') || 'selected'} edition.` };
+}
+
+
+/**
+ * Add a book the catalogs do not carry yet.
+ *
+ * Brand-new releases can be weeks away from Google Books or Open Library, and
+ * the barcode is still a perfectly good edition id. Typed details plus the
+ * scanned ISBN make a sell-ready unit: buyback and eBay both quote by ISBN,
+ * so pricing works even with no catalog record behind it.
+ */
+export async function saveManualBook(
+  _prev: BookActionState,
+  formData: FormData,
+): Promise<BookActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const title = String(formData.get('title') ?? '').trim();
+  if (!title) return { error: 'Title is required.' };
+
+  const rawIsbn = String(formData.get('isbn') ?? '').trim();
+  const isbn = rawIsbn ? normalizeIsbn(rawIsbn) : null;
+  if (rawIsbn && !isbn) {
+    return { error: 'That ISBN failed its check digit — re-scan or retype it.' };
+  }
+
+  const yearRaw = String(formData.get('published_year') ?? '').trim();
+  const publishedYear = yearRaw ? Number(yearRaw) : null;
+  if (
+    publishedYear != null &&
+    (!Number.isInteger(publishedYear) || publishedYear < 1000 || publishedYear > 2100)
+  ) {
+    return { error: 'Year must be a four-digit year.' };
+  }
+
+  const book: CanonicalBook = {
+    isbn13: isbn?.isbn13 ?? null,
+    isbn10: isbn?.isbn10 ?? null,
+    title,
+    authors: String(formData.get('authors') ?? '')
+      .split(',')
+      .map((a) => a.trim())
+      .filter(Boolean),
+    publisher: String(formData.get('publisher') ?? '').trim() || null,
+    publishedYear,
+    edition: String(formData.get('edition') ?? '').trim() || null,
+    coverUrl: null,
+    weightGrams: null,
+    matchConfidence: 1,
+    // The user is holding the book. Nothing left to confirm.
+    needsConfirmation: false,
+    resolutionSource: 'manual',
+    alternates: [],
+    confirmationReason: null,
+  };
+
+  const categoryId = await booksCategoryId(supabase);
+  if (!categoryId) return { error: 'Books category is missing from the database.' };
+
+  const timezone = await userTimezone(supabase, user.id);
+  const bundle = buildOwnedBookRows({
+    userId: user.id,
+    booksCategoryId: categoryId,
+    book,
+    acquiredAt: todayInTimezone(timezone),
+    source: 'manual',
+    forceConfirmed: true,
+  });
+
+  const { error: invError } = await supabase.from('inventory_items').insert({
+    id: bundle.inventory.id,
+    user_id: bundle.inventory.userId,
+    order_item_id: null,
+    category_id: bundle.inventory.categoryId,
+    name: bundle.inventory.name,
+    short_name: bundle.inventory.shortName,
+    variant: bundle.inventory.variant,
+    image_url: bundle.inventory.imageUrl,
+    fingerprint_loose: bundle.inventory.fingerprintLoose,
+    acquired_at: bundle.inventory.acquiredAt,
+    cost_cents: bundle.inventory.costCents,
+    search_tags: bundle.inventory.searchTags,
+    source: bundle.inventory.source,
+    status: bundle.inventory.status,
+  });
+  if (invError) return { error: invError.message };
+
+  const { error: bookError } = await supabase.from('book_details').insert({
+    id: bundle.bookDetails.id,
+    inventory_item_id: bundle.bookDetails.inventoryItemId,
+    isbn_13: bundle.bookDetails.isbn13,
+    isbn_10: bundle.bookDetails.isbn10,
+    authors: bundle.bookDetails.authors,
+    edition: bundle.bookDetails.edition,
+    publisher: bundle.bookDetails.publisher,
+    published_year: bundle.bookDetails.publishedYear,
+    weight_grams: null,
+    condition: null,
+    resolution_source: 'manual',
+    match_confidence: 1,
+    needs_confirmation: false,
+    candidates: [],
+    confirmation_reason: null,
+    auto_imported: false,
+  });
+  if (bookError) {
+    await supabase.from('inventory_items').delete().eq('id', bundle.inventory.id);
+    return { error: bookError.message };
+  }
+
+  revalidatePath('/inventory');
+  revalidatePath('/sell');
+  return {
+    message: book.isbn13
+      ? 'Added by hand with your ISBN — pricing will still work.'
+      : 'Added by hand. Add an ISBN later to unlock buyback quotes.',
+    savedIds: [bundle.inventory.id],
+    book,
+  };
 }
