@@ -43,6 +43,8 @@ export interface ManualOrderInput {
   discountCents: number;
   currency?: string;
   lines: readonly ManualOrderLineInput[];
+  /** Defaults to manual. Receipt photos use receipt_photo. */
+  source?: 'manual' | 'receipt_photo' | 'email' | 'photo';
 }
 
 export interface ManualOrderItemRow {
@@ -72,6 +74,7 @@ export interface ManualInventoryItemRow {
   acquiredAt: string;
   costCents: number;
   searchTags: string[];
+  source: 'manual' | 'receipt_photo' | 'email' | 'photo';
 }
 
 export interface ManualOrderBundle {
@@ -79,7 +82,7 @@ export interface ManualOrderBundle {
     id: string;
     userId: string;
     merchantId: string | null;
-    source: 'manual';
+    source: 'manual' | 'receipt_photo' | 'email' | 'photo';
     externalOrderNumber: string | null;
     orderDate: string;
     subtotalCents: number;
@@ -173,6 +176,7 @@ export function buildManualOrder(input: ManualOrderInput): ManualOrderBundle {
     totals,
   );
 
+  const orderSource = input.source ?? 'manual';
   const itemsById = new Map(orderItems.map((item) => [item.id, item]));
   const inventoryItems: ManualInventoryItemRow[] = allocated.map((unit) => {
     const item = itemsById.get(unit.orderItemId)!;
@@ -188,6 +192,7 @@ export function buildManualOrder(input: ManualOrderInput): ManualOrderBundle {
       acquiredAt: input.orderDate,
       costCents: unit.costCents,
       searchTags: item.searchTags,
+      source: orderSource,
     };
   });
 
@@ -196,7 +201,7 @@ export function buildManualOrder(input: ManualOrderInput): ManualOrderBundle {
       id: orderId,
       userId: input.userId,
       merchantId: input.merchantId,
-      source: 'manual',
+      source: orderSource,
       externalOrderNumber: input.externalOrderNumber?.trim()
         ? input.externalOrderNumber.trim()
         : null,

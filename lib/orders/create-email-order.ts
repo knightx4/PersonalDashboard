@@ -63,6 +63,7 @@ export interface EmailOrderBundle {
     costCents: number;
     imageUrl: string | null;
     searchTags: string[];
+    source: 'email';
   }>;
   allocated: AllocatedUnit[];
   totals: OrderTotals;
@@ -174,6 +175,7 @@ export function buildEmailOrder(input: {
       costCents: unit.costCents,
       imageUrl: item.imageUrl,
       searchTags: item.searchTags,
+      source: 'email' as const,
     };
   });
 

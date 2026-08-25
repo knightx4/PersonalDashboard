@@ -231,6 +231,7 @@ export async function createManualOrder(
       acquired_at: item.acquiredAt,
       cost_cents: item.costCents,
       search_tags: item.searchTags,
+      source: item.source,
     })),
   );
   if (inventoryError) {

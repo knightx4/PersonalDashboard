@@ -22,6 +22,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+// uniqueIndex already imported above
 import { sql } from 'drizzle-orm';
 
 // Supabase's auth schema. Declared so foreign keys type-check; never written to
@@ -64,7 +65,33 @@ export const parseStatus = pgEnum('parse_status', [
   'needs_review',
 ]);
 
-export const orderSource = pgEnum('order_source', ['email', 'manual', 'receipt_photo']);
+export const orderSource = pgEnum('order_source', [
+  'email',
+  'manual',
+  'receipt_photo',
+  'photo',
+]);
+
+export const bookCondition = pgEnum('book_condition', [
+  'new',
+  'like_new',
+  'very_good',
+  'good',
+  'acceptable',
+]);
+
+export const bookResolutionSource = pgEnum('book_resolution_source', [
+  'google_books',
+  'open_library',
+  'isbndb',
+  'manual',
+]);
+
+export const bookPriceQuoteSource = pgEnum('book_price_quote_source', [
+  'buyback',
+  'ebay_browse',
+  'sold_comps',
+]);
 
 export const orderStatus = pgEnum('order_status', [
   'ordered',
@@ -143,6 +170,10 @@ export const profiles = pgTable('profiles', {
   monthlyBudgetCents: integer('monthly_budget_cents'),
   defaultCooldownDays: integer('default_cooldown_days').notNull().default(7),
   onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
+  /** Sell assistant: only surface items that net at least this many cents. */
+  sellNetFloorCents: integer('sell_net_floor_cents'),
+  /** Flat per-listing effort penalty used in net_self math. */
+  sellEffortCents: integer('sell_effort_cents').notNull().default(500),
   ...timestamps,
 });
 
@@ -332,6 +363,12 @@ export const inventoryItems = pgTable(
     notes: text('notes'),
     /** User intent: show on the returns tracker “to return” filter. */
     returnPlanned: boolean('return_planned').notNull().default(false),
+    /**
+     * Provenance for this physical unit. For order-backed rows this mirrors
+     * orders.source; for standalone owned items (scanned books, etc.) it is
+     * set directly (manual / photo / receipt_photo).
+     */
+    source: orderSource('source').notNull().default('manual'),
     ...timestamps,
   },
   (t) => [
@@ -339,6 +376,58 @@ export const inventoryItems = pgTable(
     index('inventory_order_item_idx').on(t.orderItemId),
     index('inventory_category_idx').on(t.categoryId),
     index('inventory_fp_loose_idx').on(t.fingerprintLoose),
+  ],
+);
+
+/**
+ * Book-specific identity and enrichment, 1:1 with inventory_items.
+ * Category-agnostic core stays on inventory_items; media/clothing get their
+ * own detail tables later.
+ */
+export const bookDetails = pgTable(
+  'book_details',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    isbn13: text('isbn_13'),
+    isbn10: text('isbn_10'),
+    authors: text('authors').array().notNull().default([]),
+    edition: text('edition'),
+    publisher: text('publisher'),
+    publishedYear: integer('published_year'),
+    weightGrams: integer('weight_grams'),
+    condition: bookCondition('condition'),
+    resolutionSource: bookResolutionSource('resolution_source').notNull().default('manual'),
+    matchConfidence: numeric('match_confidence', { precision: 4, scale: 3 }),
+    needsConfirmation: boolean('needs_confirmation').notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('book_details_inventory_item_id_key').on(t.inventoryItemId),
+    index('book_details_isbn_13_idx').on(t.isbn13),
+  ],
+);
+
+/** Shared ISBN quote cache (buyback / Browse / later sold comps). */
+export const bookPriceQuotes = pgTable(
+  'book_price_quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    isbn13: text('isbn_13').notNull(),
+    source: bookPriceQuoteSource('source').notNull(),
+    quotedCents: integer('quoted_cents'),
+    shippingCents: integer('shipping_cents').notNull().default(0),
+    vendorName: text('vendor_name'),
+    vendorUrl: text('vendor_url'),
+    payload: jsonb('payload'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('book_price_quotes_isbn_source_key').on(t.isbn13, t.source),
+    index('book_price_quotes_fetched_at_idx').on(t.fetchedAt),
   ],
 );
 

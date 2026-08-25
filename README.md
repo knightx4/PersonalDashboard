@@ -10,8 +10,8 @@ month.
 
 ## Status
 
-Build order steps 1–14 are done. See [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md)
-for what is next.
+Build order steps 1–14 and books/sell assistant (16–18) are done. See
+[docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next.
 
 | | |
 |---|---|
@@ -28,6 +28,8 @@ for what is next.
 | Onboarding + Gmail pre-consent | done |
 | Incremental sync | done |
 | Review queue | done |
+| Owned-books ingestion + book_details | done |
+| Sell assistant (buyback + Browse routing) | done |
 
 ## Getting started
 
@@ -98,8 +100,9 @@ These are enforced by tests and lint rules, not by convention.
 
 Listing these because they will otherwise get invented.
 
-- No price comparison or affiliate shopping. Not a deal site.
-- No checkout. Never handles payment.
+- No shopping price comparison or affiliate deals. Not a deal site.
+  Owned-item resale assist (sell assistant) is in scope; checkout is not.
+- No checkout. Never handles payment. Sell assistant drafts; the human posts.
 - No bank or card connection in v1. Email only.
 - No social features, sharing, or feeds.
 - No browser extension in v1.

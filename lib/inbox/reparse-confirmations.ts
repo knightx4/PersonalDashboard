@@ -353,6 +353,7 @@ export async function reparseInboxConfirmations(
             cost_cents: costCents,
             image_url: built.imageUrl,
             search_tags: built.searchTags,
+            source: 'email',
           })),
         );
         if (invError) throw invError;

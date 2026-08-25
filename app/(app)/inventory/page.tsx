@@ -1,9 +1,11 @@
 import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
+import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { buttonVariants } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
@@ -373,6 +375,14 @@ export default async function InventoryPage({
         <PageHeader
           title="Inventory"
           description="Everything you currently own, so you can check before buying it again."
+          actions={
+            <Link
+              href="/inventory/add"
+              className={buttonVariants({ variant: 'primary', size: 'sm' })}
+            >
+              Add owned books
+            </Link>
+          }
         />
 
         <form className="mb-4 space-y-3" action="/inventory" method="get">
@@ -460,10 +470,12 @@ export default async function InventoryPage({
             action={
               filtered
                 ? { label: 'Clear filters', href: '/inventory' }
-                : { label: 'Add an order', href: '/orders/new' }
+                : { label: 'Add owned books', href: '/inventory/add' }
             }
             secondaryAction={
-              filtered ? undefined : { label: 'Connect an inbox', href: '/settings' }
+              filtered
+                ? undefined
+                : { label: 'Add an order', href: '/orders/new' }
             }
           />
         ) : (

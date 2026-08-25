@@ -56,7 +56,14 @@ at Tier 2.
     unmatched emails (`parse_status = needs_review`). Confirm, discard, or
     dismiss; Open in Gmail; nav badge counts both.
 15. **Account deletion** with token revocation and full cascade.
-16. **Phase 2** — the anti-spending layer. No migrations needed; the schema
+16. ✅ **Books resolution engine** — ISBN/title → canonical book via Google
+    Books + Open Library, tested with fixtures.
+17. ✅ **Owned-book ingestion** — manual search, paste list, barcode scan,
+    shelf/cover photo (confirm mandatory), receipt photo; `book_details`
+    table; standalone inventory (no synthetic orders).
+18. ✅ **Sell assistant v1** — buyback quotes + eBay Browse asking ceiling,
+    net_self / net_buyback math, routing UI on `/sell` (draft only).
+19. **Phase 2** — the anti-spending layer. No migrations needed; the schema
     already carries `item_uses`, the budget columns and `cooldown_until`.
     `price_checks` for saved items also waits until then.
 

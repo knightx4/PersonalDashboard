@@ -41,6 +41,13 @@ export function serverEnv() {
       ANTHROPIC_API_KEY: z.string().min(1).optional(),
       GOOGLE_GMAIL_CLIENT_ID: z.string().min(1).optional(),
       GOOGLE_GMAIL_CLIENT_SECRET: z.string().min(1).optional(),
+      /** Optional. Raises Google Books quota above the shared courtesy limit. */
+      GOOGLE_BOOKS_API_KEY: z.string().min(1).optional(),
+      /** Optional. BookScouter (or similar) buyback aggregator. */
+      BOOKSCOUTER_API_KEY: z.string().min(1).optional(),
+      /** Optional. eBay Browse API (OAuth client credentials). */
+      EBAY_CLIENT_ID: z.string().min(1).optional(),
+      EBAY_CLIENT_SECRET: z.string().min(1).optional(),
       INNGEST_EVENT_KEY: z.string().optional(),
       INNGEST_SIGNING_KEY: z.string().optional(),
     })

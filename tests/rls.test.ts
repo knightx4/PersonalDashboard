@@ -66,10 +66,31 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
   ids.order_items = orderItem.id;
 
   const [inventoryItem] = await admin<{ id: string }[]>`
-    insert into inventory_items (user_id, order_item_id, name, cost_cents, acquired_at)
-    values (${userId}, ${orderItem.id}, ${`${tag} widget`}, 1000, current_date)
+    insert into inventory_items (user_id, order_item_id, name, cost_cents, acquired_at, source)
+    values (${userId}, ${orderItem.id}, ${`${tag} widget`}, 1000, current_date, 'manual')
     returning id`;
   ids.inventory_items = inventoryItem.id;
+
+  const [bookDetails] = await admin<{ id: string }[]>`
+    insert into book_details (
+      inventory_item_id, isbn_13, authors, resolution_source, match_confidence, needs_confirmation
+    )
+    values (
+      ${inventoryItem.id}, ${'9780735211292'}, array['James Clear'], 'manual', 0.9, false
+    )
+    returning id`;
+  ids.book_details = bookDetails.id;
+
+  const [bookQuote] = await admin<{ id: string }[]>`
+    insert into book_price_quotes (isbn_13, source, quoted_cents, vendor_name)
+    values (
+      ${tag === 'alice' ? '9780735211292' : '9780143127550'},
+      'buyback',
+      ${tag === 'alice' ? 500 : 200},
+      ${`${tag} books`}
+    )
+    returning id`;
+  ids.book_price_quotes = bookQuote.id;
 
   const [use] = await admin<{ id: string }[]>`
     insert into item_uses (inventory_item_id, used_on)
@@ -216,7 +237,7 @@ describe('RLS coverage', () => {
 
 describe('cross-user reads', () => {
   /** Shared market-data tables: every authenticated user may read every row. */
-  const SHARED_REFERENCE_TABLES = new Set(['fx_rates']);
+  const SHARED_REFERENCE_TABLES = new Set(['fx_rates', 'book_price_quotes']);
 
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
@@ -249,6 +270,13 @@ describe('cross-user reads', () => {
   it('lets every authenticated user read cached FX rates', async () => {
     const rows = await asUser(userB, (tx) =>
       tx<{ id: string }[]>`select id from fx_rates where id = ${seedA.fx_rates}`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets every authenticated user read cached book price quotes', async () => {
+    const rows = await asUser(userB, (tx) =>
+      tx<{ id: string }[]>`select id from book_price_quotes where id = ${seedA.book_price_quotes}`,
     );
     expect(rows).toHaveLength(1);
   });

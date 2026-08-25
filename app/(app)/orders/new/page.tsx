@@ -29,9 +29,17 @@ export default async function NewOrderPage() {
         title="Add an order"
         description="Enter what you bought. Each unit lands in inventory with its share of tax, shipping and discount."
         actions={
-          <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-            Cancel
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/orders/receipt"
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Receipt photo
+            </Link>
+            <Link href="/orders" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+              Cancel
+            </Link>
+          </div>
         }
       />
       <OrderForm

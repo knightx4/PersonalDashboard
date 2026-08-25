@@ -429,6 +429,7 @@ async function handleOrderConfirmation(
       cost_cents: item.costCents,
       image_url: item.imageUrl,
       search_tags: item.searchTags,
+      source: item.source,
     })),
   );
 

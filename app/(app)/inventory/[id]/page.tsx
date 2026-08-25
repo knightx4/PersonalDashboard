@@ -10,6 +10,7 @@ import { PlanReturnButton } from '@/app/(app)/returns/plan-return-button';
 import { displayVariant } from '@/lib/inventory/display';
 import { displayNameOf } from '@/lib/inventory/sort-group';
 import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
+import { BookDetailsPanel } from './book-details-panel';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -28,6 +29,7 @@ export default async function InventoryItemPage({
     { data: lists },
     { data: memberships },
     { data: profile },
+    { data: bookRow },
   ] = await Promise.all([
     supabase
       .from('inventory_items')
@@ -35,7 +37,7 @@ export default async function InventoryItemPage({
         `
         id, name, short_name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
-        return_planned,
+        return_planned, source,
         categories ( id, name, color, slug ),
         order_items (
           order_id, product_url, image_url,
@@ -64,6 +66,16 @@ export default async function InventoryItemPage({
       .select('list_id')
       .eq('inventory_item_id', id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    supabase
+      .from('book_details')
+      .select(
+        `
+        inventory_item_id, isbn_13, isbn_10, authors, edition, publisher,
+        published_year, condition, needs_confirmation, match_confidence, resolution_source
+      `,
+      )
+      .eq('inventory_item_id', id)
+      .maybeSingle(),
   ]);
 
   if (!item) notFound();
@@ -171,6 +183,12 @@ export default async function InventoryItemPage({
           <dt className="text-ink-muted">Acquired</dt>
           <dd className="text-ink">{item.acquired_at ?? '—'}</dd>
         </div>
+        {item.source && (
+          <div>
+            <dt className="text-ink-muted">Source</dt>
+            <dd className="text-ink">{String(item.source).replace('_', ' ')}</dd>
+          </div>
+        )}
         {returnDueCopy && (
           <div className="sm:col-span-2">
             <dt className="text-ink-muted">Return due</dt>
@@ -225,6 +243,25 @@ export default async function InventoryItemPage({
         )}
       </dl>
 
+      {bookRow && (
+        <BookDetailsPanel
+          book={{
+            inventoryItemId: bookRow.inventory_item_id,
+            isbn13: bookRow.isbn_13,
+            isbn10: bookRow.isbn_10,
+            authors: bookRow.authors ?? [],
+            edition: bookRow.edition,
+            publisher: bookRow.publisher,
+            publishedYear: bookRow.published_year,
+            condition: bookRow.condition,
+            needsConfirmation: bookRow.needs_confirmation,
+            matchConfidence:
+              bookRow.match_confidence != null ? Number(bookRow.match_confidence) : null,
+            resolutionSource: bookRow.resolution_source,
+          }}
+        />
+      )}
+
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
           <div>
@@ -263,7 +300,13 @@ export default async function InventoryItemPage({
 
       {item.status === 'owned' && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <ReturnForm itemId={item.id} defaultRefundCents={item.cost_cents} />
+          {item.order_item_id ? (
+            <ReturnForm itemId={item.id} defaultRefundCents={item.cost_cents} />
+          ) : (
+            <div className="rounded-card border border-dashed border-border bg-surface p-4 text-sm text-ink-muted">
+              This owned item is not linked to an order, so it cannot be marked returned.
+            </div>
+          )}
           <DisposeForm itemId={item.id} />
         </div>
       )}

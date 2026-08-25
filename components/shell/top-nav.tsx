@@ -13,6 +13,7 @@ const SECTIONS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/orders', label: 'Orders' },
   { href: '/inventory', label: 'Inventory' },
+  { href: '/sell', label: 'Sell' },
   { href: '/returns', label: 'Returns' },
   { href: '/saved', label: 'Saved' },
   { href: '/review', label: 'Review' },
