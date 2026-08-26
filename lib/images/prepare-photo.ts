@@ -102,31 +102,77 @@ async function decodeViaImageElement(file: File): Promise<DecodedImage> {
  * Any image the device can open — HEIC/HEIF included — becomes a right-way-up,
  * downscaled JPEG data URL.
  */
+function describe(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
+}
+
+/** One draw + encode attempt at a given size. Null when the device balks. */
+function renderToJpeg(
+  decoded: DecodedImage,
+  maxEdge: number,
+): PreparedPhoto | null {
+  const size = fitWithin(decoded.width, decoded.height, maxEdge);
+  const canvas = document.createElement('canvas');
+  canvas.width = size.width;
+  canvas.height = size.height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  try {
+    ctx.drawImage(decoded.source, 0, 0, size.width, size.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+    // Safari under memory pressure returns "data:," rather than throwing.
+    if (!dataUrl.startsWith('data:image/jpeg') || dataUrl.length < 128) return null;
+    return { dataUrl, width: size.width, height: size.height };
+  } catch {
+    return null;
+  } finally {
+    // Free the backing store immediately; iOS is strict about canvas memory.
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
+
+/**
+ * Any image the device can open — HEIC/HEIF included — becomes a right-way-up,
+ * downscaled JPEG data URL.
+ *
+ * Mobile Safari fails big canvases by returning an empty data URL instead of
+ * throwing, and it does so more often as memory fills up part-way through a
+ * batch. So each size is attempted in turn and a smaller one is tried before
+ * declaring the photo unreadable.
+ */
 export async function preparePhoto(
   file: File,
   maxEdge: number = MAX_EDGE,
 ): Promise<PreparedPhoto> {
-  const decoded = (await decodeViaImageBitmap(file)) ?? (await decodeViaImageElement(file));
+  let decoded: DecodedImage;
+  try {
+    decoded = (await decodeViaImageBitmap(file)) ?? (await decodeViaImageElement(file));
+  } catch (error) {
+    if (error instanceof UnsupportedImageError) throw error;
+    throw new UnsupportedImageError(
+      `Could not open ${file.name || 'that photo'} (${describe(error)}).`,
+    );
+  }
 
   try {
     if (!decoded.width || !decoded.height) {
-      throw new UnsupportedImageError('That image came back empty. Try another photo.');
+      throw new UnsupportedImageError(
+        `${file.name || 'That photo'} decoded to an empty image. Try another one.`,
+      );
     }
 
-    const size = fitWithin(decoded.width, decoded.height, maxEdge);
-    const canvas = document.createElement('canvas');
-    canvas.width = size.width;
-    canvas.height = size.height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new UnsupportedImageError('This browser blocked image processing.');
-    ctx.drawImage(decoded.source, 0, 0, size.width, size.height);
-
-    const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-    if (!dataUrl.startsWith('data:image/jpeg')) {
-      throw new UnsupportedImageError('Could not convert that photo to JPEG.');
+    for (const edge of [maxEdge, Math.round(maxEdge * 0.75), Math.round(maxEdge * 0.5)]) {
+      const rendered = renderToJpeg(decoded, edge);
+      if (rendered) return rendered;
     }
-    return { dataUrl, width: size.width, height: size.height };
+
+    throw new UnsupportedImageError(
+      `${file.name || 'That photo'} was too large for this browser to convert. Close other tabs and retry, or pick a smaller photo.`,
+    );
   } finally {
     decoded.release();
   }

@@ -9,7 +9,6 @@
 import { ProviderError, type ProviderFailure } from '@/lib/books/providers/http';
 import {
   createBggProvider,
-  thingToCandidate,
   type BggSearchHit,
   type BggThing,
 } from '@/lib/games/providers/bgg';
@@ -37,7 +36,7 @@ export type ResolveGameOutcome = {
   productTitle?: string | null;
 };
 
-/** How many BGG search hits are worth a detail fetch. */
+/** How many ranked search hits to keep, winner included. */
 const DETAIL_FANOUT = 3;
 
 function scoreTitle(query: string, hit: BggSearchHit | BggThing): number {
@@ -133,50 +132,61 @@ async function resolveByTitle(
     .filter((entry) => entry.score >= 0.3);
   if (ranked.length === 0) return null;
 
-  const things: BggThing[] = [];
-  for (const entry of ranked.slice(0, DETAIL_FANOUT)) {
-    try {
-      const thing = await bgg.thing(entry.hit.bggId);
-      if (thing) things.push(thing);
-    } catch (error) {
-      if (error instanceof ProviderError) {
-        failures.push(error.failure);
-        continue;
-      }
-      throw error;
-    }
+  const top = ranked[0]!;
+
+  // Only the winner earns a detail call. A shelf photo can hold forty games,
+  // and BGG throttles hard — the runner-ups keep the search fields, which
+  // already carry the id, title and year the confirm prompt needs.
+  let thing: BggThing | null = null;
+  try {
+    thing = await bgg.thing(top.hit.bggId);
+  } catch (error) {
+    if (error instanceof ProviderError) failures.push(error.failure);
+    else throw error;
   }
-  if (things.length === 0) return null;
 
-  const scoredThings = things
-    .map((thing) => ({ thing, score: scoreTitle(title, thing) }))
-    .sort((a, b) => b.score - a.score);
-
-  const best = scoredThings[0];
-  if (!best) return null;
-
-  // Anything scoring near the winner is a real alternative, not noise.
-  const alternates = scoredThings
-    .slice(1)
+  const alternates: GameEditionCandidate[] = ranked
+    .slice(1, DETAIL_FANOUT)
     .filter((entry) => entry.score >= 0.5)
-    .map((entry) => thingToCandidate(entry.thing));
+    .map((entry) => ({
+      bggId: entry.hit.bggId,
+      title: entry.hit.title,
+      yearPublished: entry.hit.yearPublished,
+      publisher: null,
+      imageUrl: null,
+      source: 'bgg' as const,
+    }));
 
   const plausible = 1 + alternates.length;
-  const needsConfirmation = plausible > 1 || best.score < 0.8 || context.fromBarcode;
+  const needsConfirmation = plausible > 1 || top.score < 0.8 || context.fromBarcode;
+  const reason = needsConfirmation
+    ? confirmationReasonFor({
+        title: thing?.title ?? top.hit.title,
+        candidateCount: plausible,
+        score: top.score,
+        fromBarcode: context.fromBarcode,
+      })
+    : null;
 
-  return thingToGame(best.thing, {
+  // The detail call failing is not fatal: the search hit alone identifies the
+  // game, it just arrives without publisher, player count, or box art.
+  const resolved: BggThing = thing ?? {
+    bggId: top.hit.bggId,
+    title: top.hit.title,
+    yearPublished: top.hit.yearPublished,
+    publisher: null,
+    minPlayers: null,
+    maxPlayers: null,
+    playingTimeMinutes: null,
+    imageUrl: null,
+  };
+
+  return thingToGame(resolved, {
     barcode: context.barcode,
-    confidence: best.score,
+    confidence: top.score,
     needsConfirmation,
     alternates: needsConfirmation ? alternates : [],
-    confirmationReason: needsConfirmation
-      ? confirmationReasonFor({
-          title: best.thing.title,
-          candidateCount: plausible,
-          score: best.score,
-          fromBarcode: context.fromBarcode,
-        })
-      : null,
+    confirmationReason: reason,
   });
 }
 

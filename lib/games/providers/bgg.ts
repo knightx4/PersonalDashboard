@@ -6,10 +6,22 @@
  * this reads the handful of documented shapes with targeted patterns; the
  * fixtures in bgg.test.ts mirror real API responses.
  */
-import { ProviderError } from '@/lib/books/providers/http';
+import { ProviderError, type ProviderFailure } from '@/lib/books/providers/http';
 import type { GameEditionCandidate } from '@/lib/games/types';
 
 const BASE_URL = 'https://boardgamegeek.com/xmlapi2';
+/** Same API, different edge. Tried when the primary host refuses us. */
+const MIRROR_URL = 'https://api.geekdo.com/xmlapi2';
+
+/**
+ * BGG sits behind bot protection that rejects a bare runtime User-Agent —
+ * which is exactly what a serverless function sends by default.
+ */
+const USER_AGENT =
+  'ShoppingManager/1.0 (personal inventory tool; +https://github.com/knightx4/ShoppingManager)';
+
+/** BGG answers 202 while it builds a response; the docs say retry. */
+const QUEUE_RETRY_DELAYS_MS = [1200, 2500];
 
 export type BggThing = {
   bggId: number;
@@ -116,53 +128,103 @@ export type BggOptions = {
  * BGG serves XML, so this goes around getJson but keeps the same failure
  * contract: null for a genuine miss, ProviderError for anything else.
  */
-async function getXml(url: string, options: BggOptions): Promise<string | null> {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchOnce(
+  url: string,
+  options: BggOptions,
+): Promise<{ xml: string | null } | { failure: ProviderFailure }> {
   const fetchFn = options.fetch ?? globalThis.fetch;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10_000);
+  const timer = setTimeout(() => controller.abort(), 15_000);
   try {
     const res = await fetchFn(url, {
-      headers: { Accept: 'application/xml' },
+      headers: {
+        Accept: 'application/xml, text/xml;q=0.9, */*;q=0.8',
+        'User-Agent': USER_AGENT,
+      },
       signal: controller.signal,
     });
-    if (res.status === 404) return null;
-    // BGG answers 202 while it warms a cached response; that is not a miss.
+    if (res.status === 404) return { xml: null };
     if (res.status === 202) {
-      throw new ProviderError({ provider: 'bgg', kind: 'unavailable', status: 202 });
+      return { failure: { provider: 'bgg', kind: 'unavailable', status: 202 } };
     }
     if (!res.ok) {
-      throw new ProviderError({
-        provider: 'bgg',
-        kind: res.status === 429 ? 'rate_limited' : 'unavailable',
-        status: res.status,
-      });
+      return {
+        failure: {
+          provider: 'bgg',
+          kind:
+            res.status === 429
+              ? 'rate_limited'
+              : res.status === 401 || res.status === 403
+                ? 'unauthorized'
+                : 'unavailable',
+          status: res.status,
+        },
+      };
     }
-    return await res.text();
-  } catch (error) {
-    if (error instanceof ProviderError) throw error;
-    throw new ProviderError({
-      provider: 'bgg',
-      kind: controller.signal.aborted ? 'timeout' : 'unavailable',
-    });
+    return { xml: await res.text() };
+  } catch {
+    return {
+      failure: {
+        provider: 'bgg',
+        kind: controller.signal.aborted ? 'timeout' : 'unavailable',
+      },
+    };
   } finally {
     clearTimeout(timer);
   }
 }
 
+/**
+ * BGG serves XML, so this goes around getJson but keeps the same failure
+ * contract: null for a genuine miss, ProviderError for anything else. A 202
+ * (queued) is retried, and a refusal from the main host is retried once
+ * against the mirror before giving up.
+ */
+async function getXml(
+  path: string,
+  options: BggOptions,
+  hosts: string[],
+): Promise<string | null> {
+  let lastFailure: ProviderFailure = { provider: 'bgg', kind: 'unavailable' };
+
+  for (const host of hosts) {
+    for (let attempt = 0; attempt <= QUEUE_RETRY_DELAYS_MS.length; attempt++) {
+      if (attempt > 0) await sleep(QUEUE_RETRY_DELAYS_MS[attempt - 1] ?? 0);
+      const result = await fetchOnce(`${host}${path}`, options);
+      if ('xml' in result) return result.xml;
+
+      lastFailure = result.failure;
+      // 202 and 429 are worth waiting out; a 403 will not change on retry.
+      const retryable =
+        result.failure.status === 202 ||
+        result.failure.kind === 'rate_limited' ||
+        result.failure.kind === 'timeout' ||
+        (result.failure.status ?? 500) >= 500;
+      if (!retryable) break;
+    }
+  }
+
+  throw new ProviderError(lastFailure);
+}
+
 export function createBggProvider(options: BggOptions = {}) {
-  const baseUrl = options.baseUrl ?? BASE_URL;
+  const hosts = options.baseUrl ? [options.baseUrl] : [BASE_URL, MIRROR_URL];
 
   return {
     async searchByTitle(title: string): Promise<BggSearchHit[]> {
-      const url = `${baseUrl}/search?query=${encodeURIComponent(
+      const path = `/search?query=${encodeURIComponent(
         title,
       )}&type=boardgame,boardgameexpansion`;
-      const xml = await getXml(url, options);
+      const xml = await getXml(path, options, hosts);
       return xml ? parseSearchXml(xml) : [];
     },
 
     async thing(bggId: number): Promise<BggThing | null> {
-      const xml = await getXml(`${baseUrl}/thing?id=${bggId}`, options);
+      const xml = await getXml(`/thing?id=${bggId}`, options, hosts);
       return xml ? parseThingXml(xml) : null;
     },
   };

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   extractGamesFromPhoto,
   saveGameBatch,
+  saveUnmatchedGames,
   type GameActionState,
   type ShelfRow,
 } from './actions';
@@ -28,6 +29,10 @@ type ReadProgress = { done: number; total: number } | null;
 export function GameShelfPhotoPanel() {
   const [saveState, saveAction, savePending] = useActionState(
     saveGameBatch,
+    {} as GameActionState,
+  );
+  const [byNameState, byNameAction, byNamePending] = useActionState(
+    saveUnmatchedGames,
     {} as GameActionState,
   );
   const [rows, setRows] = useState<ShelfRow[]>([]);
@@ -70,10 +75,14 @@ export function GameShelfPhotoPanel() {
           setPhotosRead((prev) => prev + 1);
         }
       } catch (err) {
+        // Name the file and the actual reason — "try another photo" taught us
+        // nothing the last time this fired.
         setError(
           err instanceof UnsupportedImageError
             ? err.message
-            : `Could not read ${file.name || 'one of those images'}. Try another photo.`,
+            : `Could not read ${file.name || 'one of those images'}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
         );
       }
       setProgress({ done: index + 1, total: list.length });
@@ -93,6 +102,8 @@ export function GameShelfPhotoPanel() {
 
   const matched = rows.filter((row) => row.game);
   const unmatched = rows.filter((row) => !row.game);
+  // Every unmatched row carries the same provider failure; say it once.
+  const unmatchedError = unmatched.find((row) => row.error)?.error ?? null;
   // Payload indexes must line up with the checkbox values.
   const payload = matched.map((row) => row.game!);
   const reading = progress !== null;
@@ -210,23 +221,52 @@ export function GameShelfPhotoPanel() {
       )}
 
       {unmatched.length > 0 && (
-        <div>
+        <form action={byNameAction} className="flex flex-col gap-2">
+          <input
+            type="hidden"
+            name="titles_json"
+            value={JSON.stringify(unmatched.map((row) => row.raw))}
+          />
           <p className="text-sm font-medium text-ink">
             Read but not matched ({unmatched.length})
           </p>
           <p className="text-[13px] text-ink-muted">
-            The photo gave a name, BoardGameGeek did not confirm it. Add these by hand
-            or search for them.
+            The photo read these names; BoardGameGeek did not confirm them. Save them
+            as typed names now — the box is on your shelf either way — and attach a
+            BGG id later from the item page.
           </p>
-          <ul className="mt-2 divide-y divide-border rounded-xl border border-border bg-surface">
+          {unmatchedError && (
+            <p className="text-[13px] text-accent-orange">{unmatchedError}</p>
+          )}
+          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {unmatched.map((row, index) => (
-              <li key={`${row.raw}-${index}`} className="px-4 py-2 text-[13px]">
+              <li key={`${row.raw}-${index}`} className="flex gap-3 px-4 py-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  name="selected"
+                  value={String(index)}
+                  defaultChecked
+                  className="mt-0.5"
+                />
                 <span className="text-ink">{row.raw}</span>
-                {row.error && <span className="ml-2 text-accent-orange">{row.error}</span>}
               </li>
             ))}
           </ul>
-        </div>
+          <Button
+            type="submit"
+            variant="secondary"
+            disabled={byNamePending || reading}
+            className="self-start"
+          >
+            {byNamePending
+              ? 'Saving…'
+              : `Add ${unmatched.length} ticked as typed names`}
+          </Button>
+          <FieldError>{byNameState.error}</FieldError>
+          {byNameState.message && (
+            <p className="text-[13px] text-brand">{byNameState.message}</p>
+          )}
+        </form>
       )}
     </div>
   );

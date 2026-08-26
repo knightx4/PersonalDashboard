@@ -10,6 +10,7 @@ import { resolveGameDetailed } from '@/lib/games/resolve';
 import { readGameShelfPhoto, type ShelfSighting } from '@/lib/games/shelf-photo';
 import type { CanonicalGame, GameEditionCandidate } from '@/lib/games/types';
 import { mapPool } from '@/lib/async/map-pool';
+import type { ProviderFailure } from '@/lib/books/providers/http';
 import { parseImageDataUrl } from '@/lib/images/data-url';
 import { serverEnv } from '@/lib/env';
 import { todayInTimezone } from '@/lib/money';
@@ -24,6 +25,28 @@ export type ShelfRow = {
   game: CanonicalGame | null;
   error?: string;
 };
+
+/** Turn provider trouble into something specific enough to act on. */
+function describeFailures(failures: ProviderFailure[]): string | null {
+  if (failures.length === 0) return null;
+  const worst =
+    failures.find((f) => f.kind === 'unauthorized') ??
+    failures.find((f) => f.kind === 'rate_limited') ??
+    failures.find((f) => f.kind === 'timeout') ??
+    failures[0]!;
+  const where = worst.provider === 'bgg' ? 'BoardGameGeek' : 'The barcode database';
+  const status = worst.status ? ` (HTTP ${worst.status})` : '';
+  switch (worst.kind) {
+    case 'unauthorized':
+      return `${where} refused the request${status} — it is blocking this server, not rejecting the game.`;
+    case 'rate_limited':
+      return `${where} is rate-limiting us${status}. Wait a minute and retry.`;
+    case 'timeout':
+      return `${where} did not answer in time. Retry.`;
+    default:
+      return `${where} was unavailable${status}.`;
+  }
+}
 
 export type GameActionState = {
   error?: string;
@@ -343,46 +366,53 @@ export async function extractGamesFromPhoto(
   });
   if (!reading.ok) return { error: reading.error };
 
-  const rows = await mapPool(
-    reading.reading.games,
-    RESOLVE_CONCURRENCY,
-    async (sighting): Promise<ShelfRow> => {
-      const query = [sighting.title, sighting.edition].filter(Boolean).join(': ');
-      try {
-        const outcome = await resolveGameDetailed(
-          { title: query, publisher: sighting.publisher ?? null },
-          { upcApiKey: keys.upcApiKey },
-        );
-        return {
-          raw: query,
-          sighting,
-          game: outcome.game,
-          error:
-            !outcome.game && outcome.failures.length > 0
-              ? 'Lookup unavailable — try this one again later.'
-              : undefined,
-        };
-      } catch (error) {
-        return {
-          raw: query,
-          sighting,
-          game: null,
-          error: error instanceof Error ? error.message : 'Lookup failed',
-        };
-      }
-    },
-  );
+  const sightings = reading.reading.games;
+  const queryFor = (s: ShelfSighting) =>
+    [s.title, s.edition].filter(Boolean).join(': ');
+
+  // Three copies of Acquire on one shelf is one lookup, not three.
+  const uniqueQueries = [...new Set(sightings.map(queryFor))];
+  const allFailures: ProviderFailure[] = [];
+
+  const resolved = new Map<string, CanonicalGame | null>();
+  await mapPool(uniqueQueries, RESOLVE_CONCURRENCY, async (query) => {
+    try {
+      const outcome = await resolveGameDetailed(
+        { title: query },
+        { upcApiKey: keys.upcApiKey },
+      );
+      allFailures.push(...outcome.failures);
+      resolved.set(query, outcome.game);
+    } catch (error) {
+      console.error('game resolve failed', query, error);
+      resolved.set(query, null);
+    }
+  });
+
+  const failureNote = describeFailures(allFailures);
+
+  const rows: ShelfRow[] = sightings.map((sighting) => {
+    const query = queryFor(sighting);
+    const game = resolved.get(query) ?? null;
+    return {
+      raw: query,
+      sighting,
+      game,
+      error: !game && failureNote ? failureNote : undefined,
+    };
+  });
 
   const matched = rows.filter((r) => r.game).length;
   return {
     rows,
     unreadableCount: reading.reading.unreadable_boxes,
     notes: reading.reading.notes ?? null,
+    lookupFailed: matched === 0 && allFailures.length > 0,
     message: `Read ${rows.length} box(es), matched ${matched}.${
       reading.reading.unreadable_boxes > 0
         ? ` ${reading.reading.unreadable_boxes} box(es) were not readable in this photo.`
         : ''
-    }`,
+    }${failureNote ? ` ${failureNote}` : ''}`,
   };
 }
 
@@ -581,4 +611,86 @@ export async function saveScannedProduct(
 
   revalidatePath('/inventory');
   return { message: 'Added to inventory.', savedIds: [id] };
+}
+
+
+/**
+ * Save boxes the photo read but no catalog confirmed.
+ *
+ * The photo is the evidence that the game is on the shelf; BoardGameGeek
+ * being unreachable should not cost the user 40 correct titles. These land as
+ * manual rows with no BGG id — searchable and sellable-by-hand, and a later
+ * lookup can fill in the identity.
+ */
+export async function saveUnmatchedGames(
+  _prev: GameActionState,
+  formData: FormData,
+): Promise<GameActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const raw = String(formData.get('titles_json') ?? '');
+  if (!raw) return { error: 'Nothing to save.' };
+
+  let titles: string[];
+  try {
+    const parsed = z.array(z.string().trim().min(1)).safeParse(JSON.parse(raw));
+    if (!parsed.success) return { error: 'Invalid title list.' };
+    titles = parsed.data;
+  } catch {
+    return { error: 'Invalid title list JSON.' };
+  }
+
+  const selected = new Set(
+    formData
+      .getAll('selected')
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n >= 0),
+  );
+
+  const categoryId = await gamesCategoryId(supabase);
+  if (!categoryId) {
+    return { error: 'Board games category is missing — run migration 0022.' };
+  }
+  const timezone = await userTimezone(supabase, user.id);
+
+  const savedIds: string[] = [];
+  for (let i = 0; i < titles.length; i++) {
+    if (!selected.has(i)) continue;
+    const title = titles[i]!;
+    const result = await persistGame(supabase, {
+      userId: user.id,
+      categoryId,
+      timezone,
+      source: 'photo',
+      autoImported: true,
+      forceConfirmed: true,
+      game: {
+        bggId: null,
+        barcode: null,
+        title,
+        yearPublished: null,
+        publisher: null,
+        minPlayers: null,
+        maxPlayers: null,
+        playingTimeMinutes: null,
+        imageUrl: null,
+        matchConfidence: 1,
+        needsConfirmation: false,
+        resolutionSource: 'manual',
+        alternates: [],
+        confirmationReason: null,
+      },
+    });
+    if ('error' in result) return { error: result.error, savedIds };
+    savedIds.push(result.id);
+  }
+
+  revalidatePath('/inventory');
+  return {
+    message: savedIds.length
+      ? `Added ${savedIds.length} game(s) by name. Look them up later to attach a BGG id.`
+      : 'No games selected.',
+    savedIds,
+  };
 }
