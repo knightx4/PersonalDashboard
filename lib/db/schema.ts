@@ -89,6 +89,7 @@ export const bookResolutionSource = pgEnum('book_resolution_source', [
 
 export const gameResolutionSource = pgEnum('game_resolution_source', [
   'bgg',
+  'wikidata',
   'upc_lookup',
   'manual',
 ]);
@@ -442,6 +443,8 @@ export const gameDetails = pgTable(
       .notNull()
       .references(() => inventoryItems.id, { onDelete: 'cascade' }),
     bggId: integer('bgg_id'),
+    /** Wikidata item, when BGG was unreachable and Wikidata answered. */
+    wikidataId: text('wikidata_id'),
     /** EAN-13 form of the scanned barcode. */
     barcode: text('barcode'),
     yearPublished: integer('year_published'),
@@ -461,6 +464,7 @@ export const gameDetails = pgTable(
   (t) => [
     uniqueIndex('game_details_inventory_item_id_key').on(t.inventoryItemId),
     index('game_details_bgg_id_idx').on(t.bggId),
+    index('game_details_wikidata_id_idx').on(t.wikidataId),
     index('game_details_barcode_idx').on(t.barcode),
   ],
 );

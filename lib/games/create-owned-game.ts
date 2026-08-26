@@ -29,6 +29,7 @@ export type OwnedGameBundle = {
     id: string;
     inventoryItemId: string;
     bggId: number | null;
+    wikidataId: string | null;
     barcode: string | null;
     yearPublished: number | null;
     publisher: string | null;
@@ -88,7 +89,9 @@ export function buildOwnedGameRows(input: {
       imageUrl: input.game.imageUrl,
       // BGG id when we have one: two copies of the same box should collide.
       fingerprintLoose: fingerprintLoose(
-        input.game.bggId ? `bgg-${input.game.bggId}` : input.game.title,
+        input.game.bggId
+          ? `bgg-${input.game.bggId}`
+          : (input.game.wikidataId ?? input.game.title),
       ),
       acquiredAt: input.acquiredAt,
       costCents: 0,
@@ -100,6 +103,7 @@ export function buildOwnedGameRows(input: {
       id: randomUUID(),
       inventoryItemId: inventoryId,
       bggId: input.game.bggId,
+      wikidataId: input.game.wikidataId ?? null,
       barcode: input.game.barcode,
       yearPublished: input.game.yearPublished,
       publisher: input.game.publisher,

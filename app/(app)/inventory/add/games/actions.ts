@@ -78,6 +78,7 @@ function envKeys() {
 
 const canonicalGameSchema = z.object({
   bggId: z.number().int().nullable(),
+  wikidataId: z.string().nullable().optional().default(null),
   barcode: z.string().nullable(),
   title: z.string().min(1),
   yearPublished: z.number().int().nullable(),
@@ -88,7 +89,7 @@ const canonicalGameSchema = z.object({
   imageUrl: z.string().nullable(),
   matchConfidence: z.number(),
   needsConfirmation: z.boolean(),
-  resolutionSource: z.enum(['bgg', 'upc_lookup', 'manual']),
+  resolutionSource: z.enum(['bgg', 'wikidata', 'upc_lookup', 'manual']),
   alternates: z
     .array(
       z.object({
@@ -97,7 +98,7 @@ const canonicalGameSchema = z.object({
         yearPublished: z.number().int().nullable(),
         publisher: z.string().nullable(),
         imageUrl: z.string().nullable(),
-        source: z.enum(['bgg', 'upc_lookup', 'manual']),
+        source: z.enum(['bgg', 'wikidata', 'upc_lookup', 'manual']),
       }),
     )
     .optional()
@@ -174,6 +175,7 @@ async function persistGame(
     id: bundle.gameDetails.id,
     inventory_item_id: bundle.gameDetails.inventoryItemId,
     bgg_id: bundle.gameDetails.bggId,
+    wikidata_id: bundle.gameDetails.wikidataId,
     barcode: bundle.gameDetails.barcode,
     year_published: bundle.gameDetails.yearPublished,
     publisher: bundle.gameDetails.publisher,
@@ -347,9 +349,26 @@ export async function saveManualGame(
  * model could see but not identify, so the gap is visible rather than implied.
  */
 export async function extractGamesFromPhoto(
-  _prev: GameActionState,
+  prev: GameActionState,
   formData: FormData,
 ): Promise<GameActionState> {
+  // A thrown server action reaches the browser as "an error occurred in the
+  // Server Components render", which tells the user nothing. Everything below
+  // returns a message instead.
+  try {
+    return await readShelfPhoto(formData);
+  } catch (error) {
+    console.error('shelf photo read failed', error);
+    return {
+      error:
+        error instanceof Error
+          ? `Photo read failed: ${error.message}`
+          : 'Photo read failed on the server.',
+    };
+  }
+}
+
+async function readShelfPhoto(formData: FormData): Promise<GameActionState> {
   await requireUser();
   const keys = envKeys();
   if (!keys.anthropicApiKey) {
@@ -522,7 +541,7 @@ export async function switchGameEdition(
         yearPublished: z.number().int().nullable(),
         publisher: z.string().nullable(),
         imageUrl: z.string().nullable(),
-        source: z.enum(['bgg', 'upc_lookup', 'manual']),
+        source: z.enum(['bgg', 'wikidata', 'upc_lookup', 'manual']),
       })
       .safeParse(JSON.parse(String(formData.get('candidate_json') ?? '')));
     if (!parsed.success) return { error: 'Invalid edition payload.' };
@@ -545,7 +564,7 @@ export async function switchGameEdition(
       bgg_id: candidate.bggId,
       year_published: candidate.yearPublished,
       publisher: candidate.publisher,
-      resolution_source: 'bgg',
+      resolution_source: candidate.source === 'manual' ? 'manual' : candidate.source,
       match_confidence: 1,
       needs_confirmation: false,
       candidates: [],

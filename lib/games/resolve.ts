@@ -14,6 +14,7 @@ import {
 } from '@/lib/games/providers/bgg';
 import { cleanGameTitle, normalizeForCompare } from '@/lib/games/clean-title';
 import { createUpcLookup } from '@/lib/products/providers/upc-lookup';
+import { createWikidataProvider, type WikidataGame } from '@/lib/games/providers/wikidata';
 import { classifyScannedCode } from '@/lib/barcodes/scan-code';
 import {
   isBarcodeInput,
@@ -27,6 +28,9 @@ export type ResolveGameOptions = {
   upcApiKey?: string | null;
   bggBaseUrl?: string;
   upcBaseUrl?: string;
+  wikidataBaseUrl?: string;
+  /** Skip BGG entirely — set when it is known to block this host. */
+  skipBgg?: boolean;
 };
 
 export type ResolveGameOutcome = {
@@ -39,7 +43,7 @@ export type ResolveGameOutcome = {
 /** How many ranked search hits to keep, winner included. */
 const DETAIL_FANOUT = 3;
 
-function scoreTitle(query: string, hit: BggSearchHit | BggThing): number {
+function scoreTitle(query: string, hit: { title: string }): number {
   const q = normalizeForCompare(query);
   const h = normalizeForCompare(hit.title);
   if (!q || !h) return 0;
@@ -190,6 +194,105 @@ async function resolveByTitle(
   });
 }
 
+/** Wikidata fallback. Same scoring, and it often carries the BGG id anyway. */
+async function resolveViaWikidata(
+  rawTitle: string,
+  options: ResolveGameOptions,
+  failures: ProviderFailure[],
+  context: { barcode: string | null; fromBarcode: boolean },
+): Promise<CanonicalGame | null> {
+  const title = cleanGameTitle(rawTitle);
+  if (title.length < 2) return null;
+
+  const wikidata = createWikidataProvider({
+    fetch: options.fetch,
+    baseUrl: options.wikidataBaseUrl,
+  });
+
+  let hits: WikidataGame[] = [];
+  try {
+    hits = await wikidata.searchGames(title);
+  } catch (error) {
+    if (error instanceof ProviderError) {
+      failures.push(error.failure);
+      return null;
+    }
+    throw error;
+  }
+  if (hits.length === 0) return null;
+
+  const ranked = hits
+    .map((hit) => ({ hit, score: scoreTitle(title, hit) }))
+    .sort((a, b) => b.score - a.score)
+    .filter((entry) => entry.score >= 0.3);
+  const top = ranked[0];
+  if (!top) return null;
+
+  let publisher: string | null = null;
+  if (top.hit.publisherId) {
+    try {
+      const names = await wikidata.publisherNames([top.hit.publisherId]);
+      publisher = names.get(top.hit.publisherId) ?? null;
+    } catch {
+      // A missing publisher name is cosmetic; the identity still stands.
+    }
+  }
+
+  const alternates: GameEditionCandidate[] = ranked
+    .slice(1, DETAIL_FANOUT)
+    .filter((entry) => entry.score >= 0.5)
+    .map((entry) => ({
+      bggId: entry.hit.bggId,
+      title: entry.hit.title,
+      yearPublished: entry.hit.yearPublished,
+      publisher: null,
+      imageUrl: entry.hit.imageUrl,
+      source: 'wikidata' as const,
+    }));
+
+  const plausible = 1 + alternates.length;
+  const needsConfirmation = plausible > 1 || top.score < 0.8 || context.fromBarcode;
+
+  return {
+    bggId: top.hit.bggId,
+    wikidataId: top.hit.wikidataId,
+    barcode: context.barcode,
+    title: top.hit.title,
+    yearPublished: top.hit.yearPublished,
+    publisher,
+    minPlayers: null,
+    maxPlayers: null,
+    playingTimeMinutes: null,
+    imageUrl: top.hit.imageUrl,
+    matchConfidence: Number(top.score.toFixed(3)),
+    needsConfirmation,
+    resolutionSource: 'wikidata',
+    alternates: needsConfirmation ? alternates : [],
+    confirmationReason: needsConfirmation
+      ? confirmationReasonFor({
+          title: top.hit.title,
+          candidateCount: plausible,
+          score: top.score,
+          fromBarcode: context.fromBarcode,
+        })
+      : null,
+  };
+}
+
+/** BGG when it will talk to us, Wikidata when it will not. */
+async function resolveTitleAcrossCatalogs(
+  rawTitle: string,
+  options: ResolveGameOptions,
+  failures: ProviderFailure[],
+  context: { barcode: string | null; fromBarcode: boolean },
+): Promise<CanonicalGame | null> {
+  if (!options.skipBgg) {
+    const fromBgg = await resolveByTitle(rawTitle, options, failures, context);
+    if (fromBgg) return fromBgg;
+  }
+  return resolveViaWikidata(rawTitle, options, failures, context);
+}
+
 /** Resolve, reporting provider trouble separately from a genuine miss. */
 export async function resolveGameDetailed(
   input: ResolveGameInput,
@@ -218,14 +321,14 @@ export async function resolveGameDetailed(
     }
     if (!product) return { game: null, failures, productTitle: null };
 
-    const game = await resolveByTitle(product.title, options, failures, {
+    const game = await resolveTitleAcrossCatalogs(product.title, options, failures, {
       barcode: code.ean13,
       fromBarcode: true,
     });
     return { game, failures, productTitle: product.title };
   }
 
-  const game = await resolveByTitle(input.title, options, failures, {
+  const game = await resolveTitleAcrossCatalogs(input.title, options, failures, {
     barcode: null,
     fromBarcode: false,
   });

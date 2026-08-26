@@ -103,6 +103,94 @@ describe('cleanGameTitle', () => {
   });
 });
 
+const WIKIDATA_SEARCH = JSON.stringify({
+  search: [{ id: 'Q56320855', label: 'Wingspan', description: 'board game' }],
+});
+
+const WIKIDATA_ENTITIES = JSON.stringify({
+  entities: {
+    Q56320855: {
+      id: 'Q56320855',
+      labels: { en: { value: 'Wingspan' } },
+      claims: {
+        P31: [{ mainsnak: { datavalue: { value: { id: 'Q131436' } } } }],
+        P2339: [{ mainsnak: { datavalue: { value: '266192' } } }],
+        P577: [{ mainsnak: { datavalue: { value: { time: '+2019-00-00T00:00:00Z' } } } }],
+        P123: [{ mainsnak: { datavalue: { value: { id: 'Q61080557' } } } }],
+      },
+    },
+  },
+});
+
+const WIKIDATA_PUBLISHER = JSON.stringify({
+  entities: { Q61080557: { labels: { en: { value: 'Stonemaier Games' } } } },
+});
+
+describe('wikidata fallback', () => {
+  const wikidataFetch: typeof fetch = async (input) => {
+    const url = String(input);
+    // BGG refuses this host, exactly as it does from a deployed server.
+    if (url.includes('bgg.test')) return new Response('nope', { status: 401 });
+    if (url.includes('wbsearchentities')) return new Response(WIKIDATA_SEARCH, { status: 200 });
+    if (url.includes('props=labels&')) return new Response(WIKIDATA_PUBLISHER, { status: 200 });
+    if (url.includes('wbgetentities')) return new Response(WIKIDATA_ENTITIES, { status: 200 });
+    return new Response('unexpected', { status: 500 });
+  };
+
+  it('resolves through Wikidata when BoardGameGeek refuses, keeping the BGG id', async () => {
+    const outcome = await resolveGameDetailed(
+      { title: 'Wingspan' },
+      {
+        fetch: wikidataFetch,
+        bggBaseUrl: 'https://bgg.test',
+        wikidataBaseUrl: 'https://wikidata.test/w/api.php',
+      },
+    );
+    expect(outcome.game?.title).toBe('Wingspan');
+    expect(outcome.game?.bggId).toBe(266192);
+    expect(outcome.game?.wikidataId).toBe('Q56320855');
+    expect(outcome.game?.publisher).toBe('Stonemaier Games');
+    expect(outcome.game?.yearPublished).toBe(2019);
+    expect(outcome.game?.resolutionSource).toBe('wikidata');
+    // The BGG refusal is still reported, even though the lookup recovered.
+    expect(outcome.failures.some((f) => f.provider === 'bgg')).toBe(true);
+  });
+
+  it('skips entities that are not games', async () => {
+    const notAGame: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes('bgg.test')) return new Response('nope', { status: 401 });
+      if (url.includes('wbsearchentities')) {
+        return new Response(
+          JSON.stringify({ search: [{ id: 'Q1', label: 'Wingspan', description: 'album' }] }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          entities: {
+            Q1: {
+              id: 'Q1',
+              labels: { en: { value: 'Wingspan' } },
+              claims: { P31: [{ mainsnak: { datavalue: { value: { id: 'Q482994' } } } }] },
+            },
+          },
+        }),
+        { status: 200 },
+      );
+    };
+    const outcome = await resolveGameDetailed(
+      { title: 'Wingspan' },
+      {
+        fetch: notAGame,
+        bggBaseUrl: 'https://bgg.test',
+        wikidataBaseUrl: 'https://wikidata.test/w/api.php',
+      },
+    );
+    expect(outcome.game).toBeNull();
+  });
+});
+
 describe('resolveGameDetailed', () => {
   const bggFetch: typeof fetch = async (input) => {
     const url = String(input);
@@ -125,7 +213,11 @@ describe('resolveGameDetailed', () => {
     const limited: typeof fetch = async () => new Response('slow down', { status: 429 });
     const outcome = await resolveGameDetailed(
       { title: 'Wingspan' },
-      { fetch: limited, bggBaseUrl: 'https://bgg.test' },
+      {
+        fetch: limited,
+        bggBaseUrl: 'https://bgg.test',
+        wikidataBaseUrl: 'https://wikidata.test/w/api.php',
+      },
     );
     expect(outcome.game).toBeNull();
     expect(outcome.failures.map((f) => f.kind)).toContain('rate_limited');

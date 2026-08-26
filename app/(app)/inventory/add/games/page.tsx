@@ -8,6 +8,13 @@ import { GameShelfPhotoPanel } from './game-photo-panel';
 
 export const metadata = { title: 'Add board games' };
 
+/**
+ * Reading forty boxes out of one photo, then looking each one up, runs well
+ * past a default serverless limit. Server actions invoked from this page
+ * inherit this ceiling.
+ */
+export const maxDuration = 300;
+
 const MODES = [
   { id: 'photo', label: 'Shelf photo' },
   { id: 'scan', label: 'Scan barcode' },

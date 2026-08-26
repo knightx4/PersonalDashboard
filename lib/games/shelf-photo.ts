@@ -66,7 +66,9 @@ export async function readGameShelfPhoto(input: {
     // A forced tool call is the reliable way to get schema-shaped JSON back.
     response = await client.messages.create({
       model: SHELF_MODEL,
-      max_tokens: 8000,
+      // Forty entries is ~1,500 tokens; a high ceiling only buys a slower
+      // worst case, and the whole read has to fit a serverless time limit.
+      max_tokens: 4096,
       system: SYSTEM,
       tools: [
         {
@@ -122,9 +124,15 @@ export async function readGameShelfPhoto(input: {
       return { ok: false, error: 'Claude is rate-limiting us. Try again in a minute.' };
     }
     if (error instanceof Anthropic.APIError) {
-      return { ok: false, error: `Photo read failed (${error.status}).` };
+      return {
+        ok: false,
+        error: `The photo reader returned ${error.status ?? 'an error'}: ${error.message}`,
+      };
     }
-    throw error;
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'The photo read failed.',
+    };
   }
 
   const toolUse = response.content.find(

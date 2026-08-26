@@ -7,7 +7,7 @@
  * edition, so an uncertain match gets confirmed rather than guessed.
  */
 
-export type GameResolutionSource = 'bgg' | 'upc_lookup' | 'manual';
+export type GameResolutionSource = 'bgg' | 'wikidata' | 'upc_lookup' | 'manual';
 
 export type GameEditionCandidate = {
   bggId: number | null;
@@ -20,6 +20,8 @@ export type GameEditionCandidate = {
 
 export type CanonicalGame = {
   bggId: number | null;
+  /** Set when Wikidata supplied the identity (BGG blocks datacenter IPs). */
+  wikidataId?: string | null;
   /** EAN-13 form of the scanned barcode, when we came in that way. */
   barcode: string | null;
   title: string;
