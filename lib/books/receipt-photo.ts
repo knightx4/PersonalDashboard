@@ -9,25 +9,16 @@ import {
   type CategoryOption,
   PARSER_VERSION,
 } from '@/lib/email/extract/schema';
-
-function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | null {
-  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
-  if (!match) return null;
-  return { mediaType: match[1]!, data: match[2]!.replace(/\s+/g, '') };
-}
+import { parseImageDataUrl } from '@/lib/images/data-url';
 
 export async function extractOrderFromReceiptPhoto(input: {
   imageDataUrl: string;
   apiKey: string;
   categories?: readonly CategoryOption[];
 }): Promise<ApplyExtractionResult> {
-  const parsedImage = parseDataUrl(input.imageDataUrl);
-  if (!parsedImage) {
-    return {
-      ok: false,
-      reason: 'schema',
-      issues: ['Upload a JPEG or PNG receipt photo.'],
-    };
+  const parsedImage = parseImageDataUrl(input.imageDataUrl);
+  if (!parsedImage.ok) {
+    return { ok: false, reason: 'schema', issues: [parsedImage.error] };
   }
 
   const client = new Anthropic({ apiKey: input.apiKey });
@@ -63,11 +54,7 @@ Parser: ${PARSER_VERSION}. Return ONLY JSON.`,
             type: 'image',
             source: {
               type: 'base64',
-              media_type: parsedImage.mediaType as
-                | 'image/jpeg'
-                | 'image/png'
-                | 'image/gif'
-                | 'image/webp',
+              media_type: parsedImage.mediaType,
               data: parsedImage.data,
             },
           },

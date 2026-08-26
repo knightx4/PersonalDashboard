@@ -10,6 +10,7 @@ import { resolveGameDetailed } from '@/lib/games/resolve';
 import { readGameShelfPhoto, type ShelfSighting } from '@/lib/games/shelf-photo';
 import type { CanonicalGame, GameEditionCandidate } from '@/lib/games/types';
 import { mapPool } from '@/lib/async/map-pool';
+import { parseImageDataUrl } from '@/lib/images/data-url';
 import { serverEnv } from '@/lib/env';
 import { todayInTimezone } from '@/lib/money';
 
@@ -317,12 +318,6 @@ export async function saveManualGame(
   return { message: 'Added by hand.', savedIds: [result.id], game };
 }
 
-function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | null {
-  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
-  if (!match) return null;
-  return { mediaType: match[1]!, data: match[2]!.replace(/\s+/g, '') };
-}
-
 /**
  * Read a shelf photo and resolve everything it saw. Returns one row per
  * sighting — resolved, unsure, or unresolved — plus the count of boxes the
@@ -338,15 +333,12 @@ export async function extractGamesFromPhoto(
     return { error: 'Photo import needs ANTHROPIC_API_KEY on the server.' };
   }
 
-  const parsedImage = parseDataUrl(String(formData.get('image_data_url') ?? ''));
-  if (!parsedImage) return { error: 'Upload a JPEG or PNG photo.' };
-  if (parsedImage.data.length > 5_500_000) {
-    return { error: 'Photo is too large. Try a smaller image.' };
-  }
+  const parsedImage = parseImageDataUrl(String(formData.get('image_data_url') ?? ''));
+  if (!parsedImage.ok) return { error: parsedImage.error };
 
   const reading = await readGameShelfPhoto({
     apiKey: keys.anthropicApiKey,
-    mediaType: parsedImage.mediaType as 'image/jpeg' | 'image/png',
+    mediaType: parsedImage.mediaType,
     base64Data: parsedImage.data,
   });
   if (!reading.ok) return { error: reading.error };

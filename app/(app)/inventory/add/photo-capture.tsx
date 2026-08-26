@@ -5,6 +5,11 @@ import { extractBooksFromPhoto } from './photo-actions';
 import { savePasteBookList, type BookActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label } from '@/components/ui/field';
+import {
+  PHOTO_ACCEPT,
+  preparePhoto,
+  UnsupportedImageError,
+} from '@/lib/images/prepare-photo';
 import type { CanonicalBook } from '@/lib/books/types';
 
 /**
@@ -15,6 +20,7 @@ export function PhotoCapturePanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<'shelf' | 'cover'>('shelf');
   const [preview, setPreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [extractState, extractAction, extractPending] = useActionState(
     extractBooksFromPhoto,
     {} as BookActionState,
@@ -26,13 +32,19 @@ export function PhotoCapturePanel() {
 
   async function onFileChange(file: File | null) {
     if (!file) return;
-    if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result ?? '');
+    setImageError(null);
+    try {
+      // Converts HEIC, applies EXIF rotation, and shrinks the original.
+      const { dataUrl } = await preparePhoto(file);
       setPreview(dataUrl);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setPreview(null);
+      setImageError(
+        err instanceof UnsupportedImageError
+          ? err.message
+          : 'Could not read that photo. Try another one.',
+      );
+    }
   }
 
   function runExtract() {
@@ -51,8 +63,9 @@ export function PhotoCapturePanel() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ink-muted">
-        Photos are processed and discarded. You must confirm the detected list
-        before anything is saved — spine OCR is never trusted blindly.
+        Photos are processed and discarded. Any phone photo works, iPhone HEIC
+        included. You must confirm the detected list before anything is saved —
+        spine OCR is never trusted blindly.
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -80,7 +93,7 @@ export function PhotoCapturePanel() {
           ref={fileRef}
           id="photo"
           type="file"
-          accept="image/*"
+          accept={PHOTO_ACCEPT}
           className="block w-full text-sm text-ink-muted"
           onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
         />
@@ -104,7 +117,7 @@ export function PhotoCapturePanel() {
         {extractPending ? 'Reading photo…' : 'Detect books'}
       </Button>
 
-      <FieldError>{extractState.error ?? saveState.error}</FieldError>
+      <FieldError>{imageError ?? extractState.error ?? saveState.error}</FieldError>
       {extractState.message && (
         <p className="text-sm text-ink-muted">{extractState.message}</p>
       )}

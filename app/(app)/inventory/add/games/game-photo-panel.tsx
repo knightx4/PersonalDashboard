@@ -11,21 +11,11 @@ import {
 import { gameSubtitle } from './game-forms';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
-
-const MAX_EDGE = 1600;
-
-/** Downscale in the browser so a 12MP phone photo fits the request budget. */
-async function fileToDataUrl(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas unavailable');
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
+import {
+  PHOTO_ACCEPT,
+  preparePhoto,
+  UnsupportedImageError,
+} from '@/lib/images/prepare-photo';
 
 /** Overlapping shots of one shelf see the same box twice. */
 function rowKey(row: ShelfRow): string {
@@ -60,7 +50,8 @@ export function GameShelfPhotoPanel() {
 
     for (const [index, file] of list.entries()) {
       try {
-        const dataUrl = await fileToDataUrl(file);
+        // HEIC, EXIF rotation, and 12MP originals are all handled here.
+        const { dataUrl } = await preparePhoto(file);
         setPreviews((prev) => [...prev, dataUrl]);
 
         const fd = new FormData();
@@ -78,8 +69,12 @@ export function GameShelfPhotoPanel() {
           setUnreadable((prev) => prev + (result.unreadableCount ?? 0));
           setPhotosRead((prev) => prev + 1);
         }
-      } catch {
-        setError('Could not read one of those images. JPEG or PNG works best.');
+      } catch (err) {
+        setError(
+          err instanceof UnsupportedImageError
+            ? err.message
+            : `Could not read ${file.name || 'one of those images'}. Try another photo.`,
+        );
       }
       setProgress({ done: index + 1, total: list.length });
     }
@@ -105,16 +100,17 @@ export function GameShelfPhotoPanel() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ink-muted">
-        Pick photos from your library or take new ones — several shots of a big
-        shelf are merged into one list, and a box seen twice is only listed once.
-        Every readable box becomes a row you tick before saving.
+        Pick photos from your library or take new ones — straight off an iPhone
+        is fine, no converting. Several shots of a big shelf merge into one
+        list, a box seen twice is listed once, and every readable box becomes a
+        row you tick before saving.
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={PHOTO_ACCEPT}
           multiple
           className="hidden"
           onChange={(e) => onPick(e.target.files)}

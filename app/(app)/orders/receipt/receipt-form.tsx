@@ -8,10 +8,16 @@ import {
 } from './actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label } from '@/components/ui/field';
+import {
+  PHOTO_ACCEPT,
+  preparePhoto,
+  UnsupportedImageError,
+} from '@/lib/images/prepare-photo';
 import { formatMoney } from '@/lib/money';
 
 export function ReceiptPhotoForm() {
   const [preview, setPreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [previewState, previewAction, previewPending] = useActionState(
     previewReceiptPhoto,
     {} as ReceiptActionState,
@@ -21,11 +27,20 @@ export function ReceiptPhotoForm() {
     {} as ReceiptActionState,
   );
 
-  function onFile(file: File | null) {
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => setPreview(String(reader.result ?? ''));
-    reader.readAsDataURL(file);
+  async function onFile(file: File | null) {
+    if (!file) return;
+    setImageError(null);
+    try {
+      const { dataUrl } = await preparePhoto(file);
+      setPreview(dataUrl);
+    } catch (err) {
+      setPreview(null);
+      setImageError(
+        err instanceof UnsupportedImageError
+          ? err.message
+          : 'Could not read that photo. Try another one.',
+      );
+    }
   }
 
   function runPreview() {
@@ -46,7 +61,7 @@ export function ReceiptPhotoForm() {
         <input
           id="receipt"
           type="file"
-          accept="image/*"
+          accept={PHOTO_ACCEPT}
           className="block w-full text-sm"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
@@ -67,7 +82,7 @@ export function ReceiptPhotoForm() {
       >
         {previewPending ? 'Reading…' : 'Extract order'}
       </Button>
-      <FieldError>{previewState.error ?? saveState.error}</FieldError>
+      <FieldError>{imageError ?? previewState.error ?? saveState.error}</FieldError>
 
       {previewState.preview && previewState.rawOrder && (
         <form action={saveAction} className="space-y-3 rounded-xl border border-border bg-surface p-4">

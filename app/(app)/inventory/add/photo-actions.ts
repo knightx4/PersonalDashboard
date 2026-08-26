@@ -8,6 +8,7 @@ import { resolveBook } from '@/lib/books/resolve';
 import type { CanonicalBook } from '@/lib/books/types';
 import { mapPool } from '@/lib/async/map-pool';
 import { serverEnv } from '@/lib/env';
+import { parseImageDataUrl } from '@/lib/images/data-url';
 import type { BookActionState } from './actions';
 
 const spineSchema = z.object({
@@ -43,12 +44,6 @@ function envKeys() {
   }
 }
 
-function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | null {
-  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
-  if (!match) return null;
-  return { mediaType: match[1]!, data: match[2]!.replace(/\s+/g, '') };
-}
-
 export async function extractBooksFromPhoto(
   _prev: BookActionState,
   formData: FormData,
@@ -60,13 +55,8 @@ export async function extractBooksFromPhoto(
   }
 
   const kind = String(formData.get('kind') ?? 'shelf');
-  const dataUrl = String(formData.get('image_data_url') ?? '');
-  const parsedImage = parseDataUrl(dataUrl);
-  if (!parsedImage) return { error: 'Upload a JPEG or PNG photo.' };
-  // Cap ~4MB raw base64 to keep request sizes sane.
-  if (parsedImage.data.length > 5_500_000) {
-    return { error: 'Photo is too large. Try a smaller image.' };
-  }
+  const parsedImage = parseImageDataUrl(String(formData.get('image_data_url') ?? ''));
+  if (!parsedImage.ok) return { error: parsedImage.error };
 
   const client = new Anthropic({ apiKey: keys.anthropicApiKey });
   const isCover = kind === 'cover';
@@ -91,7 +81,7 @@ One object per visible spine. Skip unreadable spines. Max 40.`;
             type: 'image',
             source: {
               type: 'base64',
-              media_type: parsedImage.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+              media_type: parsedImage.mediaType,
               data: parsedImage.data,
             },
           },
