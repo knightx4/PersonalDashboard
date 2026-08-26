@@ -2,7 +2,12 @@
 
 import { useActionState, useRef, useState } from 'react';
 import Link from 'next/link';
-import { extractGamesFromPhoto, saveGameBatch, type GameActionState } from './actions';
+import {
+  extractGamesFromPhoto,
+  saveGameBatch,
+  type GameActionState,
+  type ShelfRow,
+} from './actions';
 import { gameSubtitle } from './game-forms';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
@@ -22,78 +27,135 @@ async function fileToDataUrl(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
+/** Overlapping shots of one shelf see the same box twice. */
+function rowKey(row: ShelfRow): string {
+  if (row.game?.bggId) return `bgg-${row.game.bggId}`;
+  return (row.game?.title ?? row.raw).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+type ReadProgress = { done: number; total: number } | null;
+
 export function GameShelfPhotoPanel() {
-  const [readState, readAction, readPending] = useActionState(
-    extractGamesFromPhoto,
-    {} as GameActionState,
-  );
   const [saveState, saveAction, savePending] = useActionState(
     saveGameBatch,
     {} as GameActionState,
   );
-  const [preview, setPreview] = useState<string | null>(null);
+  const [rows, setRows] = useState<ShelfRow[]>([]);
+  const [unreadable, setUnreadable] = useState(0);
+  const [photosRead, setPhotosRead] = useState(0);
+  const [progress, setProgress] = useState<ReadProgress>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function onPick(file: File | undefined) {
-    if (!file) return;
+  /**
+   * Photos are read one at a time and merged, so several angles of a big
+   * shelf add up into one list instead of replacing each other.
+   */
+  async function onPick(files: FileList | null) {
+    if (!files || files.length === 0) return;
     setError(null);
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setPreview(dataUrl);
-      const fd = new FormData();
-      fd.set('image_data_url', dataUrl);
-      readAction(fd);
-    } catch {
-      setError('Could not read that image. Try a JPEG or PNG.');
+    const list = Array.from(files);
+    setProgress({ done: 0, total: list.length });
+
+    for (const [index, file] of list.entries()) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        setPreviews((prev) => [...prev, dataUrl]);
+
+        const fd = new FormData();
+        fd.set('image_data_url', dataUrl);
+        const result = await extractGamesFromPhoto({}, fd);
+
+        if (result.error) {
+          setError(result.error);
+        } else {
+          setRows((prev) => {
+            const seen = new Set(prev.map(rowKey));
+            const fresh = (result.rows ?? []).filter((row) => !seen.has(rowKey(row)));
+            return [...prev, ...fresh];
+          });
+          setUnreadable((prev) => prev + (result.unreadableCount ?? 0));
+          setPhotosRead((prev) => prev + 1);
+        }
+      } catch {
+        setError('Could not read one of those images. JPEG or PNG works best.');
+      }
+      setProgress({ done: index + 1, total: list.length });
     }
+
+    setProgress(null);
+    if (inputRef.current) inputRef.current.value = '';
   }
 
-  const rows = readState.rows ?? [];
+  function reset() {
+    setRows([]);
+    setUnreadable(0);
+    setPhotosRead(0);
+    setPreviews([]);
+    setError(null);
+  }
+
   const matched = rows.filter((row) => row.game);
   const unmatched = rows.filter((row) => !row.game);
   // Payload indexes must line up with the checkbox values.
   const payload = matched.map((row) => row.game!);
+  const reading = progress !== null;
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="text-sm text-ink-muted">
-          Photograph the whole stack. Every box it can read becomes a row you tick
-          before saving; boxes it cannot read are counted, not silently dropped.
-        </p>
-      </div>
+      <p className="text-sm text-ink-muted">
+        Pick photos from your library or take new ones — several shots of a big
+        shelf are merged into one list, and a box seen twice is only listed once.
+        Every readable box becomes a row you tick before saving.
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          multiple
           className="hidden"
-          onChange={(e) => onPick(e.target.files?.[0])}
+          onChange={(e) => onPick(e.target.files)}
         />
-        <Button type="button" onClick={() => inputRef.current?.click()} disabled={readPending}>
-          {readPending ? 'Reading photo…' : 'Choose or take a photo'}
+        <Button type="button" onClick={() => inputRef.current?.click()} disabled={reading}>
+          {reading
+            ? `Reading photo ${progress.done + 1} of ${progress.total}…`
+            : rows.length > 0
+              ? 'Add more photos'
+              : 'Choose photos'}
         </Button>
-        {preview && (
-          // eslint-disable-next-line @next/next/no-img-element -- local data URL
-          <img src={preview} alt="" className="h-16 w-16 rounded object-cover" />
+        {rows.length > 0 && !reading && (
+          <Button type="button" variant="ghost" size="sm" onClick={reset}>
+            Start over
+          </Button>
         )}
       </div>
 
-      <FieldError>{error ?? readState.error ?? saveState.error}</FieldError>
-      {readState.message && <p className="text-sm text-ink">{readState.message}</p>}
-      {readState.notes && (
-        <p className="text-[13px] text-ink-muted">Note from the read: {readState.notes}</p>
+      {previews.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {previews.map((src, index) => (
+            // eslint-disable-next-line @next/next/no-img-element -- local data URL
+            <img key={index} src={src} alt="" className="h-14 w-14 rounded object-cover" />
+          ))}
+        </div>
+      )}
+
+      <FieldError>{error ?? saveState.error}</FieldError>
+
+      {photosRead > 0 && (
+        <p className="text-sm text-ink">
+          Read {photosRead} photo{photosRead === 1 ? '' : 's'} · matched {matched.length} of{' '}
+          {rows.length} box{rows.length === 1 ? '' : 'es'}.
+        </p>
       )}
       {saveState.message && <p className="text-sm text-brand">{saveState.message}</p>}
 
-      {(readState.unreadableCount ?? 0) > 0 && (
+      {unreadable > 0 && (
         <div className="rounded-lg border border-accent-orange/30 bg-accent-orange/5 px-3 py-2 text-[13px] text-ink">
-          {readState.unreadableCount} box(es) were visible but not identifiable —
-          turned away, hidden, or cut off. Re-shoot that part of the shelf, or add
-          those by hand.
+          {unreadable} box(es) were visible but not identifiable — turned away, hidden,
+          or cut off. Re-shoot that part of the shelf, or add those by hand.
         </div>
       )}
 
@@ -140,7 +202,7 @@ export function GameShelfPhotoPanel() {
               );
             })}
           </ul>
-          <Button type="submit" disabled={savePending} className="self-start">
+          <Button type="submit" disabled={savePending || reading} className="self-start">
             {savePending ? 'Saving…' : 'Add ticked games'}
           </Button>
           {saveState.savedIds && saveState.savedIds.length > 0 && (

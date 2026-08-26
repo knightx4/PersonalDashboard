@@ -47,7 +47,6 @@ export function ReceiptPhotoForm() {
           id="receipt"
           type="file"
           accept="image/*"
-          capture="environment"
           className="block w-full text-sm"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />

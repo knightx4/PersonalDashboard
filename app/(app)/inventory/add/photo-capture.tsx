@@ -81,7 +81,6 @@ export function PhotoCapturePanel() {
           id="photo"
           type="file"
           accept="image/*"
-          capture="environment"
           className="block w-full text-sm text-ink-muted"
           onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
         />
