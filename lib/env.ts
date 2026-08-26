@@ -45,6 +45,8 @@ export function serverEnv() {
       GOOGLE_BOOKS_API_KEY: z.string().min(1).optional(),
       /** Optional. ISBNdb — the catalog that carries brand-new releases. */
       ISBNDB_API_KEY: z.string().min(1).optional(),
+      /** Optional. UPCitemdb paid key; the trial endpoint works without it. */
+      UPCITEMDB_API_KEY: z.string().min(1).optional(),
       /** Optional. BookScouter (or similar) buyback aggregator. */
       BOOKSCOUTER_API_KEY: z.string().min(1).optional(),
       /** Optional. eBay Browse API (OAuth client credentials). */

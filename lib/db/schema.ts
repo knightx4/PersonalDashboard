@@ -87,6 +87,20 @@ export const bookResolutionSource = pgEnum('book_resolution_source', [
   'manual',
 ]);
 
+export const gameResolutionSource = pgEnum('game_resolution_source', [
+  'bgg',
+  'upc_lookup',
+  'manual',
+]);
+
+export const gameCondition = pgEnum('game_condition', [
+  'new_sealed',
+  'like_new',
+  'complete_used',
+  'incomplete',
+  'damaged',
+]);
+
 export const bookPriceQuoteSource = pgEnum('book_price_quote_source', [
   'buyback',
   'ebay_browse',
@@ -413,6 +427,41 @@ export const bookDetails = pgTable(
   (t) => [
     uniqueIndex('book_details_inventory_item_id_key').on(t.inventoryItemId),
     index('book_details_isbn_13_idx').on(t.isbn13),
+  ],
+);
+
+/**
+ * Board-game identity, 1:1 with inventory_items. Mirrors book_details: BGG id
+ * plays the role of the ISBN, and an uncertain match waits for a confirm.
+ */
+export const gameDetails = pgTable(
+  'game_details',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    bggId: integer('bgg_id'),
+    /** EAN-13 form of the scanned barcode. */
+    barcode: text('barcode'),
+    yearPublished: integer('year_published'),
+    publisher: text('publisher'),
+    minPlayers: integer('min_players'),
+    maxPlayers: integer('max_players'),
+    playingTimeMinutes: integer('playing_time_minutes'),
+    condition: gameCondition('condition'),
+    resolutionSource: gameResolutionSource('resolution_source').notNull().default('manual'),
+    matchConfidence: numeric('match_confidence', { precision: 4, scale: 3 }),
+    needsConfirmation: boolean('needs_confirmation').notNull().default(false),
+    candidates: jsonb('candidates').notNull().default([]),
+    confirmationReason: text('confirmation_reason'),
+    autoImported: boolean('auto_imported').notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('game_details_inventory_item_id_key').on(t.inventoryItemId),
+    index('game_details_bgg_id_idx').on(t.bggId),
+    index('game_details_barcode_idx').on(t.barcode),
   ],
 );
 

@@ -41,12 +41,20 @@ export default async function AddOwnedBooksPage({
         title="Add owned books"
         description="Capture books you already own. Barcodes are sell-ready; titles and shelf photos need a confirm tap."
         actions={
-          <Link
-            href="/inventory"
-            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-          >
-            Back to inventory
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/inventory/add/games"
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Add board games
+            </Link>
+            <Link
+              href="/inventory"
+              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+            >
+              Back to inventory
+            </Link>
+          </div>
         }
       />
 
