@@ -4,6 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
+import { createExpectedPriceSource } from '@/lib/sell/expected-price';
+import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/load';
+import { mapPool } from '@/lib/async/map-pool';
 import { parseDollarsToCents } from '@/lib/money';
 
 export type SellActionState = {
@@ -154,4 +157,130 @@ export async function importBooksFromOrders(
       result.unresolved > 0 ? `; ${result.unresolved} had no catalog match` : ''
     }.`,
   };
+}
+
+
+/**
+ * Spend a capped number of billed price lookups, on request only.
+ *
+ * Page loads never trigger these: a web estimate costs real money per book,
+ * so it happens when the user asks and stops at ESTIMATE_BATCH_LIMIT so one
+ * click cannot run away with a large library.
+ */
+export async function estimateMissingPrices(
+  // Signature is fixed by useActionState; the run takes no input of its own.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: SellActionState, _formData: FormData,
+): Promise<SellActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const provider = await createExpectedPriceSource({
+    ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
+    ebayClientSecret: process.env.EBAY_CLIENT_SECRET ?? null,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+  });
+
+  const usingWebEstimate = !(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
+  const source = usingWebEstimate ? 'web_estimate' : 'ebay_browse';
+  if (usingWebEstimate && !process.env.ANTHROPIC_API_KEY) {
+    return { error: 'No price source configured.' };
+  }
+
+  const { data: books } = await supabase
+    .from('book_details')
+    .select(
+      'isbn_13, manual_expected_price_cents, inventory_items!inner (user_id, status)',
+    )
+    .eq('inventory_items.user_id', user.id)
+    .eq('inventory_items.status', 'owned')
+    .eq('needs_confirmation', false)
+    .not('isbn_13', 'is', null);
+
+  const isbns = [
+    ...new Set(
+      (books ?? [])
+        .filter((b) => b.manual_expected_price_cents == null)
+        .map((b) => b.isbn_13 as string),
+    ),
+  ];
+  if (isbns.length === 0) return { message: 'Nothing to price.' };
+
+  const { data: cachedRows } = await supabase
+    .from('book_price_quotes')
+    .select('isbn_13')
+    .eq('source', source)
+    .in('isbn_13', isbns);
+  const alreadyPriced = new Set((cachedRows ?? []).map((r) => r.isbn_13 as string));
+
+  const todo = isbns.filter((isbn) => !alreadyPriced.has(isbn)).slice(0, ESTIMATE_BATCH_LIMIT);
+  if (todo.length === 0) return { message: 'Every book already has a price.' };
+
+  let priced = 0;
+  await mapPool(todo, 2, async (isbn13) => {
+    try {
+      const cents = await provider.expectedSelfListCents(isbn13);
+      await supabase.from('book_price_quotes').upsert(
+        {
+          isbn_13: isbn13,
+          source,
+          quoted_cents: cents,
+          shipping_cents: 0,
+          fetched_at: new Date().toISOString(),
+        },
+        { onConflict: 'isbn_13,source' },
+      );
+      if (cents != null) priced += 1;
+    } catch (error) {
+      console.error('price estimate failed', isbn13, error);
+    }
+  });
+
+  revalidatePath('/sell');
+  const remaining = isbns.filter((isbn) => !alreadyPriced.has(isbn)).length - todo.length;
+  return {
+    message: `Priced ${priced} of ${todo.length} book(s).${
+      remaining > 0 ? ` ${remaining} still unpriced — run again to continue.` : ''
+    }`,
+  };
+}
+
+/** Set (or clear) a price by hand. Free, and it beats every lookup. */
+export async function setManualPrice(
+  _prev: SellActionState,
+  formData: FormData,
+): Promise<SellActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('inventory_item_id'));
+  if (!id.success) return { error: 'Missing item.' };
+
+  const raw = String(formData.get('price') ?? '').trim();
+  let cents: number | null = null;
+  if (raw !== '') {
+    try {
+      cents = parseDollarsToCents(raw);
+    } catch {
+      return { error: 'Price must be a dollar amount like 12.50.' };
+    }
+  }
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) return { error: 'Item not found.' };
+
+  const { error } = await supabase
+    .from('book_details')
+    .update({ manual_expected_price_cents: cents })
+    .eq('inventory_item_id', item.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/sell');
+  revalidatePath(`/inventory/${item.id}`);
+  return { message: cents == null ? 'Price cleared.' : 'Price saved.' };
 }

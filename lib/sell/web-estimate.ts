@@ -17,11 +17,16 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import type { ExpectedPriceSource } from '@/lib/sell/expected-price';
 
-const MODEL = 'claude-opus-5';
+/**
+ * Reading a few search results and reporting a number is not a reasoning
+ * problem — Haiku does it for a fifth of Opus's token price, and the search
+ * fee dominates the bill anyway.
+ */
+const MODEL = 'claude-haiku-4-5';
 const TOOL_NAME = 'report_price';
 
-/** Enough searches to cross-check two or three listings, not a research project. */
-const MAX_SEARCHES = 4;
+/** Each search is billed. Two is enough to cross-check a price. */
+const MAX_SEARCHES = 2;
 
 export const priceEstimateSchema = z.object({
   /** Cheapest realistic used price seen. */
@@ -101,7 +106,7 @@ export async function estimateResalePrice(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 1024,
       system: SYSTEM,
       tools: [
         // Server-side web search: Anthropic runs it, results come back inline.

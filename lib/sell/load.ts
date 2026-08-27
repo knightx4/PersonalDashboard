@@ -34,6 +34,8 @@ export type SellBookRow = {
   netSelfCents: number | null;
   netBuybackCents: number | null;
   expectedSelfListCents: number | null;
+  /** True when the number came from the user, not a lookup. */
+  priceIsManual: boolean;
   buyback: BuybackQuote | null;
   donateFmvCents: number;
 };
@@ -76,6 +78,16 @@ function envKeys() {
 }
 
 const QUOTE_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+
+/**
+ * Web estimates are billed per lookup, and a used-book price does not move
+ * meaningfully inside a month. Long cache, and never refreshed just because
+ * someone opened the page.
+ */
+const WEB_ESTIMATE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+/** How many paid lookups one "estimate prices" click may spend. */
+export const ESTIMATE_BATCH_LIMIT = 15;
 
 async function cachedBuyback(
   supabase: SupabaseClient,
@@ -124,6 +136,8 @@ async function cachedExpectedPrice(
   isbn13: string,
   provider: Awaited<ReturnType<typeof createExpectedPriceSource>>,
   sourceKind: 'ebay_browse' | 'web_estimate',
+  /** False on page load for billed sources: serve cache or serve nothing. */
+  allowFetch: boolean,
 ): Promise<number | null> {
   const { data: cached } = await supabase
     .from('book_price_quotes')
@@ -132,13 +146,16 @@ async function cachedExpectedPrice(
     .eq('source', sourceKind)
     .maybeSingle();
 
+  const ttl = sourceKind === 'web_estimate' ? WEB_ESTIMATE_TTL_MS : QUOTE_TTL_MS;
   if (
     cached &&
     cached.fetched_at &&
-    Date.now() - new Date(cached.fetched_at).getTime() < QUOTE_TTL_MS
+    Date.now() - new Date(cached.fetched_at).getTime() < ttl
   ) {
     return cached.quoted_cents;
   }
+
+  if (!allowFetch) return cached?.quoted_cents ?? null;
 
   const cents = await provider.expectedSelfListCents(isbn13);
   await supabase.from('book_price_quotes').upsert(
@@ -165,6 +182,8 @@ export async function loadSellAssistant(input: {
   needsConfirmationCount: number;
   /** Where expected prices came from, so the page can qualify them. */
   priceSource: ReturnType<typeof expectedPriceSourceKind>;
+  /** Books with no cached price — what an estimate run would cover. */
+  unpricedCount: number;
 }> {
   const { supabase, userId } = input;
   const keys = envKeys();
@@ -184,6 +203,7 @@ export async function loadSellAssistant(input: {
       `
       isbn_13, authors, condition, needs_confirmation, edition, publisher,
       published_year, candidates, confirmation_reason, auto_imported,
+      manual_expected_price_cents,
       inventory_items!inner (
         id, name, short_name, image_url, status, user_id
       )
@@ -240,17 +260,28 @@ export async function loadSellAssistant(input: {
     authors: string[];
     condition: string | null;
     expectedSelfListCents: number | null;
+    priceIsManual: boolean;
     buyback: BuybackQuote | null;
   };
 
   const drafts = await mapPool(confirmed, 3, async (row) => {
     const inv = inventoryOf(row);
     if (!inv || !row.isbn_13) return null;
-    const [buyback, expectedSelfListCents] = await Promise.all([
+    // A price the user set by hand short-circuits every provider.
+    const manualCents = row.manual_expected_price_cents as number | null;
+    const [buyback, lookedUpCents] = await Promise.all([
       cachedBuyback(supabase, row.isbn_13, buybackProvider),
       priceSourceKind === 'none'
         ? Promise.resolve(null)
-        : cachedExpectedPrice(supabase, row.isbn_13, expectedProvider, priceSourceKind),
+        : cachedExpectedPrice(
+            supabase,
+            row.isbn_13,
+            expectedProvider,
+            priceSourceKind,
+            // eBay costs nothing per call, so it may refresh on load. A web
+            // estimate is billed, so it only ever runs when asked.
+            priceSourceKind === 'ebay_browse',
+          ),
     ]);
     return {
       inventoryItemId: inv.id as string,
@@ -260,7 +291,8 @@ export async function loadSellAssistant(input: {
       isbn13: row.isbn_13 as string,
       authors: (row.authors as string[]) ?? [],
       condition: (row.condition as string | null) ?? null,
-      expectedSelfListCents,
+      expectedSelfListCents: manualCents ?? lookedUpCents,
+      priceIsManual: manualCents != null,
       buyback,
     } satisfies Draft;
   });
@@ -311,5 +343,6 @@ export async function loadSellAssistant(input: {
     effortCents,
     needsConfirmationCount,
     priceSource: priceSourceKind,
+    unpricedCount: rows.filter((r) => r.expectedSelfListCents == null).length,
   };
 }

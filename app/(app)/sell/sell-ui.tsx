@@ -3,8 +3,10 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import {
+  estimateMissingPrices,
   importBooksFromOrders,
   noteListingIntent,
+  setManualPrice,
   updateSellSettings,
   type SellActionState,
 } from './actions';
@@ -28,6 +30,10 @@ const PATH_LABEL: Record<SellPath, string> = {
 };
 
 function SellRowActions({ row }: { row: SellBookRow }) {
+  const [priceState, priceAction, pricePending] = useActionState(
+    setManualPrice,
+    {} as SellActionState,
+  );
   const [disposeState, disposeAction, disposePending] = useActionState(
     disposeInventoryItem,
     {} as ActionState,
@@ -49,6 +55,23 @@ function SellRowActions({ row }: { row: SellBookRow }) {
           Open {row.buyback.vendor}
         </a>
       )}
+      <form action={priceAction} className="flex items-end gap-2">
+        <input type="hidden" name="inventory_item_id" value={row.inventoryItemId} />
+        <Input
+          name="price"
+          defaultValue={
+            row.priceIsManual && row.expectedSelfListCents != null
+              ? formatCentsAsDollarsInput(row.expectedSelfListCents)
+              : ''
+          }
+          placeholder="Own price"
+          className="w-24"
+          aria-label="Price you found yourself"
+        />
+        <Button type="submit" size="sm" variant="ghost" disabled={pricePending}>
+          {pricePending ? 'Saving…' : 'Set'}
+        </Button>
+      </form>
       {(row.path === 'list_individually' || row.path === 'lot') && (
         <form action={noteAction}>
           <input type="hidden" name="id" value={row.inventoryItemId} />
@@ -86,7 +109,7 @@ function SellRowActions({ row }: { row: SellBookRow }) {
           </Button>
         </form>
       )}
-      <FieldError>{disposeState.error ?? noteState.error}</FieldError>
+      <FieldError>{disposeState.error ?? noteState.error ?? priceState.error}</FieldError>
       {(disposeState.message || noteState.message) && (
         <p className="w-full text-[13px] text-brand">
           {disposeState.message ?? noteState.message}
@@ -174,7 +197,10 @@ export function SellPathGroup({
               <p className="mt-1 text-[12px] text-ink-faint">{row.reason}</p>
               <p className="mt-1 text-[13px] text-ink-muted">
                 {row.netSelfCents != null && (
-                  <span className="mr-3">Self net {formatMoney(row.netSelfCents)}</span>
+                  <span className="mr-3">
+                    Self net {formatMoney(row.netSelfCents)}
+                    {row.priceIsManual ? ' (your price)' : ''}
+                  </span>
                 )}
                 {row.netBuybackCents != null && (
                   <span className="mr-3">Buyback net {formatMoney(row.netBuybackCents)}</span>
@@ -309,6 +335,43 @@ export function ImportBooksFromOrdersButton() {
       <Button type="submit" size="sm" variant="secondary" disabled={pending}>
         {pending ? 'Scanning orders…' : 'Scan past orders for books'}
       </Button>
+      <FieldError>{state.error}</FieldError>
+      {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
+    </form>
+  );
+}
+
+
+/**
+ * Billed price lookups, run only on request. The label says how many books
+ * and roughly what it costs, because the click spends money.
+ */
+export function EstimatePricesButton({
+  unpricedCount,
+  batchLimit,
+  paid,
+}: {
+  unpricedCount: number;
+  batchLimit: number;
+  paid: boolean;
+}) {
+  const [state, action, pending] = useActionState(
+    estimateMissingPrices,
+    {} as SellActionState,
+  );
+  if (unpricedCount === 0) return null;
+
+  const thisRun = Math.min(unpricedCount, batchLimit);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3">
+      <Button type="submit" size="sm" disabled={pending}>
+        {pending ? 'Pricing…' : `Estimate prices for ${thisRun} book(s)`}
+      </Button>
+      <span className="text-[13px] text-ink-muted">
+        {unpricedCount} unpriced
+        {paid ? ` · about ${formatMoney(Math.ceil(thisRun * 2.5))} of API usage` : ''}
+        {unpricedCount > batchLimit ? ' · run again for the rest' : ''}
+      </span>
       <FieldError>{state.error}</FieldError>
       {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
     </form>

@@ -425,6 +425,8 @@ export const bookDetails = pgTable(
     confirmationReason: text('confirmation_reason'),
     /** True when order-email ingestion created this row, not a capture flow. */
     autoImported: boolean('auto_imported').notNull().default(false),
+    /** A price the user looked up themselves; beats every provider. */
+    manualExpectedPriceCents: integer('manual_expected_price_cents'),
     ...timestamps,
   },
   (t) => [
