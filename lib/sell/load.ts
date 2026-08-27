@@ -16,6 +16,7 @@ import {
   routeSellDecision,
   type SellPath,
 } from '@/lib/sell/route';
+import { expectedPriceSourceKind } from '@/lib/sell/expected-price';
 import { mapPool } from '@/lib/async/map-pool';
 import { serverEnv } from '@/lib/env';
 import type { BookEditionCandidate } from '@/lib/books/types';
@@ -62,12 +63,14 @@ function envKeys() {
       bookscouterApiKey: env.BOOKSCOUTER_API_KEY ?? null,
       ebayClientId: env.EBAY_CLIENT_ID ?? null,
       ebayClientSecret: env.EBAY_CLIENT_SECRET ?? null,
+      anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
     };
   } catch {
     return {
       bookscouterApiKey: process.env.BOOKSCOUTER_API_KEY ?? null,
       ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
       ebayClientSecret: process.env.EBAY_CLIENT_SECRET ?? null,
+      anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
     };
   }
 }
@@ -119,13 +122,14 @@ async function cachedBuyback(
 async function cachedExpectedPrice(
   supabase: SupabaseClient,
   isbn13: string,
-  provider: ReturnType<typeof createExpectedPriceSource>,
+  provider: Awaited<ReturnType<typeof createExpectedPriceSource>>,
+  sourceKind: 'ebay_browse' | 'web_estimate',
 ): Promise<number | null> {
   const { data: cached } = await supabase
     .from('book_price_quotes')
     .select('quoted_cents, fetched_at')
     .eq('isbn_13', isbn13)
-    .eq('source', 'ebay_browse')
+    .eq('source', sourceKind)
     .maybeSingle();
 
   if (
@@ -140,7 +144,7 @@ async function cachedExpectedPrice(
   await supabase.from('book_price_quotes').upsert(
     {
       isbn_13: isbn13,
-      source: 'ebay_browse',
+      source: sourceKind,
       quoted_cents: cents,
       shipping_cents: 0,
       fetched_at: new Date().toISOString(),
@@ -159,6 +163,8 @@ export async function loadSellAssistant(input: {
   netFloorCents: number;
   effortCents: number;
   needsConfirmationCount: number;
+  /** Where expected prices came from, so the page can qualify them. */
+  priceSource: ReturnType<typeof expectedPriceSourceKind>;
 }> {
   const { supabase, userId } = input;
   const keys = envKeys();
@@ -218,9 +224,11 @@ export async function loadSellAssistant(input: {
   const confirmed = all.filter((b) => !b.needs_confirmation && b.isbn_13);
 
   const buybackProvider = createBuybackProvider({ apiKey: keys.bookscouterApiKey });
-  const expectedProvider = createExpectedPriceSource({
+  const priceSourceKind = expectedPriceSourceKind(keys);
+  const expectedProvider = await createExpectedPriceSource({
     ebayClientId: keys.ebayClientId,
     ebayClientSecret: keys.ebayClientSecret,
+    anthropicApiKey: keys.anthropicApiKey,
   });
 
   type Draft = {
@@ -240,7 +248,9 @@ export async function loadSellAssistant(input: {
     if (!inv || !row.isbn_13) return null;
     const [buyback, expectedSelfListCents] = await Promise.all([
       cachedBuyback(supabase, row.isbn_13, buybackProvider),
-      cachedExpectedPrice(supabase, row.isbn_13, expectedProvider),
+      priceSourceKind === 'none'
+        ? Promise.resolve(null)
+        : cachedExpectedPrice(supabase, row.isbn_13, expectedProvider, priceSourceKind),
     ]);
     return {
       inventoryItemId: inv.id as string,
@@ -294,5 +304,12 @@ export async function loadSellAssistant(input: {
     };
   });
 
-  return { rows, pending, netFloorCents, effortCents, needsConfirmationCount };
+  return {
+    rows,
+    pending,
+    netFloorCents,
+    effortCents,
+    needsConfirmationCount,
+    priceSource: priceSourceKind,
+  };
 }

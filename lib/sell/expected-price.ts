@@ -117,17 +117,40 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
   }
 }
 
-export function createExpectedPriceSource(options: {
+/** Which source produced a number — shown next to the price in the UI. */
+export type ExpectedPriceSourceKind = 'ebay_browse' | 'web_estimate' | 'none';
+
+export function expectedPriceSourceKind(options: {
   ebayClientId?: string | null;
   ebayClientSecret?: string | null;
+  anthropicApiKey?: string | null;
+}): ExpectedPriceSourceKind {
+  if (options.ebayClientId && options.ebayClientSecret) return 'ebay_browse';
+  if (options.anthropicApiKey) return 'web_estimate';
+  return 'none';
+}
+
+/**
+ * Async because the web-search source is server-only and pulled in on demand,
+ * keeping the Anthropic SDK out of the import graph when eBay keys are set.
+ */
+export async function createExpectedPriceSource(options: {
+  ebayClientId?: string | null;
+  ebayClientSecret?: string | null;
+  /** Fallback while eBay approval is pending: search the open web. */
+  anthropicApiKey?: string | null;
   fetch?: typeof globalThis.fetch;
-}): ExpectedPriceSource {
+}): Promise<ExpectedPriceSource> {
   if (options.ebayClientId && options.ebayClientSecret) {
     return new EbayBrowseExpectedPriceSource({
       clientId: options.ebayClientId,
       clientSecret: options.ebayClientSecret,
       fetch: options.fetch,
     });
+  }
+  if (options.anthropicApiKey) {
+    const { WebSearchExpectedPriceSource } = await import('@/lib/sell/web-estimate');
+    return new WebSearchExpectedPriceSource({ apiKey: options.anthropicApiKey });
   }
   return new NullExpectedPriceSource();
 }

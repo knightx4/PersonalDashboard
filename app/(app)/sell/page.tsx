@@ -26,8 +26,15 @@ const PATH_ORDER: SellPath[] = [
 export default async function SellPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const { rows, pending, netFloorCents, effortCents, needsConfirmationCount } =
+  const { rows, pending, netFloorCents, effortCents, needsConfirmationCount, priceSource } =
     await loadSellAssistant({ supabase, userId: user.id });
+
+  const PRICE_SOURCE_NOTE: Record<typeof priceSource, string | null> = {
+    ebay_browse: 'Prices from active eBay listings (asking, not sold).',
+    web_estimate:
+      'Prices are web-search estimates, not market data — good enough to sort a shelf, not to price a rarity. Add eBay API keys to firm them up.',
+    none: 'No price source configured, so nothing can be routed yet. Set EBAY_CLIENT_ID/SECRET or ANTHROPIC_API_KEY.',
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -52,6 +59,12 @@ export default async function SellPage() {
           ? ` · ${needsConfirmationCount} book(s) waiting on edition confirm`
           : ''}
       </p>
+
+      {PRICE_SOURCE_NOTE[priceSource] && (
+        <p className="rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-ink-muted">
+          {PRICE_SOURCE_NOTE[priceSource]}
+        </p>
+      )}
 
       <ImportBooksFromOrdersButton />
 

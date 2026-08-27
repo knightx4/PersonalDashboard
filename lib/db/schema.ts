@@ -106,6 +106,8 @@ export const bookPriceQuoteSource = pgEnum('book_price_quote_source', [
   'buyback',
   'ebay_browse',
   'sold_comps',
+  /** Web-search estimate — the stand-in until eBay API access lands. */
+  'web_estimate',
 ]);
 
 export const orderStatus = pgEnum('order_status', [
