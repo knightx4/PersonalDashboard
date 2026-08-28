@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/field';
 import { finishOnboarding, saveCompanies, saveWelcome, type OnboardingState } from './actions';
+import { TimezoneField } from '@/components/ui/timezone-field';
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -15,7 +16,7 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function WelcomeForm({ defaultTimezone }: { defaultTimezone: string }) {
+export function WelcomeForm() {
   const [state, action] = useActionState<OnboardingState, FormData>(saveWelcome, {});
 
   return (
@@ -27,7 +28,10 @@ export function WelcomeForm({ defaultTimezone }: { defaultTimezone: string }) {
         </div>
         <div>
           <Label htmlFor="timezone">Timezone</Label>
-          <Input id="timezone" name="timezone" defaultValue={defaultTimezone} />
+          {/* No default passed: the field reads this computer's zone itself,
+              which is right far more often than any value the server could
+              guess. */}
+          <TimezoneField id="timezone" name="timezone" />
         </div>
         <div>
           <Label htmlFor="searchStartedOn">When did the search start</Label>
