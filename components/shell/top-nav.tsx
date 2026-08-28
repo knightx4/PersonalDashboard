@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
+import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 
 /**
- * Product name top left, section nav across the top, account avatar top right.
- * Review carries a count because an unattended review queue is how the
+ * Workspace switcher top left, section nav across the top, account avatar top
+ * right. Review carries a count because an unattended review queue is how the
  * dashboard quietly becomes wrong.
  */
 const SECTIONS = [
@@ -35,19 +36,7 @@ export function TopNav({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-        <Link href="/shopping/dashboard" className="flex shrink-0 items-center gap-2">
-          <span
-            className="size-6 rounded-md bg-brand"
-            style={{
-              backgroundImage:
-                'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
-            }}
-            aria-hidden
-          />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
-            Shopping Manager
-          </span>
-        </Link>
+        <WorkspaceSwitcher current="shopping" />
 
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto" aria-label="Sections">
           {SECTIONS.map((section) => {

@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
+import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 
 /**
- * Product name top left, sections across the top, avatar top right.
+ * Workspace switcher top left, sections across the top, avatar top right.
  *
  * Review carries a count because an unattended review queue is exactly how the
  * funnel quietly becomes wrong, and a number you can see is the cheapest way to
@@ -37,19 +38,7 @@ export function TopNav({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-        <Link href="/jobs/pipeline" className="flex shrink-0 items-center gap-2">
-          <span
-            className="size-6 rounded-md"
-            style={{
-              backgroundImage:
-                'linear-gradient(135deg, var(--color-brand) 0%, var(--color-status-final) 100%)',
-            }}
-            aria-hidden
-          />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
-            Application Manager
-          </span>
-        </Link>
+        <WorkspaceSwitcher current="jobs" />
 
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto" aria-label="Sections">
           {SECTIONS.map((section) => {
