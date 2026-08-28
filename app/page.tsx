@@ -56,7 +56,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="grid gap-4 pb-24 sm:grid-cols-3">
+        <section className="grid gap-4 pb-12 sm:grid-cols-3">
           {[
             {
               title: 'Everything you own, in one place',
@@ -76,6 +76,32 @@ export default function HomePage() {
               <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{feature.body}</p>
             </div>
           ))}
+        </section>
+
+        {/*
+          The job search half is stated here on purpose. This page and the
+          privacy policy are read together during Google's brand verification,
+          and the policy describes storing job descriptions and contact details
+          -- which reads as a discrepancy if the homepage only ever mentions
+          shopping.
+        */}
+        <section className="pb-24">
+          <div className="rounded-card border border-border bg-surface p-6">
+            <h2 className="font-display text-lg font-semibold tracking-tight text-ink">
+              The same account also tracks a job search
+            </h2>
+            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-muted">
+              Applications from first lead to offer on one board, with the roles and companies
+              behind them, interviews, an answer bank, and the funnel maths over all of it. Job
+              postings are kept in full, because they are usually taken down before you need them
+              again; contacts hold professional details you enter yourself and nothing more. Both
+              are set out in the{' '}
+              <Link href="/privacy" className="text-brand hover:underline">
+                privacy policy
+              </Link>
+              .
+            </p>
+          </div>
         </section>
       </main>
 
