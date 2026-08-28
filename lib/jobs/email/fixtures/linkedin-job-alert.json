@@ -1,0 +1,6 @@
+{
+  "classification": "job_alert",
+  "ats": "linkedin",
+  "tier": "A",
+  "note": "Matches 'jobs', 'analyst', every role keyword and every company name. It is its own class precisely so it never reaches the review queue."
+}

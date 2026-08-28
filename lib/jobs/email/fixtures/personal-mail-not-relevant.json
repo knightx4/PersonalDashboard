@@ -1,0 +1,6 @@
+{
+  "classification": "not_relevant",
+  "ats": "unknown",
+  "tier": "none",
+  "note": "Mentions 'the interview'. Nothing about it may be stored: no subject, no sender, no thread id. The database constraint enforces that, not the write path."
+}

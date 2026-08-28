@@ -1,0 +1,7 @@
+{
+  "classification": "scheduling",
+  "ats": "rippling",
+  "tier": "A",
+  "note": "Carries an explicit IANA timezone. An extracted datetime without one is rejected: an interview time off by three hours is worse than no interview time.",
+  "scheduling": true
+}

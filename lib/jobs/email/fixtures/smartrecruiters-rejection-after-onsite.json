@@ -1,0 +1,7 @@
+{
+  "classification": "rejection",
+  "ats": "smartrecruiters",
+  "tier": "A",
+  "company": "Bolt",
+  "note": "Rejection after a final round. rejection_stage must come out as 'final', which is the opposite diagnosis from a resume-review rejection."
+}

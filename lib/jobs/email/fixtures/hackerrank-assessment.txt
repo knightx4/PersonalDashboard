@@ -1,0 +1,14 @@
+From: Stripe Recruiting <no-reply@hire.lever.co>
+Reply-To: recruiting@stripe.com
+Subject: Your take-home exercise for Stripe
+
+Hi Chris,
+
+As the next step for the Finance Analytics role, we'd like you to complete a
+short take-home exercise. It should take about two hours.
+
+Start here: https://app.hackerrank.com/test/abc123
+The link expires in 7 days.
+
+Good luck,
+Stripe Recruiting

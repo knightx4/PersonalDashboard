@@ -1,0 +1,7 @@
+{
+  "classification": "rejection",
+  "ats": "greenhouse",
+  "tier": "A",
+  "company": "Ramp",
+  "note": "Contains neither 'reject' nor 'no'. Subject is identical in shape to a confirmation, which is why the body decides."
+}

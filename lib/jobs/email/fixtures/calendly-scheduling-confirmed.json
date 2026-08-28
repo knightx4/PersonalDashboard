@@ -1,0 +1,7 @@
+{
+  "classification": "scheduling",
+  "ats": "unknown",
+  "tier": "A",
+  "note": "Arrives from the scheduler, not the ATS. Treating scheduling tools as unknown senders loses the most time-sensitive class of message in the app. The datetime carries a named timezone, which the extraction gate requires.",
+  "scheduling": true
+}
