@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth/server';
 import { AddGameManualForm, GameSearchForm } from './game-forms';
 import { GameScanPanel } from './game-scan-panel';
 import { GameShelfPhotoPanel } from './game-photo-panel';
+import { PoweredByBgg } from './powered-by-bgg';
 
 export const metadata = { title: 'Add board games' };
 
@@ -73,6 +74,8 @@ export default async function AddGamesPage({
       {mode === 'scan' && <GameScanPanel />}
       {mode === 'search' && <GameSearchForm />}
       {mode === 'manual' && <AddGameManualForm />}
+
+      <PoweredByBgg />
     </div>
   );
 }

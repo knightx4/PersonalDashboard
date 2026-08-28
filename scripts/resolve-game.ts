@@ -20,10 +20,14 @@ async function main(): Promise<void> {
   console.log('query      :', query);
   console.log('scanned as :', code ? code.kind : 'title (not a barcode)');
   console.log('upc key    :', process.env.UPCITEMDB_API_KEY ? 'set' : 'not set (trial endpoint)');
+  console.log('bgg token  :', process.env.BGG_API_TOKEN ? 'set' : 'MISSING (BGG will refuse)');
 
   const outcome = await resolveGameDetailed(
     code?.kind === 'product' ? { barcode: code.ean13 } : { title: query },
-    { upcApiKey: process.env.UPCITEMDB_API_KEY ?? null },
+    {
+      upcApiKey: process.env.UPCITEMDB_API_KEY ?? null,
+      bggApiToken: process.env.BGG_API_TOKEN ?? null,
+    },
   );
 
   if (outcome.productTitle) console.log('upc says   :', outcome.productTitle);

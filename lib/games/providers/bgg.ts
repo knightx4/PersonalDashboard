@@ -23,6 +23,24 @@ const USER_AGENT =
 /** BGG answers 202 while it builds a response; the docs say retry. */
 const QUEUE_RETRY_DELAYS_MS = [1200, 2500];
 
+/**
+ * BGG asks callers not to hammer the API. Requests are spaced globally rather
+ * than per-provider so a forty-box shelf import stays a good citizen.
+ */
+const MIN_REQUEST_GAP_MS = 800;
+let nextSlotAt = 0;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function takeRequestSlot(): Promise<void> {
+  const now = Date.now();
+  const waitFor = Math.max(0, nextSlotAt - now);
+  nextSlotAt = Math.max(now, nextSlotAt) + MIN_REQUEST_GAP_MS;
+  if (waitFor > 0) await sleep(waitFor);
+}
+
 export type BggThing = {
   bggId: number;
   title: string;
@@ -122,16 +140,17 @@ export function thingToCandidate(thing: BggThing): GameEditionCandidate {
 export type BggOptions = {
   fetch?: typeof globalThis.fetch;
   baseUrl?: string;
+  /**
+   * Approved-application token. BGG requires it as a bearer token; without
+   * one a deployed server gets 401/403.
+   */
+  apiToken?: string | null;
 };
 
 /**
  * BGG serves XML, so this goes around getJson but keeps the same failure
  * contract: null for a genuine miss, ProviderError for anything else.
  */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function fetchOnce(
   url: string,
   options: BggOptions,
@@ -140,10 +159,14 @@ async function fetchOnce(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
+    await takeRequestSlot();
     const res = await fetchFn(url, {
       headers: {
         Accept: 'application/xml, text/xml;q=0.9, */*;q=0.8',
         'User-Agent': USER_AGENT,
+        ...(options.apiToken
+          ? { Authorization: `Bearer ${options.apiToken}` }
+          : {}),
       },
       signal: controller.signal,
     });

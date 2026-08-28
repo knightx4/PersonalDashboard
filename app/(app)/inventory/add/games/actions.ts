@@ -67,11 +67,13 @@ function envKeys() {
     return {
       anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
       upcApiKey: env.UPCITEMDB_API_KEY ?? null,
+      bggApiToken: env.BGG_API_TOKEN ?? null,
     };
   } catch {
     return {
       anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
       upcApiKey: process.env.UPCITEMDB_API_KEY ?? null,
+      bggApiToken: process.env.BGG_API_TOKEN ?? null,
     };
   }
 }
@@ -218,7 +220,7 @@ export async function searchGame(
 
   const outcome = await resolveGameDetailed(
     code?.kind === 'product' ? { barcode: code.ean13 } : { title: query },
-    { upcApiKey: keys.upcApiKey },
+    { upcApiKey: keys.upcApiKey, bggApiToken: keys.bggApiToken },
   );
 
   if (outcome.game) {
@@ -398,7 +400,7 @@ async function readShelfPhoto(formData: FormData): Promise<GameActionState> {
     try {
       const outcome = await resolveGameDetailed(
         { title: query },
-        { upcApiKey: keys.upcApiKey },
+        { upcApiKey: keys.upcApiKey, bggApiToken: keys.bggApiToken },
       );
       allFailures.push(...outcome.failures);
       resolved.set(query, outcome.game);

@@ -29,6 +29,8 @@ export type ResolveGameOptions = {
   bggBaseUrl?: string;
   upcBaseUrl?: string;
   wikidataBaseUrl?: string;
+  /** Approved-application bearer token; without it BGG refuses servers. */
+  bggApiToken?: string | null;
   /** Skip BGG entirely — set when it is known to block this host. */
   skipBgg?: boolean;
 };
@@ -116,7 +118,11 @@ async function resolveByTitle(
   const title = cleanGameTitle(rawTitle);
   if (title.length < 2) return null;
 
-  const bgg = createBggProvider({ fetch: options.fetch, baseUrl: options.bggBaseUrl });
+  const bgg = createBggProvider({
+    fetch: options.fetch,
+    baseUrl: options.bggBaseUrl,
+    apiToken: options.bggApiToken,
+  });
 
   let hits: BggSearchHit[] = [];
   try {
