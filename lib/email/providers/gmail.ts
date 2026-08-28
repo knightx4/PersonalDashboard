@@ -4,7 +4,12 @@ import { OAuth2Client } from 'google-auth-library';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { formatGmailApiError } from '@/lib/email/providers/gmail-api-error';
 import { emailFromIdToken } from '@/lib/email/id-token';
-import { gmailPayloadToHtml, gmailPayloadToText, headerValue } from '@/lib/email/mime';
+import {
+  gmailPayloadToCalendar,
+  gmailPayloadToHtml,
+  gmailPayloadToText,
+  headerValue,
+} from '@/lib/email/mime';
 import {
   GmailHistoryExpiredError,
   messageIdsFromHistory,
@@ -183,9 +188,52 @@ export const gmailProvider: GmailOAuthProvider = {
       subject: headerValue(headers, 'Subject'),
       text: full ? gmailPayloadToText(data.payload as never) : '',
       html: full ? gmailPayloadToHtml(data.payload as never) : '',
+      calendar: full ? await collectCalendar(accessToken, data.id, data.payload) : [],
     };
   },
+
+  async getAttachment(accessToken, messageId, attachmentId): Promise<string> {
+    const data = await gmailJson<{ data?: string; size?: number }>(
+      accessToken,
+      `users/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    );
+    if (!data.data) return '';
+    return Buffer.from(data.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  },
 };
+
+/** An invite is a few kilobytes; anything larger is not one. */
+const MAX_CALENDAR_ATTACHMENT_BYTES = 512_000;
+
+/**
+ * Inline calendar parts, plus the ones Gmail held back behind an attachment id.
+ *
+ * The extra request only happens for a message that actually carries a large
+ * calendar part, which is rare — most invites inline. A failure here costs the
+ * invite and nothing else, so it is swallowed rather than failing the message.
+ */
+async function collectCalendar(
+  accessToken: string,
+  messageId: string,
+  payload: unknown,
+): Promise<string[]> {
+  const { inline, refs } = gmailPayloadToCalendar(payload as never);
+  const bodies = [...inline];
+
+  for (const ref of refs) {
+    if (ref.sizeBytes != null && ref.sizeBytes > MAX_CALENDAR_ATTACHMENT_BYTES) continue;
+    try {
+      const body = await gmailProvider.getAttachment(accessToken, messageId, ref.attachmentId);
+      if (body) bodies.push(body);
+    } catch (error) {
+      console.error('calendar attachment fetch failed', messageId, {
+        name: error instanceof Error ? error.name : 'unknown',
+      });
+    }
+  }
+
+  return bodies;
+}
 
 /** Resolve the connected address: ID token first, Gmail API as fallback. */
 export async function resolveGmailAddress(

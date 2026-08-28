@@ -19,14 +19,16 @@ import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candida
 export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
   return {
     domain: 'jobs',
-    async link({ userId, accountId, accessToken, envelopes }) {
+    async link({ userId, accountId, accountEmail, accessToken, envelopes }) {
       const counters = emptyLinkerCounters();
       counters.offered = envelopes.length;
       if (envelopes.length === 0) return counters;
 
-      const [companies, candidates] = await Promise.all([
+      const [companies, candidates, profile] = await Promise.all([
         loadCompanies(supabase, userId),
         loadLinkCandidates(supabase, userId),
+        // Only for invites that state a wall-clock time with no zone at all.
+        supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle(),
       ]);
 
       const ingest = emptyCounters();
@@ -44,6 +46,8 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
             domains: c.domains,
           })),
           candidates,
+          accountEmail,
+          timezone: (profile.data?.timezone as string | undefined) ?? null,
           counters: ingest,
         },
         envelopes,

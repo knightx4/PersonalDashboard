@@ -16,6 +16,8 @@ import { decideLink, type LinkCandidate, type LinkDecision } from '@/lib/jobs/em
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
+import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
+import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
@@ -125,6 +127,34 @@ async function currentStatus(
   return (data?.status as ApplicationStatus) ?? 'lead';
 }
 
+/**
+ * The invite a message carries, if it carries one.
+ *
+ * Returns null rather than throwing for anything malformed: an invite we
+ * cannot read costs us the invite, and the model's reading of the prose is
+ * still there underneath it.
+ */
+function inviteFromMessage(
+  message: FetchedMessage,
+  ctx: Pick<IngestContext, 'accountEmail' | 'timezone'>,
+): InviteInterview | null {
+  if (!message.calendar?.length) return null;
+
+  try {
+    const events = message.calendar.flatMap((body) =>
+      parseIcs(body, { defaultTimeZone: ctx.timezone }),
+    );
+    const event = primaryEvent(events);
+    if (!event) return null;
+    return interviewFromInvite(event, { selfEmail: ctx.accountEmail });
+  } catch (error) {
+    console.error('invite parse failed', message.id, {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
+}
+
 async function writeEvent(
   supabase: AppSupabaseClient,
   opts: {
@@ -134,6 +164,7 @@ async function writeEvent(
     classification: MessageClassification;
     extracted: ExtractedMessage | null;
     message: FetchedMessage;
+    invite: InviteInterview | null;
   },
 ): Promise<void> {
   const kind = eventKindFor(opts.classification);
@@ -142,11 +173,20 @@ async function writeEvent(
   const status = await currentStatus(supabase, opts.applicationId);
   const legal = transitionIsLegal(status, kind);
 
-  const interviewKind = opts.extracted?.interviewKind ?? null;
-  const occurredAt =
+  const { invite } = opts;
+  const interviewKind = invite?.kind ?? opts.extracted?.interviewKind ?? null;
+
+  // Where an invite exists it is the schedule, full stop. The model's reading
+  // of "Thursday at 2" is the fallback, not the other way round.
+  const scheduledAt =
+    invite?.scheduledAt ??
     opts.extracted?.dates?.find((d) => d.kind === 'interview')?.at ??
     opts.message.internalDate?.toISOString() ??
     new Date().toISOString();
+
+  const interviewers = invite?.interviewerNames.length
+    ? invite.interviewerNames
+    : (opts.extracted?.interviewerNames ?? []);
 
   await supabase.from('application_events').insert({
     user_id: opts.userId,
@@ -162,18 +202,44 @@ async function writeEvent(
     payload: {
       ...(interviewKind ? { interview_kind: interviewKind } : {}),
       ...(opts.extracted?.dates?.length ? { dates: opts.extracted.dates } : {}),
-      ...(opts.extracted?.interviewerNames?.length
-        ? { interviewers: opts.extracted.interviewerNames }
-        : {}),
+      ...(interviewers.length ? { interviewers } : {}),
       ...(opts.extracted?.actionRequired ? { action_required: true } : {}),
-      scheduled_at: occurredAt,
+      ...(invite
+        ? {
+            // Recorded so the timeline can say "this was rescheduled" rather
+            // than showing two bookings and letting you work it out.
+            invite: {
+              uid: invite.icsUid,
+              sequence: invite.icsSequence,
+              cancelled: invite.cancelled,
+              ...(invite.meetingUrl ? { meeting_url: invite.meetingUrl } : {}),
+              ...(invite.timeZone ? { time_zone: invite.timeZone } : {}),
+            },
+          }
+        : {}),
+      scheduled_at: scheduledAt,
     },
     needs_review: !legal,
   });
 
-  // The interview row itself, when the mail carried a real date with a zone.
+  if (!legal) return;
+
+  if (invite) {
+    // An invite is unambiguous evidence of a booking whatever the classifier
+    // made of the covering note, so it is not gated on the event kind the way
+    // a date read out of prose has to be.
+    await applyInvite(supabase, {
+      userId: opts.userId,
+      applicationId: opts.applicationId,
+      invite,
+      fallbackKind: interviewKind,
+    });
+    return;
+  }
+
+  // No invite: the model's date, on the same terms as before.
   const interviewDate = opts.extracted?.dates?.find((d) => d.kind === 'interview');
-  if (interviewDate && legal && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
+  if (interviewDate && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
     const { count } = await supabase
       .from('interviews')
       .select('id', { count: 'exact', head: true })
@@ -188,6 +254,74 @@ async function writeEvent(
       status: 'scheduled',
     });
   }
+}
+
+/**
+ * Write the invite to the interview it books, creating or updating.
+ *
+ * The UID is what makes a reschedule an edit rather than a second interview on
+ * the board, and it is also why this is an update-then-insert rather than an
+ * upsert: the row may already exist from a hand-entered interview or from the
+ * prose path, and adopting that row is better than leaving a duplicate beside
+ * it.
+ */
+async function applyInvite(
+  supabase: AppSupabaseClient,
+  opts: {
+    userId: string;
+    applicationId: string;
+    invite: InviteInterview;
+    fallbackKind: string | null;
+  },
+): Promise<void> {
+  const { invite } = opts;
+
+  const patch: Record<string, unknown> = {
+    scheduled_at: invite.scheduledAt,
+    ics_uid: invite.icsUid,
+    ics_sequence: invite.icsSequence,
+    status: invite.cancelled ? 'cancelled' : 'scheduled',
+    ...(invite.durationMinutes != null ? { duration_minutes: invite.durationMinutes } : {}),
+    ...(invite.format ? { format: invite.format } : {}),
+    ...(invite.meetingUrl ? { meeting_url: invite.meetingUrl } : {}),
+    ...(invite.location ? { location: invite.location } : {}),
+    ...(invite.timeZone ? { time_zone: invite.timeZone } : {}),
+  };
+
+  const existing = invite.icsUid
+    ? await supabase
+        .from('interviews')
+        .select('id, ics_sequence')
+        .eq('application_id', opts.applicationId)
+        .eq('ics_uid', invite.icsUid)
+        .maybeSingle()
+    : { data: null };
+
+  if (existing.data) {
+    // Mail arrives out of order. A stale redelivery must not un-cancel a slot.
+    if (!inviteSupersedes(invite, { icsSequence: existing.data.ics_sequence as number | null })) {
+      return;
+    }
+    await supabase.from('interviews').update(patch).eq('id', existing.data.id);
+    return;
+  }
+
+  // A cancellation for an interview we never recorded is nothing to record.
+  if (invite.cancelled) return;
+
+  const { count } = await supabase
+    .from('interviews')
+    .select('id', { count: 'exact', head: true })
+    .eq('application_id', opts.applicationId);
+
+  await supabase.from('interviews').insert({
+    user_id: opts.userId,
+    application_id: opts.applicationId,
+    round: (count ?? 0) + 1,
+    kind: opts.fallbackKind ?? 'recruiter_screen',
+    format: invite.format ?? 'video',
+    ...patch,
+  });
 }
 
 function defaultSummary(classification: MessageClassification): string {
@@ -306,6 +440,14 @@ export interface IngestContext {
   userId: string;
   accountId: string;
   accessToken: string;
+  /** The connected address, so you are not listed as your own interviewer. */
+  accountEmail: string | null;
+  /**
+   * The profile timezone, applied to invites that carry a wall-clock time with
+   * no zone at all. Those are rare and they are also the ones a wrong default
+   * silently moves by several hours.
+   */
+  timezone: string | null;
   companies: CompanyDomainHit[];
   candidates: LinkCandidate[];
   counters: IngestCounters;
@@ -505,6 +647,9 @@ async function handleMessage(
     tierB: tierB.extracted,
     decision,
     coreId,
+    // Parsed once per message rather than per branch: two of the three
+    // branches below write an event, and both want the same answer.
+    invite: inviteFromMessage(message, ctx),
   });
 }
 
@@ -517,9 +662,10 @@ async function applyDecision(
     tierB: ExtractedMessage | null;
     decision: LinkDecision;
     coreId: string;
+    invite: InviteInterview | null;
   },
 ): Promise<void> {
-  const { message, classification, tierB, decision, coreId } = input;
+  const { message, classification, tierB, decision, coreId, invite } = input;
 
   const ledger = async (
     parseStatus: 'parsed' | 'needs_review' | 'failed',
@@ -582,6 +728,7 @@ async function applyDecision(
         classification,
         extracted: tierB,
         message,
+        invite,
       });
       ctx.counters.messagesParsed += 1;
       return;
@@ -626,6 +773,7 @@ async function applyDecision(
         classification,
         extracted: tierB,
         message,
+        invite,
       });
 
       ctx.counters.applicationsCreated += 1;

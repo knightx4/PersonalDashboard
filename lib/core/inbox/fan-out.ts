@@ -39,6 +39,12 @@ export interface DomainLinker {
   link(opts: {
     userId: string;
     accountId: string;
+    /**
+     * The connected address itself. A workspace needs it to tell the user
+     * apart from everyone else on a message -- you are on every calendar
+     * invite in this mailbox and are not one of your own interviewers.
+     */
+    accountEmail: string;
     accessToken: string;
     envelopes: MessageEnvelope[];
   }): Promise<LinkerCounters>;
@@ -63,6 +69,7 @@ export async function fanOut(
   opts: {
     userId: string;
     accountId: string;
+    accountEmail: string;
     accessToken: string;
     envelopes: MessageEnvelope[];
   },
