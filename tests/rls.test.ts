@@ -81,6 +81,23 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.book_details = bookDetails.id;
 
+  const [gameDetails] = await admin<{ id: string }[]>`
+    insert into game_details (
+      inventory_item_id, bgg_id, year_published, publisher, condition, resolution_source
+    )
+    values (
+      ${inventoryItem.id}, ${tag === 'alice' ? 13 : 822}, 2000,
+      ${`${tag} games`}, 'complete_used', 'manual'
+    )
+    returning id`;
+  ids.game_details = gameDetails.id;
+
+  const [feedback] = await admin<{ id: string }[]>`
+    insert into feedback_items (user_id, kind, body, page_path)
+    values (${userId}, 'bug', ${`${tag} found a bug`}, '/shopping/dashboard')
+    returning id`;
+  ids.feedback_items = feedback.id;
+
   const [bookQuote] = await admin<{ id: string }[]>`
     insert into book_price_quotes (isbn_13, source, quoted_cents, vendor_name)
     values (

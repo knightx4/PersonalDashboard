@@ -9,9 +9,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
-    # The RLS and status tests need a real Postgres: they assert on policy
-    # behaviour and on trigger-maintained columns, neither of which can be
-    # faked. pg_trgm and pgcrypto come with the stock image.
+    # The RLS, status and coexistence tests need a real Postgres: they assert
+    # on policy behaviour, on trigger-maintained columns, and on two apps'
+    # schemas sitting side by side -- none of which can be faked. pg_trgm and
+    # pgcrypto come with the stock image.
     services:
       postgres:
         image: postgres:16
@@ -45,6 +46,10 @@ jobs:
       - name: Install postgres client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      # Applies both migration sets: `public` for the commerce side and
+      # `job_search` for the job search side, in that order. The coexistence
+      # test asserts against the result, so it exercises the real neighbour
+      # rather than a stand-in.
       - name: Apply migrations
         run: ./scripts/db-reset.sh
 
@@ -54,8 +59,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Includes the cross-user isolation test, which fails automatically if a
-      # table is added without an RLS policy.
+      # Includes both cross-user isolation tests, each of which fails
+      # automatically if a table is added to its schema without an RLS policy,
+      # and the coexistence test that proves neither app's migrations reach
+      # into the other's schema.
       - name: Test
         run: npm test
 

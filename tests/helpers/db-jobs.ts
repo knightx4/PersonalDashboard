@@ -1,5 +1,9 @@
 /**
- * Test database helpers.
+ * Test database helpers for the job search schema.
+ *
+ * The commerce side has its own (./db), against the same database. Two apps
+ * share this one, each owning a schema, so which helper a test imports is what
+ * decides which app's tables its unqualified names resolve to.
  *
  * Tests connect as the `postgres` superuser, which bypasses RLS entirely, so
  * anything asserting on policy behaviour must go through `asUser()`. That sets
@@ -13,7 +17,17 @@ export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   'postgresql://postgres@localhost:5433/shopping_manager_test';
 
-export const sql = postgres(TEST_DATABASE_URL, { max: 4, onnotice: () => {} });
+/** The schema this app owns. Everything below is scoped to it. */
+export const APP_SCHEMA = 'job_search';
+
+export const sql = postgres(TEST_DATABASE_URL, {
+  max: 4,
+  onnotice: () => {},
+  // Unqualified table names in the tests resolve into job_search, the way they
+  // do for the app. `public` stays on the path so a coexistence test can see
+  // the commerce app's tables sitting beside ours.
+  connection: { search_path: `${APP_SCHEMA}, public, extensions` },
+});
 
 /** Privileged connection: bypasses RLS. Use only for setup and teardown. */
 export const admin = sql;
@@ -28,6 +42,10 @@ export async function asUser<T>(
 ): Promise<T> {
   return sql.begin(async (tx) => {
     await tx.unsafe(`set local role authenticated`);
+    // `set local role` does not touch search_path, but being explicit here means
+    // the assertions do not depend on the connection option above surviving a
+    // driver upgrade.
+    await tx.unsafe(`set local search_path = ${APP_SCHEMA}, public, extensions`);
     await tx.unsafe(`set local request.jwt.claims = '${JSON.stringify({ sub: userId, role: 'authenticated' })}'`);
     return fn(tx);
   }) as Promise<T>;
@@ -41,16 +59,15 @@ export async function createUser(email: string): Promise<string> {
   return row.id;
 }
 
-/** Remove all test users and everything cascading from them. */
+/**
+ * Remove all test users and everything cascading from them.
+ *
+ * Every table in this schema hangs off auth.users, directly or through a
+ * parent, so one delete is genuinely enough -- and if that ever stops being
+ * true, the isolation test's coverage check is what will notice.
+ */
 export async function truncateAll(): Promise<void> {
   await admin`delete from auth.users`;
-  // user-scoped merchants cascade with their creator; global seed rows stay
-  await admin`delete from merchants where not is_global`;
-  await admin`delete from fx_rates`;
-  // Reference data, keyed by ISBN rather than by user, so it does not cascade
-  // out with the accounts. Left behind, a second run against the same database
-  // trips its unique (isbn, source) key during seeding.
-  await admin`delete from book_price_quotes`;
 }
 
 export async function closeDb(): Promise<void> {
