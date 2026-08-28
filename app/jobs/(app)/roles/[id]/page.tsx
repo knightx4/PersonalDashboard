@@ -4,6 +4,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
+import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { SOURCE_LABELS, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { RoleDetailPanels } from './panels';
@@ -64,7 +65,9 @@ export default async function RoleDetailPage({
     await Promise.all([
       supabase
         .from('application_events')
-        .select('id, kind, occurred_at, source, summary, payload, needs_review')
+        .select(
+          'id, kind, occurred_at, source, summary, payload, needs_review, ingested_message_id',
+        )
         .eq('application_id', current.id)
         .order('occurred_at', { ascending: false }),
       supabase
@@ -83,7 +86,12 @@ export default async function RoleDetailPage({
         .order('created_at', { ascending: false }),
       supabase
         .from('inbox_messages')
-        .select('id, subject, from_address, received_at, classification, link_method, link_confidence')
+        // provider_message_id, thread_id and email_address are what the Gmail
+        // deep link is built from. The view carries the address so this does
+        // not need a second query for the mailbox.
+        .select(
+          'id, subject, from_address, received_at, classification, link_method, link_confidence, provider_message_id, thread_id, email_address',
+        )
         .eq('resulting_application_id', current.id)
         .order('received_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
@@ -91,6 +99,20 @@ export default async function RoleDetailPage({
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
   const requirements = (role.requirements as Requirement[] | null) ?? [];
+
+  // Timeline events name the message they came from, and the linked mail is
+  // already loaded, so the same deep link can hang off both without a second
+  // query. An event with no message (a status you set by hand) has no link.
+  const gmailHrefByMessage = new Map<string, string | null>(
+    (messages ?? []).map((message) => [
+      message.id as string,
+      gmailOpenUrl({
+        emailAddress: (message.email_address as string) ?? null,
+        threadId: (message.thread_id as string) ?? null,
+        messageId: (message.provider_message_id as string) ?? null,
+      }),
+    ]),
+  );
 
   return (
     <>
@@ -180,6 +202,8 @@ export default async function RoleDetailPage({
           source: event.source as string,
           summary: (event.summary as string) ?? null,
           needsReview: event.needs_review as boolean,
+          gmailHref:
+            gmailHrefByMessage.get(event.ingested_message_id as string) ?? null,
         }))}
         interviews={(interviews ?? []).map((interview) => ({
           id: interview.id as string,
@@ -228,6 +252,11 @@ export default async function RoleDetailPage({
           classification: message.classification as string,
           linkMethod: (message.link_method as string) ?? null,
           linkConfidence: (message.link_confidence as number) ?? null,
+          gmailHref: gmailOpenUrl({
+            emailAddress: (message.email_address as string) ?? null,
+            threadId: (message.thread_id as string) ?? null,
+            messageId: (message.provider_message_id as string) ?? null,
+          }),
         }))}
         otherAttempts={(applications ?? []).slice(1).map((attempt) => ({
           id: attempt.id as string,

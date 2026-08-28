@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CheckCircle2,
   CircleAlert,
+  ExternalLink,
   FileText,
   ListChecks,
   Mail,
@@ -45,6 +46,8 @@ export interface PanelProps {
     source: string;
     summary: string | null;
     needsReview: boolean;
+    /** Set when this event came from an email that is still in the mailbox. */
+    gmailHref: string | null;
   }>;
   interviews: Array<{
     id: string;
@@ -80,6 +83,8 @@ export interface PanelProps {
     classification: string;
     linkMethod: string | null;
     linkConfidence: number | null;
+    /** Deep link into the connected mailbox; null once the envelope is scrubbed. */
+    gmailHref: string | null;
   }>;
   otherAttempts: Array<{
     id: string;
@@ -142,6 +147,28 @@ export function RoleDetailPanels(props: PanelProps) {
   );
 }
 
+/**
+ * "Open in Gmail" for anything that came from an email.
+ *
+ * Message bodies are never stored, so a subject line is as far as this app can
+ * take you. Handing the rest off to Gmail is the whole point -- the note asked
+ * for an actual link, in both places an email is named.
+ */
+function GmailLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 hover:text-brand hover:decoration-brand"
+    >
+      <span>{children}</span>
+      <ExternalLink className="size-3 shrink-0 self-center text-ink-faint" strokeWidth={1.75} aria-hidden />
+      <span className="sr-only">Open in Gmail</span>
+    </a>
+  );
+}
+
 function Timeline({ events, timezone, otherAttempts }: PanelProps) {
   return (
     <div className="space-y-4">
@@ -186,7 +213,13 @@ function Timeline({ events, timezone, otherAttempts }: PanelProps) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] text-ink">
-                  {event.summary ?? event.kind.replace(/_/g, ' ')}
+                  {event.gmailHref ? (
+                    <GmailLink href={event.gmailHref}>
+                      {event.summary ?? event.kind.replace(/_/g, ' ')}
+                    </GmailLink>
+                  ) : (
+                    (event.summary ?? event.kind.replace(/_/g, ' '))
+                  )}
                 </p>
                 <p className="text-[11px] text-ink-faint">
                   {event.kind.replace(/_/g, ' ')} · {event.source}
@@ -592,7 +625,15 @@ function LinkedMail({ messages, timezone }: PanelProps) {
               <td className="tabular px-2 py-1.5 text-ink-muted">
                 {formatDate(message.receivedAt, timezone)}
               </td>
-              <td className="px-2 py-1.5 text-ink">{message.subject ?? '—'}</td>
+              <td className="px-2 py-1.5 text-ink">
+                {message.gmailHref ? (
+                  <GmailLink href={message.gmailHref}>
+                    {message.subject ?? '(no subject)'}
+                  </GmailLink>
+                ) : (
+                  (message.subject ?? '—')
+                )}
+              </td>
               <td className="px-2 py-1.5 text-ink-muted">
                 {message.classification.replace(/_/g, ' ')}
               </td>
