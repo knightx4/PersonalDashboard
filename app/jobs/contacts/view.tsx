@@ -1,0 +1,254 @@
+'use client';
+
+import Link from 'next/link';
+import { useActionState, useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input, Label, Select } from '@/components/ui/field';
+import { formatDate } from '@/lib/jobs/applications/load';
+import { createContact, logTouch, markTouchAnswered } from './actions';
+
+const RELATIONSHIPS = [
+  'cold',
+  'alum',
+  'second_degree',
+  'former_colleague',
+  'friend',
+  'recruiter',
+  'interviewer',
+] as const;
+
+const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+
+export interface ContactRow {
+  id: string;
+  fullName: string;
+  title: string | null;
+  relationship: string;
+  status: string;
+  linkedinUrl: string | null;
+  email: string | null;
+  howWeConnect: string | null;
+  notes: string | null;
+  companyName: string | null;
+  companySlug: string | null;
+  touches: Array<{
+    id: string;
+    channel: string;
+    direction: string;
+    sentAt: string;
+    respondedAt: string | null;
+    message: string | null;
+  }>;
+}
+
+export function ContactsView({
+  contacts,
+  companies,
+  timezone,
+}: {
+  contacts: ContactRow[];
+  companies: Array<{ id: string; name: string }>;
+  timezone: string;
+}) {
+  const [state, action] = useActionState(createContact, {});
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <section className="rounded-card border border-border bg-surface p-4 lg:order-2">
+        <h2 className="text-[13px] font-semibold text-ink">Add someone</h2>
+        <form action={action} className="mt-3 space-y-3">
+          <div>
+            <Label htmlFor="fullName">Name</Label>
+            <Input id="fullName" name="fullName" required />
+          </div>
+          <div>
+            <Label htmlFor="title">Title</Label>
+            <Input id="title" name="title" placeholder="Head of Finance" />
+          </div>
+          <div>
+            <Label htmlFor="companyId">Company</Label>
+            <Select id="companyId" name="companyId" defaultValue="">
+              <option value="">Not attached</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="relationship">Relationship</Label>
+            <Select id="relationship" name="relationship" defaultValue="cold">
+              {RELATIONSHIPS.map((entry) => (
+                <option key={entry} value={entry}>
+                  {entry.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="howWeConnect">How you connect</Label>
+            <Input id="howWeConnect" name="howWeConnect" placeholder="Same university, 2016" />
+          </div>
+          <div>
+            <Label htmlFor="linkedinUrl">LinkedIn</Label>
+            <Input id="linkedinUrl" name="linkedinUrl" type="url" />
+          </div>
+          <div>
+            <Label htmlFor="email">Work email</Label>
+            <Input id="email" name="email" type="email" />
+          </div>
+
+          {state.error && (
+            <p role="alert" className="text-[13px] text-status-rejected">
+              {state.error}
+            </p>
+          )}
+          {state.message && <p className="text-[13px] text-status-offer">{state.message}</p>}
+
+          <Button type="submit" size="sm">
+            Add contact
+          </Button>
+          <p className="text-[11px] leading-relaxed text-ink-faint">
+            Name, title, public professional URL, work email. Nothing else, and nothing scraped —
+            this is the part of the app most worth being careful with.
+          </p>
+        </form>
+      </section>
+
+      <div className="space-y-3 lg:col-span-2">
+        {contacts.length === 0 ? (
+          <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+            Nobody yet.
+          </p>
+        ) : (
+          contacts.map((contact) => (
+            <ContactCard key={contact.id} contact={contact} timezone={timezone} />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContactCard({ contact, timezone }: { contact: ContactRow; timezone: string }) {
+  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('linkedin_dm');
+  const [message, setMessage] = useState('');
+  const [note, setNote] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const outbound = contact.touches.filter((t) => t.direction === 'outbound');
+  const pendingReply = outbound.filter((t) => t.respondedAt === null);
+
+  return (
+    <article className="rounded-card border border-border bg-surface p-4">
+      <header className="flex flex-wrap items-baseline gap-2">
+        <h3 className="text-[13px] font-semibold text-ink">{contact.fullName}</h3>
+        {contact.title && <span className="text-[12px] text-ink-muted">{contact.title}</span>}
+        {contact.companySlug && (
+          <Link
+            href={`/jobs/companies/${contact.companySlug}`}
+            className="text-[12px] text-brand hover:underline"
+          >
+            {contact.companyName}
+          </Link>
+        )}
+        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
+          {contact.relationship.replace(/_/g, ' ')}
+        </span>
+        <span className="ml-auto text-[11px] text-ink-faint">
+          {contact.status.replace(/_/g, ' ')}
+        </span>
+      </header>
+
+      {contact.howWeConnect && (
+        <p className="mt-1 text-[12px] text-ink-muted">{contact.howWeConnect}</p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="w-40">
+          <Label htmlFor={`channel-${contact.id}`}>Log a send</Label>
+          <Select
+            id={`channel-${contact.id}`}
+            value={channel}
+            onChange={(event) => setChannel(event.target.value as (typeof CHANNELS)[number])}
+          >
+            {CHANNELS.map((entry) => (
+              <option key={entry} value={entry}>
+                {entry.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <Input
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="What you said, roughly"
+          className="min-w-48 flex-1"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await logTouch({
+                contactId: contact.id,
+                channel,
+                direction: 'outbound',
+                message,
+              });
+              setNote(result.error ?? 'Logged.');
+              if (!result.error) setMessage('');
+            })
+          }
+        >
+          Log
+        </Button>
+        {note && <span className="text-[12px] text-ink-muted">{note}</span>}
+      </div>
+
+      {contact.touches.length > 0 && (
+        <ul className="mt-3 divide-y divide-border border-t border-border">
+          {contact.touches.slice(0, 5).map((touch) => (
+            <li key={touch.id} className="flex flex-wrap items-center gap-2 py-1.5 text-[12px]">
+              <span className="tabular w-24 text-ink-faint">
+                {formatDate(touch.sentAt, timezone)}
+              </span>
+              <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
+              <span className="text-ink-faint">{touch.direction}</span>
+              {touch.message && (
+                <span className="min-w-0 flex-1 truncate text-ink-muted">{touch.message}</span>
+              )}
+              {touch.respondedAt ? (
+                <span className="text-status-offer">replied</span>
+              ) : touch.direction === 'outbound' ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await markTouchAnswered(touch.id, '');
+                      setNote(result.error ?? 'Marked as answered.');
+                    })
+                  }
+                >
+                  They replied
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {pendingReply.length > 0 && (
+        <p className="mt-2 text-[11px] text-ink-faint">
+          {pendingReply.length} send{pendingReply.length === 1 ? '' : 's'} still unanswered.
+        </p>
+      )}
+    </article>
+  );
+}

@@ -35,6 +35,34 @@
   --color-accent-pink: #ff6b9d;
   --color-accent-pink-tint: #ffeef4;
 
+  /* -------------------------------------------------------------------------
+   * Pipeline status, for the job search workspace. One colour per stage, used
+   * only for that stage. On that board a colour is a claim about where a
+   * pursuit stands, so they are fixed once, here, and used nowhere else for
+   * anything else.
+   *   gray    lead, drafting          -- yours to move, not theirs
+   *   blue    submitted, acknowledged -- sent, nothing has happened yet
+   *   amber   in process              -- a human is involved
+   *   purple  final round             -- nearly there
+   *   green   offer
+   *   red     rejected                -- muted, because it is information not alarm
+   *   faded   ghosted                 -- visibly drained, because it is a non-answer
+   * ---------------------------------------------------------------------- */
+  --color-status-lead: #78716c;
+  --color-status-lead-tint: #f5f5f4;
+  --color-status-submitted: #2563eb;
+  --color-status-submitted-tint: #eff6ff;
+  --color-status-process: #d97706;
+  --color-status-process-tint: #fffbeb;
+  --color-status-final: #7c3aed;
+  --color-status-final-tint: #f5f3ff;
+  --color-status-offer: #059669;
+  --color-status-offer-tint: #ecfdf5;
+  --color-status-rejected: #b91c1c;
+  --color-status-rejected-tint: #fef2f2;
+  --color-status-ghosted: #a8a29e;
+  --color-status-ghosted-tint: #fafaf9;
+
   /* Savings and refunds only. Never spend. */
   --color-positive: #3fa37a;
   --color-positive-tint: #ecf7f2;
@@ -86,6 +114,14 @@ body {
   }
 }
 
+/* The kanban card while it is being dragged. This is the most-used interaction
+ * in the job pipeline, so it gets its own treatment rather than reusing hover. */
+@utility dragging {
+  opacity: 0.55;
+  transform: scale(0.98) rotate(-0.5deg);
+  cursor: grabbing;
+}
+
 @utility press {
   transition: transform 150ms var(--ease-out-soft);
 
@@ -123,6 +159,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dragging {
+    transform: none;
+  }
+
   *,
   *::before,
   *::after {
