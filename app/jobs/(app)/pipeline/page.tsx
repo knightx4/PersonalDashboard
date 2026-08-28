@@ -95,7 +95,7 @@ export default async function PipelinePage({
         }
       />
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <LeftRail>
           <RailGroup label="Source">
             <RailItem

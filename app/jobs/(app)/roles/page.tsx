@@ -120,7 +120,7 @@ export default async function RolesPage({
         }
       />
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <LeftRail>
           <RailGroup label="Status">
             <RailItem

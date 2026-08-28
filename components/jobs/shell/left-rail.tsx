@@ -17,7 +17,13 @@ export function LeftRail({
   children: React.ReactNode;
   className?: string;
 }) {
-  const [open, setOpen] = useState(true);
+  /**
+   * Collapsed to start, which only affects narrow screens: from lg up the
+   * aside is shown by `lg:block` whatever this says. On a phone an expanded
+   * rail is a screenful of filters standing between you and the thing you
+   * opened the page to read.
+   */
+  const [open, setOpen] = useState(false);
 
   return (
     <>

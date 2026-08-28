@@ -121,7 +121,7 @@ export default async function ReviewPage({
         description={`${counts.all} waiting. Holding rather than guessing is what keeps the funnel worth reading.`}
       />
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <LeftRail>
           <RailGroup label="Kind">
             {REVIEW_VIEWS.map((entry) => (
