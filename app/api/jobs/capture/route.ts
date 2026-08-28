@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   const user = await getUser();
   if (!user) {
     return NextResponse.json(
-      { error: 'Sign in to Application Manager first, then click the bookmarklet again.' },
+      { error: 'Sign in first, then click the bookmarklet again.' },
       { status: 401, headers },
     );
   }

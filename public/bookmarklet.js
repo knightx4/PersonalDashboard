@@ -1,5 +1,5 @@
 /**
- * Application Manager capture bookmarklet.
+ * Job search capture bookmarklet.
  *
  * The general solution to reading an application form's questions.
  *
@@ -88,11 +88,11 @@
   }
 
   if (questions.length === 0) {
-    alert('Application Manager: no form questions found on this page.');
+    alert('Job search: no form questions found on this page.');
     return;
   }
 
-  fetch(ORIGIN + '/api/capture', {
+  fetch(ORIGIN + '/api/jobs/capture', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -105,11 +105,11 @@
     })
     .then(function (result) {
       if (!result.ok) {
-        alert('Application Manager: ' + (result.data.error || 'could not save.'));
+        alert('Job search: ' + (result.data.error || 'could not save.'));
         return;
       }
       alert(
-        'Application Manager: saved ' +
+        'Job search: saved ' +
           result.data.added +
           ' new question' +
           (result.data.added === 1 ? '' : 's') +
@@ -118,6 +118,6 @@
       );
     })
     .catch(function () {
-      alert('Application Manager: could not reach the app. Are you signed in?');
+      alert('Job search: could not reach the app. Are you signed in?');
     });
 })();
