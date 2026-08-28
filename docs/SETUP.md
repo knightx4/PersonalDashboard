@@ -85,13 +85,23 @@ Two directories, applied in order:
 | Directory | Schema | Versions |
 |---|---|---|
 | `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0029` |
-| `supabase/migrations-job-search` | `job_search` | `0001`–`0006` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0010` |
 
 They are separate because both sets were numbered independently from `0001`,
 and the `job_search` versions are already recorded remotely under exactly those
 numbers. Renaming them would make the local files disagree with the deployed
-history. **Do not renumber either set**, and do not re-run the `job_search`
-migrations — they are already applied.
+history. **Do not renumber either set.**
+
+`job_search` `0001`–`0006` are applied remotely; do not re-run them.
+**`0007`–`0010` are not**, and the code that depends on them is deployed, so
+they want running against the project:
+
+| Migration | What breaks without it |
+|---|---|
+| `0007_interview_invites` | An interview email carrying a calendar invite writes no interview row at all — the insert names columns that do not exist. This is the one to run first. |
+| `0008_recruitee_ats` | Adding a role from a Recruitee URL fails on the `ats_type` enum. |
+| `0009_relink_attempts` | The reprocess pass silently no-ops, so mail held in the review queue is never reconsidered. |
+| `0010_repair_timezones` | Nothing breaks — reads already fall back — but a stored `ET` stays stored, and anything reading the column directly still sees it. |
 
 ### Storage
 
