@@ -12,7 +12,9 @@ export default async function FeedbackPage() {
 
   const { data } = await supabase
     .from('feedback_items')
-    .select('id, kind, body, page_path, status, created_at')
+    .select(
+      'id, kind, body, page_path, status, priority, resolution_note, commit_sha, created_at',
+    )
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(200);
@@ -23,18 +25,44 @@ export default async function FeedbackPage() {
     body: row.body as string,
     pagePath: (row.page_path as string | null) ?? null,
     status: row.status as FeedbackRow['status'],
+    priority: (row.priority as number | null) ?? 2,
+    resolutionNote: (row.resolution_note as string | null) ?? null,
+    commitSha: (row.commit_sha as string | null) ?? null,
     createdAt: row.created_at as string,
   }));
 
-  const open = rows.filter((row) => row.status === 'open');
-  const rest = rows.filter((row) => row.status !== 'open');
+  // Anything not finished is "outstanding" — including blocked work, which is
+  // the state most easily forgotten.
+  const OUTSTANDING = ['open', 'in_progress', 'blocked', 'planned'] as const;
+  const isOutstanding = (row: FeedbackRow) =>
+    (OUTSTANDING as readonly string[]).includes(row.status);
+
+  // Same order the notes loop works them in: blocked first because it needs
+  // the user, then bugs, then priority, then oldest.
+  const RANK: Record<string, number> = { blocked: 0, in_progress: 1, open: 2, planned: 3 };
+  const outstanding = rows.filter(isOutstanding).sort((a, b) => {
+    const byStatus = (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9);
+    if (byStatus !== 0) return byStatus;
+    if (a.kind !== b.kind) return a.kind === 'bug' ? -1 : 1;
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+  const closed = rows.filter((row) => !isOutstanding(row));
+  const blocked = outstanding.filter((row) => row.status === 'blocked');
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Bugs and requests"
-        description="Everything captured from the header button. Mark items planned or done as they are picked up."
+        description="Everything captured from the header button. Say “knock out the notes” in a session to have them worked top to bottom."
       />
+
+      {blocked.length > 0 && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[13px] text-ink">
+          {blocked.length} note(s) blocked, waiting on an answer from you. They are
+          listed first below with the question.
+        </p>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState
@@ -44,20 +72,21 @@ export default async function FeedbackPage() {
         />
       ) : (
         <div className="space-y-6">
-          {open.length > 0 && (
+          {outstanding.length > 0 && (
             <section className="space-y-2">
               <h2 className="text-sm font-semibold text-ink">
-                Open <span className="font-normal text-ink-muted">({open.length})</span>
+                Outstanding{' '}
+                <span className="font-normal text-ink-muted">({outstanding.length})</span>
               </h2>
-              <FeedbackList rows={open} />
+              <FeedbackList rows={outstanding} />
             </section>
           )}
-          {rest.length > 0 && (
+          {closed.length > 0 && (
             <section className="space-y-2">
               <h2 className="text-sm font-semibold text-ink">
-                Triaged <span className="font-normal text-ink-muted">({rest.length})</span>
+                Closed <span className="font-normal text-ink-muted">({closed.length})</span>
               </h2>
-              <FeedbackList rows={rest} />
+              <FeedbackList rows={closed} />
             </section>
           )}
         </div>

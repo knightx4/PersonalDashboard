@@ -69,7 +69,14 @@ export async function submitFeedback(
   };
 }
 
-const statusSchema = z.enum(['open', 'planned', 'done', 'declined']);
+const statusSchema = z.enum([
+  'open',
+  'in_progress',
+  'blocked',
+  'planned',
+  'done',
+  'declined',
+]);
 
 /** Triage from the list page. */
 export async function updateFeedbackStatus(
@@ -85,7 +92,13 @@ export async function updateFeedbackStatus(
 
   const { error } = await supabase
     .from('feedback_items')
-    .update({ status: status.data })
+    .update({
+      status: status.data,
+      completed_at:
+        status.data === 'done' || status.data === 'declined'
+          ? new Date().toISOString()
+          : null,
+    })
     .eq('id', id.data)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
@@ -113,4 +126,28 @@ export async function deleteFeedback(
 
   revalidatePath('/feedback');
   return { message: 'Deleted.' };
+}
+
+
+/** Reorder the queue by hand: 1 next, 2 normal, 3 someday. */
+export async function setFeedbackPriority(
+  _prev: FeedbackActionState,
+  formData: FormData,
+): Promise<FeedbackActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  const priority = z.coerce.number().int().min(1).max(3).safeParse(formData.get('priority'));
+  if (!id.success || !priority.success) return { error: 'Missing item or priority.' };
+
+  const { error } = await supabase
+    .from('feedback_items')
+    .update({ priority: priority.data })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/feedback');
+  return { message: 'Priority updated.' };
 }

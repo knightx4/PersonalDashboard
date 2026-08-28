@@ -17,6 +17,7 @@ import {
   pgEnum,
   pgSchema,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -478,6 +479,8 @@ export const feedbackKind = pgEnum('feedback_kind', ['bug', 'feature']);
 export const feedbackStatus = pgEnum('feedback_status', [
   'open',
   'planned',
+  'in_progress',
+  'blocked',
   'done',
   'declined',
 ]);
@@ -496,12 +499,19 @@ export const feedbackItems = pgTable(
     pagePath: text('page_path'),
     userAgent: text('user_agent'),
     status: feedbackStatus('status').notNull().default('open'),
+    /** 1 next, 2 normal, 3 someday. Bugs outrank features at equal priority. */
+    priority: smallint('priority').notNull().default(2),
+    /** What was done, or what is being waited on. Set whenever status leaves open. */
     resolutionNote: text('resolution_note'),
+    /** The commit that closed it. */
+    commitSha: text('commit_sha'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
     index('feedback_user_created_idx').on(t.userId, t.createdAt),
     index('feedback_status_idx').on(t.status),
+    index('feedback_queue_idx').on(t.userId, t.status, t.priority, t.createdAt),
   ],
 );
 
