@@ -12,9 +12,15 @@ import {
   type MessageClassification,
 } from '@/lib/jobs/email/classify';
 import { PARSER_VERSION, verifyExtraction, type ExtractedMessage } from '@/lib/jobs/email/extract';
-import { decideLink, type LinkCandidate, type LinkDecision } from '@/lib/jobs/email/link';
+import {
+  decideLink,
+  type LinkCandidate,
+  type LinkCompany,
+  type LinkDecision,
+} from '@/lib/jobs/email/link';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { slugify } from '@/lib/jobs/slug';
 import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
 import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
 import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
@@ -355,6 +361,71 @@ function defaultSummary(classification: MessageClassification): string {
  * most of the time. It appears in the pipeline immediately, flagged, asking you
  * to confirm the details rather than asking you to remember it existed.
  */
+/**
+ * The company id for a decision, creating the company when the message named
+ * one we do not have.
+ *
+ * Idempotent through the slug: a first scan brings in a dozen messages from the
+ * same employer, and they must converge on one row rather than a dozen. The
+ * unique index on (user_id, slug) is the real guarantee — the select is the
+ * fast path, and the insert conflict is what makes concurrency safe.
+ */
+async function resolveCompanyId(
+  supabase: AppSupabaseClient,
+  userId: string,
+  company: LinkCompany,
+): Promise<string | null> {
+  if (company.kind === 'existing') return company.id;
+
+  const slug = slugify(company.name);
+
+  const { data: existing } = await supabase
+    .from('companies')
+    .select('id, domains')
+    .eq('user_id', userId)
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (existing) {
+    // Top up the domain if this message taught us one. This is what makes the
+    // *next* message from the same employer link by domain instead of guessing.
+    const domains = (existing.domains as string[] | null) ?? [];
+    if (company.domain && !domains.includes(company.domain)) {
+      await supabase
+        .from('companies')
+        .update({ domains: [...domains, company.domain] })
+        .eq('id', existing.id);
+    }
+    return existing.id as string;
+  }
+
+  const { data, error } = await supabase
+    .from('companies')
+    .insert({
+      user_id: userId,
+      name: company.name,
+      slug,
+      domains: company.domain ? [company.domain] : [],
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    // Another message in the same batch got there first.
+    const { data: raced } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('slug', slug)
+      .maybeSingle();
+    if (raced) return raced.id as string;
+    console.error('inferred company insert failed', error.message);
+    return null;
+  }
+
+  return data.id as string;
+}
+
 async function createInferredApplication(
   supabase: AppSupabaseClient,
   opts: {
@@ -745,9 +816,16 @@ async function applyDecision(
     }
 
     case 'create_inferred_application': {
+      const companyId = await resolveCompanyId(supabase, ctx.userId, decision.company);
+      if (!companyId) {
+        await ledger('needs_review', { error: 'Could not record the company for this message.' });
+        ctx.counters.heldForReview += 1;
+        return;
+      }
+
       const applicationId = await createInferredApplication(supabase, {
         userId: ctx.userId,
-        companyId: decision.companyId,
+        companyId,
         roleTitle: tierB?.roleTitle ?? null,
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
@@ -782,9 +860,16 @@ async function applyDecision(
     }
 
     case 'create_lead': {
+      const companyId = await resolveCompanyId(supabase, ctx.userId, decision.company);
+      if (!companyId) {
+        await ledger('needs_review', { error: 'Could not record the company for this message.' });
+        ctx.counters.heldForReview += 1;
+        return;
+      }
+
       const applicationId = await createInferredApplication(supabase, {
         userId: ctx.userId,
-        companyId: decision.companyId,
+        companyId,
         roleTitle: tierB?.roleTitle ?? null,
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
@@ -826,4 +911,105 @@ async function applyDecision(
       return;
     }
   }
+}
+
+/**
+ * Give held messages another look, using what the sync just learned.
+ *
+ * The review queue is not a dead letter office. A message is held because
+ * nothing on file matched it, and "on file" changes constantly: the batch that
+ * just landed may have created the company or the application this message has
+ * been waiting for. Without this, a message held on a first scan stays held
+ * until a *later* sync happens to re-list it, which for incremental syncs is
+ * never — they only offer mail that has just arrived.
+ *
+ * Envelopes are rebuilt from the view rather than refetched: the verdict is
+ * ours, but the sender, subject and date are core's, and both halves are needed
+ * to run the linker again.
+ */
+export async function reprocessHeldMessages(
+  supabase: AppSupabaseClient,
+  ctx: IngestContext,
+  opts: { limit?: number } = {},
+): Promise<void> {
+  const { data: pending } = await supabase
+    .from('inbox_messages')
+    .select('id, provider_message_id, thread_id, received_at, from_address, reply_to_address, subject')
+    .eq('email_account_id', ctx.accountId)
+    .eq('parse_status', 'needs_review')
+    .neq('classification', 'not_relevant')
+    // Each retry costs a body fetch and usually a model call, so a message that
+    // is not going to resolve stops being re-read. The counter resets when a
+    // sync creates something, which is when a retry is worth paying for again.
+    .lt('relink_attempts', MAX_RELINK_ATTEMPTS)
+    .order('received_at', { ascending: true })
+    .limit(opts.limit ?? RELINK_BATCH);
+
+  const envelopes: MessageEnvelope[] = (pending ?? []).map((row) => ({
+    id: row.id as string,
+    providerMessageId: row.provider_message_id as string,
+    threadId: (row.thread_id as string | null) ?? null,
+    receivedAt: (row.received_at as string | null) ?? null,
+    fromAddress: (row.from_address as string | null) ?? null,
+    replyToAddress: (row.reply_to_address as string | null) ?? null,
+    subject: (row.subject as string | null) ?? null,
+    isNew: false,
+  }));
+
+  if (envelopes.length === 0) return;
+
+  // Charged before the pass, not after: a run that throws half way through has
+  // still spent the fetches, and not counting them is how a crash loop turns
+  // into an unbounded bill.
+  await bumpRelinkAttempts(
+    supabase,
+    envelopes.map((envelope) => envelope.id),
+  );
+
+  // Oldest first, and one pass only. A message that is still unlinkable after
+  // this stays in the queue for you to decide, which is what the queue is for.
+  await linkEnvelopes(supabase, ctx, envelopes);
+}
+
+/** How many times a held message is re-read before it waits for you instead. */
+const MAX_RELINK_ATTEMPTS = 3;
+/** Per sync. Bounded so one run cannot walk a whole backlog and time out. */
+const RELINK_BATCH = 40;
+
+async function bumpRelinkAttempts(
+  supabase: AppSupabaseClient,
+  ids: readonly string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.rpc('bump_relink_attempts', { message_ids: ids });
+  if (error) console.error('relink attempt bump failed', error.message);
+}
+
+/**
+ * Everything held becomes worth another look again.
+ *
+ * Called when a sync creates a company or an application, because that is
+ * exactly the change that can make a previously unlinkable message linkable —
+ * and without the reset, a message that used up its retries before its
+ * application existed would never be looked at again.
+ */
+export async function resetRelinkAttempts(
+  supabase: AppSupabaseClient,
+  accountId: string,
+): Promise<void> {
+  const { data: held } = await supabase
+    .from('inbox_messages')
+    .select('id')
+    .eq('email_account_id', accountId)
+    .eq('parse_status', 'needs_review')
+    .gt('relink_attempts', 0);
+
+  const ids = (held ?? []).map((row) => row.id as string);
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from('ingested_messages')
+    .update({ relink_attempts: 0 })
+    .in('id', ids);
+  if (error) console.error('relink attempt reset failed', error.message);
 }

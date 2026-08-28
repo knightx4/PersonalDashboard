@@ -1,4 +1,4 @@
-import { domainFromAddress } from './ats-senders';
+import { domainFromAddress, isKnownAtsSender, isSchedulingSender } from './ats-senders';
 import type { MessageClassification } from './classify';
 
 /**
@@ -64,19 +64,41 @@ export interface ScoredCandidate {
   reasons: string[];
 }
 
+/**
+ * The company an inferred pursuit belongs to.
+ *
+ * `new` exists because the alternative was a deadlock. Company resolution only
+ * ever matched companies already on file, and nothing in the ingestion path
+ * created one — so on a first scan of a real mailbox every message failed to
+ * resolve a company, every one was held, and the pipeline stayed empty no
+ * matter how much recruiting mail was in there. The one thing the app promises
+ * (the confirmation email is the log entry) could not happen until you had
+ * already done the work by hand.
+ */
+export type LinkCompany =
+  | { kind: 'existing'; id: string; name: string }
+  | { kind: 'new'; name: string; domain: string | null };
+
 export type LinkDecision =
   | { action: 'link'; candidate: LinkCandidate; confidence: number; method: LinkMethod; reasons: string[] }
   | { action: 'review'; candidates: ScoredCandidate[]; reason: string }
-  | { action: 'create_inferred_application'; companyId: string; confidence: number; reasons: string[] }
-  | { action: 'create_lead'; companyId: string; reasons: string[] }
+  | { action: 'create_inferred_application'; company: LinkCompany; confidence: number; reasons: string[] }
+  | { action: 'create_lead'; company: LinkCompany; reasons: string[] }
   | { action: 'hold'; reason: string };
 
 /** Auto-link only above this, and only with exactly one candidate. */
 export const AUTO_LINK_THRESHOLD = 0.85;
 /** Below this a message is not offered as a link at all. */
 export const REVIEW_FLOOR = 0.5;
-/** How recent a confirmation must be to infer an application from it. */
-export const INFERRED_APPLICATION_WINDOW_DAYS = 7;
+/**
+ * How recent a confirmation must be to infer an application from it.
+ *
+ * The default is the backfill window rather than a week. Seven days meant a
+ * first scan — which reads months of mail — inferred nothing from any of it,
+ * because every message it found was older than the window on the day it was
+ * read. The caller passes the window the sync actually covered.
+ */
+export const INFERRED_APPLICATION_WINDOW_DAYS = 180;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -265,6 +287,122 @@ export interface DecideOptions {
   /** Companies the user tracks, for the create-a-lead and inferred paths. */
   companies: ReadonlyArray<{ id: string; name: string; domains: string[] }>;
   now?: Date;
+  /**
+   * How far back a confirmation may be dated and still infer an application.
+   * Pass the window the sync actually covered; the default is the backfill's.
+   */
+  inferredWindowDays?: number;
+}
+
+/**
+ * Names that are not a company.
+ *
+ * The extractor returns whatever the message called the employer, and a good
+ * fraction of recruiting mail calls it "the hiring team". Creating a company
+ * called Talent Acquisition is worse than holding the message, because it then
+ * absorbs every later message that fails to resolve.
+ */
+const NON_COMPANY_NAMES = new Set([
+  'careers',
+  'recruiting',
+  'recruitment',
+  'talent',
+  'talent acquisition',
+  'hiring',
+  'hiring team',
+  'the hiring team',
+  'the team',
+  'people team',
+  'human resources',
+  'hr',
+  'no reply',
+  'noreply',
+  'do not reply',
+  'jobs',
+  'apply',
+  'application',
+  'notifications',
+  'support',
+  'admin',
+  'team',
+  'company',
+  'unknown',
+]);
+
+/**
+ * A company name worth creating a record from, or null.
+ *
+ * Deliberately strict. Everything that gets through here becomes a row that
+ * later messages match against, so a junk name does not just clutter the list —
+ * it starts collecting other companies' mail.
+ */
+export function usableCompanyName(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const name = raw.trim().replace(/\s+/g, ' ');
+  if (name.length < 2 || name.length > 80) return null;
+
+  const normalized = normalizeCompanyName(name);
+  if (!normalized) return null;
+  if (NON_COMPANY_NAMES.has(normalized)) return null;
+
+  // An address or a URL is a sender, not a name.
+  if (/@|https?:\/\//.test(name)) return null;
+  // A bare number, or a string with no letters at all.
+  if (!/[a-z]/i.test(name)) return null;
+
+  return name;
+}
+
+/**
+ * The employer's own domain, when the message carries one.
+ *
+ * The ATS's domain is not it: `greenhouse.io` on a company record would match
+ * every Greenhouse customer's mail to that one company, which is the worst
+ * possible outcome for a field whose whole job is disambiguation. Scheduling
+ * tools are excluded for the same reason.
+ */
+export function employerDomain(input: LinkInput): string | null {
+  for (const domain of [domainFromAddress(input.replyToAddress), domainFromAddress(input.fromAddress)]) {
+    if (!domain) continue;
+    if (isKnownAtsSender(domain) || isSchedulingSender(domain)) continue;
+    // Free mail is a person, not an employer.
+    if (/^(gmail|googlemail|outlook|hotmail|yahoo|icloud|proton(mail)?|aol)\./.test(domain)) continue;
+    return domain;
+  }
+  return null;
+}
+
+/**
+ * The company to attribute an unmatched message to: one already on file, or a
+ * new one described well enough to create.
+ */
+export function companyForMessage(
+  input: LinkInput,
+  companies: DecideOptions['companies'],
+): LinkCompany | null {
+  const existing = resolveCompany(input, companies);
+  if (existing) return { kind: 'existing', id: existing.id, name: existing.name };
+
+  // The extractor read the employer out of the body; the hint is the ATS
+  // subdomain, which is the company's own name by construction.
+  const extracted = usableCompanyName(input.extractedCompany);
+  const hinted = usableCompanyName(input.companyHint);
+  if (!extracted && !hinted) return null;
+
+  // A subdomain is lowercase by construction, and "ramp" reads as a typo on a
+  // page full of properly cased names. A name from the body is left exactly as
+  // the sender wrote it, because they know how it is spelled.
+  const name = extracted ?? titleCaseSlug(hinted!);
+
+  return { kind: 'new', name, domain: employerDomain(input) };
+}
+
+function titleCaseSlug(value: string): string {
+  return value
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 /**
@@ -332,8 +470,9 @@ export function decideLink(
     };
   }
 
-  // Nothing matched well. Can we at least resolve a company?
-  const company = resolveCompany(input, opts.companies);
+  // Nothing matched well. Can we at least work out the company — either one on
+  // file, or one this message describes well enough to create?
+  const company = companyForMessage(input, opts.companies);
 
   if (!company) {
     return {
@@ -342,18 +481,25 @@ export function decideLink(
     };
   }
 
+  const windowDays = opts.inferredWindowDays ?? INFERRED_APPLICATION_WINDOW_DAYS;
   const fresh =
-    input.receivedAt !== null &&
-    now.getTime() - input.receivedAt.getTime() <= INFERRED_APPLICATION_WINDOW_DAYS * DAY_MS;
+    input.receivedAt !== null && now.getTime() - input.receivedAt.getTime() <= windowDays * DAY_MS;
+
+  const isNew = company.kind === 'new';
+  const provenance = isNew
+    ? `${company.name} is not on your list yet, so it was added alongside this`
+    : 'Created and flagged for review rather than silently added to the funnel';
 
   if (input.classification === 'application_confirmation' && fresh) {
     return {
       action: 'create_inferred_application',
-      companyId: company.id,
-      confidence: 0.6,
+      company,
+      // A brand-new company is a weaker claim than a recognised one: the name
+      // came out of the message rather than off a record you maintain.
+      confidence: isNew ? 0.5 : 0.6,
       reasons: [
         `Confirmation from ${company.name} with no matching application on file`,
-        'Created and flagged for review rather than silently added to the funnel',
+        provenance,
       ],
     };
   }
@@ -368,14 +514,16 @@ export function decideLink(
   ) {
     return {
       action: 'create_lead',
-      companyId: company.id,
-      reasons: [`Inbound about a role with no application on file at ${company.name}`],
+      company,
+      reasons: [`Inbound about a role with no application on file at ${company.name}`, provenance],
     };
   }
 
   return {
     action: 'hold',
-    reason: `Recognised ${company.name} but could not match this to an application.`,
+    reason: isNew
+      ? `This looks like it is from ${company.name}, but not enough to open a pursuit from.`
+      : `Recognised ${company.name} but could not match this to an application.`,
   };
 }
 

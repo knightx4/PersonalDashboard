@@ -148,15 +148,36 @@ describe('the acceptance criteria', () => {
     );
     expect(decision.action).toBe('create_inferred_application');
     if (decision.action === 'create_inferred_application') {
-      expect(decision.companyId).toBe('c-ramp');
+      expect(decision.company).toEqual({ kind: 'existing', id: 'c-ramp', name: 'Ramp' });
     }
   });
 
-  it('does not create an application from a stale confirmation', () => {
+  it('does not create an application from a confirmation older than the window', () => {
     const decision = decideLink(
+      message({ threadId: null, receivedAt: new Date('2024-01-05T10:00:00Z') }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('hold');
+  });
+
+  it('covers the whole window the sync actually read, not the last few days', () => {
+    // The window used to be seven days measured from today, which meant a
+    // first scan over months of mail inferred nothing from any of it: every
+    // message it found was already too old on the day it was read.
+    const threeMonthsOld = decideLink(
       message({ threadId: null, receivedAt: new Date('2026-01-05T10:00:00Z') }),
       [],
       { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(threeMonthsOld.action).toBe('create_inferred_application');
+  });
+
+  it('honours a narrower window when the caller passes one', () => {
+    const decision = decideLink(
+      message({ threadId: null, receivedAt: new Date('2026-01-05T10:00:00Z') }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z'), inferredWindowDays: 30 },
     );
     expect(decision.action).toBe('hold');
   });
@@ -228,8 +249,147 @@ describe('the acceptance criteria', () => {
     );
     expect(decision.action).toBe('create_lead');
     if (decision.action === 'create_lead') {
-      expect(decision.companyId).toBe('c-linear');
+      expect(decision.company).toEqual({ kind: 'existing', id: 'c-linear', name: 'Linear' });
     }
+  });
+
+  describe('a mailbox with no companies on file yet', () => {
+    /**
+     * The bug this covers: on a first scan, `companies` is empty, so company
+     * resolution failed for every message, every message was held, and the
+     * pipeline stayed empty while the review queue filled up with dozens of
+     * confirmations. Nothing in the ingestion path created a company, so the
+     * only escape was adding every role by hand — which is the work the app
+     * exists to avoid.
+     */
+    it('opens a pursuit from a confirmation naming a company it has never seen', () => {
+      const decision = decideLink(message({ threadId: null }), [], {
+        companies: [],
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+
+      expect(decision.action).toBe('create_inferred_application');
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toEqual({
+          kind: 'new',
+          name: 'Ramp',
+          // The employer's own domain, off the reply-to.
+          domain: 'ramp.com',
+        });
+      }
+    });
+
+    it('never takes the ATS as the employer domain', () => {
+      // greenhouse.io on a company record would match every Greenhouse
+      // customer's mail to that one company.
+      const decision = decideLink(
+        message({ threadId: null, replyToAddress: null, extractedCompany: 'Ramp' }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toEqual({ kind: 'new', name: 'Ramp', domain: null });
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
+    it('falls back to the ATS subdomain when the body named nobody', () => {
+      const decision = decideLink(
+        // Subdomains are lowercase by construction, and "monzo-bank" reads as
+        // a typo on a page full of properly cased names.
+        message({ threadId: null, extractedCompany: null, companyHint: 'monzo-bank' }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toMatchObject({ kind: 'new', name: 'Monzo Bank' });
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
+    it('leaves a name from the body spelled the way the sender spelled it', () => {
+      const decision = decideLink(
+        message({ threadId: null, extractedCompany: 'iRobot' }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toMatchObject({ name: 'iRobot' });
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
+    it('prefers a company already on file over creating a second one', () => {
+      const decision = decideLink(message({ threadId: null }), [], {
+        companies: COMPANIES,
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company.kind).toBe('existing');
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
+    it('refuses to invent a company from a name that is not one', () => {
+      for (const name of ['the hiring team', 'Careers', 'no-reply', 'Talent Acquisition']) {
+        const decision = decideLink(
+          message({ threadId: null, extractedCompany: name, replyToAddress: null }),
+          [],
+          { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+        );
+        // A company called "Talent Acquisition" would go on to absorb every
+        // later message that failed to resolve.
+        expect(decision.action).toBe('hold');
+      }
+    });
+
+    it('creates a lead, not an application, from cold outreach', () => {
+      const decision = decideLink(
+        message({
+          threadId: null,
+          classification: 'recruiter_outreach',
+          fromAddress: 'jordan@linear.app',
+          replyToAddress: null,
+          extractedCompany: 'Linear',
+        }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      // Counting outreach as an application would put a denominator in the
+      // funnel that was never actually sent.
+      expect(decision.action).toBe('create_lead');
+      if (decision.action === 'create_lead') {
+        expect(decision.company).toEqual({ kind: 'new', name: 'Linear', domain: 'linear.app' });
+      }
+    });
+
+    it('is less confident about a company it just invented', () => {
+      const invented = decideLink(message({ threadId: null }), [], {
+        companies: [],
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+      const known = decideLink(message({ threadId: null }), [], {
+        companies: COMPANIES,
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+
+      if (
+        invented.action !== 'create_inferred_application' ||
+        known.action !== 'create_inferred_application'
+      ) {
+        throw new Error('expected both to infer an application');
+      }
+      expect(invented.confidence).toBeLessThan(known.confidence);
+    });
   });
 
   it('holds a message whose company cannot be resolved at all', () => {
