@@ -87,8 +87,32 @@ export default function PrivacyPage() {
           so we know to skip the message next time. We do not keep the subject line or the
           sender. This is enforced by a constraint in our database, not by convention.
         </li>
-        <li>Attachments, contacts, or calendar data.</li>
+        <li>
+          <strong>Attachments</strong>, with one exception described below: the calendar
+          invite attached to an interview email.
+        </li>
       </ul>
+
+      <h2>Calendar invites</h2>
+      <p>
+        An interview email usually carries a calendar invite &mdash; the same attachment your
+        mail app uses to offer you an &ldquo;add to calendar&rdquo; button. We read it, because
+        it states the time of your interview precisely and the surrounding sentence rarely
+        does.
+      </p>
+      <p>
+        From that invite we keep <strong>the appointment and nothing else</strong>: the start
+        time and time zone, how long it runs, the meeting link or the location as the organiser
+        wrote it, the names and work addresses of the people invited, and the invite&rsquo;s own
+        identifier so that a rescheduled interview updates the one already on your board instead
+        of appearing twice. The invite&rsquo;s description text is read and discarded with the
+        rest of the message body.
+      </p>
+      <p>
+        This needs no access to your calendar. We do not connect to Google Calendar, we cannot
+        see appointments that did not arrive by email, and we never write anything to a calendar
+        of yours.
+      </p>
 
       <h2>Automated processing</h2>
       <p>
@@ -168,6 +192,16 @@ export default function PrivacyPage() {
         descriptions are the employer&rsquo;s text about a role, not your correspondence.
       </p>
 
+      <h2>Looking a company up</h2>
+      <p>
+        On a company&rsquo;s page you can ask the app to fill in blank details &mdash; industry,
+        headquarters, rough headcount, logo. That sends <strong>the company&rsquo;s name to
+        Wikidata</strong> and may fetch the company&rsquo;s own public homepage to read its
+        icon. Nothing about you is sent with either request, and neither happens unless you
+        press the button. We deliberately do not use a favicon or logo service, because that
+        would mean handing a third party the list of companies you are interested in.
+      </p>
+
       <h2>Information about other people</h2>
       <p>
         The contacts feature on the job search side stores information about third parties &mdash;
@@ -185,8 +219,10 @@ export default function PrivacyPage() {
           LinkedIn, and does not fetch anything behind a login.
         </li>
         <li>
-          Names of interviewers may be extracted from a scheduling email, because that is what the
-          email is about. Nothing else about them is extracted.
+          Names of interviewers may be extracted from a scheduling email, or read from the
+          calendar invite attached to it, because that is what the email is about. Their work
+          address is kept when the invite lists it, so the same person is recognised next time
+          rather than added twice. Nothing else about them is extracted.
         </li>
       </ul>
 

@@ -49,7 +49,7 @@ Listing these because Cursor will otherwise invent them.
 - No scraping of anything behind a login, and no LinkedIn scraping. Contacts are entered manually or pasted.
 - No resume builder or ATS keyword scoring. Resume versions are stored and referenced, not generated.
 - No recruiter-side features. One candidate's view of one search.
-- No calendar write access in v1. Read is a Phase 3 consideration and it is a separate Google grant with its own consent flow.
+- No calendar write access in v1. Calendar *read* is a Phase 3 consideration and it is a separate Google grant with its own consent flow — but the invites themselves arrive as `text/calendar` parts on mail we already fetch, and those are parsed, so most of what the grant would buy is already here without one.
 - No comp database or market data.
 
 ---
@@ -514,7 +514,19 @@ Tiered, best first, always with a manual fallback.
 - Greenhouse: `https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs/{job_id}` returns the posting.
 - Lever: `https://api.lever.co/v0/postings/{company}?mode=json` returns published postings.
 - Ashby: `https://api.ashbyhq.com/posting-api/job-board/{board_name}` returns published postings, with `includeCompensation=true` for pay data.
-- Workable, Recruitee, and Personio expose similar public feeds if you meet them.
+- SmartRecruiters: `https://api.smartrecruiters.com/v1/companies/{company}/postings/{id}` returns the ad as named sections.
+- Workable: `https://apply.workable.com/api/v1/widget/accounts/{subdomain}?details=true`. Without `details=true` it returns titles only, which looks like a successful fetch and produces an empty JD.
+- Recruitee: `https://{company}.recruitee.com/api/offers/`.
+- Breezy: `https://{company}.breezy.hr/json`.
+- BambooHR: `https://{company}.bamboohr.com/careers/{id}/detail`.
+- Rippling: `https://api.rippling.com/platform/api/ats/v1/board/{board}/jobs`.
+- Personio serves XML rather than JSON and is not wired up.
+
+All of these except Greenhouse, Lever and Ashby are undocumented-but-public
+endpoints rather than published APIs, so each falls through to tier 2 and then
+to the paste box rather than being trusted to stay up. Their shapes are pinned
+by tests, which catches a mapping regression but cannot catch a vendor changing
+its payload — that shows up as a fetch that quietly degrades to tier 2.
 
 Detect the vendor from the URL, extract the board token and job id, call the API. Store `ats_board_token` on the company so later roles at the same company skip detection.
 
@@ -627,7 +639,7 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 ### Phase 3, later
 
-- Google Calendar read, to place interviews automatically. Separate grant, separate consent, real scope creep, worth it only if the app is otherwise load-bearing
+- Google Calendar read, to place interviews automatically. Separate grant, separate consent, real scope creep, worth it only if the app is otherwise load-bearing. **Mostly obsolete:** `.ics` parts on ingested mail already give the instant, duration, attendees, meeting link and cancellations, keyed by UID so a reschedule edits the interview instead of duplicating it. The remaining gap is an interview booked without any email at all
 - Outlook support behind the existing provider interface
 - Interview question bank across companies, so past debriefs surface as prep for the next round
 - Resume version performance analysis, once there is enough volume for the comparison to mean anything

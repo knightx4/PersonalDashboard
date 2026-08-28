@@ -42,6 +42,9 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 | Sell assistant (buyback + Browse routing) | done |
 | Job search workspace merged in (schema, routes, tests) | done |
 | Unified ingestion (one grant, one sync, classifier fan-out) | done |
+| Calendar invites parsed from ingested mail | done |
+| Tier-1 JD fetch for nine ATS vendors | done |
+| Company enrichment from Wikidata | done |
 
 ## Getting started
 
