@@ -4,9 +4,14 @@
  * Ladder, highest trust first:
  *   1. JSON-LD Product / Offer
  *   2. Open Graph + product: meta tags
- *   3. Caller supplies / edits fields manually
+ *   3. <title> tag (when it is not just the site name)
+ *   4. Product slug from the URL (Amazon /dp/…, etc.)
+ *   5. Caller supplies / edits fields manually
  *
  * Network fetch + SSRF guards live in scrape-product.ts.
+ *
+ * Big retailers often serve bots a generic homepage OG card ("Amazon" + logo).
+ * We detect that junk and fall through to title/URL slug instead of trusting it.
  */
 import { z } from 'zod';
 import { parseDollarsToCents } from '@/lib/money';
@@ -17,7 +22,7 @@ export const scrapedProductSchema = z.object({
   imageUrl: z.string().url().nullable(),
   priceCents: z.number().int().nullable(),
   currency: z.string().length(3),
-  source: z.enum(['json_ld', 'open_graph', 'none']),
+  source: z.enum(['json_ld', 'open_graph', 'document_title', 'url', 'none']),
 });
 
 export type ScrapedProduct = z.infer<typeof scrapedProductSchema>;
@@ -145,13 +150,13 @@ function firstImage(value: unknown, baseUrl: string): string | null {
   for (const entry of asArray(value)) {
     if (typeof entry === 'string') {
       const abs = absolutize(entry, baseUrl);
-      if (abs) return abs;
+      if (abs && !isGenericImageUrl(abs)) return abs;
     }
     if (entry && typeof entry === 'object') {
       const url = (entry as { url?: unknown }).url;
       if (typeof url === 'string') {
         const abs = absolutize(url, baseUrl);
-        if (abs) return abs;
+        if (abs && !isGenericImageUrl(abs)) return abs;
       }
     }
   }
@@ -179,10 +184,11 @@ function fromJsonLd(html: string, baseUrl: string): Partial<ScrapedProduct> | nu
       const types = nodeTypes(node);
       if (!types.includes('product')) return;
 
-      const title =
+      const rawTitle =
         (typeof node.name === 'string' && node.name.trim()) ||
         (typeof node.title === 'string' && node.title.trim()) ||
         null;
+      const title = rawTitle && !isGenericTitle(rawTitle, baseUrl) ? rawTitle : null;
       const imageUrl = firstImage(node.image, baseUrl);
 
       let priceCents: number | null = null;
@@ -221,16 +227,20 @@ function fromJsonLd(html: string, baseUrl: string): Partial<ScrapedProduct> | nu
 }
 
 function fromOpenGraph(html: string, baseUrl: string): Partial<ScrapedProduct> | null {
-  const title =
+  const rawTitle =
     metaContent(html, 'property', 'og:title') ??
     metaContent(html, 'name', 'twitter:title') ??
     null;
-  const imageUrl = absolutize(
+  const title = rawTitle && !isGenericTitle(rawTitle, baseUrl) ? rawTitle : null;
+
+  const rawImage = absolutize(
     metaContent(html, 'property', 'og:image') ??
       metaContent(html, 'name', 'twitter:image') ??
       null,
     baseUrl,
   );
+  const imageUrl = rawImage && !isGenericImageUrl(rawImage) ? rawImage : null;
+
   const priceCents =
     parsePriceToCents(metaContent(html, 'property', 'product:price:amount')) ??
     parsePriceToCents(metaContent(html, 'property', 'og:price:amount')) ??
@@ -244,31 +254,183 @@ function fromOpenGraph(html: string, baseUrl: string): Partial<ScrapedProduct> |
   return { title, imageUrl, priceCents, currency, source: 'open_graph' };
 }
 
+function hostBrandNames(pageUrl: string): string[] {
+  try {
+    const host = new URL(pageUrl).hostname.toLowerCase().replace(/^www\./, '');
+    const base = host.split('.')[0] ?? host;
+    const names = new Set<string>([host, base, `${base}.com`, `www.${host}`]);
+    if (base === 'amazon') {
+      names.add('amazon.com');
+      names.add('amazon.co.uk');
+      names.add('amazon.ca');
+      names.add('kindle store');
+      names.add('amazon.com: online shopping');
+    }
+    return [...names];
+  } catch {
+    return [];
+  }
+}
+
+/** Site-level titles Amazon & co. serve to bots instead of the product name. */
+export function isGenericTitle(title: string, pageUrl: string): boolean {
+  const normalized = title.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!normalized) return true;
+  if (normalized.length < 3) return true;
+
+  const brands = hostBrandNames(pageUrl);
+  if (brands.some((brand) => normalized === brand || normalized === `${brand}.`)) return true;
+
+  // "Amazon.com: Online Shopping…" / "Amazon" / "Welcome to Amazon"
+  if (/^(welcome to\s+)?amazon(\.com)?\b/.test(normalized) && normalized.length < 40) {
+    return true;
+  }
+  if (/^amazon(\.com)?\s*[:|\-–—]/.test(normalized) && normalized.length < 28) {
+    return true;
+  }
+
+  const generic = new Set([
+    'home',
+    'shop',
+    'store',
+    'product',
+    'products',
+    'online shopping',
+    'official site',
+  ]);
+  if (generic.has(normalized)) return true;
+
+  return false;
+}
+
+/** Logos, share icons, sprites — not a product image. */
+export function isGenericImageUrl(imageUrl: string): boolean {
+  const lower = imageUrl.toLowerCase();
+  return (
+    /share-icons|\/favicon|\/logo|\/sprite|\/nav-?logo|\/site-logo|\/branding|\/apple-touch|\/android-chrome|\/mstile|g\/01\/gno\/|\/fls-na\.amazon|\/ux-core\//.test(
+      lower,
+    ) || /\/images\/g\/01\/(?:social|share)/.test(lower)
+  );
+}
+
+function humanizeSlug(slug: string): string {
+  return decodeURIComponent(slug)
+    .replace(/\+/g, ' ')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Title from a product URL when the page HTML is a bot shell.
+ * Amazon: /Origin-Wealth-…/dp/ASIN or /dp/ASIN/… (slug optional).
+ */
+export function titleFromProductUrl(pageUrl: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(pageUrl);
+  } catch {
+    return null;
+  }
+
+  const path = url.pathname;
+
+  // /Slug-Name-Here/dp/B0XXXX or /Slug/gp/product/B0XXXX
+  const amazonSlug = path.match(
+    /\/([^/]{8,})\/(?:dp|gp\/product)\/([A-Z0-9]{8,12})(?:\/|$)/i,
+  );
+  if (amazonSlug?.[1]) {
+    const slug = humanizeSlug(amazonSlug[1]);
+    if (slug && !/^(dp|gp|product)$/i.test(slug)) return slug;
+  }
+
+  // Bare /dp/ASIN — nothing useful in the path.
+  if (/\/(?:dp|gp\/product)\/[A-Z0-9]{8,12}(?:\/|$)/i.test(path)) {
+    return null;
+  }
+
+  // Shopify-ish /products/some-product-handle
+  const products = path.match(/\/products\/([^/?#]+)/i);
+  if (products?.[1]) {
+    const slug = humanizeSlug(products[1]);
+    if (slug.length >= 4) return slug;
+  }
+
+  return null;
+}
+
+/** Pull a useful name out of <title>, stripping "Amazon.com:" prefixes. */
+export function titleFromDocumentTitle(html: string, pageUrl: string): string | null {
+  const match = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  if (!match?.[1]) return null;
+  let title = decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').trim();
+  if (!title) return null;
+
+  // "Amazon.com: Origin of Wealth: Remaking…: Timms, …: Books"
+  title = title.replace(/^amazon\.com\s*:\s*/i, '');
+  title = title.replace(/\s*:\s*(books|electronics|clothing|everything else)\s*$/i, '');
+  // Drop trailing site name " | Nike" / " – Best Buy"
+  title = title.replace(/\s*[\|\-–—]\s*[A-Za-z0-9 .]{2,30}$/, '').trim();
+
+  if (!title || isGenericTitle(title, pageUrl)) return null;
+  // Prefer the part before an author/brand colon when still very long Amazon-style
+  // "Product Name: Author: Books" — keep the first segment if it looks like a title.
+  const segments = title.split(/\s*:\s*/).filter(Boolean);
+  if (segments.length >= 2 && segments[0]!.length >= 8) {
+    const first = segments[0]!;
+    if (!isGenericTitle(first, pageUrl)) return first;
+  }
+  return title;
+}
+
 /** Pure HTML → product fields. No network. */
 export function parseProductHtml(html: string, pageUrl: string): ScrapedProduct {
   const jsonLd = fromJsonLd(html, pageUrl);
   const og = fromOpenGraph(html, pageUrl);
+  const docTitle = titleFromDocumentTitle(html, pageUrl);
+  const urlTitle = titleFromProductUrl(pageUrl);
 
-  const usedJsonLd = Boolean(jsonLd?.title || jsonLd?.priceCents != null || jsonLd?.imageUrl);
-  const merged = {
+  const title = jsonLd?.title ?? og?.title ?? docTitle ?? urlTitle ?? null;
+  const imageUrl = jsonLd?.imageUrl ?? og?.imageUrl ?? null;
+  const priceCents = jsonLd?.priceCents ?? og?.priceCents ?? null;
+  const currency = jsonLd?.currency ?? og?.currency ?? 'USD';
+
+  let source: ScrapedProduct['source'] = 'none';
+  if (jsonLd?.title || jsonLd?.priceCents != null || jsonLd?.imageUrl) {
+    source = 'json_ld';
+  } else if (og?.title || og?.priceCents != null || og?.imageUrl) {
+    source = 'open_graph';
+  } else if (docTitle && title === docTitle) {
+    source = 'document_title';
+  } else if (urlTitle && title === urlTitle) {
+    source = 'url';
+  } else if (title || imageUrl || priceCents != null) {
+    // Title came from a later ladder step while image/price came earlier.
+    if (docTitle && title === docTitle) source = 'document_title';
+    else if (urlTitle && title === urlTitle) source = 'url';
+    else if (og) source = 'open_graph';
+    else source = 'json_ld';
+  }
+
+  return scrapedProductSchema.parse({
     url: pageUrl,
-    title: jsonLd?.title ?? og?.title ?? null,
-    imageUrl: jsonLd?.imageUrl ?? og?.imageUrl ?? null,
-    priceCents: jsonLd?.priceCents ?? og?.priceCents ?? null,
-    currency: jsonLd?.currency ?? og?.currency ?? 'USD',
-    source: (usedJsonLd ? 'json_ld' : og ? 'open_graph' : 'none') as ScrapedProduct['source'],
-  };
-
-  return scrapedProductSchema.parse(merged);
+    title,
+    imageUrl,
+    priceCents,
+    currency,
+    source,
+  });
 }
 
 export function emptyScrapedProduct(pageUrl: string): ScrapedProduct {
+  // Even with no HTML, a product slug in the URL is better than a blank title.
+  const urlTitle = titleFromProductUrl(pageUrl);
   return scrapedProductSchema.parse({
     url: pageUrl,
-    title: null,
+    title: urlTitle,
     imageUrl: null,
     priceCents: null,
     currency: 'USD',
-    source: 'none',
+    source: urlTitle ? 'url' : 'none',
   });
 }

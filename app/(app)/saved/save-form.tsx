@@ -169,7 +169,15 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                   ? `Merchant: ${preview.merchantName}`
                   : 'Merchant unknown from this URL'}
                 {preview.source && preview.source !== 'none'
-                  ? ` · filled from ${preview.source === 'json_ld' ? 'page data' : 'Open Graph'}`
+                  ? ` · filled from ${
+                      preview.source === 'json_ld'
+                        ? 'page data'
+                        : preview.source === 'open_graph'
+                          ? 'Open Graph'
+                          : preview.source === 'document_title'
+                            ? 'the page title'
+                            : 'the product URL'
+                    }`
                   : ' · nothing useful on the page — fill in by hand'}
               </p>
             </div>
