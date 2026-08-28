@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { markOnboardingComplete } from '@/lib/jobs/onboarding';
 import { domainFromUrl, slugify } from '@/lib/jobs/slug';
+import { normalizeTimeZone } from '@/lib/jobs/timezone';
 
 export interface OnboardingState {
   error?: string;
@@ -12,7 +13,18 @@ export interface OnboardingState {
 
 const welcomeSchema = z.object({
   displayName: z.string().trim().max(120).optional(),
-  timezone: z.string().trim().max(64).optional(),
+  timezone: z
+    .string()
+    .trim()
+    .max(64)
+    .optional()
+    // Validated here rather than trusted, because this is a free-text field
+    // whose value is handed straight to Intl on every page that shows a date.
+    // "ET" got stored once and took the review queue down with a 500.
+    .refine((value) => !value || normalizeTimeZone(value) !== null, {
+      message:
+        'That is not a timezone name. Use something like Europe/London or America/New_York.',
+    }),
   targetTitles: z.string().trim().optional(),
   searchStartedOn: z.string().optional(),
 });
@@ -34,7 +46,7 @@ export async function saveWelcome(
 
   const patch: Record<string, unknown> = {};
   if (parsed.data.displayName) patch.display_name = parsed.data.displayName;
-  if (parsed.data.timezone) patch.timezone = parsed.data.timezone;
+  if (parsed.data.timezone) patch.timezone = normalizeTimeZone(parsed.data.timezone);
   if (parsed.data.searchStartedOn) patch.search_started_on = parsed.data.searchStartedOn;
   if (parsed.data.targetTitles) {
     patch.target_titles = parsed.data.targetTitles

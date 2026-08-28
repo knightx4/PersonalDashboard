@@ -958,23 +958,41 @@ export async function reprocessHeldMessages(
 
   if (envelopes.length === 0) return;
 
-  // Charged before the pass, not after: a run that throws half way through has
-  // still spent the fetches, and not counting them is how a crash loop turns
-  // into an unbounded bill.
-  await bumpRelinkAttempts(
-    supabase,
-    envelopes.map((envelope) => envelope.id),
-  );
+  // Oldest first, in chunks, stopping when the budget is spent. A message that
+  // is still unlinkable after this stays in the queue for you to decide, which
+  // is what the queue is for.
+  const startedAt = Date.now();
 
-  // Oldest first, and one pass only. A message that is still unlinkable after
-  // this stays in the queue for you to decide, which is what the queue is for.
-  await linkEnvelopes(supabase, ctx, envelopes);
+  for (let i = 0; i < envelopes.length; i += RELINK_CHUNK) {
+    if (Date.now() - startedAt > RELINK_BUDGET_MS) break;
+    const chunk = envelopes.slice(i, i + RELINK_CHUNK);
+
+    // Charged before the chunk runs, not after: an invocation killed mid-pass
+    // has still spent the fetches, and not counting them is how a run that
+    // always dies at the same message re-reads it on every sync forever.
+    await bumpRelinkAttempts(
+      supabase,
+      chunk.map((envelope) => envelope.id),
+    );
+    await linkEnvelopes(supabase, ctx, chunk);
+  }
 }
 
 /** How many times a held message is re-read before it waits for you instead. */
 const MAX_RELINK_ATTEMPTS = 3;
-/** Per sync. Bounded so one run cannot walk a whole backlog and time out. */
-const RELINK_BATCH = 40;
+/**
+ * Per sync, and deliberately small.
+ *
+ * The sync route already times out at sixty seconds occasionally without this
+ * pass, and every message here costs a body fetch plus usually a model call. A
+ * backlog is cleared over several syncs; a backlog cleared in one sync that
+ * times out clears nothing at all, because the whole invocation is lost.
+ */
+const RELINK_BATCH = 12;
+/** Chunk size, so the budget below is checked often enough to matter. */
+const RELINK_CHUNK = 4;
+/** Wall clock this pass may spend before leaving the rest for the next sync. */
+const RELINK_BUDGET_MS = 20_000;
 
 async function bumpRelinkAttempts(
   supabase: AppSupabaseClient,

@@ -106,9 +106,22 @@ function ProfileSection({
               name="timezone"
               defaultValue={profile.timezone}
               placeholder="Europe/London"
+              list="timezone-options"
             />
+            {/*
+              The list is the fix for how this broke: the field is free text,
+              and "ET" is what a person types. It is still accepted — the action
+              translates it — but offering the real names means most people
+              never type an abbreviation in the first place.
+            */}
+            <datalist id="timezone-options">
+              {timeZoneOptions().map((zone) => (
+                <option key={zone} value={zone} />
+              ))}
+            </datalist>
             <p className="mt-1 text-[11px] text-ink-faint">
-              Interview times and &ldquo;this week&rdquo; are read in this zone.
+              Interview times and &ldquo;this week&rdquo; are read in this zone. A name like
+              Europe/London or America/New_York — &ldquo;ET&rdquo; and friends are translated.
             </p>
           </div>
           <div>
@@ -661,4 +674,16 @@ function DangerSection() {
       )}
     </section>
   );
+}
+
+/** Every zone this browser knows, for the settings datalist. */
+function timeZoneOptions(): string[] {
+  try {
+    const supported = (
+      Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
+    ).supportedValuesOf;
+    return supported ? supported('timeZone') : [];
+  } catch {
+    return [];
+  }
 }

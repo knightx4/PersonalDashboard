@@ -5,6 +5,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { APP_SCHEMA, type AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { normalizeTimeZone } from '@/lib/jobs/timezone';
 
 /**
  * Onboarding uses profiles.onboarding_completed_at.
@@ -58,7 +59,11 @@ export async function markOnboardingComplete(
   const patch: Record<string, unknown> = {
     onboarding_completed_at: new Date().toISOString(),
   };
-  if (extras?.timezone?.trim()) patch.timezone = extras.timezone.trim();
+  // Normalised here as well as at the form, because this is a lib function any
+  // future caller can reach, and an unusable zone stored through it takes down
+  // every page that formats a date. See lib/jobs/timezone.ts.
+  const timezone = normalizeTimeZone(extras?.timezone);
+  if (timezone) patch.timezone = timezone;
   if (extras?.displayName?.trim()) patch.display_name = extras.displayName.trim();
   if (extras?.targetTitles?.length) patch.target_titles = extras.targetTitles;
   if (extras?.searchStartedOn) patch.search_started_on = extras.searchStartedOn;

@@ -10,6 +10,7 @@ import {
   resetRelinkAttempts,
 } from '@/lib/jobs/inbox/ingest-messages';
 import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
+import { normalizeTimeZone } from '@/lib/jobs/timezone';
 
 /**
  * The job search workspace, as something the shared sync can hand mail to.
@@ -55,7 +56,10 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
         })),
         candidates,
         accountEmail,
-        timezone: (profile.data?.timezone as string | undefined) ?? null,
+        // Normalised, not raw: this is applied to invites that carry a wall
+        // clock with no zone, and a stored "ET" would silently read as UTC and
+        // put the interview five hours out.
+        timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
         counters: ingest,
       };
 
