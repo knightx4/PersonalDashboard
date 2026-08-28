@@ -473,6 +473,38 @@ export const gameDetails = pgTable(
   ],
 );
 
+export const feedbackKind = pgEnum('feedback_kind', ['bug', 'feature']);
+
+export const feedbackStatus = pgEnum('feedback_status', [
+  'open',
+  'planned',
+  'done',
+  'declined',
+]);
+
+/**
+ * Bugs and feature requests captured from the header button, with the page
+ * the user was on when they wrote it.
+ */
+export const feedbackItems = pgTable(
+  'feedback_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    kind: feedbackKind('kind').notNull(),
+    body: text('body').notNull(),
+    pagePath: text('page_path'),
+    userAgent: text('user_agent'),
+    status: feedbackStatus('status').notNull().default('open'),
+    resolutionNote: text('resolution_note'),
+    ...timestamps,
+  },
+  (t) => [
+    index('feedback_user_created_idx').on(t.userId, t.createdAt),
+    index('feedback_status_idx').on(t.status),
+  ],
+);
+
 /** Shared ISBN quote cache (buyback / Browse / later sold comps). */
 export const bookPriceQuotes = pgTable(
   'book_price_quotes',

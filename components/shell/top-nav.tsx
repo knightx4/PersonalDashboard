@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
+import { FeedbackButton } from '@/components/shell/feedback-button';
 
 /**
  * Product name top left, section nav across the top, account avatar top right.
@@ -73,6 +74,8 @@ export function TopNav({
             );
           })}
         </nav>
+
+        <FeedbackButton />
 
         <Link
           href="/settings"

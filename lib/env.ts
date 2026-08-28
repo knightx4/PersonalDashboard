@@ -45,6 +45,8 @@ export function serverEnv() {
       GOOGLE_BOOKS_API_KEY: z.string().min(1).optional(),
       /** Optional. ISBNdb — the catalog that carries brand-new releases. */
       ISBNDB_API_KEY: z.string().min(1).optional(),
+      /** Gate for in-app bug reports and feature requests. */
+      FEEDBACK_CODE: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */
