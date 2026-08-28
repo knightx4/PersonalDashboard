@@ -10,6 +10,77 @@ most of the way through the project. Do not front-load it.
 
 ---
 
+## Two apps, one Supabase project
+
+This deployment carries two workspaces behind one login: the commerce side at
+`/shopping` and the job search side at `/jobs`. They share a Supabase project
+and take a schema each — `public` and `job_search`.
+
+Supabase bills per **project**, not per app, so this costs nothing extra. It is
+also the only arrangement under which the two can share a database at all:
+their tables collide on four names (`profiles`, `email_accounts`,
+`ingested_messages`, `sync_jobs`), six enum types and two function names.
+`create type` fails loudly on a duplicate, but **`create or replace function`
+overwrites silently**, so a migration written against the wrong schema would
+clobber the other app's `handle_new_user()` on a live database without erroring.
+`tests/coexistence.test.ts` is what stops that reaching production.
+
+`auth.users` is shared on purpose: **one login for both workspaces**. Each app
+has its own trigger on it, since trigger names must differ —
+`on_auth_user_created` for commerce, `on_auth_user_created_job_search` for the
+job side — and each seeds its own profile row.
+
+### The one step that is not in this repository
+
+In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
+must include `job_search` alongside `public`.
+
+Without it PostgREST refuses every job-side request with *"The schema must be
+one of the following"*, and because it is a dashboard setting rather than a
+migration it is the step that gets forgotten after a project restore or when
+setting up a second environment. Three things have to agree — the migrations,
+the `db: { schema }` option on every job-side client, and this setting — and
+only the first two are in version control.
+
+### Migrations
+
+Two directories, applied in order:
+
+| Directory | Schema | Versions |
+|---|---|---|
+| `supabase/migrations` | `public` | `0001`–`0028` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0005` |
+
+They are separate because both sets were numbered independently from `0001`,
+and the `job_search` versions are already recorded remotely under exactly those
+numbers. Renaming them would make the local files disagree with the deployed
+history. **Do not renumber either set**, and do not re-run the `job_search`
+migrations — they are already applied.
+
+### Storage
+
+Buckets are project-wide rather than schema-scoped — the one place where
+sharing a project is not automatic isolation. The job side uses its own private
+bucket, `job-search`, for resumes and attachments. It exists. Nothing uploads to
+it yet; when something does, `storage.objects` will need per-user policies,
+since the bucket being private only stops anonymous reads.
+
+### Backfilling profiles for existing accounts
+
+The `on_auth_user_created_job_search` trigger only fires for new signups, so
+accounts that existed before the merge have no `job_search.profiles` row — and
+the signed-in job layout reads it with `.single()`, which errors on zero rows.
+This has been run once already; it is idempotent, and it is what you want after
+restoring a backup:
+
+```sql
+insert into job_search.profiles (id, display_name)
+select u.id, split_part(u.email, '@', 1) from auth.users u
+on conflict (id) do nothing;
+```
+
+---
+
 ## Tier 0 — before anything else. ~15 minutes.
 
 | What | Where | Why you and not the agent |
@@ -210,6 +281,33 @@ npm test
 pieces of Supabase's `auth` schema the migrations depend on (`auth.users`,
 `auth.uid()`, the `anon` / `authenticated` / `service_role` roles). That file is
 local-only and is never applied to Supabase.
+
+It then applies both migration sets into one database — `public` first, then
+`job_search` — which is what lets `tests/coexistence.test.ts` assert against a
+real neighbour rather than a stand-in for one.
+
+---
+
+## Cron
+
+`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs three
+things in order: the commerce inbox sync, the job inbox sync, then the job
+sweep that re-derives ghosted status and generates reminders.
+
+**One route rather than three, because the Hobby plan caps cron jobs per
+project.** The order is not incidental either — a message that arrives in the
+morning should count as activity before anything is judged quiet. Stages are
+isolated: one that throws is named in the response and the others still run, so
+a failure on the newer job side cannot stop a commerce sync that works.
+
+**Daily, because sub-daily cron needs Vercel Pro.** The mitigation is the
+**Check now** button in Settings, which runs the same sync on demand.
+`/api/cron/inbox-incremental` and `/api/cron/jobs-sweep` remain reachable for
+running one workspace's job by hand.
+
+All of them require `Authorization: Bearer $CRON_SECRET`. Vercel Cron sends it
+automatically once `CRON_SECRET` is set; if it is unset, `TOKEN_ENCRYPTION_KEY`
+is accepted as a local fallback so you can curl the routes in development.
 
 ---
 

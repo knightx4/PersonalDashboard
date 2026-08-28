@@ -1,12 +1,22 @@
-# Shopping Manager
+# Personal Tracker
 
-A shopping dashboard that tracks what you have already bought, prevents double
-buying, and holds things you want to buy in a queue instead of a cart.
+Two workspaces behind one login, one deployment and one database.
 
-The distinction from the Shop app: Shop is a delivery tracker. This is an
-ownership and spending tool. Shop tells you where your package is. This tells
-you that you already own two of these and spent $340 at this merchant last
-month.
+**Shopping** (`/shopping`) tracks what you have already bought, prevents double
+buying, and holds things you want to buy in a queue instead of a cart. The
+distinction from the Shop app: Shop is a delivery tracker. This is an ownership
+and spending tool. Shop tells you where your package is. This tells you that
+you already own two of these and spent $340 at this merchant last month.
+
+**Job search** (`/jobs`) tracks applications from lead to offer — a pipeline
+board, the roles and companies behind it, contacts, interviews, an answer bank
+and the funnel maths over all of it.
+
+They share an account, a design system and the Gmail plumbing, and nothing
+else. Each owns its own Postgres schema in one Supabase project: `public` for
+shopping, `job_search` for the job side. Their tables collide on four names, so
+that separation is load-bearing rather than tidy — see
+[docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
@@ -30,6 +40,9 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 | Review queue | done |
 | Owned-books ingestion + book_details | done |
 | Sell assistant (buyback + Browse routing) | done |
+| Job search workspace merged in (schema, routes, tests) | done |
+| Job search Gmail ingestion | not wired — needs its own OAuth client |
+| Unified ingestion across both workspaces | not started |
 
 ## Getting started
 

@@ -155,6 +155,41 @@ export default function PrivacyPage() {
         them, and are deleted when you disconnect the account they belong to.
       </p>
 
+      <h2>Job descriptions are kept in full</h2>
+      <p>
+        The job search side of the app is a deliberate exception to the retention rule above, and
+        it is worth being explicit about because it looks inconsistent otherwise.
+      </p>
+      <p>
+        When you paste a job link or a description, the <strong>full text of the posting is
+        stored</strong> and kept indefinitely. Three reasons: it is public information published on
+        a public page, it is the input to the requirement extraction and to every draft the app
+        writes, and refetching it later usually fails because the posting has been taken down. Job
+        descriptions are the employer&rsquo;s text about a role, not your correspondence.
+      </p>
+
+      <h2>Information about other people</h2>
+      <p>
+        The contacts feature on the job search side stores information about third parties &mdash;
+        recruiters, interviewers, people you want an introduction to. They have not agreed to
+        anything, so the app is deliberately narrow about it.
+      </p>
+      <ul>
+        <li>
+          The schema has room for a <strong>name, job title, public professional profile URL and
+          work email address</strong>, and nothing else. There is nowhere to put a personal phone
+          number or a home address.
+        </li>
+        <li>
+          Nothing is scraped. Contacts are typed in or pasted by you. The app does not read
+          LinkedIn, and does not fetch anything behind a login.
+        </li>
+        <li>
+          Names of interviewers may be extracted from a scheduling email, because that is what the
+          email is about. Nothing else about them is extracted.
+        </li>
+      </ul>
+
       <h2>Limited Use</h2>
       <p>
         Shopping Manager&rsquo;s use and transfer of information received from Google APIs
