@@ -19,7 +19,7 @@ export function createServiceSupabase(): SupabaseClient {
   const { SUPABASE_SERVICE_ROLE_KEY } = z
     .object({ SUPABASE_SERVICE_ROLE_KEY: z.string().min(1) })
     .parse(process.env);
-  return createClient(publicEnv.NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient(publicEnv().NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

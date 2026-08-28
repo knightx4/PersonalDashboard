@@ -1,10 +1,16 @@
 /**
- * Environment access, validated once at the boundary.
+ * Environment access, validated at the point of use.
  *
  * Only NEXT_PUBLIC_* may reach the browser. The service role key and the token
  * encryption key are read through functions that throw if called from a client
- * bundle, so a bad import fails loudly at build time rather than shipping a
- * secret to users.
+ * bundle, so a bad import fails loudly rather than shipping a secret to users.
+ *
+ * Validation is deliberately LAZY. `next build` collects page data by importing
+ * every route, so validating at module scope makes the build itself require
+ * production secrets -- and when they are missing it fails inside a compiled
+ * chunk with a stack trace that names no route and no variable. A build should
+ * only need to compile; the app should tell you what is missing when it tries
+ * to use it, in words. Hence the message below.
  */
 import { z } from 'zod';
 
@@ -14,15 +20,47 @@ const publicSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
 });
 
+export type PublicEnv = z.infer<typeof publicSchema>;
+
 /**
- * Safe in the browser. Referenced as literal `process.env.X` properties
- * because Next inlines NEXT_PUBLIC_* at build time only for static lookups.
+ * Read as literal `process.env.X` property lookups, because that is the only
+ * form Next inlines into the client bundle at build time. A destructure or a
+ * dynamic key here would leave these undefined in the browser.
  */
-export const publicEnv = publicSchema.parse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-});
+function rawPublicEnv() {
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  };
+}
+
+let cached: PublicEnv | null = null;
+
+/**
+ * The public environment, validated on first use.
+ *
+ * Throws a message naming exactly which variables are missing and where to set
+ * them, because the alternative -- a Zod dump inside a bundled chunk -- costs
+ * an hour to work out the first time you meet it.
+ */
+export function publicEnv(): PublicEnv {
+  if (cached) return cached;
+
+  const parsed = publicSchema.safeParse(rawPublicEnv());
+  if (!parsed.success) {
+    const missing = [...new Set(parsed.error.issues.map((issue) => issue.path.join('.')))];
+    throw new Error(
+      `Missing or invalid environment variables: ${missing.join(', ')}. ` +
+        'Set them in the Vercel project settings (Settings -> Environment Variables) ' +
+        'for every environment you deploy, or in .env.local when running locally. ' +
+        'The Supabase values come from `npx supabase projects api-keys`; see docs/SETUP.md.',
+    );
+  }
+
+  cached = parsed.data;
+  return cached;
+}
 
 function assertServer(name: string): void {
   if (typeof window !== 'undefined') {

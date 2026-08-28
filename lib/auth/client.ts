@@ -10,7 +10,7 @@ import { publicEnv } from '@/lib/env';
  */
 export function createClient() {
   return createBrowserClient(
-    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
-    publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    publicEnv().NEXT_PUBLIC_SUPABASE_URL,
+    publicEnv().NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
 }

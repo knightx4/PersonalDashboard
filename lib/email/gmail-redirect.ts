@@ -9,7 +9,7 @@ import { requestOrigin } from '@/lib/auth/origin';
  * with the URI registered in Google Cloud (not a vercel.app preview host).
  */
 export async function gmailRedirectUri(): Promise<string> {
-  const configured = publicEnv.NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
+  const configured = publicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, '');
   if (configured && !configured.includes('localhost') && !configured.includes('127.0.0.1')) {
     return `${configured}/api/auth/gmail/callback`;
   }
