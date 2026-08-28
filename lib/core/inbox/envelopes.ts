@@ -56,6 +56,7 @@ type CoreRow = {
   from_address: string | null;
   reply_to_address: string | null;
   subject: string | null;
+  scrubbed_at?: string | null;
 };
 
 function toEnvelope(row: CoreRow, isNew: boolean): MessageEnvelope {
@@ -85,6 +86,22 @@ export async function fetchEnvelopes(
     accessToken: string;
     messageIds: string[];
     counters: EnvelopeCounters;
+    /**
+     * Re-read headers for messages whose envelope was scrubbed.
+     *
+     * Normally a scrubbed message stays scrubbed: every workspace looked at it
+     * and none wanted it. But a workspace that did not exist when that was
+     * decided never got its say -- and most of the history here was scrubbed
+     * under the old single-app rule, before there was a job side to ask. Their
+     * subjects are gone from the database but not from the mailbox, so a
+     * backfill re-reads them, offers them to whoever has not judged them, and
+     * the sweep scrubs them again if the answer is still no.
+     *
+     * Backfills only. An incremental sync leaves them alone, so this is a
+     * bounded reconciliation rather than a re-fetch loop that undoes the
+     * retention rule on every run.
+     */
+    refetchScrubbed?: boolean;
   },
 ): Promise<MessageEnvelope[]> {
   const { accountId, accessToken, messageIds, counters } = opts;
@@ -93,7 +110,9 @@ export async function fetchEnvelopes(
   // One ledger lookup for the whole page rather than N round trips.
   const { data: existingRows, error } = await supabase
     .from('ingested_messages')
-    .select('id, provider_message_id, thread_id, received_at, from_address, reply_to_address, subject')
+    .select(
+      'id, provider_message_id, thread_id, received_at, from_address, reply_to_address, subject, scrubbed_at',
+    )
     .eq('email_account_id', accountId)
     .in('provider_message_id', messageIds);
 
@@ -109,7 +128,7 @@ export async function fetchEnvelopes(
   for (const messageId of messageIds) {
     counters.seen += 1;
     const row = known.get(messageId);
-    if (row) {
+    if (row && !(opts.refetchScrubbed && row.scrubbed_at)) {
       counters.alreadyKnown += 1;
       envelopes.push(toEnvelope(row, false));
     } else {
@@ -127,6 +146,7 @@ export async function fetchEnvelopes(
     from_address: string | null;
     reply_to_address: string | null;
     subject: string | null;
+    scrubbed_at: string | null;
   };
 
   const pending: Pending[] = [];
@@ -142,6 +162,8 @@ export async function fetchEnvelopes(
         from_address: meta.fromAddress,
         reply_to_address: meta.replyToAddress,
         subject: meta.subject,
+        // Re-read, so it is no longer scrubbed. The sweep will decide again.
+        scrubbed_at: null,
       });
     } catch {
       // A single unreadable message must not fail the page: it would stall the
@@ -154,7 +176,9 @@ export async function fetchEnvelopes(
 
   // Upsert rather than insert: two syncs racing over the same window would
   // otherwise collide on the (account, provider_message_id) key, and the
-  // loser's whole page would be lost rather than deduplicated.
+  // loser's whole page would be lost rather than deduplicated. It is also what
+  // restores a scrubbed envelope in place, keeping its id and every verdict
+  // already hanging off it.
   const { data: inserted, error: insertError } = await supabase
     .from('ingested_messages')
     .upsert(pending, { onConflict: 'email_account_id,provider_message_id' })

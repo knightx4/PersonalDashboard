@@ -187,6 +187,7 @@ async function processPage(
     messageIds: string[];
     linkers: readonly DomainLinker[];
     progress: SyncProgress;
+    refetchScrubbed?: boolean;
   },
 ): Promise<MessageEnvelope[]> {
   const envelopes = await fetchEnvelopes(supabase, {
@@ -194,6 +195,7 @@ async function processPage(
     accessToken: opts.accessToken,
     messageIds: opts.messageIds,
     counters: opts.progress,
+    refetchScrubbed: opts.refetchScrubbed,
   });
 
   opts.progress.linkers = await fanOut(opts.linkers, {
@@ -285,6 +287,9 @@ export async function syncEmailAccountBatch(
       messageIds,
       linkers: opts.linkers,
       progress,
+      // A backfill is an explicit "look at everything again", which is the only
+      // time a scrubbed envelope is worth re-reading -- see fetchEnvelopes.
+      refetchScrubbed: true,
     });
 
     progress.nextPageToken = listed.nextPageToken;

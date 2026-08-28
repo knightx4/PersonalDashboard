@@ -169,3 +169,42 @@ describe('scrubbing what nobody claimed', () => {
     expect(scrubbed).toBe(0);
   });
 });
+
+describe('re-reading a scrubbed envelope', () => {
+  it('restores it in place, keeping the id every verdict hangs off', async () => {
+    // A backfill re-reads scrubbed messages from Gmail, because a workspace
+    // that did not exist when they were discarded never got its say. The upsert
+    // must land on the same row: a new id would orphan both verdicts and any
+    // order or application already linked to it.
+    const id = await seedMessage(accountA, 'scrub-then-refetch', 'Rejected, apparently');
+    await admin`insert into public.ingested_messages (id, classification) values (${id}, 'not_relevant')`;
+    await admin`insert into job_search.ingested_messages (id, classification) values (${id}, 'not_relevant')`;
+    await admin`select core.scrub_unclaimed_messages()`;
+
+    const [scrubbed] = await admin<{ subject: string | null }[]>`
+      select subject from ingested_messages where id = ${id}`;
+    expect(scrubbed.subject).toBeNull();
+
+    // What the backfill's upsert does, on conflict.
+    await admin`
+      insert into ingested_messages (email_account_id, provider_message_id, subject, scrubbed_at)
+      values (${accountA}, 'scrub-then-refetch', 'Rejected, apparently', null)
+      on conflict (email_account_id, provider_message_id) do update
+        set subject = excluded.subject, scrubbed_at = null`;
+
+    const [restored] = await admin<{ id: string; subject: string | null; scrubbed_at: string | null }[]>`
+      select id, subject, scrubbed_at from ingested_messages
+      where email_account_id = ${accountA} and provider_message_id = 'scrub-then-refetch'`;
+    expect(restored.id).toBe(id);
+    expect(restored.subject).toBe('Rejected, apparently');
+    expect(restored.scrubbed_at).toBeNull();
+
+    // And the verdicts that hung off it are still attached.
+    const [verdicts] = await admin<{ n: number }[]>`
+      select (
+        (select count(*) from public.ingested_messages where id = ${id})
+        + (select count(*) from job_search.ingested_messages where id = ${id})
+      )::int as n`;
+    expect(verdicts.n).toBe(2);
+  });
+});

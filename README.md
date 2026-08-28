@@ -12,11 +12,11 @@ you already own two of these and spent $340 at this merchant last month.
 board, the roles and companies behind it, contacts, interviews, an answer bank
 and the funnel maths over all of it.
 
-They share an account, a design system and the Gmail plumbing, and nothing
-else. Each owns its own Postgres schema in one Supabase project: `public` for
-shopping, `job_search` for the job side. Their tables collide on four names, so
-that separation is load-bearing rather than tidy — see
-[docs/SETUP.md](docs/SETUP.md).
+They share an account, a design system and one mailbox, and nothing else. Each
+owns its own Postgres schema in one Supabase project — `public` for shopping,
+`job_search` for the job side — and ingestion sits in a third, `core`, because
+an order confirmation and a rejection letter arrive on the same sync and
+neither workspace owns that fact. See [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
@@ -41,8 +41,7 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 | Owned-books ingestion + book_details | done |
 | Sell assistant (buyback + Browse routing) | done |
 | Job search workspace merged in (schema, routes, tests) | done |
-| Job search Gmail ingestion | not wired — needs its own OAuth client |
-| Unified ingestion across both workspaces | not started |
+| Unified ingestion (one grant, one sync, classifier fan-out) | done |
 
 ## Getting started
 

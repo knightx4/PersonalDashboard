@@ -14,7 +14,8 @@ most of the way through the project. Do not front-load it.
 
 This deployment carries two workspaces behind one login: the commerce side at
 `/shopping` and the job search side at `/jobs`. They share a Supabase project
-and take a schema each — `public` and `job_search`.
+and take a schema each — `public` and `job_search` — plus a third, `core`,
+that belongs to neither.
 
 Supabase bills per **project**, not per app, so this costs nothing extra. It is
 also the only arrangement under which the two can share a database at all:
@@ -30,10 +31,45 @@ has its own trigger on it, since trigger names must differ —
 `on_auth_user_created` for commerce, `on_auth_user_created_job_search` for the
 job side — and each seeds its own profile row.
 
+### `core`, and why ingestion is not in either schema
+
+An order confirmation and a rejection letter arrive through the same mailbox on
+the same sync. The fact that a message exists is not a commerce fact or a
+recruiting fact, so `core` holds it: one Gmail grant, one sync run, and one
+copy of each message envelope, deduplicated on
+`(email_account_id, provider_message_id)`.
+
+Each workspace keeps only its **verdict** — what it thinks a message is and
+what it linked it to — in its own `ingested_messages`, keyed by the core
+message id. Those really are different questions: the two
+`message_classification` enums share no values.
+
+Two consequences worth knowing:
+
+- **Retention changed meaning.** The commerce table used to carry a check
+  constraint that a message classified `not_relevant` must have a null subject,
+  sender and thread. That worked while one app owned both halves. Now "not
+  relevant" is one workspace's opinion, and a message commerce discards may be
+  a rejection letter the job side is keeping — so the envelope is only scrubbed
+  once *every* workspace has looked and none claimed it. That is
+  `core.scrub_unclaimed_messages()`, run at the end of each sync.
+
+- **A backfill re-reads scrubbed envelopes.** Most of the history here was
+  scrubbed under the old single-app rule, before there was a job side to ask.
+  Those subjects are gone from the database but not from the mailbox, so a
+  backfill re-reads them, offers them to whoever has not judged them, and the
+  sweep discards them again if the answer is still no. Incremental syncs leave
+  them alone, so this is a bounded reconciliation rather than a loop that
+  quietly undoes the retention rule.
+
+Reading a message *with* a workspace's verdict goes through that schema's
+`inbox_messages` view, which joins the two — PostgREST cannot embed across
+schemas, so the join has to be in the database.
+
 ### The one step that is not in this repository
 
 In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include `job_search` alongside `public`.
+must include **`job_search` and `core`** alongside `public`.
 
 Without it PostgREST refuses every job-side request with *"The schema must be
 one of the following"*, and because it is a dashboard setting rather than a
@@ -48,8 +84,8 @@ Two directories, applied in order:
 
 | Directory | Schema | Versions |
 |---|---|---|
-| `supabase/migrations` | `public` | `0001`–`0028` |
-| `supabase/migrations-job-search` | `job_search` | `0001`–`0005` |
+| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0029` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0006` |
 
 They are separate because both sets were numbered independently from `0001`,
 and the `job_search` versions are already recorded remotely under exactly those
@@ -290,9 +326,10 @@ real neighbour rather than a stand-in for one.
 
 ## Cron
 
-`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs three
-things in order: the commerce inbox sync, the job inbox sync, then the job
-sweep that re-derives ghosted status and generates reminders.
+`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs two
+things in order: the inbox sync — one pass over the mailbox, offered to both
+workspaces — and then the job sweep that re-derives ghosted status and
+generates reminders.
 
 **One route rather than three, because the Hobby plan caps cron jobs per
 project.** The order is not incidental either — a message that arrives in the
@@ -303,7 +340,7 @@ a failure on the newer job side cannot stop a commerce sync that works.
 **Daily, because sub-daily cron needs Vercel Pro.** The mitigation is the
 **Check now** button in Settings, which runs the same sync on demand.
 `/api/cron/inbox-incremental` and `/api/cron/jobs-sweep` remain reachable for
-running one workspace's job by hand.
+running one stage by hand.
 
 All of them require `Authorization: Bearer $CRON_SECRET`. Vercel Cron sends it
 automatically once `CRON_SECRET` is set; if it is unset, `TOKEN_ENCRYPTION_KEY`
