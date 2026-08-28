@@ -65,7 +65,7 @@ export default async function OnboardingPage({
     // Failed connect while aiming for "done" — send them back to the consent step.
     redirect(`/onboarding?step=gmail&inbox=${encodeURIComponent(params.inbox)}`);
   } else if (!(await onboardingNeeded(supabase, user)) && step !== 'done' && !params.inbox) {
-    redirect('/dashboard');
+    redirect('/shopping/dashboard');
   }
 
   return (
@@ -230,10 +230,10 @@ export default async function OnboardingPage({
           <div className="flex flex-col gap-3 sm:flex-row">
             {params.inbox === 'connected' ? (
               <>
-                <Link href="/settings#inboxes" className={buttonVariants()}>
+                <Link href="/shopping/settings#inboxes" className={buttonVariants()}>
                   Import from Settings
                 </Link>
-                <Link href="/dashboard" className={buttonVariants({ variant: 'secondary' })}>
+                <Link href="/shopping/dashboard" className={buttonVariants({ variant: 'secondary' })}>
                   Go to dashboard
                 </Link>
               </>

@@ -7,7 +7,7 @@ import { MessageSquarePlus } from 'lucide-react';
 import {
   submitFeedback,
   type FeedbackActionState,
-} from '@/app/(app)/feedback/actions';
+} from '@/app/shopping/feedback/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -138,7 +138,7 @@ export function FeedbackButton() {
                 {pending ? 'Saving…' : 'Send'}
               </Button>
               <Link
-                href="/feedback"
+                href="/shopping/feedback"
                 className="text-[13px] text-brand hover:underline"
                 onClick={() => setOpen(false)}
               >

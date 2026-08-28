@@ -5,8 +5,8 @@ import {
   deleteInventoryItem,
   quickDisposeInventoryItem,
   toggleInventoryItemList,
-} from '@/app/(app)/inventory/actions';
-import { toggleReturnPlannedForm } from '@/app/(app)/returns/actions';
+} from '@/app/shopping/inventory/actions';
+import { toggleReturnPlannedForm } from '@/app/shopping/returns/actions';
 import { ActionMenu, IconActionButton, type ActionMenuItem } from '@/components/ui/action-menu';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 

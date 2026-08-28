@@ -46,7 +46,7 @@ export function MerchantBreakdown({
         {slices.length > 0 && (
           <p className="mt-4 text-[12px] text-ink-faint">
             Gross orders placed in this period.{' '}
-            <Link href="/orders" className="text-brand hover:underline">
+            <Link href="/shopping/orders" className="text-brand hover:underline">
               See all orders
             </Link>
           </p>

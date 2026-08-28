@@ -64,7 +64,7 @@ export function InboxSyncBanner({
         <p>
           {label} in the background — seen {job.messagesSeen}, parsed {job.messagesParsed}.
         </p>
-        <Link href="/settings#inboxes" className="underline underline-offset-2">
+        <Link href="/shopping/settings#inboxes" className="underline underline-offset-2">
           View progress
         </Link>
       </div>

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   excludeMerchantFromOrder,
   softDeleteOrder,
-} from '@/app/(app)/orders/actions';
+} from '@/app/shopping/orders/actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 
 export function OrderRowMenu({
@@ -42,7 +42,7 @@ export function OrderRowMenu({
                     setPhase('menu');
                     return;
                   }
-                  router.push('/orders');
+                  router.push('/shopping/orders');
                   router.refresh();
                 } catch (err) {
                   window.alert(err instanceof Error ? err.message : 'Delete failed.');

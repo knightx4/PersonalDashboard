@@ -18,17 +18,17 @@ const RETURN_COOKIE = 'gmail_oauth_return';
 export async function GET(request: NextRequest) {
   const user = await getUser();
   if (!user) {
-    return NextResponse.redirect(new URL('/login?next=/settings', request.url));
+    return NextResponse.redirect(new URL('/login?next=/shopping/settings', request.url));
   }
 
   if (!isGmailOAuthConfigured()) {
-    const failTo = safeAppPath(request.nextUrl.searchParams.get('return_to'), '/settings');
+    const failTo = safeAppPath(request.nextUrl.searchParams.get('return_to'), '/shopping/settings');
     const url = new URL(failTo, request.url);
     url.searchParams.set('inbox', 'unconfigured');
     return NextResponse.redirect(url);
   }
 
-  const returnTo = safeAppPath(request.nextUrl.searchParams.get('return_to'), '/settings');
+  const returnTo = safeAppPath(request.nextUrl.searchParams.get('return_to'), '/shopping/settings');
 
   const cookieStore = await cookies();
   cookieStore.set(RETURN_COOKIE, returnTo, {

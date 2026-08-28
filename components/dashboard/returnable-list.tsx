@@ -10,7 +10,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Still returnable</CardTitle>
-        <Link href="/returns" className="text-[12px] font-medium text-brand hover:underline">
+        <Link href="/shopping/returns" className="text-[12px] font-medium text-brand hover:underline">
           Returns tracker
         </Link>
       </CardHeader>
@@ -24,7 +24,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
             {shown.map((row) => (
               <li key={row.inventoryItemId}>
                 <Link
-                  href={`/inventory/${row.inventoryItemId}`}
+                  href={`/shopping/inventory/${row.inventoryItemId}`}
                   className="flex items-center gap-3 py-2.5 transition-colors hover:bg-canvas"
                 >
                   <div className="min-w-0 flex-1">
@@ -48,7 +48,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
         {rows.length > shown.length && (
           <p className="mt-2 text-[12px] text-ink-faint">
             +{rows.length - shown.length} more ·{' '}
-            <Link href="/returns?view=all" className="text-brand hover:underline">
+            <Link href="/shopping/returns?view=all" className="text-brand hover:underline">
               see all
             </Link>
           </p>

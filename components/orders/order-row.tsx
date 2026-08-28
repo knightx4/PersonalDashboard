@@ -58,7 +58,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
   return (
     <li className="group flex items-stretch hover:bg-canvas">
       <Link
-        href={`/orders/${order.id}`}
+        href={`/shopping/orders/${order.id}`}
         className={cn(
           'flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 pr-2 transition-colors duration-150',
           'focus-visible:bg-canvas focus-visible:outline-none',

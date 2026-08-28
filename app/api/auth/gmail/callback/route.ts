@@ -12,7 +12,7 @@ const RETURN_COOKIE = 'gmail_oauth_return';
 
 async function finishRedirect(request: NextRequest, code: string) {
   const cookieStore = await cookies();
-  const returnTo = safeAppPath(cookieStore.get(RETURN_COOKIE)?.value, '/settings');
+  const returnTo = safeAppPath(cookieStore.get(RETURN_COOKIE)?.value, '/shopping/settings');
   cookieStore.delete(RETURN_COOKIE);
 
   const url = new URL(returnTo, request.url);
@@ -26,7 +26,7 @@ async function finishRedirect(request: NextRequest, code: string) {
 export async function GET(request: NextRequest) {
   const user = await getUser();
   if (!user) {
-    return NextResponse.redirect(new URL('/login?next=/settings', request.url));
+    return NextResponse.redirect(new URL('/login?next=/shopping/settings', request.url));
   }
 
   const { searchParams } = request.nextUrl;

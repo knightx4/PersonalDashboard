@@ -11,13 +11,13 @@ import { FeedbackButton } from '@/components/shell/feedback-button';
  * dashboard quietly becomes wrong.
  */
 const SECTIONS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/orders', label: 'Orders' },
-  { href: '/inventory', label: 'Inventory' },
-  { href: '/sell', label: 'Sell' },
-  { href: '/returns', label: 'Returns' },
-  { href: '/saved', label: 'Saved' },
-  { href: '/review', label: 'Review' },
+  { href: '/shopping/dashboard', label: 'Dashboard' },
+  { href: '/shopping/orders', label: 'Orders' },
+  { href: '/shopping/inventory', label: 'Inventory' },
+  { href: '/shopping/sell', label: 'Sell' },
+  { href: '/shopping/returns', label: 'Returns' },
+  { href: '/shopping/saved', label: 'Saved' },
+  { href: '/shopping/review', label: 'Review' },
 ] as const;
 
 export function TopNav({
@@ -35,7 +35,7 @@ export function TopNav({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-        <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
+        <Link href="/shopping/dashboard" className="flex shrink-0 items-center gap-2">
           <span
             className="size-6 rounded-md bg-brand"
             style={{
@@ -65,7 +65,7 @@ export function TopNav({
                 )}
               >
                 {section.label}
-                {section.href === '/review' && reviewCount > 0 && (
+                {section.href === '/shopping/review' && reviewCount > 0 && (
                   <span className="tabular ml-1.5 rounded-full bg-accent-orange px-1.5 py-0.5 text-[11px] font-semibold text-white">
                     {reviewCount}
                   </span>
@@ -78,7 +78,7 @@ export function TopNav({
         <FeedbackButton />
 
         <Link
-          href="/settings"
+          href="/shopping/settings"
           className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[13px] font-semibold text-brand"
           title={displayName ?? email}
         >

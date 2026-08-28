@@ -38,7 +38,7 @@ export function parseDashboardRange(raw: string | undefined): PresetRange {
 }
 
 export function dashboardHref(range: PresetRange): string {
-  return `/dashboard?range=${range}`;
+  return `/shopping/dashboard?range=${range}`;
 }
 
 export interface ReturnableRow {
