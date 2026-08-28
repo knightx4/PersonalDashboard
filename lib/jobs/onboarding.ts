@@ -1,6 +1,8 @@
 import 'server-only';
 
 import type { User } from '@supabase/supabase-js';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 
 /**
@@ -11,6 +13,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
  */
 export async function onboardingNeeded(
   supabase: AppSupabaseClient,
+  core: CoreSupabaseClient,
   user: User,
 ): Promise<boolean> {
   const { data: profile } = await supabase
@@ -21,18 +24,15 @@ export async function onboardingNeeded(
 
   if (profile?.onboarding_completed_at) return false;
 
-  const [{ count: accountCount }, { count: companyCount }] = await Promise.all([
-    supabase
-      .from('email_accounts')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id),
+  const [accountCount, { count: companyCount }] = await Promise.all([
+    countConnectedInboxes(core, user.id),
     supabase
       .from('companies')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id),
   ]);
 
-  if ((accountCount ?? 0) > 0 || (companyCount ?? 0) > 0) {
+  if (accountCount > 0 || (companyCount ?? 0) > 0) {
     await markOnboardingComplete(supabase, user.id);
     return false;
   }

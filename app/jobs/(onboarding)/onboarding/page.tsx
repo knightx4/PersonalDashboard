@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { Building2, FileText, Inbox, Lock, Shield } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { JOB_GMAIL_ENABLED } from '@/lib/jobs/email/gmail-availability';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { markOnboardingComplete, onboardingNeeded } from '@/lib/jobs/onboarding';
 import { buttonVariants } from '@/components/ui/button';
 import { CompaniesForm, FinishForm, SkipForm, WelcomeForm } from './forms';
@@ -22,13 +23,14 @@ export default async function OnboardingPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
   const step = parseStep(params.step);
-  const configured = JOB_GMAIL_ENABLED;
+  const configured = isGmailOAuthConfigured();
 
   if (params.inbox === 'connected') {
     await markOnboardingComplete(supabase, user.id);
-  } else if (!(await onboardingNeeded(supabase, user)) && step !== 'done' && !params.inbox) {
+  } else if (!(await onboardingNeeded(supabase, core, user)) && step !== 'done' && !params.inbox) {
     redirect('/jobs/pipeline');
   }
 
@@ -176,14 +178,14 @@ export default async function OnboardingPage({
           <div className="flex flex-wrap gap-2">
             {configured ? (
               <a
-                href="/api/jobs/auth/gmail/connect?return_to=/jobs/onboarding%3Fstep%3Ddone"
+                href="/api/auth/gmail/connect?return_to=/jobs/onboarding%3Fstep%3Ddone"
                 className={buttonVariants()}
               >
                 Connect Gmail
               </a>
             ) : (
               <p className="rounded-lg bg-canvas px-3 py-2 text-[13px] text-ink-muted">
-                Inbox scanning for the job search side is not connected yet — it needs its own Google grant, separate from the one the shopping side uses. Everything else works: add roles by pasting a job link, or use the capture bookmarklet.
+                Gmail is not configured on this deployment. Everything else works.
               </p>
             )}
             <SkipForm />

@@ -1,12 +1,12 @@
 /**
  * The consolidated cron.
  *
- * Three scheduled jobs had to become one, because the Hobby plan caps them per
- * project. That is a forced change to something that already worked, so the two
- * properties it must not lose are covered here: every account still gets its
- * sync attempted even when one of them throws, and a failing stage does not
- * take the other stages down with it. The second matters most -- the commerce
- * sync has been running for months, and the job workspace's stages are new.
+ * Three scheduled jobs became one, because the Hobby plan caps them per
+ * project; unifying ingestion then took it to two, since there is one inbox
+ * sync serving both workspaces rather than one each. The two properties that
+ * must survive all of that are covered here: every account still gets its sync
+ * attempted even when one of them throws, and a failing stage does not take the
+ * other stages down with it.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -95,17 +95,9 @@ describe('runIncrementalSync', () => {
   });
 });
 
-vi.mock('@/inngest/cron/shopping-inbox', () => ({
-  runShoppingIncrementalSync: vi.fn(async () => ({
-    accounts: 1,
-    started: 1,
-    alreadyRunning: 0,
-    skipped: [],
-  })),
-}));
-vi.mock('@/inngest/jobs/cron/inbox', () => ({
-  runJobIncrementalSync: vi.fn(async () => {
-    throw new Error('job inbox exploded');
+vi.mock('@/inngest/cron/inbox', () => ({
+  runInboxIncrementalSync: vi.fn(async () => {
+    throw new Error('inbox exploded');
   }),
 }));
 vi.mock('@/inngest/jobs/cron/sweep', () => ({
@@ -113,7 +105,6 @@ vi.mock('@/inngest/jobs/cron/sweep', () => ({
 }));
 
 const { GET } = await import('@/app/api/cron/daily/route');
-const { runShoppingIncrementalSync } = await import('@/inngest/cron/shopping-inbox');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
 
 function cronRequest(token: string | null) {
@@ -147,19 +138,12 @@ describe('the daily cron route', () => {
     expect(response.status).toBe(207);
     const body = await response.json();
     expect(body.ok).toBe(false);
-    expect(body.failed).toEqual(['jobs-inbox']);
+    expect(body.failed).toEqual(['inbox']);
 
-    // The stage that broke is the new one; the one that has been running for
-    // months still ran, and so did the stage after the failure.
-    expect(runShoppingIncrementalSync).toHaveBeenCalled();
+    // The stage after the failure still ran. That is the property that matters:
+    // a broken sync must not also cost the job workspace its nightly sweep.
     expect(runJobSweep).toHaveBeenCalled();
-    expect(body.results['shopping-inbox']).toEqual({
-      accounts: 1,
-      started: 1,
-      alreadyRunning: 0,
-      skipped: [],
-    });
     expect(body.results['jobs-sweep']).toEqual({ ghosted: 3, reminders: 2 });
-    expect(body.results['jobs-inbox']).toEqual({ error: 'job inbox exploded' });
+    expect(body.results['inbox']).toEqual({ error: 'inbox exploded' });
   });
 });

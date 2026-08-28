@@ -349,6 +349,10 @@ select
   m.id,
   m.email_account_id,
   ea.user_id,
+  -- The mailbox this arrived in, for the "open in Gmail" link. Carried on the
+  -- view so a page does not need a second query, or a cross-schema embed it
+  -- cannot have.
+  ea.email_address,
   m.provider_message_id,
   m.thread_id,
   m.received_at,

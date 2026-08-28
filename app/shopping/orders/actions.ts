@@ -270,7 +270,7 @@ export async function excludeMerchantFromOrder(formData: FormData): Promise<void
   const merchantId = (order.merchant_id as string | null) ?? merchant?.id ?? null;
 
   const { data: sourceMessage } = await supabase
-    .from('ingested_messages')
+    .from('inbox_messages')
     .select('from_address')
     .eq('resulting_order_id', orderId)
     .maybeSingle();

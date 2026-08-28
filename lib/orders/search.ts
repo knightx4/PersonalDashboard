@@ -30,15 +30,17 @@ export type OrderSearchRow = {
   external_order_number: string | null;
   merchants: { name: string } | { name: string }[] | null;
   order_items: OrderListItem[] | null;
+  /**
+   * Attached after the fact rather than embedded: the envelope lives in core
+   * now, and PostgREST cannot embed across schemas. Loaded from this schema's
+   * inbox_messages view and stitched on by resulting_order_id.
+   */
   ingested_messages:
     | Array<{
         subject: string | null;
         from_address: string | null;
         classification?: string | null;
-        email_accounts?:
-          | { email_address: string }
-          | Array<{ email_address: string }>
-          | null;
+        email_address?: string | null;
       }>
     | null;
 };
@@ -81,11 +83,7 @@ export function orderInboxAddress(order: Pick<OrderSearchRow, 'ingested_messages
   const messages = order.ingested_messages ?? [];
   const preferred =
     messages.find((message) => message.classification === 'order_confirmation') ?? messages[0];
-  if (!preferred) return null;
-  const account = Array.isArray(preferred.email_accounts)
-    ? preferred.email_accounts[0]
-    : preferred.email_accounts;
-  return account?.email_address ?? null;
+  return preferred?.email_address ?? null;
 }
 
 export function orderMatchesQuery(order: OrderSearchRow, q: string): boolean {

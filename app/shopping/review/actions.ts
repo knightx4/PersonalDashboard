@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 
 export interface ActionState {
   error?: string;
@@ -121,18 +123,17 @@ export async function dismissEmailReview(
     return { error: 'Invalid message.' };
   }
 
-  const { data: accounts } = await supabase
-    .from('email_accounts')
-    .select('id')
-    .eq('user_id', user.id);
-  const accountIds = (accounts ?? []).map((row) => row.id as string);
+  const core = await createCoreClient();
+  const accountIds = await connectedAccountIds(core, user.id);
   if (accountIds.length === 0) return { error: 'No inbox connected.' };
 
+  // Ownership comes from the view's user_id: the verdict row has no account id
+  // of its own any more.
   const { data: message, error: loadError } = await supabase
-    .from('ingested_messages')
+    .from('inbox_messages')
     .select('id, parse_status')
     .eq('id', messageId)
-    .in('email_account_id', accountIds)
+    .eq('user_id', user.id)
     .maybeSingle();
 
   if (loadError) return { error: loadError.message };

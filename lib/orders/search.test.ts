@@ -18,7 +18,7 @@ describe('orders search', () => {
       {
         subject: 'Ordered: "The Well-Tempered City:..."',
         from_address: 'auto-confirm@amazon.com',
-        email_accounts: { email_address: 'home@example.com' },
+        email_address: 'home@example.com',
       },
     ],
   };

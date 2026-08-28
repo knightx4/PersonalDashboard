@@ -1,5 +1,5 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
-import { pumpInboxSync, verifyInboxContinueToken } from '@/inngest/inbox-backfill';
+import { pumpInboxSync, verifyInboxContinueToken } from '@/inngest/core/inbox-sync';
 
 export const maxDuration = 60;
 

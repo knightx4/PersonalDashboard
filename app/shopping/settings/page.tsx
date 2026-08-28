@@ -1,5 +1,6 @@
 import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User, Wallet } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -28,6 +29,7 @@ export default async function SettingsPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
 
   const { data: profile } = await supabase
@@ -36,7 +38,7 @@ export default async function SettingsPage({
     .eq('id', user.id)
     .single();
 
-  const { data: accounts } = await supabase
+  const { data: accounts } = await core
     .from('email_accounts')
     .select('id, email_address, status, last_synced_at, backfill_completed_at')
     .eq('user_id', user.id);
@@ -96,7 +98,7 @@ export default async function SettingsPage({
   > = {};
 
   if (accountIds.length > 0) {
-    const { data: jobs } = await supabase
+    const { data: jobs } = await core
       .from('sync_jobs')
       .select(
         'id, email_account_id, type, status, messages_seen, messages_classified, messages_parsed, error',

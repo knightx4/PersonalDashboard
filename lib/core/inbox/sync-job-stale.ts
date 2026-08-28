@@ -1,6 +1,11 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 
-/** Jobs with no heartbeat for this long are treated as dead. */
+/**
+ * Stale sync jobs, in core.
+ *
+ * There is one sync run now rather than one per workspace, so this rule lives
+ * once. Both apps carried an identical copy of it before the merge.
+ * Jobs with no heartbeat for this long are treated as dead. */
 export const STALE_RUNNING_MS = 15 * 60 * 1000;
 
 /** Queued jobs that never became running — after() likely crashed. */
@@ -31,7 +36,7 @@ export function isFreshActiveJob(
  * Returns the updated row fields when a change was made.
  */
 export async function failStaleSyncJob(
-  supabase: SupabaseClient,
+  supabase: CoreSupabaseClient,
   job: SyncJobStaleRow,
   nowMs = Date.now(),
 ): Promise<{ status: 'failed'; error: string; finished_at: string; updated_at: string } | null> {

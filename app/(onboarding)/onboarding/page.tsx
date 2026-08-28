@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Mail, Package, Shield } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { markOnboardingComplete, onboardingNeeded } from '@/lib/onboarding';
 import { buttonVariants } from '@/components/ui/button';
@@ -53,6 +54,7 @@ export default async function OnboardingPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
   const step = parseStep(params.step);
   const banner = inboxBanner(params.inbox);
@@ -64,7 +66,7 @@ export default async function OnboardingPage({
   } else if (step === 'done' && params.inbox && params.inbox !== 'connected') {
     // Failed connect while aiming for "done" — send them back to the consent step.
     redirect(`/onboarding?step=gmail&inbox=${encodeURIComponent(params.inbox)}`);
-  } else if (!(await onboardingNeeded(supabase, user)) && step !== 'done' && !params.inbox) {
+  } else if (!(await onboardingNeeded(supabase, core, user)) && step !== 'done' && !params.inbox) {
     redirect('/shopping/dashboard');
   }
 

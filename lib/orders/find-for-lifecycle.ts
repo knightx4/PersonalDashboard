@@ -25,7 +25,7 @@ export async function findOrderForLifecycleEmail(
 ): Promise<LifecycleOrderHit | null> {
   if (opts.threadId) {
     const { data: threadHit } = await supabase
-      .from('ingested_messages')
+      .from('inbox_messages')
       .select('resulting_order_id')
       .eq('thread_id', opts.threadId)
       .not('resulting_order_id', 'is', null)

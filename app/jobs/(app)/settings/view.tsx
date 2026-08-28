@@ -219,7 +219,7 @@ function InboxSection({
     setBusy(accountId);
     setNote(null);
     try {
-      const response = await fetch('/api/jobs/inbox/sync', {
+      const response = await fetch('/api/inbox/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, mode }),
@@ -245,7 +245,7 @@ function InboxSection({
       {accounts.length === 0 ? (
         <div className="mt-4">
           {gmailConfigured ? (
-            <a href="/api/jobs/auth/gmail/connect?return_to=/jobs/settings" className="inline-block">
+            <a href="/api/auth/gmail/connect?return_to=/jobs/settings" className="inline-block">
               <Button type="button" size="sm">
                 <Mail className="size-4" strokeWidth={1.75} />
                 Connect Gmail
@@ -314,7 +314,7 @@ function InboxSection({
                   {account.backfillCompletedAt ? 'Re-scan everything' : 'Start the first scan'}
                 </Button>
                 <a
-                  href="/api/jobs/auth/gmail/connect?return_to=/jobs/settings"
+                  href="/api/auth/gmail/connect?return_to=/jobs/settings"
                   className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
                 >
                   Reconnect
@@ -633,7 +633,7 @@ function DangerSection() {
             setBusy(true);
             setError(null);
             try {
-              const response = await fetch('/api/jobs/account/delete', {
+              const response = await fetch('/api/account/delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ confirm }),

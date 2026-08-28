@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { TopNav } from '@/components/shell/top-nav';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/onboarding';
@@ -17,46 +19,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const supabase = await createClient();
 
-  if (await onboardingNeeded(supabase, user)) {
+  const core = await createCoreClient();
+
+  if (await onboardingNeeded(supabase, core, user)) {
     redirect('/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, { data: accounts }] = await Promise.all([
+  const [{ data: profile }, reviewCount, inbox] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-    countReviewItems(supabase, user.id),
-    supabase.from('email_accounts').select('id').eq('user_id', user.id).eq('status', 'active'),
+    countReviewItems(supabase, core, user.id),
+    loadInboxBannerState(user.id),
   ]);
 
-  const accountIds = (accounts ?? []).map((a) => a.id as string);
-  let initialBannerJob: {
-    jobId: string;
-    type?: string;
-    status: string;
-    messagesSeen: number;
-    messagesParsed: number;
-    done: boolean;
-  } | null = null;
-
-  if (accountIds.length > 0) {
-    const { data: activeJob } = await supabase
-      .from('sync_jobs')
-      .select('id, type, status, messages_seen, messages_parsed')
-      .in('email_account_id', accountIds)
-      .in('status', ['running', 'queued'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (activeJob) {
-      initialBannerJob = {
-        jobId: activeJob.id as string,
-        type: activeJob.type as string,
-        status: activeJob.status as string,
-        messagesSeen: activeJob.messages_seen as number,
-        messagesParsed: activeJob.messages_parsed as number,
-        done: false,
-      };
-    }
-  }
+  const { accountIds, initialJob } = inbox;
 
   return (
     <div className="min-h-full">
@@ -65,7 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         email={user.email ?? ''}
         reviewCount={reviewCount}
       />
-      <InboxSyncBanner accountIds={accountIds} initialJob={initialBannerJob} />
+      <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
     </div>
   );

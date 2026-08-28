@@ -82,7 +82,7 @@ export default async function RoleDetailPage({
         .eq('role_id', id)
         .order('created_at', { ascending: false }),
       supabase
-        .from('ingested_messages')
+        .from('inbox_messages')
         .select('id, subject, from_address, received_at, classification, link_method, link_confidence')
         .eq('resulting_application_id', current.id)
         .order('received_at', { ascending: false }),

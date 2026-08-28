@@ -177,6 +177,9 @@ export const gmailProvider: GmailOAuthProvider = {
       threadId: data.threadId ?? null,
       internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
       fromAddress: headerValue(headers, 'From'),
+      // Reply-To carries the employer far more often than From does, because
+      // From is usually the ATS. Capturing it is what makes domain linking work.
+      replyToAddress: headerValue(headers, 'Reply-To'),
       subject: headerValue(headers, 'Subject'),
       text: full ? gmailPayloadToText(data.payload as never) : '',
       html: full ? gmailPayloadToHtml(data.payload as never) : '',

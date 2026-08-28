@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { connectedAccountIds, connectedInboxes } from '@/lib/core/inbox/accounts';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { orderItemsSummary } from '@/lib/orders/search';
 
@@ -76,16 +78,13 @@ function reasonForEmail(
  */
 export async function loadReviewQueue(
   supabase: SupabaseClient,
+  core: CoreSupabaseClient,
   userId: string,
 ): Promise<{ rows: ReviewRow[]; counts: ReviewCounts }> {
-  const { data: accounts } = await supabase
-    .from('email_accounts')
-    .select('id, email_address')
-    .eq('user_id', userId);
-  const accountIds = (accounts ?? []).map((row) => row.id as string);
-  const inboxById = new Map(
-    (accounts ?? []).map((row) => [row.id as string, row.email_address as string]),
-  );
+  // The mailbox is core's now; the verdicts below are still ours.
+  const accounts = await connectedInboxes(core, userId);
+  const accountIds = accounts.map((row) => row.id);
+  const inboxById = new Map(accounts.map((row) => [row.id, row.emailAddress]));
 
   const [{ data: orders }, messagesResult] = await Promise.all([
     supabase
@@ -103,7 +102,7 @@ export async function loadReviewQueue(
       .order('order_date', { ascending: false }),
     accountIds.length > 0
       ? supabase
-          .from('ingested_messages')
+          .from('inbox_messages')
           .select(
             `
             id, email_account_id, provider_message_id, thread_id, subject,
@@ -129,7 +128,7 @@ export async function loadReviewQueue(
 
   if (orderIds.length > 0) {
     const { data: sources } = await supabase
-      .from('ingested_messages')
+      .from('inbox_messages')
       .select(
         'resulting_order_id, provider_message_id, thread_id, error, email_account_id, classification',
       )
@@ -235,6 +234,7 @@ export function filterReviewRows(rows: ReviewRow[], view: ReviewView): ReviewRow
 /** Nav badge: heuristic orders + emails stuck in needs_review. */
 export async function countReviewItems(
   supabase: SupabaseClient,
+  core: CoreSupabaseClient,
   userId: string,
 ): Promise<number> {
   const [{ count: orderCount }, { data: accounts }] = await Promise.all([
@@ -244,14 +244,14 @@ export async function countReviewItems(
       .eq('user_id', userId)
       .eq('needs_review', true)
       .is('deleted_at', null),
-    supabase.from('email_accounts').select('id').eq('user_id', userId),
+    connectedAccountIds(core, userId).then((ids) => ({ data: ids.map((id) => ({ id })) })),
   ]);
 
   const accountIds = (accounts ?? []).map((row) => row.id as string);
   if (accountIds.length === 0) return orderCount ?? 0;
 
   const { count: emailCount } = await supabase
-    .from('ingested_messages')
+    .from('inbox_messages')
     .select('id', { count: 'exact', head: true })
     .in('email_account_id', accountIds)
     .eq('parse_status', 'needs_review');

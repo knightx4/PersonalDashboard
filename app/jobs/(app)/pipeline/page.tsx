@@ -1,5 +1,7 @@
 import { KanbanSquare } from 'lucide-react';
+import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import Link from 'next/link';
 import { PipelineBoard, STALE_DAYS } from '@/components/jobs/pipeline/board';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
@@ -33,14 +35,12 @@ export default async function PipelinePage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
 
-  const [rows, { count: inboxCount }] = await Promise.all([
+  const [rows, inboxCount] = await Promise.all([
     loadPipeline(supabase, user.id),
-    supabase
-      .from('email_accounts')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id),
+    countConnectedInboxes(core, user.id),
   ]);
 
   const source = APPLICATION_SOURCES.find((s) => s === params.source);

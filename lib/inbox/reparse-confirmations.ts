@@ -91,8 +91,10 @@ export async function reparseInboxConfirmations(
   };
   const limit = opts.limit ?? 200;
 
+  // Through the view: the verdict columns are ours, but the provider id, the
+  // sender and the subject live in core now.
   const query = supabase
-    .from('ingested_messages')
+    .from('inbox_messages')
     .select(
       'id, provider_message_id, from_address, subject, parser_version, resulting_order_id, parse_status',
     )
@@ -410,8 +412,6 @@ export async function reparseInboxConfirmations(
           parser_version: PARSER_VERSION,
           error: null,
           parse_confidence: extraction.result.order.confidence ?? null,
-          from_address: message.fromAddress,
-          subject: message.subject,
         })
         .eq('id', row.id);
 

@@ -1,6 +1,16 @@
 import { Receipt, Search } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
+
+type OrderSourceMessage = {
+  subject: string | null;
+  from_address: string | null;
+  classification: string | null;
+  email_address: string | null;
+};
+
 import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
@@ -92,6 +102,7 @@ export default async function OrdersPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
 
   const range =
@@ -101,15 +112,12 @@ export default async function OrdersPage({
   const tagId = parseTagId(params.tag);
   const q = sanitizeOrdersQuery(params.q);
 
-  const [{ data: profile }, merchants, tags, { count: inboxCount }, displayCurrency] =
+  const [{ data: profile }, merchants, tags, inboxCount, displayCurrency] =
     await Promise.all([
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
       loadUserMerchants(supabase, user.id),
       loadUserTags(supabase, user.id),
-      supabase
-        .from('email_accounts')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
+      countConnectedInboxes(core, user.id),
       loadDisplayCurrency(supabase, user.id),
     ]);
   const timezone = profile?.timezone ?? 'UTC';
@@ -131,8 +139,7 @@ export default async function OrdersPage({
       order_items (
         name, variant, quantity, image_url, categories ( name ),
         order_item_tags ( tag_id, item_tags ( id, name, slug ) )
-      ),
-      ingested_messages ( subject, from_address, classification, email_accounts ( email_address ) )
+      )
     `,
     )
     .eq('user_id', user.id)
@@ -147,7 +154,37 @@ export default async function OrdersPage({
   const { data: rows, error } = await query;
   if (error) throw error;
 
-  let orders = rows ?? [];
+  // The source emails come from the view in a second query rather than an
+  // embed: their subjects and senders live in core, which PostgREST cannot
+  // reach across from an embedded resource.
+  const orderRows = rows ?? [];
+  const sourceByOrder = new Map<string, OrderSourceMessage[]>();
+  if (orderRows.length > 0) {
+    const { data: sources } = await supabase
+      .from('inbox_messages')
+      .select('resulting_order_id, subject, from_address, classification, email_address')
+      .in(
+        'resulting_order_id',
+        orderRows.map((row) => row.id as string),
+      );
+    for (const row of sources ?? []) {
+      const orderId = row.resulting_order_id as string | null;
+      if (!orderId) continue;
+      const list = sourceByOrder.get(orderId) ?? [];
+      list.push({
+        subject: (row.subject as string | null) ?? null,
+        from_address: (row.from_address as string | null) ?? null,
+        classification: (row.classification as string | null) ?? null,
+        email_address: (row.email_address as string | null) ?? null,
+      });
+      sourceByOrder.set(orderId, list);
+    }
+  }
+
+  let orders = orderRows.map((row) => ({
+    ...row,
+    ingested_messages: sourceByOrder.get(row.id as string) ?? [],
+  }));
   if (activeTag) {
     orders = orders.filter((order) => orderHasTagId(order, activeTag));
   }

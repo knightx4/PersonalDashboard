@@ -1,15 +1,16 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
-import { createClient, getUser } from '@/lib/auth/server';
+import { getUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import {
   pumpInboxSync,
   startIncrementalSync,
   type InboxSyncJobType,
-} from '@/inngest/inbox-backfill';
+} from '@/inngest/core/inbox-sync';
 import {
   failStaleSyncJob,
   isFreshActiveJob,
   type SyncJobStaleRow,
-} from '@/lib/inbox/sync-job-stale';
+} from '@/lib/core/inbox/sync-job-stale';
 
 export const maxDuration = 60;
 
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
 
   const typeFilter = request.nextUrl.searchParams.get('type') as InboxSyncJobType | null;
 
-  const supabase = await createClient();
+  const supabase = await createCoreClient();
   const { data: account } = await supabase
     .from('email_accounts')
     .select('id')
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
     mode?: InboxSyncJobType;
   };
   const mode: InboxSyncJobType = body.mode === 'incremental' ? 'incremental' : 'backfill';
-  const supabase = await createClient();
+  const supabase = await createCoreClient();
   const origin = requestOrigin(request);
 
   let accountId = body.accountId;

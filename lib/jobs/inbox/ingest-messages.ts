@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import type { MessageEnvelope } from '@/lib/core/inbox/envelopes';
 import { mapPool } from '@/lib/async/map-pool';
 import {
   ACTIONABLE,
@@ -12,13 +13,12 @@ import {
 } from '@/lib/jobs/email/classify';
 import { PARSER_VERSION, verifyExtraction, type ExtractedMessage } from '@/lib/jobs/email/extract';
 import { decideLink, type LinkCandidate, type LinkDecision } from '@/lib/jobs/email/link';
-import { gmailProvider } from '@/lib/jobs/email/providers/gmail';
+import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
-const METADATA_CONCURRENCY = 5;
 /** Full body + model extraction. Lower, because each one costs money. */
 const EXTRACT_CONCURRENCY = 2;
 
@@ -59,9 +59,9 @@ type FetchedMessage = Awaited<ReturnType<typeof gmailProvider.getMessage>>;
 async function writeLedger(
   supabase: AppSupabaseClient,
   opts: {
-    ledgerId: string | null;
-    accountId: string;
-    message: FetchedMessage;
+    coreId: string;
+    /** For the log line only; the row is keyed by coreId. */
+    providerMessageId: string;
     classification: MessageClassification;
     parseStatus: 'pending' | 'parsed' | 'failed' | 'skipped' | 'needs_review';
     applicationId?: string | null;
@@ -71,16 +71,13 @@ async function writeLedger(
     error?: string | null;
   },
 ): Promise<string | null> {
-  const bare = opts.classification === 'not_relevant';
-
+  // The envelope belongs to core; this row is only what the job workspace
+  // concluded. Nulling the sender and subject on not_relevant used to happen
+  // here -- it now happens in core, and only once every workspace has
+  // disclaimed the message, because a message this side finds irrelevant may
+  // be an order confirmation the other side is keeping.
   const row = {
-    email_account_id: opts.accountId,
-    provider_message_id: opts.message.id,
-    thread_id: bare ? null : opts.message.threadId,
-    received_at: opts.message.internalDate?.toISOString() ?? null,
-    from_address: bare ? null : opts.message.fromAddress,
-    reply_to_address: bare ? null : opts.message.replyToAddress,
-    subject: bare ? null : opts.message.subject,
+    id: opts.coreId,
     classification: opts.classification,
     parse_status: opts.parseStatus,
     parser_version: PARSER_VERSION,
@@ -91,25 +88,12 @@ async function writeLedger(
     error: opts.error ?? null,
   };
 
-  if (opts.ledgerId) {
-    await supabase.from('ingested_messages').update(row).eq('id', opts.ledgerId);
-    return opts.ledgerId;
-  }
-
-  const { data, error } = await supabase
-    .from('ingested_messages')
-    .insert(row)
-    .select('id')
-    .single();
-
+  const { error } = await supabase.from('ingested_messages').upsert(row);
   if (error) {
-    // A duplicate here means a concurrent sync got there first, which is fine.
-    if (!/duplicate|unique/i.test(error.message)) {
-      console.error('ledger insert failed', opts.message.id, error.message);
-    }
+    console.error('verdict upsert failed', opts.providerMessageId, error.message);
     return null;
   }
-  return data?.id ?? null;
+  return opts.coreId;
 }
 
 /**
@@ -335,35 +319,37 @@ export interface IngestContext {
  * messages that survived. Re-running is safe — the unique index on
  * (email_account_id, provider_message_id) is what makes that true.
  */
-export async function ingestGmailMessageIds(
+export async function linkEnvelopes(
   supabase: AppSupabaseClient,
   ctx: IngestContext,
-  messageIds: string[],
+  envelopes: MessageEnvelope[],
 ): Promise<void> {
-  if (messageIds.length === 0) return;
+  if (envelopes.length === 0) return;
 
   const { data: existingRows } = await supabase
     .from('ingested_messages')
-    .select('id, provider_message_id, classification, parse_status')
-    .eq('email_account_id', ctx.accountId)
-    .in('provider_message_id', messageIds);
+    .select('id, classification, parse_status')
+    .in(
+      'id',
+      envelopes.map((e) => e.id),
+    );
 
-  const existing = new Map(
-    (existingRows ?? []).map((row) => [row.provider_message_id as string, row]),
-  );
+  const existing = new Map((existingRows ?? []).map((row) => [row.id as string, row]));
 
   type Pending = {
-    messageId: string;
-    ledgerId: string | null;
-    meta: FetchedMessage;
+    envelope: MessageEnvelope;
     tierA: ClassifyResult;
   };
   const needsBody: Pending[] = [];
 
-  await mapPool(messageIds, METADATA_CONCURRENCY, async (messageId) => {
+  // No pool and no Gmail call: core already fetched every header, once, for
+  // both workspaces. Tier A is pure computation over what it handed us.
+  for (const envelope of envelopes) {
+    const messageId = envelope.providerMessageId;
+    const coreId = envelope.id;
     ctx.counters.messagesSeen += 1;
 
-    const prior = existing.get(messageId);
+    const prior = existing.get(coreId);
     // A message held for review is retried on later syncs: the application it
     // belongs to may have been created since.
     const retryable =
@@ -373,66 +359,59 @@ export async function ingestGmailMessageIds(
 
     if (prior && !retryable) {
       ctx.counters.skipped += 1;
-      return;
+      continue;
     }
 
-    try {
-      const meta = await gmailProvider.getMessage(ctx.accessToken, messageId, {
-        format: 'metadata',
-      });
-      const tierA = classifyMessage({
-        fromAddress: meta.fromAddress,
-        replyToAddress: meta.replyToAddress,
-        subject: meta.subject,
-        companies: ctx.companies,
-      });
-      ctx.counters.messagesClassified += 1;
+    const tierA = classifyMessage({
+      fromAddress: envelope.fromAddress,
+      replyToAddress: envelope.replyToAddress,
+      subject: envelope.subject,
+      companies: ctx.companies,
+    });
+    ctx.counters.messagesClassified += 1;
 
-      // Board digests and confidently-irrelevant mail stop here, and for
-      // not_relevant nothing but the id and the date is written.
-      if (tierA.classification === 'job_alert' || tierA.classification === 'networking') {
-        await writeLedger(supabase, {
-          ledgerId: prior?.id ?? null,
-          accountId: ctx.accountId,
-          message: meta,
-          classification: tierA.classification,
-          parseStatus: 'skipped',
-        });
-        ctx.counters.skipped += 1;
-        return;
-      }
-
-      if (tierA.classification === 'not_relevant' && tierA.tier === 'A') {
-        await writeLedger(supabase, {
-          ledgerId: prior?.id ?? null,
-          accountId: ctx.accountId,
-          message: meta,
-          classification: 'not_relevant',
-          parseStatus: 'skipped',
-        });
-        ctx.counters.skipped += 1;
-        return;
-      }
-
-      needsBody.push({ messageId, ledgerId: prior?.id ?? null, meta, tierA });
-    } catch (error) {
-      ctx.counters.errors += 1;
-      console.error('metadata fetch failed', messageId, {
-        name: error instanceof Error ? error.name : 'unknown',
+    // Board digests and confidently-irrelevant mail stop here. The verdict is
+    // still written: saying "not mine" is what lets core work out that nobody
+    // claimed the message and scrub the envelope.
+    if (tierA.classification === 'job_alert' || tierA.classification === 'networking') {
+      await writeLedger(supabase, {
+        coreId,
+        providerMessageId: messageId,
+        classification: tierA.classification,
+        parseStatus: 'skipped',
       });
+      ctx.counters.skipped += 1;
+      continue;
     }
-  });
+
+    if (tierA.classification === 'not_relevant' && tierA.tier === 'A') {
+      await writeLedger(supabase, {
+        coreId,
+        providerMessageId: messageId,
+        classification: 'not_relevant',
+        parseStatus: 'skipped',
+      });
+      ctx.counters.skipped += 1;
+      continue;
+    }
+
+    needsBody.push({ envelope, tierA });
+  }
 
   await mapPool(needsBody, EXTRACT_CONCURRENCY, async (pending) => {
     try {
-      const message = await gmailProvider.getMessage(ctx.accessToken, pending.messageId, {
-        format: 'full',
-      });
-      message.fromAddress ??= pending.meta.fromAddress;
-      message.replyToAddress ??= pending.meta.replyToAddress;
-      message.subject ??= pending.meta.subject;
-      message.internalDate ??= pending.meta.internalDate;
-      message.threadId ??= pending.meta.threadId;
+      const message = await gmailProvider.getMessage(
+        ctx.accessToken,
+        pending.envelope.providerMessageId,
+        { format: 'full' },
+      );
+      message.fromAddress ??= pending.envelope.fromAddress;
+      message.replyToAddress ??= pending.envelope.replyToAddress;
+      message.subject ??= pending.envelope.subject;
+      message.internalDate ??= pending.envelope.receivedAt
+        ? new Date(pending.envelope.receivedAt)
+        : null;
+      message.threadId ??= pending.envelope.threadId;
 
       // Re-run Tier A with the body: rejections are decided by the body, since
       // their subject line is indistinguishable from a confirmation's.
@@ -447,11 +426,11 @@ export async function ingestGmailMessageIds(
       await handleMessage(supabase, ctx, {
         message,
         tierA,
-        ledgerId: pending.ledgerId,
+        coreId: pending.envelope.id,
       });
     } catch (error) {
       ctx.counters.errors += 1;
-      console.error('message ingest failed', pending.messageId, {
+      console.error('message ingest failed', pending.envelope.providerMessageId, {
         name: error instanceof Error ? error.name : 'unknown',
       });
     }
@@ -461,15 +440,14 @@ export async function ingestGmailMessageIds(
 async function handleMessage(
   supabase: AppSupabaseClient,
   ctx: IngestContext,
-  input: { message: FetchedMessage; tierA: ClassifyResult; ledgerId: string | null },
+  input: { message: FetchedMessage; tierA: ClassifyResult; coreId: string },
 ): Promise<void> {
-  const { message, tierA } = input;
+  const { message, tierA, coreId } = input;
 
   if (tierA.classification === 'not_relevant' && tierA.tier === 'A') {
     await writeLedger(supabase, {
-      ledgerId: input.ledgerId,
-      accountId: ctx.accountId,
-      message,
+      coreId,
+      providerMessageId: message.id,
       classification: 'not_relevant',
       parseStatus: 'skipped',
     });
@@ -494,9 +472,8 @@ async function handleMessage(
 
   if (classification === 'not_relevant' || classification === 'job_alert') {
     await writeLedger(supabase, {
-      ledgerId: input.ledgerId,
-      accountId: ctx.accountId,
-      message,
+      coreId,
+      providerMessageId: message.id,
       classification,
       parseStatus: 'skipped',
     });
@@ -522,7 +499,13 @@ async function handleMessage(
     { companies: ctx.companies.map((c) => ({ id: c.id, name: c.name, domains: c.domains })) },
   );
 
-  await applyDecision(supabase, ctx, { message, classification, tierB: tierB.extracted, decision, ledgerId: input.ledgerId });
+  await applyDecision(supabase, ctx, {
+    message,
+    classification,
+    tierB: tierB.extracted,
+    decision,
+    coreId,
+  });
 }
 
 async function applyDecision(
@@ -533,10 +516,10 @@ async function applyDecision(
     classification: MessageClassification;
     tierB: ExtractedMessage | null;
     decision: LinkDecision;
-    ledgerId: string | null;
+    coreId: string;
   },
 ): Promise<void> {
-  const { message, classification, tierB, decision } = input;
+  const { message, classification, tierB, decision, coreId } = input;
 
   const ledger = async (
     parseStatus: 'parsed' | 'needs_review' | 'failed',
@@ -548,9 +531,8 @@ async function applyDecision(
     } = {},
   ) =>
     writeLedger(supabase, {
-      ledgerId: input.ledgerId,
-      accountId: ctx.accountId,
-      message,
+      coreId,
+      providerMessageId: message.id,
       classification,
       parseStatus,
       parseConfidence: tierB?.confidence ?? null,

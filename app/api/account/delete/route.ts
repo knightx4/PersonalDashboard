@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
 import { decryptToken } from '@/lib/crypto/tokens';
-import { gmailProvider } from '@/lib/jobs/email/providers/gmail';
+import { gmailProvider } from '@/lib/email/providers/gmail';
 
 export const maxDuration = 60;
 
@@ -44,10 +45,11 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createClient();
+  const core = await createCoreClient();
 
   // 1. Revoke.
   const key = process.env.TOKEN_ENCRYPTION_KEY;
-  const { data: accounts } = await supabase
+  const { data: accounts } = await core
     .from('email_accounts')
     .select('id, oauth_refresh_token')
     .eq('user_id', user.id);

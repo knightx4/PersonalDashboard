@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-import { createClient, getUser } from '@/lib/auth/server';
+import { getUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { encryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailRedirectUri } from '@/lib/email/gmail-redirect';
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
       return finishRedirect(request, 'scope_denied');
     }
 
-    const supabase = await createClient();
+    const supabase = await createCoreClient();
     const payload = {
       provider: 'gmail' as const,
       email_address: emailAddress,

@@ -3,7 +3,7 @@ import {
   STALE_QUEUED_MS,
   STALE_RUNNING_MS,
   isFreshActiveJob,
-} from '@/lib/inbox/sync-job-stale';
+} from '@/lib/core/inbox/sync-job-stale';
 
 describe('isFreshActiveJob', () => {
   const now = Date.parse('2026-07-29T00:00:00.000Z');

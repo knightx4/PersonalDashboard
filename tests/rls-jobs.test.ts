@@ -124,26 +124,28 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
   ids.cover_letters = letter.id;
 
   const [account] = await admin<{ id: string }[]>`
-    insert into email_accounts (user_id, provider, email_address)
+    insert into core.email_accounts (user_id, provider, email_address)
     values (${userId}, 'gmail', ${`${tag}@example.com`})
     returning id`;
-  ids.email_accounts = account.id;
 
+  // The envelope belongs to core; this schema keeps only the recruiting verdict.
   const [message] = await admin<{ id: string }[]>`
-    insert into ingested_messages (email_account_id, provider_message_id, received_at,
-                                   from_address, reply_to_address, subject, classification,
-                                   parse_status, resulting_application_id, link_confidence,
-                                   link_method)
+    insert into core.ingested_messages (email_account_id, provider_message_id, received_at,
+                                        from_address, reply_to_address, subject)
     values (${account.id}, ${`${tag}-msg-1`}, now(), ${`no-reply@greenhouse.io`},
-            ${`recruiter@${tag}.example`}, ${`Your application to ${tag} Corp`},
-            'application_confirmation', 'parsed', ${application.id}, 0.95, 'ats_job_id')
+            ${`recruiter@${tag}.example`}, ${`Your application to ${tag} Corp`})
     returning id`;
+
+  await admin`
+    insert into ingested_messages (id, classification, parse_status,
+                                   resulting_application_id, link_confidence, link_method)
+    values (${message.id}, 'application_confirmation', 'parsed',
+            ${application.id}, 0.95, 'ats_job_id')`;
   ids.ingested_messages = message.id;
 
   const [job] = await admin<{ id: string }[]>`
-    insert into sync_jobs (email_account_id, type, status)
+    insert into core.sync_jobs (email_account_id, type, status)
     values (${account.id}, 'backfill', 'completed') returning id`;
-  ids.sync_jobs = job.id;
 
   const [reminder] = await admin<{ id: string }[]>`
     insert into reminders (user_id, application_id, kind, due_at, body)
@@ -222,7 +224,11 @@ describe('RLS coverage', () => {
     // The other half: they are all somewhere, and that somewhere is job_search.
     expect(tables).toContain('applications');
     expect(tables).toContain('ingested_messages');
-    expect(tables.length).toBeGreaterThanOrEqual(20);
+    // email_accounts and sync_jobs used to be here and are not any more: one
+    // mailbox is shared, so they live in core. What stays is the verdict.
+    expect(tables).not.toContain('email_accounts');
+    expect(tables).not.toContain('sync_jobs');
+    expect(tables.length).toBeGreaterThanOrEqual(18);
   });
 
   it('seeds every table, so a new table cannot skip the isolation check', () => {
@@ -266,7 +272,8 @@ describe('cross-user reads', () => {
 
 describe('cross-user writes', () => {
   it('does not let user B update user A rows', async () => {
-    for (const table of ['companies', 'roles', 'applications', 'contacts', 'email_accounts']) {
+    // email_accounts is core's now; its isolation is covered in rls-core.
+    for (const table of ['companies', 'roles', 'applications', 'contacts']) {
       const affected = await asUser(userB, (tx) =>
         tx.unsafe(`update ${APP_SCHEMA}.${table} set updated_at = now() where id = $1 returning id`, [
           seedA[table],
@@ -324,13 +331,19 @@ describe('cross-user writes', () => {
 
 describe('integrity constraints the database enforces itself', () => {
   it('refuses to store a subject or sender on a not_relevant message', async () => {
-    await expect(
-      admin`
-        insert into ingested_messages (email_account_id, provider_message_id, received_at,
-                                       subject, classification)
-        select id, 'leaky-1', now(), 'Dinner on Friday?', 'not_relevant'
-        from email_accounts limit 1`,
-    ).rejects.toThrow(/ingested_not_relevant_is_bare_ck/);
+    // The row constraint is gone and could not have survived unification: this
+    // workspace calling a message irrelevant says nothing about whether the
+    // commerce side wants it. The rule is core.scrub_unclaimed_messages(),
+    // covered in rls-core.
+    const [msg] = await admin<{ id: string }[]>`
+      insert into core.ingested_messages (email_account_id, provider_message_id, subject)
+      select id, 'leaky-1', 'Dinner on Friday?' from core.email_accounts limit 1
+      returning id`;
+    await admin`insert into ingested_messages (id, classification) values (${msg.id}, 'not_relevant')`;
+
+    const [{ scrubbed }] = await admin<{ scrubbed: number }[]>`
+      select core.scrub_unclaimed_messages() as scrubbed`;
+    expect(scrubbed).toBe(0);
   });
 
   it('refuses a note attached to two parents at once', async () => {

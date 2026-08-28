@@ -5,20 +5,29 @@
  * noise and left the sync skipping everything. Exact phrases like
  * "your order of" are intentionally avoided — they miss "Your Amazon.com order of …".
  */
+/**
+ * The commerce half of the search vocabulary.
+ *
+ * Exported because one sync now serves both workspaces and has to ask for the
+ * union of what each wants -- but the terms stay owned here, so adding a
+ * merchant keyword does not mean editing a shared file.
+ */
+export const ORDER_SUBJECT_TERMS: readonly string[] = [
+  'order',
+  'ordered',
+  'shipment',
+  'shipped',
+  'delivery',
+  'delivered',
+  'invoice',
+  'receipt',
+  'refund',
+  'return',
+];
+
 export function orderCandidateQuery(backfillWindowDays: number): string {
   const days = Math.min(730, Math.max(30, backfillWindowDays));
-  const subjects = [
-    'subject:order',
-    'subject:ordered',
-    'subject:shipment',
-    'subject:shipped',
-    'subject:delivery',
-    'subject:delivered',
-    'subject:invoice',
-    'subject:receipt',
-    'subject:refund',
-    'subject:return',
-  ].join(' OR ');
+  const subjects = ORDER_SUBJECT_TERMS.map((t) => `subject:${t}`).join(' OR ');
   return `newer_than:${days}d (${subjects})`;
 }
 

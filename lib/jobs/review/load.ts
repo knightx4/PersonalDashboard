@@ -1,4 +1,6 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { connectedAccountIds, connectedInboxes } from '@/lib/core/inbox/accounts';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 
 /**
@@ -88,18 +90,15 @@ export type ReviewCounts = {
 /** The badge in the top nav. One cheap count, three cheap counts. */
 export async function countReviewItems(
   supabase: AppSupabaseClient,
+  core: CoreSupabaseClient,
   userId: string,
 ): Promise<number> {
-  const { data: accounts } = await supabase
-    .from('email_accounts')
-    .select('id')
-    .eq('user_id', userId);
-  const accountIds = (accounts ?? []).map((a) => a.id as string);
+  const accountIds = await connectedAccountIds(core, userId);
 
   const [messages, applications, events] = await Promise.all([
     accountIds.length
       ? supabase
-          .from('ingested_messages')
+          .from('inbox_messages')
           .select('id', { count: 'exact', head: true })
           .in('email_account_id', accountIds)
           .eq('parse_status', 'needs_review')
@@ -121,21 +120,18 @@ export async function countReviewItems(
 
 export async function loadReviewQueue(
   supabase: AppSupabaseClient,
+  core: CoreSupabaseClient,
   userId: string,
 ): Promise<{ rows: ReviewRow[]; counts: ReviewCounts }> {
-  const { data: accounts } = await supabase
-    .from('email_accounts')
-    .select('id, email_address')
-    .eq('user_id', userId);
-  const accountIds = (accounts ?? []).map((a) => a.id as string);
-  const inboxByAccount = new Map(
-    (accounts ?? []).map((a) => [a.id as string, a.email_address as string]),
-  );
+  // The mailbox belongs to core; the verdicts below are this workspace's.
+  const accounts = await connectedInboxes(core, userId);
+  const accountIds = accounts.map((a) => a.id);
+  const inboxByAccount = new Map(accounts.map((a) => [a.id, a.emailAddress]));
 
   const [messagesResult, applicationsResult, eventsResult] = await Promise.all([
     accountIds.length
       ? supabase
-          .from('ingested_messages')
+          .from('inbox_messages')
           .select(
             'id, email_account_id, thread_id, provider_message_id, subject, from_address, received_at, classification, error, link_confidence',
           )

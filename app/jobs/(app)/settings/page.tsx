@@ -1,6 +1,7 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
-import { JOB_GMAIL_ENABLED } from '@/lib/jobs/email/gmail-availability';
+import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { publicEnv } from '@/lib/env';
 import { SettingsView } from './view';
 
@@ -36,6 +37,7 @@ export default async function SettingsPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
 
   const [{ data: profile }, { data: accounts }, { data: resumes }, { data: evidence }] =
@@ -47,7 +49,7 @@ export default async function SettingsPage({
         )
         .eq('id', user.id)
         .single(),
-      supabase
+      core
         .from('email_accounts')
         .select(
           'id, email_address, status, last_synced_at, backfill_completed_at, backfill_window_days',
@@ -72,7 +74,7 @@ export default async function SettingsPage({
       <SettingsView
         email={user.email ?? ''}
         banner={inboxBanner(params.inbox)}
-        gmailConfigured={JOB_GMAIL_ENABLED}
+        gmailConfigured={isGmailOAuthConfigured()}
         appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
         profile={{
           displayName: (profile?.display_name as string) ?? '',

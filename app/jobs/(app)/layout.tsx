@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { TopNav } from '@/components/jobs/shell/top-nav';
 import { InboxSyncBanner } from '@/components/jobs/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/jobs/onboarding';
@@ -18,54 +20,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const supabase = await createClient();
 
+  const core = await createCoreClient();
+
   // The job workspace's own onboarding, not the commerce one. They gate on
   // different profile rows in different schemas, so completing one says nothing
   // about the other -- and sending someone to /onboarding from here would bounce
   // them straight back, forever.
-  if (await onboardingNeeded(supabase, user)) {
+  if (await onboardingNeeded(supabase, core, user)) {
     redirect('/jobs/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, { data: accounts }] = await Promise.all([
+  const [{ data: profile }, reviewCount, inbox] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-    countReviewItems(supabase, user.id),
-    supabase
-      .from('email_accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('status', 'active'),
+    countReviewItems(supabase, core, user.id),
+    loadInboxBannerState(user.id),
   ]);
 
-  const accountIds = (accounts ?? []).map((a) => a.id as string);
-  let initialJob: {
-    jobId: string;
-    type?: string;
-    status: string;
-    messagesSeen: number;
-    messagesParsed: number;
-    done: boolean;
-  } | null = null;
-
-  if (accountIds.length > 0) {
-    const { data: activeJob } = await supabase
-      .from('sync_jobs')
-      .select('id, type, status, messages_seen, messages_parsed')
-      .in('email_account_id', accountIds)
-      .in('status', ['running', 'queued'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (activeJob) {
-      initialJob = {
-        jobId: activeJob.id as string,
-        type: activeJob.type as string,
-        status: activeJob.status as string,
-        messagesSeen: activeJob.messages_seen as number,
-        messagesParsed: activeJob.messages_parsed as number,
-        done: false,
-      };
-    }
-  }
+  const { accountIds, initialJob } = inbox;
 
   return (
     <div className="min-h-full">

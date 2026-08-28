@@ -40,6 +40,12 @@ export interface GmailMessageContent {
   threadId: string | null;
   internalDate: Date | null;
   fromAddress: string | null;
+  /**
+   * More informative than `from` for recruiting mail: the ATS sends as itself
+   * and puts the employer's recruiter in Reply-To. Captured for that reason,
+   * and harmless for commerce mail, which rarely sets it.
+   */
+  replyToAddress: string | null;
   subject: string | null;
   text: string;
   /** Ephemeral HTML for product-link extraction; never persisted. */

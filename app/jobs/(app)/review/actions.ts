@@ -29,10 +29,14 @@ export async function linkMessage(
   const user = await requireUser();
   const supabase = await createClient();
 
+  // Through the view, filtered on user_id: PostgREST cannot embed
+  // core.email_accounts from this schema, and the view carries the owner
+  // already so the check is a column comparison rather than a join.
   const { data: message } = await supabase
-    .from('ingested_messages')
-    .select('id, classification, received_at, subject, email_accounts!inner ( user_id )')
+    .from('inbox_messages')
+    .select('id, classification, received_at, subject, user_id')
     .eq('id', parsed.data.messageId)
+    .eq('user_id', user.id)
     .maybeSingle();
 
   if (!message) return { error: 'That message is no longer in the queue.' };

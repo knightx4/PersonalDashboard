@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailOAuthEnv } from '@/lib/email/gmail-env';
 import { gmailProvider } from '@/lib/email/providers/gmail';
@@ -20,8 +21,8 @@ export async function disconnectInbox(formData: FormData): Promise<void> {
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
   if (!parsed.success) return;
 
-  const supabase = await createClient();
-  const { data: account, error: fetchError } = await supabase
+  const core = await createCoreClient();
+  const { data: account, error: fetchError } = await core
     .from('email_accounts')
     .select('id, oauth_refresh_token')
     .eq('id', parsed.data.id)
@@ -42,7 +43,7 @@ export async function disconnectInbox(formData: FormData): Promise<void> {
     }
   }
 
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await core
     .from('email_accounts')
     .delete()
     .eq('id', account.id)
@@ -70,7 +71,8 @@ export async function resetInboxImport(accountId: string): Promise<{
   if (!parsed.success) return { ok: false, deletedOrders: 0, error: 'Invalid inbox.' };
 
   const supabase = await createClient();
-  const { data: account } = await supabase
+  const core = await createCoreClient();
+  const { data: account } = await core
     .from('email_accounts')
     .select('id')
     .eq('id', parsed.data)
@@ -93,7 +95,7 @@ export async function resetInboxImport(accountId: string): Promise<{
     ),
   ];
 
-  await supabase
+  await core
     .from('sync_jobs')
     .update({
       status: 'failed',
@@ -145,7 +147,7 @@ export async function resetInboxImport(accountId: string): Promise<{
     }
   }
 
-  await supabase
+  await core
     .from('email_accounts')
     .update({
       sync_cursor: null,
@@ -184,7 +186,8 @@ export async function reparseInboxOrders(accountId: string): Promise<{
   }
 
   const supabase = await createClient();
-  const { data: account } = await supabase
+  const core = await createCoreClient();
+  const { data: account } = await core
     .from('email_accounts')
     .select(
       'id, user_id, email_address, oauth_refresh_token, oauth_access_token, token_expires_at, backfill_window_days, sync_cursor, last_synced_at, status',
@@ -199,12 +202,13 @@ export async function reparseInboxOrders(accountId: string): Promise<{
 
   try {
     const { TOKEN_ENCRYPTION_KEY } = gmailOAuthEnv();
-    const { ensureAccessToken, loadCategoryContext } = await import('@/lib/inbox/sync-account');
+    const { ensureAccessToken } = await import('@/lib/core/inbox/sync-account');
+    const { loadCategoryContext } = await import('@/lib/inbox/context');
     const { loadMerchantsForUser } = await import('@/lib/merchants/resolve-order-merchant');
     const { loadMerchantExclusions } = await import('@/lib/inbox/merchant-exclusions');
     const { reparseInboxConfirmations } = await import('@/lib/inbox/reparse-confirmations');
 
-    const accessToken = await ensureAccessToken(supabase, account, TOKEN_ENCRYPTION_KEY);
+    const accessToken = await ensureAccessToken(core, account, TOKEN_ENCRYPTION_KEY);
     const merchants = (await loadMerchantsForUser(supabase, user.id)).map((m) => ({
       id: m.id,
       slug: m.slug,

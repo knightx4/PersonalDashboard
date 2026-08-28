@@ -3,12 +3,17 @@ import 'server-only';
 import {
   syncEmailAccountBatch,
   syncEmailAccountIncrementalBatch,
-} from '@/lib/inbox/sync-account';
+} from '@/lib/core/inbox/sync-account';
 import {
   signInboxContinueToken,
   verifyInboxContinueToken as verifyToken,
 } from '@/lib/inbox/continue-token';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
+import { createServiceSupabase as createJobServiceSupabase } from '@/inngest/jobs/supabase-admin';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import { commerceLinker } from '@/lib/inbox/linker';
+import { jobLinker } from '@/lib/jobs/inbox/linker';
+import type { DomainLinker } from '@/lib/core/inbox/fan-out';
 
 /** Leave headroom under the route maxDuration for the continue fetch. */
 const PUMP_BUDGET_MS = 50_000;
@@ -45,7 +50,7 @@ export function verifyInboxContinueToken(
 }
 
 async function failJob(
-  supabase: ReturnType<typeof createServiceSupabase>,
+  supabase: ReturnType<typeof createCoreServiceSupabase>,
   jobId: string,
   message: string,
 ): Promise<void> {
@@ -63,7 +68,7 @@ async function failJob(
 
 async function continueFetch(
   opts: { userId: string; accountId: string; jobId: string; origin: string },
-  supabase: ReturnType<typeof createServiceSupabase>,
+  supabase: ReturnType<typeof createCoreServiceSupabase>,
 ): Promise<void> {
   const token = signContinue(opts);
   try {
@@ -102,6 +107,47 @@ async function continueFetch(
  * Process as many Gmail pages as fit in this invocation, then self-chain
  * via /api/inbox/sync/continue when more work remains.
  */
+/**
+ * Every workspace that wants a look at the mail.
+ *
+ * Each gets a client bound to its own schema, so a linker physically cannot
+ * write to the other's tables -- supabase-js carries the schema in the client
+ * type, and the wrong one does not typecheck.
+ *
+ * Adding a third workspace later means adding a line here and nothing else in
+ * the sync: that is the whole point of the fan-out.
+ */
+function buildLinkers(): DomainLinker[] {
+  return [commerceLinker(createServiceSupabase()), jobLinker(createJobServiceSupabase())];
+}
+
+/**
+ * Domains of companies the job side already tracks, for the direct-outreach
+ * pass. Empty is fine and common -- the query is simply skipped.
+ */
+async function trackedCompanyDomains(userId: string): Promise<string[]> {
+  try {
+    const jobs = createJobServiceSupabase();
+    const { data } = await jobs
+      .from('companies')
+      .select('domains')
+      .eq('user_id', userId)
+      .limit(200);
+    const domains = new Set<string>();
+    for (const row of data ?? []) {
+      for (const d of (row.domains as string[] | null) ?? []) {
+        if (d?.trim()) domains.add(d.trim().toLowerCase());
+      }
+    }
+    return [...domains];
+  } catch (err) {
+    // The outreach pass is an enhancement, not a requirement: losing it costs
+    // recall on one class of mail and must not fail the sync.
+    console.error('company domain lookup failed', err);
+    return [];
+  }
+}
+
 export async function pumpInboxSync(opts: {
   userId: string;
   accountId: string;
@@ -109,9 +155,9 @@ export async function pumpInboxSync(opts: {
   origin: string;
   type?: InboxSyncJobType;
 }): Promise<void> {
-  let supabase: ReturnType<typeof createServiceSupabase>;
+  let supabase: ReturnType<typeof createCoreServiceSupabase>;
   try {
-    supabase = createServiceSupabase();
+    supabase = createCoreServiceSupabase();
   } catch (err) {
     console.error('inbox sync: service client failed', err);
     return;
@@ -156,6 +202,9 @@ export async function pumpInboxSync(opts: {
       return;
     }
 
+    const linkers = buildLinkers();
+    const companyDomains = await trackedCompanyDomains(opts.userId);
+
     let pageToken = (account.sync_page_token as string | null) ?? undefined;
     const runBatch =
       jobType === 'incremental' ? syncEmailAccountIncrementalBatch : syncEmailAccountBatch;
@@ -178,6 +227,8 @@ export async function pumpInboxSync(opts: {
         jobId: opts.jobId,
         pageToken,
         maxMessages: batchSize,
+        linkers,
+        companyDomains,
       });
 
       if (progress.error || progress.done) {
@@ -217,7 +268,7 @@ export async function startIncrementalSync(opts: {
   accountId: string;
   origin: string;
 }): Promise<{ jobId: string; alreadyRunning: boolean } | { skipped: string }> {
-  const supabase = createServiceSupabase();
+  const supabase = createCoreServiceSupabase();
 
   const { data: account } = await supabase
     .from('email_accounts')

@@ -7,6 +7,7 @@ import { displayNameFromAddress } from '@/lib/email/extract/heuristic';
 import { extractLifecycleFromEmail } from '@/lib/email/extract/lifecycle';
 import { PARSER_VERSION, type MessageClassification } from '@/lib/email/extract/schema';
 import { gmailProvider } from '@/lib/email/providers/gmail';
+import type { MessageEnvelope } from '@/lib/core/inbox/envelopes';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
@@ -26,7 +27,6 @@ function googleBooksApiKey(): string | null {
 }
 
 /** Parallel Gmail metadata fetches — well under user rate quota. */
-const METADATA_CONCURRENCY = 5;
 /** Parallel full-body + extract for confirmations / lifecycle. */
 const EXTRACT_CONCURRENCY = 2;
 
@@ -51,8 +51,8 @@ type FetchedMessage = Awaited<ReturnType<typeof gmailProvider.getMessage>>;
 type ClassifiedMessage = {
   message: FetchedMessage;
   classified: ReturnType<typeof classifyMessage>;
-  /** Existing ledger row when reprocessing a skipped/needs_review lifecycle mail. */
-  ledgerId: string | null;
+  /** The core message this is a verdict about. Always known: core saw it first. */
+  coreId: string;
 };
 
 async function userTimezone(supabase: SupabaseClient, userId: string): Promise<string> {
@@ -63,8 +63,7 @@ async function userTimezone(supabase: SupabaseClient, userId: string): Promise<s
 async function upsertLifecycleLedger(
   supabase: SupabaseClient,
   opts: {
-    ledgerId: string | null;
-    accountId: string;
+    coreId: string;
     message: FetchedMessage;
     classification: MessageClassification;
     parseStatus: 'pending' | 'parsed' | 'needs_review' | 'failed' | 'skipped';
@@ -74,13 +73,11 @@ async function upsertLifecycleLedger(
     confidence?: number | null;
   },
 ): Promise<string | null> {
+  // The envelope is core's now; this row is only what commerce concluded.
+  // Keyed by the core message id, so a verdict and its message cannot drift
+  // apart and re-running the sync overwrites rather than duplicates.
   const row = {
-    email_account_id: opts.accountId,
-    provider_message_id: opts.message.id,
-    thread_id: opts.message.threadId,
-    received_at: opts.message.internalDate?.toISOString() ?? null,
-    from_address: opts.message.fromAddress,
-    subject: opts.message.subject,
+    id: opts.coreId,
     classification: opts.classification,
     parse_status: opts.parseStatus,
     parser_version: opts.parserVersion ?? PARSER_VERSION,
@@ -89,35 +86,25 @@ async function upsertLifecycleLedger(
     parse_confidence: opts.confidence ?? null,
   };
 
-  if (opts.ledgerId) {
-    const { error } = await supabase.from('ingested_messages').update(row).eq('id', opts.ledgerId);
-    if (error) {
-      console.error('lifecycle ledger update failed', opts.message.id, error.message);
-      return opts.ledgerId;
-    }
-    return opts.ledgerId;
-  }
-
-  const { data, error } = await supabase.from('ingested_messages').insert(row).select('id').single();
+  const { error } = await supabase.from('ingested_messages').upsert(row);
   if (error) {
-    console.error('lifecycle ledger insert failed', opts.message.id, error.message);
+    console.error('lifecycle ledger upsert failed', opts.message.id, error.message);
     return null;
   }
-  return data?.id ?? null;
+  return opts.coreId;
 }
 
 async function handleLifecycleMessage(
   supabase: SupabaseClient,
   opts: {
     userId: string;
-    accountId: string;
     item: ClassifiedMessage;
     counters: IngestCounters;
     timezone: string;
   },
 ): Promise<void> {
-  const { userId, accountId, item, counters, timezone } = opts;
-  const { message, classified, ledgerId } = item;
+  const { userId, item, counters, timezone } = opts;
+  const { message, classified, coreId } = item;
   const classification = classified.classification;
 
   const extraction = extractLifecycleFromEmail({
@@ -130,8 +117,7 @@ async function handleLifecycleMessage(
 
   if (!extraction) {
     await upsertLifecycleLedger(supabase, {
-      ledgerId,
-      accountId,
+      coreId,
       message,
       classification,
       parseStatus: 'needs_review',
@@ -150,8 +136,7 @@ async function handleLifecycleMessage(
 
   if (!order) {
     await upsertLifecycleLedger(supabase, {
-      ledgerId,
-      accountId,
+      coreId,
       message,
       classification,
       parseStatus: 'needs_review',
@@ -163,10 +148,9 @@ async function handleLifecycleMessage(
     return;
   }
 
-  // Insert/update ledger first so returns can reference source_message_id.
+  // Write the verdict first so returns can reference source_message_id.
   const sourceId = await upsertLifecycleLedger(supabase, {
-    ledgerId,
-    accountId,
+    coreId,
     message,
     classification,
     parseStatus: 'pending',
@@ -191,8 +175,7 @@ async function handleLifecycleMessage(
 
   if (!applied.ok) {
     await upsertLifecycleLedger(supabase, {
-      ledgerId: sourceId,
-      accountId,
+      coreId,
       message,
       classification,
       parseStatus: 'needs_review',
@@ -205,8 +188,7 @@ async function handleLifecycleMessage(
   }
 
   await upsertLifecycleLedger(supabase, {
-    ledgerId: sourceId,
-    accountId,
+    coreId,
     message,
     classification,
     parseStatus: 'parsed',
@@ -221,7 +203,7 @@ async function handleOrderConfirmation(
   supabase: SupabaseClient,
   opts: {
     userId: string;
-    accountId: string;
+    coreId: string;
     message: FetchedMessage;
     classified: ReturnType<typeof classifyMessage>;
     exclusions: MerchantExclusionRow[];
@@ -232,7 +214,7 @@ async function handleOrderConfirmation(
 ): Promise<void> {
   const {
     userId,
-    accountId,
+    coreId,
     message,
     classified,
     exclusions,
@@ -247,13 +229,8 @@ async function handleOrderConfirmation(
       fromAddress: message.fromAddress,
     })
   ) {
-    await supabase.from('ingested_messages').insert({
-      email_account_id: accountId,
-      provider_message_id: message.id,
-      thread_id: message.threadId,
-      received_at: message.internalDate?.toISOString() ?? null,
-      from_address: message.fromAddress,
-      subject: message.subject,
+    await supabase.from('ingested_messages').upsert({
+      id: coreId,
       classification: 'order_confirmation',
       parse_status: 'skipped',
       parser_version: PARSER_VERSION,
@@ -278,13 +255,8 @@ async function handleOrderConfirmation(
   });
 
   if (!extraction.result.ok) {
-    await supabase.from('ingested_messages').insert({
-      email_account_id: accountId,
-      provider_message_id: message.id,
-      thread_id: message.threadId,
-      received_at: message.internalDate?.toISOString() ?? null,
-      from_address: message.fromAddress,
-      subject: message.subject,
+    await supabase.from('ingested_messages').upsert({
+      id: coreId,
       classification: 'order_confirmation',
       parse_status: 'needs_review',
       parser_version: extraction.parserVersion,
@@ -349,13 +321,8 @@ async function handleOrderConfirmation(
       const { data: existingRows } = await existingQuery;
       const existingOrder = existingRows?.[0];
       if (existingOrder) {
-        await supabase.from('ingested_messages').insert({
-          email_account_id: accountId,
-          provider_message_id: message.id,
-          thread_id: message.threadId,
-          received_at: message.internalDate?.toISOString() ?? null,
-          from_address: message.fromAddress,
-          subject: message.subject,
+        await supabase.from('ingested_messages').upsert({
+          id: coreId,
           classification: 'order_confirmation',
           parse_status: 'parsed',
           parse_confidence: extraction.result.order.confidence ?? null,
@@ -368,13 +335,8 @@ async function handleOrderConfirmation(
       }
     }
 
-    await supabase.from('ingested_messages').insert({
-      email_account_id: accountId,
-      provider_message_id: message.id,
-      thread_id: message.threadId,
-      received_at: message.internalDate?.toISOString() ?? null,
-      from_address: message.fromAddress,
-      subject: message.subject,
+    await supabase.from('ingested_messages').upsert({
+      id: coreId,
       classification: 'order_confirmation',
       parse_status: 'failed',
       parser_version: extraction.parserVersion,
@@ -477,13 +439,8 @@ async function handleOrderConfirmation(
     console.error('book auto-import failed', bundle.order.id, error);
   }
 
-  await supabase.from('ingested_messages').insert({
-    email_account_id: accountId,
-    provider_message_id: message.id,
-    thread_id: message.threadId,
-    received_at: message.internalDate?.toISOString() ?? null,
-    from_address: message.fromAddress,
-    subject: message.subject,
+  await supabase.from('ingested_messages').upsert({
+    id: coreId,
     classification: 'order_confirmation',
     parse_status: 'parsed',
     parse_confidence: extraction.result.order.confidence ?? null,
@@ -501,13 +458,12 @@ async function handleOrderConfirmation(
  * Lifecycle mail (shipping/delivery/return/cancel) that was previously skipped
  * or needs_review is retried so status can catch up once the order exists.
  */
-export async function ingestGmailMessageIds(
+export async function linkEnvelopes(
   supabase: SupabaseClient,
   opts: {
     userId: string;
-    accountId: string;
     accessToken: string;
-    messageIds: string[];
+    envelopes: MessageEnvelope[];
     merchants: MerchantDomainHit[];
     exclusions: MerchantExclusionRow[];
     categoryIdsBySlug: Map<string, string>;
@@ -517,9 +473,8 @@ export async function ingestGmailMessageIds(
 ): Promise<void> {
   const {
     userId,
-    accountId,
     accessToken,
-    messageIds,
+    envelopes,
     merchants,
     exclusions,
     categoryIdsBySlug,
@@ -530,21 +485,24 @@ export async function ingestGmailMessageIds(
   const timezone = await userTimezone(supabase, userId);
   const deferredLifecycle: ClassifiedMessage[] = [];
 
-  if (messageIds.length === 0) return;
+  if (envelopes.length === 0) return;
 
-  // One ledger lookup for the whole page instead of N round-trips.
+  // One lookup for the whole page instead of N round-trips. Keyed by core id
+  // now rather than provider id: the envelope already resolved that.
   const { data: existingRows } = await supabase
     .from('ingested_messages')
-    .select('id, provider_message_id, classification, parse_status')
-    .eq('email_account_id', accountId)
-    .in('provider_message_id', messageIds);
+    .select('id, classification, parse_status')
+    .in(
+      'id',
+      envelopes.map((e) => e.id),
+    );
 
-  const existingByProviderId = new Map(
-    (existingRows ?? []).map((row) => [row.provider_message_id as string, row]),
+  const existingByCoreId = new Map(
+    (existingRows ?? []).map((row) => [row.id as string, row]),
   );
 
   type WorkItem = {
-    messageId: string;
+    envelope: MessageEnvelope;
     existing: {
       id: string;
       classification: string;
@@ -552,10 +510,10 @@ export async function ingestGmailMessageIds(
     } | null;
   };
 
-  const work: WorkItem[] = messageIds.map((messageId) => {
-    const row = existingByProviderId.get(messageId);
+  const work: WorkItem[] = envelopes.map((envelope) => {
+    const row = existingByCoreId.get(envelope.id);
     return {
-      messageId,
+      envelope,
       existing: row
         ? {
             id: row.id as string,
@@ -566,17 +524,19 @@ export async function ingestGmailMessageIds(
     };
   });
 
-  // Pass 1: metadata-only classify (cheap). Full MIME only when needed.
+  // Pass 1: classify from the envelope. This used to be a Gmail metadata call
+  // per message; core has already made it, once, for both workspaces. Tier A is
+  // pure computation over the sender and subject we were handed, so the whole
+  // pass is now free and the API budget goes entirely on bodies.
   type NeedsBody = {
-    messageId: string;
+    envelope: MessageEnvelope;
     existing: WorkItem['existing'];
-    meta: FetchedMessage;
     classified: ReturnType<typeof classifyMessage>;
   };
 
   const needsBody: NeedsBody[] = [];
 
-  await mapPool(work, METADATA_CONCURRENCY, async (item) => {
+  for (const item of work) {
     counters.messagesSeen += 1;
 
     const retryLifecycle =
@@ -587,109 +547,72 @@ export async function ingestGmailMessageIds(
 
     if (item.existing && !retryLifecycle) {
       counters.skipped += 1;
-      return;
+      continue;
     }
 
-    try {
-      const meta = await gmailProvider.getMessage(accessToken, item.messageId, {
-        format: 'metadata',
-      });
-      const classified = classifyMessage({
-        fromAddress: meta.fromAddress,
-        subject: meta.subject,
-        merchants,
-      });
-      counters.messagesClassified += 1;
+    const classified = classifyMessage({
+      fromAddress: item.envelope.fromAddress,
+      subject: item.envelope.subject,
+      merchants,
+    });
+    counters.messagesClassified += 1;
 
-      if (classified.classification === 'not_relevant') {
-        // CHECK ingested_not_relevant_is_bare_ck: no subject/from/thread for not_relevant.
-        if (!item.existing) {
-          await supabase.from('ingested_messages').insert({
-            email_account_id: accountId,
-            provider_message_id: meta.id,
-            thread_id: null,
-            received_at: meta.internalDate?.toISOString() ?? null,
-            from_address: null,
-            subject: null,
-            classification: 'not_relevant',
-            parse_status: 'skipped',
-            parser_version: PARSER_VERSION,
-          });
-        }
-        counters.skipped += 1;
-        return;
-      }
-
-      if (
-        classified.classification !== 'order_confirmation' &&
-        !LIFECYCLE.has(classified.classification)
-      ) {
-        if (!item.existing) {
-          await supabase.from('ingested_messages').insert({
-            email_account_id: accountId,
-            provider_message_id: meta.id,
-            thread_id: meta.threadId,
-            received_at: meta.internalDate?.toISOString() ?? null,
-            from_address: meta.fromAddress,
-            subject: meta.subject,
-            classification: classified.classification,
-            parse_status: 'skipped',
-            parser_version: PARSER_VERSION,
-          });
-        }
-        counters.skipped += 1;
-        return;
-      }
-
-      needsBody.push({
-        messageId: item.messageId,
-        existing: item.existing,
-        meta,
-        classified,
-      });
-    } catch (err) {
-      console.error('sync message metadata failed', item.messageId, err);
-      counters.errors += 1;
+    // Every message gets a verdict recorded, including the ones this workspace
+    // wants nothing to do with. Saying "not mine" out loud is what lets core
+    // decide the envelope is unclaimed by everyone and scrub it -- silence
+    // would keep it alive forever.
+    if (
+      classified.classification === 'not_relevant' ||
+      (classified.classification !== 'order_confirmation' &&
+        !LIFECYCLE.has(classified.classification))
+    ) {
       if (!item.existing) {
-        const { error: ledgerError } = await supabase.from('ingested_messages').insert({
-          email_account_id: accountId,
-          provider_message_id: item.messageId,
-          classification: 'order_confirmation',
-          parse_status: 'failed',
+        await supabase.from('ingested_messages').upsert({
+          id: item.envelope.id,
+          classification: classified.classification,
+          parse_status: 'skipped',
           parser_version: PARSER_VERSION,
-          error: err instanceof Error ? err.message.slice(0, 500) : 'Sync failed',
         });
-        if (ledgerError && !/duplicate|unique/i.test(ledgerError.message)) {
-          console.error('sync ledger insert failed', item.messageId, ledgerError.message);
-        }
       }
+      counters.skipped += 1;
+      continue;
     }
-  });
+
+    needsBody.push({
+      envelope: item.envelope,
+      existing: item.existing,
+      classified,
+    });
+  }
 
   // Pass 2: full body + extract/lifecycle with a small concurrency cap.
   await mapPool(needsBody, EXTRACT_CONCURRENCY, async (item) => {
     try {
-      const message = await gmailProvider.getMessage(accessToken, item.messageId, {
-        format: 'full',
-      });
-      // Keep headers from metadata if full payload somehow omits them.
-      if (!message.fromAddress) message.fromAddress = item.meta.fromAddress;
-      if (!message.subject) message.subject = item.meta.subject;
-      if (!message.internalDate) message.internalDate = item.meta.internalDate;
-      if (!message.threadId) message.threadId = item.meta.threadId;
+      const message = await gmailProvider.getMessage(
+        accessToken,
+        item.envelope.providerMessageId,
+        { format: 'full' },
+      );
+      // Fall back to the envelope core stored if the full payload omits a header.
+      if (!message.fromAddress) message.fromAddress = item.envelope.fromAddress;
+      if (!message.subject) message.subject = item.envelope.subject;
+      if (!message.internalDate) {
+        message.internalDate = item.envelope.receivedAt ? new Date(item.envelope.receivedAt) : null;
+      }
+      if (!message.threadId) message.threadId = item.envelope.threadId;
 
       if (LIFECYCLE.has(item.classified.classification)) {
         deferredLifecycle.push({
           message,
           classified: item.classified,
-          ledgerId: item.existing?.id ?? null,
+          coreId: item.envelope.id,
         });
         return;
       }
 
       await handleOrderConfirmation(supabase, {
         userId,
-        accountId,
+        coreId: item.envelope.id,
         message,
         classified: item.classified,
         exclusions,
@@ -698,20 +621,17 @@ export async function ingestGmailMessageIds(
         counters,
       });
     } catch (err) {
-      console.error('sync message failed', item.messageId, err);
+      console.error('sync message failed', item.envelope.providerMessageId, err);
       counters.errors += 1;
-      if (!item.existing) {
-        const { error: ledgerError } = await supabase.from('ingested_messages').insert({
-          email_account_id: accountId,
-          provider_message_id: item.messageId,
-          classification: 'order_confirmation',
-          parse_status: 'failed',
-          parser_version: PARSER_VERSION,
-          error: err instanceof Error ? err.message.slice(0, 500) : 'Sync failed',
-        });
-        if (ledgerError && !/duplicate|unique/i.test(ledgerError.message)) {
-          console.error('sync ledger insert failed', item.messageId, ledgerError.message);
-        }
+      const { error: ledgerError } = await supabase.from('ingested_messages').upsert({
+        id: item.envelope.id,
+        classification: 'order_confirmation',
+        parse_status: 'failed',
+        parser_version: PARSER_VERSION,
+        error: err instanceof Error ? err.message.slice(0, 500) : 'Sync failed',
+      });
+      if (ledgerError) {
+        console.error('verdict upsert failed', item.envelope.providerMessageId, ledgerError.message);
       }
     }
   });
@@ -721,7 +641,6 @@ export async function ingestGmailMessageIds(
     try {
       await handleLifecycleMessage(supabase, {
         userId,
-        accountId,
         item,
         counters,
         timezone,
@@ -752,23 +671,33 @@ export async function reprocessPendingLifecycleMessages(
   },
 ): Promise<void> {
   const limit = opts.limit ?? 25;
+  // Through the view: the verdict is ours but received_at, the sender and the
+  // subject are core's, and this needs both halves to rebuild an envelope.
   const { data: pending } = await supabase
-    .from('ingested_messages')
-    .select('provider_message_id')
+    .from('inbox_messages')
+    .select('id, provider_message_id, thread_id, received_at, from_address, reply_to_address, subject')
     .eq('email_account_id', opts.accountId)
     .in('classification', ['shipping', 'delivery', 'return', 'cancellation'])
     .in('parse_status', ['skipped', 'needs_review'])
     .order('received_at', { ascending: true })
     .limit(limit);
 
-  const ids = (pending ?? []).map((row) => row.provider_message_id as string);
-  if (ids.length === 0) return;
+  const envelopes: MessageEnvelope[] = (pending ?? []).map((row) => ({
+    id: row.id as string,
+    providerMessageId: row.provider_message_id as string,
+    threadId: (row.thread_id as string | null) ?? null,
+    receivedAt: (row.received_at as string | null) ?? null,
+    fromAddress: (row.from_address as string | null) ?? null,
+    replyToAddress: (row.reply_to_address as string | null) ?? null,
+    subject: (row.subject as string | null) ?? null,
+    isNew: false,
+  }));
+  if (envelopes.length === 0) return;
 
-  await ingestGmailMessageIds(supabase, {
+  await linkEnvelopes(supabase, {
     userId: opts.userId,
-    accountId: opts.accountId,
     accessToken: opts.accessToken,
-    messageIds: ids,
+    envelopes,
     merchants: opts.merchants,
     exclusions: opts.exclusions,
     categoryIdsBySlug: opts.categoryIdsBySlug,

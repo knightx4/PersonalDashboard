@@ -47,10 +47,9 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
   ids.merchants = merchant.id;
 
   const [account] = await admin<{ id: string }[]>`
-    insert into email_accounts (user_id, provider, email_address)
+    insert into core.email_accounts (user_id, provider, email_address)
     values (${userId}, 'gmail', ${`${tag}@example.com`})
     returning id`;
-  ids.email_accounts = account.id;
 
   const [order] = await admin<{ id: string }[]>`
     insert into orders (user_id, merchant_id, order_date, external_order_number,
@@ -119,12 +118,18 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${order.id}, 'UPS', ${`${tag}-TRACK`}, 'in_transit') returning id`;
   ids.shipments = shipment.id;
 
+  // The envelope is core's; ingested_messages is now only this app's verdict
+  // about it, keyed by the same id.
   const [message] = await admin<{ id: string }[]>`
-    insert into ingested_messages (email_account_id, provider_message_id, received_at,
-                                   from_address, subject, classification, parse_status)
+    insert into core.ingested_messages (email_account_id, provider_message_id, received_at,
+                                        from_address, subject)
     values (${account.id}, ${`${tag}-msg-1`}, now(), ${`orders@${tag}.example`},
-            ${`Your ${tag} order`}, 'order_confirmation', 'parsed')
+            ${`Your ${tag} order`})
     returning id`;
+
+  await admin`
+    insert into ingested_messages (id, classification, parse_status)
+    values (${message.id}, 'order_confirmation', 'parsed')`;
   ids.ingested_messages = message.id;
 
   const [ret] = await admin<{ id: string }[]>`
@@ -147,9 +152,8 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
   ids.price_checks = check.id;
 
   const [job] = await admin<{ id: string }[]>`
-    insert into sync_jobs (email_account_id, type, status)
+    insert into core.sync_jobs (email_account_id, type, status)
     values (${account.id}, 'backfill', 'completed') returning id`;
-  ids.sync_jobs = job.id;
 
   const [exclusion] = await admin<{ id: string }[]>`
     insert into merchant_exclusions (user_id, merchant_id, match_domain)
@@ -321,7 +325,8 @@ describe('shared tables leak nothing user-scoped', () => {
 
 describe('cross-user writes', () => {
   it('does not let user B update user A rows', async () => {
-    for (const table of ['orders', 'inventory_items', 'saved_items', 'email_accounts']) {
+    // email_accounts moved to core; its isolation is covered in rls-core.
+    for (const table of ['orders', 'inventory_items', 'saved_items']) {
       const affected = await asUser(userB, (tx) =>
         tx.unsafe(`update ${table} set updated_at = now() where id = $1 returning id`, [
           seedA[table],
@@ -375,12 +380,26 @@ describe('cross-user writes', () => {
 
 describe('privacy constraints', () => {
   it('refuses to store a subject or sender on a not_relevant message', async () => {
-    await expect(
-      admin`
-        insert into ingested_messages (email_account_id, provider_message_id, received_at,
-                                       subject, classification)
-        select id, 'leaky-1', now(), 'Dinner on Friday?', 'not_relevant'
-        from email_accounts limit 1`,
-    ).rejects.toThrow(/ingested_not_relevant_is_bare_ck/);
+    // The row constraint that used to enforce this is gone, and could not have
+    // survived: "not relevant" is one workspace's opinion now, and the message
+    // this app discards may be the one the job side is keeping. The rule moved
+    // to core.scrub_unclaimed_messages(), which is covered in rls-core.
+    const [account] = await admin<{ id: string }[]>`
+      insert into core.email_accounts (user_id, provider, email_address)
+      values (${await createUser('bare@example.com')}, 'gmail', 'bare@example.com')
+      returning id`;
+    const [msg] = await admin<{ id: string }[]>`
+      insert into core.ingested_messages (email_account_id, provider_message_id, subject)
+      values (${account.id}, 'bare-1', 'Dinner on Friday?')
+      returning id`;
+    await admin`insert into ingested_messages (id, classification) values (${msg.id}, 'not_relevant')`;
+
+    // One workspace alone cannot cause a scrub.
+    const [{ scrubbed }] = await admin<{ scrubbed: number }[]>`
+      select core.scrub_unclaimed_messages() as scrubbed`;
+    expect(scrubbed).toBe(0);
+    const [kept] = await admin<{ subject: string | null }[]>`
+      select subject from core.ingested_messages where id = ${msg.id}`;
+    expect(kept.subject).toBe('Dinner on Friday?');
   });
 });

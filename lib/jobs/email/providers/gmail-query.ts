@@ -20,7 +20,11 @@ import { ATS_DOMAINS } from '@/lib/jobs/email/ats-senders';
  * lands there routinely, and a missed rejection is invisible.
  */
 
-const SUBJECT_TERMS = [
+/**
+ * The recruiting half of the search vocabulary. Exported for the same reason
+ * ORDER_SUBJECT_TERMS is: the one sync asks for the union of both.
+ */
+export const RECRUITING_SUBJECT_TERMS: readonly string[] = [
   'your application',
   'application received',
   'thank you for applying',
@@ -46,7 +50,7 @@ function clampDays(days: number): number {
 export function recruitingCandidateQuery(backfillWindowDays: number): string {
   const days = clampDays(backfillWindowDays);
   const from = `from:(${ATS_DOMAINS.join(' OR ')})`;
-  const subjects = `subject:(${SUBJECT_TERMS.map((t) => `"${t}"`).join(' OR ')})`;
+  const subjects = `subject:(${RECRUITING_SUBJECT_TERMS.map((t) => `"${t}"`).join(' OR ')})`;
   return `newer_than:${days}d (${from} OR ${subjects})`;
 }
 

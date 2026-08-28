@@ -1,6 +1,7 @@
 import { ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -41,10 +42,11 @@ export default async function ReviewPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
   const view = parseReviewView(params.view);
 
-  const { rows: allRows, counts } = await loadReviewQueue(supabase, user.id);
+  const { rows: allRows, counts } = await loadReviewQueue(supabase, core, user.id);
   const rows = filterReviewRows(allRows, view);
 
   const emptyCopy: Record<ReviewView, { title: string; description: string }> = {

@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { decryptToken } from '@/lib/crypto/tokens';
-import { gmailProvider } from '@/lib/jobs/email/providers/gmail';
+import { gmailProvider } from '@/lib/email/providers/gmail';
 
 export interface SettingsState {
   error?: string;
@@ -86,9 +87,9 @@ export async function updateProfile(
  */
 export async function disconnectInbox(accountId: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  const supabase = await createClient();
+  const core = await createCoreClient();
 
-  const { data: account } = await supabase
+  const { data: account } = await core
     .from('email_accounts')
     .select('id, oauth_refresh_token')
     .eq('id', accountId)
@@ -107,7 +108,7 @@ export async function disconnectInbox(accountId: string): Promise<{ error: strin
     }
   }
 
-  const { error } = await supabase
+  const { error } = await core
     .from('email_accounts')
     .delete()
     .eq('id', accountId)

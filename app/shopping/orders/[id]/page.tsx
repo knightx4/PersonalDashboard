@@ -54,9 +54,9 @@ export default async function OrderDetailPage({
   const isDeleted = Boolean(order.deleted_at);
 
   const { data: sourceMessages } = await supabase
-    .from('ingested_messages')
+    .from('inbox_messages')
     .select(
-      'provider_message_id, thread_id, subject, from_address, classification, received_at, email_accounts ( email_address )',
+      'provider_message_id, thread_id, subject, from_address, classification, received_at, email_address',
     )
     .eq('resulting_order_id', id)
     .order('received_at', { ascending: true });
@@ -85,7 +85,7 @@ export default async function OrderDetailPage({
 
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
-  const inbox = messageInbox(orderEmailMessage);
+  const inboxAddress = orderEmailMessage?.email_address ?? null;
   const orderEmailHref = messageGmailHref(orderEmailMessage);
 
   // Pair lifecycle emails to shipment rows (nearest by date, each email used once).
@@ -454,9 +454,9 @@ export default async function OrderDetailPage({
           <dt className="text-ink-muted">Source</dt>
           <dd className="text-right text-ink">
             {order.source.replaceAll('_', ' ')}
-            {inbox?.email_address ? (
+            {inboxAddress ? (
               <span className="mt-0.5 block text-[13px] font-normal text-ink-faint">
-                {inbox.email_address}
+                {inboxAddress}
               </span>
             ) : null}
           </dd>
@@ -473,10 +473,7 @@ type LinkedEmail = {
   from_address: string | null;
   classification: string | null;
   received_at: string | null;
-  email_accounts:
-    | { email_address: string }
-    | { email_address: string }[]
-    | null;
+  email_address: string | null;
 };
 
 type ShipmentRow = {
@@ -486,18 +483,12 @@ type ShipmentRow = {
   delivered_at: string | null;
 };
 
-function messageInbox(message: LinkedEmail | null | undefined) {
-  if (!message) return null;
-  return Array.isArray(message.email_accounts)
-    ? message.email_accounts[0]
-    : message.email_accounts;
-}
-
 function messageGmailHref(message: LinkedEmail | null | undefined): string | null {
   if (!message) return null;
-  const inbox = messageInbox(message);
+  // The view carries the mailbox address, so this no longer needs an embed
+  // that PostgREST could not resolve across schemas anyway.
   return gmailOpenUrl({
-    emailAddress: inbox?.email_address,
+    emailAddress: message.email_address ?? undefined,
     threadId: message.thread_id,
     messageId: message.provider_message_id,
   });

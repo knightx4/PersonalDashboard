@@ -1,5 +1,6 @@
 import { CheckCheck } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
@@ -28,11 +29,12 @@ export default async function ReviewPage({
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
   const view = parseReviewView(params.view);
 
   const [{ rows, counts }, candidates, companies, { data: profile }] = await Promise.all([
-    loadReviewQueue(supabase, user.id),
+    loadReviewQueue(supabase, core, user.id),
     loadLinkCandidates(supabase, user.id),
     loadCompanies(supabase, user.id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),

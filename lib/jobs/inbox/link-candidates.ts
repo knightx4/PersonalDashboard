@@ -47,7 +47,7 @@ export async function loadLinkCandidates(
   // Thread ids already linked, so thread continuity — the most precise signal —
   // can be checked without a query per candidate.
   const { data: threads } = await supabase
-    .from('ingested_messages')
+    .from('inbox_messages')
     .select('thread_id, resulting_application_id')
     .not('thread_id', 'is', null)
     .not('resulting_application_id', 'is', null)
