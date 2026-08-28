@@ -136,7 +136,22 @@ describe('rejection recall', () => {
 });
 
 describe('board digests stay out of the review queue', () => {
-  it('labels job alerts explicitly rather than sweeping them into not_relevant', () => {
+  it('drops ignored senders outright rather than labelling them', () => {
+    // Labelling still meant fetching. Indeed is about roles you have not
+    // applied to, so there is nothing a review queue could decide about it.
+    for (const from of ['alert@indeed.com', 'noreply@indeedemail.com', 'x@match.indeed.com']) {
+      const result = classifyMessage({
+        fromAddress: from,
+        subject: 'Senior Financial Analyst and 9 more jobs for you',
+        bodyPreview: 'New jobs matching your search. Apply now.',
+        companies: COMPANIES,
+      });
+      expect(result.classification, from).toBe('not_relevant');
+      expect(result.tier, from).toBe('A');
+    }
+  });
+
+  it('still labels job alerts from senders that are worth reading otherwise', () => {
     for (const fixture of FIXTURES.filter((f) => f.expected.classification === 'job_alert')) {
       const result = classifyMessage({
         fromAddress: fixture.from,

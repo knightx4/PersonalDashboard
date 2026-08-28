@@ -1,6 +1,7 @@
 import {
   atsVendorForDomain,
   companyHintFromSubdomain,
+  isIgnoredSender,
   domainFromAddress,
   isKnownAtsSender,
   isSchedulingSender,
@@ -115,15 +116,64 @@ const CONFIRMATION_SUBJECT = [
   /\bapplication (submitted|confirmation)\b/i,
 ];
 
+/**
+ * What an acknowledgement actually says.
+ *
+ * The original four all assumed the word "application" appears near the word
+ * "received", and most auto-acks say neither. The plainest real one in the
+ * corpus reads "Thank you for your interest in David Protein. Our team is
+ * currently reviewing applications for this role." — no keyword, and a
+ * subject of "Finance Associate - David Protein" with nothing in it either.
+ * It was classified not relevant and vanished.
+ *
+ * Broadening this is safe in a way it would not be on its own, because two
+ * things run first: rejections, which share most of this vocabulary, and the
+ * scheduling ask below, which is what separates "we got it" from "pick a
+ * time".
+ */
 const CONFIRMATION_BODY = [
   /(we|thanks for|thank you for) (have )?received your application/i,
   /your application (has been|was) (received|submitted|successfully submitted)/i,
-  /thank you for (applying|your application|submitting)/i,
+  /thank(s| you) for (applying|your application|submitting|your interest)/i,
   /we(?:'| wi)ll review your (application|materials|resume)/i,
+  /(currently|actively) reviewing (all |the )?(applications|candidates|submissions)/i,
+  /(our|the) (team|hiring team|recruiting team) (is|are|will be) reviewing/i,
+  /if there (are|is) any next steps/i,
+  /(we|you)(?:'| wi)ll be in touch (with you )?(shortly|soon|if)/i,
+  /has been (successfully )?(received|submitted)/i,
+];
+
+/**
+ * A message that asks you to pick a time is an interview invitation, whatever
+ * pleasantry it opened with.
+ *
+ * This exists because a great many invitations begin "Thank you for applying
+ * to the X role at Y" and then ask for your availability. The confirmation
+ * patterns matched that opening line, confirmation was tested first, and a
+ * real interview invite was filed as an acknowledgement — so it never reached
+ * the interviews board and the pursuit looked like it had gone quiet.
+ *
+ * Kept narrow deliberately. Every one of these is an instruction to the
+ * candidate to do something about a time, which an acknowledgement never is.
+ */
+const SCHEDULING_ASK = [
+  /(find|pick|choose|select|book|grab|suggest|share|submit|send) (a |your |some |your )?(time|times|availability)/i,
+  /schedul(e|ing) (a |your )?(call|chat|interview|screen|meeting|time)/i,
+  /would (like|love) to (set up|schedule|arrange|find a time)/i,
+  /invite you to (an? )?(interview|conversation|call|chat)/i,
+  /(let us|let's) (find|set up) a time/i,
+  /what (does your|is your) (availability|schedule)/i,
+  /(times|slots) that work for you/i,
+  // The booking links themselves, which are unambiguous.
+  /calendly\.com|ashbyhq\.com\/meeting|greenhouse\.io\/availability|savvycal\.com|cal\.com\/|modernloop|goodtime\.io|prelude\.co|hire\.withgoodtime/i,
 ];
 
 const INTERVIEW_SUBJECT = [
   /\b(interview|phone screen|screening call|chat|conversation) (invit|request|schedul|with|for)/i,
+  // "Interview Availability Request" -- a word between the two, which the
+  // pattern above requires to be adjacent.
+  /\binterview\b[^|]{0,20}\b(availability|request|scheduling)\b/i,
+  /\bavailability (request|for)\b/i,
   /\binvitation to interview\b/i,
   /\b(next|following) steps?\b/i,
   /\bschedul(e|ing) (a |your )?(call|chat|interview|screen)/i,
@@ -225,6 +275,21 @@ const NOT_RELEVANT_SUBJECT = [
   /\b(password|verify your email|two-factor|security alert|sign-?in)\b/i,
 ];
 
+/**
+ * Collapse every run of whitespace to a single space.
+ *
+ * Not cosmetic. Mail is hard-wrapped at about seventy characters, so any
+ * phrase long enough to be worth matching is eventually split across a
+ * newline — and every pattern below contains a literal space. A real
+ * rejection reading "we'll keep your resume on\nfile" matched nothing at all
+ * and was filed as not relevant, which is the single most expensive miss this
+ * classifier can make: a dead application stays counted as live and nothing
+ * ever says otherwise.
+ */
+function flatten(value: string): string {
+  return value.replace(/\s+/g, ' ');
+}
+
 function any(patterns: readonly RegExp[], value: string): boolean {
   return patterns.some((pattern) => pattern.test(value));
 }
@@ -252,9 +317,9 @@ function findCompany(
 export function classifyMessage(input: ClassifyInput): ClassifyResult {
   const fromDomain = domainFromAddress(input.fromAddress);
   const replyDomain = domainFromAddress(input.replyToAddress);
-  const subject = input.subject ?? '';
-  const body = input.bodyPreview ?? '';
-  const blob = `${subject}\n${body}`;
+  const subject = flatten(input.subject ?? '');
+  const body = flatten(input.bodyPreview ?? '');
+  const blob = `${subject} ${body}`;
 
   const ats = atsVendorForDomain(fromDomain) !== 'unknown'
     ? atsVendorForDomain(fromDomain)
@@ -277,7 +342,14 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
     tier,
   });
 
-  // Board digests first: they match every other pattern below and mean nothing.
+  // Ignored senders before anything else, including before job alerts: this is
+  // "never mine", not "mine but uninteresting", and it should not spend a
+  // single pattern match or reach the queue in any form.
+  if (isIgnoredSender(fromDomain) || isIgnoredSender(replyDomain)) {
+    return { ...result('not_relevant'), tier: 'A' };
+  }
+
+  // Board digests next: they match every other pattern below and mean nothing.
   if (any(JOB_ALERT_SUBJECT, subject)) return result('job_alert');
 
   if (any(NOT_RELEVANT_SUBJECT, subject) && !any(REJECTION_BODY, blob)) {
@@ -293,6 +365,10 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
   if (any(OFFER_SUBJECT, subject) || any(OFFER_BODY, body)) return result('offer');
 
   if (any(ASSESSMENT_SUBJECT, blob)) return result('assessment');
+
+  // Before confirmation, not after: an invitation that opens by thanking you
+  // for applying is still an invitation, and it is the ask that says so.
+  if (any(SCHEDULING_ASK, blob)) return result('interview_invite');
 
   if (any(CONFIRMATION_SUBJECT, subject) || any(CONFIRMATION_BODY, body)) {
     return result('application_confirmation');
