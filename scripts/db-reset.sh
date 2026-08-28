@@ -6,8 +6,17 @@
 # someone clicked it into the Supabase dashboard, this script won't reproduce
 # it and the RLS test will fail. That's the point.
 #
-# Against a real Supabase project you use `npx supabase db push` instead --
-# same files, no auth shim.
+# Two apps share this database, each owning a schema:
+#
+#   supabase/migrations             -> public,     the commerce side
+#   supabase/migrations-job-search  -> job_search, the job search side
+#
+# They are separate directories rather than one because the two sets were
+# numbered independently and both start at 0001 -- and the job_search versions
+# are already recorded remotely under exactly those numbers, so renaming them
+# would make the local files disagree with the deployed history. Applying
+# public first means tests/coexistence.test.ts sees a real neighbour rather
+# than a fixture standing in for one.
 set -euo pipefail
 
 DB_URL="${TEST_DATABASE_URL:-postgresql://postgres@localhost:5433/shopping_manager_test}"
@@ -26,9 +35,12 @@ psql "$BASE_URL/postgres" -v ON_ERROR_STOP=1 -q \
 echo "==> auth shim (local only)"
 psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/local/00_auth_shim.sql"
 
-for f in "$ROOT"/supabase/migrations/*.sql; do
-  echo "==> $(basename "$f")"
-  psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+for dir in migrations migrations-job-search; do
+  echo "==> $dir"
+  for f in "$ROOT/supabase/$dir"/*.sql; do
+    echo "==>   $(basename "$f")"
+    psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+  done
 done
 
 echo "==> done"
