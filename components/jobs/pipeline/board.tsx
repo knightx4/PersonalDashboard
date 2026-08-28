@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import { AlertTriangle, GripVertical } from 'lucide-react';
+import { AlertTriangle, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
-import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
+import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
  * The kanban board.
@@ -200,6 +200,7 @@ function Card({
             {'★'.repeat(row.excitement)}
           </span>
         )}
+        {!muted && <Dismiss row={row} />}
       </div>
 
       {row.nextAction && (
@@ -224,5 +225,59 @@ function Card({
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * "This was not real."
+ *
+ * On the card rather than only in the review queue, because a wrongly opened
+ * pursuit is most obvious exactly where you are looking at the board — and
+ * once it has been confirmed, or has aged out of the queue, the queue is no
+ * longer somewhere you would think to go.
+ *
+ * Hidden until hover so the board stays calm, but always reachable from the
+ * keyboard.
+ */
+function Dismiss({ row }: { row: PipelineRow }) {
+  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+
+  if (confirming) {
+    return (
+      <span className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              await dismissPursuit(row.applicationId);
+            })
+          }
+          className="press rounded px-1.5 py-0.5 text-[11px] font-medium text-status-rejected hover:bg-status-rejected-tint"
+        >
+          {pending ? 'Removing…' : 'Remove'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="press rounded px-1 py-0.5 text-[11px] text-ink-faint hover:text-ink"
+        >
+          Keep
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title="Not a real pursuit — remove it"
+      onClick={() => setConfirming(true)}
+      className="press shrink-0 rounded p-0.5 text-ink-faint opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
+    >
+      <X className="size-3.5" strokeWidth={2} aria-hidden />
+      <span className="sr-only">Not a real pursuit — remove it</span>
+    </button>
   );
 }
