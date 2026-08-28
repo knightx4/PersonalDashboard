@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/inbox-incremental",
+      "path": "/api/cron/daily",
       "schedule": "0 12 * * *"
     }
   ]

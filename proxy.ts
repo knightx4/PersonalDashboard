@@ -31,7 +31,7 @@ const PUBLIC_PATHS = [
   '/api/inbox/sync/continue',
   '/api/jobs/inbox/sync/continue',
   // Vercel Cron — authenticated via CRON_SECRET Bearer token.
-  '/api/cron/inbox-incremental',
+  '/api/cron',
 ];
 
 function isPublic(pathname: string): boolean {
