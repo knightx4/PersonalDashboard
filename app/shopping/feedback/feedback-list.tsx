@@ -9,26 +9,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { FieldError, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 
-export type FeedbackStatus =
-  | 'open'
-  | 'in_progress'
-  | 'blocked'
-  | 'planned'
-  | 'done'
-  | 'declined';
-
-export type FeedbackRow = {
-  id: string;
-  kind: 'bug' | 'feature';
-  body: string;
-  pagePath: string | null;
-  status: FeedbackStatus;
-  priority: number;
-  resolutionNote: string | null;
-  commitSha: string | null;
-  createdAt: string;
-};
+// Defined in lib/feedback so both workspaces' pages and this component agree
+// on one shape.
+export type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 
 const STATUS_STYLE: Record<FeedbackStatus, string> = {
   open: 'bg-accent-orange/10 text-accent-orange',

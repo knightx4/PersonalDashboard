@@ -5,6 +5,16 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 
+/**
+ * One queue rendered in two places, so a write has to refresh both. Missing
+ * the second is the kind of bug that only shows up as "I closed it and it is
+ * still there" from whichever workspace was not listed.
+ */
+function revalidateFeedback(): void {
+  revalidatePath('/shopping/feedback');
+  revalidatePath('/jobs/feedback');
+}
+
 export type FeedbackActionState = {
   error?: string;
   message?: string;
@@ -62,7 +72,7 @@ export async function submitFeedback(
   });
   if (error) return { error: error.message };
 
-  revalidatePath('/shopping/feedback');
+  revalidateFeedback();
   return {
     message:
       parsed.data.kind === 'bug' ? 'Bug report saved.' : 'Feature request saved.',
@@ -103,7 +113,7 @@ export async function updateFeedbackStatus(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
-  revalidatePath('/shopping/feedback');
+  revalidateFeedback();
   return { message: 'Updated.' };
 }
 
@@ -124,7 +134,7 @@ export async function deleteFeedback(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
-  revalidatePath('/shopping/feedback');
+  revalidateFeedback();
   return { message: 'Deleted.' };
 }
 
@@ -148,6 +158,6 @@ export async function setFeedbackPriority(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
-  revalidatePath('/shopping/feedback');
+  revalidateFeedback();
   return { message: 'Priority updated.' };
 }
