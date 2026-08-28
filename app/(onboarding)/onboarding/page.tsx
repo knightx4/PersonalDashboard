@@ -20,6 +20,11 @@ function parseStep(raw: string | undefined): Step {
 
 function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; text: string } | null {
   switch (code) {
+    case 'schema':
+      return {
+        tone: 'err',
+        text: 'Google connected, but the inbox could not be saved: the database schema that stores it is not exposed by the API. In Supabase open Settings → API → Exposed schemas and include public, job_search and core.',
+      };
     case 'connected':
       return {
         tone: 'ok',

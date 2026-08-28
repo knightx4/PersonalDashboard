@@ -60,6 +60,11 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
         tone: 'err',
         text: 'Connected to Google but could not read the Gmail address. Enable the Gmail API on the Google Cloud project, then try again.',
       };
+    case 'schema':
+      return {
+        tone: 'err',
+        text: 'Google connected, but the inbox could not be saved: the database schema that stores it is not exposed by the API. In Supabase open Settings → API → Exposed schemas and include public, job_search and core.',
+      };
     case 'db_write':
     case 'db_lookup':
       return {

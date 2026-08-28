@@ -18,6 +18,11 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
         tone: 'warn',
         text: 'Gmail read access was not granted. Connect again and leave “See and download your email” checked on Google’s screen.',
       };
+    case 'schema':
+      return {
+        tone: 'err',
+        text: 'Google connected, but the inbox could not be saved: the database schema that stores it is not exposed by the API. In Supabase open Settings → API → Exposed schemas and include public, job_search and core.',
+      };
     case 'unconfigured':
       return { tone: 'err', text: 'Gmail OAuth is not configured on this deployment yet.' };
     case 'no_refresh':

@@ -107,6 +107,10 @@ export async function GET(request: NextRequest) {
 
     if (lookupError) {
       console.error('gmail account lookup', lookupError);
+      // The mailbox lives in `core`, which has to be listed under Settings →
+      // API → Exposed schemas. When it is not, the grant succeeds at Google and
+      // then vanishes here -- which looks like "connecting Gmail does nothing".
+      if (lookupError.code === 'PGRST106') return finishRedirect(request, 'schema');
       return finishRedirect(request, 'db_lookup');
     }
 
@@ -116,6 +120,7 @@ export async function GET(request: NextRequest) {
 
     if (write.error) {
       console.error('gmail account write', write.error);
+      if (write.error.code === 'PGRST106') return finishRedirect(request, 'schema');
       return finishRedirect(request, 'db_write');
     }
 

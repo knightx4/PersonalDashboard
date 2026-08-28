@@ -1,4 +1,5 @@
-import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 
 /**
  * "Is a mailbox connected?", asked once.
@@ -16,10 +17,13 @@ export async function countConnectedInboxes(
   core: CoreSupabaseClient,
   userId: string,
 ): Promise<number> {
-  const { count } = await core
+  const { count, error } = await core
     .from('email_accounts')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId);
+  // A swallowed error here reads as "no mailbox connected", which is how a
+  // misconfigured deployment turned into an onboarding loop.
+  assertSchemaExposed(error, CORE_SCHEMA);
   return count ?? 0;
 }
 
@@ -28,7 +32,8 @@ export async function connectedAccountIds(
   core: CoreSupabaseClient,
   userId: string,
 ): Promise<string[]> {
-  const { data } = await core.from('email_accounts').select('id').eq('user_id', userId);
+  const { data, error } = await core.from('email_accounts').select('id').eq('user_id', userId);
+  assertSchemaExposed(error, CORE_SCHEMA);
   return (data ?? []).map((row) => row.id as string);
 }
 
@@ -37,10 +42,11 @@ export async function connectedInboxes(
   core: CoreSupabaseClient,
   userId: string,
 ): Promise<Array<{ id: string; emailAddress: string }>> {
-  const { data } = await core
+  const { data, error } = await core
     .from('email_accounts')
     .select('id, email_address')
     .eq('user_id', userId);
+  assertSchemaExposed(error, CORE_SCHEMA);
   return (data ?? []).map((row) => ({
     id: row.id as string,
     emailAddress: row.email_address as string,
