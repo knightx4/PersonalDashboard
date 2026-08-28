@@ -152,6 +152,39 @@ select
 from public.ingested_messages;
 
 -- ---------------------------------------------------------------------------
+-- Refuse to go further if the copy did not land.
+--
+-- Everything below this line is destructive, and it runs against a mailbox
+-- with real history behind it. The whole migration is one transaction, so a
+-- raise here rolls back the moves as well as the drops and leaves the database
+-- exactly as it was -- which is a far better outcome than dropping the columns
+-- and discovering afterwards that a row was missed.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  original bigint;
+  moved bigint;
+begin
+  select count(*) into original from public.ingested_messages;
+  select count(*) into moved from core.ingested_messages;
+  if moved <> original then
+    raise exception 'ingestion move incomplete: % of % messages reached core', moved, original;
+  end if;
+
+  select count(*) into original from public.email_accounts;
+  select count(*) into moved from core.email_accounts;
+  if moved <> original then
+    raise exception 'ingestion move incomplete: % of % accounts reached core', moved, original;
+  end if;
+
+  select count(*) into original from public.sync_jobs;
+  select count(*) into moved from core.sync_jobs;
+  if moved <> original then
+    raise exception 'ingestion move incomplete: % of % sync jobs reached core', moved, original;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Reduce public.ingested_messages to the commerce verdict.
 --
 -- The table keeps its name and its ids: returns.source_message_id still points
