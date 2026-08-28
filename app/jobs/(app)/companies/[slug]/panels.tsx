@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { addNote } from '@/app/jobs/roles/[id]/actions';
+import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
 import { updateCompany } from '../actions';
 
 export function CompanyPanels(props: {

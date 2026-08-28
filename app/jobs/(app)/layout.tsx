@@ -18,8 +18,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const supabase = await createClient();
 
+  // The job workspace's own onboarding, not the commerce one. They gate on
+  // different profile rows in different schemas, so completing one says nothing
+  // about the other -- and sending someone to /onboarding from here would bounce
+  // them straight back, forever.
   if (await onboardingNeeded(supabase, user)) {
-    redirect('/onboarding');
+    redirect('/jobs/onboarding');
   }
 
   const [{ data: profile }, reviewCount, { data: accounts }] = await Promise.all([

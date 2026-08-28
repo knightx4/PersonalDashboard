@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
-import { moveApplication } from '@/app/jobs/pipeline/actions';
+import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
  * The kanban board.

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/field';
-import { promoteToCanonical } from '@/app/jobs/roles/actions';
+import { promoteToCanonical } from '@/app/jobs/(app)/roles/actions';
 
 export function AnswerBank({
   questions,
