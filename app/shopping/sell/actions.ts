@@ -6,6 +6,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { createExpectedPriceSource } from '@/lib/sell/expected-price';
 import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/load';
+import { quoteIsCurrent, type CachedQuote } from '@/lib/sell/quote-cache';
 import { mapPool } from '@/lib/async/map-pool';
 import { parseDollarsToCents } from '@/lib/money';
 
@@ -168,12 +169,15 @@ export async function importBooksFromOrders(
  * click cannot run away with a large library.
  */
 export async function estimateMissingPrices(
-  // Signature is fixed by useActionState; the run takes no input of its own.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: SellActionState, _formData: FormData,
+  _prev: SellActionState,
+  formData: FormData,
 ): Promise<SellActionState> {
   const user = await requireUser();
   const supabase = await createClient();
+
+  // "Rescan" ignores the cache and prices the books again from scratch. The
+  // batch limit still applies, so the click costs the same as any other.
+  const rescan = String(formData.get('rescan') ?? '') === '1';
 
   const provider = await createExpectedPriceSource({
     ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
@@ -208,13 +212,24 @@ export async function estimateMissingPrices(
 
   const { data: cachedRows } = await supabase
     .from('book_price_quotes')
-    .select('isbn_13')
+    .select('isbn_13, quoted_cents, fetched_at')
     .eq('source', source)
     .in('isbn_13', isbns);
-  const alreadyPriced = new Set((cachedRows ?? []).map((r) => r.isbn_13 as string));
 
-  const todo = isbns.filter((isbn) => !alreadyPriced.has(isbn)).slice(0, ESTIMATE_BATCH_LIMIT);
-  if (todo.length === 0) return { message: 'Every book already has a price.' };
+  // A row is only a price if it holds one and has not expired -- the same
+  // question the loader asks. Counting every row as a price meant a lookup
+  // that found nothing silenced this button permanently.
+  const alreadyPriced = new Set(
+    rescan
+      ? []
+      : (cachedRows ?? [])
+          .filter((r) => quoteIsCurrent(r as CachedQuote, source))
+          .map((r) => r.isbn_13 as string),
+  );
+
+  const outstanding = isbns.filter((isbn) => !alreadyPriced.has(isbn));
+  const todo = outstanding.slice(0, ESTIMATE_BATCH_LIMIT);
+  if (todo.length === 0) return { message: 'Every book already has a current price.' };
 
   let priced = 0;
   await mapPool(todo, 2, async (isbn13) => {
@@ -237,11 +252,15 @@ export async function estimateMissingPrices(
   });
 
   revalidatePath('/shopping/sell');
-  const remaining = isbns.filter((isbn) => !alreadyPriced.has(isbn)).length - todo.length;
+  const remaining = outstanding.length - todo.length;
+  const noneFound =
+    priced === 0
+      ? ' No price came back for any of them — the catalog had nothing to go on.'
+      : '';
   return {
     message: `Priced ${priced} of ${todo.length} book(s).${
       remaining > 0 ? ` ${remaining} still unpriced — run again to continue.` : ''
-    }`,
+    }${noneFound}`,
   };
 }
 

@@ -18,6 +18,7 @@ import {
 } from '@/lib/sell/route';
 import { expectedPriceSourceKind } from '@/lib/sell/expected-price';
 import { mapPool } from '@/lib/async/map-pool';
+import { quoteIsCurrent } from '@/lib/sell/quote-cache';
 import { serverEnv } from '@/lib/env';
 import type { BookEditionCandidate } from '@/lib/books/types';
 
@@ -77,15 +78,6 @@ function envKeys() {
   }
 }
 
-const QUOTE_TTL_MS = 1000 * 60 * 60 * 12; // 12h
-
-/**
- * Web estimates are billed per lookup, and a used-book price does not move
- * meaningfully inside a month. Long cache, and never refreshed just because
- * someone opened the page.
- */
-const WEB_ESTIMATE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
-
 /** How many paid lookups one "estimate prices" click may spend. */
 export const ESTIMATE_BATCH_LIMIT = 15;
 
@@ -101,12 +93,9 @@ async function cachedBuyback(
     .eq('source', 'buyback')
     .maybeSingle();
 
-  if (
-    cached &&
-    cached.fetched_at &&
-    Date.now() - new Date(cached.fetched_at).getTime() < QUOTE_TTL_MS
-  ) {
-    if (cached.quoted_cents == null) return null;
+  // quoteIsCurrent is false for a row with no price, so a failed lookup does
+  // not pin the book to "no buyback offer" until the ttl runs out.
+  if (cached && cached.quoted_cents != null && quoteIsCurrent(cached, 'buyback')) {
     return {
       vendor: cached.vendor_name ?? 'Buyback',
       cents: cached.quoted_cents,
@@ -146,15 +135,10 @@ async function cachedExpectedPrice(
     .eq('source', sourceKind)
     .maybeSingle();
 
-  const ttl = sourceKind === 'web_estimate' ? WEB_ESTIMATE_TTL_MS : QUOTE_TTL_MS;
-  if (
-    cached &&
-    cached.fetched_at &&
-    Date.now() - new Date(cached.fetched_at).getTime() < ttl
-  ) {
-    return cached.quoted_cents;
-  }
+  if (cached && quoteIsCurrent(cached, sourceKind)) return cached.quoted_cents;
 
+  // Page loads never spend a billed lookup: an unpriced book stays unpriced
+  // on screen until the user asks for an estimate.
   if (!allowFetch) return cached?.quoted_cents ?? null;
 
   const cents = await provider.expectedSelfListCents(isbn13);

@@ -348,10 +348,13 @@ export function ImportBooksFromOrdersButton() {
  */
 export function EstimatePricesButton({
   unpricedCount,
+  pricedCount,
   batchLimit,
   paid,
 }: {
   unpricedCount: number;
+  /** Books that already have a price, and so can only be *re*-priced. */
+  pricedCount: number;
   batchLimit: number;
   paid: boolean;
 }) {
@@ -359,19 +362,51 @@ export function EstimatePricesButton({
     estimateMissingPrices,
     {} as SellActionState,
   );
-  if (unpricedCount === 0) return null;
+  if (unpricedCount === 0 && pricedCount === 0) return null;
 
   const thisRun = Math.min(unpricedCount, batchLimit);
+  const rescanRun = Math.min(unpricedCount + pricedCount, batchLimit);
+  const cost = (books: number) =>
+    paid ? ` · about ${formatMoney(Math.ceil(books * 2.5))} of API usage` : '';
+
   return (
     <form action={action} className="flex flex-wrap items-center gap-3">
-      <Button type="submit" size="sm" disabled={pending}>
-        {pending ? 'Pricing…' : `Estimate prices for ${thisRun} book(s)`}
-      </Button>
-      <span className="text-[13px] text-ink-muted">
-        {unpricedCount} unpriced
-        {paid ? ` · about ${formatMoney(Math.ceil(thisRun * 2.5))} of API usage` : ''}
-        {unpricedCount > batchLimit ? ' · run again for the rest' : ''}
-      </span>
+      {unpricedCount > 0 && (
+        <>
+          <Button type="submit" size="sm" disabled={pending}>
+            {pending ? 'Pricing…' : `Estimate prices for ${thisRun} book(s)`}
+          </Button>
+          <span className="text-[13px] text-ink-muted">
+            {unpricedCount} unpriced
+            {cost(thisRun)}
+            {unpricedCount > batchLimit ? ' · run again for the rest' : ''}
+          </span>
+        </>
+      )}
+
+      {/*
+        Prices go stale and lookups come back empty, so "already priced" cannot
+        be the end of it. This submit carries rescan=1, which makes the action
+        ignore the cache and ask again.
+      */}
+      {pricedCount > 0 && (
+        <>
+          <Button
+            type="submit"
+            name="rescan"
+            value="1"
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+          >
+            {pending ? 'Pricing…' : `Rescan ${rescanRun} book(s)`}
+          </Button>
+          <span className="text-[13px] text-ink-muted">
+            fetches fresh prices, ignoring what is cached{cost(rescanRun)}
+          </span>
+        </>
+      )}
+
       <FieldError>{state.error}</FieldError>
       {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
     </form>

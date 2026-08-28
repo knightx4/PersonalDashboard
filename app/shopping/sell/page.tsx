@@ -77,6 +77,7 @@ export default async function SellPage() {
 
       <EstimatePricesButton
         unpricedCount={unpricedCount}
+        pricedCount={Math.max(0, rows.length - unpricedCount)}
         batchLimit={ESTIMATE_BATCH_LIMIT}
         paid={priceSource === 'web_estimate'}
       />
