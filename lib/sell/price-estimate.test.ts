@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEstimatePayload } from '@/lib/sell/web-estimate';
+import { parseEstimatePayload } from '@/lib/sell/price-estimate';
 
 const good = {
   low_cents: 500,
