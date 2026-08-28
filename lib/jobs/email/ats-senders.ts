@@ -25,6 +25,7 @@ export type AtsVendor =
   | 'jobvite'
   | 'bamboohr'
   | 'breezy'
+  | 'recruitee'
   | 'rippling'
   | 'wellfound'
   | 'linkedin'
@@ -51,6 +52,7 @@ export const ATS_SENDERS: readonly AtsSender[] = [
   { vendor: 'jobvite', domains: ['jobvite.com'] },
   { vendor: 'bamboohr', domains: ['bamboohr.com'] },
   { vendor: 'breezy', domains: ['breezy.hr'] },
+  { vendor: 'recruitee', domains: ['recruitee.com'] },
   { vendor: 'rippling', domains: ['rippling.com'] },
   { vendor: 'wellfound', domains: ['wellfound.com', 'angel.co'] },
   { vendor: 'linkedin', domains: ['linkedin.com'] },

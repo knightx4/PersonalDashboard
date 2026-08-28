@@ -4,6 +4,12 @@ import { detectPosting, supportsQuestionFetch, type DetectedPosting } from './de
 import * as greenhouse from './greenhouse';
 import * as lever from './lever';
 import * as ashby from './ashby';
+import * as smartrecruiters from './smartrecruiters';
+import * as workable from './workable';
+import * as recruitee from './recruitee';
+import * as breezy from './breezy';
+import * as bamboohr from './bamboohr';
+import * as rippling from './rippling';
 import * as generic from './generic';
 import type { FetchedPosting } from './types';
 
@@ -16,9 +22,13 @@ export type FetchOutcome =
   | { ok: false; tier: 3; reason: string; detected: DetectedPosting };
 
 /**
- * The only entry point. Nothing outside this directory knows Greenhouse exists,
- * which is also what keeps the paste box honest: it is the documented answer
- * whenever a tier above it fails, rather than an apology.
+ * The only entry point. Nothing outside this directory knows which vendors
+ * have an API, which is also what keeps the paste box honest: it is the
+ * documented answer whenever a tier above it fails, rather than an apology.
+ *
+ * Every tier-1 vendor here publishes its board without a key. They are still
+ * somebody else's undocumented endpoint, so each one falls through to tier 2
+ * and then to the paste box rather than being trusted to stay up.
  */
 export async function fetchPostingFromUrl(url: string): Promise<FetchOutcome> {
   const detected = detectPosting(url);
@@ -41,6 +51,28 @@ export async function fetchPostingFromUrl(url: string): Promise<FetchOutcome> {
     }
     if (detected.vendor === 'ashby' && detected.boardToken) {
       return { ok: true, posting: await ashby.fetchPosting(detected.boardToken, detected.jobId), tier: 1 };
+    }
+    if (detected.vendor === 'smartrecruiters' && detected.boardToken && detected.jobId) {
+      return {
+        ok: true,
+        posting: await smartrecruiters.fetchPosting(detected.boardToken, detected.jobId),
+        tier: 1,
+      };
+    }
+    if (detected.vendor === 'workable' && detected.boardToken) {
+      return { ok: true, posting: await workable.fetchPosting(detected.boardToken, detected.jobId), tier: 1 };
+    }
+    if (detected.vendor === 'recruitee' && detected.boardToken) {
+      return { ok: true, posting: await recruitee.fetchPosting(detected.boardToken, detected.jobId), tier: 1 };
+    }
+    if (detected.vendor === 'breezy' && detected.boardToken) {
+      return { ok: true, posting: await breezy.fetchPosting(detected.boardToken, detected.jobId), tier: 1 };
+    }
+    if (detected.vendor === 'bamboohr' && detected.boardToken) {
+      return { ok: true, posting: await bamboohr.fetchPosting(detected.boardToken, detected.jobId), tier: 1 };
+    }
+    if (detected.vendor === 'rippling' && detected.boardToken) {
+      return { ok: true, posting: await rippling.fetchPosting(detected.boardToken, detected.jobId), tier: 1 };
     }
     return { ok: true, posting: await generic.fetchPosting(url), tier: 2 };
   } catch (error) {
