@@ -53,6 +53,11 @@ export const ATS_SENDERS: readonly AtsSender[] = [
   { vendor: 'bamboohr', domains: ['bamboohr.com'] },
   { vendor: 'breezy', domains: ['breezy.hr'] },
   { vendor: 'recruitee', domains: ['recruitee.com'] },
+  // Sourcing and recruiting CRMs. Not an ATS, but the same thing matters: mail
+  // sent through them is recruiting mail, and their domain is never the
+  // employer's. gem.com was recorded as a company's own domain, which would
+  // have pointed every other Gem customer's mail at that one company.
+  { vendor: 'other', domains: ['gem.com', 'ashbyhq.com', 'paradox.ai', 'hirevue.com', 'seekout.com', 'teamable.com'] },
   { vendor: 'rippling', domains: ['rippling.com'] },
   { vendor: 'wellfound', domains: ['wellfound.com', 'angel.co'] },
   { vendor: 'linkedin', domains: ['linkedin.com'] },

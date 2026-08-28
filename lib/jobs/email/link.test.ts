@@ -338,8 +338,33 @@ describe('the acceptance criteria', () => {
       }
     });
 
+    it('reads a bare hostname as the company in front of it', () => {
+      // "buildwithporter.com" went in verbatim and sat in the company list
+      // looking like a bug, because it was one.
+      const decision = decideLink(
+        message({ threadId: null, extractedCompany: 'buildwithporter.com', replyToAddress: null }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toMatchObject({ name: 'Buildwithporter' });
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
     it('refuses to invent a company from a name that is not one', () => {
-      for (const name of ['the hiring team', 'Careers', 'no-reply', 'Talent Acquisition']) {
+      for (const name of [
+        'the hiring team',
+        'Careers',
+        'no-reply',
+        'Talent Acquisition',
+        // Placeholders a posting uses when it will not name the employer.
+        'Confidential',
+        'Undisclosed',
+        'Stealth Startup',
+      ]) {
         const decision = decideLink(
           message({ threadId: null, extractedCompany: name, replyToAddress: null }),
           [],

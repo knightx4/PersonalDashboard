@@ -330,6 +330,18 @@ const NON_COMPANY_NAMES = new Set([
   'team',
   'company',
   'unknown',
+  // Placeholders a posting uses when it will not name the employer. Seen in
+  // the wild as a company called "Confidential" collecting pursuits.
+  'confidential',
+  'undisclosed',
+  'not disclosed',
+  'stealth',
+  'stealth startup',
+  'private',
+  'various',
+  'multiple',
+  'n a',
+  'none',
 ]);
 
 /**
@@ -352,6 +364,17 @@ export function usableCompanyName(raw: string | null | undefined): string | null
   if (/@|https?:\/\//.test(name)) return null;
   // A bare number, or a string with no letters at all.
   if (!/[a-z]/i.test(name)) return null;
+
+  // A bare hostname is an identifier, not a name: "buildwithporter.com" went
+  // in verbatim and sat in the company list looking like a bug, because it is
+  // one. The label in front of the suffix is the company, so use that.
+  const hostname = name.match(/^([a-z0-9][a-z0-9-]*)\.[a-z.]{2,}$/i);
+  if (hostname) {
+    const label = hostname[1];
+    if (label.length < 2) return null;
+    if (NON_COMPANY_NAMES.has(normalizeCompanyName(label))) return null;
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
 
   return name;
 }
