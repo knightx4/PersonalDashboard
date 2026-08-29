@@ -464,6 +464,8 @@ export const gameDetails = pgTable(
     candidates: jsonb('candidates').notNull().default([]),
     confirmationReason: text('confirmation_reason'),
     autoImported: boolean('auto_imported').notNull().default(false),
+    /** A price you typed yourself; beats every lookup. */
+    manualExpectedPriceCents: integer('manual_expected_price_cents'),
     ...timestamps,
   },
   (t) => [
@@ -533,6 +535,30 @@ export const bookPriceQuotes = pgTable(
   (t) => [
     uniqueIndex('book_price_quotes_isbn_source_key').on(t.isbn13, t.source),
     index('book_price_quotes_fetched_at_idx').on(t.fetchedAt),
+  ],
+);
+
+/**
+ * The same cache for games, keyed by BGG id because they have no ISBN.
+ * Separate table rather than a widened book_price_quotes — see 0030.
+ */
+export const gamePriceQuotes = pgTable(
+  'game_price_quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bggId: integer('bgg_id').notNull(),
+    source: bookPriceQuoteSource('source').notNull(),
+    quotedCents: integer('quoted_cents'),
+    shippingCents: integer('shipping_cents').notNull().default(0),
+    vendorName: text('vendor_name'),
+    vendorUrl: text('vendor_url'),
+    payload: jsonb('payload'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('game_price_quotes_bgg_source_key').on(t.bggId, t.source),
+    index('game_price_quotes_fetched_at_idx').on(t.fetchedAt),
   ],
 );
 

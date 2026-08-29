@@ -6,6 +6,7 @@ import {
   estimateMissingPrices,
   importBooksFromOrders,
   noteListingIntent,
+  setManualGamePrice,
   setManualPrice,
   updateSellSettings,
   type SellActionState,
@@ -20,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label } from '@/components/ui/field';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { SellBookRow, SellPendingRow } from '@/lib/sell/load';
+import type { SellGameRow } from '@/lib/sell/load-games';
 import type { SellPath } from '@/lib/sell/route';
 
 const PATH_LABEL: Record<SellPath, string> = {
@@ -410,5 +412,128 @@ export function EstimatePricesButton({
       <FieldError>{state.error}</FieldError>
       {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
     </form>
+  );
+}
+
+/**
+ * Games grouped by the same sell path as books.
+ *
+ * A separate component rather than a widened SellPathGroup: the subtitle is a
+ * year and publisher rather than authors and an ISBN, there is no buyback row
+ * to render because nothing buys board games back, and the manual price writes
+ * to a different table.
+ */
+export function SellGamePathGroup({
+  path,
+  rows,
+}: {
+  path: SellPath;
+  rows: SellGameRow[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-ink">
+        {PATH_LABEL[path]} <span className="font-normal text-ink-muted">({rows.length})</span>
+      </h2>
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+        {rows.map((row) => (
+          <li key={row.inventoryItemId} className="flex gap-3 px-4 py-3">
+            {row.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={row.imageUrl}
+                alt=""
+                className="h-16 w-12 shrink-0 rounded object-cover bg-canvas"
+              />
+            ) : (
+              <div className="h-16 w-12 shrink-0 rounded bg-canvas" />
+            )}
+            <div className="min-w-0 flex-1">
+              <Link
+                href={`/shopping/inventory/${row.inventoryItemId}`}
+                className="font-medium text-ink hover:underline"
+              >
+                {row.shortName || row.name}
+              </Link>
+              <p className="text-[13px] text-ink-muted">
+                {[row.publisher, row.yearPublished].filter(Boolean).join(' · ') ||
+                  'Board game'}
+              </p>
+              <p className="mt-1 text-[12px] text-ink-faint">{row.reason}</p>
+              <p className="mt-1 text-[13px] text-ink-muted">
+                {row.netSelfCents != null && (
+                  <span className="mr-3">
+                    Self net {formatMoney(row.netSelfCents)}
+                    {row.priceIsManual ? ' (your price)' : ''}
+                  </span>
+                )}
+                {row.path === 'donate' && row.donateFmvCents > 0 && (
+                  <span>FMV hint {formatMoney(row.donateFmvCents)} (not tax advice)</span>
+                )}
+              </p>
+              <SellGameRowActions row={row} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function SellGameRowActions({ row }: { row: SellGameRow }) {
+  const [priceState, priceAction, pricePending] = useActionState(
+    setManualGamePrice,
+    {} as SellActionState,
+  );
+  const [disposeState, disposeAction, disposePending] = useActionState(
+    disposeInventoryItem,
+    {} as ActionState,
+  );
+  const [noteState, noteAction, notePending] = useActionState(
+    noteListingIntent,
+    {} as SellActionState,
+  );
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      <form action={priceAction} className="flex items-end gap-2">
+        <input type="hidden" name="inventory_item_id" value={row.inventoryItemId} />
+        <Input
+          name="price"
+          defaultValue={
+            row.priceIsManual && row.expectedSelfListCents != null
+              ? formatCentsAsDollarsInput(row.expectedSelfListCents)
+              : ''
+          }
+          placeholder="Own price"
+          className="w-24"
+          aria-label="Price you found yourself"
+        />
+        <Button type="submit" size="sm" variant="ghost" disabled={pricePending}>
+          {pricePending ? 'Saving…' : 'Set'}
+        </Button>
+      </form>
+      {(row.path === 'list_individually' || row.path === 'lot') && (
+        <form action={noteAction}>
+          <input type="hidden" name="id" value={row.inventoryItemId} />
+          <input type="hidden" name="note" value={`Sell assistant: ${PATH_LABEL[row.path]}`} />
+          <Button type="submit" size="sm" variant="secondary" disabled={notePending}>
+            I’ll list this myself
+          </Button>
+        </form>
+      )}
+      {row.path === 'donate' && (
+        <form action={disposeAction}>
+          <input type="hidden" name="id" value={row.inventoryItemId} />
+          <input type="hidden" name="disposal_method" value="donated" />
+          <input type="hidden" name="disposal_proceeds" value="" />
+          <Button type="submit" size="sm" variant="secondary" disabled={disposePending}>
+            Mark donated
+          </Button>
+        </form>
+      )}
+      <FieldError>{priceState.error ?? disposeState.error ?? noteState.error}</FieldError>
+    </div>
   );
 }

@@ -2,13 +2,33 @@
  * Expected self-list price sources. v1: eBay Browse active listings (asking
  * prices). Later: paid sold-comps behind the same interface.
  */
+/**
+ * Something to price, when an ISBN is not what identifies it.
+ *
+ * Board games have no ISBN, so the query is a title. That is a materially
+ * weaker signal — an ISBN pins one edition, "Catan" matches an expansion, a
+ * travel edition and a jigsaw — hence the hint, which the web-search source
+ * uses to say what kind of thing it is looking at.
+ */
+export type PriceSubject = {
+  query: string;
+  hint?: string | null;
+};
+
 export interface ExpectedPriceSource {
   expectedSelfListCents(isbn13: string): Promise<number | null>;
+  /** Price anything not identified by an ISBN. */
+  expectedSelfListCentsFor(subject: PriceSubject): Promise<number | null>;
 }
 
 export class NullExpectedPriceSource implements ExpectedPriceSource {
   async expectedSelfListCents(isbn13: string): Promise<number | null> {
     void isbn13;
+    return null;
+  }
+
+  async expectedSelfListCentsFor(subject: PriceSubject): Promise<number | null> {
+    void subject;
     return null;
   }
 }
@@ -18,6 +38,10 @@ export class FixtureExpectedPriceSource implements ExpectedPriceSource {
 
   async expectedSelfListCents(isbn13: string): Promise<number | null> {
     return this.map[isbn13] ?? null;
+  }
+
+  async expectedSelfListCentsFor(subject: PriceSubject): Promise<number | null> {
+    return this.map[subject.query] ?? null;
   }
 }
 
@@ -79,11 +103,20 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
   }
 
   async expectedSelfListCents(isbn13: string): Promise<number | null> {
+    return this.searchCents(isbn13);
+  }
+
+  /** Browse searches free text, so a title works the same way an ISBN does. */
+  async expectedSelfListCentsFor(subject: PriceSubject): Promise<number | null> {
+    return this.searchCents(subject.query);
+  }
+
+  private async searchCents(query: string): Promise<number | null> {
     const token = await this.accessToken();
     if (!token) return null;
     const marketplace = this.options.marketplaceId ?? 'EBAY_US';
     const url = new URL('https://api.ebay.com/buy/browse/v1/item_summary/search');
-    url.searchParams.set('q', isbn13);
+    url.searchParams.set('q', query);
     url.searchParams.set('limit', '20');
     url.searchParams.set('filter', 'conditions:{USED|NEW}');
 

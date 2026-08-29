@@ -1,8 +1,13 @@
 /**
- * Sell path router for confirmed ISBN books.
+ * Sell path router for confirmed items.
  *
  * Paths: list_individually | lot | buyback | donate
  * Unconfirmed editions must never reach this function.
+ *
+ * Not book-specific: shippingCents is a parameter and a null buyback quote is
+ * an ordinary case, which is how board games route through here unchanged --
+ * nothing buys those back, so they choose between listing, lotting and
+ * donating.
  */
 import { netBuyback, netSelf } from '@/lib/sell/pricing';
 
@@ -67,7 +72,7 @@ export function routeSellDecision(input: SellRouteInput): SellRouteResult {
       path: 'list_individually',
       netSelfCents,
       netBuybackCents,
-      reason: 'Self-list net clears your floor after fees, Media Mail, and effort.',
+      reason: 'Self-list net clears your floor after fees, shipping, and effort.',
     };
   }
 

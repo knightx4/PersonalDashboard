@@ -18,7 +18,7 @@ import {
   parseEstimatePayload,
   type EstimateResult,
 } from '@/lib/sell/price-estimate';
-import type { ExpectedPriceSource } from '@/lib/sell/expected-price';
+import type { ExpectedPriceSource, PriceSubject } from '@/lib/sell/expected-price';
 
 /**
  * Reading a few search results and reporting a number is not a reasoning
@@ -145,6 +145,14 @@ export class WebSearchExpectedPriceSource implements ExpectedPriceSource {
     const result = await estimateResalePrice(this.options, {
       label: `Book, ISBN ${isbn13}`,
       hint: 'Used copy in good condition, sold on eBay / Amazon marketplace / AbeBooks.',
+    });
+    return result.ok ? result.estimate.typical_cents : null;
+  }
+
+  async expectedSelfListCentsFor(subject: PriceSubject): Promise<number | null> {
+    const result = await estimateResalePrice(this.options, {
+      label: subject.query,
+      hint: subject.hint ?? null,
     });
     return result.ok ? result.estimate.typical_cents : null;
   }

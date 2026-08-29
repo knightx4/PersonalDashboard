@@ -6,6 +6,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { createExpectedPriceSource } from '@/lib/sell/expected-price';
 import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/load';
+import { gamePriceQuery } from '@/lib/sell/game-query';
 import { quoteIsCurrent, type CachedQuote } from '@/lib/sell/quote-cache';
 import { mapPool } from '@/lib/async/map-pool';
 import { parseDollarsToCents } from '@/lib/money';
@@ -191,15 +192,27 @@ export async function estimateMissingPrices(
     return { error: 'No price source configured.' };
   }
 
-  const { data: books } = await supabase
-    .from('book_details')
-    .select(
-      'isbn_13, manual_expected_price_cents, inventory_items!inner (user_id, status)',
-    )
-    .eq('inventory_items.user_id', user.id)
-    .eq('inventory_items.status', 'owned')
-    .eq('needs_confirmation', false)
-    .not('isbn_13', 'is', null);
+  // Books and games share the batch. One click, one budget -- otherwise the
+  // shelf with 35 games and 4 books would need the games priced fifteen at a
+  // time behind a button that says "book".
+  const [{ data: books }, { data: games }] = await Promise.all([
+    supabase
+      .from('book_details')
+      .select('isbn_13, manual_expected_price_cents, inventory_items!inner (user_id, status)')
+      .eq('inventory_items.user_id', user.id)
+      .eq('inventory_items.status', 'owned')
+      .eq('needs_confirmation', false)
+      .not('isbn_13', 'is', null),
+    supabase
+      .from('game_details')
+      .select(
+        'bgg_id, year_published, publisher, manual_expected_price_cents, inventory_items!inner (name, user_id, status)',
+      )
+      .eq('inventory_items.user_id', user.id)
+      .eq('inventory_items.status', 'owned')
+      .eq('needs_confirmation', false)
+      .not('bgg_id', 'is', null),
+  ]);
 
   const isbns = [
     ...new Set(
@@ -208,46 +221,118 @@ export async function estimateMissingPrices(
         .map((b) => b.isbn_13 as string),
     ),
   ];
-  if (isbns.length === 0) return { message: 'Nothing to price.' };
 
-  const { data: cachedRows } = await supabase
-    .from('book_price_quotes')
-    .select('isbn_13, quoted_cents, fetched_at')
-    .eq('source', source)
-    .in('isbn_13', isbns);
+  const firstInventory = (value: unknown): { name?: string } | null => {
+    if (Array.isArray(value)) return (value[0] as { name?: string }) ?? null;
+    return (value as { name?: string } | null) ?? null;
+  };
+
+  const gameTargets = new Map<number, { bggId: number; query: string; hint: string }>();
+  for (const row of games ?? []) {
+    if (row.manual_expected_price_cents != null) continue;
+    const bggId = row.bgg_id as number | null;
+    const name = firstInventory(row.inventory_items)?.name;
+    if (bggId == null || !name) continue;
+    const subject = gamePriceQuery({
+      name,
+      yearPublished: (row.year_published as number | null) ?? null,
+      publisher: (row.publisher as string | null) ?? null,
+    });
+    gameTargets.set(bggId, { bggId, ...subject });
+  }
+
+  if (isbns.length === 0 && gameTargets.size === 0) {
+    return { message: 'Nothing to price.' };
+  }
+
+  const [{ data: cachedBooks }, { data: cachedGames }] = await Promise.all([
+    isbns.length > 0
+      ? supabase
+          .from('book_price_quotes')
+          .select('isbn_13, quoted_cents, fetched_at')
+          .eq('source', source)
+          .in('isbn_13', isbns)
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+    gameTargets.size > 0
+      ? supabase
+          .from('game_price_quotes')
+          .select('bgg_id, quoted_cents, fetched_at')
+          .eq('source', source)
+          .in('bgg_id', [...gameTargets.keys()])
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+  ]);
 
   // A row is only a price if it holds one and has not expired -- the same
   // question the loader asks. Counting every row as a price meant a lookup
   // that found nothing silenced this button permanently.
-  const alreadyPriced = new Set(
+  const pricedIsbns = new Set(
     rescan
       ? []
-      : (cachedRows ?? [])
+      : (cachedBooks ?? [])
           .filter((r) => quoteIsCurrent(r as CachedQuote, source))
           .map((r) => r.isbn_13 as string),
   );
+  const pricedGames = new Set(
+    rescan
+      ? []
+      : (cachedGames ?? [])
+          .filter((r) => quoteIsCurrent(r as CachedQuote, source))
+          .map((r) => r.bgg_id as number),
+  );
 
-  const outstanding = isbns.filter((isbn) => !alreadyPriced.has(isbn));
+  type Target =
+    | { kind: 'book'; isbn13: string }
+    | { kind: 'game'; bggId: number; query: string; hint: string };
+
+  const outstanding: Target[] = [
+    ...isbns
+      .filter((isbn) => !pricedIsbns.has(isbn))
+      .map((isbn13) => ({ kind: 'book' as const, isbn13 })),
+    ...[...gameTargets.values()]
+      .filter((game) => !pricedGames.has(game.bggId))
+      .map((game) => ({ kind: 'game' as const, ...game })),
+  ];
+
   const todo = outstanding.slice(0, ESTIMATE_BATCH_LIMIT);
-  if (todo.length === 0) return { message: 'Every book already has a current price.' };
+  if (todo.length === 0) return { message: 'Everything already has a current price.' };
 
   let priced = 0;
-  await mapPool(todo, 2, async (isbn13) => {
+  await mapPool(todo, 2, async (target) => {
     try {
-      const cents = await provider.expectedSelfListCents(isbn13);
-      await supabase.from('book_price_quotes').upsert(
-        {
-          isbn_13: isbn13,
-          source,
-          quoted_cents: cents,
-          shipping_cents: 0,
-          fetched_at: new Date().toISOString(),
-        },
-        { onConflict: 'isbn_13,source' },
-      );
+      const cents =
+        target.kind === 'book'
+          ? await provider.expectedSelfListCents(target.isbn13)
+          : await provider.expectedSelfListCentsFor({
+              query: target.query,
+              hint: target.hint,
+            });
+
+      if (target.kind === 'book') {
+        await supabase.from('book_price_quotes').upsert(
+          {
+            isbn_13: target.isbn13,
+            source,
+            quoted_cents: cents,
+            shipping_cents: 0,
+            fetched_at: new Date().toISOString(),
+          },
+          { onConflict: 'isbn_13,source' },
+        );
+      } else {
+        await supabase.from('game_price_quotes').upsert(
+          {
+            bgg_id: target.bggId,
+            source,
+            quoted_cents: cents,
+            shipping_cents: 0,
+            fetched_at: new Date().toISOString(),
+          },
+          { onConflict: 'bgg_id,source' },
+        );
+      }
       if (cents != null) priced += 1;
     } catch (error) {
-      console.error('price estimate failed', isbn13, error);
+      console.error('price estimate failed', target, error);
     }
   });
 
@@ -258,7 +343,7 @@ export async function estimateMissingPrices(
       ? ' No price came back for any of them — the catalog had nothing to go on.'
       : '';
   return {
-    message: `Priced ${priced} of ${todo.length} book(s).${
+    message: `Priced ${priced} of ${todo.length} item(s).${
       remaining > 0 ? ` ${remaining} still unpriced — run again to continue.` : ''
     }${noneFound}`,
   };
@@ -295,6 +380,53 @@ export async function setManualPrice(
 
   const { error } = await supabase
     .from('book_details')
+    .update({ manual_expected_price_cents: cents })
+    .eq('inventory_item_id', item.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/shopping/sell');
+  revalidatePath(`/shopping/inventory/${item.id}`);
+  return { message: cents == null ? 'Price cleared.' : 'Price saved.' };
+}
+
+/**
+ * The same by-hand price for a game.
+ *
+ * Separate from setManualPrice because the column lives on game_details, and
+ * it earns its keep more here than for books: a title search is a far weaker
+ * identifier than an ISBN, so lookups come back empty more often and typing
+ * the number yourself is frequently the only way a game gets priced at all.
+ */
+export async function setManualGamePrice(
+  _prev: SellActionState,
+  formData: FormData,
+): Promise<SellActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('inventory_item_id'));
+  if (!id.success) return { error: 'Missing item.' };
+
+  const raw = String(formData.get('price') ?? '').trim();
+  let cents: number | null = null;
+  if (raw !== '') {
+    try {
+      cents = parseDollarsToCents(raw);
+    } catch {
+      return { error: 'Price must be a dollar amount like 12.50.' };
+    }
+  }
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) return { error: 'Item not found.' };
+
+  const { error } = await supabase
+    .from('game_details')
     .update({ manual_expected_price_cents: cents })
     .eq('inventory_item_id', item.id);
   if (error) return { error: error.message };

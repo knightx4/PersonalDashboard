@@ -27,6 +27,17 @@ export const EBAY_PER_ORDER_THRESHOLD_CENTS = 1000;
  */
 export const MEDIA_MAIL_1LB_CENTS = 439;
 
+/**
+ * Flat shipping assumed for a board game, by explicit instruction: "I don't
+ * really care about the shipping that much. Just assume $5."
+ *
+ * It is an assumption, not a rate. Media Mail above is a real published price
+ * and legally cannot carry a board game; a real game parcel is 2-4 lb and would
+ * cost more than this. So net_self for a game reads a little optimistic, and
+ * the cheap fix if that ever matters is this one number.
+ */
+export const GAME_SHIP_FLAT_CENTS = 500;
+
 /** Default effort penalty when the user has not set profiles.sell_effort_cents. */
 export const DEFAULT_EFFORT_CENTS = 500;
 
