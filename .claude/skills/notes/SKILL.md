@@ -90,13 +90,30 @@ Never mark a note `done` with the fix unverified, and never silently drop one.
 
 ## Closing report
 
-End every run with:
+**Always end a run with a table**, one row per note touched, whatever the
+outcome — done, blocked, planned or declined. It is the first thing in the
+report, not an appendix:
 
-- **Done** — one line each: what changed, and the commit.
+| Note | Type | Page | Issue | Result |
+|---|---|---|---|---|
+| `3f9c1a2b` | Bug | `/sell` | what they wrote, quoted or trimmed | One sentence: what changed and the commit, or what it is waiting on. |
+
+Keep Result to a single sentence. A blocked row says what would unblock it;
+a declined row says why not. Never omit a note from the table to make the
+run look tidier.
+
+Then, below the table:
+
 - **Blocked** — one line each: the question, phrased so a one-line answer
   unblocks it.
 - **Still open** — anything not reached, and why the batch stopped there.
 - The queue count after the run.
+- Anything the user has to do themselves — a migration to apply, a setting to
+  change, a credential to add.
+
+Detail beyond the table is worth writing only where it changes what the user
+would do next: a cause worth knowing, an assumption they may want to
+overturn, a limit they should not discover later. Skip it otherwise.
 
 If nothing is blocked and nothing is left open, say so plainly — that is the
 target state.
