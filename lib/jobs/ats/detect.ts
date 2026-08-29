@@ -14,6 +14,10 @@ export type AtsVendor =
   | 'icims'
   | 'smartrecruiters'
   | 'workable'
+  | 'recruitee'
+  | 'breezy'
+  | 'bamboohr'
+  | 'rippling'
   | 'taleo'
   | 'linkedin'
   | 'wellfound'
@@ -127,14 +131,75 @@ export function detectPosting(rawUrl: string): DetectedPosting {
   }
 
   // Workable: apply.workable.com/{company}/j/{shortcode}/
+  //           {company}.workable.com/j/{shortcode}
   if (/(^|\.)workable\.com$/i.test(host)) {
-    const match = path.match(/^\/([^/]+)\/j\/([^/]+)/i);
-    return { vendor: 'workable', boardToken: match?.[1] ?? null, jobId: match?.[2] ?? null, tier: 1 };
+    const match = path.match(/^\/([^/]+)\/j\/([^/]+)/i) ?? path.match(/^\/j\/([^/]+)/i);
+    const subdomain = host.replace(/\.workable\.com$/i, '');
+    const scoped = match && match.length === 3;
+    const boardToken = scoped
+      ? match[1]
+      : subdomain && !['apply', 'www', 'jobs'].includes(subdomain)
+        ? subdomain
+        : null;
+    return {
+      vendor: 'workable',
+      boardToken,
+      jobId: (scoped ? match[2] : match?.[1]) ?? null,
+      tier: 1,
+    };
   }
 
+  // SmartRecruiters: jobs.smartrecruiters.com/{company}/{numeric-id}-{slug}
   if (/(^|\.)smartrecruiters\.com$/i.test(host)) {
     const match = path.match(/^\/([^/]+)\/(\d+)/);
-    return { vendor: 'smartrecruiters', boardToken: match?.[1] ?? null, jobId: match?.[2] ?? null, tier: 2 };
+    return { vendor: 'smartrecruiters', boardToken: match?.[1] ?? null, jobId: match?.[2] ?? null, tier: match?.[2] ? 1 : 2 };
+  }
+
+  // Recruitee: {company}.recruitee.com/o/{slug}
+  if (/(^|\.)recruitee\.com$/i.test(host)) {
+    const subdomain = host.replace(/\.recruitee\.com$/i, '');
+    const match = path.match(/^\/o\/([^/]+)/i);
+    return {
+      vendor: 'recruitee',
+      boardToken: subdomain && !['www', 'jobs'].includes(subdomain) ? subdomain : null,
+      jobId: match?.[1] ?? null,
+      tier: 1,
+    };
+  }
+
+  // Breezy: {company}.breezy.hr/p/{id}-{slug}
+  if (/(^|\.)breezy\.hr$/i.test(host)) {
+    const subdomain = host.replace(/\.breezy\.hr$/i, '');
+    const match = path.match(/^\/p\/([0-9a-f]+)/i);
+    return {
+      vendor: 'breezy',
+      boardToken: subdomain && !['app', 'www'].includes(subdomain) ? subdomain : null,
+      jobId: match?.[1] ?? null,
+      tier: 1,
+    };
+  }
+
+  // BambooHR: {company}.bamboohr.com/careers/{id}
+  if (/(^|\.)bamboohr\.com$/i.test(host)) {
+    const subdomain = host.replace(/\.bamboohr\.com$/i, '');
+    const match = path.match(/^\/careers\/(\d+)/);
+    return {
+      vendor: 'bamboohr',
+      boardToken: subdomain && subdomain !== 'www' ? subdomain : null,
+      jobId: match?.[1] ?? null,
+      tier: 1,
+    };
+  }
+
+  // Rippling: ats.rippling.com/{board}/jobs/{uuid}
+  if (/(^|\.)rippling(ats)?\.com$/i.test(host)) {
+    const match = path.match(/^\/([^/]+)\/jobs\/([0-9a-f-]{8,})/i);
+    return {
+      vendor: 'rippling',
+      boardToken: match?.[1] ?? null,
+      jobId: match?.[2] ?? null,
+      tier: match?.[1] ? 1 : 2,
+    };
   }
 
   if (/(^|\.)wellfound\.com$|(^|\.)angel\.co$/i.test(host)) {

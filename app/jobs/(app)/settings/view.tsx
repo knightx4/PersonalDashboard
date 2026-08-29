@@ -5,6 +5,7 @@ import { Copy, Mail, ShieldAlert, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { TimezoneField } from '@/components/ui/timezone-field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
 import { addEvidence, addResumeVersion, deleteEvidence } from './evidence-actions';
@@ -101,12 +102,7 @@ function ProfileSection({
           </div>
           <div>
             <Label htmlFor="timezone">Timezone</Label>
-            <Input
-              id="timezone"
-              name="timezone"
-              defaultValue={profile.timezone}
-              placeholder="Europe/London"
-            />
+            <TimezoneField id="timezone" name="timezone" defaultValue={profile.timezone} />
             <p className="mt-1 text-[11px] text-ink-faint">
               Interview times and &ldquo;this week&rdquo; are read in this zone.
             </p>

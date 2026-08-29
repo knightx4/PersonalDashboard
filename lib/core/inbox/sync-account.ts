@@ -183,6 +183,7 @@ async function processPage(
   opts: {
     userId: string;
     accountId: string;
+    accountEmail: string;
     accessToken: string;
     messageIds: string[];
     linkers: readonly DomainLinker[];
@@ -201,6 +202,7 @@ async function processPage(
   opts.progress.linkers = await fanOut(opts.linkers, {
     userId: opts.userId,
     accountId: opts.accountId,
+    accountEmail: opts.accountEmail,
     accessToken: opts.accessToken,
     envelopes,
   });
@@ -283,6 +285,7 @@ export async function syncEmailAccountBatch(
     await processPage(supabase, {
       userId: opts.userId,
       accountId: account.id,
+      accountEmail: account.email_address,
       accessToken,
       messageIds,
       linkers: opts.linkers,
@@ -408,6 +411,7 @@ export async function syncEmailAccountIncrementalBatch(
     await processPage(supabase, {
       userId: opts.userId,
       accountId: account.id,
+      accountEmail: account.email_address,
       accessToken,
       messageIds,
       linkers: opts.linkers,

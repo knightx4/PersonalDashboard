@@ -50,6 +50,14 @@ export interface GmailMessageContent {
   text: string;
   /** Ephemeral HTML for product-link extraction; never persisted. */
   html: string;
+  /**
+   * Raw text/calendar bodies carried by the message, already fetched.
+   *
+   * An interview invite states its instant, duration, attendees and video
+   * link here as structured data. Reading it is what keeps the interview time
+   * off the model's guess about what "Thursday at 2" meant.
+   */
+  calendar: string[];
 }
 
 export interface GmailOAuthProvider {
@@ -72,4 +80,10 @@ export interface GmailOAuthProvider {
     messageId: string,
     opts?: { format?: 'full' | 'metadata' },
   ): Promise<GmailMessageContent>;
+  /** users.messages.attachments.get — returns the decoded body. */
+  getAttachment(
+    accessToken: string,
+    messageId: string,
+    attachmentId: string,
+  ): Promise<string>;
 }

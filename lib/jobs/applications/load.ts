@@ -6,6 +6,7 @@ import {
   type FunnelApplication,
   type RejectionStage,
 } from '@/lib/jobs/pipeline';
+import { safeTimeZone } from '@/lib/jobs/timezone';
 
 /**
  * Reading the pipeline.
@@ -208,7 +209,10 @@ export function formatDate(iso: string | null, timezone = 'UTC'): string {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    timeZone: timezone,
+    // Through safeTimeZone, because the value comes from a free-text profile
+    // field: Intl throws on a zone it does not know, and an uncaught throw in
+    // a server component is a 500, not a wrong date. See lib/jobs/timezone.ts.
+    timeZone: safeTimeZone(timezone),
   }).format(date);
 }
 
@@ -221,7 +225,7 @@ export function formatDateTime(iso: string | null, timezone = 'UTC'): string {
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: timezone,
+    timeZone: safeTimeZone(timezone),
     timeZoneName: 'short',
   }).format(date);
 }

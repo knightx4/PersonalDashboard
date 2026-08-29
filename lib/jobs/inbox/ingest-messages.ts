@@ -12,10 +12,18 @@ import {
   type MessageClassification,
 } from '@/lib/jobs/email/classify';
 import { PARSER_VERSION, verifyExtraction, type ExtractedMessage } from '@/lib/jobs/email/extract';
-import { decideLink, type LinkCandidate, type LinkDecision } from '@/lib/jobs/email/link';
+import {
+  decideLink,
+  type LinkCandidate,
+  type LinkCompany,
+  type LinkDecision,
+} from '@/lib/jobs/email/link';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { slugify } from '@/lib/jobs/slug';
 import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
+import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
+import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
@@ -125,6 +133,34 @@ async function currentStatus(
   return (data?.status as ApplicationStatus) ?? 'lead';
 }
 
+/**
+ * The invite a message carries, if it carries one.
+ *
+ * Returns null rather than throwing for anything malformed: an invite we
+ * cannot read costs us the invite, and the model's reading of the prose is
+ * still there underneath it.
+ */
+function inviteFromMessage(
+  message: FetchedMessage,
+  ctx: Pick<IngestContext, 'accountEmail' | 'timezone'>,
+): InviteInterview | null {
+  if (!message.calendar?.length) return null;
+
+  try {
+    const events = message.calendar.flatMap((body) =>
+      parseIcs(body, { defaultTimeZone: ctx.timezone }),
+    );
+    const event = primaryEvent(events);
+    if (!event) return null;
+    return interviewFromInvite(event, { selfEmail: ctx.accountEmail });
+  } catch (error) {
+    console.error('invite parse failed', message.id, {
+      name: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
+}
+
 async function writeEvent(
   supabase: AppSupabaseClient,
   opts: {
@@ -134,6 +170,7 @@ async function writeEvent(
     classification: MessageClassification;
     extracted: ExtractedMessage | null;
     message: FetchedMessage;
+    invite: InviteInterview | null;
   },
 ): Promise<void> {
   const kind = eventKindFor(opts.classification);
@@ -142,11 +179,20 @@ async function writeEvent(
   const status = await currentStatus(supabase, opts.applicationId);
   const legal = transitionIsLegal(status, kind);
 
-  const interviewKind = opts.extracted?.interviewKind ?? null;
-  const occurredAt =
+  const { invite } = opts;
+  const interviewKind = invite?.kind ?? opts.extracted?.interviewKind ?? null;
+
+  // Where an invite exists it is the schedule, full stop. The model's reading
+  // of "Thursday at 2" is the fallback, not the other way round.
+  const scheduledAt =
+    invite?.scheduledAt ??
     opts.extracted?.dates?.find((d) => d.kind === 'interview')?.at ??
     opts.message.internalDate?.toISOString() ??
     new Date().toISOString();
+
+  const interviewers = invite?.interviewerNames.length
+    ? invite.interviewerNames
+    : (opts.extracted?.interviewerNames ?? []);
 
   await supabase.from('application_events').insert({
     user_id: opts.userId,
@@ -162,18 +208,44 @@ async function writeEvent(
     payload: {
       ...(interviewKind ? { interview_kind: interviewKind } : {}),
       ...(opts.extracted?.dates?.length ? { dates: opts.extracted.dates } : {}),
-      ...(opts.extracted?.interviewerNames?.length
-        ? { interviewers: opts.extracted.interviewerNames }
-        : {}),
+      ...(interviewers.length ? { interviewers } : {}),
       ...(opts.extracted?.actionRequired ? { action_required: true } : {}),
-      scheduled_at: occurredAt,
+      ...(invite
+        ? {
+            // Recorded so the timeline can say "this was rescheduled" rather
+            // than showing two bookings and letting you work it out.
+            invite: {
+              uid: invite.icsUid,
+              sequence: invite.icsSequence,
+              cancelled: invite.cancelled,
+              ...(invite.meetingUrl ? { meeting_url: invite.meetingUrl } : {}),
+              ...(invite.timeZone ? { time_zone: invite.timeZone } : {}),
+            },
+          }
+        : {}),
+      scheduled_at: scheduledAt,
     },
     needs_review: !legal,
   });
 
-  // The interview row itself, when the mail carried a real date with a zone.
+  if (!legal) return;
+
+  if (invite) {
+    // An invite is unambiguous evidence of a booking whatever the classifier
+    // made of the covering note, so it is not gated on the event kind the way
+    // a date read out of prose has to be.
+    await applyInvite(supabase, {
+      userId: opts.userId,
+      applicationId: opts.applicationId,
+      invite,
+      fallbackKind: interviewKind,
+    });
+    return;
+  }
+
+  // No invite: the model's date, on the same terms as before.
   const interviewDate = opts.extracted?.dates?.find((d) => d.kind === 'interview');
-  if (interviewDate && legal && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
+  if (interviewDate && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
     const { count } = await supabase
       .from('interviews')
       .select('id', { count: 'exact', head: true })
@@ -188,6 +260,74 @@ async function writeEvent(
       status: 'scheduled',
     });
   }
+}
+
+/**
+ * Write the invite to the interview it books, creating or updating.
+ *
+ * The UID is what makes a reschedule an edit rather than a second interview on
+ * the board, and it is also why this is an update-then-insert rather than an
+ * upsert: the row may already exist from a hand-entered interview or from the
+ * prose path, and adopting that row is better than leaving a duplicate beside
+ * it.
+ */
+async function applyInvite(
+  supabase: AppSupabaseClient,
+  opts: {
+    userId: string;
+    applicationId: string;
+    invite: InviteInterview;
+    fallbackKind: string | null;
+  },
+): Promise<void> {
+  const { invite } = opts;
+
+  const patch: Record<string, unknown> = {
+    scheduled_at: invite.scheduledAt,
+    ics_uid: invite.icsUid,
+    ics_sequence: invite.icsSequence,
+    status: invite.cancelled ? 'cancelled' : 'scheduled',
+    ...(invite.durationMinutes != null ? { duration_minutes: invite.durationMinutes } : {}),
+    ...(invite.format ? { format: invite.format } : {}),
+    ...(invite.meetingUrl ? { meeting_url: invite.meetingUrl } : {}),
+    ...(invite.location ? { location: invite.location } : {}),
+    ...(invite.timeZone ? { time_zone: invite.timeZone } : {}),
+  };
+
+  const existing = invite.icsUid
+    ? await supabase
+        .from('interviews')
+        .select('id, ics_sequence')
+        .eq('application_id', opts.applicationId)
+        .eq('ics_uid', invite.icsUid)
+        .maybeSingle()
+    : { data: null };
+
+  if (existing.data) {
+    // Mail arrives out of order. A stale redelivery must not un-cancel a slot.
+    if (!inviteSupersedes(invite, { icsSequence: existing.data.ics_sequence as number | null })) {
+      return;
+    }
+    await supabase.from('interviews').update(patch).eq('id', existing.data.id);
+    return;
+  }
+
+  // A cancellation for an interview we never recorded is nothing to record.
+  if (invite.cancelled) return;
+
+  const { count } = await supabase
+    .from('interviews')
+    .select('id', { count: 'exact', head: true })
+    .eq('application_id', opts.applicationId);
+
+  await supabase.from('interviews').insert({
+    user_id: opts.userId,
+    application_id: opts.applicationId,
+    round: (count ?? 0) + 1,
+    kind: opts.fallbackKind ?? 'recruiter_screen',
+    format: invite.format ?? 'video',
+    ...patch,
+  });
 }
 
 function defaultSummary(classification: MessageClassification): string {
@@ -221,6 +361,71 @@ function defaultSummary(classification: MessageClassification): string {
  * most of the time. It appears in the pipeline immediately, flagged, asking you
  * to confirm the details rather than asking you to remember it existed.
  */
+/**
+ * The company id for a decision, creating the company when the message named
+ * one we do not have.
+ *
+ * Idempotent through the slug: a first scan brings in a dozen messages from the
+ * same employer, and they must converge on one row rather than a dozen. The
+ * unique index on (user_id, slug) is the real guarantee — the select is the
+ * fast path, and the insert conflict is what makes concurrency safe.
+ */
+async function resolveCompanyId(
+  supabase: AppSupabaseClient,
+  userId: string,
+  company: LinkCompany,
+): Promise<string | null> {
+  if (company.kind === 'existing') return company.id;
+
+  const slug = slugify(company.name);
+
+  const { data: existing } = await supabase
+    .from('companies')
+    .select('id, domains')
+    .eq('user_id', userId)
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (existing) {
+    // Top up the domain if this message taught us one. This is what makes the
+    // *next* message from the same employer link by domain instead of guessing.
+    const domains = (existing.domains as string[] | null) ?? [];
+    if (company.domain && !domains.includes(company.domain)) {
+      await supabase
+        .from('companies')
+        .update({ domains: [...domains, company.domain] })
+        .eq('id', existing.id);
+    }
+    return existing.id as string;
+  }
+
+  const { data, error } = await supabase
+    .from('companies')
+    .insert({
+      user_id: userId,
+      name: company.name,
+      slug,
+      domains: company.domain ? [company.domain] : [],
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    // Another message in the same batch got there first.
+    const { data: raced } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('slug', slug)
+      .maybeSingle();
+    if (raced) return raced.id as string;
+    console.error('inferred company insert failed', error.message);
+    return null;
+  }
+
+  return data.id as string;
+}
+
 async function createInferredApplication(
   supabase: AppSupabaseClient,
   opts: {
@@ -306,6 +511,14 @@ export interface IngestContext {
   userId: string;
   accountId: string;
   accessToken: string;
+  /** The connected address, so you are not listed as your own interviewer. */
+  accountEmail: string | null;
+  /**
+   * The profile timezone, applied to invites that carry a wall-clock time with
+   * no zone at all. Those are rare and they are also the ones a wrong default
+   * silently moves by several hours.
+   */
+  timezone: string | null;
   companies: CompanyDomainHit[];
   candidates: LinkCandidate[];
   counters: IngestCounters;
@@ -505,6 +718,9 @@ async function handleMessage(
     tierB: tierB.extracted,
     decision,
     coreId,
+    // Parsed once per message rather than per branch: two of the three
+    // branches below write an event, and both want the same answer.
+    invite: inviteFromMessage(message, ctx),
   });
 }
 
@@ -517,9 +733,10 @@ async function applyDecision(
     tierB: ExtractedMessage | null;
     decision: LinkDecision;
     coreId: string;
+    invite: InviteInterview | null;
   },
 ): Promise<void> {
-  const { message, classification, tierB, decision, coreId } = input;
+  const { message, classification, tierB, decision, coreId, invite } = input;
 
   const ledger = async (
     parseStatus: 'parsed' | 'needs_review' | 'failed',
@@ -582,6 +799,7 @@ async function applyDecision(
         classification,
         extracted: tierB,
         message,
+        invite,
       });
       ctx.counters.messagesParsed += 1;
       return;
@@ -598,9 +816,16 @@ async function applyDecision(
     }
 
     case 'create_inferred_application': {
+      const companyId = await resolveCompanyId(supabase, ctx.userId, decision.company);
+      if (!companyId) {
+        await ledger('needs_review', { error: 'Could not record the company for this message.' });
+        ctx.counters.heldForReview += 1;
+        return;
+      }
+
       const applicationId = await createInferredApplication(supabase, {
         userId: ctx.userId,
-        companyId: decision.companyId,
+        companyId,
         roleTitle: tierB?.roleTitle ?? null,
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
@@ -626,6 +851,7 @@ async function applyDecision(
         classification,
         extracted: tierB,
         message,
+        invite,
       });
 
       ctx.counters.applicationsCreated += 1;
@@ -634,9 +860,16 @@ async function applyDecision(
     }
 
     case 'create_lead': {
+      const companyId = await resolveCompanyId(supabase, ctx.userId, decision.company);
+      if (!companyId) {
+        await ledger('needs_review', { error: 'Could not record the company for this message.' });
+        ctx.counters.heldForReview += 1;
+        return;
+      }
+
       const applicationId = await createInferredApplication(supabase, {
         userId: ctx.userId,
-        companyId: decision.companyId,
+        companyId,
         roleTitle: tierB?.roleTitle ?? null,
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
@@ -678,4 +911,123 @@ async function applyDecision(
       return;
     }
   }
+}
+
+/**
+ * Give held messages another look, using what the sync just learned.
+ *
+ * The review queue is not a dead letter office. A message is held because
+ * nothing on file matched it, and "on file" changes constantly: the batch that
+ * just landed may have created the company or the application this message has
+ * been waiting for. Without this, a message held on a first scan stays held
+ * until a *later* sync happens to re-list it, which for incremental syncs is
+ * never — they only offer mail that has just arrived.
+ *
+ * Envelopes are rebuilt from the view rather than refetched: the verdict is
+ * ours, but the sender, subject and date are core's, and both halves are needed
+ * to run the linker again.
+ */
+export async function reprocessHeldMessages(
+  supabase: AppSupabaseClient,
+  ctx: IngestContext,
+  opts: { limit?: number } = {},
+): Promise<void> {
+  const { data: pending } = await supabase
+    .from('inbox_messages')
+    .select('id, provider_message_id, thread_id, received_at, from_address, reply_to_address, subject')
+    .eq('email_account_id', ctx.accountId)
+    .eq('parse_status', 'needs_review')
+    .neq('classification', 'not_relevant')
+    // Each retry costs a body fetch and usually a model call, so a message that
+    // is not going to resolve stops being re-read. The counter resets when a
+    // sync creates something, which is when a retry is worth paying for again.
+    .lt('relink_attempts', MAX_RELINK_ATTEMPTS)
+    .order('received_at', { ascending: true })
+    .limit(opts.limit ?? RELINK_BATCH);
+
+  const envelopes: MessageEnvelope[] = (pending ?? []).map((row) => ({
+    id: row.id as string,
+    providerMessageId: row.provider_message_id as string,
+    threadId: (row.thread_id as string | null) ?? null,
+    receivedAt: (row.received_at as string | null) ?? null,
+    fromAddress: (row.from_address as string | null) ?? null,
+    replyToAddress: (row.reply_to_address as string | null) ?? null,
+    subject: (row.subject as string | null) ?? null,
+    isNew: false,
+  }));
+
+  if (envelopes.length === 0) return;
+
+  // Oldest first, in chunks, stopping when the budget is spent. A message that
+  // is still unlinkable after this stays in the queue for you to decide, which
+  // is what the queue is for.
+  const startedAt = Date.now();
+
+  for (let i = 0; i < envelopes.length; i += RELINK_CHUNK) {
+    if (Date.now() - startedAt > RELINK_BUDGET_MS) break;
+    const chunk = envelopes.slice(i, i + RELINK_CHUNK);
+
+    // Charged before the chunk runs, not after: an invocation killed mid-pass
+    // has still spent the fetches, and not counting them is how a run that
+    // always dies at the same message re-reads it on every sync forever.
+    await bumpRelinkAttempts(
+      supabase,
+      chunk.map((envelope) => envelope.id),
+    );
+    await linkEnvelopes(supabase, ctx, chunk);
+  }
+}
+
+/** How many times a held message is re-read before it waits for you instead. */
+const MAX_RELINK_ATTEMPTS = 3;
+/**
+ * Per sync, and deliberately small.
+ *
+ * The sync route already times out at sixty seconds occasionally without this
+ * pass, and every message here costs a body fetch plus usually a model call. A
+ * backlog is cleared over several syncs; a backlog cleared in one sync that
+ * times out clears nothing at all, because the whole invocation is lost.
+ */
+const RELINK_BATCH = 12;
+/** Chunk size, so the budget below is checked often enough to matter. */
+const RELINK_CHUNK = 4;
+/** Wall clock this pass may spend before leaving the rest for the next sync. */
+const RELINK_BUDGET_MS = 20_000;
+
+async function bumpRelinkAttempts(
+  supabase: AppSupabaseClient,
+  ids: readonly string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.rpc('bump_relink_attempts', { message_ids: ids });
+  if (error) console.error('relink attempt bump failed', error.message);
+}
+
+/**
+ * Everything held becomes worth another look again.
+ *
+ * Called when a sync creates a company or an application, because that is
+ * exactly the change that can make a previously unlinkable message linkable —
+ * and without the reset, a message that used up its retries before its
+ * application existed would never be looked at again.
+ */
+export async function resetRelinkAttempts(
+  supabase: AppSupabaseClient,
+  accountId: string,
+): Promise<void> {
+  const { data: held } = await supabase
+    .from('inbox_messages')
+    .select('id')
+    .eq('email_account_id', accountId)
+    .eq('parse_status', 'needs_review')
+    .gt('relink_attempts', 0);
+
+  const ids = (held ?? []).map((row) => row.id as string);
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from('ingested_messages')
+    .update({ relink_attempts: 0 })
+    .in('id', ids);
+  if (error) console.error('relink attempt reset failed', error.message);
 }

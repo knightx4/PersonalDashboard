@@ -1,5 +1,6 @@
 {
-  "classification": "job_alert",
-  "ats": "indeed",
-  "tier": "A"
+  "classification": "not_relevant",
+  "ats": "unknown",
+  "tier": "A",
+  "note": "Was job_alert. Indeed is now dropped at the sender rather than labelled, because labelling still meant fetching it: a digest that is going to be discarded is not worth a body fetch, and one of these reached the pipeline as a pursuit."
 }

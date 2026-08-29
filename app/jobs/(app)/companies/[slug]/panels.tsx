@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
+import {
+  applyCompanyEnrichment,
+  proposeCompanyEnrichment,
+  type EnrichmentProposal,
+} from '../actions';
 import { updateCompany } from '../actions';
 
 export function CompanyPanels(props: {
@@ -224,7 +229,102 @@ function Details({
         </Button>
         {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
       </div>
+
+      <Enrichment companyId={companyId} />
     </section>
+  );
+}
+
+/**
+ * Look the company up on Wikidata and offer to fill in the blanks.
+ *
+ * Two steps rather than one button that writes. A name search finds the wrong
+ * company often enough that the match is worth showing before it lands, and
+ * the alternative -- silently correct most of the time -- is the version you
+ * cannot audit afterwards, because you never typed any of it.
+ */
+function Enrichment({ companyId }: { companyId: string }) {
+  const [proposal, setProposal] = useState<EnrichmentProposal | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const lookUp = () =>
+    startTransition(async () => {
+      setMessage(null);
+      setProposal(null);
+      const result = await proposeCompanyEnrichment({ companyId });
+      if (result.error) setMessage(result.error);
+      else if (result.proposal && !result.proposal.hasChanges) {
+        setMessage(`Found ${result.proposal.label}, but every field it knows is already filled in.`);
+      } else setProposal(result.proposal);
+    });
+
+  const apply = (wikidataId: string) =>
+    startTransition(async () => {
+      const result = await applyCompanyEnrichment({ companyId, wikidataId });
+      setProposal(null);
+      setMessage(
+        result.error ??
+          (result.applied.length ? `Filled in ${result.applied.length} field(s).` : 'Nothing to fill in.'),
+      );
+    });
+
+  return (
+    <div className="mt-4 border-t border-border pt-3">
+      <div className="flex items-center gap-3">
+        <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={lookUp}>
+          {pending ? 'Looking up…' : 'Look up on Wikidata'}
+        </Button>
+        {message && <span className="text-[12px] text-ink-muted">{message}</span>}
+      </div>
+
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+        Fills blank fields only — anything you have typed is left exactly as it is.
+      </p>
+
+      {proposal && (
+        <div className="mt-3 rounded-card border border-border bg-canvas p-3">
+          <p className="text-[13px] font-medium text-ink">{proposal.label}</p>
+          {proposal.description && (
+            <p className="text-[12px] text-ink-muted">{proposal.description}</p>
+          )}
+
+          <p className="mt-1 text-[11px] text-ink-faint">
+            {proposal.verified
+              ? 'Matched on the company’s own website, so this is the right one.'
+              : 'Matched on name only — no website on the record to check it against. Have a look before applying.'}
+          </p>
+
+          <ul className="mt-2 space-y-0.5">
+            {proposal.changes.map((change) => (
+              <li key={change} className="text-[12px] text-ink-muted">
+                {change}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-3 flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending}
+              onClick={() => apply(proposal.wikidataId)}
+            >
+              Fill these in
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setProposal(null)}
+            >
+              Not this company
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -143,7 +143,7 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
             ${application.id}, 0.95, 'ats_job_id')`;
   ids.ingested_messages = message.id;
 
-  const [job] = await admin<{ id: string }[]>`
+  await admin`
     insert into core.sync_jobs (email_account_id, type, status)
     values (${account.id}, 'backfill', 'completed') returning id`;
 

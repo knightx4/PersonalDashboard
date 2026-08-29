@@ -18,8 +18,16 @@ import { cn } from '@/lib/cn';
  * It lives in the header so the thought can be written down where it occurs,
  * and it records the page you were on — half of every bug report is "where
  * were you when it happened", and that half is free.
+ *
+ * One button, one queue, both workspaces. `allHref` only decides which
+ * workspace's rendering of that queue you land on, so following the link does
+ * not throw you out of the app you were using.
  */
-export function FeedbackButton() {
+export function FeedbackButton({
+  allHref = '/shopping/feedback',
+}: {
+  allHref?: string;
+} = {}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<'bug' | 'feature'>('feature');
@@ -138,7 +146,7 @@ export function FeedbackButton() {
                 {pending ? 'Saving…' : 'Send'}
               </Button>
               <Link
-                href="/shopping/feedback"
+                href={allHref}
                 className="text-[13px] text-brand hover:underline"
                 onClick={() => setOpen(false)}
               >

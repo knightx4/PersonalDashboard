@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import {
   CalendarClock,
@@ -21,6 +22,7 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { addQuestions, promoteToCanonical, saveAnswer } from '../actions';
 import { addNote, saveInterview } from './actions';
+import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -143,6 +145,66 @@ export function RoleDetailPanels(props: PanelProps) {
       {tab === 'interviews' && <Interviews {...props} />}
       {tab === 'notes' && <Notes {...props} />}
       {tab === 'mail' && <LinkedMail {...props} />}
+
+      <NotRealPursuit applicationId={props.applicationId} />
+    </div>
+  );
+}
+
+/**
+ * The same "this was not real" escape as the board, on the page you land on
+ * when you click through to find out what a pursuit even is.
+ *
+ * Below the fold and behind a confirmation, because it removes the role and
+ * usually the company with it. Nothing a person put there is touched: a
+ * company with research on it, a contact, or a note survives its pursuit.
+ */
+function NotRealPursuit({ applicationId }: { applicationId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  return (
+    <div className="mt-8 border-t border-border pt-4">
+      {confirming ? (
+        <div className="space-y-2">
+          <p className="text-[13px] text-ink">
+            Remove this pursuit? The role goes with it, and the company too if nothing else is
+            attached to it. Any mail that created it is marked not relevant, so the next sync
+            will not bring it back.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await dismissPursuit(applicationId);
+                  if (result.error) setError(result.error);
+                  else router.push('/jobs/pipeline');
+                })
+              }
+            >
+              {pending ? 'Removing…' : 'Yes, remove it'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+          </div>
+          {error && <p className="text-[13px] text-status-rejected">{error}</p>}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="text-[12px] text-ink-faint hover:text-status-rejected hover:underline"
+        >
+          This was not a real pursuit — remove it
+        </button>
+      )}
     </div>
   );
 }

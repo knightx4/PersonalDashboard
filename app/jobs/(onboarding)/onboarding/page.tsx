@@ -80,7 +80,7 @@ export default async function OnboardingPage({
             </li>
           </ul>
 
-          <WelcomeForm defaultTimezone="UTC" />
+          <WelcomeForm />
         </section>
       )}
 

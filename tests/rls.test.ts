@@ -151,7 +151,7 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${saved.id}, 1800, true) returning id`;
   ids.price_checks = check.id;
 
-  const [job] = await admin<{ id: string }[]>`
+  await admin`
     insert into core.sync_jobs (email_account_id, type, status)
     values (${account.id}, 'backfill', 'completed') returning id`;
 

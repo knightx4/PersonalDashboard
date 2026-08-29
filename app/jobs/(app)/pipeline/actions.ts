@@ -95,3 +95,119 @@ export async function setNextAction(
   revalidatePath('/jobs/pipeline');
   return { error: null };
 }
+
+/**
+ * Remove a pursuit that should never have existed.
+ *
+ * The inbox now opens pursuits on its own, which is the feature — and the
+ * price of it is that it will sometimes be wrong. Until now the only way to
+ * undo that was from the review queue, and only while the row was still
+ * flagged; once you confirmed it, or once it aged out of the queue, a company
+ * you never applied to sat in the pipeline permanently and skewed every funnel
+ * number computed from it.
+ *
+ * Deleting the row is not enough on its own. The message that created it is
+ * still in the ledger pointing at it, so the next reprocess could reasonably
+ * make it again. So the mail is disclaimed at the same time: this is the
+ * user's answer to "is this real", and it should stick.
+ */
+export async function dismissPursuit(
+  applicationId: string,
+): Promise<{ error: string | null; removed?: string }> {
+  const parsed = z.string().uuid().safeParse(applicationId);
+  if (!parsed.success) return { error: 'That is not a pursuit.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: application } = await supabase
+    .from('applications')
+    .select('id, role_id, roles!inner ( id, title, company_id, companies!inner ( id, name ) )')
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!application) return { error: 'That pursuit no longer exists.' };
+
+  const role = application.roles as unknown as {
+    id: string;
+    title: string;
+    company_id: string;
+    companies: { id: string; name: string };
+  };
+
+  // Disclaim the mail first. If the delete below fails we have marked some
+  // messages irrelevant and changed nothing else, which is recoverable from
+  // the review queue; the reverse order can leave mail pointing at a row that
+  // is gone.
+  const { data: linked } = await supabase
+    .from('inbox_messages')
+    .select('id')
+    .eq('resulting_application_id', parsed.data);
+
+  const messageIds = (linked ?? []).map((row) => row.id as string);
+  if (messageIds.length > 0) {
+    await supabase
+      .from('ingested_messages')
+      .update({
+        classification: 'not_relevant',
+        parse_status: 'skipped',
+        resulting_application_id: null,
+        error: 'Dismissed: you said this was not a real pursuit.',
+      })
+      .in('id', messageIds);
+  }
+
+  const { error } = await supabase
+    .from('applications')
+    .delete()
+    .eq('id', parsed.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  // The role and the company were created for this pursuit and are worth
+  // removing with it -- but only when nothing else has attached to them since.
+  // A company you have researched, or have a contact at, is yours now whatever
+  // the inbox thought.
+  const { count: rolesLeft } = await supabase
+    .from('applications')
+    .select('id', { count: 'exact', head: true })
+    .eq('role_id', role.id);
+
+  if ((rolesLeft ?? 0) === 0) {
+    await supabase.from('roles').delete().eq('id', role.id).eq('user_id', user.id);
+    await deleteCompanyIfOrphaned(supabase, user.id, role.companies.id);
+  }
+
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/review');
+
+  return { error: null, removed: `${role.companies.name} · ${role.title}` };
+}
+
+/** A company is only removed when it holds nothing a person put there. */
+async function deleteCompanyIfOrphaned(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  companyId: string,
+): Promise<void> {
+  const [{ count: roles }, { count: contacts }, { count: notes }, { data: company }] =
+    await Promise.all([
+      supabase.from('roles').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      supabase
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', companyId),
+      supabase.from('notes').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      supabase.from('companies').select('research, priority').eq('id', companyId).maybeSingle(),
+    ]);
+
+  if ((roles ?? 0) > 0 || (contacts ?? 0) > 0 || (notes ?? 0) > 0) return;
+  if ((company?.research as string | null)?.trim()) return;
+  // A priority you set is a decision about the company, not about the pursuit.
+  if (company?.priority && company.priority !== 'interested') return;
+
+  await supabase.from('companies').delete().eq('id', companyId).eq('user_id', userId);
+}
