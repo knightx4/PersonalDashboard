@@ -44,10 +44,14 @@ export async function failStaleSyncJob(
   if (job.status !== 'running' && job.status !== 'queued') return null;
 
   const finished_at = new Date(nowMs).toISOString();
+  // Import resumes from the last page it finished, so recovering from a stall
+  // costs nothing already done. Recommending Reset & re-scan here was actively
+  // bad advice: it throws away every message imported so far to solve a problem
+  // Import solves by carrying on.
   const error =
     job.status === 'queued' && job.messages_seen === 0
       ? 'Import never started. Try again — if this keeps happening, check server logs.'
-      : 'Import stalled and was marked failed. Try Import or Reset & re-scan.';
+      : 'Import stopped early. Press Import to carry on from where it got to.';
 
   await supabase
     .from('sync_jobs')

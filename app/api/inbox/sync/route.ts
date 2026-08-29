@@ -6,6 +6,7 @@ import {
   startIncrementalSync,
   type InboxSyncJobType,
 } from '@/inngest/core/inbox-sync';
+import { shouldResumeBackfill } from '@/lib/core/inbox/pump-budget';
 import {
   failStaleSyncJob,
   isFreshActiveJob,
@@ -126,6 +127,8 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     accountId?: string;
     mode?: InboxSyncJobType;
+    /** Discard saved progress and page the mailbox from the top again. */
+    reset?: boolean;
   };
   const mode: InboxSyncJobType = body.mode === 'incremental' ? 'incremental' : 'backfill';
   const supabase = await createCoreClient();
@@ -150,7 +153,7 @@ export async function POST(request: NextRequest) {
 
   const { data: account } = await supabase
     .from('email_accounts')
-    .select('id, status, backfill_completed_at')
+    .select('id, status, backfill_completed_at, sync_page_token')
     .eq('id', accountId)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -264,12 +267,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fresh backfill pages from the start; clear durable cursor until complete.
-  await supabase
-    .from('email_accounts')
-    .update({ sync_page_token: null, sync_cursor: null })
-    .eq('id', accountId)
-    .eq('user_id', user.id);
+  // Carry on from where the last run stopped.
+  //
+  // This used to clear sync_page_token unconditionally, which meant every
+  // press of Import re-paged the mailbox from the top. Paired with a pump that
+  // was dying a page or two in, the same fifty messages were fetched over and
+  // over and the import could never reach the rest -- three attempts in a row
+  // saw 34, 74 and 54 messages and none of them got further.
+  //
+  // Starting over is still available, and always was: Reset & re-scan is its
+  // own button, and it also drops what was already imported, which Import must
+  // not do.
+  const resuming = shouldResumeBackfill({
+    savedPageToken: account.sync_page_token as string | null,
+    reset: body.reset,
+  });
+  if (!resuming) {
+    await supabase
+      .from('email_accounts')
+      .update({ sync_page_token: null, sync_cursor: null })
+      .eq('id', accountId)
+      .eq('user_id', user.id);
+  }
 
   const jobId = job.id as string;
   const userId = user.id;

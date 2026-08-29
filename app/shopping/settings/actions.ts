@@ -81,11 +81,23 @@ export async function resetInboxImport(accountId: string): Promise<{
 
   if (!account) return { ok: false, deletedOrders: 0, error: 'Inbox not found.' };
 
-  const { data: linked } = await supabase
+  // Which messages belong to this inbox is a fact about core now: unification
+  // moved the envelope, and with it email_account_id, out of this table. This
+  // filtered on that column until the column stopped existing, so the recovery
+  // path the stall message recommends was itself failing.
+  const { data: envelopes } = await core
     .from('ingested_messages')
-    .select('resulting_order_id')
-    .eq('email_account_id', account.id)
-    .not('resulting_order_id', 'is', null);
+    .select('id')
+    .eq('email_account_id', account.id);
+  const messageIds = (envelopes ?? []).map((row) => row.id as string);
+
+  const { data: linked } = messageIds.length
+    ? await supabase
+        .from('ingested_messages')
+        .select('resulting_order_id')
+        .in('id', messageIds)
+        .not('resulting_order_id', 'is', null)
+    : { data: [] as Array<{ resulting_order_id: string | null }> };
 
   const orderIds = [
     ...new Set(
@@ -105,12 +117,17 @@ export async function resetInboxImport(accountId: string): Promise<{
     .eq('email_account_id', account.id)
     .in('status', ['queued', 'running']);
 
-  const { error: ingestError } = await supabase
-    .from('ingested_messages')
-    .delete()
-    .eq('email_account_id', account.id);
-  if (ingestError) {
-    return { ok: false, deletedOrders: 0, error: ingestError.message };
+  // Only this workspace's verdicts go. The envelopes in core stay, because the
+  // job side's verdicts hang off them and a commerce reset is not a reason to
+  // destroy the other workspace's history.
+  if (messageIds.length > 0) {
+    const { error: ingestError } = await supabase
+      .from('ingested_messages')
+      .delete()
+      .in('id', messageIds);
+    if (ingestError) {
+      return { ok: false, deletedOrders: 0, error: ingestError.message };
+    }
   }
 
   // Prefer deleting orders this inbox created; also remove orphan email orders

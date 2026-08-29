@@ -14,12 +14,39 @@ import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { commerceLinker } from '@/lib/inbox/linker';
 import { jobLinker } from '@/lib/jobs/inbox/linker';
 import type { DomainLinker } from '@/lib/core/inbox/fan-out';
+import { canStartAnotherBatch } from '@/lib/core/inbox/pump-budget';
 
-/** Leave headroom under the route maxDuration for the continue fetch. */
-const PUMP_BUDGET_MS = 50_000;
-/** Backfill page size — larger pages + parallel ingest finish the 50s pump with fewer hops. */
-const BATCH_SIZE = 20;
-const INCREMENTAL_BATCH_SIZE = 40;
+/**
+ * Budgeting one invocation of the pump.
+ *
+ * The route gets 60s. Everything here exists to guarantee the pump hands off
+ * to the next invocation *before* that runs out, because the hand-off is the
+ * last thing it does: if the function is killed mid-batch, continueFetch()
+ * never runs, the chain stops dead, and the job sits queued until it is marked
+ * stalled. That is a silent halt, not a visible failure -- which is exactly
+ * what it looked like.
+ */
+const PUMP_BUDGET_MS = 45_000;
+
+/**
+ * Backfill page size.
+ *
+ * Was 20, from when one message meant one cheap classification. Unification
+ * put both workspaces on every message and the job side sends most of what it
+ * cannot place deterministically to Tier B, so a message now costs a Claude
+ * round trip rather than a regex. Measured on the live mailbox: ~0.3 messages
+ * a second, which made a 20-message batch a ~66-second unit of work inside a
+ * 60-second function -- unfinishable by construction, every time.
+ *
+ * Six keeps a batch near 20s at that rate, and the loop below simply runs more
+ * of them when the mailbox is quicker.
+ */
+const BATCH_SIZE = 6;
+
+/** Incremental messages are usually already judged, so they stay cheap. */
+const INCREMENTAL_BATCH_SIZE = 25;
+
+
 
 export type InboxSyncJobType = 'backfill' | 'incremental';
 
@@ -66,41 +93,67 @@ async function failJob(
     .in('status', ['queued', 'running']);
 }
 
+/**
+ * Hand off to the next invocation.
+ *
+ * Retried once, because this single request is what the rest of the import
+ * hangs on: a batch is at most a few messages, but a dropped hand-off ends the
+ * whole run. Smaller batches mean more hand-offs, so the per-link odds matter
+ * more than they used to -- a mailbox needing two hundred of these cannot
+ * afford each one to be a single attempt.
+ *
+ * One retry, not a loop: the caller is already near its own deadline, and a
+ * job that stops is recoverable (progress is saved per page, and Import
+ * resumes) whereas a function killed mid-retry is not.
+ */
 async function continueFetch(
   opts: { userId: string; accountId: string; jobId: string; origin: string },
   supabase: ReturnType<typeof createCoreServiceSupabase>,
 ): Promise<void> {
   const token = signContinue(opts);
-  try {
-    const res = await fetch(`${opts.origin}/api/inbox/sync/continue`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        userId: opts.userId,
-        accountId: opts.accountId,
-        jobId: opts.jobId,
-      }),
-    });
-    if (!res.ok) {
+
+  async function attempt(): Promise<string | null> {
+    try {
+      const res = await fetch(`${opts.origin}/api/inbox/sync/continue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId: opts.userId,
+          accountId: opts.accountId,
+          jobId: opts.jobId,
+        }),
+      });
+      if (res.ok) return null;
       const text = await res.text().catch(() => '');
       console.error('inbox sync continue failed', res.status, text.slice(0, 200));
-      await failJob(
-        supabase,
-        opts.jobId,
-        `Could not continue sync (${res.status}). Try again.`,
-      );
+      // A rejected token or a missing route will be rejected identically next
+      // time; only a server-side or transport failure is worth repeating.
+      return res.status >= 500
+        ? `Could not continue sync (${res.status}).`
+        : `Could not continue sync (${res.status}). Try Import again.`;
+    } catch (err) {
+      console.error('inbox sync continue fetch failed', err);
+      return err instanceof Error ? err.message : 'Could not continue sync.';
     }
-  } catch (err) {
-    console.error('inbox sync continue fetch failed', err);
-    await failJob(
-      supabase,
-      opts.jobId,
-      err instanceof Error ? err.message : 'Could not continue sync.',
-    );
   }
+
+  const first = await attempt();
+  if (first === null) return;
+
+  const retryable = !first.includes('Try Import again');
+  if (!retryable) {
+    await failJob(supabase, opts.jobId, first);
+    return;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const second = await attempt();
+  if (second === null) return;
+
+  await failJob(supabase, opts.jobId, `${second} Press Import to pick up where it stopped.`);
 }
 
 /**
@@ -210,7 +263,19 @@ export async function pumpInboxSync(opts: {
       jobType === 'incremental' ? syncEmailAccountIncrementalBatch : syncEmailAccountBatch;
     const batchSize = jobType === 'incremental' ? INCREMENTAL_BATCH_SIZE : BATCH_SIZE;
 
-    while (Date.now() < deadline) {
+    // The worst batch seen this invocation. Gmail pages and Tier B latency vary
+    // a lot between batches, so the guard is driven by what actually happened
+    // rather than by an assumed rate.
+    let slowestBatchMs = 0;
+
+    for (;;) {
+      // Stop while there is still time to hand off. Checking only that the
+      // deadline has not passed is what let a batch start at 49s and take the
+      // function past 60 -- the batch's own cost has to be part of the test.
+      if (!canStartAnotherBatch({ remainingMs: deadline - Date.now(), slowestBatchMs })) {
+        break;
+      }
+
       const { data: job } = await supabase
         .from('sync_jobs')
         .select('status')
@@ -221,6 +286,7 @@ export async function pumpInboxSync(opts: {
         return;
       }
 
+      const batchStartedAt = Date.now();
       const progress = await runBatch(supabase, {
         userId: opts.userId,
         accountId: opts.accountId,
@@ -230,6 +296,7 @@ export async function pumpInboxSync(opts: {
         linkers,
         companyDomains,
       });
+      slowestBatchMs = Math.max(slowestBatchMs, Date.now() - batchStartedAt);
 
       if (progress.error || progress.done) {
         return;
