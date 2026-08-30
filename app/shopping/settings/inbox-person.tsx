@@ -43,6 +43,20 @@ export function InboxPerson({
       <label htmlFor={`person-${accountId}`} className="text-xs text-ink-muted">
         Whose inbox
       </label>
+
+      {/*
+        Called out rather than left as a quiet "Nobody" in the dropdown. This
+        is the one step in setting up a second mailbox that is easy to skip,
+        and skipping it means everything that inbox imports arrives unlabelled
+        -- which reads as the feature not working rather than as a setting not
+        set. Assigning it later does relabel the back catalogue, but only if
+        you notice.
+      */}
+      {!value && (
+        <span className="rounded-full bg-accent-orange-tint px-2 py-0.5 text-[11px] font-medium text-accent-orange">
+          Not assigned
+        </span>
+      )}
       <Select
         id={`person-${accountId}`}
         value={value}
