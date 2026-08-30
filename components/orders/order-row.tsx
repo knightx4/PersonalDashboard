@@ -3,6 +3,8 @@ import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
 import { OrderRowMenu } from '@/components/orders/order-row-menu';
 import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/cn';
+import { PersonBadge } from '@/components/people/person-badge';
+import type { Person } from '@/lib/people/load';
 
 const STATUS_STYLES: Record<string, string> = {
   ordered: 'bg-brand-tint text-brand',
@@ -45,6 +47,8 @@ export type OrderRowData = {
   items_label: string;
   item_hint: string | null;
   inbox: string | null;
+  /** Whose order this is. Null on a one-person account, and on old data. */
+  person?: Person | null;
 };
 
 export function OrderRow({ order }: { order: OrderRowData }) {
@@ -81,6 +85,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
             >
               {statusLabel(order.status)}
             </span>
+            <PersonBadge person={order.person} />
           </div>
           <p className="mt-0.5 truncate text-[13px] text-ink-muted">
             {order.items_label}

@@ -9,6 +9,8 @@ import { formatMoney } from '@/lib/money';
 import { displayNameOf } from '@/lib/inventory/sort-group';
 import { displayVariant } from '@/lib/inventory/display';
 import { cn } from '@/lib/cn';
+import { PersonBadge } from '@/components/people/person-badge';
+import type { Person } from '@/lib/people/load';
 
 export type InventoryRowItem = {
   id: string;
@@ -24,6 +26,8 @@ export type InventoryRowItem = {
   category_slug: string | null;
   merchant_name: string | null;
   list_ids?: string[];
+  /** Whose item this is. Null on a one-person account, and on old data. */
+  person?: Person | null;
 };
 
 export function InventoryRow({
@@ -67,6 +71,7 @@ export function InventoryRow({
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-ink">
             {title}
+            <PersonBadge person={item.person} className="ml-2 align-middle" />
             {item.return_planned && (
               <span className="ml-2 inline-flex items-center gap-1 align-middle text-[11px] font-semibold uppercase tracking-wide text-brand">
                 <RotateCcw className="size-3" strokeWidth={2} aria-hidden />

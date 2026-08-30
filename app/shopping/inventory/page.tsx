@@ -19,6 +19,8 @@ import {
 } from '@/lib/inventory/sort-group';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
 
 export const metadata = { title: 'Inventory' };
 
@@ -48,6 +50,7 @@ function inventoryHref(opts: {
   range?: string;
   sort?: string;
   group?: string;
+  person?: string;
 }): string {
   const params = new URLSearchParams();
   if (opts.range && opts.range !== 'all') params.set('range', opts.range);
@@ -57,6 +60,7 @@ function inventoryHref(opts: {
   if (opts.list) params.set('list', opts.list);
   if (opts.sort && opts.sort !== 'newest') params.set('sort', opts.sort);
   if (opts.group && opts.group !== 'none') params.set('group', opts.group);
+  if (opts.person) params.set('person', opts.person);
   const qs = params.toString();
   return qs ? `/shopping/inventory?${qs}` : '/shopping/inventory';
 }
@@ -103,6 +107,7 @@ export default async function InventoryPage({
     range?: string;
     sort?: string;
     group?: string;
+    person?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -118,6 +123,12 @@ export default async function InventoryPage({
   const group = parseGroupId(params.group);
 
   await backfillUserInventoryDisplay(supabase, user.id);
+
+  const core = await createCoreClient();
+  const people = await loadPeople(core, user.id);
+  const personId = parsePersonFilter(params.person, people);
+  const byPerson = peopleById(people);
+  const showPeople = people.length > 1;
 
   const [{ data: categories }, { data: lists }, merchants, { data: profile }] = await Promise.all([
     supabase
@@ -149,7 +160,7 @@ export default async function InventoryPage({
 
   const selectWithOptionalInner = activeMerchant
     ? `
-        id, name, short_name, variant, cost_cents, acquired_at, status, category_id,
+        id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
         image_url, return_planned, search_tags,
         categories(name, color, slug),
         ${membershipJoin},
@@ -162,7 +173,7 @@ export default async function InventoryPage({
         )
       `
     : `
-        id, name, short_name, variant, cost_cents, acquired_at, status, category_id,
+        id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
         image_url, return_planned, search_tags,
         categories(name, color, slug),
         ${membershipJoin},
@@ -183,6 +194,7 @@ export default async function InventoryPage({
     .order('acquired_at', { ascending: false });
 
   if (categoryId) query = query.eq('category_id', categoryId);
+  if (personId) query = query.eq('person_id', personId);
   if (activeMerchant) {
     query = query
       .eq('order_items.orders.merchant_id', activeMerchant)
@@ -199,6 +211,7 @@ export default async function InventoryPage({
   if (error) throw error;
 
   type InventoryRow = {
+    person_id?: string | null;
     id: string;
     name: string;
     short_name: string | null;
@@ -281,6 +294,7 @@ export default async function InventoryPage({
       image_url: item.image_url ?? orderItem?.image_url ?? null,
       return_planned: item.return_planned,
       search_tags: item.search_tags,
+      person: showPeople ? (byPerson.get(item.person_id ?? '') ?? null) : null,
       category_name: category?.name ?? null,
       category_color: category?.color ?? null,
       category_slug: category?.slug ?? null,
@@ -298,6 +312,8 @@ export default async function InventoryPage({
     q || categoryId || activeMerchant || activeList || range !== 'all',
   );
 
+  // person rides in the base, so every other filter link keeps it rather than
+  // silently dropping back to everyone.
   const hrefBase = {
     range,
     q: q || undefined,
@@ -306,6 +322,7 @@ export default async function InventoryPage({
     list: activeList,
     sort,
     group,
+    person: personId ?? undefined,
   };
 
   return (
@@ -321,6 +338,24 @@ export default async function InventoryPage({
             />
           ))}
         </RailGroup>
+        {showPeople && (
+          <RailGroup label="Whose">
+            <RailItem
+              label="Everyone"
+              active={!personId}
+              href={inventoryHref({ ...hrefBase, person: undefined })}
+            />
+            {people.map((person) => (
+              <RailItem
+                key={person.id}
+                label={person.name}
+                active={personId === person.id}
+                href={inventoryHref({ ...hrefBase, person: person.id })}
+              />
+            ))}
+          </RailGroup>
+        )}
+
         <RailGroup label="List">
           <RailItem
             label="Any"

@@ -30,6 +30,7 @@ import {
   sanitizeOrdersQuery,
 } from '@/lib/orders/search';
 import { loadUserTags, parseTagId } from '@/lib/tags/ensure';
+import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
 
 export const metadata = { title: 'Orders' };
 
@@ -80,12 +81,14 @@ function hrefFor(opts: {
   merchant?: string;
   tag?: string;
   q?: string;
+  person?: string;
 }): string {
   const params = new URLSearchParams({ range: opts.range });
   if (opts.status) params.set('status', opts.status);
   if (opts.merchant) params.set('merchant', opts.merchant);
   if (opts.tag) params.set('tag', opts.tag);
   if (opts.q) params.set('q', opts.q);
+  if (opts.person) params.set('person', opts.person);
   return `/shopping/orders?${params.toString()}`;
 }
 
@@ -98,6 +101,7 @@ export default async function OrdersPage({
     merchant?: string;
     tag?: string;
     q?: string;
+    person?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -112,14 +116,20 @@ export default async function OrdersPage({
   const tagId = parseTagId(params.tag);
   const q = sanitizeOrdersQuery(params.q);
 
-  const [{ data: profile }, merchants, tags, inboxCount, displayCurrency] =
+  const [{ data: profile }, merchants, tags, inboxCount, displayCurrency, people] =
     await Promise.all([
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
       loadUserMerchants(supabase, user.id),
       loadUserTags(supabase, user.id),
       countConnectedInboxes(core, user.id),
       loadDisplayCurrency(supabase, user.id),
+      loadPeople(core, user.id),
     ]);
+  const personId = parsePersonFilter(params.person, people);
+  const byPerson = peopleById(people);
+  // The whole feature is invisible on a one-person account, which is right:
+  // there is nothing to tell apart.
+  const showPeople = people.length > 1;
   const timezone = profile?.timezone ?? 'UTC';
   const period = periodFor(range, timezone);
   const activeMerchant =
@@ -134,7 +144,7 @@ export default async function OrdersPage({
     .from('orders')
     .select(
       `
-      id, order_date, total_cents, currency, status, external_order_number,
+      id, order_date, total_cents, currency, status, external_order_number, person_id,
       merchants ( name, logo_url, domains ),
       order_items (
         name, variant, quantity, image_url, categories ( name ),
@@ -150,6 +160,7 @@ export default async function OrdersPage({
 
   if (status) query = query.eq('status', status);
   if (activeMerchant) query = query.eq('merchant_id', activeMerchant);
+  if (personId) query = query.eq('person_id', personId);
 
   const { data: rows, error } = await query;
   if (error) throw error;
@@ -233,16 +244,46 @@ export default async function OrdersPage({
                 status,
                 merchant: activeMerchant,
                 tag: activeTag,
-                q: q || undefined,
-              })}
+                q: q || undefined, person: personId ?? undefined })}
             />
           ))}
         </RailGroup>
+        {showPeople && (
+          <RailGroup label="Whose">
+            <RailItem
+              label="Everyone"
+              active={!personId}
+              href={hrefFor({
+                range,
+                status,
+                merchant: activeMerchant,
+                tag: activeTag,
+                q: q || undefined,
+              })}
+            />
+            {people.map((person) => (
+              <RailItem
+                key={person.id}
+                label={person.name}
+                active={personId === person.id}
+                href={hrefFor({
+                  range,
+                  status,
+                  merchant: activeMerchant,
+                  tag: activeTag,
+                  q: q || undefined,
+                  person: person.id,
+                })}
+              />
+            ))}
+          </RailGroup>
+        )}
+
         <RailGroup label="Merchant">
           <RailItem
             label="Any"
             active={!activeMerchant}
-            href={hrefFor({ range, status, tag: activeTag, q: q || undefined })}
+            href={hrefFor({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined })}
           />
           {merchants.map((merchant) => (
             <RailItem
@@ -254,8 +295,7 @@ export default async function OrdersPage({
                 status,
                 merchant: merchant.id,
                 tag: activeTag,
-                q: q || undefined,
-              })}
+                q: q || undefined, person: personId ?? undefined })}
             />
           ))}
         </RailGroup>
@@ -268,8 +308,7 @@ export default async function OrdersPage({
                 range,
                 status,
                 merchant: activeMerchant,
-                q: q || undefined,
-              })}
+                q: q || undefined, person: personId ?? undefined })}
             />
             {tags.map((tag) => (
               <RailItem
@@ -281,8 +320,7 @@ export default async function OrdersPage({
                   status,
                   merchant: activeMerchant,
                   tag: tag.id,
-                  q: q || undefined,
-                })}
+                  q: q || undefined, person: personId ?? undefined })}
               />
             ))}
           </RailGroup>
@@ -295,8 +333,7 @@ export default async function OrdersPage({
               range,
               merchant: activeMerchant,
               tag: activeTag,
-              q: q || undefined,
-            })}
+              q: q || undefined, person: personId ?? undefined })}
           />
           {STATUSES.map((entry) => (
             <RailItem
@@ -308,8 +345,7 @@ export default async function OrdersPage({
                 status: entry.id,
                 merchant: activeMerchant,
                 tag: activeTag,
-                q: q || undefined,
-              })}
+                q: q || undefined, person: personId ?? undefined })}
             />
           ))}
         </RailGroup>
@@ -360,7 +396,7 @@ export default async function OrdersPage({
             }
             action={
               filteredEmpty
-                ? { label: 'Clear filters', href: hrefFor({ range: 'last_12_months' }) }
+                ? { label: 'Clear filters', href: hrefFor({ range: 'last_12_months', person: personId ?? undefined }) }
                 : { label: 'Add an order', href: '/shopping/orders/new' }
             }
             secondaryAction={
@@ -417,6 +453,7 @@ export default async function OrdersPage({
                             items_label: itemsSummary.label,
                             item_hint: itemHint,
                             inbox,
+                            person: showPeople ? byPerson.get(order.person_id) : null,
                           }}
                         />
                       );
