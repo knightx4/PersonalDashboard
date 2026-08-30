@@ -25,6 +25,11 @@ export function commerceLinker(supabase: SupabaseClient): DomainLinker {
       counters.offered = envelopes.length;
       if (envelopes.length === 0) return counters;
 
+      // Whose mailbox this is, resolved once for the batch. Every order
+      // imported below inherits it, which is what makes shopping split by
+      // person without anybody labelling a single order.
+      const personId = await personForAccount(supabase, accountId);
+
       const [merchantRows, exclusions, categories] = await Promise.all([
         loadMerchantsForUser(supabase, userId),
         loadMerchantExclusions(supabase, userId),
@@ -56,6 +61,7 @@ export function commerceLinker(supabase: SupabaseClient): DomainLinker {
         categoryIdsBySlug: categories.categoryIdsBySlug,
         categoryOptions: categories.categoryOptions,
         counters: ingest,
+        personId,
       });
 
       // Lifecycle mail that arrived before its confirmation gets another look
@@ -83,3 +89,29 @@ export function commerceLinker(supabase: SupabaseClient): DomainLinker {
 }
 
 export type { LinkerCounters };
+
+/**
+ * The person who owns a mailbox.
+ *
+ * Read through the commerce client, which is bound to `public` -- so this
+ * cannot use `core.email_accounts` directly and goes through the view the
+ * commerce side already reads its mail from. Returns null rather than throwing
+ * when nobody is assigned: an unattributed order is fine, and a sync that
+ * fails because a label is missing is not.
+ */
+async function personForAccount(
+  supabase: SupabaseClient,
+  accountId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('email_account_people')
+    .select('person_id')
+    .eq('email_account_id', accountId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('person lookup failed', error.message);
+    return null;
+  }
+  return (data?.person_id as string | null) ?? null;
+}

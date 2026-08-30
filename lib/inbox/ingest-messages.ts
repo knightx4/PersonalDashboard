@@ -210,6 +210,8 @@ async function handleOrderConfirmation(
     categoryIdsBySlug: Map<string, string>;
     categoryOptions?: Array<{ slug: string; name: string }>;
     counters: IngestCounters;
+    /** Whose mailbox this arrived in; null when nobody owns it yet. */
+    personId?: string | null;
   },
 ): Promise<void> {
   const {
@@ -221,6 +223,7 @@ async function handleOrderConfirmation(
     categoryIdsBySlug,
     categoryOptions,
     counters,
+    personId = null,
   } = opts;
 
   if (
@@ -288,6 +291,9 @@ async function handleOrderConfirmation(
   const { error: orderError } = await supabase.from('orders').insert({
     id: bundle.order.id,
     user_id: bundle.order.userId,
+    // Whose mailbox this arrived in. The whole people feature rests on this
+    // one assignment: nothing downstream asks the user to label an order.
+    person_id: personId,
     merchant_id: bundle.order.merchantId,
     source: bundle.order.source,
     external_order_number: bundle.order.externalOrderNumber,
@@ -393,6 +399,10 @@ async function handleOrderConfirmation(
       short_name: item.shortName,
       variant: item.variant,
       fingerprint_loose: item.fingerprintLoose,
+      // Denormalised, like name and fingerprint above and for the same reason:
+      // the inventory list filters by person, and a hand-added item has no
+      // order to reach one through.
+      person_id: personId,
       acquired_at: item.acquiredAt,
       cost_cents: item.costCents,
       image_url: item.imageUrl,
@@ -469,6 +479,13 @@ export async function linkEnvelopes(
     categoryIdsBySlug: Map<string, string>;
     categoryOptions?: Array<{ slug: string; name: string }>;
     counters: IngestCounters;
+    /**
+     * Whose mailbox this batch came from.
+     *
+     * Resolved once per sync rather than per message: it is a property of the
+     * mailbox, and every order out of this batch inherits it.
+     */
+    personId?: string | null;
   },
 ): Promise<void> {
   const {
@@ -479,6 +496,7 @@ export async function linkEnvelopes(
     exclusions,
     categoryIdsBySlug,
     categoryOptions,
+    personId = null,
     counters,
   } = opts;
 
@@ -619,6 +637,7 @@ export async function linkEnvelopes(
         categoryIdsBySlug,
         categoryOptions,
         counters,
+        personId,
       });
     } catch (err) {
       console.error('sync message failed', item.envelope.providerMessageId, err);

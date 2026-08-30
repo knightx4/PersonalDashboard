@@ -1,6 +1,7 @@
 import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User, Wallet } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { loadPeople } from '@/lib/people/load';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { DisplayCurrencySection } from './display-currency-section';
 import { InboxSection } from './inbox-section';
 import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
+import { PeopleSection, PeopleTitle } from './people-section';
 import { ReturnPoliciesSection } from './return-policies-section';
 import { TagsSection } from './tags-section';
 
@@ -40,8 +42,10 @@ export default async function SettingsPage({
 
   const { data: accounts } = await core
     .from('email_accounts')
-    .select('id, email_address, status, last_synced_at, backfill_completed_at')
+    .select('id, email_address, status, last_synced_at, backfill_completed_at, person_id')
     .eq('user_id', user.id);
+
+  const people = await loadPeople(core, user.id);
 
   const { data: mutedMerchants } = await supabase
     .from('merchant_exclusions')
@@ -186,6 +190,17 @@ export default async function SettingsPage({
 
         <Card>
           <CardHeader>
+            <CardTitle>
+              <PeopleTitle />
+            </CardTitle>
+          </CardHeader>
+          <CardBody>
+            <PeopleSection people={people} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="size-4 text-ink-muted" strokeWidth={1.75} />
               Connected inboxes
@@ -196,6 +211,7 @@ export default async function SettingsPage({
               accounts={accounts ?? []}
               bannerCode={params.inbox}
               latestJobs={latestJobs}
+              people={people}
             />
           </CardBody>
         </Card>

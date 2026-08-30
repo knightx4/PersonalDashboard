@@ -5,6 +5,8 @@ import { cn } from '@/lib/cn';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { disconnectInbox } from './actions';
 import { InboxSyncButton, type InboxSyncProgress } from './inbox-sync-button';
+import { InboxPerson } from './inbox-person';
+import type { Person } from '@/lib/people/load';
 
 type Account = {
   id: string;
@@ -12,6 +14,7 @@ type Account = {
   status: string;
   last_synced_at: string | null;
   backfill_completed_at?: string | null;
+  person_id?: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -88,10 +91,12 @@ export function InboxSection({
   accounts,
   bannerCode,
   latestJobs = {},
+  people = [],
 }: {
   accounts: Account[];
   bannerCode?: string;
   latestJobs?: Record<string, InboxSyncProgress | null>;
+  people?: Person[];
 }) {
   const configured = isGmailOAuthConfigured();
   const banner = inboxBanner(bannerCode);
@@ -147,6 +152,12 @@ export function InboxSection({
                     </form>
                   </div>
                 </div>
+                <InboxPerson
+                  accountId={account.id}
+                  people={people}
+                  personId={account.person_id ?? null}
+                />
+
                 {account.status === 'active' && (
                   <InboxSyncButton
                     accountId={account.id}

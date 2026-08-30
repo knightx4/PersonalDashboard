@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { createManualOrder, type ActionState } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label, Select } from '@/components/ui/field';
+import type { Person } from '@/lib/people/load';
 import {
   computeOrderTotalCents,
   formatMoney,
@@ -56,10 +57,14 @@ export function OrderForm({
   merchants,
   categories,
   defaultDate,
+  people = [],
+  defaultPersonId = null,
 }: {
   merchants: MerchantOption[];
   categories: CategoryOption[];
   defaultDate: string;
+  people?: Person[];
+  defaultPersonId?: string | null;
 }) {
   const [state, action, pending] = useActionState(createManualOrder, initialState);
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
@@ -150,6 +155,25 @@ export function OrderForm({
             defaultValue={defaultDate}
           />
         </div>
+
+        {/*
+          Only shown once there is somebody to choose between. On a
+          single-person account this is a field with one answer, and asking it
+          every time would be noise.
+        */}
+        {people.length > 1 && (
+          <div>
+            <Label htmlFor="person_id">Whose is it</Label>
+            <Select id="person_id" name="person_id" defaultValue={defaultPersonId ?? ''}>
+              <option value="">Nobody in particular</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">

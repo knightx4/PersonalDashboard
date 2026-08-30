@@ -45,6 +45,13 @@ const createOrderSchema = z.object({
     .or(z.literal('').transform(() => undefined)),
   customMerchantName: z.string().trim().optional(),
   externalOrderNumber: z.string().trim().optional(),
+  // Whose order this is. Empty is a legitimate answer, not a validation
+  // failure: an order can genuinely belong to nobody in particular.
+  personId: z
+    .string()
+    .uuid()
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   orderDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick an order date.'),
   tax: moneyField('Tax', true),
   shipping: moneyField('Shipping', true),
@@ -89,6 +96,7 @@ export async function createManualOrder(
     merchantId: formData.get('merchant_id') ?? '',
     customMerchantName: String(formData.get('custom_merchant_name') ?? ''),
     externalOrderNumber: String(formData.get('external_order_number') ?? ''),
+    personId: String(formData.get('person_id') ?? ''),
     orderDate: String(formData.get('order_date') ?? ''),
     tax: String(formData.get('tax') ?? ''),
     shipping: String(formData.get('shipping') ?? ''),
@@ -182,6 +190,7 @@ export async function createManualOrder(
     discount_cents: built.order.discountCents,
     total_cents: built.order.totalCents,
     currency: built.order.currency,
+    person_id: parsed.data.personId ?? null,
   });
   if (orderError) return { error: orderError.message };
 
@@ -228,6 +237,7 @@ export async function createManualOrder(
       short_name: item.shortName,
       variant: item.variant,
       fingerprint_loose: item.fingerprintLoose,
+      person_id: parsed.data.personId ?? null,
       acquired_at: item.acquiredAt,
       cost_cents: item.costCents,
       search_tags: item.searchTags,

@@ -3,6 +3,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { todayInTimezone } from '@/lib/money';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultPerson, loadPeople } from '@/lib/people/load';
 import { OrderForm } from './order-form';
 
 export const metadata = { title: 'Add an order' };
@@ -20,6 +22,9 @@ export default async function NewOrderPage() {
       .order('name'),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
   ]);
+
+  const core = await createCoreClient();
+  const people = await loadPeople(core, user.id);
 
   const defaultDate = todayInTimezone(profile?.timezone ?? 'UTC');
 
@@ -43,6 +48,8 @@ export default async function NewOrderPage() {
         }
       />
       <OrderForm
+      people={people}
+      defaultPersonId={defaultPerson(people)?.id ?? null}
         merchants={merchants ?? []}
         categories={categories ?? []}
         defaultDate={defaultDate}

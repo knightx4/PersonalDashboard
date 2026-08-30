@@ -21,6 +21,7 @@ let userA = '';
 let userB = '';
 let accountA = '';
 let messageA = '';
+let personA = '';
 
 async function seedMessage(
   accountId: string,
@@ -44,6 +45,13 @@ beforeAll(async () => {
     values (${userA}, 'gmail', 'core-a@example.com', 'encrypted-token')
     returning id`;
   accountA = account.id;
+
+  const [person] = await admin<{ id: string }[]>`
+    insert into people (user_id, name, is_default)
+    values (${userA}, 'Chris', true)
+    returning id`;
+  personA = person.id;
+  await admin`update email_accounts set person_id = ${personA} where id = ${accountA}`;
 
   messageA = await seedMessage(accountA, 'core-msg-1', 'Your order shipped');
   await admin`
@@ -93,6 +101,63 @@ describe('cross-user reads', () => {
       (tx) => tx`select oauth_refresh_token from email_accounts`,
     );
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('people', () => {
+  it('shows the owner their people', async () => {
+    const rows = await asUser(userA, (tx) => tx`select id, name from people`);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('shows another user none of them', async () => {
+    // The names of the people you shop for are as private as the shopping.
+    const rows = await asUser(userB, (tx) => tx`select id from people`);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('does not let another user rename them', async () => {
+    const affected = await asUser(
+      userB,
+      (tx) => tx`update people set name = 'Mallory' where id = ${personA} returning id`,
+    );
+    expect(affected).toHaveLength(0);
+  });
+
+  it('does not let another user delete them', async () => {
+    const affected = await asUser(
+      userB,
+      (tx) => tx`delete from people where id = ${personA} returning id`,
+    );
+    expect(affected).toHaveLength(0);
+  });
+
+  it('allows only one default person per account', async () => {
+    await expect(
+      admin`insert into people (user_id, name, is_default) values (${userA}, 'Second', true)`,
+    ).rejects.toThrow();
+  });
+
+  it('treats a name as one person whatever its casing', async () => {
+    // "Emma" and "emma" splitting somebody's spending in two is the failure
+    // this prevents.
+    await expect(
+      admin`insert into people (user_id, name) values (${userA}, 'chris')`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps the shopping when a person is removed', async () => {
+    const [victim] = await admin<{ id: string }[]>`
+      insert into people (user_id, name) values (${userA}, 'Temporary') returning id`;
+    await admin`update email_accounts set person_id = ${victim.id} where id = ${accountA}`;
+    await admin`delete from people where id = ${victim.id}`;
+
+    // set null, not cascade: an order that happened still happened.
+    const [account] = await admin<{ person_id: string | null }[]>`
+      select person_id from email_accounts where id = ${accountA}`;
+    expect(account.person_id).toBeNull();
+
+    await admin`update email_accounts set person_id = ${personA} where id = ${accountA}`;
   });
 });
 
