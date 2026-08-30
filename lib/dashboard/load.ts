@@ -37,8 +37,12 @@ export function parseDashboardRange(raw: string | undefined): PresetRange {
   return DASHBOARD_RANGES.find((entry) => entry.id === raw)?.id ?? 'this_month';
 }
 
-export function dashboardHref(range: PresetRange): string {
-  return `/shopping/dashboard?range=${range}`;
+export function dashboardHref(range: PresetRange, personId?: string | null): string {
+  const params = new URLSearchParams({ range });
+  // Carried on every range link too, so switching the period does not silently
+  // drop you back to everyone's spending.
+  if (personId) params.set('person', personId);
+  return `/shopping/dashboard?${params.toString()}`;
 }
 
 export interface ReturnableRow {
@@ -64,6 +68,21 @@ export interface DashboardData {
   merchants: MerchantSpendSlice[];
   valueOwnedCents: number;
   returnable: ReturnableRow[];
+  /**
+   * Net spend per person for the current period, biggest first.
+   *
+   * Computed from the same converted amounts as the headline, so the parts
+   * sum to the whole rather than to a slightly different number -- two spend
+   * figures on one screen that disagree is worse than not showing the split.
+   * Empty when nobody is set up.
+   */
+  byPerson: PersonSpend[];
+}
+
+export interface PersonSpend {
+  /** Null is the unattributed bucket: real spending with no person on it. */
+  personId: string | null;
+  netCents: number;
 }
 
 type CategoryRow = {
@@ -75,6 +94,7 @@ type CategoryRow = {
 
 type OrderRow = {
   id: string;
+  person_id?: string | null;
   order_date: string;
   subtotal_cents: number;
   tax_cents: number;
@@ -194,6 +214,33 @@ function toSpendOrders(orders: OrderRow[]): SpendOrder[] {
     totalCents: order.total_cents,
     cancelled: isCancelled(order),
   }));
+}
+
+/**
+ * Net spend per person over the period, biggest first.
+ *
+ * Built from the same already-converted orders the headline uses, so the parts
+ * sum to the whole. Two spend figures on one screen that disagree by a few
+ * pounds of currency conversion is worse than not showing the split at all.
+ *
+ * Refunds are excluded rather than apportioned: a refund reaches a person only
+ * through its order, and attributing them here would double the query cost for
+ * a number this card does not claim to show. It is labelled as spend, not as
+ * net, for that reason.
+ */
+function spendByPerson(orders: OrderRow[], period: Period): PersonSpend[] {
+  const totals = new Map<string | null, number>();
+
+  for (const order of orders) {
+    if (isCancelled(order)) continue;
+    if (order.order_date < period.start || order.order_date > period.end) continue;
+    const key = order.person_id ?? null;
+    totals.set(key, (totals.get(key) ?? 0) + order.total_cents);
+  }
+
+  return [...totals.entries()]
+    .map(([personId, netCents]) => ({ personId, netCents }))
+    .sort((a, b) => b.netCents - a.netCents);
 }
 
 function toSpendRefunds(returns: ReturnRow[]): SpendRefund[] {
@@ -321,10 +368,33 @@ function returnableFromInventory(
  * Mixed-currency orders are converted to the user's display_currency using
  * Frankfurter rates on each order's purchase date before aggregation.
  */
+/**
+ * Refunds for a person.
+ *
+ * A refund has no person of its own -- it belongs to whoever the order
+ * belonged to -- so the filter goes through the embedded order, and the embed
+ * has to become an inner join for that to actually restrict anything.
+ */
+function refundsQuery(supabase: SupabaseClient, userId: string, personId: string | null) {
+  const columns = personId
+    ? 'refunded_at, refund_amount_cents, status, orders!inner ( currency, order_date, deleted_at, person_id )'
+    : 'refunded_at, refund_amount_cents, status, orders ( currency, order_date, deleted_at )';
+
+  const query = supabase
+    .from('returns')
+    .select(columns)
+    .eq('user_id', userId)
+    .eq('status', 'refunded');
+
+  return personId ? query.eq('orders.person_id', personId) : query;
+}
+
 export async function loadDashboard(
   supabase: SupabaseClient,
   userId: string,
   range: PresetRange,
+  /** Scope every figure to one person. Null is everyone. */
+  personId: string | null = null,
 ): Promise<DashboardData> {
   const { data: profile } = await supabase
     .from('profiles')
@@ -343,6 +413,51 @@ export async function loadDashboard(
   const earliest = period.start < previous.start ? period.start : previous.start;
   const latest = period.end > previous.end ? period.end : previous.end;
 
+  // Hoisted rather than inlined into Promise.all so the person filter is a
+  // plain conditional on each one. Every figure on this page has to be scoped
+  // the same way; a query that missed the filter would show one person the
+  // other's numbers with nothing to indicate it.
+  let countQuery = supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .is('deleted_at', null);
+  if (personId) countQuery = countQuery.eq('person_id', personId);
+
+  let ordersQuery = supabase
+    .from('orders')
+    .select(
+      `
+      id, person_id, order_date, subtotal_cents, tax_cents, shipping_cents,
+      discount_cents, total_cents, currency, cancelled_at, status,
+      return_deadline, merchant_id,
+      merchants ( name ),
+      order_items ( id, quantity, unit_price_cents, category_id )
+    `,
+    )
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .gte('order_date', earliest)
+    .lte('order_date', latest);
+  if (personId) ordersQuery = ordersQuery.eq('person_id', personId);
+
+  let inventoryQuery = supabase
+    .from('inventory_items')
+    .select(
+      `
+      id, name, cost_cents, status, order_item_id, person_id,
+      order_items (
+        order_id,
+        orders (
+          id, status, return_deadline, deleted_at, currency, order_date,
+          merchants ( name )
+        )
+      )
+    `,
+    )
+    .eq('user_id', userId);
+  if (personId) inventoryQuery = inventoryQuery.eq('person_id', personId);
+
   const [
     { count: orderCount },
     { data: categoryRows, error: categoriesError },
@@ -350,51 +465,13 @@ export async function loadDashboard(
     { data: returnRows, error: returnsError },
     { data: inventoryRows, error: inventoryError },
   ] = await Promise.all([
-    supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .is('deleted_at', null),
+    countQuery,
     supabase.from('categories').select('id, name, color, parent_id'),
-    supabase
-      .from('orders')
-      .select(
-        `
-        id, order_date, subtotal_cents, tax_cents, shipping_cents,
-        discount_cents, total_cents, currency, cancelled_at, status,
-        return_deadline, merchant_id,
-        merchants ( name ),
-        order_items ( id, quantity, unit_price_cents, category_id )
-      `,
-      )
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .gte('order_date', earliest)
-      .lte('order_date', latest),
-    supabase
-      .from('returns')
-      .select(
-        'refunded_at, refund_amount_cents, status, orders ( currency, order_date, deleted_at )',
-      )
-      .eq('user_id', userId)
-      .eq('status', 'refunded')
+    ordersQuery,
+    refundsQuery(supabase, userId, personId)
       .gte('refunded_at', earliest)
       .lte('refunded_at', latest),
-    supabase
-      .from('inventory_items')
-      .select(
-        `
-        id, name, cost_cents, status, order_item_id,
-        order_items (
-          order_id,
-          orders (
-            id, status, return_deadline, deleted_at, currency, order_date,
-            merchants ( name )
-          )
-        )
-      `,
-      )
-      .eq('user_id', userId),
+    inventoryQuery,
   ]);
 
   if (categoriesError) throw categoriesError;
@@ -544,6 +621,7 @@ export async function loadDashboard(
   const spendOrders = toSpendOrders(orders);
   const spendRefunds = toSpendRefunds(returns);
   const current = spend(spendOrders, spendRefunds, period);
+  const byPerson = spendByPerson(orders, period);
   const previousBreakdown = spend(spendOrders, spendRefunds, previous);
 
   return {
@@ -558,6 +636,7 @@ export async function loadDashboard(
     previous: previousBreakdown,
     categories: spendByCategory(toCategorizedUnits(orders, categories), period),
     merchants: spendByMerchant(toMerchantOrders(orders), period),
+    byPerson,
     valueOwnedCents: valueOwned(
       inventory.map((item) => ({
         costCents: item.cost_cents,

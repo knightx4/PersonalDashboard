@@ -8,6 +8,9 @@ import { CategoryDonut } from '@/components/dashboard/category-donut';
 import { MerchantBreakdown } from '@/components/dashboard/merchant-breakdown';
 import { ReturnableList } from '@/components/dashboard/returnable-list';
 import { ValueOwnedCard } from '@/components/dashboard/value-owned-card';
+import { PersonBreakdown } from '@/components/dashboard/person-breakdown';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadPeople, parsePersonFilter } from '@/lib/people/load';
 import {
   DASHBOARD_RANGES,
   dashboardHref,
@@ -25,13 +28,20 @@ export const metadata = { title: 'Dashboard' };
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; person?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
+  const core = await createCoreClient();
   const params = await searchParams;
   const range = parseDashboardRange(params.range);
-  const data = await loadDashboard(supabase, user.id, range);
+
+  const people = await loadPeople(core, user.id);
+  const personId = parsePersonFilter(params.person, people);
+  const showPeople = people.length > 1;
+
+  const data = await loadDashboard(supabase, user.id, range, personId);
+  const activePerson = personId ? people.find((entry) => entry.id === personId) : null;
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -42,16 +52,34 @@ export default async function DashboardPage({
               key={entry.id}
               label={entry.label}
               active={entry.id === range}
-              href={dashboardHref(entry.id)}
+              href={dashboardHref(entry.id, personId)}
             />
           ))}
         </RailGroup>
+
+        {showPeople && (
+          <RailGroup label="Whose">
+            <RailItem label="Everyone" active={!personId} href={dashboardHref(range)} />
+            {people.map((person) => (
+              <RailItem
+                key={person.id}
+                label={person.name}
+                active={personId === person.id}
+                href={dashboardHref(range, person.id)}
+              />
+            ))}
+          </RailGroup>
+        )}
       </LeftRail>
 
       <div className="min-w-0 flex-1">
         <PageHeader
           title="Dashboard"
-          description="What you spent, where it went, and what is still returnable."
+          description={
+            activePerson
+              ? `${activePerson.name}'s spending, where it went, and what is still returnable.`
+              : 'What you spent, where it went, and what is still returnable.'
+          }
         />
 
         {data.orderCount === 0 ? (
@@ -76,6 +104,14 @@ export default async function DashboardPage({
                 currency={data.currency}
               />
             </div>
+
+            {showPeople && !personId && (
+              <PersonBreakdown
+                rows={data.byPerson}
+                people={people}
+                currency={data.currency}
+              />
+            )}
 
             <div className="grid gap-4 lg:grid-cols-2">
               <CategoryDonut slices={data.categories} currency={data.currency} />
