@@ -417,6 +417,30 @@ describe('the acceptance criteria', () => {
     });
   });
 
+  it('routes an unmatched interview invite down the lead path', () => {
+    // The shape behind note 7f0265b8. The invite scored too low to link --
+    // different sender, no thread, no ATS id -- so it fell through to
+    // create_lead even though an open pursuit for that exact role existed.
+    // The decision itself is right; what was wrong was the ingestion treating
+    // an adopted pursuit as a brand-new lead and recording a flat note, so a
+    // booked interview never moved the status off "acknowledged".
+    const decision = decideLink(
+      message({
+        threadId: null,
+        classification: 'interview_invite',
+        fromAddress: 'rainey@revin.ai',
+        replyToAddress: null,
+        subject: 'Revin - Strategy & Operations Manager - Next Steps',
+        extractedCompany: 'Revin',
+        extractedRole: 'Strategy & Operations Manager',
+      }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-08-14T10:00:00Z') },
+    );
+
+    expect(decision.action).toBe('create_lead');
+  });
+
   it('holds a message whose company cannot be resolved at all', () => {
     const decision = decideLink(
       message({

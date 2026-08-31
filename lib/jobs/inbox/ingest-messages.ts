@@ -436,7 +436,7 @@ async function createInferredApplication(
     receivedAt: Date | null;
     asLead: boolean;
   },
-): Promise<string | null> {
+): Promise<{ applicationId: string; adopted: boolean } | null> {
   const title = opts.roleTitle?.trim() || 'Role from email';
 
   // Never a duplicate: an open application at this company with this title is
@@ -451,7 +451,10 @@ async function createInferredApplication(
     if ((role.title as string).toLowerCase() !== title.toLowerCase()) continue;
     const applications = (role.applications ?? []) as Array<{ id: string; status: string }>;
     const open = applications.find((a) => !isTerminal(a.status as ApplicationStatus));
-    if (open) return open.id;
+    // Adopted, not created. The caller has to know: an interview invite for a
+    // pursuit that already exists is an event that moves it forward, not the
+    // birth of a lead.
+    if (open) return { applicationId: open.id, adopted: true };
   }
 
   const { data: role, error: roleError } = await supabase
@@ -504,7 +507,7 @@ async function createInferredApplication(
     });
   }
 
-  return application.id;
+  return { applicationId: application.id, adopted: false };
 }
 
 export interface IngestContext {
@@ -823,7 +826,7 @@ async function applyDecision(
         return;
       }
 
-      const applicationId = await createInferredApplication(supabase, {
+      const created = await createInferredApplication(supabase, {
         userId: ctx.userId,
         companyId,
         roleTitle: tierB?.roleTitle ?? null,
@@ -832,11 +835,13 @@ async function applyDecision(
         asLead: false,
       });
 
-      if (!applicationId) {
+      if (!created) {
         await ledger('failed', { error: 'Could not create the inferred application.' });
         ctx.counters.errors += 1;
         return;
       }
+
+      const applicationId = created.applicationId;
 
       const ledgerId = await ledger('parsed', {
         applicationId,
@@ -867,7 +872,7 @@ async function applyDecision(
         return;
       }
 
-      const applicationId = await createInferredApplication(supabase, {
+      const lead = await createInferredApplication(supabase, {
         userId: ctx.userId,
         companyId,
         roleTitle: tierB?.roleTitle ?? null,
@@ -876,29 +881,51 @@ async function applyDecision(
         asLead: true,
       });
 
-      if (!applicationId) {
+      if (!lead) {
         await ledger('failed', { error: 'Could not create the lead.' });
         ctx.counters.errors += 1;
         return;
       }
 
+      const applicationId = lead.applicationId;
+
       const ledgerId = await ledger('parsed', {
         applicationId,
         linkConfidence: 0.5,
-        linkMethod: 'lead_from_inbound',
+        linkMethod: lead.adopted ? 'matched_open_pursuit' : 'lead_from_inbound',
       });
 
-      // A lead has no application to advance, so the inbound is recorded as a
-      // note on the timeline rather than as a status-moving event.
-      await supabase.from('application_events').insert({
-        user_id: ctx.userId,
-        application_id: applicationId,
-        kind: 'note',
-        occurred_at: message.internalDate?.toISOString() ?? new Date().toISOString(),
-        source: 'email',
-        ingested_message_id: ledgerId,
-        summary: tierB?.summary ?? 'Inbound about a role you have not applied to',
-      });
+      if (lead.adopted) {
+        // Not a lead at all. The dedupe found an open pursuit at this company
+        // with this title, which means the message is about something already
+        // on the board -- so it gets its real event and moves the status.
+        //
+        // This is what an interview invite landing here used to lose: it was
+        // classified correctly, attached to the right application, and then
+        // recorded as a flat note, so a pursuit with an interview booked still
+        // read as merely acknowledged.
+        await writeEvent(supabase, {
+          userId: ctx.userId,
+          applicationId,
+          ledgerId,
+          classification,
+          extracted: tierB,
+          message,
+          invite,
+        });
+      } else {
+        // A genuinely new lead has no application to advance, so the inbound is
+        // recorded as a note rather than as a status-moving event.
+        await supabase.from('application_events').insert({
+          user_id: ctx.userId,
+          application_id: applicationId,
+          kind: 'note',
+          occurred_at: message.internalDate?.toISOString() ?? new Date().toISOString(),
+          source: 'email',
+          ingested_message_id: ledgerId,
+          summary: tierB?.summary ?? 'Inbound about a role you have not applied to',
+        });
+      }
 
       ctx.counters.leadsCreated += 1;
       ctx.counters.messagesParsed += 1;
