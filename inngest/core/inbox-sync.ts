@@ -327,12 +327,19 @@ export async function pumpInboxSync(opts: {
     // Whatever is left, capped: on the invocation that finishes the mailbox
     // there is a lot, and that is exactly when a held rejection is most likely
     // to find the application this run just created.
-    await sweepAccount(supabase, {
-      userId: opts.userId,
-      accountId: opts.accountId,
-      linkers,
-      budgetMs: Math.min(SWEEP_BUDGET_MS, deadline - Date.now()),
-    });
+    try {
+      await sweepAccount(supabase, {
+        userId: opts.userId,
+        accountId: opts.accountId,
+        linkers,
+        budgetMs: Math.min(SWEEP_BUDGET_MS, deadline - Date.now()),
+      });
+    } catch (err) {
+      // Never fatal. This is the optional pass, and it sits directly in front
+      // of the hand-off -- letting it reach the catch below would mark a job
+      // failed for the one piece of work that was not the point.
+      console.error('inbox sweep failed', err);
+    }
 
     if (finished) return;
 

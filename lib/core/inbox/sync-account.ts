@@ -467,6 +467,7 @@ export async function sweepAccount(
   },
 ): Promise<void> {
   if (opts.budgetMs <= 0) return;
+  if (!opts.linkers.some((linker) => linker.sweep)) return;
 
   const encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
   const account = await loadAccount(supabase, opts.userId, opts.accountId);
