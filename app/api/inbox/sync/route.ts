@@ -12,6 +12,7 @@ import {
   isFreshActiveJob,
   type SyncJobStaleRow,
 } from '@/lib/core/inbox/sync-job-stale';
+import { backfillResumable, type BackfillState } from '@/lib/core/inbox/resume';
 
 export const maxDuration = 60;
 
@@ -54,6 +55,23 @@ function jobToProgress(job: JobRow) {
   };
 }
 
+/**
+ * Where the first scan got to, for a client that has to decide whether to ask
+ * for the next stretch. The rules themselves live in lib/core/inbox/resume.
+ */
+function backfillStateOf(
+  account: { status: string; backfill_completed_at: string | null },
+  rows: JobRow[],
+): BackfillState & { resumable: boolean } {
+  const latest = rows.find((j) => (j.type ?? 'backfill') === 'backfill') ?? null;
+  const state: BackfillState = {
+    accountStatus: account.status,
+    backfillCompletedAt: account.backfill_completed_at,
+    latestJob: latest ? { status: latest.status, messagesSeen: latest.messages_seen } : null,
+  };
+  return { ...state, resumable: backfillResumable(state) };
+}
+
 const JOB_SELECT =
   'id, type, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at';
 
@@ -78,7 +96,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createCoreClient();
   const { data: account } = await supabase
     .from('email_accounts')
-    .select('id')
+    .select('id, status, backfill_completed_at')
     .eq('id', accountId)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -106,7 +124,7 @@ export async function GET(request: NextRequest) {
     rows.find((j) => j.status === 'running' || j.status === 'queued') ?? rows[0] ?? null;
 
   if (!selected) {
-    return NextResponse.json({ job: null });
+    return NextResponse.json({ job: null, backfill: backfillStateOf(account, rows) });
   }
 
   let row = selected;
@@ -115,7 +133,10 @@ export async function GET(request: NextRequest) {
     row = { ...row, ...stale };
   }
 
-  return NextResponse.json({ job: jobToProgress(row) });
+  return NextResponse.json({
+    job: jobToProgress(row),
+    backfill: backfillStateOf(account, rows),
+  });
 }
 
 export async function POST(request: NextRequest) {

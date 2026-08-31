@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
 import { TimezoneField } from '@/components/ui/timezone-field';
 import { formatDate } from '@/lib/jobs/applications/load';
+import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
 import { addEvidence, addResumeVersion, deleteEvidence } from './evidence-actions';
 
@@ -24,14 +25,7 @@ export function SettingsView(props: {
     writingStyleNotes: string;
     bannedConstructions: string;
   };
-  accounts: Array<{
-    id: string;
-    emailAddress: string;
-    status: string;
-    lastSyncedAt: string | null;
-    backfillCompletedAt: string | null;
-    backfillWindowDays: number;
-  }>;
+  accounts: InboxAccount[];
   resumes: Array<{ id: string; label: string; isDefault: boolean; notes: string | null }>;
   evidence: Array<{
     id: string;
@@ -193,18 +187,37 @@ function ProfileSection({
   );
 }
 
+export type InboxAccount = {
+  id: string;
+  emailAddress: string;
+  status: string;
+  lastSyncedAt: string | null;
+  backfillCompletedAt: string | null;
+  backfillWindowDays: number;
+  /** The last first-scan attempt, so a stopped one can say so. */
+  latestBackfill: {
+    status: string;
+    messagesSeen: number;
+    error: string | null;
+    finishedAt: string | null;
+  } | null;
+};
+
+function backfillStateOf(account: InboxAccount) {
+  return {
+    accountStatus: account.status,
+    backfillCompletedAt: account.backfillCompletedAt,
+    latestJob: account.latestBackfill
+      ? { status: account.latestBackfill.status, messagesSeen: account.latestBackfill.messagesSeen }
+      : null,
+  };
+}
+
 function InboxSection({
   accounts,
   gmailConfigured,
 }: {
-  accounts: Array<{
-    id: string;
-    emailAddress: string;
-    status: string;
-    lastSyncedAt: string | null;
-    backfillCompletedAt: string | null;
-    backfillWindowDays: number;
-  }>;
+  accounts: InboxAccount[];
   gmailConfigured: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -284,6 +297,22 @@ function InboxSection({
                 </p>
               )}
 
+              {backfillResumable(backfillStateOf(account)) && account.latestBackfill && (
+                // The scan hands off between server invocations and the host
+                // cuts that chain after a few hops, so a long first scan stops
+                // partway. It resumes where it stopped -- which the page has to
+                // actually say, or the only reading left is that nothing
+                // happened the last six times.
+                <p className="mt-2 rounded bg-canvas px-2 py-1.5 text-[12px] text-ink-muted">
+                  First scan stopped partway — {account.latestBackfill.messagesSeen} messages read
+                  {account.latestBackfill.finishedAt
+                    ? `, ${formatDate(account.latestBackfill.finishedAt)}`
+                    : ''}
+                  . It picks up where it left off, and keeps going on its own while a page of the
+                  app is open.
+                </p>
+              )}
+
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {/*
                   Check now is the primary action once the first scan is done.
@@ -307,7 +336,7 @@ function InboxSection({
                   disabled={busy === account.id}
                   onClick={() => startSync(account.id, 'backfill')}
                 >
-                  {account.backfillCompletedAt ? 'Re-scan everything' : 'Start the first scan'}
+                  {scanButtonLabel(backfillStateOf(account))}
                 </Button>
                 <a
                   href="/api/auth/gmail/connect?return_to=/jobs/settings"

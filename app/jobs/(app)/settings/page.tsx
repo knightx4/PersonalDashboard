@@ -73,6 +73,34 @@ export default async function SettingsPage({
         .order('strength', { ascending: false }),
     ]);
 
+  // The last first-scan attempt per mailbox. Without it the page cannot tell a
+  // scan that has never been run from one that stopped six times partway, and
+  // it invited the user to "start" a scan they had already started.
+  type BackfillRow = {
+    email_account_id: string;
+    status: string;
+    messages_seen: number;
+    error: string | null;
+    finished_at: string | null;
+  };
+
+  const accountIds = (accounts ?? []).map((a) => a.id as string);
+  const backfills: BackfillRow[] = accountIds.length
+    ? (((
+        await core
+          .from('sync_jobs')
+          .select('email_account_id, status, messages_seen, error, finished_at')
+          .in('email_account_id', accountIds)
+          .eq('type', 'backfill')
+          .order('created_at', { ascending: false })
+      ).data ?? []) as BackfillRow[])
+    : [];
+
+  const latestBackfill = new Map<string, BackfillRow>();
+  for (const row of backfills) {
+    if (!latestBackfill.has(row.email_account_id)) latestBackfill.set(row.email_account_id, row);
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Settings" description="Your profile, your inboxes, and your data." />
@@ -90,14 +118,25 @@ export default async function SettingsPage({
           writingStyleNotes: (profile?.writing_style_notes as string) ?? '',
           bannedConstructions: ((profile?.banned_constructions as string[]) ?? []).join('\n'),
         }}
-        accounts={(accounts ?? []).map((account) => ({
-          id: account.id as string,
-          emailAddress: account.email_address as string,
-          status: account.status as string,
-          lastSyncedAt: (account.last_synced_at as string) ?? null,
-          backfillCompletedAt: (account.backfill_completed_at as string) ?? null,
-          backfillWindowDays: account.backfill_window_days as number,
-        }))}
+        accounts={(accounts ?? []).map((account) => {
+          const job = latestBackfill.get(account.id as string);
+          return {
+            id: account.id as string,
+            emailAddress: account.email_address as string,
+            status: account.status as string,
+            lastSyncedAt: (account.last_synced_at as string) ?? null,
+            backfillCompletedAt: (account.backfill_completed_at as string) ?? null,
+            backfillWindowDays: account.backfill_window_days as number,
+            latestBackfill: job
+              ? {
+                  status: job.status,
+                  messagesSeen: job.messages_seen,
+                  error: job.error,
+                  finishedAt: job.finished_at,
+                }
+              : null,
+          };
+        })}
         resumes={(resumes ?? []).map((resume) => ({
           id: resume.id as string,
           label: resume.label as string,
