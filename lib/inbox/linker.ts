@@ -20,6 +20,46 @@ import { loadCategoryContext } from '@/lib/inbox/context';
 export function commerceLinker(supabase: SupabaseClient): DomainLinker {
   return {
     domain: 'commerce',
+
+    /**
+     * Lifecycle mail that arrived before its confirmation, looked at again --
+     * which is how a shipping notice attaches to an order imported minutes
+     * ago. Once per invocation rather than per page: it costs a body fetch per
+     * message, and paying that for every six new messages is what made the
+     * first scan crawl.
+     */
+    async sweep({ userId, accountId, accessToken, budgetMs }) {
+      const [merchantRows, exclusions, categories] = await Promise.all([
+        loadMerchantsForUser(supabase, userId),
+        loadMerchantExclusions(supabase, userId),
+        loadCategoryContext(supabase, userId),
+      ]);
+
+      await reprocessPendingLifecycleMessages(supabase, {
+        userId,
+        accountId,
+        accessToken,
+        merchants: merchantRows.map((m) => ({
+          id: m.id,
+          slug: m.slug,
+          name: m.name,
+          domains: m.domains,
+        })),
+        exclusions,
+        categoryIdsBySlug: categories.categoryIdsBySlug,
+        categoryOptions: categories.categoryOptions,
+        counters: {
+          messagesSeen: 0,
+          messagesClassified: 0,
+          messagesParsed: 0,
+          ordersCreated: 0,
+          skipped: 0,
+          errors: 0,
+        },
+        budgetMs,
+      });
+    },
+
     async link({ userId, accountId, accessToken, envelopes }) {
       const counters = emptyLinkerCounters();
       counters.offered = envelopes.length;
@@ -62,20 +102,6 @@ export function commerceLinker(supabase: SupabaseClient): DomainLinker {
         categoryOptions: categories.categoryOptions,
         counters: ingest,
         personId,
-      });
-
-      // Lifecycle mail that arrived before its confirmation gets another look
-      // once this batch has landed, which is how a shipping notice attaches to
-      // an order imported minutes ago.
-      await reprocessPendingLifecycleMessages(supabase, {
-        userId,
-        accountId,
-        accessToken,
-        merchants,
-        exclusions,
-        categoryIdsBySlug: categories.categoryIdsBySlug,
-        categoryOptions: categories.categoryOptions,
-        counters: ingest,
       });
 
       counters.alreadyJudged = ingest.skipped;

@@ -28,7 +28,7 @@ function googleBooksApiKey(): string | null {
 
 /** Parallel Gmail metadata fetches — well under user rate quota. */
 /** Parallel full-body + extract for confirmations / lifecycle. */
-const EXTRACT_CONCURRENCY = 2;
+const EXTRACT_CONCURRENCY = 6;
 
 export type IngestCounters = {
   messagesSeen: number;
@@ -687,6 +687,8 @@ export async function reprocessPendingLifecycleMessages(
     categoryOptions?: Array<{ slug: string; name: string }>;
     counters: IngestCounters;
     limit?: number;
+    /** Wall clock this pass may spend before leaving the rest for next time. */
+    budgetMs?: number;
   },
 ): Promise<void> {
   const limit = opts.limit ?? 25;
@@ -713,14 +715,25 @@ export async function reprocessPendingLifecycleMessages(
   }));
   if (envelopes.length === 0) return;
 
-  await linkEnvelopes(supabase, {
-    userId: opts.userId,
-    accessToken: opts.accessToken,
-    envelopes,
-    merchants: opts.merchants,
-    exclusions: opts.exclusions,
-    categoryIdsBySlug: opts.categoryIdsBySlug,
-    categoryOptions: opts.categoryOptions,
-    counters: opts.counters,
-  });
+  // In chunks against the clock: this runs at the end of an invocation, and
+  // overrunning costs the hand-off that keeps the whole sync alive.
+  const budgetMs = opts.budgetMs ?? Number.POSITIVE_INFINITY;
+  const startedAt = Date.now();
+
+  for (let i = 0; i < envelopes.length; i += LIFECYCLE_CHUNK) {
+    if (Date.now() - startedAt > budgetMs) break;
+    await linkEnvelopes(supabase, {
+      userId: opts.userId,
+      accessToken: opts.accessToken,
+      envelopes: envelopes.slice(i, i + LIFECYCLE_CHUNK),
+      merchants: opts.merchants,
+      exclusions: opts.exclusions,
+      categoryIdsBySlug: opts.categoryIdsBySlug,
+      categoryOptions: opts.categoryOptions,
+      counters: opts.counters,
+    });
+  }
 }
+
+/** Small enough that the budget above is checked often enough to matter. */
+const LIFECYCLE_CHUNK = 5;

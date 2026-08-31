@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  sweepAccount,
   syncEmailAccountBatch,
   syncEmailAccountIncrementalBatch,
 } from '@/lib/core/inbox/sync-account';
@@ -19,29 +20,45 @@ import { canStartAnotherBatch } from '@/lib/core/inbox/pump-budget';
 /**
  * Budgeting one invocation of the pump.
  *
- * The route gets 60s. Everything here exists to guarantee the pump hands off
- * to the next invocation *before* that runs out, because the hand-off is the
- * last thing it does: if the function is killed mid-batch, continueFetch()
- * never runs, the chain stops dead, and the job sits queued until it is marked
- * stalled. That is a silent halt, not a visible failure -- which is exactly
- * what it looked like.
+ * The route declares 300s (see app/api/inbox/sync). Everything here exists to
+ * guarantee the pump hands off to the next invocation *before* that runs out,
+ * because the hand-off is the last thing it does: if the function is killed
+ * mid-batch, continueFetch() never runs, the chain stops dead, and the job sits
+ * queued until it is marked stalled. That is a silent halt, not a visible
+ * failure -- which is exactly what it looked like.
+ *
+ * The sixty seconds this used to assume is why the chain needed so many links:
+ * five hops of forty-five seconds is under four minutes of reading, and the
+ * host stops a function from invoking itself much past five hops. Five hops of
+ * four minutes is twenty minutes, which is a mailbox rather than a sample.
  */
-const PUMP_BUDGET_MS = 45_000;
+const PUMP_BUDGET_MS = 240_000;
+
+/**
+ * Time held back at the end of an invocation for the held-queue sweep.
+ *
+ * The sweep is the only work that is not urgent -- new mail is always worth
+ * more than a third look at mail that would not link twice -- so it gets what
+ * is left after the mailbox has been read, and never the hand-off's share.
+ */
+const SWEEP_BUDGET_MS = 12_000;
 
 /**
  * Backfill page size.
  *
- * Was 20, from when one message meant one cheap classification. Unification
- * put both workspaces on every message and the job side sends most of what it
- * cannot place deterministically to Tier B, so a message now costs a Claude
- * round trip rather than a regex. Measured on the live mailbox: ~0.3 messages
- * a second, which made a 20-message batch a ~66-second unit of work inside a
- * 60-second function -- unfinishable by construction, every time.
+ * This was six, which was the right answer to the wrong problem. The measured
+ * ~0.3 messages a second was not the cost of reading a message: every page,
+ * however small, also ran each workspace's pass over its held queue, and that
+ * pass alone was allowed twenty seconds. A page of six therefore cost about as
+ * much as a page of forty, and the invocation spent its minute re-reading old
+ * mail. The sweep now runs once per invocation instead, and a page is priced
+ * by the messages in it again.
  *
- * Six keeps a batch near 20s at that rate, and the loop below simply runs more
- * of them when the mailbox is quicker.
+ * Forty is a page of Gmail ids -- listing is cheap, bodies are not, and only
+ * the messages Tier A cannot settle are fetched. The loop below runs as many
+ * pages as the budget allows, so this is a unit of work, not a limit.
  */
-const BATCH_SIZE = 6;
+const BATCH_SIZE = 40;
 
 /** Incremental messages are usually already judged, so they stay cheap. */
 const INCREMENTAL_BATCH_SIZE = 25;
@@ -267,6 +284,7 @@ export async function pumpInboxSync(opts: {
     // a lot between batches, so the guard is driven by what actually happened
     // rather than by an assumed rate.
     let slowestBatchMs = 0;
+    let finished = false;
 
     for (;;) {
       // Stop while there is still time to hand off. Checking only that the
@@ -299,11 +317,24 @@ export async function pumpInboxSync(opts: {
       slowestBatchMs = Math.max(slowestBatchMs, Date.now() - batchStartedAt);
 
       if (progress.error || progress.done) {
-        return;
+        finished = true;
+        break;
       }
 
       pageToken = progress.nextPageToken ?? undefined;
     }
+
+    // Whatever is left, capped: on the invocation that finishes the mailbox
+    // there is a lot, and that is exactly when a held rejection is most likely
+    // to find the application this run just created.
+    await sweepAccount(supabase, {
+      userId: opts.userId,
+      accountId: opts.accountId,
+      linkers,
+      budgetMs: Math.min(SWEEP_BUDGET_MS, deadline - Date.now()),
+    });
+
+    if (finished) return;
 
     await continueFetch(opts, supabase);
   } catch (err) {

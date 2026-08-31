@@ -1,7 +1,7 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { pumpInboxSync, verifyInboxContinueToken } from '@/inngest/core/inbox-sync';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * Internal continuation for background Gmail sync (backfill or incremental).

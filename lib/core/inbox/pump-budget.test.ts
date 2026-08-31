@@ -20,7 +20,7 @@ describe('nextBatchNeedsMs', () => {
   });
 
   it('allows a slow batch room to be slower still', () => {
-    expect(nextBatchNeedsMs(20_000)).toBe(Math.round(20_000 * BATCH_SLOWDOWN_ALLOWANCE));
+    expect(nextBatchNeedsMs(40_000)).toBe(Math.round(40_000 * BATCH_SLOWDOWN_ALLOWANCE));
   });
 
   it('never drops below the floor for a quick batch', () => {
@@ -36,14 +36,14 @@ describe('nextBatchNeedsMs', () => {
 
 describe('canStartAnotherBatch', () => {
   it('starts one when the budget covers a batch like the last', () => {
-    expect(canStartAnotherBatch({ remainingMs: 30_000, slowestBatchMs: 20_000 })).toBe(true);
+    expect(canStartAnotherBatch({ remainingMs: 60_000, slowestBatchMs: 40_000 })).toBe(true);
   });
 
   it('refuses the case that broke the chain: time left, but not a batch of time', () => {
-    // 10s on the clock and batches have been taking 20s. The old test was
+    // 20s on the clock and batches have been taking 40s. The old test was
     // "deadline not passed", which said yes here and let the function be
-    // killed 10s into a 20s batch -- taking the hand-off with it.
-    expect(canStartAnotherBatch({ remainingMs: 10_000, slowestBatchMs: 20_000 })).toBe(false);
+    // killed 20s into a 40s batch -- taking the hand-off with it.
+    expect(canStartAnotherBatch({ remainingMs: 20_000, slowestBatchMs: 40_000 })).toBe(false);
   });
 
   it('refuses when under the floor even with no batch measured yet', () => {
@@ -60,9 +60,9 @@ describe('canStartAnotherBatch', () => {
 
   it('tightens as batches get slower, rather than trusting an average', () => {
     // A budget that comfortably fit 10s batches must stop offering to run one
-    // once a batch has taken 40s: the worst case is what gets you killed.
-    expect(canStartAnotherBatch({ remainingMs: 25_000, slowestBatchMs: 10_000 })).toBe(true);
-    expect(canStartAnotherBatch({ remainingMs: 25_000, slowestBatchMs: 40_000 })).toBe(false);
+    // once a batch has taken 60s: the worst case is what gets you killed.
+    expect(canStartAnotherBatch({ remainingMs: 50_000, slowestBatchMs: 10_000 })).toBe(true);
+    expect(canStartAnotherBatch({ remainingMs: 50_000, slowestBatchMs: 60_000 })).toBe(false);
   });
 });
 

@@ -36,6 +36,24 @@ export function emptyLinkerCounters(): LinkerCounters {
 export interface DomainLinker {
   /** Short name, used in logs and in the sync summary. */
   readonly domain: string;
+  /**
+   * Another look at mail this workspace could not place earlier.
+   *
+   * Separate from `link` because it is not per-page work. It used to run
+   * inside it, so every page of six new messages also paid for a twenty-second
+   * pass over the held queue -- which is most of why a first scan crawled: the
+   * invocation spent its minute re-reading old mail instead of reading the
+   * mailbox. The pump calls this once per invocation, when the mailbox is
+   * exhausted or there is time to spare.
+   */
+  sweep?(opts: {
+    userId: string;
+    accountId: string;
+    accountEmail: string;
+    accessToken: string;
+    /** Wall clock this pass may spend. */
+    budgetMs: number;
+  }): Promise<void>;
   link(opts: {
     userId: string;
     accountId: string;
@@ -87,4 +105,36 @@ export async function fanOut(
   }
 
   return result;
+}
+
+/**
+ * The held-queue pass, for every linker that has one.
+ *
+ * Sequential and failure-isolated for the same reasons `fanOut` is: they share
+ * a Gmail rate limit, and a workspace that throws here must not cost the other
+ * one its sweep -- or, worse, the hand-off that keeps the sync alive.
+ */
+export async function sweepLinkers(
+  linkers: readonly DomainLinker[],
+  opts: {
+    userId: string;
+    accountId: string;
+    accountEmail: string;
+    accessToken: string;
+    budgetMs: number;
+  },
+): Promise<void> {
+  const startedAt = Date.now();
+
+  for (const linker of linkers) {
+    if (!linker.sweep) continue;
+    const remaining = opts.budgetMs - (Date.now() - startedAt);
+    if (remaining <= 0) return;
+
+    try {
+      await linker.sweep({ ...opts, budgetMs: remaining });
+    } catch (err) {
+      console.error('linker sweep failed', linker.domain, err);
+    }
+  }
 }

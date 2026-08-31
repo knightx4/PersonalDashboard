@@ -14,7 +14,7 @@ import {
 } from '@/lib/core/inbox/sync-job-stale';
 import { backfillResumable, type BackfillState } from '@/lib/core/inbox/resume';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type JobRow = {
   id: string;

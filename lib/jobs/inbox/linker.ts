@@ -25,15 +25,52 @@ import { normalizeTimeZone } from '@/lib/jobs/timezone';
 export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
   return {
     domain: 'jobs',
+
+    /**
+     * Mail held on an earlier pass, looked at again.
+     *
+     * Companies and candidates are read here rather than reused from `link`:
+     * the whole point of the second look is that the batch just landed may
+     * have created the very application a held rejection belongs to, and a
+     * list read before the batch would compare against a pipeline that no
+     * longer exists.
+     */
+    async sweep({ userId, accountId, accountEmail, accessToken, budgetMs }) {
+      const [companies, candidates, profile] = await Promise.all([
+        loadCompanies(supabase, userId),
+        loadLinkCandidates(supabase, userId),
+        supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle(),
+      ]);
+
+      await reprocessHeldMessages(
+        supabase,
+        {
+          userId,
+          accountId,
+          accessToken,
+          accountEmail,
+          companies: companies.map((c) => ({
+            id: c.id,
+            slug: c.slug,
+            name: c.name,
+            domains: c.domains,
+          })),
+          candidates,
+          timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
+          counters: emptyCounters(),
+        },
+        { budgetMs },
+      );
+    },
+
     async link({ userId, accountId, accountEmail, accessToken, envelopes }) {
       const counters = emptyLinkerCounters();
       counters.offered = envelopes.length;
 
-      // No early return on an empty batch. A sync that finds no new mail is
-      // exactly when the held queue is most worth another pass -- and it is the
-      // common case, because incremental syncs offer only mail that has just
-      // arrived. Returning here meant "Sync now" on a quiet mailbox did nothing
-      // at all for messages waiting to be linked.
+      // A sync that finds no new mail is exactly when the held queue is most
+      // worth another look, and that now happens in `sweep` -- which the pump
+      // calls whether or not this batch had anything in it.
+      if (envelopes.length === 0) return counters;
 
       const [companies, candidates, profile] = await Promise.all([
         loadCompanies(supabase, userId),
@@ -65,36 +102,12 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
 
       if (envelopes.length > 0) await linkEnvelopes(supabase, ctx, envelopes);
 
-      // Mail held on an earlier sync gets another look now that this batch has
-      // landed, which is how a rejection attaches to the application the
-      // confirmation in the same run just created.
-      //
-      // Companies and candidates are reloaded first, and that reload is the
-      // whole point: the lists above were read before this batch ran, so
-      // reusing them would compare held mail against a picture of the pipeline
-      // that predates everything the batch added.
       // Anything created just now changes what held mail can match against, so
       // messages that used up their retries before it existed get their budget
-      // back -- and get it back in time for the pass below.
+      // back -- in time for the sweep at the end of this invocation.
       if (ingest.applicationsCreated + ingest.leadsCreated > 0) {
         await resetRelinkAttempts(supabase, accountId);
       }
-
-      const [freshCompanies, freshCandidates] = await Promise.all([
-        loadCompanies(supabase, userId),
-        loadLinkCandidates(supabase, userId),
-      ]);
-
-      await reprocessHeldMessages(supabase, {
-        ...ctx,
-        companies: freshCompanies.map((c) => ({
-          id: c.id,
-          slug: c.slug,
-          name: c.name,
-          domains: c.domains,
-        })),
-        candidates: freshCandidates,
-      });
 
       counters.alreadyJudged = ingest.skipped;
       counters.classified = ingest.messagesClassified;

@@ -21,9 +21,10 @@
 
 /**
  * Never begin a batch with less than this left, however fast the last one was.
- * The first batch of an invocation has nothing measured to reason from.
+ * The first batch of an invocation has nothing measured to reason from -- and
+ * a page is forty messages now, not six, so the blind guess has to cover more.
  */
-export const MIN_BATCH_RESERVE_MS = 15_000;
+export const MIN_BATCH_RESERVE_MS = 30_000;
 
 /** How much slower than the worst batch so far the next one may be. */
 export const BATCH_SLOWDOWN_ALLOWANCE = 1.3;

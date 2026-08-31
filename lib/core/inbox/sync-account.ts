@@ -11,7 +11,12 @@ import {
   type EnvelopeCounters,
   type MessageEnvelope,
 } from '@/lib/core/inbox/envelopes';
-import { fanOut, type DomainLinker, type FanOutResult } from '@/lib/core/inbox/fan-out';
+import {
+  fanOut,
+  sweepLinkers,
+  type DomainLinker,
+  type FanOutResult,
+} from '@/lib/core/inbox/fan-out';
 
 export { incrementalFallbackQuery };
 
@@ -442,4 +447,36 @@ export async function syncEmailAccountIncrementalBatch(
     progress.error = message;
     return progress;
   }
+}
+
+/**
+ * The held-queue pass, once for an invocation rather than once per page.
+ *
+ * It needs a Gmail token and the connected address, which live behind
+ * `loadAccount` -- so it goes here, beside the batch runners, rather than in
+ * the pump. The token is almost always the cached one, so this is a row read
+ * and nothing more.
+ */
+export async function sweepAccount(
+  supabase: CoreSupabaseClient,
+  opts: {
+    userId: string;
+    accountId: string;
+    linkers: readonly DomainLinker[];
+    budgetMs: number;
+  },
+): Promise<void> {
+  if (opts.budgetMs <= 0) return;
+
+  const encryptionKey = gmailOAuthEnv().TOKEN_ENCRYPTION_KEY;
+  const account = await loadAccount(supabase, opts.userId, opts.accountId);
+  const accessToken = await ensureAccessToken(supabase, account, encryptionKey);
+
+  await sweepLinkers(opts.linkers, {
+    userId: opts.userId,
+    accountId: account.id,
+    accountEmail: account.email_address,
+    accessToken,
+    budgetMs: opts.budgetMs,
+  });
 }

@@ -4,5 +4,6 @@
       "path": "/api/cron/daily",
       "schedule": "0 12 * * *"
     }
-  ]
+  ],
+  "fluid": true
 }

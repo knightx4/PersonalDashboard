@@ -27,8 +27,17 @@ import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/l
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
-/** Full body + model extraction. Lower, because each one costs money. */
-const EXTRACT_CONCURRENCY = 2;
+/**
+ * Full body + model extraction, in flight at once.
+ *
+ * Two was set when this pass shared its invocation with a per-page sweep of the
+ * held queue and the whole thing had to fit in a minute. It made the first scan
+ * read about a third of a message a second. Six is still well inside Gmail's
+ * per-user quota (a body fetch is five units of two hundred and fifty a second)
+ * and inside the model's, and it costs nothing extra: the same messages get the
+ * same calls, just not one after another.
+ */
+const EXTRACT_CONCURRENCY = 6;
 
 export type IngestCounters = {
   messagesSeen: number;
@@ -977,7 +986,7 @@ async function applyDecision(
 export async function reprocessHeldMessages(
   supabase: AppSupabaseClient,
   ctx: IngestContext,
-  opts: { limit?: number } = {},
+  opts: { limit?: number; budgetMs?: number } = {},
 ): Promise<void> {
   const { data: pending } = await supabase
     .from('inbox_messages')
@@ -1009,9 +1018,10 @@ export async function reprocessHeldMessages(
   // is still unlinkable after this stays in the queue for you to decide, which
   // is what the queue is for.
   const startedAt = Date.now();
+  const budgetMs = opts.budgetMs ?? RELINK_BUDGET_MS;
 
   for (let i = 0; i < envelopes.length; i += RELINK_CHUNK) {
-    if (Date.now() - startedAt > RELINK_BUDGET_MS) break;
+    if (Date.now() - startedAt > budgetMs) break;
     const chunk = envelopes.slice(i, i + RELINK_CHUNK);
 
     // Charged before the chunk runs, not after: an invocation killed mid-pass
