@@ -426,6 +426,20 @@ async function resolveCompanyId(
   return data.id as string;
 }
 
+/**
+ * How the seeded `submitted` event reads, by the mail it was inferred from.
+ *
+ * Only a confirmation dates the application itself. A rejection or an offer
+ * says an application existed without saying when it was sent, and the row
+ * says so rather than presenting the mail's date as the submission date.
+ */
+const SEED_SUMMARY: Record<string, string> = {
+  application_confirmation: 'Inferred from a confirmation email — confirm the details',
+  rejection: 'Inferred from a rejection — the application itself was never captured',
+  assessment: 'Inferred from an assessment invitation — confirm when you applied',
+  offer: 'Inferred from an offer email — confirm when you applied',
+};
+
 async function createInferredApplication(
   supabase: AppSupabaseClient,
   opts: {
@@ -435,6 +449,8 @@ async function createInferredApplication(
     atsJobId: string | null;
     receivedAt: Date | null;
     asLead: boolean;
+    /** What the pursuit was inferred from, for the seed event's summary. */
+    seededBy?: MessageClassification;
   },
 ): Promise<{ applicationId: string; adopted: boolean } | null> {
   const title = opts.roleTitle?.trim() || 'Role from email';
@@ -502,7 +518,10 @@ async function createInferredApplication(
       kind: 'submitted',
       occurred_at: opts.receivedAt?.toISOString() ?? new Date().toISOString(),
       source: 'system',
-      summary: 'Inferred from a confirmation email — confirm the details',
+      // The date is the mail's, not the application's, and for anything but a
+      // confirmation that is a guess -- so the summary says which message it
+      // came from rather than implying the send date is known.
+      summary: SEED_SUMMARY[opts.seededBy ?? 'application_confirmation'],
       needs_review: true,
     });
   }
@@ -833,6 +852,7 @@ async function applyDecision(
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
         asLead: false,
+        seededBy: classification,
       });
 
       if (!created) {
@@ -846,7 +866,7 @@ async function applyDecision(
       const ledgerId = await ledger('parsed', {
         applicationId,
         linkConfidence: decision.confidence,
-        linkMethod: 'inferred_from_confirmation',
+        linkMethod: `inferred_from_${classification}`,
       });
 
       await writeEvent(supabase, {

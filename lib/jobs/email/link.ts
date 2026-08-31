@@ -100,6 +100,36 @@ export const REVIEW_FLOOR = 0.5;
  */
 export const INFERRED_APPLICATION_WINDOW_DAYS = 180;
 
+/**
+ * Mail that can only exist because you applied.
+ *
+ * A rejection is as much proof of an application as a confirmation is -- more,
+ * in the common case where you applied through a portal that never emailed you
+ * and the only trace in the mailbox is the "we have decided to move forward
+ * with other candidates". Held instead of inferred, that whole company never
+ * appears anywhere in the app, which is exactly how a mailbox full of job mail
+ * shows an empty Companies page.
+ *
+ * `scheduling` is deliberately not here -- finding a time can just as easily
+ * follow inbound outreach you never applied to, so it opens a lead below
+ * rather than an application you may never have sent. `recruiter_reply` is
+ * vaguer still and stays held.
+ */
+const PRESUPPOSES_APPLICATION: ReadonlySet<MessageClassification> = new Set([
+  'application_confirmation',
+  'rejection',
+  'assessment',
+  'offer',
+]);
+
+/** How each of those reads in the reason line shown next to the pursuit. */
+const OUTCOME_NOUN: Partial<Record<MessageClassification, string>> = {
+  application_confirmation: 'Confirmation',
+  rejection: 'Rejection',
+  assessment: 'Assessment',
+  offer: 'Offer',
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function normalizeCompanyName(name: string): string {
@@ -516,7 +546,7 @@ export function decideLink(
     ? `${company.name} is not on your list yet, so it was added alongside this`
     : 'Created and flagged for review rather than silently added to the funnel';
 
-  if (input.classification === 'application_confirmation' && fresh) {
+  if (PRESUPPOSES_APPLICATION.has(input.classification) && fresh) {
     return {
       action: 'create_inferred_application',
       company,
@@ -524,7 +554,7 @@ export function decideLink(
       // came out of the message rather than off a record you maintain.
       confidence: isNew ? 0.5 : 0.6,
       reasons: [
-        `Confirmation from ${company.name} with no matching application on file`,
+        `${OUTCOME_NOUN[input.classification] ?? 'Mail'} from ${company.name} with no matching application on file`,
         provenance,
       ],
     };
@@ -536,7 +566,8 @@ export function decideLink(
   // actually sent.
   if (
     input.classification === 'recruiter_outreach' ||
-    input.classification === 'interview_invite'
+    input.classification === 'interview_invite' ||
+    input.classification === 'scheduling'
   ) {
     return {
       action: 'create_lead',

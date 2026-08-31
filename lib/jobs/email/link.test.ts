@@ -152,6 +152,69 @@ describe('the acceptance criteria', () => {
     }
   });
 
+  it('opens a pursuit from a rejection for a company with nothing on file', () => {
+    // The Kalshi case: applied through a portal that never sent a
+    // confirmation, so the rejection is the only trace in the mailbox. Held,
+    // it meant the company appeared nowhere in the app at all.
+    const decision = decideLink(
+      message({
+        threadId: null,
+        classification: 'rejection',
+        subject: 'Thank you for your interest in Ramp',
+        bodyPreview: 'We have decided to move forward with other candidates.',
+      }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('create_inferred_application');
+    if (decision.action === 'create_inferred_application') {
+      expect(decision.company).toEqual({ kind: 'existing', id: 'c-ramp', name: 'Ramp' });
+      expect(decision.reasons[0]).toContain('Rejection');
+    }
+  });
+
+  it('opens a pursuit from an assessment and from an offer', () => {
+    for (const classification of ['assessment', 'offer'] as const) {
+      const decision = decideLink(message({ threadId: null, classification }), [], {
+        companies: COMPANIES,
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+      expect(decision.action).toBe('create_inferred_application');
+    }
+  });
+
+  it('keeps mail that can follow cold outreach off the applied count', () => {
+    // Scheduling and a recruiter's reply can both belong to a conversation you
+    // never applied to. They are leads or they are held; they are never an
+    // application you did not send.
+    const scheduling = decideLink(
+      message({ threadId: null, classification: 'scheduling' }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(scheduling.action).toBe('create_lead');
+
+    const reply = decideLink(
+      message({ threadId: null, classification: 'recruiter_reply' }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(reply.action).not.toBe('create_inferred_application');
+  });
+
+  it('does not create an application from a rejection older than the window', () => {
+    const decision = decideLink(
+      message({
+        threadId: null,
+        classification: 'rejection',
+        receivedAt: new Date('2024-01-05T10:00:00Z'),
+      }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('hold');
+  });
+
   it('does not create an application from a confirmation older than the window', () => {
     const decision = decideLink(
       message({ threadId: null, receivedAt: new Date('2024-01-05T10:00:00Z') }),
