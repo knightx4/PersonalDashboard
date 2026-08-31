@@ -6,9 +6,11 @@ import Link from 'next/link';
 import { PipelineBoard, STALE_DAYS } from '@/components/jobs/pipeline/board';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
 import { PageHeader } from '@/components/jobs/shell/page-header';
+import { SearchField } from '@/components/jobs/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
+import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { APPLICATION_SOURCES, SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Pipeline' };
@@ -31,7 +33,13 @@ function isStale(row: PipelineRow): boolean {
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; excitement?: string; stale?: string; company?: string }>;
+  searchParams: Promise<{
+    source?: string;
+    excitement?: string;
+    stale?: string;
+    company?: string;
+    q?: string;
+  }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -47,10 +55,14 @@ export default async function PipelinePage({
   const excitement = params.excitement ? Number(params.excitement) : null;
   const staleOnly = params.stale === '1';
 
+  const terms = searchTerms(params.q);
+
   let filtered = rows;
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (excitement) filtered = filtered.filter((row) => (row.excitement ?? 0) >= excitement);
   if (staleOnly) filtered = filtered.filter(isStale);
+  if (terms.length)
+    filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
 
   const countsBySource = new Map<ApplicationSource, number>();
   for (const row of rows) {
@@ -87,11 +99,18 @@ export default async function PipelinePage({
     <>
       <PageHeader
         title="Pipeline"
-        description={`${rows.length} ${rows.length === 1 ? 'pursuit' : 'pursuits'}, ${rows.filter(isStale).length} gone quiet.`}
+        description={
+          terms.length
+            ? `${filtered.length} of ${rows.length} match “${params.q}”.`
+            : `${rows.length} ${rows.length === 1 ? 'pursuit' : 'pursuits'}, ${rows.filter(isStale).length} gone quiet.`
+        }
         actions={
-          <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-            Add a role
-          </Link>
+          <>
+            <SearchField />
+            <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
+              Add a role
+            </Link>
+          </>
         }
       />
 
@@ -100,7 +119,7 @@ export default async function PipelinePage({
           <RailGroup label="Source">
             <RailItem
               label="All sources"
-              href={hrefFor({ excitement: params.excitement, stale: params.stale })}
+              href={hrefFor({ excitement: params.excitement, stale: params.stale, q: params.q })}
               active={!source}
               count={rows.length}
             />
@@ -112,6 +131,7 @@ export default async function PipelinePage({
                   source: entry,
                   excitement: params.excitement,
                   stale: params.stale,
+                  q: params.q,
                 })}
                 active={source === entry}
                 count={countsBySource.get(entry)}
@@ -122,7 +142,7 @@ export default async function PipelinePage({
           <RailGroup label="Excitement">
             <RailItem
               label="Any"
-              href={hrefFor({ source: params.source, stale: params.stale })}
+              href={hrefFor({ source: params.source, stale: params.stale, q: params.q })}
               active={!excitement}
             />
             {[5, 4, 3].map((level) => (
@@ -133,6 +153,7 @@ export default async function PipelinePage({
                   source: params.source,
                   excitement: String(level),
                   stale: params.stale,
+                  q: params.q,
                 })}
                 active={excitement === level}
               />
@@ -146,6 +167,7 @@ export default async function PipelinePage({
                 source: params.source,
                 excitement: params.excitement,
                 stale: staleOnly ? undefined : '1',
+                q: params.q,
               })}
               active={staleOnly}
               count={rows.filter(isStale).length}

@@ -3,9 +3,11 @@ import { Table2 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
 import { PageHeader } from '@/components/jobs/shell/page-header';
+import { SearchField } from '@/components/jobs/shell/search-field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import {
   formatCompBand,
   formatDate,
@@ -73,7 +75,7 @@ function hrefFor(params: Record<string, string | undefined>): string {
 export default async function RolesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; status?: string; source?: string }>;
+  searchParams: Promise<{ sort?: string; status?: string; source?: string; q?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -85,9 +87,13 @@ export default async function RolesPage({
   const status = APPLICATION_STATUSES.find((s) => s === params.status);
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
 
+  const terms = searchTerms(params.q);
+
   let filtered = rows;
   if (status) filtered = filtered.filter((row) => row.status === status);
   if (source) filtered = filtered.filter((row) => row.source === source);
+  if (terms.length)
+    filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
   filtered = sortRows(filtered, sort);
 
   const statusCounts = new Map<ApplicationStatus, number>();
@@ -114,9 +120,12 @@ export default async function RolesPage({
         title="Roles"
         description={`${filtered.length} of ${rows.length} shown.`}
         actions={
-          <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-            Add a role
-          </Link>
+          <>
+            <SearchField />
+            <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
+              Add a role
+            </Link>
+          </>
         }
       />
 
@@ -125,7 +134,7 @@ export default async function RolesPage({
           <RailGroup label="Status">
             <RailItem
               label="All"
-              href={hrefFor({ sort: params.sort, source: params.source })}
+              href={hrefFor({ sort: params.sort, source: params.source, q: params.q })}
               active={!status}
               count={rows.length}
             />
@@ -133,7 +142,12 @@ export default async function RolesPage({
               <RailItem
                 key={entry}
                 label={entry.replace(/_/g, ' ')}
-                href={hrefFor({ sort: params.sort, source: params.source, status: entry })}
+                href={hrefFor({
+                  sort: params.sort,
+                  source: params.source,
+                  status: entry,
+                  q: params.q,
+                })}
                 active={status === entry}
                 count={statusCounts.get(entry)}
               />
@@ -143,14 +157,19 @@ export default async function RolesPage({
           <RailGroup label="Source">
             <RailItem
               label="All"
-              href={hrefFor({ sort: params.sort, status: params.status })}
+              href={hrefFor({ sort: params.sort, status: params.status, q: params.q })}
               active={!source}
             />
             {APPLICATION_SOURCES.filter((s) => rows.some((r) => r.source === s)).map((entry) => (
               <RailItem
                 key={entry}
                 label={SOURCE_LABELS[entry]}
-                href={hrefFor({ sort: params.sort, status: params.status, source: entry })}
+                href={hrefFor({
+                  sort: params.sort,
+                  status: params.status,
+                  source: entry,
+                  q: params.q,
+                })}
                 active={source === entry}
               />
             ))}
@@ -168,6 +187,7 @@ export default async function RolesPage({
                         sort: entry.id,
                         status: params.status,
                         source: params.source,
+                        q: params.q,
                       })}
                       className={sort === entry.id ? 'text-brand' : 'hover:text-ink'}
                     >

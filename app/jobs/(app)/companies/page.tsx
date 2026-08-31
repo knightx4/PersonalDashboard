@@ -5,15 +5,24 @@ import { PageHeader } from '@/components/jobs/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
+import { SearchField } from '@/components/jobs/shell/search-field';
+import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 
 export const metadata = { title: 'Companies' };
 
 const PRIORITIES = ['target', 'interested', 'backup', 'passed'] as const;
 
+function hrefFor(params: Record<string, string | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value) search.set(key, value);
+  const query = search.toString();
+  return query ? `/jobs/companies?${query}` : '/jobs/companies';
+}
+
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ priority?: string }>;
+  searchParams: Promise<{ priority?: string; q?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -38,7 +47,16 @@ export default async function CompaniesPage({
   }>;
 
   const priority = PRIORITIES.find((p) => p === params.priority);
-  const filtered = priority ? companies.filter((c) => c.priority === priority) : companies;
+  const terms = searchTerms(params.q);
+
+  let filtered = priority ? companies.filter((c) => c.priority === priority) : companies;
+  if (terms.length) {
+    // The domains are in here on purpose: a rejection often arrives from an ATS
+    // and the only name you remember is the one in the address.
+    filtered = filtered.filter((c) =>
+      matchesSearch([c.name, c.industry, c.hq_location, ...c.domains], terms),
+    );
+  }
 
   if (companies.length === 0) {
     return (
@@ -61,23 +79,35 @@ export default async function CompaniesPage({
     <>
       <PageHeader
         title="Companies"
-        description={`${companies.length} tracked. Notes and contacts here outlive any single posting.`}
+        description={
+          terms.length
+            ? `${filtered.length} of ${companies.length} match “${params.q}”.`
+            : `${companies.length} tracked. Notes and contacts here outlive any single posting.`
+        }
         actions={
-          <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-            Add a role
-          </Link>
+          <>
+            <SearchField placeholder="Search companies" />
+            <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
+              Add a role
+            </Link>
+          </>
         }
       />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         <LeftRail>
           <RailGroup label="Priority">
-            <RailItem label="All" href="/jobs/companies" active={!priority} count={companies.length} />
+            <RailItem
+              label="All"
+              href={hrefFor({ q: params.q })}
+              active={!priority}
+              count={companies.length}
+            />
             {PRIORITIES.map((entry) => (
               <RailItem
                 key={entry}
                 label={entry}
-                href={`/jobs/companies?priority=${entry}`}
+                href={hrefFor({ priority: entry, q: params.q })}
                 active={priority === entry}
                 count={companies.filter((c) => c.priority === entry).length}
               />
