@@ -3,7 +3,9 @@ import { authorizeCron, requestOrigin } from '@/inngest/cron/authorize';
 import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 
-export const maxDuration = 60;
+// Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
+// allowed to take, and a route that ends first takes the hand-off with it.
+export const maxDuration = 300;
 
 /**
  * Everything scheduled, behind one cron.
