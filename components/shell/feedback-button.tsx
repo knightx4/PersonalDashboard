@@ -80,7 +80,12 @@ export function FeedbackButton({
           ref={panelRef}
           role="dialog"
           aria-label="Send feedback"
-          className="absolute right-0 top-10 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-card border border-border bg-surface p-4 shadow-lg"
+          // On a phone the button sits far enough right that a panel anchored
+          // to it hangs off the left edge of the screen, where nothing can
+          // scroll it back into view -- and Safari answers a field focused out
+          // there by zooming the whole page out to reach it. Pinned to the
+          // viewport below the header until there is room to anchor it.
+          className="fixed inset-x-4 top-16 z-50 rounded-card border border-border bg-surface p-4 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-88"
         >
           <form action={action} className="flex flex-col gap-3">
             <input type="hidden" name="page_path" value={pathname} />

@@ -21,7 +21,7 @@ export const Input = function Input({
     <input
       ref={ref}
       className={cn(
-        'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink',
+        'h-10 w-full rounded-lg border border-border bg-surface px-3 text-base text-ink sm:text-sm',
         'placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className,
@@ -39,7 +39,7 @@ export function Select({
   return (
     <select
       className={cn(
-        'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink',
+        'h-10 w-full rounded-lg border border-border bg-surface px-3 text-base text-ink sm:text-sm',
         'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className,
@@ -58,7 +58,7 @@ export function Textarea({
   return (
     <textarea
       className={cn(
-        'min-h-24 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink',
+        'min-h-24 w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-ink sm:text-sm',
         'placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className,
