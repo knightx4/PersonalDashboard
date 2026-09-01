@@ -251,7 +251,7 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId }: Pan
             {otherAttempts.map((attempt) => (
               <li key={attempt.id} className="flex items-center gap-2 text-[13px]">
                 <span className="tabular text-ink-faint">#{attempt.attempt}</span>
-                <StatusBadge status={attempt.status} />
+                <StatusBadge status={attempt.status} everSubmitted={attempt.submittedAt !== null} />
                 <span className="text-ink-muted">{formatDate(attempt.submittedAt, timezone)}</span>
                 {attempt.rejectionStage && (
                   <span className="text-ink-faint">at {attempt.rejectionStage}</span>

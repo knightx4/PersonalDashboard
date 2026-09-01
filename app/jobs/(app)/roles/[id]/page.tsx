@@ -140,7 +140,11 @@ export default async function RoleDetailPage({
         }
         actions={
           <div className="flex items-center gap-2">
-            <StatusPicker applicationId={current.id as string} status={current.status as ApplicationStatus} />
+            <StatusPicker
+              applicationId={current.id as string}
+              status={current.status as ApplicationStatus}
+              submittedAt={current.submitted_at as string | null}
+            />
             {role.jd_url && (
               <a
                 href={role.jd_url as string}

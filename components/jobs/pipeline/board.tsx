@@ -289,7 +289,11 @@ function Card({
       )}
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        {muted ? <StatusBadge status={row.status} /> : <span />}
+        {muted ? (
+          <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-1.5">
           {row.needsReview && (
             <AlertTriangle className="size-3.5 text-accent-orange" strokeWidth={2} aria-label="Needs review" />

@@ -261,7 +261,7 @@ function ApplicationRow({
         <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
           {row.companyName} · {row.roleTitle}
         </h3>
-        <StatusBadge status={row.status as ApplicationStatus} />
+        <StatusBadge status={row.status as ApplicationStatus} everSubmitted={row.submittedAt !== null} />
         <span className="tabular text-[12px] text-ink-faint">
           {formatDate(row.submittedAt, timezone)}
         </span>

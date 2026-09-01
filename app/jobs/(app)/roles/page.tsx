@@ -226,7 +226,7 @@ export default async function RolesPage({
                     )}
                   </td>
                   <td className="px-2 py-1.5">
-                    <StatusBadge status={row.status} />
+                    <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
                   </td>
                   <td className="tabular px-2 py-1.5 text-ink-muted">
                     {formatDate(row.submittedAt)}

@@ -132,6 +132,7 @@ export default async function CompanyDetailPage({
                     <StatusPicker
                       applicationId={application.id}
                       status={application.status as ApplicationStatus}
+                      submittedAt={application.submitted_at as string | null}
                     />
                     <span className="tabular text-[11px] text-ink-faint">
                       {application.attempt > 1 && `#${application.attempt} `}
