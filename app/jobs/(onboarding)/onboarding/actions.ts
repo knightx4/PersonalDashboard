@@ -106,5 +106,5 @@ export async function finishOnboarding(): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
   await markOnboardingComplete(supabase, user.id);
-  redirect('/jobs/pipeline');
+  redirect('/jobs/today');
 }

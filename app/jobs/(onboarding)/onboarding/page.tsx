@@ -31,7 +31,7 @@ export default async function OnboardingPage({
   if (params.inbox === 'connected') {
     await markOnboardingComplete(supabase, user.id);
   } else if (!(await onboardingNeeded(supabase, core, user)) && step !== 'done' && !params.inbox) {
-    redirect('/jobs/pipeline');
+    redirect('/jobs/today');
   }
 
   const index = STEPS.indexOf(step);

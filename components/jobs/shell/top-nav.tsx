@@ -14,6 +14,7 @@ import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
  * keep that from happening.
  */
 const SECTIONS = [
+  { href: '/jobs/today', label: 'This week' },
   { href: '/jobs/pipeline', label: 'Pipeline' },
   { href: '/jobs/roles', label: 'Roles' },
   { href: '/jobs/companies', label: 'Companies' },

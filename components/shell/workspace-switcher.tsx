@@ -29,7 +29,7 @@ const WORKSPACES = [
   {
     id: 'jobs',
     prefix: '/jobs',
-    home: '/jobs/pipeline',
+    home: '/jobs/today',
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
     gradient:
