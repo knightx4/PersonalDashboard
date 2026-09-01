@@ -9,9 +9,13 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 const STATUS_STYLES: Record<ApplicationStatus, { label: string; className: string }> = {
   lead: { label: 'Lead', className: 'bg-status-lead-tint text-status-lead' },
   drafting: { label: 'Drafting', className: 'bg-status-lead-tint text-status-lead' },
+  // Both read "Submitted": nearly everything is created from a confirmation
+  // email and lands straight on `acknowledged`, so `submitted` -- sent, no
+  // confirmation yet -- almost never has a row of its own, and the two were
+  // one category to look at even before they shared a label.
   submitted: { label: 'Submitted', className: 'bg-status-submitted-tint text-status-submitted' },
   acknowledged: {
-    label: 'Acknowledged',
+    label: 'Submitted',
     className: 'bg-status-submitted-tint text-status-submitted',
   },
   in_process: { label: 'In process', className: 'bg-status-process-tint text-status-process' },

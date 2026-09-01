@@ -21,14 +21,26 @@ import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actio
  * 'ghosted' has no column. It is a view over silence rather than a place you
  * put things, and giving it a column would invite people to drag cards into it.
  */
-const COLUMNS: Array<{ status: ApplicationStatus; label: string; hint: string }> = [
-  { status: 'lead', label: 'Leads', hint: 'Saved, not applied' },
-  { status: 'drafting', label: 'Drafting', hint: 'You are working on it' },
-  { status: 'submitted', label: 'Submitted', hint: 'Sent, no confirmation yet' },
-  { status: 'acknowledged', label: 'Acknowledged', hint: 'It landed somewhere real' },
-  { status: 'in_process', label: 'In process', hint: 'A human is involved' },
-  { status: 'final_round', label: 'Final round', hint: '' },
-  { status: 'offer', label: 'Offer', hint: '' },
+/**
+ * `submitted` and `acknowledged` share a column, labeled by the later one:
+ * nearly everything here is created from a confirmation email and lands
+ * straight on `acknowledged`, so `submitted` -- sent, no confirmation yet --
+ * almost never has a card in it on its own, and stayed empty as its own
+ * column. `setStatus` is what a manual move or drag writes; the underlying
+ * event log can still tell the two apart for anything that reads it directly.
+ */
+const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStatus; label: string; hint: string }> = [
+  { statuses: ['lead'], setStatus: 'lead', label: 'Leads', hint: 'Saved, not applied' },
+  { statuses: ['drafting'], setStatus: 'drafting', label: 'Drafting', hint: 'You are working on it' },
+  {
+    statuses: ['submitted', 'acknowledged'],
+    setStatus: 'acknowledged',
+    label: 'Submitted',
+    hint: 'Sent, and landed somewhere real',
+  },
+  { statuses: ['in_process'], setStatus: 'in_process', label: 'In process', hint: 'A human is involved' },
+  { statuses: ['final_round'], setStatus: 'final_round', label: 'Final round', hint: '' },
+  { statuses: ['offer'], setStatus: 'offer', label: 'Offer', hint: '' },
 ];
 
 /** How long a live pursuit can go quiet before the card starts saying so. */
@@ -88,24 +100,24 @@ export function PipelineBoard({
   // decides what sm-and-up sees.
   const renderColumns = (mode: PipelineView) =>
     COLUMNS.map((column) => {
-      const columnRows = rows.filter((row) => statusOf(row) === column.status);
+      const columnRows = rows.filter((row) => column.statuses.includes(statusOf(row)));
 
       if (mode === 'list') {
         return (
           <details
-            key={column.status}
+            key={column.setStatus}
             open={columnRows.length > 0}
             onDragOver={(event) => {
               event.preventDefault();
-              setOver(column.status);
+              setOver(column.setStatus);
             }}
             onDragLeave={() =>
-              setOver((current) => (current === column.status ? null : current))
+              setOver((current) => (current === column.setStatus ? null : current))
             }
-            onDrop={() => drop(column.status)}
+            onDrop={() => drop(column.setStatus)}
             className={cn(
               'rounded-card border border-border bg-canvas transition-colors duration-150',
-              over === column.status && 'border-brand bg-brand-tint',
+              over === column.setStatus && 'border-brand bg-brand-tint',
             )}
           >
             <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
@@ -133,16 +145,16 @@ export function PipelineBoard({
 
       return (
         <section
-          key={column.status}
+          key={column.setStatus}
           onDragOver={(event) => {
             event.preventDefault();
-            setOver(column.status);
+            setOver(column.setStatus);
           }}
-          onDragLeave={() => setOver((current) => (current === column.status ? null : current))}
-          onDrop={() => drop(column.status)}
+          onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
+          onDrop={() => drop(column.setStatus)}
           className={cn(
             'w-64 shrink-0 rounded-card border border-border bg-canvas p-2 transition-colors duration-150',
-            over === column.status && 'border-brand bg-brand-tint',
+            over === column.setStatus && 'border-brand bg-brand-tint',
           )}
           aria-label={column.label}
         >
