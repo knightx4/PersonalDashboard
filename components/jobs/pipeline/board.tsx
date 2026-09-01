@@ -82,6 +82,96 @@ export function PipelineBoard({
 
   const closedRows = rows.filter((row) => CLOSED.includes(statusOf(row)));
 
+  // The kanban board is a horizontal scroll through one and a half columns
+  // on a phone, whatever view the user picked for desktop — so a phone
+  // always gets the stacked, collapsible layout, and the toggle only
+  // decides what sm-and-up sees.
+  const renderColumns = (mode: PipelineView) =>
+    COLUMNS.map((column) => {
+      const columnRows = rows.filter((row) => statusOf(row) === column.status);
+
+      if (mode === 'list') {
+        return (
+          <details
+            key={column.status}
+            open={columnRows.length > 0}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setOver(column.status);
+            }}
+            onDragLeave={() =>
+              setOver((current) => (current === column.status ? null : current))
+            }
+            onDrop={() => drop(column.status)}
+            className={cn(
+              'rounded-card border border-border bg-canvas transition-colors duration-150',
+              over === column.status && 'border-brand bg-brand-tint',
+            )}
+          >
+            <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
+              <span className="text-[13px] font-semibold text-ink">{column.label}</span>
+              <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
+              {column.hint && <span className="text-[11px] text-ink-faint">{column.hint}</span>}
+            </summary>
+            <div className="space-y-2 px-2 pb-2">
+              {columnRows.map((row) => (
+                <Card
+                  key={row.applicationId}
+                  row={row}
+                  dragging={dragging === row.applicationId}
+                  onDragStart={() => setDragging(row.applicationId)}
+                  onDragEnd={() => setDragging(null)}
+                />
+              ))}
+              {columnRows.length === 0 && (
+                <p className="px-1.5 py-2 text-[12px] text-ink-faint">Nothing here</p>
+              )}
+            </div>
+          </details>
+        );
+      }
+
+      return (
+        <section
+          key={column.status}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setOver(column.status);
+          }}
+          onDragLeave={() => setOver((current) => (current === column.status ? null : current))}
+          onDrop={() => drop(column.status)}
+          className={cn(
+            'w-64 shrink-0 rounded-card border border-border bg-canvas p-2 transition-colors duration-150',
+            over === column.status && 'border-brand bg-brand-tint',
+          )}
+          aria-label={column.label}
+        >
+          <header className="mb-2 flex items-baseline justify-between px-1.5 pt-1">
+            <h2 className="text-[13px] font-semibold text-ink">{column.label}</h2>
+            <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
+          </header>
+          {column.hint && (
+            <p className="mb-2 px-1.5 text-[11px] leading-snug text-ink-faint">{column.hint}</p>
+          )}
+
+          <div className="space-y-2">
+            {columnRows.map((row) => (
+              <Card
+                key={row.applicationId}
+                row={row}
+                dragging={dragging === row.applicationId}
+                onDragStart={() => setDragging(row.applicationId)}
+                onDragEnd={() => setDragging(null)}
+              />
+            ))}
+            {columnRows.length === 0 && (
+              <p className="px-1.5 py-6 text-center text-[12px] text-ink-faint">Nothing here</p>
+            )}
+          </div>
+        </section>
+      );
+    });
+
   return (
     <div className="space-y-4">
       {error && (
@@ -90,104 +180,14 @@ export function PipelineBoard({
         </p>
       )}
 
+      <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
       <div
         className={cn(
-          view === 'board' ? 'flex gap-3 overflow-x-auto pb-2' : 'flex flex-col gap-2',
+          'hidden sm:flex',
+          view === 'board' ? 'gap-3 overflow-x-auto pb-2' : 'flex-col gap-2',
         )}
       >
-        {COLUMNS.map((column) => {
-          const columnRows = rows.filter((row) => statusOf(row) === column.status);
-
-          // The vertical view is a stack of collapsible groups rather than a
-          // row of columns: on a phone the board shows one and a half columns
-          // of a seven-column board, which is a horizontal scroll through
-          // something you wanted to read top to bottom. Empty groups collapse
-          // to a single line instead of a column of white space.
-          if (view === 'list') {
-            return (
-              <details
-                key={column.status}
-                open={columnRows.length > 0}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setOver(column.status);
-                }}
-                onDragLeave={() =>
-                  setOver((current) => (current === column.status ? null : current))
-                }
-                onDrop={() => drop(column.status)}
-                className={cn(
-                  'rounded-card border border-border bg-canvas transition-colors duration-150',
-                  over === column.status && 'border-brand bg-brand-tint',
-                )}
-              >
-                <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
-                  <span className="text-[13px] font-semibold text-ink">{column.label}</span>
-                  <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
-                  {column.hint && (
-                    <span className="text-[11px] text-ink-faint">{column.hint}</span>
-                  )}
-                </summary>
-                <div className="space-y-2 px-2 pb-2">
-                  {columnRows.map((row) => (
-                    <Card
-                      key={row.applicationId}
-                      row={row}
-                      dragging={dragging === row.applicationId}
-                      onDragStart={() => setDragging(row.applicationId)}
-                      onDragEnd={() => setDragging(null)}
-                    />
-                  ))}
-                  {columnRows.length === 0 && (
-                    <p className="px-1.5 py-2 text-[12px] text-ink-faint">Nothing here</p>
-                  )}
-                </div>
-              </details>
-            );
-          }
-
-          return (
-            <section
-              key={column.status}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setOver(column.status);
-              }}
-              onDragLeave={() => setOver((current) => (current === column.status ? null : current))}
-              onDrop={() => drop(column.status)}
-              className={cn(
-                'w-64 shrink-0 rounded-card border border-border bg-canvas p-2 transition-colors duration-150',
-                over === column.status && 'border-brand bg-brand-tint',
-              )}
-              aria-label={column.label}
-            >
-              <header className="mb-2 flex items-baseline justify-between px-1.5 pt-1">
-                <h2 className="text-[13px] font-semibold text-ink">{column.label}</h2>
-                <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
-              </header>
-              {column.hint && (
-                <p className="mb-2 px-1.5 text-[11px] leading-snug text-ink-faint">{column.hint}</p>
-              )}
-
-              <div className="space-y-2">
-                {columnRows.map((row) => (
-                  <Card
-                    key={row.applicationId}
-                    row={row}
-                    dragging={dragging === row.applicationId}
-                    onDragStart={() => setDragging(row.applicationId)}
-                    onDragEnd={() => setDragging(null)}
-                  />
-                ))}
-                {columnRows.length === 0 && (
-                  <p className="px-1.5 py-6 text-center text-[12px] text-ink-faint">
-                    Nothing here
-                  </p>
-                )}
-              </div>
-            </section>
-          );
-        })}
+        {renderColumns(view)}
       </div>
 
       {closedRows.length > 0 && (
