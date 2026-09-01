@@ -31,6 +31,15 @@ export const INTERVIEW_HORIZON_DAYS = 14;
 export const GOING_QUIET_WINDOW_DAYS = 7;
 
 /**
+ * How far ahead a reminder is worth surfacing.
+ *
+ * Rule-generated reminders are always due the moment they are raised, so this
+ * only matters for a custom to-do with a future date -- without it, one due in
+ * three days is invisible on "This week" until the day it is already late.
+ */
+export const REMINDER_HORIZON_DAYS = 7;
+
+/**
  * How far "Later" pushes a nudge. Long enough that deferring is a decision
  * rather than a way of clearing the screen.
  *
@@ -128,7 +137,7 @@ export async function loadToday(
       )
       .eq('user_id', userId)
       .is('completed_at', null)
-      .lte('due_at', now.toISOString())
+      .lte('due_at', new Date(now.getTime() + REMINDER_HORIZON_DAYS * DAY_MS).toISOString())
       .order('due_at', { ascending: true })
       .limit(50),
 
