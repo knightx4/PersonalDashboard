@@ -14,6 +14,7 @@ import {
   type CompanyPatch,
 } from '@/lib/jobs/enrich/company';
 import { fetchSiteIcon } from '@/lib/jobs/enrich/site-icon';
+import { lookupCompanyOnline } from '@/lib/jobs/enrich/ai-company';
 
 const updateSchema = z.object({
   companyId: z.string().uuid(),
@@ -24,6 +25,7 @@ const updateSchema = z.object({
   hqLocation: z.string().optional(),
   careersUrl: z.string().optional(),
   linkedinUrl: z.string().optional(),
+  website: z.string().optional(),
 });
 
 export async function updateCompany(
@@ -42,6 +44,7 @@ export async function updateCompany(
   if (parsed.data.hqLocation !== undefined) patch.hq_location = parsed.data.hqLocation || null;
   if (parsed.data.careersUrl !== undefined) patch.careers_url = parsed.data.careersUrl || null;
   if (parsed.data.linkedinUrl !== undefined) patch.linkedin_url = parsed.data.linkedinUrl || null;
+  if (parsed.data.website !== undefined) patch.website = parsed.data.website || null;
   if (parsed.data.domains !== undefined) {
     // Domains drive email linking, so they are normalised rather than trusted:
     // a stray "https://" here means mail from that company never links.
@@ -200,6 +203,125 @@ export async function applyCompanyEnrichment(
 
   revalidatePath('/jobs/companies');
   return { applied: describePatch(patch), error: null };
+}
+
+export interface AiEnrichmentProposal {
+  website: string | null;
+  summary: string | null;
+  sources: Array<{ title: string | null; url: string }>;
+  /** What applying would fill in — empty when both fields are already set. */
+  changes: string[];
+  hasChanges: boolean;
+}
+
+/**
+ * The AI counterpart to the Wikidata lookup, for the companies too small or
+ * too new to have an encyclopedia entry. Same propose-then-apply shape: a
+ * search result is shown before it lands, and only ever fills blanks.
+ */
+export async function proposeAiCompanyEnrichment(
+  input: z.input<typeof lookupSchema>,
+): Promise<{ proposal: AiEnrichmentProposal | null; error: string | null }> {
+  const parsed = lookupSchema.safeParse(input);
+  if (!parsed.success) return { proposal: null, error: parsed.error.issues[0].message };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { proposal: null, error: 'AI lookups are not configured.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: company, error } = await supabase
+    .from('companies')
+    .select('id, name, domains, website, careers_url, industry, hq_location, research')
+    .eq('id', parsed.data.companyId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) return { proposal: null, error: error.message };
+  if (!company) return { proposal: null, error: 'That company is not on your list.' };
+
+  const hints =
+    [
+      ((company.domains as string[] | null) ?? []).join(', ') || null,
+      company.careers_url ? `careers page ${company.careers_url}` : null,
+      company.industry as string | null,
+      company.hq_location ? `based in ${company.hq_location}` : null,
+    ]
+      .filter((entry): entry is string => Boolean(entry))
+      .join('; ') || null;
+
+  const result = await lookupCompanyOnline({ apiKey }, { name: company.name as string, hints });
+  if (!result.ok) return { proposal: null, error: result.error };
+
+  const changes: string[] = [];
+  if (!company.website && result.website) changes.push(`Homepage: ${result.website}`);
+  if (!company.research && result.summary) changes.push('Research notes: a short summary');
+
+  return {
+    proposal: {
+      website: result.website,
+      summary: result.summary,
+      sources: result.sources,
+      changes,
+      hasChanges: changes.length > 0,
+    },
+    error: null,
+  };
+}
+
+const aiApplySchema = lookupSchema.extend({
+  website: z.string().url().nullable(),
+  summary: z.string().nullable(),
+});
+
+/**
+ * Write what the AI lookup found, filling blanks only — re-checked against
+ * the row's current state rather than the proposal, in case it changed by
+ * hand between propose and apply.
+ */
+export async function applyAiCompanyEnrichment(
+  input: z.input<typeof aiApplySchema>,
+): Promise<{ applied: string[]; error: string | null }> {
+  const parsed = aiApplySchema.safeParse(input);
+  if (!parsed.success) return { applied: [], error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: company, error } = await supabase
+    .from('companies')
+    .select('id, website, research')
+    .eq('id', parsed.data.companyId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) return { applied: [], error: error.message };
+  if (!company) return { applied: [], error: 'That company is not on your list.' };
+
+  const patch: Record<string, unknown> = {};
+  const applied: string[] = [];
+  if (!company.website && parsed.data.website) {
+    patch.website = parsed.data.website;
+    applied.push('Homepage');
+  }
+  if (!company.research && parsed.data.summary) {
+    patch.research = parsed.data.summary;
+    applied.push('Research notes');
+  }
+
+  if (Object.keys(patch).length === 0) return { applied: [], error: null };
+
+  const { error: writeError } = await supabase
+    .from('companies')
+    .update(patch)
+    .eq('id', parsed.data.companyId)
+    .eq('user_id', user.id);
+
+  if (writeError) return { applied: [], error: writeError.message };
+
+  revalidatePath('/jobs/companies');
+  return { applied, error: null };
 }
 
 const COMPANY_ENRICH_COLUMNS =

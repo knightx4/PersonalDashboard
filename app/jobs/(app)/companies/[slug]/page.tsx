@@ -153,6 +153,7 @@ export default async function CompanyDetailPage({
         hqLocation={(company.hq_location as string) ?? ''}
         careersUrl={(company.careers_url as string) ?? ''}
         linkedinUrl={(company.linkedin_url as string) ?? ''}
+        website={(company.website as string) ?? ''}
         priority={company.priority as string}
         timezone={timezone}
         contacts={(contacts ?? []).map((contact) => ({
