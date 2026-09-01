@@ -28,6 +28,10 @@ import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actio
  * almost never has a card in it on its own, and stayed empty as its own
  * column. `setStatus` is what a manual move or drag writes; the underlying
  * event log can still tell the two apart for anything that reads it directly.
+ *
+ * `final_round` folds into `in_process` the same way. The status itself, and
+ * everything derived from it (analytics, rejection-stage inference), is
+ * untouched -- only the board stops giving it its own column.
  */
 const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStatus; label: string; hint: string }> = [
   { statuses: ['lead'], setStatus: 'lead', label: 'Leads', hint: 'Saved, not applied' },
@@ -38,8 +42,12 @@ const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStat
     label: 'Submitted',
     hint: 'Sent, and landed somewhere real',
   },
-  { statuses: ['in_process'], setStatus: 'in_process', label: 'In process', hint: 'A human is involved' },
-  { statuses: ['final_round'], setStatus: 'final_round', label: 'Final round', hint: '' },
+  {
+    statuses: ['in_process', 'final_round'],
+    setStatus: 'in_process',
+    label: 'In process',
+    hint: 'A human is involved',
+  },
   { statuses: ['offer'], setStatus: 'offer', label: 'Offer', hint: '' },
 ];
 
