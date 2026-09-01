@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import {
   CalendarClock,
   CheckCircle2,
@@ -41,6 +41,8 @@ export interface PanelProps {
   jdText: string;
   requirements: Requirement[];
   timezone: string;
+  /** The interview to scroll to and highlight, arriving from This week. */
+  focusInterviewId?: string | null;
   events: Array<{
     id: string;
     kind: string;
@@ -98,8 +100,8 @@ export interface PanelProps {
   }>;
 }
 
-export function RoleDetailPanels(props: PanelProps) {
-  const [tab, setTab] = useState<Tab>('timeline');
+export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(props.initialTab ?? 'timeline');
 
   return (
     <div>
@@ -504,7 +506,7 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
   );
 }
 
-function Interviews({ interviews, timezone }: PanelProps) {
+function Interviews({ interviews, timezone, focusInterviewId }: PanelProps) {
   if (interviews.length === 0) {
     return (
       <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
@@ -517,7 +519,12 @@ function Interviews({ interviews, timezone }: PanelProps) {
   return (
     <div className="space-y-3">
       {interviews.map((interview) => (
-        <InterviewCard key={interview.id} interview={interview} timezone={timezone} />
+        <InterviewCard
+          key={interview.id}
+          interview={interview}
+          timezone={timezone}
+          focused={interview.id === focusInterviewId}
+        />
       ))}
     </div>
   );
@@ -526,7 +533,9 @@ function Interviews({ interviews, timezone }: PanelProps) {
 function InterviewCard({
   interview,
   timezone,
+  focused = false,
 }: {
+  focused?: boolean;
   interview: PanelProps['interviews'][number];
   timezone: string;
 }) {
@@ -535,11 +544,25 @@ function InterviewCard({
   const [wentPoorly, setWentPoorly] = useState(interview.wentPoorly);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const ref = useRef<HTMLElement>(null);
 
   const needsDebrief = interview.isPast && !wentWell && !wentPoorly;
 
+  // Arriving from This week's "click the interview, land on its prep" link:
+  // the tab is already switched to Interviews, so what is left is finding
+  // the one round among several this role might have.
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focused]);
+
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
+    <section
+      ref={ref}
+      className={cn(
+        'rounded-card border border-border bg-surface p-4',
+        focused && 'ring-2 ring-brand ring-offset-2 ring-offset-canvas',
+      )}
+    >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-[13px] font-semibold text-ink">
           Round {interview.round} · {interview.kind.replace(/_/g, ' ')}

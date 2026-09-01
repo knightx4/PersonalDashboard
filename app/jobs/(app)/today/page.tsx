@@ -78,14 +78,22 @@ export default async function TodayPage() {
           >
             <ul className="divide-y divide-border">
               {board.interviews.map((interview) => (
-                <li key={interview.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5">
+                <li
+                  key={interview.id}
+                  className="relative flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5"
+                >
                   <span className="tabular w-full text-[13px] font-medium text-ink sm:w-44">
                     {formatDateTime(interview.scheduledAt, timezone)}
                   </span>
                   <Link
-                    href={`/jobs/roles/${interview.roleId}`}
+                    href={`/jobs/roles/${interview.roleId}?tab=interviews&interview=${interview.id}`}
                     className="text-[13px] font-medium text-ink hover:text-brand"
                   >
+                    {/* The whole row opens the same place -- prep materials on
+                        the role's Interviews tab -- so this stretches to cover
+                        it rather than being the one sliver of the row that
+                        responds to a click. */}
+                    <span className="absolute inset-0" aria-hidden />
                     {interview.companyName} · {interview.roleTitle}
                   </Link>
                   <span className="text-[12px] text-ink-muted">
@@ -97,7 +105,7 @@ export default async function TodayPage() {
                       href={interview.meetingUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[12px] font-medium text-brand underline underline-offset-2"
+                      className="relative inline-flex items-center gap-1 text-[12px] font-medium text-brand underline underline-offset-2"
                     >
                       <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
                       Join

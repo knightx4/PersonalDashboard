@@ -18,10 +18,13 @@ export const metadata = { title: 'Role' };
  */
 export default async function RoleDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string; interview?: string }>;
 }) {
   const { id } = await params;
+  const { tab, interview: focusInterviewId } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -195,6 +198,8 @@ export default async function RoleDetailPage({
         jdText={(role.jd_text as string) ?? ''}
         requirements={requirements}
         timezone={timezone}
+        initialTab={tab === 'interviews' ? 'interviews' : undefined}
+        focusInterviewId={focusInterviewId ?? null}
         events={(events ?? []).map((event) => ({
           id: event.id as string,
           kind: event.kind as string,
