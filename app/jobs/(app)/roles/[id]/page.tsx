@@ -8,6 +8,7 @@ import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { SOURCE_LABELS, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { RoleDetailPanels } from './panels';
+import { RoleTitle } from './role-title';
 
 export const metadata = { title: 'Role' };
 
@@ -126,7 +127,7 @@ export default async function RoleDetailPage({
   return (
     <>
       <PageHeader
-        title={role.title as string}
+        title={<RoleTitle roleId={role.id as string} title={role.title as string} />}
         description={
           <>
             <Link href={`/jobs/companies/${company.slug}`} className="hover:text-brand">

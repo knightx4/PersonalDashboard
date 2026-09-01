@@ -57,6 +57,39 @@ export async function addNote(input: {
   return { error: null };
 }
 
+const renameRoleSchema = z.object({
+  roleId: z.string().uuid(),
+  title: z.string().trim().min(1, 'A role needs a name.').max(200),
+});
+
+/**
+ * The inbox's best guess at a title is still a guess, and the ones it could
+ * not read at all are left as "Role from email" -- both are worth overriding
+ * by hand rather than living with.
+ */
+export async function renameRole(roleId: string, title: string): Promise<{ error: string | null }> {
+  const parsed = renameRoleSchema.safeParse({ roleId, title });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('roles')
+    .update({ title: parsed.data.title })
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/today');
+  return { error: null };
+}
+
 const reminderSchema = z.object({
   applicationId: z.string().uuid(),
   body: z.string().trim().min(1, 'Say what it is.'),
