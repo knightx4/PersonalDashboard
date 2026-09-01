@@ -1,5 +1,11 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
+import {
+  addressOnly,
+  composeFollowUp,
+  displayName,
+  gmailComposeUrl,
+} from '@/lib/jobs/followup/compose';
 import { DEFAULT_GHOST_THRESHOLD_DAYS, TERMINAL_STATUSES, isTerminal } from '@/lib/jobs/pipeline';
 
 /**
@@ -58,6 +64,8 @@ export interface DueReminder {
   roleId: string | null;
   companyName: string | null;
   roleTitle: string | null;
+  /** A Gmail compose window with the follow-up already written, when one fits. */
+  followUpHref: string | null;
 }
 
 export interface WaitingOnYou {
@@ -79,6 +87,7 @@ export interface GoingQuiet {
   lastActivityAt: string | null;
   daysSinceActivity: number;
   daysUntilGhosted: number;
+  followUpHref: string | null;
 }
 
 export interface TodayBoard {
@@ -95,7 +104,7 @@ type RoleJoin = { id: string; title: string; companies: { name: string } };
 export async function loadToday(
   supabase: AppSupabaseClient,
   userId: string,
-  opts: { now?: Date; ghostThresholdDays?: number } = {},
+  opts: { now?: Date; ghostThresholdDays?: number; senderName?: string | null } = {},
 ): Promise<TodayBoard> {
   const now = opts.now ?? new Date();
   const ghostDays = opts.ghostThresholdDays ?? DEFAULT_GHOST_THRESHOLD_DAYS;
@@ -193,6 +202,7 @@ export async function loadToday(
       roleId: row.applications?.roles.id ?? null,
       companyName: row.applications?.roles.companies.name ?? null,
       roleTitle: row.applications?.roles.title ?? null,
+      followUpHref: null,
     }),
   );
 
@@ -226,6 +236,54 @@ export async function loadToday(
       reminders.map((r) => r.applicationId).filter((id): id is string => Boolean(id)),
     ),
   });
+
+  // Who to write to, for everything on the page that could be followed up.
+  // One query for all of them rather than one each: this page is opened every
+  // morning and a round trip per row would be felt.
+  const needsDraft = [
+    ...reminders.filter((r) => r.kind === 'follow_up' && r.applicationId),
+    ...quiet,
+  ];
+  const correspondents = await lastCorrespondents(
+    supabase,
+    userId,
+    needsDraft.map((r) => ('applicationId' in r ? r.applicationId : null)),
+  );
+
+  const submittedAt = new Map(quietRows.map((row) => [row.applicationId, row.submittedAt]));
+
+  const draftFor = (
+    applicationId: string | null,
+    companyName: string | null,
+    roleTitle: string | null,
+  ): string | null => {
+    if (!applicationId || !companyName) return null;
+    const correspondent = correspondents.get(applicationId);
+    const draft = composeFollowUp({
+      companyName,
+      roleTitle,
+      appliedAt: submittedAt.get(applicationId) ?? null,
+      recipientName: displayName(correspondent?.fromAddress),
+      senderName: opts.senderName ?? null,
+      now,
+    });
+    return gmailComposeUrl({
+      emailAddress: correspondent?.inbox ?? null,
+      to: addressOnly(correspondent?.fromAddress),
+      subject: draft.subject,
+      body: draft.body,
+    });
+  };
+
+  for (const reminder of reminders) {
+    reminder.followUpHref =
+      reminder.kind === 'follow_up'
+        ? draftFor(reminder.applicationId, reminder.companyName, reminder.roleTitle)
+        : null;
+  }
+  for (const row of quiet) {
+    row.followUpHref = draftFor(row.applicationId, row.companyName, row.roleTitle);
+  }
 
   return {
     interviews,
@@ -273,6 +331,47 @@ export function selectGoingQuiet(
       lastActivityAt: row.lastActivityAt,
       daysSinceActivity: row.daysSinceActivity ?? 0,
       daysUntilGhosted: Math.max(0, opts.ghostDays - (row.daysSinceActivity ?? 0)),
+      // Filled in by loadToday once it knows who to write to; the selection
+      // itself is pure and has no database to ask.
+      followUpHref: null,
     }))
     .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity);
+}
+
+/**
+ * The most recent inbound sender on each pursuit.
+ *
+ * The address a follow-up should go to is whoever last wrote to you about it,
+ * which is often a person even when the first confirmation came from a
+ * no-reply. Where it is still a no-reply the draft is written anyway, without
+ * a recipient -- an unaddressed draft is a smaller problem than no draft.
+ */
+async function lastCorrespondents(
+  supabase: AppSupabaseClient,
+  userId: string,
+  applicationIds: readonly (string | null)[],
+): Promise<Map<string, { fromAddress: string | null; inbox: string | null }>> {
+  const ids = [...new Set(applicationIds.filter((id): id is string => Boolean(id)))];
+  const found = new Map<string, { fromAddress: string | null; inbox: string | null }>();
+  if (ids.length === 0) return found;
+
+  const { data } = await supabase
+    .from('inbox_messages')
+    .select('resulting_application_id, from_address, reply_to_address, email_address, received_at')
+    .eq('user_id', userId)
+    .in('resulting_application_id', ids)
+    .order('received_at', { ascending: false });
+
+  for (const row of data ?? []) {
+    const id = row.resulting_application_id as string;
+    if (found.has(id)) continue;
+    found.set(id, {
+      // Reply-to first: an ATS sends from a no-reply and points replies at the
+      // recruiter, and the recruiter is the one who answers.
+      fromAddress: (row.reply_to_address as string) ?? (row.from_address as string) ?? null,
+      inbox: (row.email_address as string) ?? null,
+    });
+  }
+
+  return found;
 }

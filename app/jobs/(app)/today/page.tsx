@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarClock, CheckCircle2, Clock, MailQuestion, Video } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock, MailQuestion, PenLine, Video } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { formatDateTime } from '@/lib/jobs/applications/load';
@@ -24,14 +24,17 @@ export default async function TodayPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('timezone, ghost_threshold_days')
+    .select('display_name, timezone, ghost_threshold_days')
     .eq('id', user.id)
     .maybeSingle();
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
   const ghostDays = (profile?.ghost_threshold_days as number) ?? DEFAULT_GHOST_THRESHOLD_DAYS;
 
-  const board = await loadToday(supabase, user.id, { ghostThresholdDays: ghostDays });
+  const board = await loadToday(supabase, user.id, {
+    ghostThresholdDays: ghostDays,
+    senderName: (profile?.display_name as string) ?? null,
+  });
 
   return (
     <>
@@ -158,6 +161,7 @@ export default async function TodayPage() {
                   <span className="w-full text-[12px] text-ink-muted sm:w-auto sm:flex-1">
                     {reminder.body}
                   </span>
+                  {reminder.followUpHref && <DraftLink href={reminder.followUpHref} />}
                   <ReminderActions id={reminder.id} />
                 </li>
               ))}
@@ -188,6 +192,11 @@ export default async function TodayPage() {
                   <span className="tabular text-[12px] text-ink-muted">
                     quiet {row.daysSinceActivity} days
                   </span>
+                  {row.followUpHref && (
+                    <span className="ml-auto">
+                      <DraftLink href={row.followUpHref} />
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -195,6 +204,27 @@ export default async function TodayPage() {
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * Opens Gmail's own composer with the follow-up already written.
+ *
+ * Not a draft written through the API: that needs `gmail.compose` on top of
+ * the read-only grant this app asks for, and a reconnect to get it. A wider
+ * key to the mailbox is a poor trade for saving one click.
+ */
+function DraftLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="press inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-canvas px-2 py-0.5 text-[12px] font-medium text-ink"
+    >
+      <PenLine className="size-3" strokeWidth={2} aria-hidden />
+      Draft follow-up
+    </a>
   );
 }
 
