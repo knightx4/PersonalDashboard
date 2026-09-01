@@ -27,6 +27,7 @@ import {
   inferredApplicationNeedsReview,
   unappliedEventNeedsReview,
 } from '@/lib/jobs/review/flagging';
+import { contactFromSender, contactsFromInvite, type CandidateContact } from '@/lib/jobs/contacts/from-mail';
 import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
 import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
 
@@ -185,6 +186,8 @@ async function writeEvent(
     extracted: ExtractedMessage | null;
     message: FetchedMessage;
     invite: InviteInterview | null;
+    /** The connected mailbox: you are not one of your own contacts. */
+    accountEmail: string | null;
   },
 ): Promise<void> {
   const kind = eventKindFor(opts.classification);
@@ -245,6 +248,24 @@ async function writeEvent(
     needs_review: !legal && unappliedEventNeedsReview(kind),
   });
 
+  // Whoever wrote it, if a person wrote it. Contacts and interview
+  // participants were both empty after six months because both were things
+  // you had to type, while every recruiter's mail carried a name and an
+  // address in its From header the whole time.
+  const sender = contactFromSender({
+    classification: opts.classification,
+    fromAddress: opts.message.fromAddress,
+    replyToAddress: opts.message.replyToAddress,
+    selfAddress: opts.accountEmail,
+  });
+  if (sender) {
+    await upsertContact(supabase, {
+      userId: opts.userId,
+      companyId: await companyForApplication(supabase, opts.applicationId),
+      contact: sender,
+    });
+  }
+
   if (!legal) return;
 
   if (invite) {
@@ -298,6 +319,7 @@ async function applyInvite(
   },
 ): Promise<void> {
   const { invite } = opts;
+  const companyId = await companyForApplication(supabase, opts.applicationId);
 
   const patch: Record<string, unknown> = {
     scheduled_at: invite.scheduledAt,
@@ -326,6 +348,12 @@ async function applyInvite(
       return;
     }
     await supabase.from('interviews').update(patch).eq('id', existing.data.id);
+    await recordParticipants(supabase, {
+      userId: opts.userId,
+      companyId,
+      interviewId: existing.data.id as string,
+      invite,
+    });
     return;
   }
 
@@ -337,14 +365,152 @@ async function applyInvite(
     .select('id', { count: 'exact', head: true })
     .eq('application_id', opts.applicationId);
 
-  await supabase.from('interviews').insert({
-    user_id: opts.userId,
-    application_id: opts.applicationId,
-    round: (count ?? 0) + 1,
-    kind: opts.fallbackKind ?? 'recruiter_screen',
-    format: invite.format ?? 'video',
-    ...patch,
-  });
+  const { data: created } = await supabase
+    .from('interviews')
+    .insert({
+      user_id: opts.userId,
+      application_id: opts.applicationId,
+      round: (count ?? 0) + 1,
+      kind: opts.fallbackKind ?? 'recruiter_screen',
+      format: invite.format ?? 'video',
+      ...patch,
+    })
+    .select('id')
+    .single();
+
+  if (created) {
+    await recordParticipants(supabase, {
+      userId: opts.userId,
+      companyId,
+      interviewId: created.id as string,
+      invite,
+    });
+  }
+}
+
+/** The company a pursuit is at, for hanging contacts off. */
+async function companyForApplication(
+  supabase: AppSupabaseClient,
+  applicationId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('applications')
+    .select('roles!inner ( company_id )')
+    .eq('id', applicationId)
+    .maybeSingle();
+  const roles = (data as { roles?: { company_id: string } } | null)?.roles;
+  return roles?.company_id ?? null;
+}
+
+/**
+ * A contact row for a person the mail named, without making a second one.
+ *
+ * Identity is the person, not the address. Within one company the name is who
+ * they are -- the same recruiter wrote from @eliseai.com and @meetelise.com,
+ * and two rows for that reads as a bug -- so a name match at the company wins,
+ * and an address found later fills a blank rather than forking the row. Only
+ * where there is no company does the address carry identity on its own.
+ *
+ * Blanks are filled and nothing else is overwritten. Someone who has edited a
+ * contact has said something, and an email header does not overrule it.
+ */
+async function upsertContact(
+  supabase: AppSupabaseClient,
+  opts: { userId: string; companyId: string | null; contact: CandidateContact },
+): Promise<string | null> {
+  const { contact } = opts;
+  const email = contact.email?.toLowerCase() ?? null;
+
+  if (opts.companyId) {
+    const { data: byName } = await supabase
+      .from('contacts')
+      .select('id, email')
+      .eq('user_id', opts.userId)
+      .eq('company_id', opts.companyId)
+      .ilike('full_name', contact.fullName)
+      .maybeSingle();
+
+    if (byName?.id) {
+      if (email && !byName.email) {
+        await supabase.from('contacts').update({ email }).eq('id', byName.id);
+      }
+      return byName.id as string;
+    }
+  }
+
+  if (email) {
+    const { data: byEmail } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', opts.userId)
+      .eq('email', email)
+      .maybeSingle();
+    if (byEmail?.id) return byEmail.id as string;
+  }
+
+  const { data: created, error } = await supabase
+    .from('contacts')
+    .insert({
+      user_id: opts.userId,
+      company_id: opts.companyId,
+      full_name: contact.fullName,
+      email,
+      relationship: contact.relationship,
+      status: 'responded',
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (created?.id) return created.id as string;
+
+  // Lost a race against another message from the same person in this batch.
+  // Both unique keys are partial, so which one caught it depends on the row.
+  if (error) {
+    const { data: raced } = email
+      ? await supabase
+          .from('contacts')
+          .select('id')
+          .eq('user_id', opts.userId)
+          .eq('email', email)
+          .maybeSingle()
+      : await supabase
+          .from('contacts')
+          .select('id')
+          .eq('user_id', opts.userId)
+          .eq('company_id', opts.companyId ?? '')
+          .ilike('full_name', contact.fullName)
+          .maybeSingle();
+    return (raced?.id as string) ?? null;
+  }
+
+  return null;
+}
+
+/** Everyone on the invite, attached to the interview it books. */
+async function recordParticipants(
+  supabase: AppSupabaseClient,
+  opts: {
+    userId: string;
+    companyId: string | null;
+    interviewId: string;
+    invite: InviteInterview;
+  },
+): Promise<void> {
+  for (const person of contactsFromInvite(opts.invite)) {
+    const contactId = await upsertContact(supabase, {
+      userId: opts.userId,
+      companyId: opts.companyId,
+      contact: person,
+    });
+    if (!contactId) continue;
+
+    await supabase
+      .from('interview_participants')
+      .upsert(
+        { interview_id: opts.interviewId, contact_id: contactId, role: 'interviewer' },
+        { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
+      );
+  }
 }
 
 function defaultSummary(classification: MessageClassification): string {
@@ -850,6 +1016,7 @@ async function applyDecision(
         extracted: tierB,
         message,
         invite,
+        accountEmail: ctx.accountEmail,
       });
       ctx.counters.messagesParsed += 1;
       return;
@@ -912,6 +1079,7 @@ async function applyDecision(
         extracted: tierB,
         message,
         invite,
+        accountEmail: ctx.accountEmail,
       });
 
       ctx.counters.applicationsCreated += 1;
@@ -974,6 +1142,7 @@ async function applyDecision(
           extracted: tierB,
           message,
           invite,
+          accountEmail: ctx.accountEmail,
         });
       } else {
         // A genuinely new lead has no application to advance, so the inbound is
