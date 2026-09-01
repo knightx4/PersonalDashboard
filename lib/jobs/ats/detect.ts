@@ -25,6 +25,31 @@ export type AtsVendor =
   | 'other'
   | 'unknown';
 
+/**
+ * The vendors that publish a whole board without a key.
+ *
+ * The same nine that `tier: 1` picks out above, named as a set because board
+ * discovery reasons about vendors rather than about URLs: given only a company
+ * and a guessed token, these are the doors worth knocking on.
+ */
+export const BOARD_VENDORS = [
+  'greenhouse',
+  'lever',
+  'ashby',
+  'smartrecruiters',
+  'workable',
+  'recruitee',
+  'breezy',
+  'bamboohr',
+  'rippling',
+] as const;
+
+export type BoardVendor = (typeof BOARD_VENDORS)[number];
+
+export function isBoardVendor(vendor: string | null | undefined): vendor is BoardVendor {
+  return (BOARD_VENDORS as readonly string[]).includes(vendor as string);
+}
+
 export interface DetectedPosting {
   vendor: AtsVendor;
   /** The company's board slug, when the URL carries one. */

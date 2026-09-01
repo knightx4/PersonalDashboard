@@ -11,7 +11,7 @@ import type { FetchedPosting, FetchedQuestion } from './types';
 
 const BASE = 'https://boards-api.greenhouse.io/v1/boards';
 
-interface GreenhouseJob {
+export interface GreenhouseJob {
   id?: number;
   title?: string;
   content?: string;
@@ -61,9 +61,18 @@ export async function fetchPosting(
   const job = JSON.parse(body) as GreenhouseJob;
   if (!job.title) throw new Error('Greenhouse returned no posting.');
 
+  return toPosting(job, boardToken, jobId);
+}
+
+/** The shape assumption, kept separate from the fetch so it can be tested. */
+export function toPosting(
+  job: GreenhouseJob,
+  boardToken: string,
+  jobId: string | null,
+): FetchedPosting {
   return {
     vendor: 'greenhouse',
-    title: job.title,
+    title: job.title ?? '',
     text: job.content ? htmlToText(job.content) : '',
     url: job.absolute_url ?? null,
     location: job.location?.name ?? null,
@@ -71,6 +80,32 @@ export async function fetchPosting(
     boardToken,
     questions: (job.questions ?? []).map(toQuestion).filter(Boolean) as FetchedQuestion[],
   };
+}
+
+/**
+ * Every published posting on a board, in one call.
+ *
+ * `content=true` asks for the descriptions inline, which turns a board of forty
+ * roles into one request rather than forty-one. It is an undocumented flag on
+ * an undocumented API, so nothing depends on it working: a posting that comes
+ * back without content is hydrated individually by the caller.
+ */
+export async function fetchBoard(boardToken: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(
+    `${BASE}/${encodeURIComponent(boardToken)}/jobs?content=true`,
+  );
+  if (status !== 200) throw new Error(`Greenhouse returned ${status} for that board.`);
+
+  return toPostings(JSON.parse(body) as { jobs?: GreenhouseJob[] }, boardToken);
+}
+
+export function toPostings(
+  parsed: { jobs?: GreenhouseJob[] },
+  boardToken: string,
+): FetchedPosting[] {
+  return (parsed.jobs ?? [])
+    .filter((job) => Boolean(job.title))
+    .map((job) => toPosting(job, boardToken, null));
 }
 
 function toQuestion(raw: NonNullable<GreenhouseJob['questions']>[number]): FetchedQuestion | null {

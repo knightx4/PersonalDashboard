@@ -70,11 +70,50 @@ export function toPosting(
 }
 
 async function firstOpeningId(subdomain: string): Promise<string | null> {
+  const list = await fetchList(subdomain);
+  const id = list[0]?.id;
+  return id != null ? String(id) : null;
+}
+
+export interface BambooListing {
+  id?: number | string;
+  jobOpeningName?: string;
+  location?: { city?: string; state?: string; country?: string };
+  atsLocation?: { city?: string; state?: string; country?: string };
+  isRemote?: boolean;
+  locationType?: string;
+}
+
+async function fetchList(subdomain: string): Promise<BambooListing[]> {
   const { status, body } = await safeFetch(
     `https://${encodeURIComponent(subdomain)}.bamboohr.com/careers/list`,
   );
-  if (status !== 200) return null;
-  const parsed = JSON.parse(body) as { result?: Array<{ id?: number | string }> };
-  const id = parsed.result?.[0]?.id;
-  return id != null ? String(id) : null;
+  if (status !== 200) throw new Error(`BambooHR returned ${status} for that board.`);
+  const parsed = JSON.parse(body) as { result?: BambooListing[] };
+  return parsed.result ?? [];
+}
+
+/**
+ * The board index, titles only.
+ *
+ * BambooHR keeps the description on a per-posting endpoint, so these come back
+ * with an empty `text` and the caller hydrates the one it matched.
+ */
+export async function fetchBoard(subdomain: string): Promise<FetchedPosting[]> {
+  return toPostings(await fetchList(subdomain), subdomain);
+}
+
+export function toPostings(listings: BambooListing[], subdomain: string): FetchedPosting[] {
+  return listings
+    .filter((listing) => Boolean(listing.jobOpeningName) && listing.id != null)
+    .map((listing) => ({
+      vendor: 'bamboohr',
+      title: listing.jobOpeningName ?? '',
+      text: '',
+      url: null,
+      location: locationName(listing as BambooDetail),
+      atsJobId: String(listing.id),
+      boardToken: subdomain,
+      questions: [],
+    }));
 }

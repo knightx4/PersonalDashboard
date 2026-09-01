@@ -12,6 +12,8 @@ import {
   type MessageClassification,
 } from '@/lib/jobs/email/classify';
 import { PARSER_VERSION, verifyExtraction, type ExtractedMessage } from '@/lib/jobs/email/extract';
+import type { AtsVendor } from '@/lib/jobs/email/ats-senders';
+import { isBoardVendor } from '@/lib/jobs/ats/detect';
 import {
   decideLink,
   type LinkCandidate,
@@ -687,6 +689,52 @@ async function resolveCompanyId(
 }
 
 /**
+ * Remember which ATS subdomain a company's mail arrives from.
+ *
+ * `ramp.greenhouse.io` says two things at once: this employer uses Greenhouse,
+ * and their board is probably called `ramp`. Both were already worked out
+ * during classification and then thrown away with the rest of the tier-A
+ * result, because linking had no use for them.
+ *
+ * The JD backfill does. Almost no confirmation email links to the posting, so
+ * the sending subdomain is frequently the only thing in the entire mailbox that
+ * points at the board — and a board is all the fetchers need.
+ *
+ * Written as a HINT, never as `ats_board_token`: that column means a board has
+ * answered to it. This one means it is worth asking. Discovery promotes the one
+ * to the other, and only after the board proves to be this company's.
+ */
+async function learnBoardHint(
+  supabase: AppSupabaseClient,
+  companyId: string,
+  hint: string | null,
+  vendor: AtsVendor,
+): Promise<void> {
+  const knownVendor = isBoardVendor(vendor);
+  if (!hint && !knownVendor) return;
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('ats_type, ats_board_token, ats_board_hint')
+    .eq('id', companyId)
+    .maybeSingle();
+  if (!company) return;
+
+  const patch: Record<string, unknown> = {};
+  // A proven token outranks a hint, and a hint already recorded is not
+  // improved by a second message saying the same thing.
+  if (hint && !company.ats_board_token && !company.ats_board_hint) {
+    patch.ats_board_hint = hint;
+  }
+  if (knownVendor && (!company.ats_type || company.ats_type === 'unknown')) {
+    patch.ats_type = vendor;
+  }
+  if (Object.keys(patch).length === 0) return;
+
+  await supabase.from('companies').update(patch).eq('id', companyId);
+}
+
+/**
  * How the seeded `submitted` event reads, by the mail it was inferred from.
  *
  * Only a confirmation dates the application itself. A rejection or an offer
@@ -1140,6 +1188,8 @@ async function applyDecision(
         return;
       }
 
+      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats);
+
       const created = await createInferredApplication(supabase, {
         userId: ctx.userId,
         companyId,
@@ -1194,6 +1244,8 @@ async function applyDecision(
         ctx.counters.heldForReview += 1;
         return;
       }
+
+      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats);
 
       const lead = await createInferredApplication(supabase, {
         userId: ctx.userId,

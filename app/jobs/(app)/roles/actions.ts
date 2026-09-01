@@ -141,6 +141,7 @@ export async function createRole(
       jd_text: jdText,
       jd_fetched_at: null,
       jd_hash: jdText ? jdHash(jdText) : null,
+      jd_source: jdText ? 'manual' : null,
       ats_job_id: detected?.jobId ?? null,
       seniority: jdText ? guessSeniority(input.title, jdText) : null,
       location: input.location || null,
@@ -254,6 +255,11 @@ export async function updateRole(
     const text = patch.jdText?.trim() || null;
     update.jd_text = text;
     update.jd_hash = text ? jdHash(text) : null;
+    update.jd_source = text ? 'manual' : null;
+    // The nightly board lookup's note explains an empty panel or a title-based
+    // match. Once you have pasted the description yourself it explains nothing,
+    // so it goes with the thing it was about.
+    update.jd_lookup_note = null;
     // Requirements are extracted once per JD; changing the JD re-extracts.
     update.requirements = text ? extractRequirements(text) : null;
     update.requirements_extracted_at = text ? new Date().toISOString() : null;

@@ -45,6 +45,7 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 | Calendar invites parsed from ingested mail | done |
 | Tier-1 JD fetch for nine ATS vendors | done |
 | Company enrichment from Wikidata | done |
+| JD backfill from the employer's own ATS board | done |
 
 ## Getting started
 

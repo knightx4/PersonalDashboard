@@ -8,7 +8,7 @@ import type { FetchedPosting } from './types';
  * serve the application form's questions, so those come from the bookmarklet.
  */
 
-interface LeverPosting {
+export interface LeverPosting {
   id?: string;
   text?: string;
   hostedUrl?: string;
@@ -54,9 +54,18 @@ export async function fetchPosting(
   const posting = Array.isArray(parsed) ? parsed[0] : parsed;
   if (!posting?.text) throw new Error('Lever returned no posting.');
 
+  return toPosting(posting, boardToken, jobId);
+}
+
+/** The shape assumption, kept separate from the fetch so it can be tested. */
+export function toPosting(
+  posting: LeverPosting,
+  boardToken: string,
+  jobId: string | null,
+): FetchedPosting {
   return {
     vendor: 'lever',
-    title: posting.text,
+    title: posting.text ?? '',
     text: plainText(posting),
     url: posting.hostedUrl ?? null,
     location: posting.categories?.location ?? null,
@@ -65,4 +74,20 @@ export async function fetchPosting(
     // Lever does not expose the application form publicly. The bookmarklet does.
     questions: [],
   };
+}
+
+/** The whole board in one call, descriptions included. */
+export async function fetchBoard(boardToken: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(
+    `https://api.lever.co/v0/postings/${encodeURIComponent(boardToken)}?mode=json`,
+  );
+  if (status !== 200) throw new Error(`Lever returned ${status} for that board.`);
+
+  return toPostings(JSON.parse(body) as LeverPosting[], boardToken);
+}
+
+export function toPostings(parsed: LeverPosting[], boardToken: string): FetchedPosting[] {
+  return (Array.isArray(parsed) ? parsed : [])
+    .filter((posting) => Boolean(posting.text))
+    .map((posting) => toPosting(posting, boardToken, null));
 }

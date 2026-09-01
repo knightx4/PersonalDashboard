@@ -32,7 +32,7 @@ export default async function RoleDetailPage({
   const { data: role } = await supabase
     .from('roles')
     .select(
-      `id, title, jd_url, jd_text, jd_hash, ats_job_id, seniority, location, work_mode,
+      `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, ats_job_id, seniority, location, work_mode,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
        requirements,
        companies!inner ( id, name, slug, ats_type, priority )`,
@@ -207,6 +207,7 @@ export default async function RoleDetailPage({
         roleId={role.id as string}
         applicationId={current.id as string}
         jdText={(role.jd_text as string) ?? ''}
+        jdLookupNote={(role.jd_lookup_note as string) ?? null}
         requirements={requirements}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}

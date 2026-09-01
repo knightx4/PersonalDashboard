@@ -102,3 +102,38 @@ export async function fetchPosting(
 
   return toPosting(JSON.parse(body) as SmartRecruitersPosting, companyId, postingId);
 }
+
+/**
+ * The board index, which carries titles and locations but no job ad.
+ *
+ * Unlike the board-at-a-time vendors, the description here needs a second call
+ * per posting — so these come back with an empty `text` and the caller hydrates
+ * only the one it actually matched. Forty titles for one request beats forty
+ * requests for forty descriptions nobody wanted.
+ */
+export async function fetchBoard(companyId: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(
+    `${BASE}/${encodeURIComponent(companyId)}/postings?limit=100`,
+  );
+  if (status !== 200) throw new Error(`SmartRecruiters returned ${status} for that board.`);
+
+  return toPostings(JSON.parse(body) as { content?: SmartRecruitersPosting[] }, companyId);
+}
+
+export function toPostings(
+  parsed: { content?: SmartRecruitersPosting[] },
+  companyId: string,
+): FetchedPosting[] {
+  return (parsed.content ?? [])
+    .filter((posting) => Boolean(posting.name) && Boolean(posting.id))
+    .map((posting) => ({
+      vendor: 'smartrecruiters',
+      title: posting.name ?? '',
+      text: sectionsToText(posting),
+      url: posting.postingUrl ?? posting.applyUrl ?? null,
+      location: locationName(posting),
+      atsJobId: posting.id ?? null,
+      boardToken: companyId,
+      questions: [],
+    }));
+}

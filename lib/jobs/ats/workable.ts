@@ -58,16 +58,39 @@ export function toPosting(
 
   if (!job?.title) throw new Error('Workable returned no matching posting.');
 
+  return mapJob(job, subdomain, shortcode);
+}
+
+function mapJob(job: WorkableJob, subdomain: string, fallbackId: string | null): FetchedPosting {
   return {
     vendor: 'workable',
-    title: job.title,
+    title: job.title ?? '',
     text: bodyText(job),
     url: job.url ?? job.application_url ?? null,
     location: locationName(job),
-    atsJobId: job.shortcode ?? job.id ?? shortcode,
+    atsJobId: job.shortcode ?? job.id ?? fallbackId,
     boardToken: subdomain,
     questions: [],
   };
+}
+
+export function toPostings(
+  parsed: { jobs?: WorkableJob[] },
+  subdomain: string,
+): FetchedPosting[] {
+  return (parsed.jobs ?? [])
+    .filter((job) => Boolean(job.title))
+    .map((job) => mapJob(job, subdomain, null));
+}
+
+/** The whole board in one call — the same call a single posting already makes. */
+export async function fetchBoard(subdomain: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(
+    `https://apply.workable.com/api/v1/widget/accounts/${encodeURIComponent(subdomain)}?details=true`,
+  );
+  if (status !== 200) throw new Error(`Workable returned ${status} for that board.`);
+
+  return toPostings(JSON.parse(body) as { jobs?: WorkableJob[] }, subdomain);
 }
 
 export async function fetchPosting(

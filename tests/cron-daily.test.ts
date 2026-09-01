@@ -3,10 +3,11 @@
  *
  * Three scheduled jobs became one, because the Hobby plan caps them per
  * project; unifying ingestion then took it to two, since there is one inbox
- * sync serving both workspaces rather than one each. The two properties that
- * must survive all of that are covered here: every account still gets its sync
- * attempted even when one of them throws, and a failing stage does not take the
- * other stages down with it.
+ * sync serving both workspaces rather than one each, and the JD backfill then
+ * took it to three. The two properties that must survive all of that are
+ * covered here: every account still gets its sync attempted even when one of
+ * them throws, and a failing stage does not take the other stages down with
+ * it.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -103,9 +104,13 @@ vi.mock('@/inngest/cron/inbox', () => ({
 vi.mock('@/inngest/jobs/cron/sweep', () => ({
   runJobSweep: vi.fn(async () => ({ ghosted: 3, reminders: 2 })),
 }));
+vi.mock('@/inngest/jobs/cron/jd-backfill', () => ({
+  runJdBackfill: vi.fn(async () => ({ companies: 1, filled: 2, ambiguous: 0, closed: 1, noBoard: 0 })),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
+const { runJdBackfill } = await import('@/inngest/jobs/cron/jd-backfill');
 
 function cronRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -140,10 +145,19 @@ describe('the daily cron route', () => {
     expect(body.ok).toBe(false);
     expect(body.failed).toEqual(['inbox']);
 
-    // The stage after the failure still ran. That is the property that matters:
-    // a broken sync must not also cost the job workspace its nightly sweep.
+    // Every stage after the failure still ran. That is the property that
+    // matters: a broken sync must not also cost the job workspace its nightly
+    // sweep, nor the job descriptions the sweep never needed in the first place.
     expect(runJobSweep).toHaveBeenCalled();
+    expect(runJdBackfill).toHaveBeenCalled();
     expect(body.results['jobs-sweep']).toEqual({ ghosted: 3, reminders: 2 });
+    expect(body.results['jd-backfill']).toEqual({
+      companies: 1,
+      filled: 2,
+      ambiguous: 0,
+      closed: 1,
+      noBoard: 0,
+    });
     expect(body.results['inbox']).toEqual({ error: 'inbox exploded' });
   });
 });

@@ -45,16 +45,39 @@ export function toPosting(
 
   if (!job?.name) throw new Error('Rippling returned no matching posting.');
 
+  return mapJob(job, boardSlug, jobId);
+}
+
+function mapJob(job: RipplingJob, boardSlug: string, fallbackId: string | null): FetchedPosting {
   return {
     vendor: 'rippling',
-    title: job.name,
+    title: job.name ?? '',
     text: htmlToText(job.descriptionHtml ?? job.description ?? ''),
     url: job.url ?? null,
     location: locationName(job),
-    atsJobId: job.uuid ?? job.id ?? jobId,
+    atsJobId: job.uuid ?? job.id ?? fallbackId,
     boardToken: boardSlug,
     questions: [],
   };
+}
+
+export function toPostings(
+  parsed: RipplingJob[] | { items?: RipplingJob[] },
+  boardSlug: string,
+): FetchedPosting[] {
+  const jobs = Array.isArray(parsed) ? parsed : (parsed.items ?? []);
+  return jobs.filter((job) => Boolean(job.name)).map((job) => mapJob(job, boardSlug, null));
+}
+
+/** The whole board in one call — the same call a single posting already makes. */
+export async function fetchBoard(boardSlug: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(`${BASE}/${encodeURIComponent(boardSlug)}/jobs`);
+  if (status !== 200) throw new Error(`Rippling returned ${status} for that board.`);
+
+  return toPostings(
+    JSON.parse(body) as RipplingJob[] | { items?: RipplingJob[] },
+    boardSlug,
+  );
 }
 
 export async function fetchPosting(

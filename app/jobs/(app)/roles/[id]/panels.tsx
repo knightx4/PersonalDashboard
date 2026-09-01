@@ -41,6 +41,8 @@ export interface PanelProps {
   roleId: string;
   applicationId: string;
   jdText: string;
+  /** What the last automated board lookup did, or could not do. */
+  jdLookupNote: string | null;
   requirements: Requirement[];
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
@@ -386,7 +388,7 @@ function Todos({
   );
 }
 
-function Posting({ jdText, requirements }: PanelProps) {
+function Posting({ jdText, jdLookupNote, requirements }: PanelProps) {
   const groups: Array<{ kind: Requirement['kind']; label: string }> = [
     { kind: 'must_have', label: 'Must have' },
     { kind: 'nice_to_have', label: 'Nice to have' },
@@ -439,6 +441,14 @@ function Posting({ jdText, requirements }: PanelProps) {
         ) : (
           <p className="mt-3 text-[13px] text-ink-faint">
             Nothing saved. Paste the description on this role to build the requirement map.
+          </p>
+        )}
+        {/* Why the nightly board lookup did not fill this in, or which posting
+            it picked when the match was on a title rather than an id. An empty
+            panel on its own asks you for nothing and explains nothing. */}
+        {jdLookupNote && (
+          <p className="mt-3 border-t border-border pt-3 text-[12px] text-ink-faint">
+            {jdLookupNote}
           </p>
         )}
       </section>
