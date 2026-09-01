@@ -45,7 +45,7 @@ export default async function SettingsPage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [{ data: profile }, { data: accounts }, { data: resumes }, { data: evidence }] =
+  const [{ data: profile }, { data: accounts }, { data: resumes }, { data: evidence }, { data: excludedSenders }] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -71,6 +71,11 @@ export default async function SettingsPage({
         .select('id, title, body, context, skills, metrics, strength, used_count')
         .eq('user_id', user.id)
         .order('strength', { ascending: false }),
+      supabase
+        .from('excluded_senders')
+        .select('id, domain')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
     ]);
 
   // The last first-scan attempt per mailbox. Without it the page cannot tell a
@@ -137,6 +142,10 @@ export default async function SettingsPage({
               : null,
           };
         })}
+        excludedSenders={(excludedSenders ?? []).map((entry) => ({
+          id: entry.id as string,
+          domain: entry.domain as string,
+        }))}
         resumes={(resumes ?? []).map((resume) => ({
           id: resume.id as string,
           label: resume.label as string,

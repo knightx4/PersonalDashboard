@@ -9,7 +9,7 @@ import {
   reprocessHeldMessages,
   resetRelinkAttempts,
 } from '@/lib/jobs/inbox/ingest-messages';
-import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
+import { loadCompanies, loadExcludedDomains, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
 import { normalizeTimeZone } from '@/lib/jobs/timezone';
 
 /**
@@ -36,9 +36,10 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
      * longer exists.
      */
     async sweep({ userId, accountId, accountEmail, accessToken, budgetMs }) {
-      const [companies, candidates, profile] = await Promise.all([
+      const [companies, candidates, excludedDomains, profile] = await Promise.all([
         loadCompanies(supabase, userId),
         loadLinkCandidates(supabase, userId),
+        loadExcludedDomains(supabase, userId),
         supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle(),
       ]);
 
@@ -56,6 +57,7 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
             domains: c.domains,
           })),
           candidates,
+          excludedDomains,
           timezone: normalizeTimeZone(profile.data?.timezone as string | undefined),
           counters: emptyCounters(),
         },
@@ -72,9 +74,10 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
       // calls whether or not this batch had anything in it.
       if (envelopes.length === 0) return counters;
 
-      const [companies, candidates, profile] = await Promise.all([
+      const [companies, candidates, excludedDomains, profile] = await Promise.all([
         loadCompanies(supabase, userId),
         loadLinkCandidates(supabase, userId),
+        loadExcludedDomains(supabase, userId),
         // Only for invites that state a wall-clock time with no zone at all.
         supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle(),
       ]);
@@ -92,6 +95,7 @@ export function jobLinker(supabase: AppSupabaseClient): DomainLinker {
           domains: c.domains,
         })),
         candidates,
+        excludedDomains,
         accountEmail,
         // Normalised, not raw: this is applied to invites that carry a wall
         // clock with no zone, and a stored "ET" would silently read as UTC and
