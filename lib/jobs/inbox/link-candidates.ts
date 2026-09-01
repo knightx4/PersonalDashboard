@@ -1,5 +1,6 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { LinkCandidate } from '@/lib/jobs/email/link';
+import { gmailOpenUrl } from '@/lib/email/gmail-open';
 
 /**
  * Load the applications a message could plausibly belong to.
@@ -103,4 +104,72 @@ export async function loadExcludedDomains(
 ): Promise<string[]> {
   const { data } = await supabase.from('excluded_senders').select('domain').eq('user_id', userId);
   return (data ?? []).map((row) => row.domain as string);
+}
+
+export interface UnlinkedMessage {
+  id: string;
+  subject: string | null;
+  fromAddress: string | null;
+  receivedAt: string | null;
+  classification: string;
+  /** Deep link into the connected mailbox; null once the envelope is scrubbed. */
+  gmailHref: string | null;
+}
+
+/**
+ * Unlinked mail whose subject or sender mentions a search term, for the
+ * "possible matches" box on the role page and its "add other" search.
+ *
+ * A plain `ilike` on the term is the whole test, deliberately: it is exactly
+ * the signal a person uses eyeballing an inbox, matches what the note that
+ * asked for this described, and it is all that is available for old mail —
+ * the extracted fields `scoreCandidate` uses only exist at ingestion time.
+ */
+export async function findUnlinkedMessages(
+  supabase: AppSupabaseClient,
+  userId: string,
+  opts: { applicationId: string; term: string; limit?: number },
+): Promise<UnlinkedMessage[]> {
+  const term = opts.term.trim();
+  if (term.length < 2) return [];
+  const limit = opts.limit ?? 20;
+  // Escape ilike's own wildcards so a company name containing % or _ is
+  // matched literally rather than as a pattern.
+  const needle = term.replace(/[%_]/g, (char) => `\\${char}`);
+
+  const [{ data: dismissed }, { data: messages }] = await Promise.all([
+    supabase
+      .from('message_link_dismissals')
+      .select('message_id')
+      .eq('application_id', opts.applicationId),
+    supabase
+      .from('inbox_messages')
+      .select(
+        'id, subject, from_address, received_at, classification, email_address, thread_id, provider_message_id',
+      )
+      .eq('user_id', userId)
+      .is('resulting_application_id', null)
+      .is('scrubbed_at', null)
+      .or(`subject.ilike.%${needle}%,from_address.ilike.%${needle}%`)
+      .order('received_at', { ascending: false })
+      .limit(limit + 25),
+  ]);
+
+  const dismissedIds = new Set((dismissed ?? []).map((row) => row.message_id as string));
+
+  return (messages ?? [])
+    .filter((row) => !dismissedIds.has(row.id as string))
+    .slice(0, limit)
+    .map((row) => ({
+      id: row.id as string,
+      subject: row.subject as string | null,
+      fromAddress: row.from_address as string | null,
+      receivedAt: row.received_at as string | null,
+      classification: row.classification as string,
+      gmailHref: gmailOpenUrl({
+        emailAddress: (row.email_address as string) ?? null,
+        threadId: (row.thread_id as string) ?? null,
+        messageId: (row.provider_message_id as string) ?? null,
+      }),
+    }));
 }

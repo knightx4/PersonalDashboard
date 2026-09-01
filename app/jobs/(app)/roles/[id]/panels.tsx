@@ -21,7 +21,16 @@ import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { addQuestions, promoteToCanonical, saveAnswer } from '../actions';
-import { addInterview, addNote, addReminder, deleteInterview, saveInterview } from './actions';
+import {
+  addInterview,
+  addNote,
+  addReminder,
+  declineCandidateMessage,
+  deleteInterview,
+  linkCandidateMessage,
+  saveInterview,
+  searchUnlinkedMessages,
+} from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
 import { Input, Label, Select } from '@/components/ui/field';
@@ -90,6 +99,16 @@ export interface PanelProps {
     linkMethod: string | null;
     linkConfidence: number | null;
     /** Deep link into the connected mailbox; null once the envelope is scrubbed. */
+    gmailHref: string | null;
+  }>;
+  companyName: string;
+  /** Unlinked mail mentioning the company, offered to approve or wave off. */
+  matchCandidates: Array<{
+    id: string;
+    subject: string | null;
+    fromAddress: string | null;
+    receivedAt: string | null;
+    classification: string;
     gmailHref: string | null;
   }>;
   otherAttempts: Array<{
@@ -870,55 +889,275 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
   );
 }
 
-function LinkedMail({ messages, timezone }: PanelProps) {
-  if (messages.length === 0) {
-    return (
-      <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
-        No mail has been linked to this pursuit yet.
-      </p>
-    );
+function LinkedMail(props: PanelProps) {
+  const { messages, timezone, applicationId, companyName, matchCandidates } = props;
+
+  return (
+    <div className="space-y-4">
+      <MatchCandidates
+        applicationId={applicationId}
+        companyName={companyName}
+        candidates={matchCandidates}
+        timezone={timezone}
+      />
+
+      {messages.length === 0 ? (
+        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+          No mail has been linked to this pursuit yet.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+                <th className="px-2 py-2 font-semibold">Received</th>
+                <th className="px-2 py-2 font-semibold">Subject</th>
+                <th className="px-2 py-2 font-semibold">Kind</th>
+                <th className="px-2 py-2 font-semibold">Linked by</th>
+              </tr>
+            </thead>
+            <tbody>
+              {messages.map((message) => (
+                <tr key={message.id} className="border-b border-border">
+                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                    {formatDate(message.receivedAt, timezone)}
+                  </td>
+                  <td className="px-2 py-1.5 text-ink">
+                    {message.gmailHref ? (
+                      <GmailLink href={message.gmailHref}>
+                        {message.subject ?? '(no subject)'}
+                      </GmailLink>
+                    ) : (
+                      (message.subject ?? '—')
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5 text-ink-muted">
+                    {message.classification.replace(/_/g, ' ')}
+                  </td>
+                  <td className="tabular px-2 py-1.5 text-ink-faint">
+                    {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
+                    {message.linkConfidence !== null &&
+                      ` (${Math.round(message.linkConfidence * 100)}%)`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-[11px] text-ink-faint">
+            Subjects and senders only. Message bodies are never stored.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Unlinked mail that mentions the company, offered to approve or wave off
+ * rather than linked automatically. Collapsed by default so a pursuit with
+ * nothing pending does not open to a wall of maybes.
+ */
+function MatchCandidates({
+  applicationId,
+  companyName,
+  candidates,
+  timezone,
+}: {
+  applicationId: string;
+  companyName: string;
+  candidates: PanelProps['matchCandidates'];
+  timezone: string;
+}) {
+  const [handled, setHandled] = useState<Set<string>>(new Set());
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [, startTransition] = useTransition();
+
+  const visible = candidates.filter((candidate) => !handled.has(candidate.id));
+
+  function decide(id: string, action: (messageId: string, applicationId: string) => Promise<{ error: string | null }>) {
+    setError(null);
+    setPendingId(id);
+    startTransition(async () => {
+      const result = await action(id, applicationId);
+      if (result.error) setError(result.error);
+      else setHandled((prev) => new Set(prev).add(id));
+      setPendingId(null);
+    });
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-[13px]">
-        <thead>
-          <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
-            <th className="px-2 py-2 font-semibold">Received</th>
-            <th className="px-2 py-2 font-semibold">Subject</th>
-            <th className="px-2 py-2 font-semibold">Kind</th>
-            <th className="px-2 py-2 font-semibold">Linked by</th>
-          </tr>
-        </thead>
-        <tbody>
-          {messages.map((message) => (
-            <tr key={message.id} className="border-b border-border">
-              <td className="tabular px-2 py-1.5 text-ink-muted">
-                {formatDate(message.receivedAt, timezone)}
-              </td>
-              <td className="px-2 py-1.5 text-ink">
-                {message.gmailHref ? (
-                  <GmailLink href={message.gmailHref}>
-                    {message.subject ?? '(no subject)'}
-                  </GmailLink>
-                ) : (
-                  (message.subject ?? '—')
-                )}
-              </td>
-              <td className="px-2 py-1.5 text-ink-muted">
-                {message.classification.replace(/_/g, ' ')}
-              </td>
-              <td className="tabular px-2 py-1.5 text-ink-faint">
-                {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
-                {message.linkConfidence !== null && ` (${Math.round(message.linkConfidence * 100)}%)`}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-2 text-[11px] text-ink-faint">
-        Subjects and senders only. Message bodies are never stored.
-      </p>
+    <div className="space-y-2">
+      {visible.length > 0 && (
+        <details className="rounded-card border border-border bg-surface">
+          <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-ink">
+            Possible matches — {visible.length}
+          </summary>
+          <div className="space-y-2 border-t border-border p-3">
+            <p className="text-[11px] text-ink-faint">
+              Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not a
+              match and it will not be suggested again for this pursuit.
+            </p>
+            <ul className="space-y-1.5">
+              {visible.map((candidate) => (
+                <MatchRow
+                  key={candidate.id}
+                  message={candidate}
+                  timezone={timezone}
+                  busy={pendingId === candidate.id}
+                  onDecline={() => decide(candidate.id, declineCandidateMessage)}
+                  onLink={() => decide(candidate.id, linkCandidateMessage)}
+                />
+              ))}
+            </ul>
+          </div>
+        </details>
+      )}
+
+      {error && <p className="text-[12px] text-status-rejected">{error}</p>}
+
+      {searching ? (
+        <AddOtherSearch applicationId={applicationId} timezone={timezone} onClose={() => setSearching(false)} />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setSearching(true)}
+          className="text-[12px] font-medium text-brand underline underline-offset-2"
+        >
+          Add other
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MatchRow({
+  message,
+  timezone,
+  busy,
+  onDecline,
+  onLink,
+}: {
+  message: PanelProps['matchCandidates'][number];
+  timezone: string;
+  busy: boolean;
+  /** Omitted for a plain search result: "not a match" only means something for a suggested candidate. */
+  onDecline?: () => void;
+  onLink: () => void;
+}) {
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-canvas px-2.5 py-2 text-[13px]">
+      <span className="tabular w-full text-[11px] text-ink-faint sm:w-32">
+        {formatDate(message.receivedAt, timezone)}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-ink">
+        {message.gmailHref ? (
+          <GmailLink href={message.gmailHref}>{message.subject ?? '(no subject)'}</GmailLink>
+        ) : (
+          (message.subject ?? '—')
+        )}
+      </span>
+      <span className="truncate text-[11px] text-ink-faint">{message.fromAddress ?? ''}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        {onDecline && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onDecline}
+            className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
+          >
+            Not a match
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onLink}
+          className="press rounded-lg border border-border bg-surface px-2 py-0.5 text-[12px] font-medium text-ink disabled:opacity-50"
+        >
+          Link
+        </button>
+      </span>
+    </li>
+  );
+}
+
+/** Manual fallback for a match the company-name search missed. */
+function AddOtherSearch({
+  applicationId,
+  timezone,
+  onClose,
+}: {
+  applicationId: string;
+  timezone: string;
+  onClose: () => void;
+}) {
+  const [term, setTerm] = useState('');
+  const [results, setResults] = useState<PanelProps['matchCandidates'] | null>(null);
+  const [linked, setLinked] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function search() {
+    setError(null);
+    startTransition(async () => {
+      const { results: found, error: searchError } = await searchUnlinkedMessages(applicationId, term);
+      setError(searchError);
+      setResults(found);
+    });
+  }
+
+  function link(id: string) {
+    startTransition(async () => {
+      const result = await linkCandidateMessage(id, applicationId);
+      if (result.error) setError(result.error);
+      else setLinked((prev) => new Set(prev).add(id));
+    });
+  }
+
+  return (
+    <div className="rounded-card border border-dashed border-border bg-surface p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1">
+          <Label htmlFor="mail-search">Search unlinked mail</Label>
+          <Input
+            id="mail-search"
+            value={term}
+            onChange={(event) => setTerm(event.target.value)}
+            placeholder="Subject or sender"
+          />
+        </div>
+        <Button type="button" size="sm" disabled={pending || term.trim().length < 2} onClick={search}>
+          Search
+        </Button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+        >
+          Close
+        </button>
+      </div>
+      {error && <p className="mt-2 text-[12px] text-status-rejected">{error}</p>}
+      {results !== null && (
+        <ul className="mt-2 space-y-1.5">
+          {results.length === 0 && (
+            <li className="text-[12px] text-ink-faint">No unlinked mail matches that.</li>
+          )}
+          {results
+            .filter((message) => !linked.has(message.id))
+            .map((message) => (
+              <MatchRow
+                key={message.id}
+                message={message}
+                timezone={timezone}
+                busy={pending}
+                onLink={() => link(message.id)}
+              />
+            ))}
+        </ul>
+      )}
     </div>
   );
 }
