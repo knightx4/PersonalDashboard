@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
-import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyPanels } from './panels';
@@ -129,7 +129,10 @@ export default async function CompanyDetailPage({
                 )}
                 {role.applications.map((application) => (
                   <span key={application.id} className="flex items-center gap-1.5">
-                    <StatusBadge status={application.status} />
+                    <StatusPicker
+                      applicationId={application.id}
+                      status={application.status as ApplicationStatus}
+                    />
                     <span className="tabular text-[11px] text-ink-faint">
                       {application.attempt > 1 && `#${application.attempt} `}
                       {formatDate(application.submitted_at, timezone)}

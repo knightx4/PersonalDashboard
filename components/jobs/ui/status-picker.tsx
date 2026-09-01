@@ -1,0 +1,73 @@
+'use client';
+
+import { useState, useTransition } from 'react';
+import { cn } from '@/lib/cn';
+import { statusLabel } from '@/components/jobs/ui/status-badge';
+import { APPLICATION_STATUSES, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
+
+/**
+ * The status, where you are already looking at it.
+ *
+ * Dragging a card on the board is a fine way to move one pursuit and a poor
+ * way to move the one you happen to be reading about on a company page. This
+ * is the same action underneath -- it writes the manual override event and
+ * lets the database recompute the status from the event log -- so a change
+ * made here is indistinguishable from a change made on the board.
+ *
+ * `ghosted` is missing on purpose: it is worked out from silence, and the
+ * action refuses it. Offering an option that always errors is worse than not
+ * offering it.
+ */
+const SETTABLE = APPLICATION_STATUSES.filter((status) => status !== 'ghosted');
+
+export function StatusPicker({
+  applicationId,
+  status,
+  className,
+}: {
+  applicationId: string;
+  status: ApplicationStatus;
+  className?: string;
+}) {
+  const [busy, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  // Optimistic, so the select does not snap back to the old value while the
+  // server round trip and the revalidation happen.
+  const [shown, setShown] = useState<ApplicationStatus>(status);
+
+  return (
+    <span className={cn('inline-flex items-center gap-1.5', className)}>
+      <select
+        value={shown}
+        disabled={busy}
+        aria-label="Status"
+        onChange={(event) => {
+          const next = event.target.value as ApplicationStatus;
+          const previous = shown;
+          setShown(next);
+          setError(null);
+          startTransition(async () => {
+            const result = await moveApplication(applicationId, next);
+            if (result.error) {
+              setShown(previous);
+              setError(result.error);
+            }
+          });
+        }}
+        className="h-7 rounded-lg border border-border bg-surface px-1.5 text-[12px] text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+      >
+        {SETTABLE.map((option) => (
+          <option key={option} value={option}>
+            {statusLabel(option)}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <span role="alert" className="text-[11px] text-status-rejected">
+          {error}
+        </span>
+      )}
+    </span>
+  );
+}
