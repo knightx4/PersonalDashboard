@@ -75,24 +75,29 @@ export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) 
 
   return (
     <div ref={containerRef} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="press flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors duration-150 hover:bg-canvas"
-      >
-        <span
-          className="size-6 rounded-md bg-brand"
-          style={{ backgroundImage: active.gradient }}
-          aria-hidden
-        />
-        <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
-          {active.label}
-        </span>
-        <ChevronsUpDown className="size-3.5 text-ink-muted" strokeWidth={2} aria-hidden />
-        <span className="sr-only">Switch workspace</span>
-      </button>
+      <div className="flex items-center gap-2 rounded-lg py-1 pl-1.5 pr-1 transition-colors duration-150 hover:bg-canvas">
+        <Link href="/home" className="press flex items-center rounded-md" title="Home">
+          <span
+            className="size-6 rounded-md bg-brand"
+            style={{ backgroundImage: active.gradient }}
+            aria-hidden
+          />
+          <span className="sr-only">Home</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="press flex items-center gap-2"
+        >
+          <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
+            {active.label}
+          </span>
+          <ChevronsUpDown className="size-3.5 text-ink-muted" strokeWidth={2} aria-hidden />
+          <span className="sr-only">Switch workspace</span>
+        </button>
+      </div>
 
       {open && (
         <div
