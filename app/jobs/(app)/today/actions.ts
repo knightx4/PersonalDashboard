@@ -25,6 +25,9 @@ export async function completeReminder(id: string): Promise<{ error: string | nu
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/today');
+  // A to-do added from the role page's timeline is also shown there, so
+  // finishing it here has to clear it there too.
+  revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
 
@@ -41,5 +44,6 @@ export async function snoozeReminder(id: string): Promise<{ error: string | null
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/today');
+  revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }

@@ -21,8 +21,10 @@ import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { addQuestions, promoteToCanonical, saveAnswer } from '../actions';
-import { addNote, saveInterview } from './actions';
+import { addNote, addReminder, saveInterview } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
+import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
+import { Input, Label } from '@/components/ui/field';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -79,6 +81,8 @@ export interface PanelProps {
     timesSeen: number;
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
+  /** Open to-dos you set for yourself, not events the inbox produced. */
+  todos: Array<{ id: string; body: string; dueAt: string }>;
   messages: Array<{
     id: string;
     subject: string | null;
@@ -233,9 +237,11 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
   );
 }
 
-function Timeline({ events, timezone, otherAttempts }: PanelProps) {
+function Timeline({ events, timezone, otherAttempts, todos, applicationId }: PanelProps) {
   return (
     <div className="space-y-4">
+      <Todos todos={todos} applicationId={applicationId} timezone={timezone} />
+
       {otherAttempts.length > 0 && (
         <section className="rounded-card border border-border bg-surface p-4">
           <h3 className="text-[13px] font-semibold text-ink">Earlier attempts</h3>
@@ -301,6 +307,84 @@ function Timeline({ events, timezone, otherAttempts }: PanelProps) {
         </ol>
       )}
     </div>
+  );
+}
+
+/**
+ * Something to do, with a date, that nobody's mail is going to tell you about.
+ *
+ * Backed by the same `reminders` row the nightly sweep raises, so setting one
+ * here is not a second system: it shows up on This week's Nudges once due,
+ * and finishing it there clears it here too.
+ */
+function Todos({
+  todos,
+  applicationId,
+  timezone,
+}: {
+  todos: PanelProps['todos'];
+  applicationId: string;
+  timezone: string;
+}) {
+  const [body, setBody] = useState('');
+  const [dueAt, setDueAt] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-4">
+      <h3 className="mb-2 text-[13px] font-semibold text-ink">To-dos</h3>
+      {todos.length > 0 && (
+        <ul className="mb-3 space-y-1.5">
+          {todos.map((todo) => (
+            <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+              <span className="tabular text-ink-faint">{formatDate(todo.dueAt, timezone)}</span>
+              <span className="text-ink">{todo.body}</span>
+              <ReminderActions id={todo.id} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1">
+          <Label htmlFor="todo-body">Add a to-do</Label>
+          <Input
+            id="todo-body"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Record a video interview"
+          />
+        </div>
+        <div>
+          <Label htmlFor="todo-due">Done by</Label>
+          <Input
+            id="todo-due"
+            type="date"
+            value={dueAt}
+            onChange={(event) => setDueAt(event.target.value)}
+            className="w-40"
+          />
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || !body.trim() || !dueAt}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await addReminder({ applicationId, body, dueAt });
+              setError(result.error);
+              if (!result.error) {
+                setBody('');
+                setDueAt('');
+              }
+            })
+          }
+        >
+          Add
+        </Button>
+        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+      </div>
+    </section>
   );
 }
 

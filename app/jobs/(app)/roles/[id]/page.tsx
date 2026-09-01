@@ -64,7 +64,7 @@ export default async function RoleDetailPage({
   const current = (applications ?? [])[0];
   if (!current) notFound();
 
-  const [{ data: events }, { data: interviews }, { data: answers }, { data: notes }, { data: messages }, { data: profile }] =
+  const [{ data: events }, { data: interviews }, { data: answers }, { data: notes }, { data: messages }, { data: profile }, { data: reminders }] =
     await Promise.all([
       supabase
         .from('application_events')
@@ -98,6 +98,12 @@ export default async function RoleDetailPage({
         .eq('resulting_application_id', current.id)
         .order('received_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+      supabase
+        .from('reminders')
+        .select('id, body, due_at')
+        .eq('application_id', current.id)
+        .is('completed_at', null)
+        .order('due_at', { ascending: true }),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -248,6 +254,11 @@ export default async function RoleDetailPage({
           body: note.body as string,
           pinned: note.pinned as boolean,
           createdAt: note.created_at as string,
+        }))}
+        todos={(reminders ?? []).map((reminder) => ({
+          id: reminder.id as string,
+          body: reminder.body as string,
+          dueAt: reminder.due_at as string,
         }))}
         messages={(messages ?? []).map((message) => ({
           id: message.id as string,
