@@ -37,7 +37,6 @@ export default async function PipelinePage({
   searchParams: Promise<{
     source?: string;
     excitement?: string;
-    stale?: string;
     company?: string;
     q?: string;
   }>;
@@ -57,14 +56,12 @@ export default async function PipelinePage({
 
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
   const excitement = params.excitement ? Number(params.excitement) : null;
-  const staleOnly = params.stale === '1';
 
   const terms = searchTerms(params.q);
 
   let filtered = rows;
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (excitement) filtered = filtered.filter((row) => (row.excitement ?? 0) >= excitement);
-  if (staleOnly) filtered = filtered.filter(isStale);
   if (terms.length)
     filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
 
@@ -124,7 +121,7 @@ export default async function PipelinePage({
           <RailGroup label="Source">
             <RailItem
               label="All sources"
-              href={hrefFor({ excitement: params.excitement, stale: params.stale, q: params.q })}
+              href={hrefFor({ excitement: params.excitement, q: params.q })}
               active={!source}
               count={rows.length}
             />
@@ -135,7 +132,6 @@ export default async function PipelinePage({
                 href={hrefFor({
                   source: entry,
                   excitement: params.excitement,
-                  stale: params.stale,
                   q: params.q,
                 })}
                 active={source === entry}
@@ -147,7 +143,7 @@ export default async function PipelinePage({
           <RailGroup label="Excitement">
             <RailItem
               label="Any"
-              href={hrefFor({ source: params.source, stale: params.stale, q: params.q })}
+              href={hrefFor({ source: params.source, q: params.q })}
               active={!excitement}
             />
             {[5, 4, 3].map((level) => (
@@ -157,26 +153,11 @@ export default async function PipelinePage({
                 href={hrefFor({
                   source: params.source,
                   excitement: String(level),
-                  stale: params.stale,
                   q: params.q,
                 })}
                 active={excitement === level}
               />
             ))}
-          </RailGroup>
-
-          <RailGroup label="Attention">
-            <RailItem
-              label={`Quiet ${STALE_DAYS}+ days`}
-              href={hrefFor({
-                source: params.source,
-                excitement: params.excitement,
-                stale: staleOnly ? undefined : '1',
-                q: params.q,
-              })}
-              active={staleOnly}
-              count={rows.filter(isStale).length}
-            />
           </RailGroup>
 
           <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
