@@ -1,11 +1,9 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
-import { StatusPicker } from '@/components/jobs/ui/status-picker';
-import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyPanels } from './panels';
+import { RolesList } from './roles-list';
 
 export const metadata = { title: 'Company' };
 
@@ -112,38 +110,23 @@ export default async function CompanyDetailPage({
 
       <section className="mb-6 rounded-card border border-border bg-surface p-4">
         <h2 className="text-[13px] font-semibold text-ink">Roles here, across cycles</h2>
-        {roleRows.length === 0 ? (
-          <p className="mt-2 text-[13px] text-ink-faint">No roles saved at this company yet.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-border">
-            {roleRows.map((role) => (
-              <li key={role.id} className="flex flex-wrap items-center gap-2 py-2">
-                <Link
-                  href={`/jobs/roles/${role.id}`}
-                  className="flex-1 text-[13px] font-medium text-ink hover:text-brand"
-                >
-                  {role.title}
-                </Link>
-                {role.location && (
-                  <span className="text-[12px] text-ink-faint">{role.location}</span>
-                )}
-                {role.applications.map((application) => (
-                  <span key={application.id} className="flex items-center gap-1.5">
-                    <StatusPicker
-                      applicationId={application.id}
-                      status={application.status as ApplicationStatus}
-                      submittedAt={application.submitted_at as string | null}
-                    />
-                    <span className="tabular text-[11px] text-ink-faint">
-                      {application.attempt > 1 && `#${application.attempt} `}
-                      {formatDate(application.submitted_at, timezone)}
-                    </span>
-                  </span>
-                ))}
-              </li>
-            ))}
-          </ul>
-        )}
+        <RolesList
+          companyId={company.id as string}
+          timezone={timezone}
+          roles={roleRows.map((role) => ({
+            id: role.id,
+            title: role.title,
+            location: role.location,
+            firstSeenAt: role.first_seen_at,
+            applications: role.applications.map((application) => ({
+              id: application.id,
+              attempt: application.attempt,
+              status: application.status,
+              submittedAt: application.submitted_at,
+              outcome: application.outcome,
+            })),
+          }))}
+        />
       </section>
 
       <CompanyPanels

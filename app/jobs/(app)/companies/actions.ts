@@ -324,6 +324,100 @@ export async function applyAiCompanyEnrichment(
   return { applied, error: null };
 }
 
+const mergeRolesSchema = z.object({
+  companyId: z.string().uuid(),
+  survivorRoleId: z.string().uuid(),
+  mergedRoleIds: z.array(z.string().uuid()).min(1),
+});
+
+/**
+ * Fold one or more duplicate role rows into the survivor, keeping every
+ * application as an attempt on it rather than discarding anything.
+ *
+ * There is no database transaction wrapping this — supabase-js issues each
+ * statement separately — so the order matters: every merged role's
+ * applications get a fresh attempt number strictly above the survivor's
+ * current highest before its role_id changes, which can never collide with
+ * the (role_id, attempt) unique index no matter what order the statements
+ * land in. The survivor's own existing attempts are never renumbered, so
+ * their order is untouched; a merged role's own attempts keep their
+ * relative order, appended after.
+ */
+export async function mergeRoles(
+  input: z.input<typeof mergeRolesSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = mergeRolesSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not a mergeable selection.' };
+  const { companyId, survivorRoleId, mergedRoleIds } = parsed.data;
+  if (mergedRoleIds.includes(survivorRoleId)) {
+    return { error: 'Pick a different role to merge into.' };
+  }
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS would block a cross-owner or cross-company row silently rather than
+  // explain why nothing moved, so it is checked here for a real message.
+  const { data: involved } = await supabase
+    .from('roles')
+    .select('id, company_id')
+    .eq('user_id', user.id)
+    .in('id', [survivorRoleId, ...mergedRoleIds]);
+
+  if ((involved ?? []).length !== mergedRoleIds.length + 1) {
+    return { error: 'One of those roles no longer exists.' };
+  }
+  if ((involved ?? []).some((role) => role.company_id !== companyId)) {
+    return { error: 'Roles can only be merged within the same company.' };
+  }
+
+  const { data: survivorApps } = await supabase
+    .from('applications')
+    .select('attempt')
+    .eq('role_id', survivorRoleId)
+    .order('attempt', { ascending: false })
+    .limit(1);
+  let nextAttempt = (survivorApps?.[0]?.attempt as number | undefined) ?? 0;
+
+  for (const mergedRoleId of mergedRoleIds) {
+    const { data: apps } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('role_id', mergedRoleId)
+      .order('attempt', { ascending: true });
+
+    for (const app of apps ?? []) {
+      nextAttempt += 1;
+      const { error } = await supabase
+        .from('applications')
+        .update({ role_id: survivorRoleId, attempt: nextAttempt })
+        .eq('id', app.id as string);
+      if (error) return { error: error.message };
+    }
+
+    const { error: notesError } = await supabase
+      .from('notes')
+      .update({ role_id: survivorRoleId })
+      .eq('role_id', mergedRoleId);
+    if (notesError) return { error: notesError.message };
+
+    const { error: attachmentsError } = await supabase
+      .from('attachments')
+      .update({ role_id: survivorRoleId })
+      .eq('role_id', mergedRoleId);
+    if (attachmentsError) return { error: attachmentsError.message };
+
+    const { error: deleteError } = await supabase.from('roles').delete().eq('id', mergedRoleId);
+    if (deleteError) return { error: deleteError.message };
+  }
+
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/roles');
+  return { error: null };
+}
+
 const COMPANY_ENRICH_COLUMNS =
   'id, name, domains, website, careers_url, industry, hq_location, headcount_band, stage, logo_url, linkedin_url';
 
