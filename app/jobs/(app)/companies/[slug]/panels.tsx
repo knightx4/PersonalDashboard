@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
@@ -340,7 +341,13 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
         <ul className="mt-2 divide-y divide-border">
           {contacts.map((contact) => (
             <li key={contact.id} className="flex flex-wrap items-baseline gap-2 py-2">
-              <span className="text-[13px] font-medium text-ink">{contact.fullName}</span>
+              <Link
+                href={`/jobs/contacts#contact-${contact.id}`}
+                className="text-[13px] font-medium text-ink hover:underline"
+                title="Add or edit their details"
+              >
+                {contact.fullName}
+              </Link>
               {contact.title && <span className="text-[12px] text-ink-muted">{contact.title}</span>}
               <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
                 {contact.relationship.replace(/_/g, ' ')}
