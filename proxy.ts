@@ -77,7 +77,15 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && (pathname === '/login' || pathname === '/signup')) {
+  // A signed-in person has no use for the marketing page or the sign-in form.
+  // `/` was missing from this list, so opening the site while already signed
+  // in showed a homepage inviting you to sign in -- on a phone, where the app
+  // is opened from a bookmark, that is every visit.
+  //
+  // Sent to /onboarding rather than straight to the dashboard because that is
+  // the page that knows which it should be: it forwards a finished account to
+  // /shopping/dashboard and keeps an unfinished one where it belongs.
+  if (user && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone();
     url.pathname = '/onboarding';
     url.search = '';
@@ -90,8 +98,9 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets and image files. Auth pages are matched
-     * deliberately, so a signed-in user gets bounced off /login.
+     * Everything except static assets and image files. The homepage and the
+     * auth pages are matched deliberately, so a signed-in user gets bounced
+     * off all three.
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
