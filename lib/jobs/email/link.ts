@@ -76,7 +76,21 @@ export interface ScoredCandidate {
  * already done the work by hand.
  */
 export type LinkCompany =
-  | { kind: 'existing'; id: string; name: string }
+  | {
+      kind: 'existing';
+      id: string;
+      name: string;
+      /**
+       * A domain this message was sent from that the company record does not
+       * carry yet -- set only when the match came from the name or the ATS
+       * hint, not the domain itself. A recruiter's own address (emma@
+       * meetelise.com) is exactly as much the employer's domain as the ATS
+       * confirmation that first created the row (no-reply@ashbyhq.com), and
+       * leaving it unlearned is why every later message from that recruiter
+       * kept failing to link and spawning a new lead instead.
+       */
+      domainToLearn?: string;
+    }
   | { kind: 'new'; name: string; domain: string | null };
 
 export type LinkDecision =
@@ -437,7 +451,11 @@ export function companyForMessage(
   companies: DecideOptions['companies'],
 ): LinkCompany | null {
   const existing = resolveCompany(input, companies);
-  if (existing) return { kind: 'existing', id: existing.id, name: existing.name };
+  if (existing) {
+    const domain = employerDomain(input);
+    const domainToLearn = domain && !domainOwnedBy(domain, existing.domains) ? domain : undefined;
+    return { kind: 'existing', id: existing.id, name: existing.name, domainToLearn };
+  }
 
   // The extractor read the employer out of the body; the hint is the ATS
   // subdomain, which is the company's own name by construction.
@@ -596,23 +614,22 @@ export function decideLink(
   };
 }
 
+function domainOwnedBy(domain: string, domains: readonly string[]): boolean {
+  const needle = domain.toLowerCase();
+  return domains.some((owned) => needle === owned.toLowerCase() || needle.endsWith(`.${owned.toLowerCase()}`));
+}
+
 function resolveCompany(
   input: LinkInput,
   companies: DecideOptions['companies'],
-): { id: string; name: string } | null {
+): { id: string; name: string; domains: readonly string[] } | null {
   const fromDomain = domainFromAddress(input.fromAddress);
   const replyDomain = domainFromAddress(input.replyToAddress);
 
   for (const domain of [replyDomain, fromDomain]) {
     if (!domain) continue;
     for (const company of companies) {
-      if (
-        company.domains.some(
-          (owned) => domain === owned.toLowerCase() || domain.endsWith(`.${owned.toLowerCase()}`),
-        )
-      ) {
-        return company;
-      }
+      if (domainOwnedBy(domain, company.domains)) return company;
     }
   }
 

@@ -615,7 +615,27 @@ async function resolveCompanyId(
   userId: string,
   company: LinkCompany,
 ): Promise<string | null> {
-  if (company.kind === 'existing') return company.id;
+  if (company.kind === 'existing') {
+    // A name match proves the domain belongs to this company just as surely
+    // as the domain match below does -- recording it is what lets the next
+    // message from the same recruiter link by domain instead of falling
+    // through to the same weak signals again.
+    if (company.domainToLearn) {
+      const { data: current } = await supabase
+        .from('companies')
+        .select('domains')
+        .eq('id', company.id)
+        .maybeSingle();
+      const domains = (current?.domains as string[] | null) ?? [];
+      if (!domains.includes(company.domainToLearn)) {
+        await supabase
+          .from('companies')
+          .update({ domains: [...domains, company.domainToLearn] })
+          .eq('id', company.id);
+      }
+    }
+    return company.id;
+  }
 
   const slug = slugify(company.name);
 
