@@ -132,6 +132,7 @@ export default async function CompanyDetailPage({
                     <StatusPicker
                       applicationId={application.id}
                       status={application.status as ApplicationStatus}
+                      submittedAt={application.submitted_at as string | null}
                     />
                     <span className="tabular text-[11px] text-ink-faint">
                       {application.attempt > 1 && `#${application.attempt} `}
@@ -153,6 +154,7 @@ export default async function CompanyDetailPage({
         hqLocation={(company.hq_location as string) ?? ''}
         careersUrl={(company.careers_url as string) ?? ''}
         linkedinUrl={(company.linkedin_url as string) ?? ''}
+        website={(company.website as string) ?? ''}
         priority={company.priority as string}
         timezone={timezone}
         contacts={(contacts ?? []).map((contact) => ({

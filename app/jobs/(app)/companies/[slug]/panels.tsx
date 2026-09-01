@@ -1,13 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
 import {
+  applyAiCompanyEnrichment,
   applyCompanyEnrichment,
+  proposeAiCompanyEnrichment,
   proposeCompanyEnrichment,
+  type AiEnrichmentProposal,
   type EnrichmentProposal,
 } from '../actions';
 import { updateCompany } from '../actions';
@@ -20,6 +24,7 @@ export function CompanyPanels(props: {
   hqLocation: string;
   careersUrl: string;
   linkedinUrl: string;
+  website: string;
   priority: string;
   timezone: string;
   contacts: Array<{
@@ -109,6 +114,7 @@ function Details({
   hqLocation,
   careersUrl,
   linkedinUrl,
+  website,
   priority,
 }: {
   companyId: string;
@@ -117,6 +123,7 @@ function Details({
   hqLocation: string;
   careersUrl: string;
   linkedinUrl: string;
+  website: string;
   priority: string;
 }) {
   const [form, setForm] = useState({
@@ -125,6 +132,7 @@ function Details({
     hqLocation,
     careersUrl,
     linkedinUrl,
+    website,
     priority,
   });
   const [saved, setSaved] = useState<string | null>(null);
@@ -187,6 +195,26 @@ function Details({
         </div>
 
         <div>
+          <Label htmlFor="website">Homepage</Label>
+          <Input
+            id="website"
+            value={form.website}
+            onChange={(event) => set('website')(event.target.value)}
+            placeholder="https://"
+          />
+          {form.website && (
+            <a
+              href={form.website}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-1 inline-block text-[12px] text-brand underline underline-offset-2"
+            >
+              Open
+            </a>
+          )}
+        </div>
+
+        <div>
           <Label htmlFor="careersUrl">Careers page</Label>
           <Input
             id="careersUrl"
@@ -219,6 +247,7 @@ function Details({
                 hqLocation: form.hqLocation,
                 careersUrl: form.careersUrl,
                 linkedinUrl: form.linkedinUrl,
+                website: form.website,
                 priority: form.priority as 'target' | 'interested' | 'backup' | 'passed',
               });
               setSaved(result.error ?? 'Saved.');
@@ -231,6 +260,7 @@ function Details({
       </div>
 
       <Enrichment companyId={companyId} />
+      <AiEnrichment companyId={companyId} />
     </section>
   );
 }
@@ -328,6 +358,123 @@ function Enrichment({ companyId }: { companyId: string }) {
   );
 }
 
+/**
+ * The AI counterpart to Wikidata, for companies too small or too new to have
+ * an encyclopedia entry -- which is most of them. Same propose-then-apply
+ * shape: a search result is shown before it lands, and it only ever fills
+ * the homepage and research notes when they are still blank.
+ */
+function AiEnrichment({ companyId }: { companyId: string }) {
+  const [proposal, setProposal] = useState<AiEnrichmentProposal | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const lookUp = () =>
+    startTransition(async () => {
+      setMessage(null);
+      setProposal(null);
+      const result = await proposeAiCompanyEnrichment({ companyId });
+      if (result.error) setMessage(result.error);
+      else if (result.proposal && !result.proposal.hasChanges) {
+        setMessage('Found it, but the homepage and research notes are already filled in.');
+      } else setProposal(result.proposal);
+    });
+
+  const apply = () => {
+    if (!proposal) return;
+    startTransition(async () => {
+      const result = await applyAiCompanyEnrichment({
+        companyId,
+        website: proposal.website,
+        summary: proposal.summary,
+      });
+      setProposal(null);
+      setMessage(
+        result.error ??
+          (result.applied.length ? `Filled in ${result.applied.join(' and ')}.` : 'Nothing to fill in.'),
+      );
+    });
+  };
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="flex items-center gap-3">
+        <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={lookUp}>
+          {pending ? 'Searching…' : 'Search with AI'}
+        </Button>
+        {message && <span className="text-[12px] text-ink-muted">{message}</span>}
+      </div>
+
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+        For the companies Wikidata has never heard of. Reads the web for a homepage and a plain
+        summary; fills blank fields only.
+      </p>
+
+      {proposal && (
+        <div className="mt-3 rounded-card border border-border bg-canvas p-3">
+          {proposal.website && (
+            <a
+              href={proposal.website}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-[13px] font-medium text-brand underline underline-offset-2"
+            >
+              {proposal.website}
+            </a>
+          )}
+          {proposal.summary && (
+            <p className="mt-1 text-[12px] text-ink-muted">{proposal.summary}</p>
+          )}
+
+          {proposal.changes.length > 0 && (
+            <ul className="mt-2 space-y-0.5">
+              {proposal.changes.map((change) => (
+                <li key={change} className="text-[12px] text-ink-muted">
+                  {change}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {proposal.sources.length > 0 && (
+            <p className="mt-2 text-[11px] text-ink-faint">
+              Sources:{' '}
+              {proposal.sources.map((source, index) => (
+                <span key={source.url}>
+                  {index > 0 && ', '}
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="underline underline-offset-2"
+                  >
+                    {source.title ?? new URL(source.url).hostname}
+                  </a>
+                </span>
+              ))}
+            </p>
+          )}
+
+          <div className="mt-3 flex items-center gap-2">
+            <Button type="button" size="sm" disabled={pending || !proposal.hasChanges} onClick={apply}>
+              Fill these in
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setProposal(null)}
+            >
+              Not this company
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Contacts({ contacts }: { contacts: CompanyContact[] }) {
   return (
     <section className="rounded-card border border-border bg-surface p-4">
@@ -340,7 +487,13 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
         <ul className="mt-2 divide-y divide-border">
           {contacts.map((contact) => (
             <li key={contact.id} className="flex flex-wrap items-baseline gap-2 py-2">
-              <span className="text-[13px] font-medium text-ink">{contact.fullName}</span>
+              <Link
+                href={`/jobs/contacts#contact-${contact.id}`}
+                className="text-[13px] font-medium text-ink hover:underline"
+                title="Add or edit their details"
+              >
+                {contact.fullName}
+              </Link>
               {contact.title && <span className="text-[12px] text-ink-muted">{contact.title}</span>}
               <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
                 {contact.relationship.replace(/_/g, ' ')}

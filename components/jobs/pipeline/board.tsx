@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
-import { AlertTriangle, GripVertical, X } from 'lucide-react';
+import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
@@ -273,7 +273,12 @@ function Card({
             {'★'.repeat(row.excitement)}
           </span>
         )}
-        {!muted && <Dismiss row={row} />}
+        {!muted && (
+          <span className="flex shrink-0 items-center gap-0.5">
+            <QuickReject row={row} />
+            <Dismiss row={row} />
+          </span>
+        )}
       </div>
 
       {row.nextAction && (
@@ -284,7 +289,11 @@ function Card({
       )}
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        {muted ? <StatusBadge status={row.status} /> : <span />}
+        {muted ? (
+          <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-1.5">
           {row.needsReview && (
             <AlertTriangle className="size-3.5 text-accent-orange" strokeWidth={2} aria-label="Needs review" />
@@ -298,6 +307,60 @@ function Card({
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * "Send this straight to rejected."
+ *
+ * A rejection you already know about — a form-letter no, a posting that
+ * vanished — otherwise costs a drag across every column in between, or a trip
+ * to the status picker on the role page. This writes the same status_override
+ * event `moveApplication` always has; it just skips the trip.
+ */
+function QuickReject({ row }: { row: PipelineRow }) {
+  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+
+  if (row.status === 'rejected') return null;
+
+  if (confirming) {
+    return (
+      <span className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              await moveApplication(row.applicationId, 'rejected');
+              setConfirming(false);
+            })
+          }
+          className="press rounded px-1.5 py-0.5 text-[11px] font-medium text-status-rejected hover:bg-status-rejected-tint"
+        >
+          {pending ? 'Moving…' : 'Reject'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="press rounded px-1 py-0.5 text-[11px] text-ink-faint hover:text-ink"
+        >
+          Keep
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title="Send straight to rejected"
+      onClick={() => setConfirming(true)}
+      className="press shrink-0 rounded p-0.5 text-ink-faint opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
+    >
+      <Ban className="size-3.5" strokeWidth={2} aria-hidden />
+      <span className="sr-only">Send straight to rejected</span>
+    </button>
   );
 }
 

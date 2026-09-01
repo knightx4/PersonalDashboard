@@ -61,6 +61,56 @@ export async function createContact(
   return { message: 'Added.' };
 }
 
+const contactEditSchema = z.object({
+  fullName: z.string().trim().min(1, 'A name is needed.'),
+  title: z.string().trim().optional(),
+  linkedinUrl: z.string().trim().url().optional().or(z.literal('')),
+  email: z.string().trim().email().optional().or(z.literal('')),
+  howWeConnect: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+/**
+ * Fill in what a contact created from mail never had: a name is all the
+ * inbox can give you, so title, LinkedIn and how you actually know them stay
+ * blank until you add them by hand.
+ */
+export async function updateContact(
+  contactId: string,
+  input: {
+    fullName: string;
+    title: string;
+    linkedinUrl: string;
+    email: string;
+    howWeConnect: string;
+    notes: string;
+  },
+): Promise<{ error: string | null }> {
+  const parsed = contactEditSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('contacts')
+    .update({
+      full_name: parsed.data.fullName,
+      title: parsed.data.title || null,
+      linkedin_url: parsed.data.linkedinUrl || null,
+      email: parsed.data.email || null,
+      how_we_connect: parsed.data.howWeConnect || null,
+      notes: parsed.data.notes || null,
+    })
+    .eq('id', contactId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  return { error: null };
+}
+
 export async function logTouch(input: {
   contactId: string;
   channel: 'linkedin_dm' | 'linkedin_connect' | 'email' | 'intro' | 'event' | 'other';

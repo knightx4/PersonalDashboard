@@ -316,6 +316,37 @@ describe('the acceptance criteria', () => {
     }
   });
 
+  it('flags a recruiter domain to learn when the company matched by name, not by it', () => {
+    // The EliseAI case: a recruiter's own address (emma@meetelise.com) is not
+    // among the domains recorded for the company (only the ATS confirmation's
+    // ashbyhq.com is), so every one of her emails matched only by name and
+    // never taught the company its own recruiter's domain -- so the next one,
+    // and the one after that, kept failing to link the same way and each
+    // spawned a fresh lead instead of joining the one already open.
+    const decision = decideLink(
+      message({
+        threadId: null,
+        classification: 'scheduling',
+        fromAddress: 'emma@meetelise.com',
+        replyToAddress: null,
+        subject: 'Interview Confirmation',
+        extractedCompany: 'Linear',
+        extractedRole: null,
+      }),
+      [],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('create_lead');
+    if (decision.action === 'create_lead') {
+      expect(decision.company).toEqual({
+        kind: 'existing',
+        id: 'c-linear',
+        name: 'Linear',
+        domainToLearn: 'meetelise.com',
+      });
+    }
+  });
+
   describe('a mailbox with no companies on file yet', () => {
     /**
      * The bug this covers: on a first scan, `companies` is empty, so company

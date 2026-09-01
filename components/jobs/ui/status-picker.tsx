@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
-import { statusLabel } from '@/components/jobs/ui/status-badge';
+import { statusLabel } from '@/lib/jobs/status-label';
 import { APPLICATION_STATUSES, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
@@ -33,10 +33,13 @@ function displayStatus(status: ApplicationStatus): ApplicationStatus {
 export function StatusPicker({
   applicationId,
   status,
+  submittedAt = null,
   className,
 }: {
   applicationId: string;
   status: ApplicationStatus;
+  /** Null for a lead or draft never submitted — see statusLabel. */
+  submittedAt?: string | null;
   className?: string;
 }) {
   const [busy, startTransition] = useTransition();
@@ -44,6 +47,7 @@ export function StatusPicker({
   // Optimistic, so the select does not snap back to the old value while the
   // server round trip and the revalidation happen.
   const [shown, setShown] = useState<ApplicationStatus>(displayStatus(status));
+  const everSubmitted = submittedAt !== null;
 
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>
@@ -68,7 +72,7 @@ export function StatusPicker({
       >
         {SETTABLE.map((option) => (
           <option key={option} value={option}>
-            {statusLabel(option)}
+            {statusLabel(option, everSubmitted)}
           </option>
         ))}
       </select>
