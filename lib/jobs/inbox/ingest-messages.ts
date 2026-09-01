@@ -45,6 +45,63 @@ import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/l
  */
 const EXTRACT_CONCURRENCY = 6;
 
+/**
+ * What a role is called when the mail did not say.
+ *
+ * Exported so the dedupe below can recognise its own placeholders: a row with
+ * this title is "we know there is something here" rather than a distinct
+ * pursuit, and treating it as distinct is what produced two rows for one
+ * conversation.
+ */
+export const PLACEHOLDER_ROLE_TITLE = 'Role from email';
+
+export type OpenPursuit = { roleId: string; roleTitle: string; applicationId: string };
+
+export type PursuitChoice =
+  | { kind: 'create' }
+  | { kind: 'adopt'; applicationId: string }
+  | { kind: 'rename'; applicationId: string; roleId: string };
+
+/**
+ * Which pursuit at this company an inferred message belongs to.
+ *
+ * A title match is the easy case and was the only case, which is how one
+ * company ended up with "Finance Manager" and "Role from email" open beside
+ * each other, both from the same conversation. A title the model could not
+ * read is not evidence of a second pursuit -- it is the absence of evidence
+ * either way.
+ *
+ * The two placeholder cases both insist on exactly one candidate. Where a
+ * company has several things open, which one an untitled message belongs to is
+ * a guess, and silently attaching mail to the wrong role is worse than a
+ * duplicate row you can see and merge.
+ */
+export function choosePursuit(open: readonly OpenPursuit[], title: string): PursuitChoice {
+  const wanted = title.toLowerCase();
+  const isPlaceholder = (pursuit: OpenPursuit) =>
+    pursuit.roleTitle.toLowerCase() === PLACEHOLDER_ROLE_TITLE.toLowerCase();
+
+  const sameTitle = open.find((pursuit) => pursuit.roleTitle.toLowerCase() === wanted);
+  if (sameTitle) return { kind: 'adopt', applicationId: sameTitle.applicationId };
+
+  if (wanted === PLACEHOLDER_ROLE_TITLE.toLowerCase()) {
+    return open.length === 1
+      ? { kind: 'adopt', applicationId: open[0].applicationId }
+      : { kind: 'create' };
+  }
+
+  const placeholders = open.filter(isPlaceholder);
+  if (placeholders.length === 1) {
+    return {
+      kind: 'rename',
+      applicationId: placeholders[0].applicationId,
+      roleId: placeholders[0].roleId,
+    };
+  }
+
+  return { kind: 'create' };
+}
+
 export type IngestCounters = {
   messagesSeen: number;
   messagesClassified: number;
@@ -638,25 +695,44 @@ async function createInferredApplication(
     needsReview: boolean;
   },
 ): Promise<{ applicationId: string; adopted: boolean } | null> {
-  const title = opts.roleTitle?.trim() || 'Role from email';
+  const title = opts.roleTitle?.trim() || PLACEHOLDER_ROLE_TITLE;
 
-  // Never a duplicate: an open application at this company with this title is
-  // the one this message belongs to, and the linker simply scored it too low.
   const { data: existingRoles } = await supabase
     .from('roles')
     .select('id, title, applications ( id, status )')
     .eq('user_id', opts.userId)
     .eq('company_id', opts.companyId);
 
+  const open: OpenPursuit[] = [];
   for (const role of existingRoles ?? []) {
-    if ((role.title as string).toLowerCase() !== title.toLowerCase()) continue;
     const applications = (role.applications ?? []) as Array<{ id: string; status: string }>;
-    const open = applications.find((a) => !isTerminal(a.status as ApplicationStatus));
-    // Adopted, not created. The caller has to know: an interview invite for a
-    // pursuit that already exists is an event that moves it forward, not the
-    // birth of a lead.
-    if (open) return { applicationId: open.id, adopted: true };
+    const live = applications.find((a) => !isTerminal(a.status as ApplicationStatus));
+    if (live) {
+      open.push({
+        roleId: role.id as string,
+        roleTitle: role.title as string,
+        applicationId: live.id,
+      });
+    }
   }
+
+  const choice = choosePursuit(open, title);
+
+  if (choice.kind === 'rename') {
+    // The message that names the role arrives after one that could not. Adopt
+    // the placeholder and give it the name, rather than leaving a nameless row
+    // beside a named one.
+    await supabase
+      .from('roles')
+      .update({ title, ...(opts.atsJobId ? { ats_job_id: opts.atsJobId } : {}) })
+      .eq('id', choice.roleId)
+      .eq('user_id', opts.userId);
+  }
+
+  // Adopted, not created. The caller has to know: an interview invite for a
+  // pursuit that already exists is an event that moves it forward, not the
+  // birth of a lead.
+  if (choice.kind !== 'create') return { applicationId: choice.applicationId, adopted: true };
 
   const { data: role, error: roleError } = await supabase
     .from('roles')
