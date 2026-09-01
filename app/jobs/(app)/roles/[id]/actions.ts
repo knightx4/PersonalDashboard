@@ -57,13 +57,83 @@ export async function addNote(input: {
   return { error: null };
 }
 
+const renameRoleSchema = z.object({
+  roleId: z.string().uuid(),
+  title: z.string().trim().min(1, 'A role needs a name.').max(200),
+});
+
+/**
+ * The inbox's best guess at a title is still a guess, and the ones it could
+ * not read at all are left as "Role from email" -- both are worth overriding
+ * by hand rather than living with.
+ */
+export async function renameRole(roleId: string, title: string): Promise<{ error: string | null }> {
+  const parsed = renameRoleSchema.safeParse({ roleId, title });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('roles')
+    .update({ title: parsed.data.title })
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/today');
+  return { error: null };
+}
+
+const reminderSchema = z.object({
+  applicationId: z.string().uuid(),
+  body: z.string().trim().min(1, 'Say what it is.'),
+  dueAt: z.string().min(1, 'Pick a date.'),
+});
+
+/**
+ * A to-do you set for yourself, not one the sweep raised.
+ *
+ * Same table and the same Nudges section on This week as the automatic
+ * ones — `rule_key` stays null, which is what tells the sweep this one is
+ * not its to manage, so it will not touch or re-fire it.
+ */
+export async function addReminder(input: {
+  applicationId: string;
+  body: string;
+  dueAt: string;
+}): Promise<{ error: string | null }> {
+  const parsed = reminderSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from('reminders').insert({
+    user_id: user.id,
+    application_id: parsed.data.applicationId,
+    kind: 'custom',
+    body: parsed.data.body,
+    due_at: new Date(parsed.data.dueAt).toISOString(),
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/today');
+  return { error: null };
+}
+
 export async function saveInterview(
   interviewId: string,
   patch: {
     prepNotes?: string;
-    debrief?: string;
-    wentWell?: string;
-    wentPoorly?: string;
+    notes?: string;
     status?: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
   },
 ): Promise<{ error: string | null }> {
@@ -72,9 +142,7 @@ export async function saveInterview(
 
   const update: Record<string, unknown> = {};
   if (patch.prepNotes !== undefined) update.prep_notes = patch.prepNotes || null;
-  if (patch.debrief !== undefined) update.debrief = patch.debrief || null;
-  if (patch.wentWell !== undefined) update.went_well = patch.wentWell || null;
-  if (patch.wentPoorly !== undefined) update.went_poorly = patch.wentPoorly || null;
+  if (patch.notes !== undefined) update.notes = patch.notes || null;
   if (patch.status !== undefined) update.status = patch.status;
 
   const { error } = await supabase
@@ -85,5 +153,75 @@ export async function saveInterview(
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+const addInterviewSchema = z.object({
+  applicationId: z.string().uuid(),
+  round: z.number().int().min(1),
+  kind: z.enum([
+    'recruiter_screen',
+    'hiring_manager',
+    'technical',
+    'case',
+    'panel',
+    'onsite',
+    'final',
+    'informal',
+  ]),
+  scheduledAt: z.string().min(1, 'Pick a date.'),
+});
+
+/**
+ * A round the inbox never saw mail about -- a phone screen nobody emailed
+ * you the invite for, or the same case with `deleteInterview`: a round the
+ * inbox saw twice.
+ */
+export async function addInterview(input: {
+  applicationId: string;
+  round: number;
+  kind: string;
+  scheduledAt: string;
+}): Promise<{ error: string | null }> {
+  const parsed = addInterviewSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from('interviews').insert({
+    user_id: user.id,
+    application_id: parsed.data.applicationId,
+    round: parsed.data.round,
+    kind: parsed.data.kind,
+    scheduled_at: parsed.data.scheduledAt,
+  });
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/today');
+  return { error: null };
+}
+
+/** The inbox read one scheduling thread as two rounds; this is how you say so. */
+export async function deleteInterview(interviewId: string): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(interviewId);
+  if (!parsed.success) return { error: 'That is not an interview.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('interviews')
+    .delete()
+    .eq('id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/today');
   return { error: null };
 }

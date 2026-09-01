@@ -20,7 +20,7 @@ export default function HomePage() {
             aria-hidden
           />
           <span className="font-display text-[15px] font-semibold tracking-tight">
-            Shopping Manager
+            Personal Dashboard
           </span>
         </div>
         <nav className="flex items-center gap-2">
@@ -39,7 +39,7 @@ export default function HomePage() {
             You already own two of these.
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted">
-            Shopping Manager reads your order confirmations and turns them into a picture of
+            Personal Dashboard reads your order confirmations and turns them into a picture of
             what you own and what you spend. Not a delivery tracker — a way to stop buying the
             same thing twice.
           </p>
@@ -107,7 +107,7 @@ export default function HomePage() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-2 px-6 py-6 text-[13px] text-ink-muted">
-          <span>Shopping Manager</span>
+          <span>Personal Dashboard</span>
           <nav className="flex gap-4">
             <Link href="/privacy" className="hover:text-ink">
               Privacy

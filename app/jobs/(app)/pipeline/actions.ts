@@ -54,10 +54,11 @@ export async function moveApplication(
 
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
-  // The company page shows the same statuses and can now set them, so it has
-  // to be revalidated too -- otherwise a change made there appears to do
-  // nothing until something else forces a refresh.
+  // The company page and the role page itself both show this status and can
+  // now set it, so they have to be revalidated too -- otherwise a change made
+  // there appears to do nothing until something else forces a refresh.
   revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/today');
   return { error: null };
 }

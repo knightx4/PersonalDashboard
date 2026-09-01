@@ -95,3 +95,12 @@ export async function loadCompanies(
     domains: (row.domains as string[]) ?? [],
   }));
 }
+
+/** The user's own additions to the ignored-sender list. See excluded_senders. */
+export async function loadExcludedDomains(
+  supabase: AppSupabaseClient,
+  userId: string,
+): Promise<string[]> {
+  const { data } = await supabase.from('excluded_senders').select('domain').eq('user_id', userId);
+  return (data ?? []).map((row) => row.domain as string);
+}

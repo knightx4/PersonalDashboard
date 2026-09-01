@@ -15,7 +15,7 @@ import Link from 'next/link';
  */
 export const metadata = {
   title: 'Privacy',
-  description: 'What Shopping Manager reads, what it stores, and what it never keeps.',
+  description: 'What Personal Dashboard reads, what it stores, and what it never keeps.',
 };
 
 const LAST_UPDATED = '26 July 2026';
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
       <p className="!text-ink-faint">Last updated {LAST_UPDATED}</p>
 
       <p>
-        Shopping Manager helps you see what you already own and what you spend. To do that it
+        Personal Dashboard helps you see what you already own and what you spend. To do that it
         can, with your permission, read purchase-related messages in your email. This page
         explains exactly what it reads, what it keeps, and what it never keeps.
       </p>
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
       <h2>Who we are</h2>
       <p>
         {/* TODO: replace with the real legal entity and address before verification. */}
-        Shopping Manager is operated by <strong>[TODO: legal entity name]</strong>. You can
+        Personal Dashboard is operated by <strong>[TODO: legal entity name]</strong>. You can
         reach us at <strong>[TODO: contact email]</strong>.
       </p>
 
@@ -228,6 +228,14 @@ export default function PrivacyPage() {
 
       <h2>Limited Use</h2>
       <p>
+        {/*
+          Left as "Shopping Manager" deliberately: this is the app name Google
+          has on file from OAuth consent screen registration and brand
+          verification, and this clause is what a reviewer checks it against.
+          Rename it here only after renaming the registration itself in
+          Google Cloud Console -- changing the two independently is worse
+          than the current name being stale.
+        */}
         Shopping Manager&rsquo;s use and transfer of information received from Google APIs
         adheres to the{' '}
         <a

@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
-import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { SOURCE_LABELS, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { RoleDetailPanels } from './panels';
+import { RoleTitle } from './role-title';
 
 export const metadata = { title: 'Role' };
 
@@ -18,10 +19,13 @@ export const metadata = { title: 'Role' };
  */
 export default async function RoleDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string; interview?: string }>;
 }) {
   const { id } = await params;
+  const { tab, interview: focusInterviewId } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -61,7 +65,7 @@ export default async function RoleDetailPage({
   const current = (applications ?? [])[0];
   if (!current) notFound();
 
-  const [{ data: events }, { data: interviews }, { data: answers }, { data: notes }, { data: messages }, { data: profile }] =
+  const [{ data: events }, { data: interviews }, { data: answers }, { data: notes }, { data: messages }, { data: profile }, { data: reminders }] =
     await Promise.all([
       supabase
         .from('application_events')
@@ -72,7 +76,7 @@ export default async function RoleDetailPage({
         .order('occurred_at', { ascending: false }),
       supabase
         .from('interviews')
-        .select('id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, debrief, went_well, went_poorly, questions_asked')
+        .select('id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes, questions_asked')
         .eq('application_id', current.id)
         .order('round', { ascending: true }),
       supabase
@@ -95,6 +99,12 @@ export default async function RoleDetailPage({
         .eq('resulting_application_id', current.id)
         .order('received_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+      supabase
+        .from('reminders')
+        .select('id, body, due_at')
+        .eq('application_id', current.id)
+        .is('completed_at', null)
+        .order('due_at', { ascending: true }),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -117,7 +127,7 @@ export default async function RoleDetailPage({
   return (
     <>
       <PageHeader
-        title={role.title as string}
+        title={<RoleTitle roleId={role.id as string} title={role.title as string} />}
         description={
           <>
             <Link href={`/jobs/companies/${company.slug}`} className="hover:text-brand">
@@ -130,7 +140,7 @@ export default async function RoleDetailPage({
         }
         actions={
           <div className="flex items-center gap-2">
-            <StatusBadge status={current.status as ApplicationStatus} />
+            <StatusPicker applicationId={current.id as string} status={current.status as ApplicationStatus} />
             {role.jd_url && (
               <a
                 href={role.jd_url as string}
@@ -195,6 +205,8 @@ export default async function RoleDetailPage({
         jdText={(role.jd_text as string) ?? ''}
         requirements={requirements}
         timezone={timezone}
+        initialTab={tab === 'interviews' ? 'interviews' : undefined}
+        focusInterviewId={focusInterviewId ?? null}
         events={(events ?? []).map((event) => ({
           id: event.id as string,
           kind: event.kind as string,
@@ -214,9 +226,7 @@ export default async function RoleDetailPage({
           format: interview.format as string | null,
           status: interview.status as string,
           prepNotes: (interview.prep_notes as string) ?? '',
-          debrief: (interview.debrief as string) ?? '',
-          wentWell: (interview.went_well as string) ?? '',
-          wentPoorly: (interview.went_poorly as string) ?? '',
+          notes: (interview.notes as string) ?? '',
           questionsAsked: (interview.questions_asked as string[]) ?? [],
         }))}
         answers={(answers ?? []).map((answer) => {
@@ -243,6 +253,11 @@ export default async function RoleDetailPage({
           body: note.body as string,
           pinned: note.pinned as boolean,
           createdAt: note.created_at as string,
+        }))}
+        todos={(reminders ?? []).map((reminder) => ({
+          id: reminder.id as string,
+          body: reminder.body as string,
+          dueAt: reminder.due_at as string,
         }))}
         messages={(messages ?? []).map((message) => ({
           id: message.id as string,

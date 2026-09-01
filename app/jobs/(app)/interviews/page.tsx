@@ -15,7 +15,7 @@ export default async function InterviewsPage() {
     supabase
       .from('interviews')
       .select(
-        'id, round, kind, scheduled_at, format, status, went_well, went_poorly, applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, round, kind, scheduled_at, format, status, notes, applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', user.id)
       .order('scheduled_at', { ascending: false }),
@@ -31,8 +31,7 @@ export default async function InterviewsPage() {
     scheduled_at: string | null;
     format: string | null;
     status: string;
-    went_well: string | null;
-    went_poorly: string | null;
+    notes: string | null;
     applications: { id: string; roles: { id: string; title: string; companies: { name: string } } };
   };
 
@@ -96,7 +95,7 @@ export default async function InterviewsPage() {
  * Split into upcoming and past. Outside the component because reading the clock
  * during render gives a different answer on every re-render.
  */
-function splitByTime<T extends { scheduled_at: string | null; went_well: string | null; went_poorly: string | null }>(
+function splitByTime<T extends { scheduled_at: string | null; notes: string | null }>(
   rows: T[],
 ): { upcoming: T[]; past: T[]; needDebrief: T[] } {
   const now = Date.now();
@@ -106,7 +105,7 @@ function splitByTime<T extends { scheduled_at: string | null; went_well: string 
   const past = rows.filter(
     (row) => row.scheduled_at === null || new Date(row.scheduled_at).getTime() < now,
   );
-  return { upcoming, past, needDebrief: past.filter((row) => !row.went_well && !row.went_poorly) };
+  return { upcoming, past, needDebrief: past.filter((row) => !row.notes) };
 }
 
 function Section({
@@ -122,8 +121,7 @@ function Section({
     scheduled_at: string | null;
     format: string | null;
     status: string;
-    went_well: string | null;
-    went_poorly: string | null;
+    notes: string | null;
     applications: { id: string; roles: { id: string; title: string; companies: { name: string } } };
   }>;
   timezone: string;
@@ -165,7 +163,7 @@ function Section({
                 <td className="tabular px-2 py-1.5 text-ink-muted">{row.round}</td>
                 <td className="px-2 py-1.5 text-ink-muted">{row.kind.replace(/_/g, ' ')}</td>
                 <td className="px-2 py-1.5 text-ink-faint">
-                  {row.went_well || row.went_poorly ? 'written' : '—'}
+                  {row.notes ? 'written' : '—'}
                 </td>
               </tr>
             ))}

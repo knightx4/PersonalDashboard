@@ -809,6 +809,8 @@ export interface IngestContext {
   timezone: string | null;
   companies: CompanyDomainHit[];
   candidates: LinkCandidate[];
+  /** The user's own additions to the ignored-sender list; see excluded_senders. */
+  excludedDomains: string[];
   counters: IngestCounters;
 }
 
@@ -868,6 +870,7 @@ export async function linkEnvelopes(
       replyToAddress: envelope.replyToAddress,
       subject: envelope.subject,
       companies: ctx.companies,
+      excludedDomains: ctx.excludedDomains,
     });
     ctx.counters.messagesClassified += 1;
 
@@ -922,6 +925,7 @@ export async function linkEnvelopes(
         subject: message.subject,
         bodyPreview: message.text.slice(0, 2000),
         companies: ctx.companies,
+        excludedDomains: ctx.excludedDomains,
       });
 
       await handleMessage(supabase, ctx, {

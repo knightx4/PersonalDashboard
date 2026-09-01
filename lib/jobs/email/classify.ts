@@ -51,6 +51,13 @@ export interface ClassifyInput {
   /** First ~2000 chars of plaintext. Ephemeral; never persisted. */
   bodyPreview?: string | null;
   companies?: readonly CompanyDomainHit[];
+  /**
+   * The user's own additions to the ignored-sender list, on top of the
+   * built-in one (Indeed). Unlike Indeed, a domain here is not blanket-noise
+   * for everyone -- it is noise for this mailbox specifically, so it lives on
+   * the profile rather than in code.
+   */
+  excludedDomains?: readonly string[];
 }
 
 export interface ClassifyResult {
@@ -344,8 +351,18 @@ export function classifyMessage(input: ClassifyInput): ClassifyResult {
 
   // Ignored senders before anything else, including before job alerts: this is
   // "never mine", not "mine but uninteresting", and it should not spend a
-  // single pattern match or reach the queue in any form.
-  if (isIgnoredSender(fromDomain) || isIgnoredSender(replyDomain)) {
+  // single pattern match or reach the queue in any form. The user's own
+  // additions are checked the same way as the built-in ones.
+  const excludedDomains = (input.excludedDomains ?? []).map((d) => d.toLowerCase());
+  const userExcluded = (domain: string | null) =>
+    domain !== null &&
+    excludedDomains.some((excluded) => domain === excluded || domain.endsWith(`.${excluded}`));
+  if (
+    isIgnoredSender(fromDomain) ||
+    isIgnoredSender(replyDomain) ||
+    userExcluded(fromDomain) ||
+    userExcluded(replyDomain)
+  ) {
     return { ...result('not_relevant'), tier: 'A' };
   }
 

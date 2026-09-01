@@ -70,7 +70,7 @@ export function SkipGmailForm() {
 
 export function FinishOnboardingForm({
   label = 'Go to dashboard',
-  next = '/shopping/dashboard',
+  next = '/home',
 }: {
   label?: string;
   next?: string;

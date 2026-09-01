@@ -20,13 +20,13 @@ export default function TermsPage() {
       <p className="!text-ink-faint">Last updated {LAST_UPDATED}</p>
 
       <p>
-        These terms cover your use of Shopping Manager. By creating an account you agree to
+        These terms cover your use of Personal Dashboard. By creating an account you agree to
         them.
       </p>
 
       <h2>What the service does</h2>
       <p>
-        Shopping Manager collects your purchase records — from your email if you connect an
+        Personal Dashboard collects your purchase records — from your email if you connect an
         inbox, or from what you enter yourself — and presents them as an inventory and a
         spending summary. It does not sell anything, does not process payments, and never has
         access to your payment methods.

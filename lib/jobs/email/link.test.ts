@@ -374,6 +374,54 @@ describe('the acceptance criteria', () => {
       }
     });
 
+    it('falls back to the sender domain when the body named nobody and there is no hint', () => {
+      // The shape behind note 766498c3: a written-interview email from
+      // delano.henry@canonical.com, extraction came back empty, and the
+      // message sat held with "could not work out which company this is
+      // about" even though the sender's own domain said exactly who it was.
+      const decision = decideLink(
+        message({
+          threadId: null,
+          fromAddress: 'Delano Henry <delano.henry@canonical.com>',
+          replyToAddress: null,
+          subject: 'Written interview for Financial Analyst role at Canonical',
+          classification: 'assessment',
+          extractedCompany: null,
+          extractedRole: null,
+          companyHint: null,
+        }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      expect(decision.action).toBe('create_inferred_application');
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toEqual({ kind: 'new', name: 'Canonical', domain: 'canonical.com' });
+      }
+    });
+
+    it('does not invent a company from a cold-outreach sender domain', () => {
+      // Unlike an assessment or confirmation, outreach can come from a
+      // recruiting agency's own domain -- trusting it would misattribute the
+      // message to the agency rather than holding it for a human to sort out.
+      const decision = decideLink(
+        message({
+          threadId: null,
+          fromAddress: 'sam@harrisonwilde.com',
+          replyToAddress: null,
+          subject: 'Are you open to a conversation?',
+          classification: 'recruiter_outreach',
+          extractedCompany: null,
+          extractedRole: null,
+          companyHint: null,
+        }),
+        [],
+        { companies: [], now: new Date('2026-04-06T10:00:00Z') },
+      );
+
+      expect(decision.action).toBe('hold');
+    });
+
     it('leaves a name from the body spelled the way the sender spelled it', () => {
       const decision = decideLink(
         message({ threadId: null, extractedCompany: 'iRobot' }),

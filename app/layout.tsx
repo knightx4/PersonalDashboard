@@ -9,11 +9,11 @@ const instrument = Instrument_Sans({ variable: '--font-instrument', subsets: ['l
 
 export const metadata: Metadata = {
   title: {
-    default: 'Shopping Manager',
-    template: '%s · Shopping Manager',
+    default: 'Personal Dashboard',
+    template: '%s · Personal Dashboard',
   },
   description:
-    'Know what you already own, what you spent, and what you were about to buy again.',
+    'What you own, what you spent, and where your job search stands, in one account.',
 };
 
 /**

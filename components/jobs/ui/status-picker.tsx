@@ -18,8 +18,17 @@ import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
  * `ghosted` is missing on purpose: it is worked out from silence, and the
  * action refuses it. Offering an option that always errors is worse than not
  * offering it.
+ *
+ * `submitted` is missing too, on purpose: it and `acknowledged` share a
+ * label and a column on the board, so offering both here would be two
+ * identical-looking options. Picking "Submitted" writes `acknowledged`.
  */
-const SETTABLE = APPLICATION_STATUSES.filter((status) => status !== 'ghosted');
+const SETTABLE = APPLICATION_STATUSES.filter((status) => status !== 'ghosted' && status !== 'submitted');
+
+/** `submitted` and `acknowledged` are one option here; see SETTABLE above. */
+function displayStatus(status: ApplicationStatus): ApplicationStatus {
+  return status === 'submitted' ? 'acknowledged' : status;
+}
 
 export function StatusPicker({
   applicationId,
@@ -34,7 +43,7 @@ export function StatusPicker({
   const [error, setError] = useState<string | null>(null);
   // Optimistic, so the select does not snap back to the old value while the
   // server round trip and the revalidation happen.
-  const [shown, setShown] = useState<ApplicationStatus>(status);
+  const [shown, setShown] = useState<ApplicationStatus>(displayStatus(status));
 
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>

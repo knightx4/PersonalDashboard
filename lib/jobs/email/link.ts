@@ -443,14 +443,26 @@ export function companyForMessage(
   // subdomain, which is the company's own name by construction.
   const extracted = usableCompanyName(input.extractedCompany);
   const hinted = usableCompanyName(input.companyHint);
-  if (!extracted && !hinted) return null;
+  const domain = employerDomain(input);
+  // A domain-derived name is trusted only for mail that presupposes an
+  // application: that mail could only exist because you already applied
+  // somewhere, so the sender's own domain is the employer's -- the extractor
+  // failing to name them in the body is not a reason to hold a written
+  // interview from delano.henry@canonical.com. Cold outreach gets no such
+  // trust: an agency's own domain is not the employer's, and guessing one
+  // from it is worse than holding the message.
+  const domainName =
+    !extracted && !hinted && PRESUPPOSES_APPLICATION.has(input.classification)
+      ? usableCompanyName(domain)
+      : null;
+  if (!extracted && !hinted && !domainName) return null;
 
   // A subdomain is lowercase by construction, and "ramp" reads as a typo on a
   // page full of properly cased names. A name from the body is left exactly as
   // the sender wrote it, because they know how it is spelled.
-  const name = extracted ?? titleCaseSlug(hinted!);
+  const name = extracted ?? (hinted ? titleCaseSlug(hinted) : domainName!);
 
-  return { kind: 'new', name, domain: employerDomain(input) };
+  return { kind: 'new', name, domain };
 }
 
 function titleCaseSlug(value: string): string {

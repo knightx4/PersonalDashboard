@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
 import { addEvidence, addResumeVersion, deleteEvidence } from './evidence-actions';
+import { addExcludedSender, removeExcludedSender } from './sender-actions';
 
 export function SettingsView(props: {
   email: string;
@@ -27,6 +28,7 @@ export function SettingsView(props: {
   };
   accounts: InboxAccount[];
   resumes: Array<{ id: string; label: string; isDefault: boolean; notes: string | null }>;
+  excludedSenders: Array<{ id: string; domain: string }>;
   evidence: Array<{
     id: string;
     title: string;
@@ -59,6 +61,7 @@ export function SettingsView(props: {
         gmailConfigured={props.gmailConfigured}
       />
       <BookmarkletSection appOrigin={props.appOrigin} />
+      <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
       <EvidenceSection evidence={props.evidence} />
       <DangerSection />
@@ -443,6 +446,60 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
         Only Greenhouse publishes its application questions to an API, so for every other vendor
         this is the way in. The paste box on any role always works too.
       </p>
+    </section>
+  );
+}
+
+function ExcludedSendersSection({
+  excludedSenders,
+}: {
+  excludedSenders: Array<{ id: string; domain: string }>;
+}) {
+  const [state, action] = useActionState(addExcludedSender, {});
+  const [, startTransition] = useTransition();
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-5">
+      <h2 className="text-sm font-semibold text-ink">Excluded senders</h2>
+      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
+        Mail from Indeed is already excluded everywhere for everyone — it is suggested jobs, not
+        anything you applied to. Add a domain here for anything else that keeps showing up as a
+        lead it should not be, like a job board or a newsletter.
+      </p>
+
+      {excludedSenders.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {excludedSenders.map((entry) => (
+            <li key={entry.id} className="flex items-center gap-2 text-[13px]">
+              <span className="tabular text-ink">{entry.domain}</span>
+              <button
+                type="button"
+                className="ml-auto text-ink-faint hover:text-status-rejected"
+                onClick={() =>
+                  startTransition(async () => {
+                    await removeExcludedSender(entry.id);
+                  })
+                }
+                aria-label={`Stop excluding ${entry.domain}`}
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.75} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1">
+          <Label htmlFor="domain">Domain</Label>
+          <Input id="domain" name="domain" placeholder="jobs.example.com" />
+        </div>
+        <Button type="submit" size="sm" variant="secondary">
+          Exclude
+        </Button>
+      </form>
+      {state.error && <p className="mt-2 text-[13px] text-status-rejected">{state.error}</p>}
+      {state.message && <p className="mt-2 text-[13px] text-status-offer">{state.message}</p>}
     </section>
   );
 }

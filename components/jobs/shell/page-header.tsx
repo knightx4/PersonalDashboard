@@ -3,7 +3,8 @@ export function PageHeader({
   description,
   actions,
 }: {
-  title: string;
+  /** Node, not string: the role page puts an editable field here. */
+  title: React.ReactNode;
   /** Node, not string: several pages put a company link in the subtitle. */
   description?: React.ReactNode;
   actions?: React.ReactNode;

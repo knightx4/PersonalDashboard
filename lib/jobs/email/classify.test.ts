@@ -163,6 +163,31 @@ describe('board digests stay out of the review queue', () => {
       expect(result.classification).toBe('job_alert');
     }
   });
+
+  it('drops a sender the user added to their own exclusion list', () => {
+    // LinkedIn cannot be excluded outright: real recruiter InMail and "5 jobs
+    // for you" share a domain. This is the per-user escape hatch for it.
+    const result = classifyMessage({
+      fromAddress: 'jobs-noreply@linkedin.com',
+      subject: '5 jobs for you: Senior Financial Analyst and more',
+      bodyPreview: 'Jobs matching your profile.',
+      companies: COMPANIES,
+      excludedDomains: ['linkedin.com'],
+    });
+    expect(result.classification).toBe('not_relevant');
+    expect(result.tier).toBe('A');
+  });
+
+  it('leaves a sender alone when it is not on the exclusion list', () => {
+    const result = classifyMessage({
+      fromAddress: 'jobs-noreply@linkedin.com',
+      subject: '5 jobs for you: Senior Financial Analyst and more',
+      bodyPreview: 'Jobs matching your profile.',
+      companies: COMPANIES,
+      excludedDomains: ['some-other-board.com'],
+    });
+    expect(result.classification).not.toBe('not_relevant');
+  });
 });
 
 describe('a known ATS domain never implies relevance on its own', () => {
