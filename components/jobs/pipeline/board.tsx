@@ -37,7 +37,15 @@ export const STALE_DAYS = 14;
 /** Closed pursuits live in one shared column so the live board stays readable. */
 const CLOSED: readonly ApplicationStatus[] = ['rejected', 'withdrawn', 'ghosted', 'role_closed'];
 
-export function PipelineBoard({ rows }: { rows: PipelineRow[] }) {
+export type PipelineView = 'board' | 'list';
+
+export function PipelineBoard({
+  rows,
+  view = 'board',
+}: {
+  rows: PipelineRow[];
+  view?: PipelineView;
+}) {
   const [optimistic, setOptimistic] = useState<Record<string, ApplicationStatus>>({});
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<ApplicationStatus | null>(null);
@@ -82,9 +90,62 @@ export function PipelineBoard({ rows }: { rows: PipelineRow[] }) {
         </p>
       )}
 
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div
+        className={cn(
+          view === 'board' ? 'flex gap-3 overflow-x-auto pb-2' : 'flex flex-col gap-2',
+        )}
+      >
         {COLUMNS.map((column) => {
           const columnRows = rows.filter((row) => statusOf(row) === column.status);
+
+          // The vertical view is a stack of collapsible groups rather than a
+          // row of columns: on a phone the board shows one and a half columns
+          // of a seven-column board, which is a horizontal scroll through
+          // something you wanted to read top to bottom. Empty groups collapse
+          // to a single line instead of a column of white space.
+          if (view === 'list') {
+            return (
+              <details
+                key={column.status}
+                open={columnRows.length > 0}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setOver(column.status);
+                }}
+                onDragLeave={() =>
+                  setOver((current) => (current === column.status ? null : current))
+                }
+                onDrop={() => drop(column.status)}
+                className={cn(
+                  'rounded-card border border-border bg-canvas transition-colors duration-150',
+                  over === column.status && 'border-brand bg-brand-tint',
+                )}
+              >
+                <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
+                  <span className="text-[13px] font-semibold text-ink">{column.label}</span>
+                  <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
+                  {column.hint && (
+                    <span className="text-[11px] text-ink-faint">{column.hint}</span>
+                  )}
+                </summary>
+                <div className="space-y-2 px-2 pb-2">
+                  {columnRows.map((row) => (
+                    <Card
+                      key={row.applicationId}
+                      row={row}
+                      dragging={dragging === row.applicationId}
+                      onDragStart={() => setDragging(row.applicationId)}
+                      onDragEnd={() => setDragging(null)}
+                    />
+                  ))}
+                  {columnRows.length === 0 && (
+                    <p className="px-1.5 py-2 text-[12px] text-ink-faint">Nothing here</p>
+                  )}
+                </div>
+              </details>
+            );
+          }
+
           return (
             <section
               key={column.status}

@@ -3,7 +3,8 @@ import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import Link from 'next/link';
-import { PipelineBoard, STALE_DAYS } from '@/components/jobs/pipeline/board';
+import { PipelineBoard, STALE_DAYS, type PipelineView } from '@/components/jobs/pipeline/board';
+import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
@@ -46,10 +47,13 @@ export default async function PipelinePage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [rows, inboxCount] = await Promise.all([
+  const [rows, inboxCount, { data: profile }] = await Promise.all([
     loadPipeline(supabase, user.id),
     countConnectedInboxes(core, user.id),
+    supabase.from('profiles').select('pipeline_view').eq('id', user.id).maybeSingle(),
   ]);
+
+  const view: PipelineView = profile?.pipeline_view === 'list' ? 'list' : 'board';
 
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
   const excitement = params.excitement ? Number(params.excitement) : null;
@@ -107,6 +111,7 @@ export default async function PipelinePage({
         actions={
           <>
             <SearchField />
+            <PipelineViewToggle view={view} />
             <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
               Add a role
             </Link>
@@ -184,7 +189,7 @@ export default async function PipelinePage({
         </LeftRail>
 
         <div className="min-w-0 flex-1">
-          <PipelineBoard rows={filtered} />
+          <PipelineBoard rows={filtered} view={view} />
         </div>
       </div>
     </>

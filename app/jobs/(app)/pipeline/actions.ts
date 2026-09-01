@@ -216,3 +216,28 @@ async function deleteCompanyIfOrphaned(
 
   await supabase.from('companies').delete().eq('id', companyId).eq('user_id', userId);
 }
+
+/**
+ * Which shape to draw the pipeline in.
+ *
+ * Stored on the profile rather than in the URL: the board is reached by a link
+ * from another page, so a query parameter would forget the choice every time,
+ * and this is a standing preference rather than a filter.
+ */
+export async function setPipelineView(
+  view: 'board' | 'list',
+): Promise<{ error: string | null }> {
+  if (view !== 'board' && view !== 'list') return { error: 'Unknown view.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ pipeline_view: view })
+    .eq('id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/pipeline');
+  return { error: null };
+}
