@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
-import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { SOURCE_LABELS, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -130,7 +130,7 @@ export default async function RoleDetailPage({
         }
         actions={
           <div className="flex items-center gap-2">
-            <StatusBadge status={current.status as ApplicationStatus} />
+            <StatusPicker applicationId={current.id as string} status={current.status as ApplicationStatus} />
             {role.jd_url && (
               <a
                 href={role.jd_url as string}
