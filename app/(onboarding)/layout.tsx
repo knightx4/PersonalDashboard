@@ -28,7 +28,7 @@ export default async function OnboardingLayout({
             aria-hidden
           />
           <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
-            Shopping Manager
+            Personal Dashboard
           </span>
         </Link>
         <form action={signOut}>

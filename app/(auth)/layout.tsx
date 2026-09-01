@@ -13,7 +13,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           aria-hidden
         />
         <span className="font-display text-base font-semibold tracking-tight text-ink">
-          Shopping Manager
+          Personal Dashboard
         </span>
       </Link>
 

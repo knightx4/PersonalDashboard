@@ -15,7 +15,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
               aria-hidden
             />
             <span className="font-display text-sm font-semibold tracking-tight">
-              Shopping Manager
+              Personal Dashboard
             </span>
           </Link>
         </div>

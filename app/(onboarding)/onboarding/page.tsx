@@ -72,7 +72,7 @@ export default async function OnboardingPage({
     // Failed connect while aiming for "done" — send them back to the consent step.
     redirect(`/onboarding?step=gmail&inbox=${encodeURIComponent(params.inbox)}`);
   } else if (!(await onboardingNeeded(supabase, core, user)) && step !== 'done' && !params.inbox) {
-    redirect('/shopping/dashboard');
+    redirect('/home');
   }
 
   return (
@@ -107,7 +107,7 @@ export default async function OnboardingPage({
               Know what you own before you buy it again
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-              Shopping Manager turns order confirmations into inventory and a spending picture.
+              Personal Dashboard turns order confirmations into inventory and a spending picture.
               It is not a delivery tracker and never handles payment.
             </p>
           </div>
@@ -240,7 +240,7 @@ export default async function OnboardingPage({
                 <Link href="/shopping/settings#inboxes" className={buttonVariants()}>
                   Import from Settings
                 </Link>
-                <Link href="/shopping/dashboard" className={buttonVariants({ variant: 'secondary' })}>
+                <Link href="/home" className={buttonVariants({ variant: 'secondary' })}>
                   Go to dashboard
                 </Link>
               </>

@@ -48,9 +48,8 @@ export async function completeOnboarding(
 
   if (error) return { error };
 
-  const nextRaw = String(formData.get('next') ?? '/shopping/dashboard');
-  const next =
-    nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/shopping/dashboard';
+  const nextRaw = String(formData.get('next') ?? '/home');
+  const next = nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/home';
 
   revalidatePath('/', 'layout');
   redirect(next);
