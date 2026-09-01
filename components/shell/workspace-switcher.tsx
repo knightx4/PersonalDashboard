@@ -39,11 +39,21 @@ const WORKSPACES = [
 
 export type WorkspaceId = (typeof WORKSPACES)[number]['id'];
 
-export function WorkspaceSwitcher({ current }: { current: WorkspaceId }) {
+/**
+ * `current: null` is the home page: neither workspace is active, so the
+ * button shows a neutral mark and "Home" rather than defaulting to one
+ * module's own gradient and name.
+ */
+const HOME = {
+  label: 'Home',
+  gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-ink-muted) 100%)',
+} as const;
+
+export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const active = WORKSPACES.find((w) => w.id === current) ?? WORKSPACES[0];
+  const active = current === null ? HOME : (WORKSPACES.find((w) => w.id === current) ?? WORKSPACES[0]);
 
   useEffect(() => {
     if (!open) return;

@@ -3,6 +3,8 @@ import { Briefcase, ShoppingBag } from 'lucide-react';
 import { requireUser, createClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
+import { FeedbackButton } from '@/components/shell/feedback-button';
+import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 
 export const metadata = { title: 'Home' };
 
@@ -19,7 +21,7 @@ export default async function HomePage() {
   const supabase = await createClient();
   const jobs = await createJobsClient();
 
-  const [{ count: itemCount }, { count: pursuitCount }] = await Promise.all([
+  const [{ count: itemCount }, { count: pursuitCount }, { data: profile }] = await Promise.all([
     supabase
       .from('inventory_items')
       .select('id', { count: 'exact', head: true })
@@ -29,26 +31,48 @@ export default async function HomePage() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`),
+    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
   ]);
 
-  return (
-    <div className="mx-auto min-h-dvh max-w-3xl px-4 py-12 sm:px-6">
-      <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Home</h1>
+  const displayName = profile?.display_name ?? null;
+  const initial = (displayName || user.email || '').charAt(0).toUpperCase();
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <ModuleCard
-          href="/shopping/dashboard"
-          icon={ShoppingBag}
-          title="Shopping"
-          stat={`${itemCount ?? 0} item${itemCount === 1 ? '' : 's'} tracked`}
-        />
-        <ModuleCard
-          href="/jobs/today"
-          icon={Briefcase}
-          title="Job search"
-          stat={`${pursuitCount ?? 0} open pursuit${pursuitCount === 1 ? '' : 's'}`}
-        />
-      </div>
+  return (
+    <div className="min-h-full">
+      <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
+          <WorkspaceSwitcher current={null} />
+          <div className="flex-1" />
+          <FeedbackButton />
+          <Link
+            href="/shopping/settings"
+            className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[13px] font-semibold text-brand"
+            title={displayName ?? user.email ?? ''}
+          >
+            {initial}
+            <span className="sr-only">Account and settings</span>
+          </Link>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Home</h1>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <ModuleCard
+            href="/shopping/dashboard"
+            icon={ShoppingBag}
+            title="Shopping"
+            stat={`${itemCount ?? 0} item${itemCount === 1 ? '' : 's'} tracked`}
+          />
+          <ModuleCard
+            href="/jobs/today"
+            icon={Briefcase}
+            title="Job search"
+            stat={`${pursuitCount ?? 0} open pursuit${pursuitCount === 1 ? '' : 's'}`}
+          />
+        </div>
+      </main>
     </div>
   );
 }
