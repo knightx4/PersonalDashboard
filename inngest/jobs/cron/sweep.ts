@@ -20,7 +20,7 @@ import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type SweepSummary = { ghosted: number; reminders: number };
+export type SweepSummary = { ghosted: number; closedLeads: number; reminders: number };
 
 export async function runJobSweep(): Promise<SweepSummary> {
   const supabase = createServiceSupabase();
@@ -30,8 +30,96 @@ export async function runJobSweep(): Promise<SweepSummary> {
   });
   if (error) throw new Error(error.message);
 
+  const closedLeads = await closeColdLeads(supabase);
   const reminders = await generateReminders(supabase);
-  return { ghosted: ghosted ?? 0, reminders };
+  return { ghosted: ghosted ?? 0, closedLeads, reminders };
+}
+
+/**
+ * How long an untouched lead sits on the board before it is let go.
+ *
+ * Twice the ghost threshold, because a lead is a weaker thing than an
+ * application: nothing was sent, so there is nothing to be waiting on, and a
+ * recruiter who resurfaces after six weeks is not unusual. At the default that
+ * is sixty days.
+ */
+export function coldLeadCutoffDays(ghostThresholdDays: number): number {
+  return ghostThresholdDays * 2;
+}
+
+/**
+ * Leads nobody ever took up.
+ *
+ * Ghosting deliberately skips `lead` and `drafting` -- those describe your own
+ * inaction rather than theirs, and the derivation has a test saying so. But
+ * left alone they never close either, so inbound outreach from four months ago
+ * sat in the first column of the board forever.
+ *
+ * Closed by writing the `withdrawal` event a person would write, rather than
+ * by teaching the derivation a new rule. The status then follows from the
+ * event log exactly as it does for a withdrawal you made yourself -- there is
+ * still one definition of what `withdrawn` means, and the timeline says who
+ * closed it and why.
+ */
+async function closeColdLeads(
+  supabase: ReturnType<typeof createServiceSupabase>,
+): Promise<number> {
+  const { data: candidates } = await supabase
+    .from('applications')
+    .select('id, user_id, created_at, profiles!inner ( ghost_threshold_days )')
+    .in('status', ['lead', 'drafting'])
+    .limit(500);
+
+  type Row = {
+    id: string;
+    user_id: string;
+    created_at: string;
+    profiles: { ghost_threshold_days: number | null };
+  };
+
+  const rows = (candidates ?? []) as unknown as Row[];
+  if (rows.length === 0) return 0;
+
+  const { data: activity } = await supabase
+    .from('application_events')
+    .select('application_id, kind, occurred_at')
+    .in(
+      'application_id',
+      rows.map((row) => row.id),
+    )
+    .order('occurred_at', { ascending: false });
+
+  const lastAt = new Map<string, string>();
+  const alreadyClosed = new Set<string>();
+  for (const event of activity ?? []) {
+    const id = event.application_id as string;
+    if (!lastAt.has(id)) lastAt.set(id, event.occurred_at as string);
+    // Idempotent: a second withdrawal on the same row would be noise in the
+    // timeline and would not change the status it already produced.
+    if (event.kind === 'withdrawal') alreadyClosed.add(id);
+  }
+
+  let closed = 0;
+  const now = Date.now();
+
+  for (const row of rows) {
+    if (alreadyClosed.has(row.id)) continue;
+    const cutoff = coldLeadCutoffDays(row.profiles.ghost_threshold_days ?? 30);
+    const last = new Date(lastAt.get(row.id) ?? row.created_at).getTime();
+    if (now - last <= cutoff * DAY_MS) continue;
+
+    const { error } = await supabase.from('application_events').insert({
+      user_id: row.user_id,
+      application_id: row.id,
+      kind: 'withdrawal',
+      occurred_at: new Date().toISOString(),
+      source: 'system',
+      summary: `Closed after ${cutoff} days with nothing sent and no further contact. Move it back if it is still live.`,
+    });
+    if (!error) closed += 1;
+  }
+
+  return closed;
 }
 
 /**
