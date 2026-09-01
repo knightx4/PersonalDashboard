@@ -22,6 +22,11 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { slugify } from '@/lib/jobs/slug';
 import { extractWithModel, reconcileClassification } from '@/lib/jobs/inbox/tier-b';
+import {
+  inboundMayMove,
+  inferredApplicationNeedsReview,
+  unappliedEventNeedsReview,
+} from '@/lib/jobs/review/flagging';
 import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
 import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
 
@@ -125,9 +130,9 @@ function transitionIsLegal(
   kind: ReturnType<typeof eventKindFor>,
 ): boolean {
   if (kind === null) return true;
-  if (!isTerminal(currentStatus)) return true;
-  // Nothing reopens a terminal application from the inbox.
-  return false;
+  // Nothing reopens a *decided* application from the inbox. A ghosting is not
+  // a decision -- see inboundMayMove.
+  return inboundMayMove(currentStatus);
 }
 
 async function currentStatus(
@@ -234,7 +239,10 @@ async function writeEvent(
         : {}),
       scheduled_at: scheduledAt,
     },
-    needs_review: !legal,
+    // Flagged only when it is worth a look: forward-moving mail landing on a
+    // pursuit the app believes is closed means the app is probably wrong. A
+    // second rejection is an echo, and an echo is not a decision.
+    needs_review: !legal && unappliedEventNeedsReview(kind),
   });
 
   if (!legal) return;
@@ -460,6 +468,8 @@ async function createInferredApplication(
     asLead: boolean;
     /** What the pursuit was inferred from, for the seed event's summary. */
     seededBy?: MessageClassification;
+    /** Whether opening this is a judgement only the user can make. */
+    needsReview: boolean;
   },
 ): Promise<{ applicationId: string; adopted: boolean } | null> {
   const title = opts.roleTitle?.trim() || 'Role from email';
@@ -507,9 +517,11 @@ async function createInferredApplication(
       role_id: role.id,
       source: opts.asLead ? 'recruiter_inbound' : 'portal',
       created_by: 'email_inferred',
-      // Always flagged. An unreviewed inferred row is still visible; an
-      // unflagged wrong one silently corrupts the funnel.
-      needs_review: true,
+      // Flagged only where there is something to decide -- see
+      // lib/jobs/review/flagging. Everything created here stays visible and
+      // editable whether or not it is flagged; the flag is what claims your
+      // attention, and claiming it for all of them meant claiming it for none.
+      needs_review: opts.needsReview,
       submitted_at: opts.asLead ? null : (opts.receivedAt?.toISOString() ?? null),
     })
     .select('id')
@@ -531,7 +543,10 @@ async function createInferredApplication(
       // confirmation that is a guess -- so the summary says which message it
       // came from rather than implying the send date is known.
       summary: SEED_SUMMARY[opts.seededBy ?? 'application_confirmation'],
-      needs_review: true,
+      // Provenance, not a decision. The application row carries the review
+      // flag if there is anything to decide; flagging its own seed event as
+      // well only doubled the queue with rows that ask nothing.
+      needs_review: false,
     });
   }
 
@@ -746,6 +761,9 @@ async function handleMessage(
   await applyDecision(supabase, ctx, {
     message,
     classification,
+    // The evidence, not just the conclusion: whether a deterministic rule or a
+    // model settled this is what decides if the row needs your eyes.
+    tierA,
     tierB: tierB.extracted,
     decision,
     coreId,
@@ -761,13 +779,14 @@ async function applyDecision(
   input: {
     message: FetchedMessage;
     classification: MessageClassification;
+    tierA: ClassifyResult;
     tierB: ExtractedMessage | null;
     decision: LinkDecision;
     coreId: string;
     invite: InviteInterview | null;
   },
 ): Promise<void> {
-  const { message, classification, tierB, decision, coreId, invite } = input;
+  const { message, classification, tierA, tierB, decision, coreId, invite } = input;
 
   const ledger = async (
     parseStatus: 'parsed' | 'needs_review' | 'failed',
@@ -862,6 +881,13 @@ async function applyDecision(
         receivedAt: message.internalDate,
         asLead: false,
         seededBy: classification,
+        needsReview: inferredApplicationNeedsReview({
+          path: 'application',
+          classification,
+          tier: tierA.tier,
+          ats: tierA.ats,
+          companyKind: decision.company.kind,
+        }),
       });
 
       if (!created) {
@@ -908,6 +934,13 @@ async function applyDecision(
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
         asLead: true,
+        needsReview: inferredApplicationNeedsReview({
+          path: 'lead',
+          classification,
+          tier: tierA.tier,
+          ats: tierA.ats,
+          companyKind: decision.company.kind,
+        }),
       });
 
       if (!lead) {
