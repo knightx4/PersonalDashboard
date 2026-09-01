@@ -76,7 +76,7 @@ export default async function RoleDetailPage({
         .order('occurred_at', { ascending: false }),
       supabase
         .from('interviews')
-        .select('id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, debrief, went_well, went_poorly, questions_asked')
+        .select('id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes, questions_asked')
         .eq('application_id', current.id)
         .order('round', { ascending: true }),
       supabase
@@ -226,9 +226,7 @@ export default async function RoleDetailPage({
           format: interview.format as string | null,
           status: interview.status as string,
           prepNotes: (interview.prep_notes as string) ?? '',
-          debrief: (interview.debrief as string) ?? '',
-          wentWell: (interview.went_well as string) ?? '',
-          wentPoorly: (interview.went_poorly as string) ?? '',
+          notes: (interview.notes as string) ?? '',
           questionsAsked: (interview.questions_asked as string[]) ?? [],
         }))}
         answers={(answers ?? []).map((answer) => {

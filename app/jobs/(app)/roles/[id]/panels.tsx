@@ -21,10 +21,10 @@ import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { addQuestions, promoteToCanonical, saveAnswer } from '../actions';
-import { addNote, addReminder, saveInterview } from './actions';
+import { addInterview, addNote, addReminder, deleteInterview, saveInterview } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
-import { Input, Label } from '@/components/ui/field';
+import { Input, Label, Select } from '@/components/ui/field';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -65,9 +65,7 @@ export interface PanelProps {
     format: string | null;
     status: string;
     prepNotes: string;
-    debrief: string;
-    wentWell: string;
-    wentPoorly: string;
+    notes: string;
     questionsAsked: string[];
   }>;
   answers: Array<{
@@ -590,26 +588,25 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
   );
 }
 
-function Interviews({ interviews, timezone, focusInterviewId }: PanelProps) {
-  if (interviews.length === 0) {
-    return (
-      <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
-        No interviews yet. They appear here when a scheduling email arrives, or you can add one by
-        hand from the interviews page.
-      </p>
-    );
-  }
-
+function Interviews({ interviews, applicationId, timezone, focusInterviewId }: PanelProps) {
   return (
     <div className="space-y-3">
-      {interviews.map((interview) => (
-        <InterviewCard
-          key={interview.id}
-          interview={interview}
-          timezone={timezone}
-          focused={interview.id === focusInterviewId}
-        />
-      ))}
+      {interviews.length === 0 ? (
+        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+          No interviews yet. They appear here when a scheduling email arrives, or you can add one
+          below.
+        </p>
+      ) : (
+        interviews.map((interview) => (
+          <InterviewCard
+            key={interview.id}
+            interview={interview}
+            timezone={timezone}
+            focused={interview.id === focusInterviewId}
+          />
+        ))
+      )}
+      <AddInterview applicationId={applicationId} nextRound={interviews.length + 1} />
     </div>
   );
 }
@@ -624,13 +621,13 @@ function InterviewCard({
   timezone: string;
 }) {
   const [prep, setPrep] = useState(interview.prepNotes);
-  const [wentWell, setWentWell] = useState(interview.wentWell);
-  const [wentPoorly, setWentPoorly] = useState(interview.wentPoorly);
+  const [notes, setNotes] = useState(interview.notes);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ref = useRef<HTMLElement>(null);
 
-  const needsDebrief = interview.isPast && !wentWell && !wentPoorly;
+  const needsDebrief = interview.isPast && !notes;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
@@ -662,7 +659,7 @@ function InterviewCard({
         </p>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
             Prep
@@ -671,20 +668,11 @@ function InterviewCard({
         </div>
         <div>
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Went well
+            Interview notes
           </label>
-          <Textarea rows={4} value={wentWell} onChange={(e) => setWentWell(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Went poorly
-          </label>
-          <Textarea rows={4} value={wentPoorly} onChange={(e) => setWentPoorly(e.target.value)} />
+          <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>
-      <p className="mt-1 text-[11px] text-ink-faint">
-        Two boxes, not one: a single box gets written as a paragraph and never reread.
-      </p>
 
       {interview.questionsAsked.length > 0 && (
         <div className="mt-3">
@@ -706,11 +694,7 @@ function InterviewCard({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const result = await saveInterview(interview.id, {
-                prepNotes: prep,
-                wentWell,
-                wentPoorly,
-              });
+              const result = await saveInterview(interview.id, { prepNotes: prep, notes });
               setSaved(result.error ?? 'Saved.');
             })
           }
@@ -718,6 +702,124 @@ function InterviewCard({
           Save notes
         </Button>
         {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        <span className="ml-auto">
+          {confirmingDelete ? (
+            <span className="flex items-center gap-2">
+              <span className="text-[12px] text-ink-muted">Delete this round?</span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => startTransition(() => void deleteInterview(interview.id))}
+                className="press text-[12px] font-medium text-status-rejected"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                className="text-[12px] text-ink-faint hover:text-ink"
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="text-[12px] text-ink-faint underline underline-offset-2 hover:text-status-rejected"
+            >
+              Not a real round — remove it
+            </button>
+          )}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The other half of "I don't know why it says 2 separate rounds": the inbox
+ * sometimes reads one scheduling back-and-forth as two, and the fix used to
+ * require filing a bug. Now it's the button above. This is its mirror --
+ * adding a round the inbox never saw at all, a phone screen nobody emailed
+ * about.
+ */
+function AddInterview({ applicationId, nextRound }: { applicationId: string; nextRound: number }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState('recruiter_screen');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-[13px] text-ink-muted hover:border-brand hover:text-brand"
+      >
+        Add a round
+      </button>
+    );
+  }
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <Label htmlFor="interview-kind">Kind</Label>
+          <Select
+            id="interview-kind"
+            value={kind}
+            onChange={(event) => setKind(event.target.value)}
+            className="w-48"
+          >
+            <option value="recruiter_screen">Recruiter screen</option>
+            <option value="hiring_manager">Hiring manager</option>
+            <option value="technical">Technical</option>
+            <option value="case">Case study</option>
+            <option value="panel">Panel</option>
+            <option value="onsite">Onsite</option>
+            <option value="final">Final</option>
+            <option value="informal">Informal</option>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="interview-when">When</Label>
+          <Input
+            id="interview-when"
+            type="datetime-local"
+            value={scheduledAt}
+            onChange={(event) => setScheduledAt(event.target.value)}
+          />
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || !scheduledAt}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await addInterview({
+                applicationId,
+                round: nextRound,
+                kind,
+                scheduledAt: new Date(scheduledAt).toISOString(),
+              });
+              if (result.error) {
+                setError(result.error);
+              } else {
+                setOpen(false);
+                setScheduledAt('');
+              }
+            })
+          }
+        >
+          Add round {nextRound}
+        </Button>
+        <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-ink-faint hover:text-ink">
+          Cancel
+        </button>
+        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
       </div>
     </section>
   );
