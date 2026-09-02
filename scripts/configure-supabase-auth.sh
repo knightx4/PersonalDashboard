@@ -10,14 +10,21 @@
 #
 # Optional overrides:
 #   PROJECT_REF=asjztutnqxbecruvyrbj
-#   SITE_URL=https://shopping.selveyknight.com
+#   SITE_URL=https://dash.selveyknight.com
 #   EXTRA_REDIRECTS='https://other.example/auth/callback'
 #
 set -euo pipefail
 
 PROJECT_REF="${PROJECT_REF:-asjztutnqxbecruvyrbj}"
-SITE_URL="${SITE_URL:-https://shopping.selveyknight.com}"
-VERCEL_URL="${VERCEL_URL:-https://shopping-manager-amber.vercel.app}"
+SITE_URL="${SITE_URL:-https://dash.selveyknight.com}"
+
+# Every hostname the app is reachable on has to be on the allow-list, because
+# Supabase silently falls back to Site URL for any `redirectTo` that is not --
+# and a Site URL whose DNS record has been retired is how "a server with the
+# specified hostname could not be found" appears *after* a successful Google
+# consent. The wildcards cover Vercel's generated aliases (which change
+# whenever the project is renamed) so a rename cannot break sign-in again.
+VERCEL_PATTERNS="${VERCEL_PATTERNS:-https://*-knightx4s-projects.vercel.app/**,https://personal-dashboard*.vercel.app/**}"
 
 die() { printf '\n\033[31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 
@@ -26,17 +33,17 @@ die() { printf '\n\033[31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 REDIRECTS="$(
   node -e "
     const site = process.env.SITE_URL;
-    const vercel = process.env.VERCEL_URL;
-    const extra = (process.env.EXTRA_REDIRECTS || '')
-      .split(/[,\s]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const split = (value) =>
+      (value || '')
+        .split(/[,\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
     const urls = [
       site + '/auth/callback',
       site + '/**',
-      vercel + '/auth/callback',
+      ...split(process.env.VERCEL_PATTERNS),
       'http://localhost:3000/auth/callback',
-      ...extra,
+      ...split(process.env.EXTRA_REDIRECTS),
     ];
     process.stdout.write([...new Set(urls)].join(','));
   "

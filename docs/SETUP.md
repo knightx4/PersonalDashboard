@@ -191,16 +191,29 @@ Or set them in the dashboard under **Authentication → URL Configuration**:
 
 | Field | Value |
 |---|---|
-| Site URL | `https://shopping.selveyknight.com` |
-| Redirect URLs | `https://shopping.selveyknight.com/auth/callback` |
-| | `https://shopping.selveyknight.com/**` |
-| | `https://shopping-manager-amber.vercel.app/auth/callback` |
+| Site URL | `https://dash.selveyknight.com` |
+| Redirect URLs | `https://dash.selveyknight.com/auth/callback` |
+| | `https://dash.selveyknight.com/**` |
+| | `https://*-knightx4s-projects.vercel.app/**` |
+| | `https://personal-dashboard*.vercel.app/**` |
 | | `http://localhost:3000/auth/callback` |
 
-> **If Google sign-in dumps you on `localhost:3000`**, Site URL is still the
-> Supabase default. Change it to the production URL above and save — Supabase
-> falls back to Site URL whenever the `redirectTo` is missing from the allow
-> list.
+> **Supabase falls back to Site URL whenever the `redirectTo` is missing from
+> the allow list**, and both ways that goes wrong look nothing like a redirect
+> problem:
+>
+> - **Google sign-in dumps you on `localhost:3000`** — Site URL is still the
+>   Supabase default. Set it to the production URL above.
+> - **"A server with the specified hostname could not be found" after the
+>   Google consent screen** — Site URL names a hostname that no longer has a
+>   DNS record. This is what a domain rename does: the old subdomain is retired
+>   at the DNS provider, Supabase keeps sending users to it, and the browser
+>   fails to resolve it *after* a successful sign-in. Point Site URL at the
+>   current domain and re-run the script.
+>
+> The two wildcard entries exist so that Vercel's generated aliases — which
+> change every time the project is renamed — stay on the allow list without
+> anyone remembering to add them.
 
 ### Google sign-in (optional)
 

@@ -1,5 +1,6 @@
 import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User, Wallet } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { requestOrigin } from '@/lib/auth/origin';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPeople } from '@/lib/people/load';
 import { PageHeader } from '@/components/shell/page-header';
@@ -210,6 +211,7 @@ export default async function SettingsPage({
             <InboxSection
               accounts={accounts ?? []}
               bannerCode={params.inbox}
+              appOrigin={await requestOrigin()}
               latestJobs={latestJobs}
               people={people}
             />

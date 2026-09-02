@@ -24,7 +24,10 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'Error',
 };
 
-function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; text: string } | null {
+function inboxBanner(
+  code: string | undefined,
+  appOrigin: string,
+): { tone: 'ok' | 'warn' | 'err'; text: string } | null {
   switch (code) {
     case 'connected':
       return {
@@ -36,7 +39,7 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'no_refresh':
       return {
         tone: 'warn',
-        text: 'Google did not issue a refresh token. Disconnect Shopping Manager under Google Account → Security → Third-party access, then connect again.',
+        text: 'Google did not issue a refresh token. Disconnect Personal Dashboard under Google Account → Security → Third-party access, then connect again.',
       };
     case 'scope_denied':
       return {
@@ -56,7 +59,10 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'exchange':
       return {
         tone: 'err',
-        text: 'Google rejected the token exchange. Confirm the OAuth client redirect URI is exactly https://shopping.selveyknight.com/api/auth/gmail/callback',
+        // Named from the live origin rather than hardcoded: after a domain
+        // rename the hardcoded one sends you to check a URI the app no longer
+        // uses, which is the opposite of what this message is for.
+        text: `Google rejected the token exchange. Confirm the OAuth client redirect URI is exactly ${appOrigin}/api/auth/gmail/callback`,
       };
     case 'profile':
       return {
@@ -90,16 +96,18 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
 export function InboxSection({
   accounts,
   bannerCode,
+  appOrigin,
   latestJobs = {},
   people = [],
 }: {
   accounts: Account[];
   bannerCode?: string;
+  appOrigin: string;
   latestJobs?: Record<string, InboxSyncProgress | null>;
   people?: Person[];
 }) {
   const configured = isGmailOAuthConfigured();
-  const banner = inboxBanner(bannerCode);
+  const banner = inboxBanner(bannerCode, appOrigin);
 
   return (
     <section id="inboxes" className="scroll-mt-6">

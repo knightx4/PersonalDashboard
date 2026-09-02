@@ -17,7 +17,7 @@
 set -euo pipefail
 
 SUPABASE="npx --yes supabase@latest"
-PROJECT_NAME="${PROJECT_NAME:-shopping-manager}"
+PROJECT_NAME="${PROJECT_NAME:-personal-dashboard}"
 REGION="${REGION:-us-east-1}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
