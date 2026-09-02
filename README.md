@@ -31,6 +31,10 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
 next body of work.
 
+A fourth workspace — **Todo**, the things you have to do, merged across the
+other three and outside all of them — is specified but not built:
+[docs/TODO-SPEC.md](docs/TODO-SPEC.md), build order steps 24–30.
+
 | | |
 |---|---|
 | Schema, RLS, seeds | done |

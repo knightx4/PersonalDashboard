@@ -103,6 +103,42 @@ called `vault`, which is Supabase's own — see the head of the migration.
 23. ✅ **Connect UI.** `/vault/settings` — connect, disconnect, sync now, reauth
     banner on an expired PAT. Near-copy of the Gmail connection panel.
 
+### Todo — the fourth workspace
+
+Specified in full in [TODO-SPEC.md](TODO-SPEC.md), built in none of it yet.
+Seven steps, in this order, and none of them depends on 19. The module is
+worth having after step 25 and is only *interesting* from 27 on.
+
+The thing the spec is really about is the one rule everything else follows from:
+an obligation is displayed by whoever needs to show it and written by whoever
+owns it. The todo module owns the tasks you typed into it, and about a job
+reminder, a return deadline or a checkbox in a note it stores one thing only --
+that you dismissed it. No import job, no second copy, no write-back into the
+vault.
+
+24. **Schema and the isolation test.** New `todo` schema in
+    `supabase/migrations-todo/`, applied last by `db-reset.sh` because its
+    foreign keys point into the other three. RLS on all three tables and the
+    cross-user isolation test **before any feature code** -- the same rule as
+    steps 2 and 20. `todo` also joins the exposed-schemas assertion.
+25. **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
+    snooze, due dates, pinned. Fourth entry in `WORKSPACES`. Zero integration,
+    and already worth having.
+26. **Links and the inline sections.** `todo.task_links` -- real cross-schema
+    foreign keys, one parent from six, the shape `job_search.notes` already
+    uses. A Tasks section on the role, company, contact and interview pages and
+    on a note.
+27. **The job lane.** Reminders on the agenda with the follow-up composer
+    intact (`fd33268` applies here with full force), completion writing through
+    to `job_search.reminders`, interviews as day context rather than as items.
+28. **The note lane.** One generated column on `obsidian.notes` so finding open
+    checkboxes is an index rather than a scan, the read-only lane, and
+    promotion -- the only way a line in a note becomes a task you own.
+29. **The shopping lane.** `orders.return_deadline` within the horizon. Last
+    because it is the thinnest.
+30. **`/home`.** The top slice of the agenda on the front door, which currently
+    shows two counts and no reason to visit.
+
 ### Ordering notes worth respecting
 
 - Step 2 before step 4, so a missing policy surfaces immediately.
@@ -117,6 +153,11 @@ called `vault`, which is Supabase's own — see the head of the migration.
   connection row inserted by hand is enough to develop against.
 - The vault block (20–23) is independent of 19. Either order is fine, and
   neither blocks the other.
+- Step 24 before 25, for the third time and the same reason. Steps 27, 28 and
+  29 are independent of each other and can land in any order; 26 comes before
+  all three only because the inline sections are what make a merged agenda feel
+  like part of the app rather than a page beside it. Step 28 needs the vault
+  (20–23) shipped; it is the only cross-block dependency in the file.
 
 ## Open questions, still open
 
@@ -145,6 +186,10 @@ household one is worth deciding before launch rather than after.
 - **Vault scope, size and freshness.** Three open questions specific to the
   vault, kept in [VAULT-SPEC.md](VAULT-SPEC.md) rather than duplicated here.
   None blocks steps 20–23.
+- **Whether the note lane earns its place.** The most interesting of the todo
+  module's integrations and the most likely to be noise. Four more, specific to
+  it, are kept in [TODO-SPEC.md](TODO-SPEC.md) rather than duplicated here.
+  None blocks steps 24–30.
 - **Whether Promotions actually contains order confirmations** in practice.
   Measure recall both ways on a real mailbox before hardcoding either behaviour.
   The exclusion is a config flag, default off.
