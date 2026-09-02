@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authorizeCron, requestOrigin } from '@/inngest/cron/authorize';
 import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
+import { runVaultSyncForAll } from '@/inngest/vault/sync';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -10,10 +11,14 @@ export const maxDuration = 300;
 /**
  * Everything scheduled, behind one cron.
  *
- * Two stages now rather than three: there is one inbox sync, shared by both
- * workspaces, and then the job sweep. Their order is the point -- a message
- * that arrived this morning has to be ingested before anything is judged to
- * have gone quiet.
+ * Three stages: one inbox sync shared by both workspaces, then the job sweep,
+ * then the vault. The first two are ordered and the order is the point -- a
+ * message that arrived this morning has to be ingested before anything is
+ * judged to have gone quiet.
+ *
+ * The vault goes last because it is the newest and least proven, and because
+ * nothing reads it yet: its freshness buys nothing today, and it must not be
+ * what delays a stage that does matter.
  *
  * Each stage is isolated. A failure in one is reported and the rest still run,
  * because the alternative is that a broken job inbox silently stops the
@@ -30,6 +35,7 @@ export async function GET(request: NextRequest) {
   const stages: Stage[] = [
     { name: 'inbox', run: () => runInboxIncrementalSync(origin) },
     { name: 'jobs-sweep', run: () => runJobSweep() },
+    { name: 'vault', run: () => runVaultSyncForAll() },
   ];
 
   const results: Record<string, unknown> = {};

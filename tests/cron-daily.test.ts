@@ -103,9 +103,19 @@ vi.mock('@/inngest/cron/inbox', () => ({
 vi.mock('@/inngest/jobs/cron/sweep', () => ({
   runJobSweep: vi.fn(async () => ({ ghosted: 3, reminders: 2 })),
 }));
+vi.mock('@/inngest/vault/sync', () => ({
+  runVaultSyncForAll: vi.fn(async () => ({
+    connections: 1,
+    synced: 1,
+    notesWritten: 4,
+    notesDeleted: 0,
+    failed: [],
+  })),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
+const { runVaultSyncForAll } = await import('@/inngest/vault/sync');
 
 function cronRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -145,5 +155,10 @@ describe('the daily cron route', () => {
     expect(runJobSweep).toHaveBeenCalled();
     expect(body.results['jobs-sweep']).toEqual({ ghosted: 3, reminders: 2 });
     expect(body.results['inbox']).toEqual({ error: 'inbox exploded' });
+
+    // Same again for the vault, which is last and therefore the stage most
+    // easily lost to an earlier failure.
+    expect(runVaultSyncForAll).toHaveBeenCalled();
+    expect(body.results['vault']).toMatchObject({ synced: 1, notesWritten: 4 });
   });
 });

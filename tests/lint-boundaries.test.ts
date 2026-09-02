@@ -50,6 +50,10 @@ const ATS_IMPORT = `import { fetchPosting } from '@/lib/jobs/ats/greenhouse';
 export const handler = fetchPosting;
 `;
 
+const VAULT_PROVIDER_IMPORT = `import { GithubVaultSource } from '@/lib/vault/providers/github';
+export const source = GithubVaultSource;
+`;
+
 const MONEY_SYNTAX = `export const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 `;
 
@@ -83,6 +87,28 @@ describe('the ATS boundary', () => {
 
   it('still applies inside the exempted cron routes', () => {
     expect(lint('app/api/cron/__boundary_probe.ts', ATS_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+});
+
+describe('the vault provider boundary', () => {
+  it('blocks the GitHub source from a page', () => {
+    expect(lint('app/__boundary_probe.ts', VAULT_PROVIDER_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+
+  it('blocks it from a component', () => {
+    expect(lint('components/__boundary_probe.ts', VAULT_PROVIDER_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+
+  it('still applies inside the exempted cron routes', () => {
+    // The cron may hold the service-role client; it still must not know the
+    // vault is in git. Those are separate privileges and only one is granted.
+    expect(lint('app/api/cron/__boundary_probe.ts', VAULT_PROVIDER_IMPORT)).toMatch(
       /no-restricted-imports/,
     );
   });
