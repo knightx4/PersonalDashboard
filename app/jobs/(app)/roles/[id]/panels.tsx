@@ -48,6 +48,7 @@ import {
   saveInterview,
   searchUnlinkedMessages,
   shareCasePage,
+  unlinkMessage,
   unshareCasePage,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
@@ -1965,20 +1966,23 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                       ` (${Math.round(message.linkConfidence * 100)}%)`}
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    {INTERVIEW_MAIL.has(message.classification) && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onAddInterview({
-                            kind: 'recruiter_screen',
-                            fromSubject: message.subject,
-                          })
-                        }
-                        className="whitespace-nowrap text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
-                      >
-                        Add interview
-                      </button>
-                    )}
+                    <span className="inline-flex items-center gap-3">
+                      {INTERVIEW_MAIL.has(message.classification) && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onAddInterview({
+                              kind: 'recruiter_screen',
+                              fromSubject: message.subject,
+                            })
+                          }
+                          className="whitespace-nowrap text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+                        >
+                          Add interview
+                        </button>
+                      )}
+                      <UnlinkMessage messageId={message.id} applicationId={applicationId} />
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -1990,6 +1994,49 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "Not this pursuit." The message returns to the review queue with the events
+ * it wrote here removed, so the status stops being derived from mail this role
+ * no longer claims. Confirmed first: it is the one row action that changes the
+ * timeline.
+ */
+function UnlinkMessage({
+  messageId,
+  applicationId,
+}: {
+  messageId: string;
+  applicationId: string;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      {error && <span className="text-[11px] text-status-rejected">{error}</span>}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (
+            !window.confirm(
+              'Unlink this email? It goes back to the review queue, and anything it added to this timeline is removed.',
+            )
+          ) {
+            return;
+          }
+          startTransition(async () => {
+            const result = await unlinkMessage(messageId, applicationId);
+            setError(result.error);
+          });
+        }}
+        className="whitespace-nowrap text-[12px] text-ink-faint underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
+      >
+        {pending ? 'Unlinking…' : 'Unlink'}
+      </button>
+    </span>
   );
 }
 

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { linkMessage } from '@/app/jobs/(app)/review/actions';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/link-candidates';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchRequirements } from '@/lib/jobs/evidence/match';
@@ -94,6 +95,140 @@ export async function renameRole(roleId: string, title: string): Promise<{ error
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/today');
+  return { error: null };
+}
+
+const moveRoleSchema = z.object({
+  roleId: z.string().uuid(),
+  companyName: z.string().trim().min(1, 'Which company is this?').max(200),
+});
+
+/**
+ * Put a role under the company it actually belongs to.
+ *
+ * The linker attributes mail by sender domain, and a shared ATS domain or a
+ * forwarded thread lands a pursuit under the wrong name often enough that
+ * "delete it and start again" was the only remedy — which throws away the
+ * timeline and every linked message with it. Moving the role keeps all of it.
+ *
+ * The company is resolved by name the same way creating a role resolves it, so
+ * a company that is not on file yet is created rather than blocking the move.
+ */
+export async function moveRoleToCompany(
+  roleId: string,
+  companyName: string,
+): Promise<{ error: string | null; slug: string | null }> {
+  const parsed = moveRoleSchema.safeParse({ roleId, companyName });
+  if (!parsed.success) return { error: parsed.error.issues[0].message, slug: null };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const company = await ensureCompany(supabase, user.id, parsed.data.companyName);
+  if (company.error) return { error: company.error, slug: null };
+
+  const { error } = await supabase
+    .from('roles')
+    .update({ company_id: company.id })
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id);
+
+  if (error) {
+    // (user_id, company_id, jd_hash) is unique: the same posting is already
+    // filed under the company being moved to.
+    return {
+      error:
+        error.code === '23505'
+          ? 'That company already has this same posting. Merge the two from the company page instead.'
+          : error.message,
+      slug: null,
+    };
+  }
+
+  const { data: moved } = await supabase
+    .from('companies')
+    .select('slug')
+    .eq('id', company.id)
+    .maybeSingle();
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/today');
+  return { error: null, slug: (moved?.slug as string) ?? null };
+}
+
+const unlinkSchema = z.object({
+  messageId: z.string().uuid(),
+  applicationId: z.string().uuid(),
+});
+
+/**
+ * "This email is not about this pursuit."
+ *
+ * The message goes back to the review queue rather than being thrown away, and
+ * every event it wrote here goes with it — leaving those behind would keep the
+ * status derived from mail this role no longer claims. The pair is remembered
+ * as declined so the same suggestion does not immediately offer itself again.
+ */
+export async function unlinkMessage(
+  messageId: string,
+  applicationId: string,
+): Promise<{ error: string | null }> {
+  const parsed = unlinkSchema.safeParse({ messageId, applicationId });
+  if (!parsed.success) return { error: 'That is not an unlinkable pair.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: message } = await supabase
+    .from('inbox_messages')
+    .select('id, user_id')
+    .eq('id', parsed.data.messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!message) return { error: 'That message is no longer in the mailbox.' };
+
+  // Events first: while the message still points at the application, a failure
+  // here leaves the link intact rather than a pursuit whose timeline has
+  // quietly lost its evidence.
+  const { error: eventsError } = await supabase
+    .from('application_events')
+    .delete()
+    .eq('ingested_message_id', parsed.data.messageId)
+    .eq('application_id', parsed.data.applicationId)
+    .eq('user_id', user.id);
+
+  if (eventsError) return { error: eventsError.message };
+
+  const { error } = await supabase
+    .from('ingested_messages')
+    .update({
+      resulting_application_id: null,
+      parse_status: 'needs_review',
+      link_method: null,
+      link_confidence: null,
+      error: 'Unlinked by hand from the role page.',
+    })
+    .eq('id', parsed.data.messageId);
+
+  if (error) return { error: error.message };
+
+  await supabase.from('message_link_dismissals').upsert(
+    {
+      user_id: user.id,
+      application_id: parsed.data.applicationId,
+      message_id: parsed.data.messageId,
+    },
+    { onConflict: 'application_id,message_id' },
+  );
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/pipeline');
   return { error: null };
 }
 

@@ -20,6 +20,7 @@ import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
+import { RoleCompany } from './role-company';
 
 export const metadata = { title: 'Role' };
 
@@ -88,6 +89,7 @@ export default async function RoleDetailPage({
     { data: companyContacts },
     { data: bank },
     { data: caseLetter },
+    { data: allCompanies },
   ] = await Promise.all([
       supabase
         .from('application_events')
@@ -160,6 +162,8 @@ export default async function RoleDetailPage({
         .eq('application_id', current.id)
         .eq('user_id', user.id)
         .maybeSingle(),
+      // Every company on file, to move this role to the right one by name.
+      supabase.from('companies').select('name').eq('user_id', user.id).order('name'),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -195,9 +199,12 @@ export default async function RoleDetailPage({
         title={<RoleTitle roleId={role.id as string} title={role.title as string} />}
         description={
           <>
-            <Link href={`/jobs/companies/${company.slug}`} className="hover:text-brand">
-              {company.name}
-            </Link>
+            <RoleCompany
+              roleId={role.id as string}
+              name={company.name}
+              slug={company.slug}
+              companies={(allCompanies ?? []).map((row) => row.name as string)}
+            />
             {role.location ? ` · ${role.location}` : ''}
             {role.work_mode ? ` · ${role.work_mode}` : ''}
             {role.seniority ? ` · ${role.seniority}` : ''}
