@@ -167,7 +167,7 @@ function ProfileSection({
             placeholder="Direct. Specific numbers. No throat-clearing. British spelling."
           />
           <p className="mt-1 text-[11px] text-ink-faint">
-            Injected into every generated draft in Phase 2. Revise it whenever one comes back
+            Injected into every generated draft. Revise it whenever one comes back
             wrong.
           </p>
         </div>
