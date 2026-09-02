@@ -235,10 +235,15 @@ export async function updateRole(
   patch: {
     title?: string;
     jdText?: string | null;
+    jdUrl?: string | null;
+    atsJobId?: string | null;
     location?: string | null;
     workMode?: string | null;
     postingStatus?: string | null;
     seniority?: string | null;
+    compMinCents?: number | null;
+    compMaxCents?: number | null;
+    compSource?: 'posted' | 'recruiter' | 'estimate' | null;
   },
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
@@ -250,6 +255,11 @@ export async function updateRole(
   if (patch.workMode !== undefined) update.work_mode = patch.workMode || null;
   if (patch.postingStatus !== undefined) update.posting_status = patch.postingStatus;
   if (patch.seniority !== undefined) update.seniority = patch.seniority;
+  if (patch.jdUrl !== undefined) update.jd_url = patch.jdUrl || null;
+  if (patch.atsJobId !== undefined) update.ats_job_id = patch.atsJobId || null;
+  if (patch.compMinCents !== undefined) update.comp_min_cents = patch.compMinCents;
+  if (patch.compMaxCents !== undefined) update.comp_max_cents = patch.compMaxCents;
+  if (patch.compSource !== undefined) update.comp_source = patch.compSource;
   if (patch.jdText !== undefined) {
     const text = patch.jdText?.trim() || null;
     update.jd_text = text;
@@ -257,6 +267,19 @@ export async function updateRole(
     // Requirements are extracted once per JD; changing the JD re-extracts.
     update.requirements = text ? extractRequirements(text) : null;
     update.requirements_extracted_at = text ? new Date().toISOString() : null;
+
+    // Fill the comp band from the posting text itself -- but only when the
+    // extraction actually found one, and only when this same call is not
+    // already setting comp by hand. A JD with no visible range should not
+    // erase a number pulled from a call with the recruiter.
+    if (text && patch.compMinCents === undefined && patch.compMaxCents === undefined) {
+      const comp = extractCompBand(text);
+      if (comp) {
+        update.comp_min_cents = comp.minCents;
+        update.comp_max_cents = comp.maxCents;
+        update.comp_source = 'posted';
+      }
+    }
   }
 
   const { error } = await supabase

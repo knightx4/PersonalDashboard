@@ -225,6 +225,11 @@ export default async function RoleDetailPage({
         roleId={role.id as string}
         applicationId={current.id as string}
         jdText={(role.jd_text as string) ?? ''}
+        jdUrl={(role.jd_url as string) ?? null}
+        atsJobId={(role.ats_job_id as string) ?? null}
+        compMinCents={(role.comp_min_cents as number) ?? null}
+        compMaxCents={(role.comp_max_cents as number) ?? null}
+        compSource={(role.comp_source as string) ?? null}
         requirements={requirements}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
