@@ -154,6 +154,31 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.reminders = reminder.id;
 
+  const [excluded] = await admin<{ id: string }[]>`
+    insert into excluded_senders (user_id, domain)
+    values (${userId}, ${`${tag}.example`})
+    returning id`;
+  ids.excluded_senders = excluded.id;
+
+  const [linkDismissal] = await admin<{ id: string }[]>`
+    insert into message_link_dismissals (user_id, application_id, message_id)
+    values (${userId}, ${application.id}, ${message.id})
+    returning id`;
+  ids.message_link_dismissals = linkDismissal.id;
+
+  // The two /jobs/today dismissals: one keyed to an event, one to a pursuit.
+  const [waiting] = await admin<{ id: string }[]>`
+    insert into waiting_dismissals (user_id, application_event_id)
+    values (${userId}, ${event.id})
+    returning id`;
+  ids.waiting_dismissals = waiting.id;
+
+  const [quiet] = await admin<{ id: string }[]>`
+    insert into quiet_dismissals (user_id, application_id)
+    values (${userId}, ${application.id})
+    returning id`;
+  ids.quiet_dismissals = quiet.id;
+
   return ids;
 }
 

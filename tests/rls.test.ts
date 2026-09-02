@@ -108,6 +108,17 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.book_price_quotes = bookQuote.id;
 
+  const [gameQuote] = await admin<{ id: string }[]>`
+    insert into game_price_quotes (bgg_id, source, quoted_cents, vendor_name)
+    values (
+      ${tag === 'alice' ? 13 : 822},
+      'buyback',
+      ${tag === 'alice' ? 1500 : 900},
+      ${`${tag} games`}
+    )
+    returning id`;
+  ids.game_price_quotes = gameQuote.id;
+
   const [use] = await admin<{ id: string }[]>`
     insert into item_uses (inventory_item_id, used_on)
     values (${inventoryItem.id}, current_date) returning id`;
@@ -258,7 +269,11 @@ describe('RLS coverage', () => {
 
 describe('cross-user reads', () => {
   /** Shared market-data tables: every authenticated user may read every row. */
-  const SHARED_REFERENCE_TABLES = new Set(['fx_rates', 'book_price_quotes']);
+  const SHARED_REFERENCE_TABLES = new Set([
+    'fx_rates',
+    'book_price_quotes',
+    'game_price_quotes',
+  ]);
 
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
@@ -298,6 +313,13 @@ describe('cross-user reads', () => {
   it('lets every authenticated user read cached book price quotes', async () => {
     const rows = await asUser(userB, (tx) =>
       tx<{ id: string }[]>`select id from book_price_quotes where id = ${seedA.book_price_quotes}`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets every authenticated user read cached game price quotes', async () => {
+    const rows = await asUser(userB, (tx) =>
+      tx<{ id: string }[]>`select id from game_price_quotes where id = ${seedA.game_price_quotes}`,
     );
     expect(rows).toHaveLength(1);
   });

@@ -78,12 +78,21 @@ describe('coexistence with the commerce app in public', () => {
   );
 
   it.runIf(neighbourPresent)('does not overwrite the neighbour functions', async () => {
-    for (const fn of ['handle_new_user', 'touch_updated_at']) {
+    // Each schema keeps its own copy; none of them clobbers a neighbour's.
+    // `vault` appears for touch_updated_at and not for handle_new_user because
+    // it has updated_at columns but creates nothing on sign-up -- a vault
+    // exists once someone connects a repo, not once they have an account.
+    const owners: Record<string, string[]> = {
+      handle_new_user: [APP_SCHEMA, 'public'],
+      touch_updated_at: [APP_SCHEMA, 'public', 'vault'],
+    };
+
+    for (const [fn, expected] of Object.entries(owners)) {
       const rows = await admin<{ nspname: string }[]>`
         select n.nspname from pg_proc p
         join pg_namespace n on n.oid = p.pronamespace
         where p.proname = ${fn} order by 1`;
-      expect(rows.map((r) => r.nspname), fn).toEqual([APP_SCHEMA, 'public']);
+      expect(rows.map((r) => r.nspname), fn).toEqual(expected);
     }
   });
 
