@@ -1,4 +1,11 @@
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import {
+  atsVendorForDomain,
+  companyHintFromSubdomain,
+  domainFromAddress,
+} from '@/lib/jobs/email/ats-senders';
+import { isBoardVendor } from '@/lib/jobs/ats/detect';
 import { discoverBoard, type CompanyBoardIdentity } from '@/lib/jobs/ats/discover';
 import { hydrate } from '@/lib/jobs/ats/board';
 import { matchPosting, type BoardMatch } from '@/lib/jobs/ats/match';
@@ -43,6 +50,9 @@ export interface JdBackfillSummary {
   closed: number;
   noBoard: number;
 }
+
+/** Messages to look back through when recovering a board hint from mail. */
+const MAIL_LOOKBACK = 50;
 
 /** How long before a role with no description is worth another look. */
 const RETRY_AFTER_DAYS = 14;
@@ -143,6 +153,23 @@ async function backfillCompany(
   const company = roles[0].companies;
   if (!company) return;
 
+  // Ingestion records the ATS sending subdomain from here on, but every
+  // company that predates that has none -- and those are precisely the roles
+  // with no description. Recovering it from the mail already ingested is what
+  // stops the first runs from being reduced to guessing at names.
+  const recalled =
+    !company.ats_board_hint && !company.ats_board_token
+      ? await recallBoardHintFromMail(supabase, roles[0].user_id, company.id)
+      : null;
+
+  if (recalled) {
+    const patch: Record<string, unknown> = { ats_board_hint: recalled.hint };
+    if (!company.ats_type || company.ats_type === 'unknown') patch.ats_type = recalled.vendor;
+    await supabase.from('companies').update(patch).eq('id', company.id);
+    company.ats_board_hint = recalled.hint;
+    if (!company.ats_type || company.ats_type === 'unknown') company.ats_type = recalled.vendor;
+  }
+
   const identity: CompanyBoardIdentity = {
     name: company.name,
     atsType: company.ats_type,
@@ -238,6 +265,73 @@ async function backfillCompany(
     await writePosting(supabase, role, posting, match, trust, now);
     summary.filled += 1;
   }
+}
+
+/**
+ * The ATS sending subdomain, read back out of mail already ingested.
+ *
+ * `ramp.greenhouse.io` in a From header says both that this employer uses
+ * Greenhouse and that their board is probably called `ramp` -- the strongest
+ * pointer at a board that exists anywhere in a mailbox, given that the mail
+ * almost never links to the posting. Classification worked it out for every
+ * message and discarded it, so for every company that predates that being
+ * recorded it has to be recovered rather than waited for.
+ *
+ * Three queries, and only for a company that has neither a hint nor a proven
+ * token. The envelope lives in `core` and the verdict in `job_search`, hence
+ * the second client; ids are shared between the two by design.
+ *
+ * `companyHintFromSubdomain` is the single definition of what counts as a
+ * tenant subdomain rather than the vendor's own infrastructure, which is why
+ * this reads mail through it rather than matching domains in SQL.
+ */
+async function recallBoardHintFromMail(
+  supabase: AppSupabaseClient,
+  userId: string,
+  companyId: string,
+): Promise<{ hint: string; vendor: string } | null> {
+  const { data: applications } = await supabase
+    .from('applications')
+    .select('id, roles!inner ( company_id )')
+    .eq('user_id', userId)
+    .eq('roles.company_id', companyId)
+    .limit(MAIL_LOOKBACK);
+
+  const applicationIds = (applications ?? []).map((row) => row.id as string);
+  if (applicationIds.length === 0) return null;
+
+  const { data: verdicts } = await supabase
+    .from('ingested_messages')
+    .select('id')
+    .in('resulting_application_id', applicationIds)
+    .limit(MAIL_LOOKBACK);
+
+  const messageIds = (verdicts ?? []).map((row) => row.id as string);
+  if (messageIds.length === 0) return null;
+
+  const core = createCoreServiceSupabase();
+  const { data: envelopes } = await core
+    .from('ingested_messages')
+    .select('from_address, reply_to_address, received_at')
+    .in('id', messageIds)
+    // A scrubbed envelope has had its headers removed on purpose. Nothing here
+    // is a reason to go looking at what they used to say.
+    .is('scrubbed_at', null)
+    .order('received_at', { ascending: false })
+    .limit(MAIL_LOOKBACK);
+
+  for (const envelope of envelopes ?? []) {
+    for (const address of [envelope.from_address, envelope.reply_to_address]) {
+      const domain = domainFromAddress(address as string | null);
+      const hint = companyHintFromSubdomain(domain);
+      if (!hint) continue;
+      const vendor = atsVendorForDomain(domain);
+      if (!isBoardVendor(vendor)) continue;
+      return { hint, vendor };
+    }
+  }
+
+  return null;
 }
 
 async function hydrateQuietly(
