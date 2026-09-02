@@ -2,13 +2,18 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { ExternalLink, Plus } from 'lucide-react';
+import { ExternalLink, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { classificationLabel, type ReviewRow } from '@/lib/jobs/review/load';
+import {
+  classificationLabel,
+  matchRoles,
+  type ReviewRow,
+  type SearchableRole,
+} from '@/lib/jobs/review/load';
 import { domainFromAddress } from '@/lib/jobs/email/ats-senders';
 import { usableCompanyName } from '@/lib/jobs/email/link';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -34,11 +39,14 @@ export function ReviewList({
   rows,
   timezone,
   companyNames,
+  allRoles,
 }: {
   rows: ReviewRow[];
   timezone: string;
   /** Every company on file, so starting a new role from a message is a pick. */
   companyNames: string[];
+  /** Every pursuit on file, for linking to one the top three did not offer. */
+  allRoles: SearchableRole[];
 }) {
   const companyCount = companyNames.length;
   const [cursor, setCursor] = useState(0);
@@ -134,6 +142,7 @@ export function ReviewList({
               busy={busy}
               companyCount={companyCount}
               companies={companyNames}
+              allRoles={allRoles}
               onDone={setMessage}
             />
           )}
@@ -155,6 +164,7 @@ function MessageRow({
   busy,
   companyCount,
   companies,
+  allRoles,
   onDone,
 }: {
   row: Extract<ReviewRow, { kind: 'message' }>;
@@ -162,6 +172,7 @@ function MessageRow({
   busy: boolean;
   companyCount: number;
   companies: string[];
+  allRoles: SearchableRole[];
   onDone: (message: string) => void;
 }) {
   const [, startTransition] = useTransition();
@@ -223,6 +234,8 @@ function MessageRow({
         </ul>
       )}
 
+      <OtherRolePicker row={row} roles={allRoles} onDone={onDone} />
+
       <NewRoleForm row={row} companies={companies} onDone={onDone} />
 
       <footer className="mt-3 flex flex-wrap items-center gap-3">
@@ -253,6 +266,101 @@ function MessageRow({
         )}
       </footer>
     </>
+  );
+}
+
+/**
+ * "None of these — but it is one I already have."
+ *
+ * The three suggestions are ranked by how well the message matches, which is
+ * the right default and wrong often enough to matter: a rejection from an
+ * agency, or a role whose title the mail never says, scores below three
+ * unrelated pursuits. Rather than a select over several hundred rows, this is
+ * the same thing a person would do with a filing cabinet — type part of the
+ * company or the title, and pick out of what is left.
+ */
+function OtherRolePicker({
+  row,
+  roles,
+  onDone,
+}: {
+  row: Extract<ReviewRow, { kind: 'message' }>;
+  roles: SearchableRole[];
+  onDone: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  if (roles.length === 0) return null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 inline-flex items-center gap-1 text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+      >
+        <Search className="size-3.5" strokeWidth={1.75} aria-hidden />
+        Some other role — search all {roles.length}
+      </button>
+    );
+  }
+
+  const matches = matchRoles(roles, query);
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
+      <Label htmlFor={`other-role-${row.id}`}>Link to another role</Label>
+      <Input
+        id={`other-role-${row.id}`}
+        autoFocus
+        value={query}
+        disabled={pending}
+        placeholder="Company or role title"
+        onChange={(event) => setQuery(event.target.value)}
+      />
+
+      {matches.length === 0 ? (
+        <p className="mt-2 text-[12px] text-ink-faint">No role matches that.</p>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {matches.map((role) => (
+            <li key={role.applicationId}>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const label = `${role.companyName} · ${role.roleTitle}`;
+                    const result = await linkMessage(row.id, role.applicationId);
+                    if (!result.error) setOpen(false);
+                    onDone(result.error ?? `Linked to ${label}.`);
+                  })
+                }
+                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface disabled:opacity-50"
+              >
+                <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                  {role.companyName} · {role.roleTitle}
+                </span>
+                <StatusBadge
+                  status={role.status as ApplicationStatus}
+                  everSubmitted={role.everSubmitted}
+                />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="mt-2 text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+      >
+        Cancel
+      </button>
+    </div>
   );
 }
 

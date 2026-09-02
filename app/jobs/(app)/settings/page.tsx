@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
+import { loadActivity } from '@/lib/jobs/activity/load';
 import { publicEnv } from '@/lib/env';
 import { SettingsView } from './view';
 
@@ -45,8 +46,14 @@ export default async function SettingsPage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [{ data: profile }, { data: accounts }, { data: resumes }, { data: evidence }, { data: excludedSenders }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: accounts },
+    { data: resumes },
+    { data: evidence },
+    { data: excludedSenders },
+    activity,
+  ] = await Promise.all([
       supabase
         .from('profiles')
         .select(
@@ -76,6 +83,7 @@ export default async function SettingsPage({
         .select('id, domain')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
+      loadActivity(supabase, core, user.id),
     ]);
 
   // The last first-scan attempt per mailbox. Without it the page cannot tell a
@@ -142,6 +150,7 @@ export default async function SettingsPage({
               : null,
           };
         })}
+        activity={activity}
         excludedSenders={(excludedSenders ?? []).map((entry) => ({
           id: entry.id as string,
           domain: entry.domain as string,
