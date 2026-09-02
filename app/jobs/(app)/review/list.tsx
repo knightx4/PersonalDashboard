@@ -2,16 +2,20 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { Input, Label } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { classificationLabel, type ReviewRow } from '@/lib/jobs/review/load';
+import { domainFromAddress } from '@/lib/jobs/email/ats-senders';
+import { usableCompanyName } from '@/lib/jobs/email/link';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import {
   acknowledgeEvent,
   confirmApplication,
+  createRoleFromMessage,
   deleteInferredApplication,
   dismissMessage,
   linkMessage,
@@ -29,12 +33,14 @@ import {
 export function ReviewList({
   rows,
   timezone,
-  companyCount,
+  companyNames,
 }: {
   rows: ReviewRow[];
   timezone: string;
-  companyCount: number;
+  /** Every company on file, so starting a new role from a message is a pick. */
+  companyNames: string[];
 }) {
+  const companyCount = companyNames.length;
   const [cursor, setCursor] = useState(0);
   const [busy, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -122,7 +128,14 @@ export function ReviewList({
           )}
         >
           {row.kind === 'message' && (
-            <MessageRow row={row} timezone={timezone} busy={busy} companyCount={companyCount} onDone={setMessage} />
+            <MessageRow
+              row={row}
+              timezone={timezone}
+              busy={busy}
+              companyCount={companyCount}
+              companies={companyNames}
+              onDone={setMessage}
+            />
           )}
           {row.kind === 'application' && (
             <ApplicationRow row={row} timezone={timezone} busy={busy} onDone={setMessage} />
@@ -141,12 +154,14 @@ function MessageRow({
   timezone,
   busy,
   companyCount,
+  companies,
   onDone,
 }: {
   row: Extract<ReviewRow, { kind: 'message' }>;
   timezone: string;
   busy: boolean;
   companyCount: number;
+  companies: string[];
   onDone: (message: string) => void;
 }) {
   const [, startTransition] = useTransition();
@@ -208,6 +223,8 @@ function MessageRow({
         </ul>
       )}
 
+      <NewRoleForm row={row} companies={companies} onDone={onDone} />
+
       <footer className="mt-3 flex flex-wrap items-center gap-3">
         <Button
           type="button"
@@ -237,6 +254,125 @@ function MessageRow({
       </footer>
     </>
   );
+}
+
+/**
+ * "None of these — it is a new one."
+ *
+ * The queue could only file mail against something already on the board, so
+ * anything genuinely new had no move except dismissing it. Company and title
+ * are guessed from the sender and the subject and both are editable, because a
+ * guess offered for correction is faster than an empty pair of boxes and safer
+ * than one written without being seen.
+ */
+function NewRoleForm({
+  row,
+  companies,
+  onDone,
+}: {
+  row: Extract<ReviewRow, { kind: 'message' }>;
+  companies: string[];
+  onDone: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [company, setCompany] = useState(() => suggestedCompany(row));
+  const [title, setTitle] = useState(() => suggestedTitle(row));
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 inline-flex items-center gap-1 text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+      >
+        <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+        None of these — start a new role
+      </button>
+    );
+  }
+
+  const submit = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await createRoleFromMessage({
+        messageId: row.id,
+        companyName: company,
+        title,
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      onDone(`Started ${company} · ${title} and linked this message to it.`);
+    });
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
+      <p className="text-[12px] font-medium text-ink">Start a new role from this message</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div>
+          <Label htmlFor={`company-${row.id}`}>Company</Label>
+          <Input
+            id={`company-${row.id}`}
+            list="review-companies"
+            value={company}
+            disabled={pending}
+            onChange={(event) => setCompany(event.target.value)}
+          />
+          <datalist id="review-companies">
+            {companies.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </div>
+        <div>
+          <Label htmlFor={`title-${row.id}`}>Role</Label>
+          <Input
+            id={`title-${row.id}`}
+            value={title}
+            disabled={pending}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" disabled={pending} onClick={submit}>
+          {pending ? 'Creating…' : 'Create and link'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => setOpen(false)}
+        >
+          Cancel
+        </Button>
+        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+      </div>
+      <p className="mt-2 text-[11px] text-ink-faint">
+        No applied date is set: this message writes the event its kind implies, and the status
+        follows from that.
+      </p>
+    </div>
+  );
+}
+
+/** The employer, as far as the sender can say. Blank rather than wrong. */
+function suggestedCompany(row: Extract<ReviewRow, { kind: 'message' }>): string {
+  const display = row.fromAddress?.match(/^\s*"?([^"<]+?)"?\s*</)?.[1];
+  const domain = domainFromAddress(row.fromAddress);
+  return usableCompanyName(display) ?? usableCompanyName(domain) ?? '';
+}
+
+/** The subject with the usual mail furniture off the front. */
+function suggestedTitle(row: Extract<ReviewRow, { kind: 'message' }>): string {
+  const subject = (row.subject ?? '').replace(/^\s*((re|fwd|fw)\s*:\s*)+/i, '').trim();
+  return subject.slice(0, 200);
 }
 
 function ApplicationRow({

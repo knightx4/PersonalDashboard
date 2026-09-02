@@ -143,7 +143,7 @@ export default async function ReviewPage({
           <ReviewList
             rows={filtered}
             timezone={(profile?.timezone as string) ?? 'UTC'}
-            companyCount={companies.length}
+            companyNames={companies.map((company) => company.name).sort()}
           />
         </div>
       </div>
