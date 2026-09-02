@@ -4,6 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { VAULT_SCHEMA, type VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { folderOf } from '@/lib/vault/paths';
 import type { LinkTarget } from '@/lib/vault/markdown/obsidian';
+import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 
 /**
  * Reading the vault.
@@ -113,6 +114,55 @@ export async function loadConnection(
     backfillCompletedAt: row.backfill_completed_at,
     syncCursor: row.sync_cursor,
   };
+}
+
+/**
+ * The last few sync runs, newest first.
+ *
+ * Through the session client like everything else here: the sync_runs policy
+ * joins back to the connection's owner, so a run belonging to somebody else is
+ * not filtered out in this file -- it never arrives.
+ */
+export async function loadSyncRuns(
+  supabase: VaultSupabaseClient,
+  limit = 5,
+): Promise<SyncRunSummary[]> {
+  const { data, error } = await supabase
+    .from('sync_runs')
+    .select(
+      'id, type, status, notes_seen, notes_written, notes_deleted, notes_skipped, started_at, finished_at, error',
+    )
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  assertSchemaExposed(error, VAULT_SCHEMA);
+  if (error || !data) return [];
+
+  type RunRow = {
+    id: string;
+    type: SyncRunSummary['type'];
+    status: SyncRunSummary['status'];
+    notes_seen: number;
+    notes_written: number;
+    notes_deleted: number;
+    notes_skipped: number;
+    started_at: string | null;
+    finished_at: string | null;
+    error: string | null;
+  };
+
+  return (data as RunRow[]).map((row) => ({
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    notesSeen: row.notes_seen,
+    notesWritten: row.notes_written,
+    notesDeleted: row.notes_deleted,
+    notesSkipped: row.notes_skipped,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    error: row.error,
+  }));
 }
 
 const LIST_LIMIT = 500;

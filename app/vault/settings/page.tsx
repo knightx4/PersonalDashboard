@@ -3,7 +3,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { createVaultClient } from '@/lib/vault/auth/server';
-import { loadConnection } from '@/lib/vault/notes/load';
+import { loadConnection, loadSyncRuns } from '@/lib/vault/notes/load';
+import { describeRun, syncProgress, type SyncProgress } from '@/lib/vault/sync/progress';
 import { ConnectVaultForm } from './connect-form';
 import { disconnectVault, rescanVault } from './actions';
 
@@ -20,10 +21,18 @@ export default async function VaultSettingsPage() {
   const supabase = await createVaultClient();
   const connection = await loadConnection(supabase);
 
-  const { count } = await supabase
-    .from('notes')
-    .select('id', { count: 'exact', head: true })
-    .is('deleted_at', null);
+  const [{ count }, runs] = await Promise.all([
+    supabase.from('notes').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+    connection ? loadSyncRuns(supabase) : Promise.resolve([]),
+  ]);
+
+  const progress = connection
+    ? syncProgress({
+        mirrored: count ?? 0,
+        backfillCompletedAt: connection.backfillCompletedAt,
+        runs,
+      })
+    : null;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -87,12 +96,9 @@ export default async function VaultSettingsPage() {
                 <dd className="text-ink">
                   {connection.lastSyncedAt ? formatWhen(connection.lastSyncedAt) : 'Not yet'}
                 </dd>
-
-                <dt className="text-ink-muted">First sync</dt>
-                <dd className="text-ink">
-                  {connection.backfillCompletedAt ? 'Complete' : 'Still working through the vault'}
-                </dd>
               </dl>
+
+              {progress && <SyncProgressBar progress={progress} />}
 
               {connection.lastError && (
                 <p className="rounded-lg bg-accent-orange-tint px-3 py-2 text-[13px] text-ink">
@@ -100,9 +106,37 @@ export default async function VaultSettingsPage() {
                 </p>
               )}
 
+              {runs.length > 0 && (
+                <details className="rounded-lg border border-border">
+                  <summary className="cursor-pointer px-3 py-2 text-[13px] text-ink-muted">
+                    Recent runs
+                  </summary>
+                  <ul className="divide-y divide-border border-t border-border">
+                    {runs.map((run) => (
+                      <li key={run.id} className="flex flex-wrap items-baseline gap-x-3 px-3 py-2">
+                        <span className="w-24 text-[12px] font-medium text-ink">
+                          {run.type === 'backfill' ? 'First sync' : 'Update'}
+                        </span>
+                        <span className="tabular w-32 text-[12px] text-ink-faint">
+                          {run.startedAt ? formatWhen(run.startedAt) : '—'}
+                        </span>
+                        <span
+                          className={
+                            run.status === 'failed'
+                              ? 'flex-1 text-[12px] text-accent-orange'
+                              : 'flex-1 text-[12px] text-ink-muted'
+                          }
+                        >
+                          {describeRun(run)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+
               <p className="text-[13px] text-ink-muted">
-                Syncing runs once a day, on the same schedule as the mailbox. There is nothing to
-                press — this page is here to tell you when something is wrong.
+                Syncing runs once a day, on the same schedule as the mailbox.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -152,6 +186,52 @@ export default async function VaultSettingsPage() {
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The bar, and the one sentence under it.
+ *
+ * A percentage on its own is not the feedback that was asked for: "62%" of an
+ * unknown number says nothing. The counts go under it, and where a total is
+ * genuinely unknown -- a vault whose first run has not finished walking the
+ * tree -- the bar is left off rather than filled in with a guess.
+ */
+function SyncProgressBar({ progress }: { progress: SyncProgress }) {
+  const tone =
+    progress.phase === 'failed'
+      ? 'bg-accent-orange'
+      : progress.phase === 'up_to_date'
+        ? 'bg-status-offer'
+        : 'bg-brand';
+
+  return (
+    <div className="rounded-lg bg-canvas px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[13px] font-medium text-ink">{progress.headline}</span>
+        {progress.percent !== null && (
+          <span className="tabular text-[12px] text-ink-muted">{progress.percent}%</span>
+        )}
+      </div>
+
+      {progress.percent !== null && (
+        <div
+          role="progressbar"
+          aria-valuenow={progress.percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Vault sync progress"
+          className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border"
+        >
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${tone}`}
+            style={{ width: `${progress.percent}%` }}
+          />
+        </div>
+      )}
+
+      <p className="mt-1.5 text-[12px] text-ink-muted">{progress.detail}</p>
     </div>
   );
 }
