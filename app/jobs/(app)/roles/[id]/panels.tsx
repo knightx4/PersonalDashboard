@@ -8,6 +8,7 @@ import {
   CircleAlert,
   ExternalLink,
   FileText,
+  ChevronDown,
   ListChecks,
   Mail,
   MessageSquareText,
@@ -950,19 +951,13 @@ function InterviewCard({
         </p>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Prep
-          </label>
+      <div className="mt-3 space-y-3">
+        <CollapsibleField label="Prep" defaultOpen>
           <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Interview notes
-          </label>
+        </CollapsibleField>
+        <CollapsibleField label="Interview notes" defaultOpen>
           <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </div>
+        </CollapsibleField>
       </div>
 
       {interview.questionsAsked.length > 0 && (
@@ -1025,6 +1020,38 @@ function InterviewCard({
         </span>
       </div>
     </section>
+  );
+}
+
+/** A labeled section that opens and closes, stacked rather than side by side. */
+function CollapsibleField({
+  label,
+  defaultOpen = false,
+  children,
+}: {
+  label: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint"
+      >
+        <ChevronDown
+          className={cn('size-3.5 shrink-0 transition-transform duration-150', !open && '-rotate-90')}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+        {label}
+      </button>
+      {open && <div className="mt-1">{children}</div>}
+    </div>
   );
 }
 
