@@ -207,6 +207,78 @@ export async function addInterview(input: {
   return { error: null };
 }
 
+const participantSchema = z.object({
+  interviewId: z.string().uuid(),
+  contactId: z.string().uuid(),
+});
+
+/**
+ * Name who is in the room, as the contact rather than as a string.
+ *
+ * A calendar invite already records its attendees this way, and the point of
+ * keeping it a contact is that the name on a round is the same record as the
+ * one on the contacts page -- so it carries the title, the LinkedIn and every
+ * touch, instead of being a second, unlinked copy of a person.
+ */
+export async function addInterviewer(input: {
+  interviewId: string;
+  contactId: string;
+}): Promise<{ error: string | null }> {
+  const parsed = participantSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not a person to add.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS reaches the owner through the interview, and a trigger refuses a
+  // contact belonging to someone else -- but a silent zero-row write explains
+  // nothing, so the contact is checked here for a message worth reading.
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('id')
+    .eq('id', parsed.data.contactId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!contact) return { error: 'That contact no longer exists.' };
+
+  const { error } = await supabase.from('interview_participants').upsert(
+    {
+      interview_id: parsed.data.interviewId,
+      contact_id: parsed.data.contactId,
+      role: 'interviewer',
+    },
+    { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
+  );
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+/** Wrong person, or an invite that swept in the room's calendar account. */
+export async function removeInterviewer(input: {
+  interviewId: string;
+  contactId: string;
+}): Promise<{ error: string | null }> {
+  const parsed = participantSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not a person to remove.' };
+
+  await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('interview_participants')
+    .delete()
+    .eq('interview_id', parsed.data.interviewId)
+    .eq('contact_id', parsed.data.contactId);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
 /** The inbox read one scheduling thread as two rounds; this is how you say so. */
 export async function deleteInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);

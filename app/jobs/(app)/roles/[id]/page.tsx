@@ -80,6 +80,7 @@ export default async function RoleDetailPage({
     { data: profile },
     { data: reminders },
     matchCandidates,
+    { data: companyContacts },
   ] = await Promise.all([
       supabase
         .from('application_events')
@@ -90,7 +91,14 @@ export default async function RoleDetailPage({
         .order('occurred_at', { ascending: false }),
       supabase
         .from('interviews')
-        .select('id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes, questions_asked')
+        // Participants come back embedded: who is in the room is part of
+        // reading a round, and the contact carries the LinkedIn and the title
+        // that make the name worth clicking.
+        .select(
+          `id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes,
+           questions_asked,
+           interview_participants ( role, contacts ( id, full_name, title ) )`,
+        )
         .eq('application_id', current.id)
         .order('round', { ascending: true }),
       supabase
@@ -123,6 +131,15 @@ export default async function RoleDetailPage({
         applicationId: current.id as string,
         term: company.name,
       }),
+      // Everyone already known at this company, so naming an interviewer is a
+      // pick rather than a retype -- and so the name on the round is the same
+      // record as the one on the contacts page.
+      supabase
+        .from('contacts')
+        .select('id, full_name, title')
+        .eq('user_id', user.id)
+        .eq('company_id', company.id)
+        .order('full_name'),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -255,6 +272,28 @@ export default async function RoleDetailPage({
           prepNotes: (interview.prep_notes as string) ?? '',
           notes: (interview.notes as string) ?? '',
           questionsAsked: (interview.questions_asked as string[]) ?? [],
+          participants: (
+            (interview.interview_participants ?? []) as unknown as Array<{
+              role: string;
+              contacts: { id: string; full_name: string; title: string | null } | null;
+            }>
+          )
+            .filter((participant) => participant.contacts !== null)
+            .map((participant) => ({
+              contactId: participant.contacts!.id,
+              name: participant.contacts!.full_name,
+              title: participant.contacts!.title,
+              role: participant.role,
+            })),
+        }))}
+        companyContacts={((companyContacts ?? []) as unknown as Array<{
+          id: string;
+          full_name: string;
+          title: string | null;
+        }>).map((contact) => ({
+          id: contact.id,
+          name: contact.full_name,
+          title: contact.title,
         }))}
         answers={(answers ?? []).map((answer) => {
           const question = answer.questions as unknown as {

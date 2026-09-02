@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
@@ -25,11 +26,13 @@ import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { addQuestions, promoteToCanonical, saveAnswer, updateRole } from '../actions';
 import {
   addInterview,
+  addInterviewer,
   addNote,
   addReminder,
   declineCandidateMessage,
   deleteInterview,
   linkCandidateMessage,
+  removeInterviewer,
   saveInterview,
   searchUnlinkedMessages,
 } from './actions';
@@ -83,7 +86,16 @@ export interface PanelProps {
     prepNotes: string;
     notes: string;
     questionsAsked: string[];
+    /** Who is in the room, as contacts rather than as names on a string. */
+    participants: Array<{
+      contactId: string;
+      name: string;
+      title: string | null;
+      role: string;
+    }>;
   }>;
+  /** Everyone known at this company, for naming an interviewer without retyping. */
+  companyContacts: Array<{ id: string; name: string; title: string | null }>;
   answers: Array<{
     id: string;
     answer: string;
@@ -916,6 +928,7 @@ function Interviews({
   timezone,
   focusInterviewId,
   messages,
+  companyContacts,
   seed,
   onSeedUsed,
 }: PanelProps & { seed?: InterviewSeed | null; onSeedUsed?: () => void }) {
@@ -956,6 +969,7 @@ function Interviews({
             key={interview.id}
             interview={interview}
             timezone={timezone}
+            companyContacts={companyContacts}
             focused={interview.id === focusInterviewId}
           />
         ))
@@ -970,14 +984,129 @@ function Interviews({
   );
 }
 
+/**
+ * Who is in the room, as people rather than as text.
+ *
+ * A calendar invite has been recording its attendees as contacts since the
+ * invite parser landed; the round just never showed them. Each name is the
+ * contact record, so it opens on their title, their LinkedIn and every touch
+ * you have had with them — which is the whole reason for storing a person
+ * rather than a string.
+ */
+function Interviewers({
+  interview,
+  companyContacts,
+}: {
+  interview: PanelProps['interviews'][number];
+  companyContacts: PanelProps['companyContacts'];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const named = new Set(interview.participants.map((participant) => participant.contactId));
+  const available = companyContacts.filter((contact) => !named.has(contact.id));
+
+  const add = (contactId: string) =>
+    startTransition(async () => {
+      const result = await addInterviewer({ interviewId: interview.id, contactId });
+      setError(result.error);
+      if (!result.error) setAdding(false);
+    });
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        Interviewers
+      </span>
+
+      {interview.participants.length === 0 && !adding && (
+        <span className="text-ink-faint">Nobody named yet</span>
+      )}
+
+      {interview.participants.map((participant) => (
+        <span
+          key={participant.contactId}
+          className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5"
+        >
+          <Link
+            href={`/jobs/contacts/${participant.contactId}`}
+            className="text-ink underline underline-offset-2 hover:text-brand"
+            title={participant.title ?? undefined}
+          >
+            {participant.name}
+          </Link>
+          {participant.role !== 'interviewer' && (
+            <span className="text-ink-faint">{participant.role}</span>
+          )}
+          <button
+            type="button"
+            disabled={pending}
+            aria-label={`Remove ${participant.name}`}
+            onClick={() =>
+              startTransition(() =>
+                void removeInterviewer({
+                  interviewId: interview.id,
+                  contactId: participant.contactId,
+                }),
+              )
+            }
+            className="text-ink-faint hover:text-status-rejected"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+
+      {adding ? (
+        available.length > 0 ? (
+          <Select
+            aria-label="Add an interviewer"
+            defaultValue=""
+            disabled={pending}
+            className="h-7 w-56 py-0 text-[12px]"
+            onChange={(event) => event.target.value && add(event.target.value)}
+          >
+            <option value="">Pick a contact…</option>
+            {available.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.title ? `${contact.name} — ${contact.title}` : contact.name}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          // No picker without anyone to pick: an interviewer has to exist as a
+          // contact first, and inventing one from here would put a person on
+          // the company with nothing but a name.
+          <span className="text-ink-faint">
+            No contacts at this company yet — add them on the company page first.
+          </span>
+        )
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="text-ink-faint underline underline-offset-2 hover:text-brand"
+        >
+          Add
+        </button>
+      )}
+
+      {error && <span className="text-status-rejected">{error}</span>}
+    </div>
+  );
+}
+
 function InterviewCard({
   interview,
   timezone,
+  companyContacts,
   focused = false,
 }: {
   focused?: boolean;
   interview: PanelProps['interviews'][number];
   timezone: string;
+  companyContacts: PanelProps['companyContacts'];
 }) {
   const [prep, setPrep] = useState(interview.prepNotes);
   const [notes, setNotes] = useState(interview.notes);
@@ -1011,6 +1140,8 @@ function InterviewCard({
           {formatDateTime(interview.scheduledAt, timezone)}
         </span>
       </header>
+
+      <Interviewers interview={interview} companyContacts={companyContacts} />
 
       {needsDebrief && (
         <p className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5 text-[12px] text-ink">
