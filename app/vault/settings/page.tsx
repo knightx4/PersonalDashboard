@@ -6,6 +6,7 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadConnection, loadSyncRuns } from '@/lib/vault/notes/load';
 import { describeRun, syncProgress, type SyncProgress } from '@/lib/vault/sync/progress';
 import { ConnectVaultForm } from './connect-form';
+import { SyncNowButton } from './sync-now-button';
 import { disconnectVault, rescanVault } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -136,10 +137,12 @@ export default async function VaultSettingsPage() {
               )}
 
               <p className="text-[13px] text-ink-muted">
-                Syncing runs once a day, on the same schedule as the mailbox.
+                Syncing runs once a day, on the same schedule as the mailbox. Press Sync now to
+                pull anything you have pushed since.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
+                <SyncNowButton active={progress?.phase === 'running'} />
                 <form action={rescanVault}>
                   <input type="hidden" name="id" value={connection.id} />
                   <Button type="submit" variant="secondary">
