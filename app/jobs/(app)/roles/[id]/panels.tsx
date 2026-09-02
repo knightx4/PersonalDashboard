@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
@@ -32,11 +33,13 @@ import {
 } from '../actions';
 import {
   addInterview,
+  addInterviewer,
   addNote,
   addReminder,
   declineCandidateMessage,
   deleteInterview,
   linkCandidateMessage,
+  removeInterviewer,
   saveInterview,
   searchUnlinkedMessages,
 } from './actions';
@@ -92,7 +95,16 @@ export interface PanelProps {
     prepNotes: string;
     notes: string;
     questionsAsked: string[];
+    /** Who is in the room, as contacts rather than as names on a string. */
+    participants: Array<{
+      contactId: string;
+      name: string;
+      title: string | null;
+      role: string;
+    }>;
   }>;
+  /** Everyone known at this company, for naming an interviewer without retyping. */
+  companyContacts: Array<{ id: string; name: string; title: string | null }>;
   answers: Array<{
     id: string;
     answer: string;
@@ -137,8 +149,32 @@ export interface PanelProps {
   }>;
 }
 
+/**
+ * Mail that describes an interview rather than merely mentioning one.
+ *
+ * These are the classifications the ingest path turns into a booking, so they
+ * are the ones worth offering a round against when it did not: a scheduling
+ * thread hand-linked from the review queue records its event but no interview,
+ * and until now that left the Interviews tab silently empty.
+ */
+const INTERVIEW_MAIL = new Set(['interview_invite', 'scheduling']);
+
+/** What the "Add a round" form should be seeded with, and which mail asked. */
+interface InterviewSeed {
+  kind: string;
+  fromSubject: string | null;
+}
+
 export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'timeline');
+  const [interviewSeed, setInterviewSeed] = useState<InterviewSeed | null>(null);
+
+  // Adding the round from a message is one move, not "go to the other tab and
+  // find the button": the seed opens the form there already filled in.
+  const startInterviewFrom = (seed: InterviewSeed) => {
+    setInterviewSeed(seed);
+    setTab('interviews');
+  };
 
   return (
     <div>
@@ -181,9 +217,15 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
       {tab === 'timeline' && <Timeline {...props} />}
       {tab === 'posting' && <Posting {...props} />}
       {tab === 'answers' && <Answers {...props} />}
-      {tab === 'interviews' && <Interviews {...props} />}
+      {tab === 'interviews' && (
+        <Interviews
+          {...props}
+          seed={interviewSeed}
+          onSeedUsed={() => setInterviewSeed(null)}
+        />
+      )}
       {tab === 'notes' && <Notes {...props} />}
-      {tab === 'mail' && <LinkedMail {...props} />}
+      {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
 
       <NotRealPursuit applicationId={props.applicationId} />
     </div>
@@ -962,25 +1004,177 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
   );
 }
 
-function Interviews({ interviews, applicationId, timezone, focusInterviewId }: PanelProps) {
+function Interviews({
+  interviews,
+  applicationId,
+  timezone,
+  focusInterviewId,
+  messages,
+  companyContacts,
+  seed,
+  onSeedUsed,
+}: PanelProps & { seed?: InterviewSeed | null; onSeedUsed?: () => void }) {
+  // Mail that says an interview exists while this tab says none does. The
+  // combination is always a miss -- a hand-link that recorded only the event,
+  // or a thread the extractor read without finding a date -- so it is stated
+  // rather than left as a blank the tab count already implied was correct.
+  const interviewMail = interviews.length === 0
+    ? messages.filter((message) => INTERVIEW_MAIL.has(message.classification))
+    : [];
+
   return (
     <div className="space-y-3">
       {interviews.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
-          No interviews yet. They appear here when a scheduling email arrives, or you can add one
-          below.
-        </p>
+        <div className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+          {interviewMail.length > 0 ? (
+            <>
+              <p className="text-ink">
+                {interviewMail.length === 1
+                  ? 'An email about scheduling is linked to this pursuit, but no interview is recorded.'
+                  : `${interviewMail.length} emails about scheduling are linked to this pursuit, but no interview is recorded.`}
+              </p>
+              <p className="mt-1">
+                The mail only ever carries a booking when it arrives with a calendar invite. Add
+                the round below, or from the message itself under Linked mail.
+              </p>
+            </>
+          ) : (
+            <p>
+              No interviews yet. They appear here when a scheduling email arrives, or you can add
+              one below.
+            </p>
+          )}
+        </div>
       ) : (
         interviews.map((interview) => (
           <InterviewCard
             key={interview.id}
             interview={interview}
             timezone={timezone}
+            companyContacts={companyContacts}
             focused={interview.id === focusInterviewId}
           />
         ))
       )}
-      <AddInterview applicationId={applicationId} nextRound={interviews.length + 1} />
+      <AddInterview
+        applicationId={applicationId}
+        nextRound={interviews.length + 1}
+        seed={seed}
+        onSeedUsed={onSeedUsed}
+      />
+    </div>
+  );
+}
+
+/**
+ * Who is in the room, as people rather than as text.
+ *
+ * A calendar invite has been recording its attendees as contacts since the
+ * invite parser landed; the round just never showed them. Each name is the
+ * contact record, so it opens on their title, their LinkedIn and every touch
+ * you have had with them — which is the whole reason for storing a person
+ * rather than a string.
+ */
+function Interviewers({
+  interview,
+  companyContacts,
+}: {
+  interview: PanelProps['interviews'][number];
+  companyContacts: PanelProps['companyContacts'];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const named = new Set(interview.participants.map((participant) => participant.contactId));
+  const available = companyContacts.filter((contact) => !named.has(contact.id));
+
+  const add = (contactId: string) =>
+    startTransition(async () => {
+      const result = await addInterviewer({ interviewId: interview.id, contactId });
+      setError(result.error);
+      if (!result.error) setAdding(false);
+    });
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        Interviewers
+      </span>
+
+      {interview.participants.length === 0 && !adding && (
+        <span className="text-ink-faint">Nobody named yet</span>
+      )}
+
+      {interview.participants.map((participant) => (
+        <span
+          key={participant.contactId}
+          className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5"
+        >
+          <Link
+            href={`/jobs/contacts/${participant.contactId}`}
+            className="text-ink underline underline-offset-2 hover:text-brand"
+            title={participant.title ?? undefined}
+          >
+            {participant.name}
+          </Link>
+          {participant.role !== 'interviewer' && (
+            <span className="text-ink-faint">{participant.role}</span>
+          )}
+          <button
+            type="button"
+            disabled={pending}
+            aria-label={`Remove ${participant.name}`}
+            onClick={() =>
+              startTransition(() =>
+                void removeInterviewer({
+                  interviewId: interview.id,
+                  contactId: participant.contactId,
+                }),
+              )
+            }
+            className="text-ink-faint hover:text-status-rejected"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+
+      {adding ? (
+        available.length > 0 ? (
+          <Select
+            aria-label="Add an interviewer"
+            defaultValue=""
+            disabled={pending}
+            className="h-7 w-56 py-0 text-[12px]"
+            onChange={(event) => event.target.value && add(event.target.value)}
+          >
+            <option value="">Pick a contact…</option>
+            {available.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.title ? `${contact.name} — ${contact.title}` : contact.name}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          // No picker without anyone to pick: an interviewer has to exist as a
+          // contact first, and inventing one from here would put a person on
+          // the company with nothing but a name.
+          <span className="text-ink-faint">
+            No contacts at this company yet — add them on the company page first.
+          </span>
+        )
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="text-ink-faint underline underline-offset-2 hover:text-brand"
+        >
+          Add
+        </button>
+      )}
+
+      {error && <span className="text-status-rejected">{error}</span>}
     </div>
   );
 }
@@ -988,11 +1182,13 @@ function Interviews({ interviews, applicationId, timezone, focusInterviewId }: P
 function InterviewCard({
   interview,
   timezone,
+  companyContacts,
   focused = false,
 }: {
   focused?: boolean;
   interview: PanelProps['interviews'][number];
   timezone: string;
+  companyContacts: PanelProps['companyContacts'];
 }) {
   const [prep, setPrep] = useState(interview.prepNotes);
   const [notes, setNotes] = useState(interview.notes);
@@ -1026,6 +1222,8 @@ function InterviewCard({
           {formatDateTime(interview.scheduledAt, timezone)}
         </span>
       </header>
+
+      <Interviewers interview={interview} companyContacts={companyContacts} />
 
       {needsDebrief && (
         <p className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5 text-[12px] text-ink">
@@ -1144,12 +1342,40 @@ function CollapsibleField({
  * adding a round the inbox never saw at all, a phone screen nobody emailed
  * about.
  */
-function AddInterview({ applicationId, nextRound }: { applicationId: string; nextRound: number }) {
+function AddInterview({
+  applicationId,
+  nextRound,
+  seed,
+  onSeedUsed,
+}: {
+  applicationId: string;
+  nextRound: number;
+  /** Set when the round is being added from a specific email. */
+  seed?: InterviewSeed | null;
+  onSeedUsed?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('recruiter_screen');
   const [scheduledAt, setScheduledAt] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [usedSeed, setUsedSeed] = useState<InterviewSeed | null>(null);
+
+  // Arriving from a message in Linked mail: open already filled in. The time
+  // is deliberately not guessed from the mail -- the mail's arrival is not the
+  // appointment, and a wrong hour on the board is worse than an empty field.
+  if (seed && seed !== usedSeed) {
+    setUsedSeed(seed);
+    setKind(seed.kind);
+    setError(null);
+    setOpen(true);
+  }
+
+  const close = () => {
+    setOpen(false);
+    setUsedSeed(null);
+    onSeedUsed?.();
+  };
 
   if (!open) {
     return (
@@ -1165,6 +1391,13 @@ function AddInterview({ applicationId, nextRound }: { applicationId: string; nex
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
+      {usedSeed && (
+        <p className="mb-3 text-[12px] text-ink-muted">
+          From{' '}
+          <span className="text-ink">{usedSeed.fromSubject ?? 'the linked message'}</span> — that
+          mail says when it is; put the time in below.
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <Label htmlFor="interview-kind">Kind</Label>
@@ -1208,15 +1441,15 @@ function AddInterview({ applicationId, nextRound }: { applicationId: string; nex
               if (result.error) {
                 setError(result.error);
               } else {
-                setOpen(false);
                 setScheduledAt('');
+                close();
               }
             })
           }
         >
           Add round {nextRound}
         </Button>
-        <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-ink-faint hover:text-ink">
+        <button type="button" onClick={close} className="text-[12px] text-ink-faint hover:text-ink">
           Cancel
         </button>
         {error && <span className="text-[12px] text-status-rejected">{error}</span>}
@@ -1270,8 +1503,8 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
   );
 }
 
-function LinkedMail(props: PanelProps) {
-  const { messages, timezone, applicationId, companyName, matchCandidates } = props;
+function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) => void }) {
+  const { messages, timezone, applicationId, companyName, matchCandidates, onAddInterview } = props;
 
   return (
     <div className="space-y-4">
@@ -1295,6 +1528,7 @@ function LinkedMail(props: PanelProps) {
                 <th className="px-2 py-2 font-semibold">Subject</th>
                 <th className="px-2 py-2 font-semibold">Kind</th>
                 <th className="px-2 py-2 font-semibold">Linked by</th>
+                <th className="px-2 py-2 font-semibold" />
               </tr>
             </thead>
             <tbody>
@@ -1319,6 +1553,22 @@ function LinkedMail(props: PanelProps) {
                     {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
                     {message.linkConfidence !== null &&
                       ` (${Math.round(message.linkConfidence * 100)}%)`}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {INTERVIEW_MAIL.has(message.classification) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAddInterview({
+                            kind: 'recruiter_screen',
+                            fromSubject: message.subject,
+                          })
+                        }
+                        className="whitespace-nowrap text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+                      >
+                        Add interview
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
