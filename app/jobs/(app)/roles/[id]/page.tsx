@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
+import { publicEnv } from '@/lib/env';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
@@ -86,6 +87,7 @@ export default async function RoleDetailPage({
     matchCandidates,
     { data: companyContacts },
     { data: bank },
+    { data: caseLetter },
   ] = await Promise.all([
       supabase
         .from('application_events')
@@ -152,6 +154,12 @@ export default async function RoleDetailPage({
       // cannot tell a current map from one computed before you added the item
       // that answers its biggest gap.
       supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
+      supabase
+        .from('cover_letters')
+        .select('body, public_slug, public_expires_at')
+        .eq('application_id', current.id)
+        .eq('user_id', user.id)
+        .maybeSingle(),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -298,6 +306,16 @@ export default async function RoleDetailPage({
           (role.requirement_matches_key as string | null) !== currentMatchKey
         }
         bankSize={evidence.length}
+        caseStatement={(caseLetter?.body as string) ?? ''}
+        // A slug with a live expiry is what the read function accepts, so a
+        // slug alone is not "shared" and must not read as it.
+        caseSlug={
+          caseLetter?.public_slug && caseLetter?.public_expires_at
+            ? (caseLetter.public_slug as string)
+            : null
+        }
+        caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
+        appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
         focusInterviewId={focusInterviewId ?? null}

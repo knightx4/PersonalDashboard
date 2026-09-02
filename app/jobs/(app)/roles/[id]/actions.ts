@@ -1,5 +1,6 @@
 'use server';
 
+import { randomBytes } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -459,4 +460,120 @@ export async function matchRoleRequirements(
 
   revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
   return { matches: result.matches, error: null };
+}
+
+/**
+ * Sharing the case page.
+ *
+ * The slug is the whole authorization, so it is generated here from
+ * `randomBytes` rather than from anything derivable — not the application id,
+ * not a hash of the role, not a timestamp. 24 bytes is 192 bits; a guessing
+ * attack is not the threat model, but a slug that could be enumerated from a
+ * neighbouring one would be.
+ *
+ * The expiry is not optional. A link with no end is a link that outlives the
+ * application, the job and your interest in the company, and the read function
+ * refuses a row that has none — so this always sets one.
+ */
+const SHARE_DAYS = 30;
+
+const shareSchema = z.object({
+  applicationId: z.string().uuid(),
+  /** The statement of interest. Written by hand; nothing generates it. */
+  body: z.string().trim().max(8000).optional(),
+});
+
+export async function shareCasePage(
+  input: z.input<typeof shareSchema>,
+): Promise<{ slug: string | null; expiresAt: string | null; error: string | null }> {
+  const parsed = shareSchema.safeParse(input);
+  if (!parsed.success) return { slug: null, expiresAt: null, error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: application, error: appError } = await supabase
+    .from('applications')
+    .select('id, roles!inner ( requirement_matches )')
+    .eq('id', parsed.data.applicationId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (appError) return { slug: null, expiresAt: null, error: appError.message };
+  if (!application) return { slug: null, expiresAt: null, error: 'That pursuit is not yours.' };
+
+  // A page with no matched requirements is a page with a paragraph on it. The
+  // requirement map is the thing worth sending; refusing here is friendlier
+  // than shipping an empty link to an employer.
+  const matches =
+    ((application.roles as unknown as { requirement_matches: RequirementMatch[] | null })
+      .requirement_matches ?? []).filter((match) => match.verdict !== 'gap');
+  if (matches.length === 0) {
+    return {
+      slug: null,
+      expiresAt: null,
+      error: 'Match the requirements first — without the map there is nothing to show.',
+    };
+  }
+
+  const slug = randomBytes(24).toString('base64url');
+  const expiresAt = new Date(Date.now() + SHARE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: existing } = await supabase
+    .from('cover_letters')
+    .select('id')
+    .eq('application_id', parsed.data.applicationId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const patch = {
+    public_slug: slug,
+    public_expires_at: expiresAt,
+    ...(parsed.data.body !== undefined ? { body: parsed.data.body } : {}),
+  };
+
+  const { error } = existing
+    ? await supabase
+        .from('cover_letters')
+        .update(patch)
+        .eq('id', existing.id)
+        .eq('user_id', user.id)
+    : await supabase.from('cover_letters').insert({
+        user_id: user.id,
+        application_id: parsed.data.applicationId,
+        body: parsed.data.body ?? null,
+        ...patch,
+      });
+
+  if (error) return { slug: null, expiresAt: null, error: error.message };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { slug, expiresAt, error: null };
+}
+
+/**
+ * Stop sharing.
+ *
+ * Clearing the expiry as well as the slug, because the read function checks
+ * both and a row with a live expiry and no slug is a row one careless update
+ * away from being public again.
+ */
+export async function unshareCasePage(
+  applicationId: string,
+): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(applicationId);
+  if (!parsed.success) return { error: 'That is not a pursuit.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('cover_letters')
+    .update({ public_slug: null, public_expires_at: null })
+    .eq('application_id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
 }

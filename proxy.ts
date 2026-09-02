@@ -32,6 +32,10 @@ const PUBLIC_PATHS = [
   '/api/jobs/inbox/sync/continue',
   // Vercel Cron — authenticated via CRON_SECRET Bearer token.
   '/api/cron',
+  // The shared case page. Authorized by an unguessable, expiring slug and read
+  // through one security definer function that checks both; see
+  // supabase/migrations-job-search/0017_public_case_page.sql.
+  '/jobs/p',
 ];
 
 function isPublic(pathname: string): boolean {
