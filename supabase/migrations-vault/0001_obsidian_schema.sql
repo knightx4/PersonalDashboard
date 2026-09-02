@@ -141,7 +141,11 @@ create table obsidian.notes (
   -- git's blob SHA for the file's content. Content dedup, free.
   blob_sha text not null,
   size_bytes int not null default 0,
-  -- Commit time of the last change to this path, when the sync knows it.
+  -- When the note last changed, as well as it can be known. A git tree
+  -- listing carries no timestamps, so a backfill can only date a note from
+  -- its own frontmatter; everything else stays null until a later commit
+  -- touches it. Stamping the whole vault with the day it was connected is the
+  -- obvious alternative and is worse: wrong, and it looks right.
   git_updated_at timestamptz,
 
   deleted_at timestamptz,
@@ -178,8 +182,14 @@ create index notes_search_idx on obsidian.notes using gin (search_tsv);
 
 -- Fuzzy title match, the same way job_search indexes questions.text. Wikilink
 -- resolution leans on this: `[[Some Note]]` is a title lookup, thousands of
--- times per rendered page in a heavily linked obsidian.
-create index notes_title_trgm_idx on obsidian.notes using gin (title gin_trgm_ops);
+-- times per rendered page in a heavily linked vault.
+-- `extensions.gin_trgm_ops`, schema-qualified. pg_trgm lives in `extensions` on
+-- Supabase, and an index definition stores the operator class resolved at
+-- creation time -- so leaving it bare makes the migration depend on whatever
+-- search_path the tool applying it happens to use. This is what was applied to
+-- the project; keep them identical.
+create index notes_title_trgm_idx
+  on obsidian.notes using gin (title extensions.gin_trgm_ops);
 
 -- ---------------------------------------------------------------------------
 -- Sync runs.
