@@ -27,7 +27,9 @@ letter arrive on the same sync and neither workspace owns that fact. See
 ## Status
 
 Build order steps 1–14 and books/sell assistant (16–18) are done. See
-[docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next.
+[docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next on the shopping
+side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
+next body of work.
 
 | | |
 |---|---|
@@ -51,6 +53,7 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 | Calendar invites parsed from ingested mail | done |
 | Tier-1 JD fetch for nine ATS vendors | done |
 | Company enrichment from Wikidata | done |
+| JD backfill from the employer's own ATS board | done |
 | Vault workspace (schema, git sync, viewer, connect UI) | done |
 
 ## Getting started

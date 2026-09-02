@@ -377,14 +377,21 @@ contains all of the above.
 
 Recorded so the v1 shape is legible, and so none of it gets built early.
 
-**The writing layer.** `evidence_items` is the quality ceiling for every draft
-the app produces — its own migration comment says no prompt engineering
-compensates for an empty bank — and it is currently hand-fed. Vault passages
-retrieved at draft time and cited inline would fill it, and the promotion rule is
-the one from the section above: approving an `application_answer` that cited a
-passage is what turns that passage into a real evidence item. The mechanism
-already exists in `application_answers.evidence_item_ids`. No queue is ever
-created.
+**The writing layer**, which now has its own plan and its own owner:
+[EVIDENCE-LAYER.md](EVIDENCE-LAYER.md). Its first slice fills `evidence_items`
+from material already in the account, and the vault is the fourth candidate
+source there — the largest body of the account holder's own prose, and the only
+one carrying voice rather than facts.
+
+Note where that document and the "never a queue" rule above disagree, because
+the disagreement is deliberate and it wins: slice 1 requires a confirm list,
+on the grounds that a bad evidence item silently poisons every match
+downstream. That is a stronger argument than mine. The no-queue rule holds for
+everything the vault does on its own — it must never hand back a pile of notes
+to triage — but the moment a vault passage is proposed as evidence, it goes
+through the same click as every other source. Confirmation at the point of use
+(approving a draft promotes what it cited) is a refinement to consider *after*
+that ships, not instead of it.
 
 **Attaching to what already exists.** `job_search.notes` takes exactly one parent
 from five (company, role, application, contact, interview). A vault note about a

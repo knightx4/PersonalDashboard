@@ -22,7 +22,7 @@ const KINDS = [
  *
  * The reuse loop is the whole point: after twenty applications the common
  * questions are answered and the work per application drops to tailoring.
- * Generation is Phase 2, but capture and manual answering are MVP precisely so
+ * Generation is later work, but capture and manual answering are MVP precisely so
  * the bank has real content by the time generation exists.
  */
 export default async function AnswersPage({

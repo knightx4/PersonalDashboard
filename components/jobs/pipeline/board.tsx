@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
-import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
@@ -241,6 +241,9 @@ function Card({
 }) {
   const age = shortAge(row.lastActivityAt);
   const stale = (row.daysSinceActivity ?? 0) > STALE_DAYS;
+  // Null on a role that has never been matched, which is most of them. The
+  // card says nothing rather than showing 0/0 and reading as a hopeless fit.
+  const coverage = formatCoverage(row.coverage);
 
   return (
     <article
@@ -303,6 +306,17 @@ function Card({
           <span />
         )}
         <div className="flex items-center gap-1.5">
+          {coverage && (
+            <span
+              className={cn(
+                'tabular text-[11px]',
+                row.coverage.gaps > 0 ? 'text-accent-orange' : 'text-ink-faint',
+              )}
+              title={`${coverage} covered by your evidence`}
+            >
+              {row.coverage.covered}/{row.coverage.total}
+            </span>
+          )}
           {row.needsReview && (
             <AlertTriangle className="size-3.5 text-accent-orange" strokeWidth={2} aria-label="Needs review" />
           )}

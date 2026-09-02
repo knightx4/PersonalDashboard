@@ -63,9 +63,12 @@ at Tier 2.
     table; standalone inventory (no synthetic orders).
 18. ✅ **Sell assistant v1** — buyback quotes + eBay Browse asking ceiling,
     net_self / net_buyback math, routing UI on `/sell` (draft only).
-19. **Phase 2** — the anti-spending layer. No migrations needed; the schema
-    already carries `item_uses`, the budget columns and `cooldown_until`.
-    `price_checks` for saved items also waits until then.
+19. **Phase 2** — the anti-spending layer, on the *shopping* side. No
+    migrations needed; the schema already carries `item_uses`, the budget
+    columns and `cooldown_until`. `price_checks` for saved items also waits
+    until then. (The job side's own second phase is a separate body of work
+    with its own name — see [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md) — so that
+    "Phase 2" here means one thing only.)
 
 ### Vault — the third workspace
 
@@ -75,10 +78,11 @@ everything the vault is actually *for* is deferred until something reads it.
 
 All four are done. What the spec got wrong on contact with the code: the
 backfill does not need `resume.ts` (a stored path is a resume point, so there
-is no hand-off chain to keep alive), and account deletion needed no change
-because all three tables cascade from `auth.users` already.
+is no hand-off chain to keep alive); account deletion needed no change because
+all three tables cascade from `auth.users` already; and the schema could not be
+called `vault`, which is Supabase's own — see the head of the migration.
 
-20. ✅ **Schema and the isolation test.** New `vault` schema in
+20. ✅ **Schema and the isolation test.** New `obsidian` schema in
     `supabase/migrations-vault/` (`vault_connections`, `notes`, `sync_runs`),
     added to the `db-reset.sh` loop. RLS on all three, and the cross-user
     isolation test extended to cover them **before any feature code** — the same

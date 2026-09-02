@@ -43,16 +43,45 @@ export function toPosting(
 
   if (!position?.name) throw new Error('Breezy returned no matching posting.');
 
+  return mapPosition(position, company, positionId);
+}
+
+function mapPosition(
+  position: BreezyPosition,
+  company: string,
+  fallbackId: string | null,
+): FetchedPosting {
   return {
     vendor: 'breezy',
-    title: position.name,
+    title: position.name ?? '',
     text: htmlToText(position.description ?? ''),
     url: position.url ?? null,
     location: locationName(position),
-    atsJobId: position.id ?? position.friendly_id ?? positionId,
+    atsJobId: position.id ?? position.friendly_id ?? fallbackId,
     boardToken: company,
     questions: [],
   };
+}
+
+export function toPostings(
+  parsed: BreezyPosition[] | { positions?: BreezyPosition[] },
+  company: string,
+): FetchedPosting[] {
+  const positions = Array.isArray(parsed) ? parsed : (parsed.positions ?? []);
+  return positions
+    .filter((position) => Boolean(position.name))
+    .map((position) => mapPosition(position, company, null));
+}
+
+/** The whole board in one call — the same call a single posting already makes. */
+export async function fetchBoard(company: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(`https://${encodeURIComponent(company)}.breezy.hr/json`);
+  if (status !== 200) throw new Error(`Breezy returned ${status} for that board.`);
+
+  return toPostings(
+    JSON.parse(body) as BreezyPosition[] | { positions?: BreezyPosition[] },
+    company,
+  );
 }
 
 export async function fetchPosting(

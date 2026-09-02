@@ -202,6 +202,10 @@ export async function applyCompanyEnrichment(
 
   if (writeError) return { applied: [], error: writeError.message };
 
+  // The detail page is where the button was pressed, so it is the page that
+  // has to change. Revalidating only the list left the fields exactly as they
+  // were until a manual reload.
+  revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/companies');
   return { applied: describePatch(patch), error: null };
 }
@@ -321,6 +325,7 @@ export async function applyAiCompanyEnrichment(
 
   if (writeError) return { applied: [], error: writeError.message };
 
+  revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/companies');
   return { applied, error: null };
 }

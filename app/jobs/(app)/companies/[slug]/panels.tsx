@@ -63,6 +63,40 @@ export function CompanyPanels(props: {
   );
 }
 
+/**
+ * Form state that the server is allowed to move underneath it.
+ *
+ * These inputs are seeded from the company row, and the row changes without a
+ * navigation: an enrichment fills the blanks in place and the revalidated page
+ * arrives while this component is still mounted, so `useState`'s initial value
+ * never runs again and the field goes on showing the blank it was born with —
+ * which is why filling a company in used to need a manual reload.
+ *
+ * The fix is React's documented one: notice during render that a prop moved
+ * and re-seed. Only the fields that actually changed are re-seeded, so typing
+ * in progress elsewhere in the form is not thrown away by someone else's write.
+ */
+function useServerSeeded<T extends Record<string, string>>(
+  incoming: T,
+): [T, (updater: (current: T) => T) => void] {
+  const [form, setForm] = useState(incoming);
+  const [seed, setSeed] = useState(incoming);
+
+  const moved = (Object.keys(incoming) as Array<keyof T>).filter(
+    (key) => incoming[key] !== seed[key],
+  );
+  if (moved.length > 0) {
+    setSeed(incoming);
+    setForm((current) => {
+      const next = { ...current };
+      for (const key of moved) next[key] = incoming[key];
+      return next;
+    });
+  }
+
+  return [form, setForm];
+}
+
 function Research({
   companyId,
   research,
@@ -70,7 +104,9 @@ function Research({
   companyId: string;
   research: string;
 }) {
-  const [text, setText] = useState(research);
+  const [form, setForm] = useServerSeeded({ research });
+  const text = form.research;
+  const setText = (value: string) => setForm(() => ({ research: value }));
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -126,7 +162,7 @@ function Details({
   website: string;
   priority: string;
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useServerSeeded({
     domains,
     industry,
     hqLocation,

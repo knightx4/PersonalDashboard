@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import {
@@ -22,16 +23,32 @@ import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
-import { addQuestions, promoteToCanonical, saveAnswer, updateRole } from '../actions';
+import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import {
+  addQuestions,
+  draftAnswerFromEvidence,
+  lookUpJobDescription,
+  promoteToCanonical,
+  saveAnswer,
+  saveDraftedAnswer,
+  updateRole,
+  type JdLookupResult,
+} from '../actions';
 import {
   addInterview,
+  addInterviewer,
   addNote,
   addReminder,
   declineCandidateMessage,
   deleteInterview,
   linkCandidateMessage,
+  matchRoleRequirements,
+  removeInterviewer,
   saveInterview,
   searchUnlinkedMessages,
+  shareCasePage,
+  unshareCasePage,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
@@ -52,12 +69,27 @@ export interface PanelProps {
   roleId: string;
   applicationId: string;
   jdText: string;
+  /** What the last automated board lookup did, or could not do. */
+  jdLookupNote: string | null;
   jdUrl: string | null;
   atsJobId: string | null;
   compMinCents: number | null;
   compMaxCents: number | null;
   compSource: string | null;
   requirements: Requirement[];
+  /** The stored match, or null if this role has never been matched. */
+  requirementMatches: RequirementMatch[] | null;
+  requirementMatchesAt: string | null;
+  /** The description or the bank has changed since the match was computed. */
+  requirementMatchesStale: boolean;
+  /** How many items the bank holds. Zero is why a match refuses to run. */
+  bankSize: number;
+  /** The statement of interest on the shared case page. Written by hand. */
+  caseStatement: string;
+  /** The live share slug, or null when the page is not shared. */
+  caseSlug: string | null;
+  caseExpiresAt: string | null;
+  appOrigin: string;
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
   focusInterviewId?: string | null;
@@ -83,7 +115,16 @@ export interface PanelProps {
     prepNotes: string;
     notes: string;
     questionsAsked: string[];
+    /** Who is in the room, as contacts rather than as names on a string. */
+    participants: Array<{
+      contactId: string;
+      name: string;
+      title: string | null;
+      role: string;
+    }>;
   }>;
+  /** Everyone known at this company, for naming an interviewer without retyping. */
+  companyContacts: Array<{ id: string; name: string; title: string | null }>;
   answers: Array<{
     id: string;
     answer: string;
@@ -93,6 +134,9 @@ export interface PanelProps {
     questionKind: string;
     canonicalAnswer: string | null;
     timesSeen: number;
+    /** What a previous draft cited, and what it could not ground. */
+    evidenceItemIds: string[];
+    unsupportedClaims: string[];
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
   /** Open to-dos you set for yourself, not events the inbox produced. */
@@ -128,8 +172,32 @@ export interface PanelProps {
   }>;
 }
 
+/**
+ * Mail that describes an interview rather than merely mentioning one.
+ *
+ * These are the classifications the ingest path turns into a booking, so they
+ * are the ones worth offering a round against when it did not: a scheduling
+ * thread hand-linked from the review queue records its event but no interview,
+ * and until now that left the Interviews tab silently empty.
+ */
+const INTERVIEW_MAIL = new Set(['interview_invite', 'scheduling']);
+
+/** What the "Add a round" form should be seeded with, and which mail asked. */
+interface InterviewSeed {
+  kind: string;
+  fromSubject: string | null;
+}
+
 export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'timeline');
+  const [interviewSeed, setInterviewSeed] = useState<InterviewSeed | null>(null);
+
+  // Adding the round from a message is one move, not "go to the other tab and
+  // find the button": the seed opens the form there already filled in.
+  const startInterviewFrom = (seed: InterviewSeed) => {
+    setInterviewSeed(seed);
+    setTab('interviews');
+  };
 
   return (
     <div>
@@ -172,9 +240,15 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
       {tab === 'timeline' && <Timeline {...props} />}
       {tab === 'posting' && <Posting {...props} />}
       {tab === 'answers' && <Answers {...props} />}
-      {tab === 'interviews' && <Interviews {...props} />}
+      {tab === 'interviews' && (
+        <Interviews
+          {...props}
+          seed={interviewSeed}
+          onSeedUsed={() => setInterviewSeed(null)}
+        />
+      )}
       {tab === 'notes' && <Notes {...props} />}
-      {tab === 'mail' && <LinkedMail {...props} />}
+      {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
 
       <NotRealPursuit applicationId={props.applicationId} />
     </div>
@@ -412,15 +486,37 @@ function Todos({
   );
 }
 
+/**
+ * Colour carries the verdict, so a map is readable at a glance without reading
+ * every line. Gap is the same red as a rejection on purpose: it is the answer
+ * that saves you the hour, not a failure state to be softened.
+ */
+const VERDICT_STYLE: Record<MatchVerdict, { dot: string; label: string; text: string }> = {
+  strong: { dot: 'bg-status-offer', label: 'Strong', text: 'text-status-offer' },
+  partial: { dot: 'bg-accent-orange', label: 'Partial', text: 'text-accent-orange' },
+  gap: { dot: 'bg-status-rejected', label: 'Gap', text: 'text-status-rejected' },
+};
+
 function Posting({
   roleId,
   jdText,
+  jdLookupNote,
   jdUrl,
   atsJobId,
   compMinCents,
   compMaxCents,
   compSource,
   requirements,
+  requirementMatches,
+  requirementMatchesAt,
+  requirementMatchesStale,
+  bankSize,
+  applicationId,
+  caseStatement,
+  caseSlug,
+  caseExpiresAt,
+  appOrigin,
+  timezone,
 }: PanelProps) {
   const groups: Array<{ kind: Requirement['kind']; label: string }> = [
     { kind: 'must_have', label: 'Must have' },
@@ -428,14 +524,73 @@ function Posting({
     { kind: 'responsibility', label: 'What the role does' },
   ];
 
+  const [matches, setMatches] = useState(requirementMatches);
+  const [stale, setStale] = useState(requirementMatchesStale);
+  const [matching, setMatching] = useState(false);
+  const [matchError, setMatchError] = useState<string | null>(null);
+  const [, startMatch] = useTransition();
+
+  // Keyed by text, because the map is stored as its own list and a description
+  // re-extracted since the match can have moved, added or dropped a line. A
+  // line with no entry simply renders unmatched, which is the honest reading.
+  const verdictFor = new Map((matches ?? []).map((match) => [match.requirement, match]));
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-card border border-border bg-surface p-4">
-        <h3 className="text-[13px] font-semibold text-ink">Requirement map</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-[13px] font-semibold text-ink">Requirement map</h3>
+          {requirements.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={matching}
+              onClick={() => {
+                setMatching(true);
+                setMatchError(null);
+                startMatch(async () => {
+                  const result = await matchRoleRequirements({ roleId });
+                  setMatching(false);
+                  if (result.error || !result.matches) {
+                    setMatchError(result.error ?? 'The match came back empty.');
+                    return;
+                  }
+                  setMatches(result.matches);
+                  setStale(false);
+                });
+              }}
+            >
+              {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
+            </Button>
+          )}
+        </div>
         <p className="mt-0.5 text-[12px] text-ink-muted">
-          Extracted once from the description. In Phase 2 each line gets your best matching
-          evidence beside it, scored strong, partial or gap.
+          {matches
+            ? 'Your best evidence beside each line. A gap is the useful answer — it is the hour you do not spend.'
+            : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'}
         </p>
+
+        {matches && requirementMatchesAt && !stale && (
+          <p className="mt-1 text-[12px] text-ink-faint">
+            Matched {formatDateTime(requirementMatchesAt, timezone)}.
+          </p>
+        )}
+        {stale && (
+          <p className="mt-1 text-[12px] text-accent-orange">
+            The description or your bank has changed since this was matched.
+          </p>
+        )}
+        {bankSize === 0 && (
+          <p className="mt-1 text-[12px] text-ink-faint">
+            Your evidence bank is empty, so there is nothing to match against.{' '}
+            <Link href="/jobs/settings" className="underline underline-offset-2 hover:text-ink">
+              Fill it in Settings.
+            </Link>
+          </p>
+        )}
+        {matchError && <p className="mt-1 text-[12px] text-status-rejected">{matchError}</p>}
+
         {requirements.length === 0 ? (
           <p className="mt-3 text-[13px] text-ink-faint">
             No description saved yet, so there is nothing to map.
@@ -451,12 +606,31 @@ function Posting({
                     {group.label}
                   </h4>
                   <ul className="mt-1 space-y-1">
-                    {items.map((item, index) => (
-                      <li key={`${group.kind}-${index}`} className="flex gap-2 text-[13px] text-ink">
-                        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-border-strong" aria-hidden />
-                        {item.text}
-                      </li>
-                    ))}
+                    {items.map((item, index) => {
+                      const match = verdictFor.get(item.text);
+                      const style = match ? VERDICT_STYLE[match.verdict] : null;
+                      return (
+                        <li key={`${group.kind}-${index}`} className="flex gap-2 text-[13px] text-ink">
+                          <span
+                            className={cn(
+                              'mt-1.5 size-1.5 shrink-0 rounded-full',
+                              style ? style.dot : 'bg-border-strong',
+                            )}
+                            aria-hidden
+                          />
+                          <span className="min-w-0">
+                            {item.text}
+                            {match && style && (
+                              <span className="block text-[12px] text-ink-muted">
+                                <span className={cn('font-medium', style.text)}>{style.label}</span>
+                                {' — '}
+                                {match.why}
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               );
@@ -466,6 +640,16 @@ function Posting({
       </section>
 
       <div className="space-y-4">
+        <ShareCaseCard
+          applicationId={applicationId}
+          statement={caseStatement}
+          slug={caseSlug}
+          expiresAt={caseExpiresAt}
+          appOrigin={appOrigin}
+          canShare={(matches ?? []).some((match) => match.verdict !== 'gap')}
+          timezone={timezone}
+        />
+
         <RoleDetailsCard
           roleId={roleId}
           jdUrl={jdUrl}
@@ -475,9 +659,148 @@ function Posting({
           compSource={compSource}
         />
 
-        <JobDescriptionCard roleId={roleId} jdText={jdText} />
+        <JobDescriptionCard roleId={roleId} jdText={jdText} jdLookupNote={jdLookupNote} />
       </div>
     </div>
+  );
+}
+
+/**
+ * The shared case page.
+ *
+ * The requirement map is already the work; this puts a link on it. A statement
+ * of interest goes on top, written by hand -- the map is what makes the page
+ * worth sending, and a generated paragraph of enthusiasm above it would undo
+ * that. Standalone cover letter generation is dropped for the same reason.
+ *
+ * Only the covered lines travel. The private map exists to show what you
+ * cannot claim; this page exists to show what you can, and the filtering
+ * happens in the database so gap lines never leave it.
+ */
+function ShareCaseCard({
+  applicationId,
+  statement,
+  slug,
+  expiresAt,
+  appOrigin,
+  canShare,
+  timezone,
+}: {
+  applicationId: string;
+  statement: string;
+  slug: string | null;
+  expiresAt: string | null;
+  appOrigin: string;
+  canShare: boolean;
+  timezone: string;
+}) {
+  const [body, setBody] = useState(statement);
+  const [liveSlug, setLiveSlug] = useState(slug);
+  const [liveExpiry, setLiveExpiry] = useState(expiresAt);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const url = liveSlug ? `${appOrigin}/jobs/p/${liveSlug}` : null;
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-4">
+      <h3 className="text-[13px] font-semibold text-ink">Share the map</h3>
+      <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">
+        A private link showing this role&rsquo;s requirements with your evidence beside each one. It
+        is a work sample and a cover letter in one. Gaps are never on it, and the link expires.
+      </p>
+
+      <Label htmlFor={`case-body-${applicationId}`} className="mt-3 block">
+        Why you want it
+      </Label>
+      <Textarea
+        id={`case-body-${applicationId}`}
+        rows={4}
+        value={body}
+        onChange={(event) => setBody(event.target.value)}
+        placeholder="A short paragraph, in your words. Nothing writes this for you."
+      />
+
+      {url && (
+        <div className="mt-3 rounded-lg bg-canvas p-2">
+          <p className="break-all font-mono text-[11px] text-ink">{url}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="text-[12px] text-brand hover:underline"
+              onClick={() => {
+                navigator.clipboard.writeText(url);
+                setCopied(true);
+              }}
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+            {liveExpiry && (
+              <span className="text-[11px] text-ink-faint">
+                Expires {formatDate(liveExpiry, timezone)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={pending || !canShare}
+          title={canShare ? undefined : 'Match the requirements first — there is nothing to show yet.'}
+          onClick={() => {
+            setError(null);
+            setCopied(false);
+            startTransition(async () => {
+              const result = await shareCasePage({ applicationId, body });
+              if (result.error) {
+                setError(result.error);
+                return;
+              }
+              setLiveSlug(result.slug);
+              setLiveExpiry(result.expiresAt);
+            });
+          }}
+        >
+          {liveSlug ? 'Save and re-issue the link' : 'Create the link'}
+        </Button>
+
+        {liveSlug && (
+          <button
+            type="button"
+            className="text-[12px] text-ink-faint hover:text-status-rejected"
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await unshareCasePage(applicationId);
+                if (result.error) {
+                  setError(result.error);
+                  return;
+                }
+                setLiveSlug(null);
+                setLiveExpiry(null);
+                setCopied(false);
+              });
+            }}
+          >
+            Stop sharing
+          </button>
+        )}
+
+        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+      </div>
+
+      {liveSlug && (
+        <p className="mt-1.5 text-[11px] text-ink-faint">
+          Re-issuing gives a new link and breaks the old one, which is how you take a shared page
+          back.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -660,12 +983,22 @@ function RoleDetailsCard({
  * when the text has a visible range in it, fills the comp band too -- see
  * updateRole.
  */
-function JobDescriptionCard({ roleId, jdText }: { roleId: string; jdText: string }) {
+function JobDescriptionCard({
+  roleId,
+  jdText,
+  jdLookupNote,
+}: {
+  roleId: string;
+  jdText: string;
+  jdLookupNote: string | null;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(jdText);
   const [error, setError] = useState<string | null>(null);
+  const [lookup, setLookup] = useState<JdLookupResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const [looking, startLooking] = useTransition();
 
   const save = () => {
     setError(null);
@@ -680,22 +1013,40 @@ function JobDescriptionCard({ roleId, jdText }: { roleId: string; jdText: string
     });
   };
 
+  // The nightly pass walks six companies a night. A role you are looking at now
+  // should not wait behind two hundred you are not, and the answer arrives in
+  // about the time the board takes to reply.
+  const lookItUp = () => {
+    setLookup(null);
+    startLooking(async () => {
+      setLookup(await lookUpJobDescription(roleId));
+      router.refresh();
+    });
+  };
+
   return (
     <section className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-[13px] font-semibold text-ink">Job description</h3>
         {!editing && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setDraft(jdText);
-              setEditing(true);
-            }}
-          >
-            {jdText ? 'Edit' : 'Add description'}
-          </Button>
+          <div className="flex items-center gap-1">
+            {!jdText && (
+              <Button type="button" size="sm" variant="ghost" disabled={looking} onClick={lookItUp}>
+                {looking ? 'Looking…' : 'Look it up'}
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDraft(jdText);
+                setEditing(true);
+              }}
+            >
+              {jdText ? 'Edit' : 'Add description'}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -734,11 +1085,55 @@ function JobDescriptionCard({ roleId, jdText }: { roleId: string; jdText: string
           band automatically.
         </p>
       )}
+
+      {/* What this lookup just did. Shown instead of the stored note, which it
+          has only this second replaced -- two lines saying almost the same
+          thing is how a panel stops being read. */}
+      {!editing && lookup && (
+        <div className="mt-3 border-t border-border pt-3">
+          <p className={cn('text-[12px]', lookup.ok ? 'text-ink-muted' : 'text-ink-faint')}>
+            {lookup.message}
+          </p>
+          {/* The ambiguous case is the one worth spending pixels on: the board
+              knows which postings these are, so linking them turns "go and find
+              it" into one click away from the right page. */}
+          {lookup.candidates && lookup.candidates.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {lookup.candidates.map((candidate) => (
+                <li key={`${candidate.title}-${candidate.url ?? ''}`} className="text-[12px]">
+                  {candidate.url ? (
+                    <a
+                      href={candidate.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-ink-muted underline underline-offset-2 hover:text-ink"
+                    >
+                      {candidate.title}
+                    </a>
+                  ) : (
+                    <span className="text-ink-muted">{candidate.title}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Why the nightly board lookup did not fill this in, or which posting it
+          picked when the match was on a title rather than an id. An empty panel
+          on its own asks you for nothing and explains nothing. Hidden while
+          editing, where the box you are typing in is the answer. */}
+      {!editing && !lookup && jdLookupNote && (
+        <p className="mt-3 border-t border-border pt-3 text-[12px] text-ink-faint">
+          {jdLookupNote}
+        </p>
+      )}
     </section>
   );
 }
 
-function Answers({ answers, applicationId }: PanelProps) {
+function Answers({ answers, applicationId, bankSize }: PanelProps) {
   const [paste, setPaste] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -784,7 +1179,7 @@ function Answers({ answers, applicationId }: PanelProps) {
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} />
+            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} />
           ))}
         </div>
       )}
@@ -792,11 +1187,25 @@ function Answers({ answers, applicationId }: PanelProps) {
   );
 }
 
-function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
+function AnswerCard({
+  answer,
+  bankSize,
+}: {
+  answer: PanelProps['answers'][number];
+  bankSize: number;
+}) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // The draft lives here, beside the textarea, and never in it. It reaches the
+  // answer only through Insert, and the record only through Save -- the
+  // compose.ts rule: the model may prepare text, but nothing goes out over
+  // your name that you did not put there.
+  const [draft, setDraft] = useState<AnswerDraft | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   const usingCanonical = !answer.answer && Boolean(answer.canonicalAnswer);
 
@@ -819,6 +1228,24 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
         <p className="mt-2 rounded bg-brand-tint px-2 py-1 text-[12px] text-brand">
           Filled from your default answer for this question. Edit it if this one needs tailoring.
         </p>
+      )}
+
+      {/*
+        The claims a saved draft could not ground, still shown after the reload.
+        This is the one thing worth re-reading before you submit, so it does not
+        live only in the session that generated it.
+      */}
+      {!draft && answer.unsupportedClaims.length > 0 && (
+        <div className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5">
+          <p className="text-[12px] font-medium text-ink">
+            This answer states things your bank does not carry:
+          </p>
+          <ul className="mt-0.5 list-disc pl-4 text-[12px] text-ink">
+            {answer.unsupportedClaims.map((claim) => (
+              <li key={claim}>{claim}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <Textarea
@@ -874,31 +1301,290 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
             Make this my default answer
           </Button>
         )}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={drafting || bankSize === 0}
+          title={
+            bankSize === 0
+              ? 'Your evidence bank is empty, so there is nothing to draft from.'
+              : undefined
+          }
+          onClick={() => {
+            setDrafting(true);
+            setDraftError(null);
+            startTransition(async () => {
+              const result = await draftAnswerFromEvidence({ answerId: answer.id });
+              setDrafting(false);
+              if (result.error || !result.draft) {
+                setDraftError(result.error ?? 'Nothing came back.');
+                return;
+              }
+              setDraft(result.draft);
+            });
+          }}
+        >
+          {drafting ? 'Drafting…' : 'Draft from my evidence'}
+        </Button>
         {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        {draftError && <span className="text-[12px] text-status-rejected">{draftError}</span>}
       </div>
+
+      {draft && (
+        <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h4 className="text-[12px] font-medium text-ink">A draft, from your own stories</h4>
+            <span className="text-[11px] text-ink-faint">
+              Nothing is saved until you insert it and save.
+            </span>
+          </div>
+
+          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
+            {draft.text}
+          </p>
+
+          <p className="mt-2 text-[11px] text-ink-faint">
+            Draws on{' '}
+            {draft.evidenceItemIds.length === 1
+              ? 'one item'
+              : `${draft.evidenceItemIds.length} items`}{' '}
+            from your bank.
+          </p>
+
+          {draft.unsupportedClaims.length > 0 && (
+            <div className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5">
+              <p className="text-[12px] font-medium text-ink">
+                Not grounded in anything you wrote:
+              </p>
+              <ul className="mt-0.5 list-disc pl-4 text-[12px] text-ink">
+                {draft.unsupportedClaims.map((claim) => (
+                  <li key={claim}>{claim}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-[11px] text-ink-muted">
+                Check each of these before it goes out, or cut it.
+              </p>
+            </div>
+          )}
+
+          {draft.bannedFound.length > 0 && (
+            <p className="mt-2 text-[12px] text-accent-orange">
+              Uses {draft.bannedFound.map((phrase) => `“${phrase}”`).join(', ')} — on your banned
+              list.
+            </p>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => {
+                setText(draft.text);
+                startTransition(async () => {
+                  const result = await saveDraftedAnswer({
+                    answerId: answer.id,
+                    answer: draft.text,
+                    evidenceItemIds: draft.evidenceItemIds,
+                    unsupportedClaims: draft.unsupportedClaims,
+                  });
+                  setSaved(result.error ?? 'Inserted and saved as a draft.');
+                  if (!result.error) {
+                    setStatus('draft');
+                    setDraft(null);
+                  }
+                });
+              }}
+            >
+              Insert
+            </Button>
+            <button
+              type="button"
+              className="text-[12px] text-ink-faint hover:text-ink"
+              onClick={() => setDraft(null)}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-function Interviews({ interviews, applicationId, timezone, focusInterviewId }: PanelProps) {
+function Interviews({
+  interviews,
+  applicationId,
+  timezone,
+  focusInterviewId,
+  messages,
+  companyContacts,
+  seed,
+  onSeedUsed,
+}: PanelProps & { seed?: InterviewSeed | null; onSeedUsed?: () => void }) {
+  // Mail that says an interview exists while this tab says none does. The
+  // combination is always a miss -- a hand-link that recorded only the event,
+  // or a thread the extractor read without finding a date -- so it is stated
+  // rather than left as a blank the tab count already implied was correct.
+  const interviewMail = interviews.length === 0
+    ? messages.filter((message) => INTERVIEW_MAIL.has(message.classification))
+    : [];
+
   return (
     <div className="space-y-3">
       {interviews.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
-          No interviews yet. They appear here when a scheduling email arrives, or you can add one
-          below.
-        </p>
+        <div className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+          {interviewMail.length > 0 ? (
+            <>
+              <p className="text-ink">
+                {interviewMail.length === 1
+                  ? 'An email about scheduling is linked to this pursuit, but no interview is recorded.'
+                  : `${interviewMail.length} emails about scheduling are linked to this pursuit, but no interview is recorded.`}
+              </p>
+              <p className="mt-1">
+                The mail only ever carries a booking when it arrives with a calendar invite. Add
+                the round below, or from the message itself under Linked mail.
+              </p>
+            </>
+          ) : (
+            <p>
+              No interviews yet. They appear here when a scheduling email arrives, or you can add
+              one below.
+            </p>
+          )}
+        </div>
       ) : (
         interviews.map((interview) => (
           <InterviewCard
             key={interview.id}
             interview={interview}
             timezone={timezone}
+            companyContacts={companyContacts}
             focused={interview.id === focusInterviewId}
           />
         ))
       )}
-      <AddInterview applicationId={applicationId} nextRound={interviews.length + 1} />
+      <AddInterview
+        applicationId={applicationId}
+        nextRound={interviews.length + 1}
+        seed={seed}
+        onSeedUsed={onSeedUsed}
+      />
+    </div>
+  );
+}
+
+/**
+ * Who is in the room, as people rather than as text.
+ *
+ * A calendar invite has been recording its attendees as contacts since the
+ * invite parser landed; the round just never showed them. Each name is the
+ * contact record, so it opens on their title, their LinkedIn and every touch
+ * you have had with them — which is the whole reason for storing a person
+ * rather than a string.
+ */
+function Interviewers({
+  interview,
+  companyContacts,
+}: {
+  interview: PanelProps['interviews'][number];
+  companyContacts: PanelProps['companyContacts'];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const named = new Set(interview.participants.map((participant) => participant.contactId));
+  const available = companyContacts.filter((contact) => !named.has(contact.id));
+
+  const add = (contactId: string) =>
+    startTransition(async () => {
+      const result = await addInterviewer({ interviewId: interview.id, contactId });
+      setError(result.error);
+      if (!result.error) setAdding(false);
+    });
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        Interviewers
+      </span>
+
+      {interview.participants.length === 0 && !adding && (
+        <span className="text-ink-faint">Nobody named yet</span>
+      )}
+
+      {interview.participants.map((participant) => (
+        <span
+          key={participant.contactId}
+          className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5"
+        >
+          <Link
+            href={`/jobs/contacts/${participant.contactId}`}
+            className="text-ink underline underline-offset-2 hover:text-brand"
+            title={participant.title ?? undefined}
+          >
+            {participant.name}
+          </Link>
+          {participant.role !== 'interviewer' && (
+            <span className="text-ink-faint">{participant.role}</span>
+          )}
+          <button
+            type="button"
+            disabled={pending}
+            aria-label={`Remove ${participant.name}`}
+            onClick={() =>
+              startTransition(() =>
+                void removeInterviewer({
+                  interviewId: interview.id,
+                  contactId: participant.contactId,
+                }),
+              )
+            }
+            className="text-ink-faint hover:text-status-rejected"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+
+      {adding ? (
+        available.length > 0 ? (
+          <Select
+            aria-label="Add an interviewer"
+            defaultValue=""
+            disabled={pending}
+            className="h-7 w-56 py-0 text-[12px]"
+            onChange={(event) => event.target.value && add(event.target.value)}
+          >
+            <option value="">Pick a contact…</option>
+            {available.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.title ? `${contact.name} — ${contact.title}` : contact.name}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          // No picker without anyone to pick: an interviewer has to exist as a
+          // contact first, and inventing one from here would put a person on
+          // the company with nothing but a name.
+          <span className="text-ink-faint">
+            No contacts at this company yet — add them on the company page first.
+          </span>
+        )
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="text-ink-faint underline underline-offset-2 hover:text-brand"
+        >
+          Add
+        </button>
+      )}
+
+      {error && <span className="text-status-rejected">{error}</span>}
     </div>
   );
 }
@@ -906,11 +1592,13 @@ function Interviews({ interviews, applicationId, timezone, focusInterviewId }: P
 function InterviewCard({
   interview,
   timezone,
+  companyContacts,
   focused = false,
 }: {
   focused?: boolean;
   interview: PanelProps['interviews'][number];
   timezone: string;
+  companyContacts: PanelProps['companyContacts'];
 }) {
   const [prep, setPrep] = useState(interview.prepNotes);
   const [notes, setNotes] = useState(interview.notes);
@@ -944,6 +1632,8 @@ function InterviewCard({
           {formatDateTime(interview.scheduledAt, timezone)}
         </span>
       </header>
+
+      <Interviewers interview={interview} companyContacts={companyContacts} />
 
       {needsDebrief && (
         <p className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5 text-[12px] text-ink">
@@ -1062,12 +1752,40 @@ function CollapsibleField({
  * adding a round the inbox never saw at all, a phone screen nobody emailed
  * about.
  */
-function AddInterview({ applicationId, nextRound }: { applicationId: string; nextRound: number }) {
+function AddInterview({
+  applicationId,
+  nextRound,
+  seed,
+  onSeedUsed,
+}: {
+  applicationId: string;
+  nextRound: number;
+  /** Set when the round is being added from a specific email. */
+  seed?: InterviewSeed | null;
+  onSeedUsed?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('recruiter_screen');
   const [scheduledAt, setScheduledAt] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [usedSeed, setUsedSeed] = useState<InterviewSeed | null>(null);
+
+  // Arriving from a message in Linked mail: open already filled in. The time
+  // is deliberately not guessed from the mail -- the mail's arrival is not the
+  // appointment, and a wrong hour on the board is worse than an empty field.
+  if (seed && seed !== usedSeed) {
+    setUsedSeed(seed);
+    setKind(seed.kind);
+    setError(null);
+    setOpen(true);
+  }
+
+  const close = () => {
+    setOpen(false);
+    setUsedSeed(null);
+    onSeedUsed?.();
+  };
 
   if (!open) {
     return (
@@ -1083,6 +1801,13 @@ function AddInterview({ applicationId, nextRound }: { applicationId: string; nex
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
+      {usedSeed && (
+        <p className="mb-3 text-[12px] text-ink-muted">
+          From{' '}
+          <span className="text-ink">{usedSeed.fromSubject ?? 'the linked message'}</span> — that
+          mail says when it is; put the time in below.
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <Label htmlFor="interview-kind">Kind</Label>
@@ -1126,15 +1851,15 @@ function AddInterview({ applicationId, nextRound }: { applicationId: string; nex
               if (result.error) {
                 setError(result.error);
               } else {
-                setOpen(false);
                 setScheduledAt('');
+                close();
               }
             })
           }
         >
           Add round {nextRound}
         </Button>
-        <button type="button" onClick={() => setOpen(false)} className="text-[12px] text-ink-faint hover:text-ink">
+        <button type="button" onClick={close} className="text-[12px] text-ink-faint hover:text-ink">
           Cancel
         </button>
         {error && <span className="text-[12px] text-status-rejected">{error}</span>}
@@ -1188,8 +1913,8 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
   );
 }
 
-function LinkedMail(props: PanelProps) {
-  const { messages, timezone, applicationId, companyName, matchCandidates } = props;
+function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) => void }) {
+  const { messages, timezone, applicationId, companyName, matchCandidates, onAddInterview } = props;
 
   return (
     <div className="space-y-4">
@@ -1213,6 +1938,7 @@ function LinkedMail(props: PanelProps) {
                 <th className="px-2 py-2 font-semibold">Subject</th>
                 <th className="px-2 py-2 font-semibold">Kind</th>
                 <th className="px-2 py-2 font-semibold">Linked by</th>
+                <th className="px-2 py-2 font-semibold" />
               </tr>
             </thead>
             <tbody>
@@ -1237,6 +1963,22 @@ function LinkedMail(props: PanelProps) {
                     {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
                     {message.linkConfidence !== null &&
                       ` (${Math.round(message.linkConfidence * 100)}%)`}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {INTERVIEW_MAIL.has(message.classification) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAddInterview({
+                            kind: 'recruiter_screen',
+                            fromSubject: message.subject,
+                          })
+                        }
+                        className="whitespace-nowrap text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+                      >
+                        Add interview
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -24,7 +24,7 @@ create table profiles (
   -- anchors every funnel time series
   search_started_on date,
   weekly_application_goal int,
-  -- free text, injected into every generation prompt (Phase 2)
+  -- free text, injected into every generation prompt; see docs/EVIDENCE-LAYER.md
   writing_style_notes text,
   -- hard post-processing check on generated text. Seeded with em dashes.
   banned_constructions text[] not null default
@@ -442,7 +442,8 @@ create index questions_text_trgm_idx on questions using gin (text gin_trgm_ops);
 -- ---------------------------------------------------------------------------
 -- application_answers -- the per-application instance.
 -- evidence_item_ids is the grounding record: an answer that cites nothing was
--- not grounded, and Phase 2 treats that as an error rather than a fallback.
+-- not grounded, and the evidence layer treats that as an error rather than a
+-- fallback.
 -- ---------------------------------------------------------------------------
 create table application_answers (
   id uuid primary key default gen_random_uuid(),
@@ -473,7 +474,7 @@ create table cover_letters (
   body text,
   status answer_status not null default 'draft',
   evidence_item_ids uuid[] not null default '{}',
-  -- Phase 2 shareable page. Unguessable, expiring, noindex.
+  -- The shareable case page. Unguessable, expiring, noindex.
   public_slug text,
   public_expires_at timestamptz,
   created_at timestamptz not null default now(),

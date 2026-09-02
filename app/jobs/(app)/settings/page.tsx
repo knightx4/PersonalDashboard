@@ -63,7 +63,7 @@ export default async function SettingsPage({
         .order('created_at'),
       supabase
         .from('resume_versions')
-        .select('id, label, is_default, notes, created_at')
+        .select('id, label, is_default, notes, created_at, text_content')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
       supabase
@@ -151,6 +151,9 @@ export default async function SettingsPage({
           label: resume.label as string,
           isDefault: resume.is_default as boolean,
           notes: (resume.notes as string) ?? null,
+          // Whether it can be read, not the text: a resume is several kilobytes
+          // and the client only needs to know the option is offerable.
+          hasText: Boolean((resume.text_content as string | null)?.trim()),
         }))}
         evidence={(evidence ?? []).map((item) => ({
           id: item.id as string,

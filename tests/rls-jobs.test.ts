@@ -12,7 +12,7 @@
  * whenever the schema grows.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { admin, APP_SCHEMA, asUser, closeDb, createUser, truncateAll } from './helpers/db-jobs';
+import { admin, APP_SCHEMA, asAnon, asUser, closeDb, createUser, truncateAll } from './helpers/db-jobs';
 
 type SeedIds = Record<string, string>;
 
@@ -418,5 +418,121 @@ describe('integrity constraints the database enforces itself', () => {
       returning id`;
     expect(rows).toHaveLength(1);
     await admin`delete from applications where id = ${rows[0].id}`;
+  });
+});
+
+/**
+ * The public case page.
+ *
+ * The one unauthenticated read in the whole application, so it gets its own
+ * negative cases rather than riding on the loop above. Every assertion here
+ * runs as `anon` -- the role an actual stranger gets -- because a test that
+ * passes as `authenticated` proves nothing about a link pasted into an email.
+ */
+describe('the public case page', () => {
+  const SLUG = 'case-slug-with-real-entropy-aaaa';
+  let letterId: string;
+
+  beforeAll(async () => {
+    const [item] = await admin<{ id: string }[]>`
+      insert into evidence_items (user_id, title, body)
+      values (${userA}, 'Forecasting rebuild', 'I rebuilt the forecast.')
+      returning id`;
+
+    // A private item nothing on the page references. If this ever comes back
+    // through the function, the page is leaking the bank rather than citing it.
+    await admin`
+      insert into evidence_items (user_id, title, body)
+      values (${userA}, 'Unreferenced private story', 'Should never leave the database.')`;
+
+    await admin`
+      update roles set requirement_matches = ${admin.json([
+        {
+          requirement: 'Five years of forecasting',
+          kind: 'must_have',
+          verdict: 'strong',
+          evidence_item_id: item.id,
+          why: 'Six years of it.',
+        },
+        {
+          requirement: 'German localisation',
+          kind: 'must_have',
+          verdict: 'gap',
+          evidence_item_id: null,
+          why: 'Nothing in the bank covers this.',
+        },
+      ])}
+      where id = ${seedA.roles}`;
+
+    const [letter] = await admin<{ id: string }[]>`
+      insert into cover_letters (user_id, application_id, body, public_slug, public_expires_at)
+      values (${userA}, ${seedA.applications}, 'Why this role.', ${SLUG}, now() + interval '7 days')
+      returning id`;
+    letterId = letter.id;
+  });
+
+  afterAll(async () => {
+    await admin`delete from cover_letters where id = ${letterId}`;
+  });
+
+  async function fetchCase(slug: string | null): Promise<Record<string, unknown> | null> {
+    const [row] = await asAnon((tx) =>
+      tx.unsafe<{ page: Record<string, unknown> | null }[]>(
+        `select ${APP_SCHEMA}.public_case_page($1) as page`,
+        [slug],
+      ),
+    );
+    return row?.page ?? null;
+  }
+
+  it('renders the shared page for a live slug', async () => {
+    const page = await fetchCase(SLUG);
+    expect(page).not.toBeNull();
+    expect(page?.company).toBeTruthy();
+    expect(page?.body).toBe('Why this role.');
+  });
+
+  it('shows the covered lines and never the gaps', async () => {
+    const page = await fetchCase(SLUG);
+    const matches = page?.matches as Array<{ requirement: string; verdict: string }>;
+    expect(matches.map((m) => m.verdict)).toEqual(['strong']);
+    expect(JSON.stringify(page)).not.toContain('German localisation');
+  });
+
+  it('sends only the evidence the page cites, not the bank', async () => {
+    const page = await fetchCase(SLUG);
+    const evidence = page?.evidence as Array<{ title: string }>;
+    expect(evidence.map((e) => e.title)).toEqual(['Forecasting rebuild']);
+    expect(JSON.stringify(page)).not.toContain('Unreferenced private story');
+  });
+
+  it('returns nothing for a wrong slug', async () => {
+    expect(await fetchCase('case-slug-with-real-entropy-bbbb')).toBeNull();
+  });
+
+  it('returns nothing for a null or too-short slug', async () => {
+    expect(await fetchCase(null)).toBeNull();
+    expect(await fetchCase('short')).toBeNull();
+  });
+
+  it('returns nothing once the link has expired', async () => {
+    await admin`update cover_letters set public_expires_at = now() - interval '1 day' where id = ${letterId}`;
+    expect(await fetchCase(SLUG)).toBeNull();
+    await admin`update cover_letters set public_expires_at = now() + interval '7 days' where id = ${letterId}`;
+  });
+
+  it('returns nothing when sharing was never turned on', async () => {
+    await admin`update cover_letters set public_expires_at = null where id = ${letterId}`;
+    expect(await fetchCase(SLUG)).toBeNull();
+    await admin`update cover_letters set public_expires_at = now() + interval '7 days' where id = ${letterId}`;
+  });
+
+  it('does not let anon reach the table the function reads', async () => {
+    await expect(
+      asAnon((tx) => tx.unsafe(`select count(*) from ${APP_SCHEMA}.cover_letters`)),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asAnon((tx) => tx.unsafe(`select count(*) from ${APP_SCHEMA}.evidence_items`)),
+    ).rejects.toThrow(/permission denied/);
   });
 });

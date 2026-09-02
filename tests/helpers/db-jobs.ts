@@ -51,6 +51,21 @@ export async function asUser<T>(
   }) as Promise<T>;
 }
 
+/**
+ * Run a callback as `anon` -- a visitor with no session at all.
+ *
+ * The public case page is the only thing in this app that a stranger can read,
+ * so its assertions have to run as the role a stranger actually gets. `asUser`
+ * would grant `authenticated`, which is a different and more privileged thing.
+ */
+export async function asAnon<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+  return sql.begin(async (tx) => {
+    await tx.unsafe(`set local role anon`);
+    await tx.unsafe(`set local search_path = ${APP_SCHEMA}, public, extensions`);
+    return fn(tx);
+  }) as Promise<T>;
+}
+
 /** Create an auth.users row (and, via trigger, its profile). */
 export async function createUser(email: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`

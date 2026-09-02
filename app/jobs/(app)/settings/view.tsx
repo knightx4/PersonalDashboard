@@ -9,8 +9,15 @@ import { TimezoneField } from '@/components/ui/timezone-field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
-import { addEvidence, addResumeVersion, deleteEvidence } from './evidence-actions';
+import {
+  acceptEvidence,
+  addEvidence,
+  addResumeVersion,
+  deleteEvidence,
+  proposeEvidence,
+} from './evidence-actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
+import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 
 export function SettingsView(props: {
   email: string;
@@ -27,7 +34,13 @@ export function SettingsView(props: {
     bannedConstructions: string;
   };
   accounts: InboxAccount[];
-  resumes: Array<{ id: string; label: string; isDefault: boolean; notes: string | null }>;
+  resumes: Array<{
+    id: string;
+    label: string;
+    isDefault: boolean;
+    notes: string | null;
+    hasText: boolean;
+  }>;
   excludedSenders: Array<{ id: string; domain: string }>;
   evidence: Array<{
     id: string;
@@ -63,7 +76,7 @@ export function SettingsView(props: {
       <BookmarkletSection appOrigin={props.appOrigin} />
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
-      <EvidenceSection evidence={props.evidence} />
+      <EvidenceSection evidence={props.evidence} resumes={props.resumes} />
       <DangerSection />
     </div>
   );
@@ -155,7 +168,7 @@ function ProfileSection({
             placeholder="Direct. Specific numbers. No throat-clearing. British spelling."
           />
           <p className="mt-1 text-[11px] text-ink-faint">
-            Injected into every generated draft in Phase 2. Revise it whenever one comes back
+            Injected into every generated draft. Revise it whenever one comes back
             wrong.
           </p>
         </div>
@@ -167,11 +180,12 @@ function ProfileSection({
             name="bannedConstructions"
             rows={4}
             defaultValue={profile.bannedConstructions}
+            placeholder={DEFAULT_BANNED_CONSTRUCTIONS.join('\n')}
           />
           <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
             One per line. Checked deterministically after generation rather than only asked for in
             the prompt — a prompt instruction is not reliable enough for something you would
-            notice in every single draft.
+            notice in every single draft. Leave it empty and the list shown here is used.
           </p>
         </div>
 
@@ -507,7 +521,7 @@ function ExcludedSendersSection({
 function ResumeSection({
   resumes,
 }: {
-  resumes: Array<{ id: string; label: string; isDefault: boolean; notes: string | null }>;
+  resumes: Array<{ id: string; label: string; notes: string | null; isDefault: boolean; hasText: boolean }>;
 }) {
   const [state, action] = useActionState(addResumeVersion, {});
 
@@ -525,24 +539,41 @@ function ResumeSection({
             <li key={resume.id} className="flex items-baseline gap-2 text-[13px]">
               <span className="font-medium text-ink">{resume.label}</span>
               {resume.isDefault && <span className="text-[11px] text-brand">default</span>}
+              {!resume.hasText && (
+                <span className="text-[11px] text-ink-faint">no text pasted</span>
+              )}
               {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
             </li>
           ))}
         </ul>
       )}
 
-      <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="w-32">
-          <Label htmlFor="label">Label</Label>
-          <Input id="label" name="label" required placeholder="C" />
+      <form action={action} className="mt-3 space-y-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-32">
+            <Label htmlFor="label">Label</Label>
+            <Input id="label" name="label" required placeholder="C" />
+          </div>
+          <div className="min-w-48 flex-1">
+            <Label htmlFor="notes">What is different about it</Label>
+            <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
+          </div>
+          <Button type="submit" size="sm" variant="secondary">
+            Add
+          </Button>
         </div>
-        <div className="min-w-48 flex-1">
-          <Label htmlFor="notes">What is different about it</Label>
-          <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
+        <div>
+          <Label htmlFor="textContent">Paste the text</Label>
+          <Textarea
+            id="textContent"
+            name="textContent"
+            rows={4}
+            placeholder="Paste the whole resume. Formatting does not matter."
+          />
+          <p className="mt-1 text-[12px] text-ink-muted">
+            Optional, but it is what the evidence bank reads to propose your stories.
+          </p>
         </div>
-        <Button type="submit" size="sm" variant="secondary">
-          Add
-        </Button>
       </form>
       {state.error && <p className="mt-2 text-[13px] text-status-rejected">{state.error}</p>}
       {state.message && <p className="mt-2 text-[13px] text-status-offer">{state.message}</p>}
@@ -552,7 +583,9 @@ function ResumeSection({
 
 function EvidenceSection({
   evidence,
+  resumes,
 }: {
+  resumes: Array<{ id: string; label: string; hasText: boolean }>;
   evidence: Array<{
     id: string;
     title: string;
@@ -625,6 +658,8 @@ function EvidenceSection({
         </ul>
       )}
 
+      <SeedFromWriting resumes={resumes} />
+
       <form action={action} className="mt-4 space-y-3 border-t border-border pt-4">
         <div>
           <Label htmlFor="title">Short handle</Label>
@@ -677,6 +712,263 @@ function EvidenceSection({
         </Button>
       </form>
     </section>
+  );
+}
+
+/**
+ * Seeding the bank from writing that already exists in the account.
+ *
+ * The one-at-a-time form below is why the bank is empty: nobody fills in six
+ * fields twenty times. A resume, the answers you have approved and the
+ * debriefs you wrote are all stories in your own words already, so the model
+ * only has to split them up. It proposes; you tick and edit. Nothing lands
+ * unread, because a bad item in the bank is invisible after the fact and
+ * degrades every match built on top of it.
+ */
+type EvidenceDraft = {
+  title: string;
+  body: string;
+  context: string | null;
+  metrics: string | null;
+  strength: number;
+  /** Kept as typed text, so a half-finished tag is not lost on every keystroke. */
+  skillsText: string;
+  picked: boolean;
+};
+
+function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: string; hasText: boolean }> }) {
+  const readable = resumes.filter((resume) => resume.hasText);
+
+  const [, startTransition] = useTransition();
+
+  const [kind, setKind] = useState<'resume' | 'answers' | 'debriefs'>('resume');
+  const [resumeVersionId, setResumeVersionId] = useState(readable[0]?.id ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<EvidenceDraft[] | null>(null);
+
+  const sources: Array<{ value: typeof kind; label: string }> = [
+    { value: 'resume', label: 'A resume' },
+    { value: 'answers', label: 'Approved answers' },
+    { value: 'debriefs', label: 'Interview debriefs' },
+  ];
+
+  function patch(index: number, changes: Partial<EvidenceDraft>) {
+    setDrafts((current) =>
+      (current ?? []).map((draft, i) => (i === index ? { ...draft, ...changes } : draft)),
+    );
+  }
+
+  const picked = (drafts ?? []).filter((draft) => draft.picked);
+
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-canvas p-3">
+      <h3 className="text-[13px] font-medium text-ink">Seed it from what you have written</h3>
+      <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">
+        Read a resume, your approved behavioural answers, or your interview debriefs, and propose
+        the stories in them. Nothing is added until you tick it.
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <div>
+          <Label htmlFor="seed-kind">Read</Label>
+          <Select
+            id="seed-kind"
+            value={kind}
+            onChange={(event) => {
+              setKind(event.target.value as typeof kind);
+              setDrafts(null);
+              setError(null);
+              setMessage(null);
+            }}
+          >
+            {sources.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {kind === 'resume' && (
+          <div>
+            <Label htmlFor="seed-resume">Version</Label>
+            <Select
+              id="seed-resume"
+              value={resumeVersionId}
+              disabled={readable.length === 0}
+              onChange={(event) => setResumeVersionId(event.target.value)}
+            >
+              {readable.length === 0 ? (
+                <option value="">No version has text pasted</option>
+              ) : (
+                readable.map((resume) => (
+                  <option key={resume.id} value={resume.id}>
+                    {resume.label}
+                  </option>
+                ))
+              )}
+            </Select>
+          </div>
+        )}
+
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy || (kind === 'resume' && !resumeVersionId)}
+          onClick={() => {
+            setBusy(true);
+            setError(null);
+            setMessage(null);
+            setDrafts(null);
+            startTransition(async () => {
+              const result = await proposeEvidence({
+                kind,
+                resumeVersionId: kind === 'resume' ? resumeVersionId : undefined,
+              });
+              setBusy(false);
+              if (result.error || !result.proposal) {
+                setError(result.error ?? 'Nothing came back.');
+                return;
+              }
+              setDrafts(
+                result.proposal.candidates.map((candidate) => ({
+                  ...candidate,
+                  picked: true,
+                  skillsText: candidate.skills.join(', '),
+                })),
+              );
+            });
+          }}
+        >
+          {busy ? 'Reading…' : 'Propose'}
+        </Button>
+
+        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+        {message && <span className="text-[12px] text-status-offer">{message}</span>}
+      </div>
+
+      {drafts && drafts.length > 0 && (
+        <div className="mt-3 space-y-2 border-t border-border pt-3">
+          <p className="text-[12px] text-ink-muted">
+            {drafts.length} proposed. Edit anything that is not how you would put it — this is the
+            text every future draft quotes.
+          </p>
+
+          {drafts.map((draft, index) => (
+            <div
+              key={index}
+              className={cn(
+                'rounded-lg border p-2',
+                draft.picked ? 'border-border-strong bg-surface' : 'border-border opacity-60',
+              )}
+            >
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-2"
+                  checked={draft.picked}
+                  onChange={(event) => patch(index, { picked: event.target.checked })}
+                  aria-label={`Add ${draft.title}`}
+                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Input
+                    value={draft.title}
+                    aria-label="Short handle"
+                    onChange={(event) => patch(index, { title: event.target.value })}
+                  />
+                  <Textarea
+                    rows={3}
+                    value={draft.body}
+                    aria-label="The story"
+                    onChange={(event) => patch(index, { body: event.target.value })}
+                  />
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Input
+                      value={draft.context ?? ''}
+                      placeholder="Where and when"
+                      aria-label="Where and when"
+                      onChange={(event) => patch(index, { context: event.target.value })}
+                    />
+                    <Input
+                      value={draft.metrics ?? ''}
+                      placeholder="The number"
+                      aria-label="The number"
+                      onChange={(event) => patch(index, { metrics: event.target.value })}
+                    />
+                    <Select
+                      value={String(draft.strength)}
+                      aria-label="How strong is it"
+                      onChange={(event) => patch(index, { strength: Number(event.target.value) })}
+                    >
+                      {[5, 4, 3, 2, 1].map((level) => (
+                        <option key={level} value={level}>
+                          {'★'.repeat(level)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Input
+                    value={draft.skillsText}
+                    placeholder="Tags"
+                    aria-label="Tags"
+                    onChange={(event) => patch(index, { skillsText: event.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || picked.length === 0}
+              onClick={() => {
+                setBusy(true);
+                setError(null);
+                startTransition(async () => {
+                  const result = await acceptEvidence({
+                    items: picked.map((draft) => ({
+                      title: draft.title.trim(),
+                      body: draft.body.trim(),
+                      context: draft.context?.trim() || null,
+                      metrics: draft.metrics?.trim() || null,
+                      strength: draft.strength,
+                      skills: draft.skillsText
+                        .split(/[,\n]/)
+                        .map((entry) => entry.trim())
+                        .filter(Boolean),
+                    })),
+                  });
+                  setBusy(false);
+                  if (result.error) {
+                    setError(result.error);
+                    return;
+                  }
+                  setDrafts(null);
+                  setMessage(`Added ${result.added} to the bank.`);
+                });
+              }}
+            >
+              Add {picked.length} to the bank
+            </Button>
+            <button
+              type="button"
+              className="text-[12px] text-ink-faint hover:text-ink"
+              onClick={() => {
+                setDrafts(null);
+                setMessage(null);
+              }}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,10 +1,13 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import {
   highWaterFromRejectionStage,
+  requirementCoverage,
   type ApplicationSource,
   type ApplicationStatus,
+  type CoverageEntry,
   type FunnelApplication,
   type RejectionStage,
+  type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
 import { safeTimeZone } from '@/lib/jobs/timezone';
 
@@ -50,6 +53,12 @@ export interface PipelineRow {
   daysSinceActivity: number | null;
   compMinCents: number | null;
   compMaxCents: number | null;
+  /**
+   * Must-have coverage from the stored requirement match, or a null rate when
+   * the role has never been matched. Derived once here rather than per card,
+   * for the same reason `daysSinceActivity` is.
+   */
+  coverage: RequirementCoverage;
 }
 
 const SELECT = `
@@ -57,7 +66,7 @@ const SELECT = `
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
-    id, title, location, work_mode, comp_min_cents, comp_max_cents,
+    id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
     companies!inner ( id, name, slug, logo_url )
   )
 `;
@@ -87,6 +96,7 @@ type RawRow = {
     work_mode: string | null;
     comp_min_cents: number | null;
     comp_max_cents: number | null;
+    requirement_matches: CoverageEntry[] | null;
     companies: { id: string; name: string; slug: string; logo_url: string | null };
   };
 };
@@ -146,6 +156,7 @@ export async function loadPipeline(
     daysSinceActivity: daysSince(lastActivity.get(row.id) ?? row.created_at),
     compMinCents: row.roles.comp_min_cents,
     compMaxCents: row.roles.comp_max_cents,
+    coverage: requirementCoverage(row.roles.requirement_matches),
   }));
 }
 

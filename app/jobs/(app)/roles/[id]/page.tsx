@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { cn } from '@/lib/cn';
+import { publicEnv } from '@/lib/env';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
@@ -9,10 +11,13 @@ import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
 import {
   DEBRIEF_NUDGE_WINDOW_DAYS,
   SOURCE_LABELS,
+  formatCoverage,
+  requirementCoverage,
   type ApplicationSource,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
+import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
 
@@ -38,9 +43,9 @@ export default async function RoleDetailPage({
   const { data: role } = await supabase
     .from('roles')
     .select(
-      `id, title, jd_url, jd_text, jd_hash, ats_job_id, seniority, location, work_mode,
+      `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, ats_job_id, seniority, location, work_mode,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
-       requirements,
+       requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
        companies!inner ( id, name, slug, ats_type, priority )`,
     )
     .eq('id', id)
@@ -80,6 +85,9 @@ export default async function RoleDetailPage({
     { data: profile },
     { data: reminders },
     matchCandidates,
+    { data: companyContacts },
+    { data: bank },
+    { data: caseLetter },
   ] = await Promise.all([
       supabase
         .from('application_events')
@@ -90,12 +98,21 @@ export default async function RoleDetailPage({
         .order('occurred_at', { ascending: false }),
       supabase
         .from('interviews')
-        .select('id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes, questions_asked')
+        // Participants come back embedded: who is in the room is part of
+        // reading a round, and the contact carries the LinkedIn and the title
+        // that make the name worth clicking.
+        .select(
+          `id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes,
+           questions_asked,
+           interview_participants ( role, contacts ( id, full_name, title ) )`,
+        )
         .eq('application_id', current.id)
         .order('round', { ascending: true }),
       supabase
         .from('application_answers')
-        .select('id, answer, status, word_limit, questions!inner ( id, text, kind, canonical_answer, times_seen )')
+        .select(
+          'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!inner ( id, text, kind, canonical_answer, times_seen )',
+        )
         .eq('application_id', current.id),
       supabase
         .from('notes')
@@ -123,10 +140,40 @@ export default async function RoleDetailPage({
         applicationId: current.id as string,
         term: company.name,
       }),
+      // Everyone already known at this company, so naming an interviewer is a
+      // pick rather than a retype -- and so the name on the round is the same
+      // record as the one on the contacts page.
+      supabase
+        .from('contacts')
+        .select('id, full_name, title')
+        .eq('user_id', user.id)
+        .eq('company_id', company.id)
+        .order('full_name'),
+      // Only what the staleness key is computed from. A stored match stays put
+      // until the description or the bank changes; without this the page
+      // cannot tell a current map from one computed before you added the item
+      // that answers its biggest gap.
+      supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
+      supabase
+        .from('cover_letters')
+        .select('body, public_slug, public_expires_at')
+        .eq('application_id', current.id)
+        .eq('user_id', user.id)
+        .maybeSingle(),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
   const requirements = (role.requirements as Requirement[] | null) ?? [];
+
+  const evidence = (bank ?? []).map((item) => ({
+    id: item.id as string,
+    strength: item.strength as number,
+    skills: (item.skills as string[]) ?? [],
+  }));
+  const requirementMatches = (role.requirement_matches as RequirementMatch[] | null) ?? null;
+  const coverage = requirementCoverage(requirementMatches);
+  const coverageLabel = formatCoverage(coverage);
+  const currentMatchKey = matchKey(role.jd_hash as string | null, evidence);
 
   // Timeline events name the message they came from, and the linked mail is
   // already loaded, so the same deep link can hang off both without a second
@@ -158,6 +205,24 @@ export default async function RoleDetailPage({
         }
         actions={
           <div className="flex items-center gap-2">
+            {coverageLabel && (
+              <Link
+                href={`/jobs/roles/${role.id}?tab=posting`}
+                className={cn(
+                  'tabular rounded-full px-2 py-0.5 text-[12px]',
+                  coverage.gaps > 0
+                    ? 'bg-accent-orange-tint text-ink'
+                    : 'bg-status-offer-tint text-status-offer',
+                )}
+                title={
+                  coverage.gaps > 0
+                    ? `${coverage.gaps} must-have${coverage.gaps === 1 ? '' : 's'} your bank does not cover`
+                    : 'Every must-have covered by your evidence'
+                }
+              >
+                {coverageLabel}
+              </Link>
+            )}
             <StatusPicker
               applicationId={current.id as string}
               status={current.status as ApplicationStatus}
@@ -225,12 +290,32 @@ export default async function RoleDetailPage({
         roleId={role.id as string}
         applicationId={current.id as string}
         jdText={(role.jd_text as string) ?? ''}
+        jdLookupNote={(role.jd_lookup_note as string) ?? null}
         jdUrl={(role.jd_url as string) ?? null}
         atsJobId={(role.ats_job_id as string) ?? null}
         compMinCents={(role.comp_min_cents as number) ?? null}
         compMaxCents={(role.comp_max_cents as number) ?? null}
         compSource={(role.comp_source as string) ?? null}
         requirements={requirements}
+        requirementMatches={requirementMatches}
+        requirementMatchesAt={(role.requirement_matches_at as string) ?? null}
+        // Stale rather than absent: the map still reads, it is just no longer
+        // the map for this description and this bank.
+        requirementMatchesStale={
+          requirementMatches !== null &&
+          (role.requirement_matches_key as string | null) !== currentMatchKey
+        }
+        bankSize={evidence.length}
+        caseStatement={(caseLetter?.body as string) ?? ''}
+        // A slug with a live expiry is what the read function accepts, so a
+        // slug alone is not "shared" and must not read as it.
+        caseSlug={
+          caseLetter?.public_slug && caseLetter?.public_expires_at
+            ? (caseLetter.public_slug as string)
+            : null
+        }
+        caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
+        appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
         focusInterviewId={focusInterviewId ?? null}
@@ -255,6 +340,28 @@ export default async function RoleDetailPage({
           prepNotes: (interview.prep_notes as string) ?? '',
           notes: (interview.notes as string) ?? '',
           questionsAsked: (interview.questions_asked as string[]) ?? [],
+          participants: (
+            (interview.interview_participants ?? []) as unknown as Array<{
+              role: string;
+              contacts: { id: string; full_name: string; title: string | null } | null;
+            }>
+          )
+            .filter((participant) => participant.contacts !== null)
+            .map((participant) => ({
+              contactId: participant.contacts!.id,
+              name: participant.contacts!.full_name,
+              title: participant.contacts!.title,
+              role: participant.role,
+            })),
+        }))}
+        companyContacts={((companyContacts ?? []) as unknown as Array<{
+          id: string;
+          full_name: string;
+          title: string | null;
+        }>).map((contact) => ({
+          id: contact.id,
+          name: contact.full_name,
+          title: contact.title,
         }))}
         answers={(answers ?? []).map((answer) => {
           const question = answer.questions as unknown as {
@@ -273,6 +380,10 @@ export default async function RoleDetailPage({
             questionKind: question.kind,
             canonicalAnswer: question.canonical_answer,
             timesSeen: question.times_seen,
+            // Persisted, so the claims you have to check survive the reload
+            // between drafting an answer and submitting it.
+            evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
+            unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
           };
         })}
         notes={(notes ?? []).map((note) => ({
