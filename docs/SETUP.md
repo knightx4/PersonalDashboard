@@ -232,6 +232,26 @@ it, so this is skippable if you want to move faster.
 > performs that OAuth exchange, which is why no `GOOGLE_SIGNIN_*` variable
 > appears in `.env.example`.
 
+> **The sign-in client's redirect URI is never this app's domain.** Google
+> redirects to *Supabase*, which completes the exchange and only then sends the
+> user on to the app — that second hop is the Site URL / allow-list above, not
+> a Google setting. So renaming the app's domain never requires touching this
+> client. Putting the app domain here instead produces:
+>
+> ```
+> You can't sign in to this app because it doesn't comply with Google's
+> OAuth 2.0 policy.
+> redirect_uri=https://<your-supabase-ref>.supabase.co/auth/v1/callback
+> ```
+>
+> which names the URI that *should* be registered and got removed. Put it back.
+>
+> The Gmail client in Tier 2 is the opposite: its redirect URI **is** an app
+> URL, so it does need updating on a domain rename. Tell the two apart by
+> Client ID — the sign-in one is whichever is pasted into Supabase →
+> Authentication → Providers → Google; the Gmail one matches
+> `GOOGLE_GMAIL_CLIENT_ID`.
+
 There is no API for creating OAuth client IDs, so that part is genuinely
 console-only.
 
@@ -252,8 +272,9 @@ This is the real setup work, and the only part that is more than clicking.
    entity, contact address). A policy that does not match the app is a common
    rejection reason.
 4. **Create the second OAuth client**, Web application, for the Gmail grant.
-   Redirect URI `https://yourdomain.com/api/auth/gmail/callback`. Keep this
-   separate from the sign-in client.
+   Redirect URI `https://dash.selveyknight.com/api/auth/gmail/callback`. Keep
+   this separate from the sign-in client, and note that this is the client a
+   domain rename affects — the sign-in client's URI stays on `supabase.co`.
 5. **Enable the Gmail API** on that same Google Cloud project
    ([API overview](https://console.developers.google.com/apis/api/gmail.googleapis.com/overview)).
    Connect can succeed without this (openid/email), but **Import orders** calls
