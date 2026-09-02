@@ -271,3 +271,52 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 export function classificationLabel(value: string): string {
   return CLASSIFICATION_LABELS[value] ?? value;
 }
+
+/** One pursuit as the "some other role" picker needs it: a name and a status. */
+export interface SearchableRole {
+  applicationId: string;
+  companyName: string;
+  roleTitle: string;
+  status: string;
+  everSubmitted: boolean;
+}
+
+/**
+ * The roles a typed query should offer, best first.
+ *
+ * The scorer above ranks the three suggestions by how well the *message*
+ * matches; this ranks by how well the *typing* does, which is a different
+ * question and deliberately dumber. Every whitespace-separated term has to
+ * appear somewhere in "company · title", so "canonical eng" narrows the way a
+ * person expects it to, and a company name alone lists that company's roles.
+ */
+export function matchRoles(
+  roles: readonly SearchableRole[],
+  query: string,
+  limit = 8,
+): SearchableRole[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return roles.slice(0, limit);
+
+  return roles
+    .map((role) => {
+      const company = role.companyName.toLowerCase();
+      const title = role.roleTitle.toLowerCase();
+      const haystack = `${company} ${title}`;
+      if (!terms.every((term) => haystack.includes(term))) return null;
+      // Where the term landed decides the order: the company you typed the
+      // start of, then the title you typed the start of, then anything that
+      // merely contains the letters. Otherwise "ubs" buries UBS under
+      // "Columbus Health".
+      const rank = terms.reduce(
+        (total, term) =>
+          total + (company.startsWith(term) ? 0 : title.startsWith(term) ? 1 : 2),
+        0,
+      );
+      return { role, rank };
+    })
+    .filter((entry): entry is { role: SearchableRole; rank: number } => entry !== null)
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit)
+    .map((entry) => entry.role);
+}
