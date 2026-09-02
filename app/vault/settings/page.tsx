@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, GitBranch } from 'lucide-react';
+import { AlertTriangle, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,20 +54,16 @@ export default async function VaultSettingsPage() {
               <CardTitle>
                 {connection.repoOwner}/{connection.repoName}
               </CardTitle>
-              <span
-                className={
-                  connection.status === 'active'
-                    ? 'inline-flex items-center gap-1 rounded-full bg-positive-tint px-2 py-0.5 text-[12px] font-medium text-positive'
-                    : 'inline-flex items-center gap-1 rounded-full bg-accent-orange-tint px-2 py-0.5 text-[12px] font-medium text-accent-orange'
-                }
-              >
-                {connection.status === 'active' ? (
-                  <Check className="size-3" strokeWidth={2.5} aria-hidden />
-                ) : (
+              {connection.status === 'active' ? (
+                <span className="shrink-0 text-[12px] text-ink-muted">
+                  {STATUS_LABEL[connection.status]}
+                </span>
+              ) : (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-orange-tint px-2 py-0.5 text-[12px] font-medium text-accent-orange">
                   <AlertTriangle className="size-3" strokeWidth={2.5} aria-hidden />
-                )}
-                {STATUS_LABEL[connection.status] ?? connection.status}
-              </span>
+                  {STATUS_LABEL[connection.status] ?? connection.status}
+                </span>
+              )}
             </CardHeader>
             <CardBody className="space-y-3">
               <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[13px]">

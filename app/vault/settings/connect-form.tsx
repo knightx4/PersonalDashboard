@@ -81,7 +81,9 @@ export function ConnectVaultForm({
       </div>
 
       {state.error && <FieldError>{state.error}</FieldError>}
-      {state.message && <p className="text-[13px] text-positive">{state.message}</p>}
+      {/* Not `text-positive`: green is the savings-and-refunds colour and means
+          money in this design system, which a saved form does not. */}
+      {state.message && <p className="text-[13px] text-ink-muted">{state.message}</p>}
 
       <Button type="submit" disabled={pending}>
         {pending ? 'Saving…' : submitLabel}
