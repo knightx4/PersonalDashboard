@@ -11,6 +11,10 @@ import { extractCompBand, extractRequirements, guessSeniority, guessWorkMode, jd
 import { domainFromUrl, slugify } from '@/lib/jobs/slug';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { APPLICATION_SOURCES } from '@/lib/jobs/pipeline';
+import { draftAnswer } from '@/lib/jobs/evidence/draft';
+import { DEFAULT_BANNED_CONSTRUCTIONS, type AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
 
 /**
  * Creating a role.
@@ -506,4 +510,164 @@ export async function lookUpJobDescription(roleId: string): Promise<JdLookupResu
     case 'save_failed':
       return { ok: false, message: outcome.note };
   }
+}
+
+/**
+ * Drafting one answer from the bank.
+ *
+ * The draft comes back to the caller and is not written anywhere. It lands
+ * beside the textarea, not in it, and only an Insert followed by a Save puts
+ * it on the record — the compose.ts principle carried forward: the model may
+ * prepare text, but nothing goes out over your name that you did not put
+ * there.
+ */
+const draftSchema = z.object({ answerId: z.string().uuid() });
+
+export async function draftAnswerFromEvidence(
+  input: z.input<typeof draftSchema>,
+): Promise<{ draft: AnswerDraft | null; error: string | null }> {
+  const parsed = draftSchema.safeParse(input);
+  if (!parsed.success) return { draft: null, error: parsed.error.issues[0].message };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: row, error: rowError } = await supabase
+    .from('application_answers')
+    .select(
+      `id, word_limit,
+       questions!inner ( text, canonical_answer ),
+       applications!inner ( roles!inner ( title, requirement_matches, companies!inner ( name ) ) )`,
+    )
+    .eq('id', parsed.data.answerId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (rowError) return { draft: null, error: rowError.message };
+  if (!row) return { draft: null, error: 'That question is not yours.' };
+
+  const question = row.questions as unknown as { text: string; canonical_answer: string | null };
+  const role = (row.applications as unknown as {
+    roles: {
+      title: string;
+      requirement_matches: RequirementMatch[] | null;
+      companies: { name: string } | null;
+    };
+  }).roles;
+
+  const [{ data: bank, error: bankError }, { data: profile }] = await Promise.all([
+    supabase
+      .from('evidence_items')
+      .select('id, title, body, context, metrics, skills, strength')
+      .eq('user_id', user.id),
+    supabase
+      .from('profiles')
+      .select('writing_style_notes, banned_constructions')
+      .eq('id', user.id)
+      .maybeSingle(),
+  ]);
+
+  if (bankError) return { draft: null, error: bankError.message };
+
+  const items = (bank ?? []).map((item) => ({
+    id: item.id as string,
+    title: item.title as string,
+    body: item.body as string,
+    context: (item.context as string) ?? null,
+    metrics: (item.metrics as string) ?? null,
+    skills: (item.skills as string[]) ?? [],
+    strength: item.strength as number,
+  }));
+
+  if (items.length === 0) {
+    return {
+      draft: null,
+      error: 'Your evidence bank is empty. Fill it in Settings — a draft from nothing is a blank page with extra steps.',
+    };
+  }
+
+  // The shortlist is against the question rather than the description: this
+  // one answer is about one thing, and sending the whole bank invites the
+  // model to reach for a stronger story that answers a different question.
+  const shortlist = shortlistEvidence([{ text: question.text, kind: 'must_have' }], items);
+
+  // What the match already established this role wants, so the draft is
+  // written toward the role rather than in the abstract. Absent until the
+  // requirements have been matched, which is fine.
+  const matches = (role.requirement_matches as RequirementMatch[] | null) ?? [];
+  const wants = matches
+    .filter((match) => match.kind === 'must_have')
+    .slice(0, 8)
+    .map((match) => match.requirement)
+    .join('; ');
+
+  const banned = (profile?.banned_constructions as string[] | null) ?? [];
+
+  const result = await draftAnswer(
+    { apiKey },
+    {
+      question: question.text,
+      roleLabel: [role.companies?.name, role.title].filter(Boolean).join(', '),
+      bank: shortlist,
+      wordLimit: (row.word_limit as number) ?? null,
+      styleNotes: (profile?.writing_style_notes as string) ?? null,
+      banned: banned.length > 0 ? banned : DEFAULT_BANNED_CONSTRUCTIONS,
+      canonicalAnswer: question.canonical_answer,
+      requirementSummary: wants || null,
+    },
+  );
+
+  if (!result.ok) return { draft: null, error: result.error };
+  return { draft: result.draft, error: null };
+}
+
+const acceptDraftSchema = z.object({
+  answerId: z.string().uuid(),
+  answer: z.string().trim().min(1),
+  evidenceItemIds: z.array(z.string().uuid()).max(40),
+  unsupportedClaims: z.array(z.string().trim().min(1)).max(20),
+});
+
+/**
+ * Save an answer that came from a draft, recording what it cited.
+ *
+ * Separate from `saveAnswer` because the citation is the point: an answer with
+ * `evidence_item_ids` can be traced back to the stories it rests on months
+ * later, and `unsupported_claims` is what you re-read before you submit. The
+ * used counters go up here rather than at draft time, so a draft you discarded
+ * does not make a story look worn out.
+ */
+export async function saveDraftedAnswer(
+  input: z.input<typeof acceptDraftSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = acceptDraftSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('application_answers')
+    .update({
+      answer: parsed.data.answer,
+      status: 'draft',
+      evidence_item_ids: parsed.data.evidenceItemIds,
+      unsupported_claims: parsed.data.unsupportedClaims,
+    })
+    .eq('id', parsed.data.answerId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  // Best effort: a use counter that failed to tick is not a reason to lose the
+  // answer that was just saved.
+  if (parsed.data.evidenceItemIds.length > 0) {
+    await supabase.rpc('bump_evidence_use', { item_ids: parsed.data.evidenceItemIds });
+  }
+
+  revalidatePath('/jobs/answers');
+  return { error: null };
 }

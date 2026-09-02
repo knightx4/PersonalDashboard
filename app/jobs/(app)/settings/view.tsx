@@ -17,6 +17,7 @@ import {
   proposeEvidence,
 } from './evidence-actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
+import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 
 export function SettingsView(props: {
   email: string;
@@ -179,11 +180,12 @@ function ProfileSection({
             name="bannedConstructions"
             rows={4}
             defaultValue={profile.bannedConstructions}
+            placeholder={DEFAULT_BANNED_CONSTRUCTIONS.join('\n')}
           />
           <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
             One per line. Checked deterministically after generation rather than only asked for in
             the prompt — a prompt instruction is not reliable enough for something you would
-            notice in every single draft.
+            notice in every single draft. Leave it empty and the list shown here is used.
           </p>
         </div>
 

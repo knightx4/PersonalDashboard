@@ -108,7 +108,9 @@ export default async function RoleDetailPage({
         .order('round', { ascending: true }),
       supabase
         .from('application_answers')
-        .select('id, answer, status, word_limit, questions!inner ( id, text, kind, canonical_answer, times_seen )')
+        .select(
+          'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!inner ( id, text, kind, canonical_answer, times_seen )',
+        )
         .eq('application_id', current.id),
       supabase
         .from('notes')
@@ -360,6 +362,10 @@ export default async function RoleDetailPage({
             questionKind: question.kind,
             canonicalAnswer: question.canonical_answer,
             timesSeen: question.times_seen,
+            // Persisted, so the claims you have to check survive the reload
+            // between drafting an answer and submitting it.
+            evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
+            unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
           };
         })}
         notes={(notes ?? []).map((note) => ({

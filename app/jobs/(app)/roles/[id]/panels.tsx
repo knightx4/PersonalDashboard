@@ -24,11 +24,14 @@ import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applicati
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import {
   addQuestions,
+  draftAnswerFromEvidence,
   lookUpJobDescription,
   promoteToCanonical,
   saveAnswer,
+  saveDraftedAnswer,
   updateRole,
   type JdLookupResult,
 } from '../actions';
@@ -123,6 +126,9 @@ export interface PanelProps {
     questionKind: string;
     canonicalAnswer: string | null;
     timesSeen: number;
+    /** What a previous draft cited, and what it could not ground. */
+    evidenceItemIds: string[];
+    unsupportedClaims: string[];
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
   /** Open to-dos you set for yourself, not events the inbox produced. */
@@ -965,7 +971,7 @@ function JobDescriptionCard({
   );
 }
 
-function Answers({ answers, applicationId }: PanelProps) {
+function Answers({ answers, applicationId, bankSize }: PanelProps) {
   const [paste, setPaste] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -1011,7 +1017,7 @@ function Answers({ answers, applicationId }: PanelProps) {
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} />
+            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} />
           ))}
         </div>
       )}
@@ -1019,11 +1025,25 @@ function Answers({ answers, applicationId }: PanelProps) {
   );
 }
 
-function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
+function AnswerCard({
+  answer,
+  bankSize,
+}: {
+  answer: PanelProps['answers'][number];
+  bankSize: number;
+}) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // The draft lives here, beside the textarea, and never in it. It reaches the
+  // answer only through Insert, and the record only through Save -- the
+  // compose.ts rule: the model may prepare text, but nothing goes out over
+  // your name that you did not put there.
+  const [draft, setDraft] = useState<AnswerDraft | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   const usingCanonical = !answer.answer && Boolean(answer.canonicalAnswer);
 
@@ -1046,6 +1066,24 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
         <p className="mt-2 rounded bg-brand-tint px-2 py-1 text-[12px] text-brand">
           Filled from your default answer for this question. Edit it if this one needs tailoring.
         </p>
+      )}
+
+      {/*
+        The claims a saved draft could not ground, still shown after the reload.
+        This is the one thing worth re-reading before you submit, so it does not
+        live only in the session that generated it.
+      */}
+      {!draft && answer.unsupportedClaims.length > 0 && (
+        <div className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5">
+          <p className="text-[12px] font-medium text-ink">
+            This answer states things your bank does not carry:
+          </p>
+          <ul className="mt-0.5 list-disc pl-4 text-[12px] text-ink">
+            {answer.unsupportedClaims.map((claim) => (
+              <li key={claim}>{claim}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <Textarea
@@ -1101,8 +1139,115 @@ function AnswerCard({ answer }: { answer: PanelProps['answers'][number] }) {
             Make this my default answer
           </Button>
         )}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={drafting || bankSize === 0}
+          title={
+            bankSize === 0
+              ? 'Your evidence bank is empty, so there is nothing to draft from.'
+              : undefined
+          }
+          onClick={() => {
+            setDrafting(true);
+            setDraftError(null);
+            startTransition(async () => {
+              const result = await draftAnswerFromEvidence({ answerId: answer.id });
+              setDrafting(false);
+              if (result.error || !result.draft) {
+                setDraftError(result.error ?? 'Nothing came back.');
+                return;
+              }
+              setDraft(result.draft);
+            });
+          }}
+        >
+          {drafting ? 'Drafting…' : 'Draft from my evidence'}
+        </Button>
         {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        {draftError && <span className="text-[12px] text-status-rejected">{draftError}</span>}
       </div>
+
+      {draft && (
+        <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h4 className="text-[12px] font-medium text-ink">A draft, from your own stories</h4>
+            <span className="text-[11px] text-ink-faint">
+              Nothing is saved until you insert it and save.
+            </span>
+          </div>
+
+          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
+            {draft.text}
+          </p>
+
+          <p className="mt-2 text-[11px] text-ink-faint">
+            Draws on{' '}
+            {draft.evidenceItemIds.length === 1
+              ? 'one item'
+              : `${draft.evidenceItemIds.length} items`}{' '}
+            from your bank.
+          </p>
+
+          {draft.unsupportedClaims.length > 0 && (
+            <div className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5">
+              <p className="text-[12px] font-medium text-ink">
+                Not grounded in anything you wrote:
+              </p>
+              <ul className="mt-0.5 list-disc pl-4 text-[12px] text-ink">
+                {draft.unsupportedClaims.map((claim) => (
+                  <li key={claim}>{claim}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-[11px] text-ink-muted">
+                Check each of these before it goes out, or cut it.
+              </p>
+            </div>
+          )}
+
+          {draft.bannedFound.length > 0 && (
+            <p className="mt-2 text-[12px] text-accent-orange">
+              Uses {draft.bannedFound.map((phrase) => `“${phrase}”`).join(', ')} — on your banned
+              list.
+            </p>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={() => {
+                setText(draft.text);
+                startTransition(async () => {
+                  const result = await saveDraftedAnswer({
+                    answerId: answer.id,
+                    answer: draft.text,
+                    evidenceItemIds: draft.evidenceItemIds,
+                    unsupportedClaims: draft.unsupportedClaims,
+                  });
+                  setSaved(result.error ?? 'Inserted and saved as a draft.');
+                  if (!result.error) {
+                    setStatus('draft');
+                    setDraft(null);
+                  }
+                });
+              }}
+            >
+              Insert
+            </Button>
+            <button
+              type="button"
+              className="text-[12px] text-ink-faint hover:text-ink"
+              onClick={() => setDraft(null)}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
