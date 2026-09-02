@@ -35,6 +35,17 @@ const WORKSPACES = [
     gradient:
       'linear-gradient(135deg, var(--color-brand) 0%, var(--color-status-final) 100%)',
   },
+  {
+    id: 'vault',
+    prefix: '/vault',
+    // The note list, not settings: "what is in here" is the question this
+    // workspace answers, and it is the only page it has that answers one.
+    home: '/vault',
+    label: 'Vault',
+    description: 'Your Obsidian notes, mirrored and searchable',
+    gradient:
+      'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-orange) 100%)',
+  },
 ] as const;
 
 export type WorkspaceId = (typeof WORKSPACES)[number]['id'];

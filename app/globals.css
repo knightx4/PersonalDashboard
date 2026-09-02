@@ -191,3 +191,120 @@ body {
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
+
+/* ---------------------------------------------------------------------------
+ * Vault notes.
+ *
+ * A note is the only place in this app that renders long-form prose written
+ * by a person rather than laid out by a component, so it needs typography the
+ * design system does not otherwise have: a comfortable measure, vertical
+ * rhythm between blocks, and quiet defaults for everything markdown can emit.
+ *
+ * Scoped to .vault-prose rather than set globally -- these are rules for a
+ * document, and applying them to the app's own interface would be wrong.
+ * ------------------------------------------------------------------------ */
+.vault-prose {
+  color: var(--color-ink);
+  font-size: 15px;
+  line-height: 1.7;
+  /* Around 70 characters, which is where long lines stop being readable. */
+  max-width: 68ch;
+}
+
+.vault-prose > * + * {
+  margin-top: 1em;
+}
+
+.vault-prose h1,
+.vault-prose h2,
+.vault-prose h3,
+.vault-prose h4 {
+  font-family: var(--font-display, var(--font-sans));
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.3;
+  margin-top: 1.8em;
+}
+
+.vault-prose h1 { font-size: 1.5rem; }
+.vault-prose h2 { font-size: 1.25rem; }
+.vault-prose h3 { font-size: 1.05rem; }
+.vault-prose h4 { font-size: 0.95rem; }
+
+.vault-prose > :first-child { margin-top: 0; }
+
+.vault-prose a {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.vault-prose ul,
+.vault-prose ol {
+  padding-left: 1.4em;
+}
+
+.vault-prose ul { list-style: disc; }
+.vault-prose ol { list-style: decimal; }
+.vault-prose li + li { margin-top: 0.25em; }
+
+/* Obsidian checklists. The box is disabled: this is a mirror, not an editor. */
+.vault-prose li input[type='checkbox'] {
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+
+.vault-prose blockquote {
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-ink-muted);
+  padding-left: 1em;
+}
+
+.vault-prose code {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+}
+
+.vault-prose pre {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  padding: 0.9em 1em;
+}
+
+.vault-prose pre code {
+  background: none;
+  border: 0;
+  font-size: 0.85em;
+  padding: 0;
+}
+
+/* Wide tables scroll inside the note rather than widening the page. */
+.vault-prose table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.vault-prose th,
+.vault-prose td {
+  border: 1px solid var(--color-border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+
+.vault-prose th {
+  background: var(--color-canvas);
+  font-weight: 600;
+}
+
+.vault-prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 2em 0;
+}

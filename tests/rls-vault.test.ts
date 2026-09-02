@@ -241,6 +241,25 @@ describe('integrity the database enforces itself', () => {
     ).rejects.toThrow();
   });
 
+  it('takes the whole vault with the account', async () => {
+    // Account deletion goes through auth.admin.deleteUser, so the vault has
+    // to fall out on the foreign keys rather than on the route remembering
+    // three more tables. It does -- this is the assertion that says so.
+    const userE = await createUser('vault-e@example.com');
+    const connection = await seedConnection(userE, 'erin');
+    await seedNote(userE, connection, 'Private.md', 'Nobody else should hold this.');
+    await admin`insert into sync_runs (connection_id, type) values (${connection}, 'backfill')`;
+
+    await admin`delete from auth.users where id = ${userE}`;
+
+    const [{ connections, notes, runs }] = await admin<
+      { connections: number; notes: number; runs: number }[]
+    >`select (select count(*) from vault_connections where user_id = ${userE})::int as connections,
+             (select count(*) from notes where user_id = ${userE})::int as notes,
+             (select count(*) from sync_runs where connection_id = ${connection})::int as runs`;
+    expect({ connections, notes, runs }).toEqual({ connections: 0, notes: 0, runs: 0 });
+  });
+
   it('takes the notes and runs with the connection', async () => {
     const userD = await createUser('vault-d@example.com');
     const connection = await seedConnection(userD, 'dave');

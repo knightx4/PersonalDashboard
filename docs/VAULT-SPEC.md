@@ -167,6 +167,16 @@ Indexes: unique `(user_id, path)`; `(user_id, git_updated_at desc)` for the list
 a generated `tsvector` over `title || body` with GIN for search; `gin_trgm_ops`
 on `title` for fuzzy title match, matching how the job side indexes `questions.text`.
 
+**Dates are best-effort, and the list is ordered by path because of it.** A git
+tree listing carries no timestamps, so a backfill can only date a note from its
+own frontmatter (`updated`, `modified`, `date`, then `created`); everything else
+stays null until a later commit touches it, at which point the commit's date is
+used. Frontmatter wins over the commit deliberately: a vault-wide reformat must
+not restamp five years of journals as today. Dating every note with the day of
+the first sync was the alternative and is worse -- it is wrong, and it looks
+right. Sorting the list by a mostly-null column would read as a bug, so the list
+groups by folder and orders by path, which is also what a vault actually is.
+
 A per-note cap of 1 MB. Anything larger is skipped and recorded on the sync run
 rather than failing it — one pathological note must not stop a vault.
 
@@ -194,8 +204,15 @@ test in `tests/` gets the three new tables added to its list **before any featur
 code is written** — build step 2's rule, which exists precisely so a missing
 policy surfaces immediately rather than months later.
 
-`vault.notes` and `vault.vault_connections` must also be added to the cascade in
-`app/api/account/delete/route.ts` when build step 15 lands.
+Account deletion needs no change: that route ends at
+`auth.admin.deleteUser()`, and all three tables hang off `auth.users` with
+`on delete cascade`, so the vault falls out on the foreign keys rather than on
+the route remembering three more tables. `rls-vault.test.ts` asserts it rather
+than assuming it.
+
+The stored credential is a user-generated PAT, so unlike the Gmail grant there
+is nothing for the app to revoke -- deleting the row is the whole of it. Anyone
+who wants the token dead revokes it on GitHub.
 
 ## Transport
 
@@ -229,10 +246,17 @@ fetched in batches. A 3,000-note vault is ~3,000 requests against a 5,000/hour
 PAT limit, which fits, but not with room to spare and not inside one function
 invocation.
 
-So backfill reuses the existing pump: `lib/core/inbox/pump-budget.ts` and
-`resume.ts` already solve "do as much as the 300-second budget allows, record
-where you stopped, hand off to a continuation." The vault is a second caller of
-machinery that is already load-bearing, not a second implementation of it.
+So backfill reuses `lib/core/inbox/pump-budget.ts`, which already answers "is
+there time for another batch and the write after it" from measured cost rather
+than a guess.
+
+It does **not** reuse `resume.ts`, and that is worth recording because this
+spec originally said it would. A Gmail backfill needs a chain of HTTP hand-offs
+because its position in the mailbox is a page token that exists only inside the
+run; the vault's position is a path, in sort order, stored on the connection. A
+run that stops early has therefore already written down where to continue, and
+the next scheduled pass continues it. There is no chain to keep alive, which
+removes the entire class of failure `resume.ts` exists to recover from.
 
 If the tree response comes back `truncated: true` (100k entries or 7 MB), fall
 back to a per-directory walk. Rare, but silent truncation would mean silently
@@ -280,7 +304,7 @@ search. Same shell, same design system, same `PageHeader` and `EmptyState`.
 
 | Route | |
 |---|---|
-| `/vault` | notes, grouped by folder, newest first. Search over title and body. |
+| `/vault` | notes, grouped by folder and ordered by path. Search over title and body. |
 | `/vault/n/[...path]` | one note, rendered. |
 | `/vault/settings` | connect, disconnect, sync now, last-synced, note count. |
 

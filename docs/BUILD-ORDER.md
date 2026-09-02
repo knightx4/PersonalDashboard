@@ -73,25 +73,30 @@ Full detail in [VAULT-SPEC.md](VAULT-SPEC.md). Four steps, in this order, and
 none of them depends on 19. The v1 deliverable is a viewer and nothing more;
 everything the vault is actually *for* is deferred until something reads it.
 
-20. **Schema and the isolation test.** New `vault` schema in
+All four are done. What the spec got wrong on contact with the code: the
+backfill does not need `resume.ts` (a stored path is a resume point, so there
+is no hand-off chain to keep alive), and account deletion needed no change
+because all three tables cascade from `auth.users` already.
+
+20. ✅ **Schema and the isolation test.** New `vault` schema in
     `supabase/migrations-vault/` (`vault_connections`, `notes`, `sync_runs`),
     added to the `db-reset.sh` loop. RLS on all three, and the cross-user
     isolation test extended to cover them **before any feature code** — the same
     rule as step 2, for the same reason. The three tables also go into the
     step 15 delete cascade.
-21. **The GitHub source.** `lib/vault/providers/github.ts`, containment enforced
+21. ✅ **The GitHub source.** `lib/vault/providers/github.ts`, containment enforced
     the way `lib/email/providers/` already is. Tree call filtered to `.md`
     *before* any blob is requested, so attachment bytes never cross the network.
     Backfill reuses `lib/core/inbox/pump-budget.ts` and `resume.ts` rather than
     reimplementing them; incremental is the compare API with the commit SHA as
     cursor, falling back to a full tree diff on a rewritten history. Third stage
     on `/api/cron/daily`.
-22. **The viewer.** `app/vault/` plus a third entry in `WORKSPACES` in
+22. ✅ **The viewer.** `app/vault/` plus a third entry in `WORKSPACES` in
     `workspace-switcher.tsx`. List, note detail, search. `react-markdown` +
     `remark-gfm` + `gray-matter`, and deliberately **not** `rehype-raw` —
     disabled raw HTML is the sanitizer, and clipped notes carry arbitrary web
     HTML. Wikilinks resolve; attachment embeds render as a placeholder.
-23. **Connect UI.** `/vault/settings` — connect, disconnect, sync now, reauth
+23. ✅ **Connect UI.** `/vault/settings` — connect, disconnect, sync now, reauth
     banner on an expired PAT. Near-copy of the Gmail connection panel.
 
 ### Ordering notes worth respecting
