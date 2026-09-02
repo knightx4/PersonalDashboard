@@ -107,6 +107,7 @@ export async function updateContact(
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
   revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
 }
@@ -144,6 +145,7 @@ export async function logTouch(input: {
   }
 
   revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
   return { error: null };
 }
 
@@ -171,5 +173,6 @@ export async function markTouchAnswered(
     .eq('user_id', user.id);
 
   revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
   return { error: null };
 }
