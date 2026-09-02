@@ -5,7 +5,13 @@ import { PageHeader } from '@/components/jobs/shell/page-header';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
-import { SOURCE_LABELS, type ApplicationSource, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
+import {
+  DEBRIEF_NUDGE_WINDOW_DAYS,
+  SOURCE_LABELS,
+  type ApplicationSource,
+  type ApplicationStatus,
+} from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
@@ -65,8 +71,16 @@ export default async function RoleDetailPage({
   const current = (applications ?? [])[0];
   if (!current) notFound();
 
-  const [{ data: events }, { data: interviews }, { data: answers }, { data: notes }, { data: messages }, { data: profile }, { data: reminders }] =
-    await Promise.all([
+  const [
+    { data: events },
+    { data: interviews },
+    { data: answers },
+    { data: notes },
+    { data: messages },
+    { data: profile },
+    { data: reminders },
+    matchCandidates,
+  ] = await Promise.all([
       supabase
         .from('application_events')
         .select(
@@ -105,6 +119,10 @@ export default async function RoleDetailPage({
         .eq('application_id', current.id)
         .is('completed_at', null)
         .order('due_at', { ascending: true }),
+      findUnlinkedMessages(supabase, user.id, {
+        applicationId: current.id as string,
+        term: company.name,
+      }),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -208,6 +226,11 @@ export default async function RoleDetailPage({
         applicationId={current.id as string}
         jdText={(role.jd_text as string) ?? ''}
         jdLookupNote={(role.jd_lookup_note as string) ?? null}
+        jdUrl={(role.jd_url as string) ?? null}
+        atsJobId={(role.ats_job_id as string) ?? null}
+        compMinCents={(role.comp_min_cents as number) ?? null}
+        compMaxCents={(role.comp_max_cents as number) ?? null}
+        compSource={(role.comp_source as string) ?? null}
         requirements={requirements}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
@@ -227,7 +250,7 @@ export default async function RoleDetailPage({
           round: interview.round as number,
           kind: interview.kind as string,
           scheduledAt: interview.scheduled_at as string | null,
-          isPast: isPast(interview.scheduled_at as string | null),
+          debriefDue: debriefDue(interview.scheduled_at as string | null),
           format: interview.format as string | null,
           status: interview.status as string,
           prepNotes: (interview.prep_notes as string) ?? '',
@@ -278,6 +301,8 @@ export default async function RoleDetailPage({
             messageId: (message.provider_message_id as string) ?? null,
           }),
         }))}
+        companyName={company.name}
+        matchCandidates={matchCandidates}
         otherAttempts={(applications ?? []).slice(1).map((attempt) => ({
           id: attempt.id as string,
           attempt: attempt.attempt as number,
@@ -292,9 +317,17 @@ export default async function RoleDetailPage({
   );
 }
 
-/** Outside the component: reading the clock during render is unstable. */
-function isPast(iso: string | null): boolean {
-  return iso !== null && new Date(iso).getTime() < Date.now();
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Past, and recent enough that "write it up tonight" is still true. Outside
+ * the component: reading the clock during render is unstable.
+ */
+function debriefDue(iso: string | null): boolean {
+  if (iso === null) return false;
+  const scheduledAt = new Date(iso).getTime();
+  const now = Date.now();
+  return scheduledAt < now && scheduledAt >= now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
 }
 
 function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {

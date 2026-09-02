@@ -7,6 +7,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
 import { SearchField } from '@/components/jobs/shell/search-field';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
+import { IN_PROCESS_OR_LATER, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Companies' };
 
@@ -22,7 +23,7 @@ function hrefFor(params: Record<string, string | undefined>): string {
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ priority?: string; q?: string }>;
+  searchParams: Promise<{ priority?: string; active?: string; q?: string }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -30,7 +31,9 @@ export default async function CompaniesPage({
 
   const { data } = await supabase
     .from('companies')
-    .select('id, name, slug, priority, status, industry, hq_location, domains, roles ( id )')
+    .select(
+      'id, name, slug, priority, status, industry, hq_location, domains, roles ( id, applications ( status ) )',
+    )
     .eq('user_id', user.id)
     .order('name');
 
@@ -43,13 +46,23 @@ export default async function CompaniesPage({
     industry: string | null;
     hq_location: string | null;
     domains: string[];
-    roles: Array<{ id: string }>;
+    roles: Array<{ id: string; applications: Array<{ status: ApplicationStatus }> }>;
   }>;
 
+  // A company is "in process or beyond" the moment any pursuit there has —
+  // rejected, withdrawn or otherwise closed roles do not count, and neither
+  // does one still stuck at submitted, waiting to hear back at all.
+  const isActive = (company: (typeof companies)[number]): boolean =>
+    company.roles.some((role) =>
+      role.applications.some((application) => IN_PROCESS_OR_LATER.includes(application.status)),
+    );
+
   const priority = PRIORITIES.find((p) => p === params.priority);
+  const activeOnly = params.active === '1';
   const terms = searchTerms(params.q);
 
   let filtered = priority ? companies.filter((c) => c.priority === priority) : companies;
+  if (activeOnly) filtered = filtered.filter(isActive);
   if (terms.length) {
     // The domains are in here on purpose: a rejection often arrives from an ATS
     // and the only name you remember is the one in the address.
@@ -99,7 +112,7 @@ export default async function CompaniesPage({
           <RailGroup label="Priority">
             <RailItem
               label="All"
-              href={hrefFor({ q: params.q })}
+              href={hrefFor({ active: params.active, q: params.q })}
               active={!priority}
               count={companies.length}
             />
@@ -107,11 +120,24 @@ export default async function CompaniesPage({
               <RailItem
                 key={entry}
                 label={entry}
-                href={hrefFor({ priority: entry, q: params.q })}
+                href={hrefFor({ priority: entry, active: params.active, q: params.q })}
                 active={priority === entry}
                 count={companies.filter((c) => c.priority === entry).length}
               />
             ))}
+          </RailGroup>
+
+          <RailGroup label="Pursuing">
+            <RailItem
+              label="In process or beyond"
+              href={hrefFor({
+                priority: params.priority,
+                active: activeOnly ? undefined : '1',
+                q: params.q,
+              })}
+              active={activeOnly}
+              count={companies.filter(isActive).length}
+            />
           </RailGroup>
         </LeftRail>
 

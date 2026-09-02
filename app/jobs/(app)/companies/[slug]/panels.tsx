@@ -488,9 +488,9 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
           {contacts.map((contact) => (
             <li key={contact.id} className="flex flex-wrap items-baseline gap-2 py-2">
               <Link
-                href={`/jobs/contacts#contact-${contact.id}`}
+                href={`/jobs/contacts/${contact.id}`}
                 className="text-[13px] font-medium text-ink hover:underline"
-                title="Add or edit their details"
+                title="See details, notes and logged sends"
               >
                 {contact.fullName}
               </Link>

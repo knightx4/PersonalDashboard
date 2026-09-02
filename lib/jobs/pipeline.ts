@@ -146,6 +146,13 @@ export const HUMAN_RESPONSE_KINDS: readonly ApplicationEventKind[] = [
 export const DEFAULT_GHOST_THRESHOLD_DAYS = 30;
 
 /**
+ * How long a completed, un-debriefed interview stays "write it up tonight"
+ * urgent. Past that, it is just an old interview with no notes -- still
+ * visible in the Past list, but no longer nagging as if it happened today.
+ */
+export const DEBRIEF_NUDGE_WINDOW_DAYS = 3;
+
+/**
  * How long a cohort needs before its rates mean anything. Applications sent
  * last week have not had time to be answered; including them drags every rate
  * toward zero and makes recent effort look like failure.

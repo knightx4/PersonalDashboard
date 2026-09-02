@@ -15,6 +15,7 @@ import {
 } from '@/lib/jobs/enrich/company';
 import { fetchSiteIcon } from '@/lib/jobs/enrich/site-icon';
 import { lookupCompanyOnline } from '@/lib/jobs/enrich/ai-company';
+import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 const updateSchema = z.object({
   companyId: z.string().uuid(),
@@ -322,6 +323,166 @@ export async function applyAiCompanyEnrichment(
 
   revalidatePath('/jobs/companies');
   return { applied, error: null };
+}
+
+const mergeRolesSchema = z.object({
+  companyId: z.string().uuid(),
+  survivorRoleId: z.string().uuid(),
+  mergedRoleIds: z.array(z.string().uuid()).min(1),
+});
+
+/**
+ * Tables that hang off one specific application rather than the role as a
+ * whole. Consolidating duplicate applications means moving every one of
+ * these onto the survivor before the loser can be deleted, or its history —
+ * events, interviews, attachments — would go with it.
+ */
+const APPLICATION_CHILD_TABLES = [
+  'application_events',
+  'application_answers',
+  'attachments',
+  'contact_touches',
+  'cover_letters',
+  'interviews',
+  'message_link_dismissals',
+  'notes',
+] as const;
+
+/**
+ * Roles being merged are the same posting, so their applications are the same
+ * application, not separate attempts. Keep the one furthest along — ties
+ * broken by whichever is older — move every other one's history onto it, and
+ * delete the rest. `apps` must already include every application on the
+ * survivor and every merged role.
+ */
+async function consolidateApplications(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  survivorRoleId: string,
+  apps: Array<{
+    id: string;
+    role_id: string;
+    attempt: number;
+    status: string;
+    status_manual_override: string | null;
+    created_at: string;
+  }>,
+): Promise<{ error: string | null }> {
+  if (apps.length === 0) return { error: null };
+
+  const target = apps.reduce((best, app) => {
+    const appRank = statusRank(app.status as ApplicationStatus);
+    const bestRank = statusRank(best.status as ApplicationStatus);
+    if (appRank !== bestRank) return appRank > bestRank ? app : best;
+    return new Date(app.created_at) < new Date(best.created_at) ? app : best;
+  });
+
+  const losers = apps.filter((app) => app.id !== target.id);
+  let overrideToApply: string | null = null;
+
+  for (const loser of losers) {
+    for (const table of APPLICATION_CHILD_TABLES) {
+      const { error } = await supabase
+        .from(table)
+        .update({ application_id: target.id })
+        .eq('application_id', loser.id);
+      if (error) return { error: error.message };
+    }
+    // A manual override is a deliberate human decision — keep it rather than
+    // silently dropping it because it happened to be on the losing row.
+    if (!target.status_manual_override && !overrideToApply && loser.status_manual_override) {
+      overrideToApply = loser.status_manual_override;
+    }
+    const { error } = await supabase.from('applications').delete().eq('id', loser.id);
+    if (error) return { error: error.message };
+  }
+
+  if (overrideToApply) {
+    const { error } = await supabase
+      .from('applications')
+      .update({ status_manual_override: overrideToApply })
+      .eq('id', target.id);
+    if (error) return { error: error.message };
+  }
+
+  if (target.role_id !== survivorRoleId || target.attempt !== 1) {
+    const { error } = await supabase
+      .from('applications')
+      .update({ role_id: survivorRoleId, attempt: 1 })
+      .eq('id', target.id);
+    if (error) return { error: error.message };
+  }
+
+  return { error: null };
+}
+
+/**
+ * Fold one or more duplicate role rows into the survivor. They are the same
+ * posting, so their applications are consolidated into one rather than piled
+ * up as separate attempts — see consolidateApplications.
+ */
+export async function mergeRoles(
+  input: z.input<typeof mergeRolesSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = mergeRolesSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not a mergeable selection.' };
+  const { companyId, survivorRoleId, mergedRoleIds } = parsed.data;
+  if (mergedRoleIds.includes(survivorRoleId)) {
+    return { error: 'Pick a different role to merge into.' };
+  }
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS would block a cross-owner or cross-company row silently rather than
+  // explain why nothing moved, so it is checked here for a real message.
+  const { data: involved } = await supabase
+    .from('roles')
+    .select('id, company_id')
+    .eq('user_id', user.id)
+    .in('id', [survivorRoleId, ...mergedRoleIds]);
+
+  if ((involved ?? []).length !== mergedRoleIds.length + 1) {
+    return { error: 'One of those roles no longer exists.' };
+  }
+  if ((involved ?? []).some((role) => role.company_id !== companyId)) {
+    return { error: 'Roles can only be merged within the same company.' };
+  }
+
+  const { data: apps, error: appsError } = await supabase
+    .from('applications')
+    .select('id, role_id, attempt, status, status_manual_override, created_at')
+    .in('role_id', [survivorRoleId, ...mergedRoleIds]);
+  if (appsError) return { error: appsError.message };
+
+  const { error: consolidateError } = await consolidateApplications(
+    supabase,
+    survivorRoleId,
+    apps ?? [],
+  );
+  if (consolidateError) return { error: consolidateError };
+
+  for (const mergedRoleId of mergedRoleIds) {
+    const { error: notesError } = await supabase
+      .from('notes')
+      .update({ role_id: survivorRoleId })
+      .eq('role_id', mergedRoleId);
+    if (notesError) return { error: notesError.message };
+
+    const { error: attachmentsError } = await supabase
+      .from('attachments')
+      .update({ role_id: survivorRoleId })
+      .eq('role_id', mergedRoleId);
+    if (attachmentsError) return { error: attachmentsError.message };
+
+    const { error: deleteError } = await supabase.from('roles').delete().eq('id', mergedRoleId);
+    if (deleteError) return { error: deleteError.message };
+  }
+
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/roles');
+  return { error: null };
 }
 
 const COMPANY_ENRICH_COLUMNS =

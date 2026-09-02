@@ -31,6 +31,15 @@ export const INTERVIEW_HORIZON_DAYS = 14;
 export const GOING_QUIET_WINDOW_DAYS = 7;
 
 /**
+ * How far ahead a reminder is worth surfacing.
+ *
+ * Rule-generated reminders are always due the moment they are raised, so this
+ * only matters for a custom to-do with a future date -- without it, one due in
+ * three days is invisible on "This week" until the day it is already late.
+ */
+export const REMINDER_HORIZON_DAYS = 7;
+
+/**
  * How far "Later" pushes a nudge. Long enough that deferring is a decision
  * rather than a way of clearing the screen.
  *
@@ -109,7 +118,14 @@ export async function loadToday(
   const now = opts.now ?? new Date();
   const ghostDays = opts.ghostThresholdDays ?? DEFAULT_GHOST_THRESHOLD_DAYS;
 
-  const [interviewRows, reminderRows, eventRows, quietRows] = await Promise.all([
+  const [
+    interviewRows,
+    reminderRows,
+    eventRows,
+    quietRows,
+    waitingDismissedRows,
+    quietDismissedRows,
+  ] = await Promise.all([
     supabase
       .from('interviews')
       .select(
@@ -128,7 +144,7 @@ export async function loadToday(
       )
       .eq('user_id', userId)
       .is('completed_at', null)
-      .lte('due_at', now.toISOString())
+      .lte('due_at', new Date(now.getTime() + REMINDER_HORIZON_DAYS * DAY_MS).toISOString())
       .order('due_at', { ascending: true })
       .limit(50),
 
@@ -151,6 +167,21 @@ export async function loadToday(
     // and a second derivation of it here is how two screens start disagreeing
     // about which pursuits are stale.
     loadPipeline(supabase, userId),
+
+    // Dismissed "waiting" and "quiet" items. A row with no dismissed_until is
+    // dismissed for good; one with a future dismissed_until is snoozed and
+    // filtered the same way until it passes.
+    supabase
+      .from('waiting_dismissals')
+      .select('application_event_id, dismissed_until')
+      .eq('user_id', userId)
+      .or(`dismissed_until.is.null,dismissed_until.gt.${now.toISOString()}`),
+
+    supabase
+      .from('quiet_dismissals')
+      .select('application_id, dismissed_until')
+      .eq('user_id', userId)
+      .or(`dismissed_until.is.null,dismissed_until.gt.${now.toISOString()}`),
   ]);
 
   type InterviewRaw = {
@@ -215,9 +246,17 @@ export async function loadToday(
     applications: { status: string; roles: RoleJoin };
   };
 
+  const dismissedWaiting = new Set(
+    (waitingDismissedRows.data ?? []).map((row) => row.application_event_id as string),
+  );
+  const dismissedQuiet = new Set(
+    (quietDismissedRows.data ?? []).map((row) => row.application_id as string),
+  );
+
   const waiting: WaitingOnYou[] = ((eventRows.data ?? []) as unknown as EventRaw[])
     // A request on a pursuit that has since closed is not waiting on anybody.
     .filter((row) => !TERMINAL_STATUSES.includes(row.applications.status as never))
+    .filter((row) => !dismissedWaiting.has(row.id))
     .map((row) => ({
       eventId: row.id,
       applicationId: row.application_id,
@@ -235,6 +274,7 @@ export async function loadToday(
     alreadyNudged: new Set(
       reminders.map((r) => r.applicationId).filter((id): id is string => Boolean(id)),
     ),
+    dismissed: dismissedQuiet,
   });
 
   // Who to write to, for everything on the page that could be followed up.
@@ -314,14 +354,17 @@ export function selectGoingQuiet(
     ghostDays: number;
     withInterview: ReadonlySet<string>;
     alreadyNudged: ReadonlySet<string>;
+    dismissed?: ReadonlySet<string>;
   },
 ): GoingQuiet[] {
   const floor = opts.ghostDays - GOING_QUIET_WINDOW_DAYS;
+  const dismissed = opts.dismissed ?? new Set<string>();
 
   return rows
     .filter((row) => !isTerminal(row.status))
     .filter((row) => !opts.withInterview.has(row.applicationId))
     .filter((row) => !opts.alreadyNudged.has(row.applicationId))
+    .filter((row) => !dismissed.has(row.applicationId))
     .filter((row) => (row.daysSinceActivity ?? 0) >= floor)
     .map((row) => ({
       applicationId: row.applicationId,

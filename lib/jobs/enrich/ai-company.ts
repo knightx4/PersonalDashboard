@@ -60,7 +60,9 @@ export async function lookupCompanyOnline(
       system: SYSTEM,
       tools: [
         {
-          type: 'web_search_20260209',
+          // The dynamic-filtering 20260209 variant is Opus/Sonnet-tier only;
+          // Haiku needs the basic tool or every call 400s.
+          type: 'web_search_20250305',
           name: 'web_search',
           max_uses: MAX_SEARCHES,
         } as unknown as Anthropic.Tool,

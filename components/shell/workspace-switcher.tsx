@@ -53,7 +53,9 @@ export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const active = current === null ? HOME : (WORKSPACES.find((w) => w.id === current) ?? WORKSPACES[0]);
+  const workspace =
+    current === null ? null : (WORKSPACES.find((w) => w.id === current) ?? WORKSPACES[0]);
+  const active = workspace ?? HOME;
 
   useEffect(() => {
     if (!open) return;
@@ -78,12 +80,26 @@ export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) 
       <div className="flex items-center gap-2 rounded-lg py-1 pl-1.5 pr-1 transition-colors duration-150 hover:bg-canvas">
         <Link href="/home" className="press flex items-center rounded-md" title="Home">
           <span
-            className="size-6 rounded-md bg-brand"
-            style={{ backgroundImage: active.gradient }}
+            className="size-8 rounded-lg bg-brand"
+            style={{ backgroundImage: HOME.gradient }}
             aria-hidden
           />
           <span className="sr-only">Home</span>
         </Link>
+        {workspace && (
+          <Link
+            href={workspace.home}
+            className="press flex items-center rounded-md"
+            title={workspace.label}
+          >
+            <span
+              className="size-5 rounded-md bg-brand"
+              style={{ backgroundImage: workspace.gradient }}
+              aria-hidden
+            />
+            <span className="sr-only">{workspace.label}</span>
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}

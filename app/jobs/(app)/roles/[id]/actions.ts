@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { linkMessage } from '@/app/jobs/(app)/review/actions';
+import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/link-candidates';
 
 /**
  * Notes attach to exactly one parent, enforced by a check constraint in the
@@ -224,4 +226,69 @@ export async function deleteInterview(interviewId: string): Promise<{ error: str
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/today');
   return { error: null };
+}
+
+/** Approve a suggested match, or one found through "add other": the same manual link the review queue writes. */
+export async function linkCandidateMessage(
+  messageId: string,
+  applicationId: string,
+): Promise<{ error: string | null }> {
+  const result = await linkMessage(messageId, applicationId);
+  if (!result.error) revalidatePath('/jobs/roles/[id]', 'page');
+  return result;
+}
+
+const declineSchema = z.object({
+  messageId: z.string().uuid(),
+  applicationId: z.string().uuid(),
+});
+
+/**
+ * "Not this one." Remembered per pursuit so the same suggestion does not keep
+ * coming back — the message itself is untouched and can still be linked
+ * elsewhere, or found again through "add other" if this was a mistake.
+ */
+export async function declineCandidateMessage(
+  messageId: string,
+  applicationId: string,
+): Promise<{ error: string | null }> {
+  const parsed = declineSchema.safeParse({ messageId, applicationId });
+  if (!parsed.success) return { error: 'That is not a declinable pair.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from('message_link_dismissals').upsert(
+    {
+      user_id: user.id,
+      application_id: parsed.data.applicationId,
+      message_id: parsed.data.messageId,
+    },
+    { onConflict: 'application_id,message_id' },
+  );
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+/** The "add other" search: any unlinked mail naming the search term, not just the company. */
+export async function searchUnlinkedMessages(
+  applicationId: string,
+  term: string,
+): Promise<{ results: UnlinkedMessage[]; error: string | null }> {
+  const parsed = z.object({ applicationId: z.string().uuid(), term: z.string() }).safeParse({
+    applicationId,
+    term,
+  });
+  if (!parsed.success) return { results: [], error: 'That is not a valid search.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const results = await findUnlinkedMessages(supabase, user.id, {
+    applicationId: parsed.data.applicationId,
+    term: parsed.data.term,
+  });
+  return { results, error: null };
 }
