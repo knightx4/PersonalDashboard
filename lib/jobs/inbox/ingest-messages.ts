@@ -1225,15 +1225,13 @@ async function applyDecision(
         linkMethod: lead.adopted ? 'matched_open_pursuit' : 'lead_from_inbound',
       });
 
-      if (lead.adopted) {
-        // Not a lead at all. The dedupe found an open pursuit at this company
-        // with this title, which means the message is about something already
-        // on the board -- so it gets its real event and moves the status.
-        //
-        // This is what an interview invite landing here used to lose: it was
-        // classified correctly, attached to the right application, and then
-        // recorded as a flat note, so a pursuit with an interview booked still
-        // read as merely acknowledged.
+      if (lead.adopted || eventKindFor(classification) !== null) {
+        // Not a lead at all, or a brand new one whose very first message is
+        // itself a status-moving signal (a cold interview invite, a recruiter
+        // scheduling straight off the bat): either way it gets its real event
+        // -- an interview invite for a role never applied to before still
+        // means an interview, and used to lose that fact by landing here as a
+        // flat, un-actionable note with no interviews row behind it.
         await writeEvent(supabase, {
           userId: ctx.userId,
           applicationId,
@@ -1245,8 +1243,8 @@ async function applyDecision(
           accountEmail: ctx.accountEmail,
         });
       } else {
-        // A genuinely new lead has no application to advance, so the inbound is
-        // recorded as a note rather than as a status-moving event.
+        // Nothing writeEvent would recognize as a status-moving kind, so
+        // there is no event to write -- just a line saying the mail arrived.
         await supabase.from('application_events').insert({
           user_id: ctx.userId,
           application_id: applicationId,
