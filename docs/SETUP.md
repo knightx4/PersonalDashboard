@@ -10,12 +10,12 @@ most of the way through the project. Do not front-load it.
 
 ---
 
-## Two apps, one Supabase project
+## Three apps, one Supabase project
 
-This deployment carries two workspaces behind one login: the commerce side at
-`/shopping` and the job search side at `/jobs`. They share a Supabase project
-and take a schema each — `public` and `job_search` — plus a third, `core`,
-that belongs to neither.
+This deployment carries three workspaces behind one login: the commerce side at
+`/shopping`, the job search side at `/jobs`, and the vault at `/vault`. They
+share a Supabase project and take a schema each — `public`, `job_search` and
+`vault` — plus `core`, which belongs to none of them.
 
 Supabase bills per **project**, not per app, so this costs nothing extra. It is
 also the only arrangement under which the two can share a database at all:
@@ -69,28 +69,41 @@ schemas, so the join has to be in the database.
 ### The one step that is not in this repository
 
 In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search` and `core`** alongside `public`.
+must include **`job_search`, `core` and `vault`** alongside `public`.
 
-Without it PostgREST refuses every job-side request with *"The schema must be
-one of the following"*, and because it is a dashboard setting rather than a
-migration it is the step that gets forgotten after a project restore or when
-setting up a second environment. Three things have to agree — the migrations,
-the `db: { schema }` option on every job-side client, and this setting — and
-only the first two are in version control.
+Without it PostgREST refuses every request against the missing schema with
+*"The schema must be one of the following"*, and because it is a dashboard
+setting rather than a migration it is the step that gets forgotten after a
+project restore or when setting up a second environment. Three things have to
+agree — the migrations, the `db: { schema }` option on every client, and this
+setting — and only the first two are in version control.
+
+`vault` is the newest and therefore the one most likely to be missing: the
+symptom is a Vault workspace that reports no connection and no notes on an
+account that has both.
 
 ### Migrations
 
-Two directories, applied in order:
+Three directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
-| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0029` |
-| `supabase/migrations-job-search` | `job_search` | `0001`–`0010` |
+| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0036` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0013` |
+| `supabase/migrations-vault` | `vault` | `0001` |
 
-They are separate because both sets were numbered independently from `0001`,
-and the `job_search` versions are already recorded remotely under exactly those
+They are separate because the sets were numbered independently from `0001`, and
+the `job_search` versions are already recorded remotely under exactly those
 numbers. Renaming them would make the local files disagree with the deployed
-history. **Do not renumber either set.**
+history. **Do not renumber any set.**
+
+The two older sets depend on each other in both directions:
+`job_search/0006` hands ingestion to `core`, which `public/0029` creates, while
+`public/0031` onward repair `job_search` rows. So the working order is public
+through `0030`, then all of `job_search`, then the rest of public, then
+`vault` — which is what `scripts/db-reset.sh` now does. Running the directories
+straight through fails on `public/0031` with *"relation
+job_search.application_events does not exist"*.
 
 `job_search` `0001`–`0006` are applied remotely; do not re-run them.
 **`0007`–`0010` are not**, and the code that depends on them is deployed, so

@@ -1,6 +1,6 @@
 # Personal Tracker
 
-Two workspaces behind one login, one deployment and one database.
+Three workspaces behind one login, one deployment and one database.
 
 **Shopping** (`/shopping`) tracks what you have already bought, prevents double
 buying, and holds things you want to buy in a queue instead of a cart. The
@@ -12,11 +12,17 @@ you already own two of these and spent $340 at this merchant last month.
 board, the roles and companies behind it, contacts, interviews, an answer bank
 and the funnel maths over all of it.
 
-They share an account, a design system and one mailbox, and nothing else. Each
-owns its own Postgres schema in one Supabase project — `public` for shopping,
-`job_search` for the job side — and ingestion sits in a third, `core`, because
-an order confirmation and a rejection letter arrive on the same sync and
-neither workspace owns that fact. See [docs/SETUP.md](docs/SETUP.md).
+**Vault** (`/vault`) mirrors an Obsidian vault from a git repository and makes
+it readable and searchable here. Markdown only — attachments are never even
+requested. It is a viewer today; what it is *for* is in
+[docs/VAULT-SPEC.md](docs/VAULT-SPEC.md).
+
+They share an account and a design system, and the first two share one mailbox.
+Otherwise nothing. Each owns its own Postgres schema in one Supabase project —
+`public` for shopping, `job_search` for the job side, `vault` for the notes —
+and ingestion sits in `core`, because an order confirmation and a rejection
+letter arrive on the same sync and neither workspace owns that fact. See
+[docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
@@ -45,6 +51,7 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 | Calendar invites parsed from ingested mail | done |
 | Tier-1 JD fetch for nine ATS vendors | done |
 | Company enrichment from Wikidata | done |
+| Vault workspace (schema, git sync, viewer, connect UI) | done |
 
 ## Getting started
 
@@ -70,6 +77,7 @@ npm test
 app/
   (auth)/          login, signup, reset, callback
   (app)/           dashboard | orders | inventory | saved | review | settings
+  vault/           notes | note detail | settings
   (legal)/         privacy, terms   (required for Google verification)
 proxy.ts           session refresh + route protection
 lib/
@@ -79,6 +87,9 @@ lib/
   money.ts         integer cents, allocation, spend. ALL money math lives here
   status.ts        derived order + inventory status
   fingerprint.ts   strict + loose
+lib/
+  vault/           providers/ (the git source, contained), sync/ (pure planning
+                   + the runner), markdown/ (frontmatter and Obsidian syntax)
 supabase/
   migrations/      the source of truth for the database
   local/           auth shim for the local test database only
@@ -110,6 +121,19 @@ These are enforced by tests and lint rules, not by convention.
 - **All LLM output is parsed through a Zod schema** before touching the
   database, and never gates on self-reported confidence alone — the arithmetic
   check is the real gate.
+- **Nothing outside `lib/vault/providers/` knows the vault lives in git.**
+  A lint rule fails the build otherwise, and `tests/lint-boundaries.test.ts`
+  asserts the rule still fires. Same containment as the email providers.
+- **The vault fetches markdown and nothing else**, and the filter runs against
+  a listing rather than a download, so an attachment's bytes are never
+  requested at all.
+- **Notes render without raw HTML.** `rehype-raw` is not installed and must not
+  be: with raw HTML disabled, `react-markdown` will not render the arbitrary
+  markup a web-clipper note carries. That absence is the sanitizer.
+- **The vault sync never advances its cursor past work it did not do.** A
+  cursor is a promise that everything up to a commit is mirrored, and a promise
+  made early is a permanent gap — the next run only asks for what changed since
+  a point it never reached.
 
 ## Non-goals
 
