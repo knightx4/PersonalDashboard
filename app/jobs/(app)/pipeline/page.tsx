@@ -3,7 +3,7 @@ import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import Link from 'next/link';
-import { PipelineBoard, STALE_DAYS, type PipelineView } from '@/components/jobs/pipeline/board';
+import { PipelineBoard, type PipelineView } from '@/components/jobs/pipeline/board';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
 import { PageHeader } from '@/components/jobs/shell/page-header';
@@ -12,7 +12,12 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
-import { APPLICATION_SOURCES, SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
+import {
+  APPLICATION_SOURCES,
+  SOURCE_LABELS,
+  isTerminal,
+  type ApplicationSource,
+} from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Pipeline' };
 
@@ -27,8 +32,9 @@ function hrefFor(params: Record<string, string | undefined>): string {
   return query ? `/jobs/pipeline?${query}` : '/jobs/pipeline';
 }
 
-function isStale(row: PipelineRow): boolean {
-  return (row.daysSinceActivity ?? 0) > STALE_DAYS;
+/** Not rejected, withdrawn, ghosted, or closed -- still actually in play. */
+function isAlive(row: PipelineRow): boolean {
+  return !isTerminal(row.status);
 }
 
 export default async function PipelinePage({
@@ -103,7 +109,7 @@ export default async function PipelinePage({
         description={
           terms.length
             ? `${filtered.length} of ${rows.length} match “${params.q}”.`
-            : `${rows.length} ${rows.length === 1 ? 'pursuit' : 'pursuits'}, ${rows.filter(isStale).length} gone quiet.`
+            : `${rows.length} ${rows.length === 1 ? 'pursuit' : 'pursuits'}, ${rows.filter(isAlive).length} still alive.`
         }
         actions={
           <>
