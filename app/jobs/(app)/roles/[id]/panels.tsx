@@ -8,19 +8,21 @@ import {
   CircleAlert,
   ExternalLink,
   FileText,
+  ChevronDown,
   ListChecks,
   Mail,
   MessageSquareText,
+  Pencil,
   StickyNote,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
-import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
+import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
-import { addQuestions, promoteToCanonical, saveAnswer } from '../actions';
+import { addQuestions, promoteToCanonical, saveAnswer, updateRole } from '../actions';
 import {
   addInterview,
   addNote,
@@ -50,6 +52,11 @@ export interface PanelProps {
   roleId: string;
   applicationId: string;
   jdText: string;
+  jdUrl: string | null;
+  atsJobId: string | null;
+  compMinCents: number | null;
+  compMaxCents: number | null;
+  compSource: string | null;
   requirements: Requirement[];
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
@@ -70,7 +77,7 @@ export interface PanelProps {
     kind: string;
     scheduledAt: string | null;
     /** Computed on the server: reading the clock during render is unstable. */
-    isPast: boolean;
+    debriefDue: boolean;
     format: string | null;
     status: string;
     prepNotes: string;
@@ -405,7 +412,16 @@ function Todos({
   );
 }
 
-function Posting({ jdText, requirements }: PanelProps) {
+function Posting({
+  roleId,
+  jdText,
+  jdUrl,
+  atsJobId,
+  compMinCents,
+  compMaxCents,
+  compSource,
+  requirements,
+}: PanelProps) {
   const groups: Array<{ kind: Requirement['kind']; label: string }> = [
     { kind: 'must_have', label: 'Must have' },
     { kind: 'nice_to_have', label: 'Nice to have' },
@@ -449,19 +465,276 @@ function Posting({ jdText, requirements }: PanelProps) {
         )}
       </section>
 
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h3 className="text-[13px] font-semibold text-ink">Job description</h3>
-        {jdText ? (
-          <pre className="mt-2 max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-ink-muted">
-            {jdText}
-          </pre>
-        ) : (
-          <p className="mt-3 text-[13px] text-ink-faint">
-            Nothing saved. Paste the description on this role to build the requirement map.
-          </p>
-        )}
-      </section>
+      <div className="space-y-4">
+        <RoleDetailsCard
+          roleId={roleId}
+          jdUrl={jdUrl}
+          atsJobId={atsJobId}
+          compMinCents={compMinCents}
+          compMaxCents={compMaxCents}
+          compSource={compSource}
+        />
+
+        <JobDescriptionCard roleId={roleId} jdText={jdText} />
+      </div>
     </div>
+  );
+}
+
+/**
+ * The link, the ATS requisition id, and the comp band -- editable, because
+ * none of them arrive from mail as reliably as the description itself does.
+ */
+function RoleDetailsCard({
+  roleId,
+  jdUrl,
+  atsJobId,
+  compMinCents,
+  compMaxCents,
+  compSource,
+}: {
+  roleId: string;
+  jdUrl: string | null;
+  atsJobId: string | null;
+  compMinCents: number | null;
+  compMaxCents: number | null;
+  compSource: string | null;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [jdUrlDraft, setJdUrlDraft] = useState(jdUrl ?? '');
+  const [atsJobIdDraft, setAtsJobIdDraft] = useState(atsJobId ?? '');
+  const [compMinDraft, setCompMinDraft] = useState(
+    compMinCents !== null ? String(Math.round(compMinCents / 100)) : '',
+  );
+  const [compMaxDraft, setCompMaxDraft] = useState(
+    compMaxCents !== null ? String(Math.round(compMaxCents / 100)) : '',
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const compBand = formatCompBand(compMinCents, compMaxCents);
+
+  const save = () => {
+    setError(null);
+    const min = compMinDraft.trim() ? Math.round(Number(compMinDraft) * 100) : null;
+    const max = compMaxDraft.trim() ? Math.round(Number(compMaxDraft) * 100) : null;
+    if ((min !== null && !Number.isFinite(min)) || (max !== null && !Number.isFinite(max))) {
+      setError('Compensation has to be a number.');
+      return;
+    }
+    startTransition(async () => {
+      const result = await updateRole(roleId, {
+        jdUrl: jdUrlDraft.trim() || null,
+        atsJobId: atsJobIdDraft.trim() || null,
+        compMinCents: min,
+        compMaxCents: max,
+        compSource:
+          min !== null || max !== null
+            ? ((compSource ?? 'recruiter') as 'posted' | 'recruiter' | 'estimate')
+            : null,
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    });
+  };
+
+  if (!editing) {
+    return (
+      <section className="rounded-card border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[13px] font-semibold text-ink">Details</h3>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-ink-faint hover:text-ink"
+            title="Edit posting details"
+          >
+            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+          </button>
+        </div>
+        <dl className="mt-2 space-y-1.5 text-[13px]">
+          <div className="flex items-baseline gap-2">
+            <dt className="w-24 shrink-0 text-ink-faint">Posting link</dt>
+            <dd className="min-w-0 flex-1 truncate">
+              {jdUrl ? (
+                <a
+                  href={jdUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-brand underline underline-offset-2"
+                >
+                  {jdUrl}
+                </a>
+              ) : (
+                <span className="text-ink-faint">—</span>
+              )}
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="w-24 shrink-0 text-ink-faint">ATS job id</dt>
+            <dd className="text-ink">{atsJobId ?? <span className="text-ink-faint">—</span>}</dd>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <dt className="w-24 shrink-0 text-ink-faint">Compensation</dt>
+            <dd className="text-ink">
+              {compBand ?? <span className="text-ink-faint">—</span>}
+              {compBand && compSource && (
+                <span className="ml-1.5 text-[12px] text-ink-faint">from the {compSource}</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-4">
+      <h3 className="text-[13px] font-semibold text-ink">Details</h3>
+      <div className="mt-2 space-y-2">
+        <div>
+          <Label htmlFor={`jdurl-${roleId}`}>Posting link</Label>
+          <Input
+            id={`jdurl-${roleId}`}
+            type="url"
+            value={jdUrlDraft}
+            onChange={(event) => setJdUrlDraft(event.target.value)}
+            placeholder="https://…"
+          />
+        </div>
+        <div>
+          <Label htmlFor={`ats-${roleId}`}>ATS job id</Label>
+          <Input
+            id={`ats-${roleId}`}
+            value={atsJobIdDraft}
+            onChange={(event) => setAtsJobIdDraft(event.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label htmlFor={`compmin-${roleId}`}>Comp min ($)</Label>
+            <Input
+              id={`compmin-${roleId}`}
+              type="number"
+              value={compMinDraft}
+              onChange={(event) => setCompMinDraft(event.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor={`compmax-${roleId}`}>Comp max ($)</Label>
+            <Input
+              id={`compmax-${roleId}`}
+              type="number"
+              value={compMaxDraft}
+              onChange={(event) => setCompMaxDraft(event.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      {error && <p className="mt-2 text-[13px] text-status-rejected">{error}</p>}
+      <div className="mt-3 flex gap-2">
+        <Button type="button" size="sm" disabled={pending} onClick={save}>
+          {pending ? 'Saving…' : 'Save'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => setEditing(false)}
+        >
+          Cancel
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The description itself. Pasting one re-extracts the requirement map and,
+ * when the text has a visible range in it, fills the comp band too -- see
+ * updateRole.
+ */
+function JobDescriptionCard({ roleId, jdText }: { roleId: string; jdText: string }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(jdText);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const save = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await updateRole(roleId, { jdText: draft });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    });
+  };
+
+  return (
+    <section className="rounded-card border border-border bg-surface p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-semibold text-ink">Job description</h3>
+        {!editing && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDraft(jdText);
+              setEditing(true);
+            }}
+          >
+            {jdText ? 'Edit' : 'Add description'}
+          </Button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="mt-2">
+          <Textarea
+            autoFocus
+            rows={16}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Paste the full posting here."
+          />
+          {error && <p className="mt-2 text-[13px] text-status-rejected">{error}</p>}
+          <div className="mt-2 flex gap-2">
+            <Button type="button" size="sm" disabled={pending} onClick={save}>
+              {pending ? 'Saving…' : 'Save'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : jdText ? (
+        <pre className="mt-2 max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-ink-muted">
+          {jdText}
+        </pre>
+      ) : (
+        <p className="mt-3 text-[13px] text-ink-faint">
+          Nothing saved. Add the description to build the requirement map and fill in the comp
+          band automatically.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -646,7 +919,7 @@ function InterviewCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ref = useRef<HTMLElement>(null);
 
-  const needsDebrief = interview.isPast && !notes;
+  const needsDebrief = interview.debriefDue && !notes;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
@@ -678,19 +951,13 @@ function InterviewCard({
         </p>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Prep
-          </label>
+      <div className="mt-3 space-y-3">
+        <CollapsibleField label="Prep" defaultOpen>
           <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Interview notes
-          </label>
+        </CollapsibleField>
+        <CollapsibleField label="Interview notes" defaultOpen>
           <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </div>
+        </CollapsibleField>
       </div>
 
       {interview.questionsAsked.length > 0 && (
@@ -753,6 +1020,38 @@ function InterviewCard({
         </span>
       </div>
     </section>
+  );
+}
+
+/** A labeled section that opens and closes, stacked rather than side by side. */
+function CollapsibleField({
+  label,
+  defaultOpen = false,
+  children,
+}: {
+  label: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint"
+      >
+        <ChevronDown
+          className={cn('size-3.5 shrink-0 transition-transform duration-150', !open && '-rotate-90')}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+        {label}
+      </button>
+      {open && <div className="mt-1">{children}</div>}
+    </div>
   );
 }
 

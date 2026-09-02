@@ -4,6 +4,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatDateTime } from '@/lib/jobs/applications/load';
+import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Interviews' };
 
@@ -91,21 +92,34 @@ export default async function InterviewsPage() {
   );
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Split into upcoming and past. Outside the component because reading the clock
  * during render gives a different answer on every re-render.
+ *
+ * needDebrief is further bounded to the last DEBRIEF_NUDGE_WINDOW_DAYS: an
+ * interview from months ago with no notes is stale, not "write it up
+ * tonight" — it stays visible in the Past table without the urgent banner.
  */
 function splitByTime<T extends { scheduled_at: string | null; notes: string | null }>(
   rows: T[],
 ): { upcoming: T[]; past: T[]; needDebrief: T[] } {
   const now = Date.now();
+  const debriefWindowStart = now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
   const upcoming = rows.filter(
     (row) => row.scheduled_at !== null && new Date(row.scheduled_at).getTime() >= now,
   );
   const past = rows.filter(
     (row) => row.scheduled_at === null || new Date(row.scheduled_at).getTime() < now,
   );
-  return { upcoming, past, needDebrief: past.filter((row) => !row.notes) };
+  const needDebrief = past.filter(
+    (row) =>
+      !row.notes &&
+      row.scheduled_at !== null &&
+      new Date(row.scheduled_at).getTime() >= debriefWindowStart,
+  );
+  return { upcoming, past, needDebrief };
 }
 
 function Section({

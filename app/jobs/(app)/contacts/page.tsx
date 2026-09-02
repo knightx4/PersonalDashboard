@@ -14,15 +14,13 @@ export default async function ContactsPage() {
     await Promise.all([
       supabase
         .from('contacts')
-        .select(
-          'id, full_name, title, relationship, status, linkedin_url, email, how_we_connect, notes, company_id, companies ( name, slug )',
-        )
+        .select('id, full_name, title, relationship, status, company_id, companies ( name, slug )')
         .eq('user_id', user.id)
         .order('full_name'),
       supabase.from('companies').select('id, name').eq('user_id', user.id).order('name'),
       supabase
         .from('contact_touches')
-        .select('id, contact_id, channel, direction, sent_at, responded_at, message')
+        .select('contact_id, direction, sent_at, responded_at')
         .eq('user_id', user.id)
         .order('sent_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
@@ -47,26 +45,19 @@ export default async function ContactsPage() {
     );
   }
 
-  const touchesByContact = new Map<string, Array<{
-    id: string;
-    channel: string;
-    direction: string;
-    sentAt: string;
-    respondedAt: string | null;
-    message: string | null;
-  }>>();
+  // Last touch and pending-reply count per contact -- everything else about a
+  // send now lives on the contact's own page.
+  const lastTouchByContact = new Map<string, string>();
+  const pendingByContact = new Map<string, number>();
 
   for (const touch of touches ?? []) {
-    const list = touchesByContact.get(touch.contact_id as string) ?? [];
-    list.push({
-      id: touch.id as string,
-      channel: touch.channel as string,
-      direction: touch.direction as string,
-      sentAt: touch.sent_at as string,
-      respondedAt: (touch.responded_at as string) ?? null,
-      message: (touch.message as string) ?? null,
-    });
-    touchesByContact.set(touch.contact_id as string, list);
+    const contactId = touch.contact_id as string;
+    if (!lastTouchByContact.has(contactId)) {
+      lastTouchByContact.set(contactId, touch.sent_at as string);
+    }
+    if (touch.direction === 'outbound' && touch.responded_at === null) {
+      pendingByContact.set(contactId, (pendingByContact.get(contactId) ?? 0) + 1);
+    }
   }
 
   const outbound = (touches ?? []).filter((t) => t.direction === 'outbound');
@@ -95,10 +86,6 @@ export default async function ContactsPage() {
           title: string | null;
           relationship: string;
           status: string;
-          linkedin_url: string | null;
-          email: string | null;
-          how_we_connect: string | null;
-          notes: string | null;
           company_id: string | null;
           companies: { name: string; slug: string } | null;
         }>).map((contact) => ({
@@ -107,13 +94,10 @@ export default async function ContactsPage() {
           title: contact.title,
           relationship: contact.relationship,
           status: contact.status,
-          linkedinUrl: contact.linkedin_url,
-          email: contact.email,
-          howWeConnect: contact.how_we_connect,
-          notes: contact.notes,
           companyName: contact.companies?.name ?? null,
           companySlug: contact.companies?.slug ?? null,
-          touches: touchesByContact.get(contact.id) ?? [],
+          lastTouchAt: lastTouchByContact.get(contact.id) ?? null,
+          pendingReplies: pendingByContact.get(contact.id) ?? 0,
         }))}
       />
     </>

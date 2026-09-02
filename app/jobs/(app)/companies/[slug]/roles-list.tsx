@@ -157,8 +157,8 @@ export function RolesList({
             })}
           </select>
           <span className="text-[12px] text-ink-faint">
-            {selected.size - 1} other{selected.size - 1 === 1 ? '' : 's'} fold in as additional
-            attempts.
+            {selected.size - 1} other{selected.size - 1 === 1 ? '' : 's'} fold into it as one
+            application.
           </span>
           <Button type="button" size="sm" disabled={pending} onClick={merge} className="ml-auto">
             {pending ? 'Merging…' : `Merge ${selected.size} roles`}

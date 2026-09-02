@@ -103,6 +103,16 @@ describe('what counts as about to go quiet', () => {
     ).toHaveLength(1);
   });
 
+  it('leaves out one the user has dismissed', () => {
+    const quiet = selectGoingQuiet([row()], {
+      ghostDays: GHOST_DAYS,
+      withInterview: new Set(),
+      alreadyNudged: new Set(),
+      dismissed: new Set(['a-1']),
+    });
+    expect(quiet).toHaveLength(0);
+  });
+
   it('never reports a negative countdown for one already past the line', () => {
     const quiet = selectGoingQuiet([row({ daysSinceActivity: 45 })], {
       ghostDays: GHOST_DAYS,

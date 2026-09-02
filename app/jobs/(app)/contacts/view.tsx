@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil } from 'lucide-react';
-import { useActionState, useState, useTransition } from 'react';
+import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { Input, Label, Select } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { createContact, logTouch, markTouchAnswered, updateContact } from './actions';
+import { createContact } from './actions';
 
 const RELATIONSHIPS = [
   'cold',
@@ -17,8 +16,6 @@ const RELATIONSHIPS = [
   'recruiter',
   'interviewer',
 ] as const;
-
-const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
 
 export interface ContactRow {
   id: string;
@@ -42,12 +39,25 @@ export interface ContactRow {
   }>;
 }
 
+/** A row's place in the table: who they are, and where a send to them stands. */
+export interface ContactListRow {
+  id: string;
+  fullName: string;
+  title: string | null;
+  relationship: string;
+  status: string;
+  companyName: string | null;
+  companySlug: string | null;
+  lastTouchAt: string | null;
+  pendingReplies: number;
+}
+
 export function ContactsView({
   contacts,
   companies,
   timezone,
 }: {
-  contacts: ContactRow[];
+  contacts: ContactListRow[];
   companies: Array<{ id: string; name: string }>;
   timezone: string;
 }) {
@@ -117,299 +127,69 @@ export function ContactsView({
         </form>
       </section>
 
-      <div className="space-y-3 lg:col-span-2">
+      <div className="lg:col-span-2">
         {contacts.length === 0 ? (
           <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
             Nobody yet.
           </p>
         ) : (
-          contacts.map((contact) => (
-            <ContactCard key={contact.id} contact={contact} timezone={timezone} />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ContactCard({ contact: initial, timezone }: { contact: ContactRow; timezone: string }) {
-  const [contact, setContact] = useState(initial);
-  const [editing, setEditing] = useState(false);
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('linkedin_dm');
-  const [message, setMessage] = useState('');
-  const [note, setNote] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const outbound = contact.touches.filter((t) => t.direction === 'outbound');
-  const pendingReply = outbound.filter((t) => t.respondedAt === null);
-
-  return (
-    <article id={`contact-${contact.id}`} className="rounded-card border border-border bg-surface p-4">
-      <header className="flex flex-wrap items-baseline gap-2">
-        <h3 className="text-[13px] font-semibold text-ink">{contact.fullName}</h3>
-        {contact.title && <span className="text-[12px] text-ink-muted">{contact.title}</span>}
-        {contact.companySlug && (
-          <Link
-            href={`/jobs/companies/${contact.companySlug}`}
-            className="text-[12px] text-brand hover:underline"
-          >
-            {contact.companyName}
-          </Link>
-        )}
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
-          {contact.relationship.replace(/_/g, ' ')}
-        </span>
-        <span className="ml-auto text-[11px] text-ink-faint">
-          {contact.status.replace(/_/g, ' ')}
-        </span>
-        {!editing && (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="text-ink-faint hover:text-ink"
-            title="Add or edit their details"
-          >
-            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
-          </button>
-        )}
-      </header>
-
-      {editing ? (
-        <ContactEditForm
-          contact={contact}
-          onCancel={() => setEditing(false)}
-          onSaved={(next) => {
-            setContact(next);
-            setEditing(false);
-          }}
-        />
-      ) : (
-        <>
-          {contact.howWeConnect && (
-            <p className="mt-1 text-[12px] text-ink-muted">{contact.howWeConnect}</p>
-          )}
-          <div className="mt-1 flex flex-wrap gap-3 text-[12px]">
-            {contact.linkedinUrl && (
-              <a
-                href={contact.linkedinUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-brand underline underline-offset-2"
-              >
-                LinkedIn
-              </a>
-            )}
-            {contact.email && <span className="text-ink-muted">{contact.email}</span>}
+          <div className="overflow-x-auto rounded-card border border-border bg-surface">
+            <table className="w-full min-w-[640px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+                  <th className="px-3 py-2 font-semibold">Name</th>
+                  <th className="px-3 py-2 font-semibold">Company</th>
+                  <th className="px-3 py-2 font-semibold">Relationship</th>
+                  <th className="px-3 py-2 font-semibold">Status</th>
+                  <th className="px-3 py-2 font-semibold">Last touch</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contacts.map((contact) => (
+                  <tr key={contact.id} className="border-b border-border last:border-0 hover:bg-canvas">
+                    <td className="px-3 py-2">
+                      <Link
+                        href={`/jobs/contacts/${contact.id}`}
+                        className="font-medium text-ink hover:text-brand"
+                      >
+                        {contact.fullName}
+                      </Link>
+                      {contact.title && (
+                        <span className="ml-1.5 text-ink-muted">{contact.title}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-ink-muted">
+                      {contact.companySlug ? (
+                        <Link
+                          href={`/jobs/companies/${contact.companySlug}`}
+                          className="hover:text-brand hover:underline"
+                        >
+                          {contact.companyName}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-ink-muted">
+                      {contact.relationship.replace(/_/g, ' ')}
+                    </td>
+                    <td className="px-3 py-2 text-ink-muted">
+                      {contact.status.replace(/_/g, ' ')}
+                      {contact.pendingReplies > 0 && (
+                        <span className="ml-1.5 text-[11px] text-ink-faint">
+                          ({contact.pendingReplies} unanswered)
+                        </span>
+                      )}
+                    </td>
+                    <td className="tabular px-3 py-2 text-ink-faint">
+                      {contact.lastTouchAt ? formatDate(contact.lastTouchAt, timezone) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {contact.notes && <p className="mt-1 text-[12px] text-ink-muted">{contact.notes}</p>}
-        </>
-      )}
-
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="w-40">
-          <Label htmlFor={`channel-${contact.id}`}>Log a send</Label>
-          <Select
-            id={`channel-${contact.id}`}
-            value={channel}
-            onChange={(event) => setChannel(event.target.value as (typeof CHANNELS)[number])}
-          >
-            {CHANNELS.map((entry) => (
-              <option key={entry} value={entry}>
-                {entry.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <Input
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          placeholder="What you said, roughly"
-          className="min-w-48 flex-1"
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await logTouch({
-                contactId: contact.id,
-                channel,
-                direction: 'outbound',
-                message,
-              });
-              setNote(result.error ?? 'Logged.');
-              if (!result.error) setMessage('');
-            })
-          }
-        >
-          Log
-        </Button>
-        {note && <span className="text-[12px] text-ink-muted">{note}</span>}
-      </div>
-
-      {contact.touches.length > 0 && (
-        <ul className="mt-3 divide-y divide-border border-t border-border">
-          {contact.touches.slice(0, 5).map((touch) => (
-            <li key={touch.id} className="flex flex-wrap items-center gap-2 py-1.5 text-[12px]">
-              <span className="tabular w-24 text-ink-faint">
-                {formatDate(touch.sentAt, timezone)}
-              </span>
-              <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
-              <span className="text-ink-faint">{touch.direction}</span>
-              {touch.message && (
-                <span className="min-w-0 flex-1 truncate text-ink-muted">{touch.message}</span>
-              )}
-              {touch.respondedAt ? (
-                <span className="text-status-offer">replied</span>
-              ) : touch.direction === 'outbound' ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const result = await markTouchAnswered(touch.id, '');
-                      setNote(result.error ?? 'Marked as answered.');
-                    })
-                  }
-                >
-                  They replied
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {pendingReply.length > 0 && (
-        <p className="mt-2 text-[11px] text-ink-faint">
-          {pendingReply.length} send{pendingReply.length === 1 ? '' : 's'} still unanswered.
-        </p>
-      )}
-    </article>
-  );
-}
-
-/**
- * A contact created from mail arrives with only a name -- the extractor has
- * no way to know a title or a LinkedIn URL. This is the only place either
- * gets added.
- */
-function ContactEditForm({
-  contact,
-  onCancel,
-  onSaved,
-}: {
-  contact: ContactRow;
-  onCancel: () => void;
-  onSaved: (next: ContactRow) => void;
-}) {
-  const [fullName, setFullName] = useState(contact.fullName);
-  const [title, setTitle] = useState(contact.title ?? '');
-  const [linkedinUrl, setLinkedinUrl] = useState(contact.linkedinUrl ?? '');
-  const [email, setEmail] = useState(contact.email ?? '');
-  const [howWeConnect, setHowWeConnect] = useState(contact.howWeConnect ?? '');
-  const [notes, setNotes] = useState(contact.notes ?? '');
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const save = () => {
-    setError(null);
-    startTransition(async () => {
-      const result = await updateContact(contact.id, {
-        fullName,
-        title,
-        linkedinUrl,
-        email,
-        howWeConnect,
-        notes,
-      });
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      onSaved({
-        ...contact,
-        fullName,
-        title: title || null,
-        linkedinUrl: linkedinUrl || null,
-        email: email || null,
-        howWeConnect: howWeConnect || null,
-        notes: notes || null,
-      });
-    });
-  };
-
-  return (
-    <div className="mt-2 space-y-2 border-t border-border pt-2">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={`name-${contact.id}`}>Name</Label>
-          <Input
-            id={`name-${contact.id}`}
-            value={fullName}
-            onChange={(event) => setFullName(event.target.value)}
-          />
-        </div>
-        <div>
-          <Label htmlFor={`title-${contact.id}`}>Title</Label>
-          <Input
-            id={`title-${contact.id}`}
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-        </div>
-        <div>
-          <Label htmlFor={`linkedin-${contact.id}`}>LinkedIn</Label>
-          <Input
-            id={`linkedin-${contact.id}`}
-            type="url"
-            value={linkedinUrl}
-            onChange={(event) => setLinkedinUrl(event.target.value)}
-          />
-        </div>
-        <div>
-          <Label htmlFor={`email-${contact.id}`}>Work email</Label>
-          <Input
-            id={`email-${contact.id}`}
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor={`connect-${contact.id}`}>How you connect</Label>
-        <Input
-          id={`connect-${contact.id}`}
-          value={howWeConnect}
-          onChange={(event) => setHowWeConnect(event.target.value)}
-        />
-      </div>
-      <div>
-        <Label htmlFor={`notes-${contact.id}`}>Notes</Label>
-        <Textarea
-          id={`notes-${contact.id}`}
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          rows={2}
-        />
-      </div>
-      {error && (
-        <p role="alert" className="text-[13px] text-status-rejected">
-          {error}
-        </p>
-      )}
-      <div className="flex gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={save}>
-          Save
-        </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onCancel}>
-          Cancel
-        </Button>
+        )}
       </div>
     </div>
   );
