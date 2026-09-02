@@ -23,8 +23,11 @@ const WORKSPACES = [
     home: '/shopping/dashboard',
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
+    // Warm, and the only mark that does not start on brand blue -- the two
+    // module marks sit next to the home mark rather than under it, so they
+    // read best when they are not variations on the same first colour.
     gradient:
-      'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
+      'linear-gradient(135deg, var(--color-accent-orange) 0%, var(--color-accent-pink) 100%)',
   },
   {
     id: 'jobs',
@@ -40,13 +43,18 @@ const WORKSPACES = [
 export type WorkspaceId = (typeof WORKSPACES)[number]['id'];
 
 /**
- * `current: null` is the home page: neither workspace is active, so the
- * button shows a neutral mark and "Home" rather than defaulting to one
- * module's own gradient and name.
+ * The mark for the whole app, on the largest icon in the topbar and on the
+ * button when no workspace is active.
+ *
+ * Blue into pink, which is what the signed-out pages -- the marketing page,
+ * sign-in, onboarding -- have always used for the product itself. It belongs
+ * on the icon that means "the whole thing" rather than on one of the two
+ * modules inside it, and it replaces a brand-into-grey gradient that only ever
+ * looked like a mark waiting to be chosen.
  */
 const HOME = {
   label: 'Home',
-  gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-ink-muted) 100%)',
+  gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
 } as const;
 
 export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) {
