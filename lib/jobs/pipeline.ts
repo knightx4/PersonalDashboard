@@ -674,3 +674,78 @@ export function formatDays(value: number | null): string {
   const rounded = Math.round(value * 10) / 10;
   return `${rounded} ${rounded === 1 ? 'day' : 'days'}`;
 }
+
+// ---------------------------------------------------------------------------
+// Requirement coverage
+//
+// The map on the role page tells you what to fix; this number is what makes
+// you look. It is the same job /jobs/today does for time and the review queue
+// does for trust: reduce a screenful to the one figure that changes what you
+// do next, and put it where the decision is made.
+//
+// Must-haves only. A nice-to-have you cannot claim costs nothing, and folding
+// it into the count is how "4 of 6" becomes "9 of 21" and stops meaning
+// anything. Responsibilities describe the job, not the bar to clear.
+//
+// Arithmetic over a stored match, no model call. It lives here rather than in
+// a component for the same reason every other derived number does: a count
+// with the wrong denominator is indistinguishable from a right one until you
+// act on it, and three screens computing it inline would disagree by next
+// month.
+// ---------------------------------------------------------------------------
+
+/** One line of the stored map, as much of it as the count needs. */
+export interface CoverageEntry {
+  kind: 'must_have' | 'nice_to_have' | 'responsibility';
+  verdict: 'strong' | 'partial' | 'gap';
+}
+
+export interface RequirementCoverage {
+  /** Must-haves answered strongly. */
+  covered: number;
+  /** Must-haves in total. Zero means the number is not worth showing. */
+  total: number;
+  /** Must-haves that are outright gaps — what you would have to talk around. */
+  gaps: number;
+  /**
+   * Covered over total, or null when there are no must-haves. Null renders as
+   * "—", never as 0%, the same rule the funnel rates follow.
+   */
+  rate: number | null;
+}
+
+/**
+ * A partial counts as half.
+ *
+ * Not because half is precise, but because the two alternatives are both
+ * wrong in a way that matters. Counting it as covered lets a row of "adjacent,
+ * but less depth" read as a role you can claim, which is the flattery this
+ * layer exists to remove. Counting it as a gap makes a genuinely close fit
+ * look like a wall and sends you past roles worth an hour. Half keeps a
+ * mixed map ranked between a strong one and a hollow one, which is all the
+ * number is for.
+ */
+const PARTIAL_WEIGHT = 0.5;
+
+export function requirementCoverage(
+  matches: readonly CoverageEntry[] | null | undefined,
+): RequirementCoverage {
+  const musts = (matches ?? []).filter((match) => match.kind === 'must_have');
+  if (musts.length === 0) return { covered: 0, total: 0, gaps: 0, rate: null };
+
+  const strong = musts.filter((match) => match.verdict === 'strong').length;
+  const partial = musts.filter((match) => match.verdict === 'partial').length;
+
+  return {
+    covered: strong,
+    total: musts.length,
+    gaps: musts.filter((match) => match.verdict === 'gap').length,
+    rate: (strong + partial * PARTIAL_WEIGHT) / musts.length,
+  };
+}
+
+/** "4 of 6 must-haves", or null when there is nothing worth saying. */
+export function formatCoverage(coverage: RequirementCoverage): string | null {
+  if (coverage.total === 0) return null;
+  return `${coverage.covered} of ${coverage.total} must-have${coverage.total === 1 ? '' : 's'}`;
+}

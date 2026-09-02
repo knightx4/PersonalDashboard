@@ -43,6 +43,7 @@ export default async function PipelinePage({
   searchParams: Promise<{
     source?: string;
     excitement?: string;
+    coverage?: string;
     company?: string;
     q?: string;
   }>;
@@ -62,14 +63,23 @@ export default async function PipelinePage({
 
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
   const excitement = params.excitement ? Number(params.excitement) : null;
+  const coverage = params.coverage === 'gaps' || params.coverage === 'covered' ? params.coverage : null;
 
   const terms = searchTerms(params.q);
 
   let filtered = rows;
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (excitement) filtered = filtered.filter((row) => (row.excitement ?? 0) >= excitement);
+  // Unmatched roles are in neither bucket. A role you have not matched is not a
+  // role without gaps, and putting it in "no gaps" would be the flattery this
+  // whole layer exists to remove.
+  if (coverage === 'gaps') filtered = filtered.filter((row) => row.coverage.gaps > 0);
+  if (coverage === 'covered')
+    filtered = filtered.filter((row) => row.coverage.total > 0 && row.coverage.gaps === 0);
   if (terms.length)
     filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
+
+  const matchedCount = rows.filter((row) => row.coverage.total > 0).length;
 
   const countsBySource = new Map<ApplicationSource, number>();
   for (const row of rows) {
@@ -127,7 +137,7 @@ export default async function PipelinePage({
           <RailGroup label="Source">
             <RailItem
               label="All sources"
-              href={hrefFor({ excitement: params.excitement, q: params.q })}
+              href={hrefFor({ excitement: params.excitement, coverage: params.coverage, q: params.q })}
               active={!source}
               count={rows.length}
             />
@@ -138,6 +148,7 @@ export default async function PipelinePage({
                 href={hrefFor({
                   source: entry,
                   excitement: params.excitement,
+                  coverage: params.coverage,
                   q: params.q,
                 })}
                 active={source === entry}
@@ -149,7 +160,7 @@ export default async function PipelinePage({
           <RailGroup label="Excitement">
             <RailItem
               label="Any"
-              href={hrefFor({ source: params.source, q: params.q })}
+              href={hrefFor({ source: params.source, coverage: params.coverage, q: params.q })}
               active={!excitement}
             />
             {[5, 4, 3].map((level) => (
@@ -159,12 +170,49 @@ export default async function PipelinePage({
                 href={hrefFor({
                   source: params.source,
                   excitement: String(level),
+                  coverage: params.coverage,
                   q: params.q,
                 })}
                 active={excitement === level}
               />
             ))}
           </RailGroup>
+
+          {matchedCount > 0 && (
+            <RailGroup label="Evidence">
+              <RailItem
+                label="Any"
+                href={hrefFor({
+                  source: params.source,
+                  excitement: params.excitement,
+                  q: params.q,
+                })}
+                active={!coverage}
+              />
+              <RailItem
+                label="Has gaps"
+                href={hrefFor({
+                  source: params.source,
+                  excitement: params.excitement,
+                  coverage: 'gaps',
+                  q: params.q,
+                })}
+                active={coverage === 'gaps'}
+                count={rows.filter((row) => row.coverage.gaps > 0).length}
+              />
+              <RailItem
+                label="Fully covered"
+                href={hrefFor({
+                  source: params.source,
+                  excitement: params.excitement,
+                  coverage: 'covered',
+                  q: params.q,
+                })}
+                active={coverage === 'covered'}
+                count={rows.filter((row) => row.coverage.total > 0 && row.coverage.gaps === 0).length}
+              />
+            </RailGroup>
+          )}
 
           <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
             Priority lives on the company, not the pursuit —{' '}

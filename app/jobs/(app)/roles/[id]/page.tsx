@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { cn } from '@/lib/cn';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
@@ -9,6 +10,8 @@ import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
 import {
   DEBRIEF_NUDGE_WINDOW_DAYS,
   SOURCE_LABELS,
+  formatCoverage,
+  requirementCoverage,
   type ApplicationSource,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
@@ -158,6 +161,8 @@ export default async function RoleDetailPage({
     skills: (item.skills as string[]) ?? [],
   }));
   const requirementMatches = (role.requirement_matches as RequirementMatch[] | null) ?? null;
+  const coverage = requirementCoverage(requirementMatches);
+  const coverageLabel = formatCoverage(coverage);
   const currentMatchKey = matchKey(role.jd_hash as string | null, evidence);
 
   // Timeline events name the message they came from, and the linked mail is
@@ -190,6 +195,24 @@ export default async function RoleDetailPage({
         }
         actions={
           <div className="flex items-center gap-2">
+            {coverageLabel && (
+              <Link
+                href={`/jobs/roles/${role.id}?tab=posting`}
+                className={cn(
+                  'tabular rounded-full px-2 py-0.5 text-[12px]',
+                  coverage.gaps > 0
+                    ? 'bg-accent-orange-tint text-ink'
+                    : 'bg-status-offer-tint text-status-offer',
+                )}
+                title={
+                  coverage.gaps > 0
+                    ? `${coverage.gaps} must-have${coverage.gaps === 1 ? '' : 's'} your bank does not cover`
+                    : 'Every must-have covered by your evidence'
+                }
+              >
+                {coverageLabel}
+              </Link>
+            )}
             <StatusPicker
               applicationId={current.id as string}
               status={current.status as ApplicationStatus}
