@@ -1,4 +1,5 @@
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
+import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
 /**
  * The nightly sweep: ghosting and rule-generated reminders.
@@ -167,7 +168,7 @@ async function generateReminders(
     .from('interviews')
     .select('id, user_id, application_id, scheduled_at')
     .lt('scheduled_at', new Date(now).toISOString())
-    .gt('scheduled_at', new Date(now - 3 * DAY_MS).toISOString())
+    .gt('scheduled_at', new Date(now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS).toISOString())
     .is('debrief', null)
     .is('went_well', null)
     .limit(500);

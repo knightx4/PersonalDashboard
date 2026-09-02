@@ -70,7 +70,7 @@ export interface PanelProps {
     kind: string;
     scheduledAt: string | null;
     /** Computed on the server: reading the clock during render is unstable. */
-    isPast: boolean;
+    debriefDue: boolean;
     format: string | null;
     status: string;
     prepNotes: string;
@@ -646,7 +646,7 @@ function InterviewCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ref = useRef<HTMLElement>(null);
 
-  const needsDebrief = interview.isPast && !notes;
+  const needsDebrief = interview.debriefDue && !notes;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
