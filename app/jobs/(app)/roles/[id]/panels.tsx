@@ -22,7 +22,14 @@ import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
-import { addQuestions, promoteToCanonical, saveAnswer, updateRole } from '../actions';
+import {
+  addQuestions,
+  lookUpJobDescription,
+  promoteToCanonical,
+  saveAnswer,
+  updateRole,
+  type JdLookupResult,
+} from '../actions';
 import {
   addInterview,
   addNote,
@@ -676,7 +683,9 @@ function JobDescriptionCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(jdText);
   const [error, setError] = useState<string | null>(null);
+  const [lookup, setLookup] = useState<JdLookupResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const [looking, startLooking] = useTransition();
 
   const save = () => {
     setError(null);
@@ -691,22 +700,40 @@ function JobDescriptionCard({
     });
   };
 
+  // The nightly pass walks six companies a night. A role you are looking at now
+  // should not wait behind two hundred you are not, and the answer arrives in
+  // about the time the board takes to reply.
+  const lookItUp = () => {
+    setLookup(null);
+    startLooking(async () => {
+      setLookup(await lookUpJobDescription(roleId));
+      router.refresh();
+    });
+  };
+
   return (
     <section className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-[13px] font-semibold text-ink">Job description</h3>
         {!editing && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setDraft(jdText);
-              setEditing(true);
-            }}
-          >
-            {jdText ? 'Edit' : 'Add description'}
-          </Button>
+          <div className="flex items-center gap-1">
+            {!jdText && (
+              <Button type="button" size="sm" variant="ghost" disabled={looking} onClick={lookItUp}>
+                {looking ? 'Looking…' : 'Look it up'}
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDraft(jdText);
+                setEditing(true);
+              }}
+            >
+              {jdText ? 'Edit' : 'Add description'}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -746,11 +773,45 @@ function JobDescriptionCard({
         </p>
       )}
 
+      {/* What this lookup just did. Shown instead of the stored note, which it
+          has only this second replaced -- two lines saying almost the same
+          thing is how a panel stops being read. */}
+      {!editing && lookup && (
+        <div className="mt-3 border-t border-border pt-3">
+          <p className={cn('text-[12px]', lookup.ok ? 'text-ink-muted' : 'text-ink-faint')}>
+            {lookup.message}
+          </p>
+          {/* The ambiguous case is the one worth spending pixels on: the board
+              knows which postings these are, so linking them turns "go and find
+              it" into one click away from the right page. */}
+          {lookup.candidates && lookup.candidates.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {lookup.candidates.map((candidate) => (
+                <li key={`${candidate.title}-${candidate.url ?? ''}`} className="text-[12px]">
+                  {candidate.url ? (
+                    <a
+                      href={candidate.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-ink-muted underline underline-offset-2 hover:text-ink"
+                    >
+                      {candidate.title}
+                    </a>
+                  ) : (
+                    <span className="text-ink-muted">{candidate.title}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Why the nightly board lookup did not fill this in, or which posting it
           picked when the match was on a title rather than an id. An empty panel
           on its own asks you for nothing and explains nothing. Hidden while
           editing, where the box you are typing in is the answer. */}
-      {!editing && jdLookupNote && (
+      {!editing && !lookup && jdLookupNote && (
         <p className="mt-3 border-t border-border pt-3 text-[12px] text-ink-faint">
           {jdLookupNote}
         </p>

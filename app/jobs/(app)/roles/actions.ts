@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
 import { fetchPostingFromUrl, fetchQuestionsFromUrl, detectPosting } from '@/lib/jobs/ats';
 import { extractCompBand, extractRequirements, guessSeniority, guessWorkMode, jdHash } from '@/lib/jobs/jd/requirements';
 import { domainFromUrl, slugify } from '@/lib/jobs/slug';
@@ -395,4 +397,113 @@ export async function promoteToCanonical(
   if (error) return { error: error.message };
   revalidatePath('/jobs/answers');
   return { error: null };
+}
+
+/** What the role page shows after a lookup. */
+export interface JdLookupResult {
+  ok: boolean;
+  message: string;
+  /** Set only when the board offered more than one plausible posting. */
+  candidates?: Array<{ title: string; url: string | null }>;
+}
+
+/**
+ * Read this role's description off the employer's board, now.
+ *
+ * The same work the nightly backfill does, on one role, on your session rather
+ * than the service key -- so RLS decides what is yours, not this function. The
+ * point of it existing at all is the queue: the nightly pass walks six
+ * companies a night, and a role you care about today should not wait its turn
+ * behind two hundred you do not.
+ *
+ * Refuses a role that already has a description. The button is only offered on
+ * an empty one, but the rule that automated work never overwrites what a person
+ * wrote belongs here, where it cannot be got round by a stale page.
+ */
+export async function lookUpJobDescription(roleId: string): Promise<JdLookupResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: role, error } = await supabase
+    .from('roles')
+    .select(
+      `id, user_id, company_id, title, jd_text, ats_job_id, location, work_mode, seniority,
+       comp_min_cents, comp_max_cents, jd_url, posting_status,
+       companies!inner ( id, name, ats_type, ats_board_token, ats_board_hint, careers_url, website )`,
+    )
+    .eq('id', roleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) return { ok: false, message: error.message };
+  if (!role) return { ok: false, message: 'That role could not be found.' };
+  if ((role.jd_text as string | null)?.trim()) {
+    return { ok: false, message: 'This role already has a description. Edit it instead.' };
+  }
+
+  const company = role.companies as unknown as CompanyForLookup | null;
+  if (!company) return { ok: false, message: 'That role has no company to look up a board for.' };
+
+  // Every title at this company, not just this one: a guessed board is only
+  // believed when a posting on it matches a role recorded here, and one title
+  // is a thinner test than four.
+  const { data: siblings } = await supabase
+    .from('roles')
+    .select('title')
+    .eq('user_id', user.id)
+    .eq('company_id', role.company_id as string)
+    .limit(50);
+
+  const now = new Date();
+  const resolved = await resolveBoard(
+    supabase,
+    await createCoreClient(),
+    company,
+    user.id,
+    (siblings ?? []).map((row) => row.title as string),
+    now,
+  );
+
+  revalidatePath(`/jobs/roles/${roleId}`);
+
+  if (!resolved.ok) return { ok: false, message: resolved.reason };
+
+  const outcome = await applyBoardToRole(
+    supabase,
+    role as unknown as RoleForLookup,
+    resolved.board,
+    now,
+  );
+
+  revalidatePath(`/jobs/roles/${roleId}`);
+
+  switch (outcome.kind) {
+    case 'filled':
+      return { ok: true, message: `Read from the ${outcome.vendor} board: “${outcome.title}”.` };
+    case 'ambiguous':
+      return {
+        ok: false,
+        message: `More than one posting on the ${outcome.vendor} board could be this role. Open the one that is yours and paste it, rather than have the wrong description saved here.`,
+        candidates: outcome.candidates,
+      };
+    case 'closed':
+      return {
+        ok: false,
+        message: `Not on the ${outcome.vendor} board any more, so the posting has closed and its description is no longer published.`,
+      };
+    case 'no_match':
+      return { ok: false, message: `No posting on the ${outcome.vendor} board matched this role.` };
+    case 'untitled':
+      return {
+        ok: false,
+        message: 'This role still has no title, so there is nothing to match against the board.',
+      };
+    case 'no_description':
+      return {
+        ok: false,
+        message: `Found the posting on the ${outcome.vendor} board, but it publishes no description.`,
+      };
+    case 'save_failed':
+      return { ok: false, message: outcome.note };
+  }
 }
