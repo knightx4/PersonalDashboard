@@ -63,9 +63,12 @@ at Tier 2.
     table; standalone inventory (no synthetic orders).
 18. ✅ **Sell assistant v1** — buyback quotes + eBay Browse asking ceiling,
     net_self / net_buyback math, routing UI on `/sell` (draft only).
-19. **Phase 2** — the anti-spending layer. No migrations needed; the schema
-    already carries `item_uses`, the budget columns and `cooldown_until`.
-    `price_checks` for saved items also waits until then.
+19. **Phase 2** — the anti-spending layer, on the *shopping* side. No
+    migrations needed; the schema already carries `item_uses`, the budget
+    columns and `cooldown_until`. `price_checks` for saved items also waits
+    until then. (The job side's own second phase is a separate body of work
+    with its own name — see [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md) — so that
+    "Phase 2" here means one thing only.)
 
 ### Ordering notes worth respecting
 
