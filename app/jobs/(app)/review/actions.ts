@@ -87,9 +87,14 @@ export async function linkMessage(
 }
 
 /**
- * Dismiss a message. The subject and sender are cleared at the same time,
- * because a message that turns out to be irrelevant must not keep its
- * retention exemption — the database constraint enforces the same rule.
+ * Dismiss a message. This row is only this workspace's verdict: the envelope —
+ * subject, sender, reply-to, thread — lives in `core.ingested_messages` and is
+ * not ours to clear, because a message the job side finds irrelevant may be an
+ * order confirmation the commerce side is keeping. Scrubbing happens once in
+ * core, by the sweep at the end of a sync, when every workspace has disclaimed
+ * it. Writing the envelope columns here is what produced the "from_address not
+ * in the schema cache" error: they stopped existing on this table at the
+ * ingestion unification.
  */
 export async function dismissMessage(messageId: string): Promise<{ error: string | null }> {
   await requireUser();
@@ -100,10 +105,6 @@ export async function dismissMessage(messageId: string): Promise<{ error: string
     .update({
       classification: 'not_relevant',
       parse_status: 'skipped',
-      subject: null,
-      from_address: null,
-      reply_to_address: null,
-      thread_id: null,
       resulting_application_id: null,
       link_method: null,
       link_confidence: null,
