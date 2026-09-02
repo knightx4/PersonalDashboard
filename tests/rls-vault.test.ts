@@ -67,12 +67,12 @@ afterAll(async () => {
 });
 
 describe('RLS coverage', () => {
-  it('has row level security enabled on every table in vault', async () => {
+  it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
       select c.relname as tablename
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'vault' and c.relkind = 'r' and not c.relrowsecurity
+      where n.nspname = 'obsidian' and c.relkind = 'r' and not c.relrowsecurity
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([]);
   });
@@ -82,7 +82,7 @@ describe('RLS coverage', () => {
       select c.relname as tablename
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'vault' and c.relkind = 'r'
+      where n.nspname = 'obsidian' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual(['notes', 'sync_runs', 'vault_connections']);
   });

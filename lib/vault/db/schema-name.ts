@@ -12,8 +12,15 @@
  *      `db: { schema: VAULT_SCHEMA }`.
  *   3. The schema is listed under Settings → API → Exposed schemas in the
  *      Supabase dashboard, alongside `public`, `job_search` and `core`.
+ *
+ * It is called `obsidian` rather than the obvious `vault` because Supabase
+ * already ships a `vault` schema on every project -- Supabase Vault, the
+ * encrypted secrets store, whose `vault.secrets` table deliberately has no
+ * RLS. Putting these tables there and exposing the schema to PostgREST would
+ * have published that table. The product, the routes and this directory are
+ * still called vault; only the Postgres schema differs.
  */
-export const VAULT_SCHEMA = 'vault';
+export const VAULT_SCHEMA = 'obsidian';
 
 /**
  * A Supabase client bound to the vault schema.

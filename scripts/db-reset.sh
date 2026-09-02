@@ -10,7 +10,7 @@
 #
 #   supabase/migrations             -> public,     the commerce side
 #   supabase/migrations-job-search  -> job_search, the job search side
-#   supabase/migrations-vault       -> vault,      the Obsidian mirror
+#   supabase/migrations-vault       -> obsidian,   the Obsidian mirror
 #
 # They are separate directories rather than one because the sets were numbered
 # independently and each starts at 0001 -- and the job_search versions are
@@ -79,7 +79,7 @@ for f in "$ROOT/supabase/migrations-job-search"/*.sql; do apply_file "$f"; done
 echo "==> migrations (after $CORE_HANDOVER, which repair job_search)"
 apply_range migrations "$CORE_HANDOVER" after
 
-echo "==> migrations-vault"
+echo "==> migrations-vault (obsidian)"
 for f in "$ROOT/supabase/migrations-vault"/*.sql; do apply_file "$f"; done
 
 echo "==> done"

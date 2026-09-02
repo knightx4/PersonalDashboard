@@ -114,8 +114,23 @@ whenever a desktop next opens the vault. Acceptable for v1.
 
 ## Schema
 
-A fourth schema, `vault`, alongside `public` (shopping), `job_search`, and
-`core` (ingestion). It gets its own schema for the same reason the other two do:
+A fourth schema, `obsidian`, alongside `public` (shopping), `job_search`, and
+`core` (ingestion).
+
+> **It is not called `vault`, and must never be renamed to it.** Supabase ships
+> Supabase Vault — an encrypted secrets store — in a schema called `vault` on
+> every hosted project, and `vault.secrets` deliberately carries no RLS because
+> nothing is meant to reach it through PostgREST. The grants at the end of a
+> schema migration read "all tables in schema", so creating these tables there
+> would have granted every authenticated user access to that secrets table, and
+> exposing the schema to PostgREST — which this workspace requires — would have
+> published it. A local Postgres has no Supabase extensions, so the name looks
+> free in the test database and is not free in production. `00_auth_shim.sql`
+> now creates the collision locally and `coexistence.test.ts` asserts nothing
+> of ours landed in it.
+>
+> The product, the routes (`/vault`) and the module (`lib/vault/`) are all still
+> called vault. Only the Postgres schema differs. It gets its own schema for the same reason the other two do:
 it is a separate domain with its own lifecycle, and nothing in it belongs to
 either existing workspace.
 

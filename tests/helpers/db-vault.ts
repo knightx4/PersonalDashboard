@@ -13,7 +13,7 @@ export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   'postgresql://postgres@localhost:5433/shopping_manager_test';
 
-export const VAULT_SCHEMA = 'vault';
+export const VAULT_SCHEMA = 'obsidian';
 
 export const sql = postgres(TEST_DATABASE_URL, {
   max: 4,

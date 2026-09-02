@@ -15,7 +15,11 @@ most of the way through the project. Do not front-load it.
 This deployment carries three workspaces behind one login: the commerce side at
 `/shopping`, the job search side at `/jobs`, and the vault at `/vault`. They
 share a Supabase project and take a schema each — `public`, `job_search` and
-`vault` — plus `core`, which belongs to none of them.
+`obsidian` — plus `core`, which belongs to none of them.
+
+The notes workspace is called Vault everywhere a person sees it, but its schema
+is `obsidian`: `vault` is taken by Supabase Vault on every hosted project, and
+its `secrets` table has no RLS.
 
 Supabase bills per **project**, not per app, so this costs nothing extra. It is
 also the only arrangement under which the two can share a database at all:
@@ -69,7 +73,7 @@ schemas, so the join has to be in the database.
 ### The one step that is not in this repository
 
 In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search`, `core` and `vault`** alongside `public`.
+must include **`job_search`, `core` and `obsidian`** alongside `public`.
 
 Without it PostgREST refuses every request against the missing schema with
 *"The schema must be one of the following"*, and because it is a dashboard
@@ -78,9 +82,14 @@ project restore or when setting up a second environment. Three things have to
 agree — the migrations, the `db: { schema }` option on every client, and this
 setting — and only the first two are in version control.
 
-`vault` is the newest and therefore the one most likely to be missing: the
+`obsidian` is the newest and therefore the one most likely to be missing: the
 symptom is a Vault workspace that reports no connection and no notes on an
 account that has both.
+
+**Never add `vault` to that list.** That schema is Supabase's own — Supabase
+Vault, the encrypted secrets store — and `vault.secrets` carries no RLS
+because nothing is meant to reach it through PostgREST. The notes workspace is
+called Vault and lives in `obsidian` for exactly this reason.
 
 ### Migrations
 
@@ -90,7 +99,7 @@ Three directories, and the order is **not** directory by directory:
 |---|---|---|
 | `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0036` |
 | `supabase/migrations-job-search` | `job_search` | `0001`–`0013` |
-| `supabase/migrations-vault` | `vault` | `0001` |
+| `supabase/migrations-vault` | `obsidian` | `0001` |
 
 They are separate because the sets were numbered independently from `0001`, and
 the `job_search` versions are already recorded remotely under exactly those
@@ -101,7 +110,7 @@ The two older sets depend on each other in both directions:
 `job_search/0006` hands ingestion to `core`, which `public/0029` creates, while
 `public/0031` onward repair `job_search` rows. So the working order is public
 through `0030`, then all of `job_search`, then the rest of public, then
-`vault` — which is what `scripts/db-reset.sh` now does. Running the directories
+`obsidian` — which is what `scripts/db-reset.sh` now does. Running the directories
 straight through fails on `public/0031` with *"relation
 job_search.application_events does not exist"*.
 

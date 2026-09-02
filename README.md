@@ -19,7 +19,7 @@ requested. It is a viewer today; what it is *for* is in
 
 They share an account and a design system, and the first two share one mailbox.
 Otherwise nothing. Each owns its own Postgres schema in one Supabase project —
-`public` for shopping, `job_search` for the job side, `vault` for the notes —
+`public` for shopping, `job_search` for the job side, `obsidian` for the notes —
 and ingestion sits in `core`, because an order confirmation and a rejection
 letter arrive on the same sync and neither workspace owns that fact. See
 [docs/SETUP.md](docs/SETUP.md).
