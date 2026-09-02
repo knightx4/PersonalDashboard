@@ -21,7 +21,9 @@ neither workspace owns that fact. See [docs/SETUP.md](docs/SETUP.md).
 ## Status
 
 Build order steps 1–14 and books/sell assistant (16–18) are done. See
-[docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next.
+[docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next on the shopping
+side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
+next body of work.
 
 | | |
 |---|---|
