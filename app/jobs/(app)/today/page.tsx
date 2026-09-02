@@ -6,6 +6,7 @@ import { formatDateTime } from '@/lib/jobs/applications/load';
 import { DEFAULT_GHOST_THRESHOLD_DAYS } from '@/lib/jobs/pipeline';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
 import { ReminderActions } from './reminder-actions';
+import { QuietActions, WaitingActions } from './waiting-quiet-actions';
 
 export const metadata = { title: 'This week' };
 
@@ -145,6 +146,7 @@ export default async function TodayPage() {
                       {row.summary}
                     </span>
                   )}
+                  <WaitingActions eventId={row.eventId} />
                 </li>
               ))}
             </ul>
@@ -200,11 +202,8 @@ export default async function TodayPage() {
                   <span className="tabular text-[12px] text-ink-muted">
                     quiet {row.daysSinceActivity} days
                   </span>
-                  {row.followUpHref && (
-                    <span className="ml-auto">
-                      <DraftLink href={row.followUpHref} />
-                    </span>
-                  )}
+                  {row.followUpHref && <DraftLink href={row.followUpHref} />}
+                  <QuietActions applicationId={row.applicationId} />
                 </li>
               ))}
             </ul>
