@@ -13,6 +13,7 @@ import {
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
+import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
 
@@ -40,7 +41,7 @@ export default async function RoleDetailPage({
     .select(
       `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, ats_job_id, seniority, location, work_mode,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
-       requirements,
+       requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
        companies!inner ( id, name, slug, ats_type, priority )`,
     )
     .eq('id', id)
@@ -81,6 +82,7 @@ export default async function RoleDetailPage({
     { data: reminders },
     matchCandidates,
     { data: companyContacts },
+    { data: bank },
   ] = await Promise.all([
       supabase
         .from('application_events')
@@ -140,10 +142,23 @@ export default async function RoleDetailPage({
         .eq('user_id', user.id)
         .eq('company_id', company.id)
         .order('full_name'),
+      // Only what the staleness key is computed from. A stored match stays put
+      // until the description or the bank changes; without this the page
+      // cannot tell a current map from one computed before you added the item
+      // that answers its biggest gap.
+      supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
   const requirements = (role.requirements as Requirement[] | null) ?? [];
+
+  const evidence = (bank ?? []).map((item) => ({
+    id: item.id as string,
+    strength: item.strength as number,
+    skills: (item.skills as string[]) ?? [],
+  }));
+  const requirementMatches = (role.requirement_matches as RequirementMatch[] | null) ?? null;
+  const currentMatchKey = matchKey(role.jd_hash as string | null, evidence);
 
   // Timeline events name the message they came from, and the linked mail is
   // already loaded, so the same deep link can hang off both without a second
@@ -249,6 +264,15 @@ export default async function RoleDetailPage({
         compMaxCents={(role.comp_max_cents as number) ?? null}
         compSource={(role.comp_source as string) ?? null}
         requirements={requirements}
+        requirementMatches={requirementMatches}
+        requirementMatchesAt={(role.requirement_matches_at as string) ?? null}
+        // Stale rather than absent: the map still reads, it is just no longer
+        // the map for this description and this bank.
+        requirementMatchesStale={
+          requirementMatches !== null &&
+          (role.requirement_matches_key as string | null) !== currentMatchKey
+        }
+        bankSize={evidence.length}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
         focusInterviewId={focusInterviewId ?? null}

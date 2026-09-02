@@ -23,6 +23,7 @@ import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
+import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import {
   addQuestions,
   lookUpJobDescription,
@@ -39,6 +40,7 @@ import {
   declineCandidateMessage,
   deleteInterview,
   linkCandidateMessage,
+  matchRoleRequirements,
   removeInterviewer,
   saveInterview,
   searchUnlinkedMessages,
@@ -70,6 +72,13 @@ export interface PanelProps {
   compMaxCents: number | null;
   compSource: string | null;
   requirements: Requirement[];
+  /** The stored match, or null if this role has never been matched. */
+  requirementMatches: RequirementMatch[] | null;
+  requirementMatchesAt: string | null;
+  /** The description or the bank has changed since the match was computed. */
+  requirementMatchesStale: boolean;
+  /** How many items the bank holds. Zero is why a match refuses to run. */
+  bankSize: number;
   timezone: string;
   /** The interview to scroll to and highlight, arriving from This week. */
   focusInterviewId?: string | null;
@@ -463,6 +472,17 @@ function Todos({
   );
 }
 
+/**
+ * Colour carries the verdict, so a map is readable at a glance without reading
+ * every line. Gap is the same red as a rejection on purpose: it is the answer
+ * that saves you the hour, not a failure state to be softened.
+ */
+const VERDICT_STYLE: Record<MatchVerdict, { dot: string; label: string; text: string }> = {
+  strong: { dot: 'bg-status-offer', label: 'Strong', text: 'text-status-offer' },
+  partial: { dot: 'bg-accent-orange', label: 'Partial', text: 'text-accent-orange' },
+  gap: { dot: 'bg-status-rejected', label: 'Gap', text: 'text-status-rejected' },
+};
+
 function Posting({
   roleId,
   jdText,
@@ -473,6 +493,11 @@ function Posting({
   compMaxCents,
   compSource,
   requirements,
+  requirementMatches,
+  requirementMatchesAt,
+  requirementMatchesStale,
+  bankSize,
+  timezone,
 }: PanelProps) {
   const groups: Array<{ kind: Requirement['kind']; label: string }> = [
     { kind: 'must_have', label: 'Must have' },
@@ -480,14 +505,73 @@ function Posting({
     { kind: 'responsibility', label: 'What the role does' },
   ];
 
+  const [matches, setMatches] = useState(requirementMatches);
+  const [stale, setStale] = useState(requirementMatchesStale);
+  const [matching, setMatching] = useState(false);
+  const [matchError, setMatchError] = useState<string | null>(null);
+  const [, startMatch] = useTransition();
+
+  // Keyed by text, because the map is stored as its own list and a description
+  // re-extracted since the match can have moved, added or dropped a line. A
+  // line with no entry simply renders unmatched, which is the honest reading.
+  const verdictFor = new Map((matches ?? []).map((match) => [match.requirement, match]));
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-card border border-border bg-surface p-4">
-        <h3 className="text-[13px] font-semibold text-ink">Requirement map</h3>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-[13px] font-semibold text-ink">Requirement map</h3>
+          {requirements.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={matching}
+              onClick={() => {
+                setMatching(true);
+                setMatchError(null);
+                startMatch(async () => {
+                  const result = await matchRoleRequirements({ roleId });
+                  setMatching(false);
+                  if (result.error || !result.matches) {
+                    setMatchError(result.error ?? 'The match came back empty.');
+                    return;
+                  }
+                  setMatches(result.matches);
+                  setStale(false);
+                });
+              }}
+            >
+              {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
+            </Button>
+          )}
+        </div>
         <p className="mt-0.5 text-[12px] text-ink-muted">
-          Extracted once from the description. In Phase 2 each line gets your best matching
-          evidence beside it, scored strong, partial or gap.
+          {matches
+            ? 'Your best evidence beside each line. A gap is the useful answer — it is the hour you do not spend.'
+            : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'}
         </p>
+
+        {matches && requirementMatchesAt && !stale && (
+          <p className="mt-1 text-[12px] text-ink-faint">
+            Matched {formatDateTime(requirementMatchesAt, timezone)}.
+          </p>
+        )}
+        {stale && (
+          <p className="mt-1 text-[12px] text-accent-orange">
+            The description or your bank has changed since this was matched.
+          </p>
+        )}
+        {bankSize === 0 && (
+          <p className="mt-1 text-[12px] text-ink-faint">
+            Your evidence bank is empty, so there is nothing to match against.{' '}
+            <Link href="/jobs/settings" className="underline underline-offset-2 hover:text-ink">
+              Fill it in Settings.
+            </Link>
+          </p>
+        )}
+        {matchError && <p className="mt-1 text-[12px] text-status-rejected">{matchError}</p>}
+
         {requirements.length === 0 ? (
           <p className="mt-3 text-[13px] text-ink-faint">
             No description saved yet, so there is nothing to map.
@@ -503,12 +587,31 @@ function Posting({
                     {group.label}
                   </h4>
                   <ul className="mt-1 space-y-1">
-                    {items.map((item, index) => (
-                      <li key={`${group.kind}-${index}`} className="flex gap-2 text-[13px] text-ink">
-                        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-border-strong" aria-hidden />
-                        {item.text}
-                      </li>
-                    ))}
+                    {items.map((item, index) => {
+                      const match = verdictFor.get(item.text);
+                      const style = match ? VERDICT_STYLE[match.verdict] : null;
+                      return (
+                        <li key={`${group.kind}-${index}`} className="flex gap-2 text-[13px] text-ink">
+                          <span
+                            className={cn(
+                              'mt-1.5 size-1.5 shrink-0 rounded-full',
+                              style ? style.dot : 'bg-border-strong',
+                            )}
+                            aria-hidden
+                          />
+                          <span className="min-w-0">
+                            {item.text}
+                            {match && style && (
+                              <span className="block text-[12px] text-ink-muted">
+                                <span className={cn('font-medium', style.text)}>{style.label}</span>
+                                {' — '}
+                                {match.why}
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               );

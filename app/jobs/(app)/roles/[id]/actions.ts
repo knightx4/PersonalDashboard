@@ -5,6 +5,10 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { linkMessage } from '@/app/jobs/(app)/review/actions';
 import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/link-candidates';
+import type { Requirement } from '@/lib/jobs/jd/requirements';
+import { matchRequirements } from '@/lib/jobs/evidence/match';
+import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
 
 /**
  * Notes attach to exactly one parent, enforced by a check constraint in the
@@ -363,4 +367,96 @@ export async function searchUnlinkedMessages(
     term: parsed.data.term,
   });
   return { results, error: null };
+}
+
+/**
+ * The requirement match.
+ *
+ * Triggered by a click rather than computed on render: it costs a model call,
+ * and a page you visit six times while deciding should not cost six. The
+ * stored key is the other half of that — a match already computed against this
+ * description and this bank is returned as it stands, and re-running is only
+ * offered once one of the two has changed.
+ */
+const matchSchema = z.object({ roleId: z.string().uuid() });
+
+export async function matchRoleRequirements(
+  input: z.input<typeof matchSchema>,
+): Promise<{ matches: RequirementMatch[] | null; error: string | null }> {
+  const parsed = matchSchema.safeParse(input);
+  if (!parsed.success) return { matches: null, error: parsed.error.issues[0].message };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { matches: null, error: 'Matching is not configured.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: role, error: roleError } = await supabase
+    .from('roles')
+    .select('id, title, jd_hash, requirements, companies!inner ( name )')
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (roleError) return { matches: null, error: roleError.message };
+  if (!role) return { matches: null, error: 'That role is not yours.' };
+
+  const requirements = (role.requirements as Requirement[] | null) ?? [];
+  if (requirements.length === 0) {
+    return { matches: null, error: 'No requirements have been extracted from this description yet.' };
+  }
+
+  const { data: bank, error: bankError } = await supabase
+    .from('evidence_items')
+    .select('id, title, body, context, metrics, skills, strength')
+    .eq('user_id', user.id);
+
+  if (bankError) return { matches: null, error: bankError.message };
+
+  const items = (bank ?? []).map((item) => ({
+    id: item.id as string,
+    title: item.title as string,
+    body: item.body as string,
+    context: (item.context as string) ?? null,
+    metrics: (item.metrics as string) ?? null,
+    skills: (item.skills as string[]) ?? [],
+    strength: item.strength as number,
+  }));
+
+  // An empty bank is an error, not an empty-context fallback: a map built
+  // against nothing would read as a role you are wholly unqualified for.
+  if (items.length === 0) {
+    return {
+      matches: null,
+      error: 'Your evidence bank is empty. Fill it in Settings first — the map is only as good as it is.',
+    };
+  }
+
+  const company = role.companies as unknown as { name: string } | null;
+  const result = await matchRequirements(
+    { apiKey },
+    {
+      requirements,
+      bank: shortlistEvidence(requirements, items),
+      roleLabel: [company?.name, role.title as string].filter(Boolean).join(', '),
+    },
+  );
+
+  if (!result.ok) return { matches: null, error: result.error };
+
+  const { error: writeError } = await supabase
+    .from('roles')
+    .update({
+      requirement_matches: result.matches,
+      requirement_matches_at: new Date().toISOString(),
+      requirement_matches_key: matchKey(role.jd_hash as string | null, items),
+    })
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id);
+
+  if (writeError) return { matches: null, error: writeError.message };
+
+  revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  return { matches: result.matches, error: null };
 }
