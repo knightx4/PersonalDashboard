@@ -177,14 +177,22 @@ export async function deleteInferredApplication(
   return { error: null };
 }
 
-/** Acknowledge a conflicting event. It stays on the timeline; the flag clears. */
+/**
+ * Acknowledge a conflicting event. It stays on the timeline; the flag clears.
+ *
+ * `acknowledged_at` is what makes that stick. Clearing the flag is an update to
+ * application_events, which fires the sync trigger, which re-derives
+ * needs_review for every event sitting on a closed pursuit — so without a
+ * record that a person answered it, the flag came straight back and the button
+ * did nothing at all.
+ */
 export async function acknowledgeEvent(eventId: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
   const { error } = await supabase
     .from('application_events')
-    .update({ needs_review: false })
+    .update({ needs_review: false, acknowledged_at: new Date().toISOString() })
     .eq('id', eventId)
     .eq('user_id', user.id);
 
