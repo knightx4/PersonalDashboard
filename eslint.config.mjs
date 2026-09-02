@@ -35,9 +35,16 @@ const ATS_PATTERN = {
     "Nothing outside lib/jobs/ats/ knows which ATS vendors exist. Go through lib/jobs/ats/index.ts.",
 };
 
+const VAULT_PROVIDER_PATTERN = {
+  group: ["**/vault/providers/github", "@/lib/vault/providers/github"],
+  message:
+    "Nothing outside lib/vault/providers/ knows the vault lives in a git repository. Go through lib/vault/providers/index.ts.",
+};
+
 /**
  * Pages, components and the proxy render for a signed-in user, so they must go
- * through RLS. They also must not care which ATS a role came from.
+ * through RLS. They also must not care which ATS a role came from, or where a
+ * vault is stored.
  */
 const renderBoundaries = {
   files: [
@@ -48,7 +55,10 @@ const renderBoundaries = {
     "proxy.ts",
   ],
   rules: {
-    "no-restricted-imports": ["error", { patterns: [SERVICE_ROLE_PATTERN, ATS_PATTERN] }],
+    "no-restricted-imports": [
+      "error",
+      { patterns: [SERVICE_ROLE_PATTERN, ATS_PATTERN, VAULT_PROVIDER_PATTERN] },
+    ],
   },
 };
 
@@ -99,7 +109,7 @@ const jdBoundary = {
 const serviceRoleExceptions = {
   files: ["app/api/cron/**/*.ts", "app/api/jobs/account/delete/route.ts"],
   rules: {
-    "no-restricted-imports": ["error", { patterns: [ATS_PATTERN] }],
+    "no-restricted-imports": ["error", { patterns: [ATS_PATTERN, VAULT_PROVIDER_PATTERN] }],
   },
 };
 

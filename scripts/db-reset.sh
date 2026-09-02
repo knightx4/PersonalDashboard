@@ -10,13 +10,15 @@
 #
 #   supabase/migrations             -> public,     the commerce side
 #   supabase/migrations-job-search  -> job_search, the job search side
+#   supabase/migrations-vault       -> obsidian,   the Obsidian mirror
 #
-# They are separate directories rather than one because the two sets were
-# numbered independently and both start at 0001 -- and the job_search versions
-# are already recorded remotely under exactly those numbers, so renaming them
-# would make the local files disagree with the deployed history. Applying
-# public first means tests/coexistence.test.ts sees a real neighbour rather
-# than a fixture standing in for one.
+# They are separate directories rather than one because the sets were numbered
+# independently and each starts at 0001 -- and the job_search versions are
+# already recorded remotely under exactly those numbers, so renaming them would
+# make the local files disagree with the deployed history. Applying public
+# first means tests/coexistence.test.ts sees a real neighbour rather than a
+# fixture standing in for one; vault goes last because it is the newest and
+# depends on nothing but auth.users.
 set -euo pipefail
 
 DB_URL="${TEST_DATABASE_URL:-postgresql://postgres@localhost:5433/shopping_manager_test}"
@@ -35,12 +37,49 @@ psql "$BASE_URL/postgres" -v ON_ERROR_STOP=1 -q \
 echo "==> auth shim (local only)"
 psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$ROOT/supabase/local/00_auth_shim.sql"
 
-for dir in migrations migrations-job-search; do
-  echo "==> $dir"
+# The order is phased, not directory-by-directory, because the two sets depend
+# on each other in both directions and no single ordering of the directories
+# satisfies both:
+#
+#   job_search/0006 hands ingestion to `core`, which public/0029 creates.
+#   public/0031 onward repair job_search rows, so they need its tables.
+#
+# So: public up to the one that creates core, then all of job_search, then the
+# rest of public, then vault. Running the directories straight through fails on
+# public/0031 with "relation job_search.application_events does not exist",
+# which is what this split exists to prevent.
+CORE_HANDOVER="0030"
+
+apply_file() {
+  echo "==>   $(basename "$1")"
+  psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$1"
+}
+
+# Files in $1 whose numeric prefix is <= $2 (when $3 is "upto") or > $2.
+apply_range() {
+  local dir="$1" bound="$2" mode="$3" f base num
   for f in "$ROOT/supabase/$dir"/*.sql; do
-    echo "==>   $(basename "$f")"
-    psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+    base="$(basename "$f")"
+    num="${base%%_*}"
+    if [ "$mode" = "upto" ]; then
+      [[ "$num" > "$bound" ]] && continue
+    else
+      [[ "$num" > "$bound" ]] || continue
+    fi
+    apply_file "$f"
   done
-done
+}
+
+echo "==> migrations (through $CORE_HANDOVER, which creates core)"
+apply_range migrations "$CORE_HANDOVER" upto
+
+echo "==> migrations-job-search"
+for f in "$ROOT/supabase/migrations-job-search"/*.sql; do apply_file "$f"; done
+
+echo "==> migrations (after $CORE_HANDOVER, which repair job_search)"
+apply_range migrations "$CORE_HANDOVER" after
+
+echo "==> migrations-vault (obsidian)"
+for f in "$ROOT/supabase/migrations-vault"/*.sql; do apply_file "$f"; done
 
 echo "==> done"

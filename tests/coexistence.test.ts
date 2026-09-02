@@ -77,13 +77,51 @@ describe('coexistence with the commerce app in public', () => {
     },
   );
 
+  it('puts nothing in Supabase\'s own `vault` schema', async () => {
+    // `vault` belongs to Supabase Vault, the encrypted secrets store, and it
+    // exists on every hosted project. The notes workspace wanted that name,
+    // and taking it would have been worse than a collision: the grants at the
+    // end of a schema migration say "all tables in schema", so `grant select
+    // ... to authenticated` would have handed every signed-in user
+    // vault.secrets -- which carries no RLS, because nothing is meant to
+    // reach it. Exposing the schema to PostgREST would then have published it.
+    //
+    // The notes live in `obsidian`. This asserts they stayed there.
+    const rows = await admin<{ tablename: string }[]>`
+      select c.relname as tablename
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'vault' and c.relkind = 'r' and c.relname <> 'secrets'
+      order by 1`;
+    expect(rows.map((r) => r.tablename)).toEqual([]);
+  });
+
+  it('grants no application role access to Supabase Vault', async () => {
+    const rows = await admin<{ grantee: string }[]>`
+      select distinct grantee from information_schema.role_table_grants
+      where table_schema = 'vault'
+        and grantee in ('anon', 'authenticated')
+      order by 1`;
+    expect(rows.map((r) => r.grantee)).toEqual([]);
+  });
+
   it.runIf(neighbourPresent)('does not overwrite the neighbour functions', async () => {
-    for (const fn of ['handle_new_user', 'touch_updated_at']) {
+    // Each schema keeps its own copy; none of them clobbers a neighbour's.
+    // `obsidian` -- the vault workspace's schema -- appears for
+    // touch_updated_at and not for handle_new_user because it has updated_at
+    // columns but creates nothing on sign-up: a vault exists once someone
+    // connects a repository, not once they have an account.
+    const owners: Record<string, string[]> = {
+      handle_new_user: [APP_SCHEMA, 'public'],
+      touch_updated_at: [APP_SCHEMA, 'obsidian', 'public'],
+    };
+
+    for (const [fn, expected] of Object.entries(owners)) {
       const rows = await admin<{ nspname: string }[]>`
         select n.nspname from pg_proc p
         join pg_namespace n on n.oid = p.pronamespace
         where p.proname = ${fn} order by 1`;
-      expect(rows.map((r) => r.nspname), fn).toEqual([APP_SCHEMA, 'public']);
+      expect(rows.map((r) => r.nspname), fn).toEqual(expected);
     }
   });
 

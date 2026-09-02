@@ -20,10 +20,10 @@ than the list suggests.
 The spec is eighteen months of drift out of date in the places that matter to
 this work.
 
-**One deployment, three schemas.** The job tracker was specced as its own app
+**One deployment, four schemas.** The job tracker was specced as its own app
 fetching its own mail. It is a workspace inside this one: `public` for
-commerce, `job_search` for the job side, `core` for ingestion, one login, one
-Supabase project. Migration `migrations-job-search/0006_ingestion_to_core.sql`
+commerce, `job_search` for the job side, `core` for ingestion, `obsidian` for
+the vault, one login, one Supabase project. Migration `migrations-job-search/0006_ingestion_to_core.sql`
 dropped the job side's own `email_accounts`, `sync_jobs` and
 `ingested_messages` — those three tables never held a row.
 
@@ -167,6 +167,12 @@ this number. If it stays at zero they are all worth zero.
   behavioural — an approved behavioural answer *is* a story, already in your
   own words.
 - `interviews.notes` — the debriefs, same argument.
+- `obsidian.notes` — the vault, once there is one. It is the largest body of
+  the account holder's own prose by a wide margin and the only source that
+  carries *voice* rather than facts. It is listed last on purpose: it is also
+  the least curated, full of drafts, quotes from other people and positions
+  since abandoned, so the confirm list below matters more for it than for the
+  other three, not less. See [VAULT-SPEC.md](VAULT-SPEC.md).
 
 One model call per source, tool-use, returning candidates shaped like the
 `evidence_items` columns (`title`, `body`, `context`, `metrics`, `skills`).

@@ -47,10 +47,12 @@ export async function truncateAll(): Promise<void> {
   // user-scoped merchants cascade with their creator; global seed rows stay
   await admin`delete from merchants where not is_global`;
   await admin`delete from fx_rates`;
-  // Reference data, keyed by ISBN rather than by user, so it does not cascade
-  // out with the accounts. Left behind, a second run against the same database
-  // trips its unique (isbn, source) key during seeding.
+  // Reference data, keyed by ISBN or BGG id rather than by user, so it does not
+  // cascade out with the accounts. Left behind, a second run against the same
+  // database trips the unique (isbn, source) / (bgg_id, source) key during
+  // seeding.
   await admin`delete from book_price_quotes`;
+  await admin`delete from game_price_quotes`;
 }
 
 export async function closeDb(): Promise<void> {

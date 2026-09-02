@@ -63,3 +63,30 @@ $$;
 
 grant execute on function auth.uid(), auth.role() to anon, authenticated, service_role;
 grant select on auth.users to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Supabase Vault, stood up locally so its schema name is taken here too.
+--
+-- Every Supabase project ships Supabase Vault -- an encrypted secrets store --
+-- in a schema called `vault`, and `vault.secrets` deliberately carries no RLS
+-- because nothing is supposed to reach it through PostgREST. A plain Postgres
+-- has none of that, so the name looks free locally and is not free in
+-- production.
+--
+-- That gap nearly shipped: the notes workspace was written against a schema
+-- called `vault`, whose grants say "all tables in schema", which would have
+-- granted every authenticated user select on vault.secrets and then exposed
+-- the schema to PostgREST. It passed every local test, because locally there
+-- was nothing to collide with.
+--
+-- So the collision exists here now. tests/coexistence.test.ts asserts that no
+-- application table has been created in it.
+-- ---------------------------------------------------------------------------
+create schema if not exists vault;
+
+create table if not exists vault.secrets (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  secret text not null,
+  created_at timestamptz not null default now()
+);

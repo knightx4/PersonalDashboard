@@ -107,10 +107,20 @@ vi.mock('@/inngest/jobs/cron/sweep', () => ({
 vi.mock('@/inngest/jobs/cron/jd-backfill', () => ({
   runJdBackfill: vi.fn(async () => ({ companies: 1, filled: 2, ambiguous: 0, closed: 1, noBoard: 0 })),
 }));
+vi.mock('@/inngest/vault/sync', () => ({
+  runVaultSyncForAll: vi.fn(async () => ({
+    connections: 1,
+    synced: 1,
+    notesWritten: 4,
+    notesDeleted: 0,
+    failed: [],
+  })),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
 const { runJdBackfill } = await import('@/inngest/jobs/cron/jd-backfill');
+const { runVaultSyncForAll } = await import('@/inngest/vault/sync');
 
 function cronRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -159,5 +169,10 @@ describe('the daily cron route', () => {
       noBoard: 0,
     });
     expect(body.results['inbox']).toEqual({ error: 'inbox exploded' });
+
+    // Same again for the vault, which is last and therefore the stage most
+    // easily lost to an earlier failure.
+    expect(runVaultSyncForAll).toHaveBeenCalled();
+    expect(body.results['vault']).toMatchObject({ synced: 1, notesWritten: 4 });
   });
 });
