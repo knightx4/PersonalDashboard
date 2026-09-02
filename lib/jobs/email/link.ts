@@ -25,6 +25,14 @@ export interface LinkCandidate {
   roleTitle: string;
   atsJobId: string | null;
   submittedAt: Date | null;
+  /**
+   * When the mail that opened this pursuit arrived (roles.first_seen_at).
+   *
+   * The date floor below needs a date the *pursuit* happened on, and for an
+   * inferred row created_at is only when the backfill ran -- see
+   * isDatePlausible.
+   */
+  firstSeenAt: Date | null;
   createdAt: Date;
   status: string;
   attempt: number;
@@ -165,6 +173,24 @@ export function normalizeTitle(title: string): string {
     .trim();
 }
 
+/**
+ * The key two titles share when they name the same job.
+ *
+ * Deliberately weaker than normalizeTitle, which strips seniority: "Senior
+ * Analyst" and "Analyst" are different jobs and collapsing them would attach
+ * mail to the wrong one. All this forgives is punctuation and spacing, which is
+ * the only thing that actually varies when one posting is read out of several
+ * different emails -- "Engagement Lead, Future Platforms | Housing" against the
+ * same words with a different separator.
+ */
+export function roleIdentityKey(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[\u2019']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 /** Trigram similarity, matching what pg_trgm does closely enough to reason about. */
 export function titleSimilarity(a: string, b: string): number {
   const trigrams = (value: string): Set<string> => {
@@ -274,11 +300,23 @@ export function scoreCandidate(input: LinkInput, candidate: LinkCandidate): Scor
     }
   }
 
-  // 6. Role title similarity. Disambiguates between several roles at one
-  //    company rather than establishing the company in the first place.
+  // 6. Role title. Disambiguates between several roles at one company rather
+  //    than establishing the company in the first place -- but when the message
+  //    names the role *exactly*, it does more than disambiguate. Company
+  //    evidence plus a title that matches character for character is not a
+  //    suggestion, and scoring it as one is what left every "Engagement Lead,
+  //    Future Platforms | Housing" mail sitting in the queue next to the
+  //    pursuit of that name: 0.55 for the domain plus 0.25 for the title came
+  //    to 0.80, which is below the auto-link threshold by exactly the amount
+  //    that makes a person do it by hand instead.
   if (input.extractedRole) {
+    const identical = roleIdentityKey(input.extractedRole) === roleIdentityKey(candidate.roleTitle);
     const similarity = titleSimilarity(input.extractedRole, candidate.roleTitle);
-    if (similarity >= 0.75) {
+    if (identical) {
+      score += 0.35;
+      if (method === 'none') method = 'role_title';
+      reasons.push(`Role title is exactly "${candidate.roleTitle}"`);
+    } else if (similarity >= 0.75) {
       score += 0.25;
       reasons.push(`Role title matches "${candidate.roleTitle}"`);
     } else if (similarity >= 0.4) {
@@ -321,7 +359,16 @@ const TERMINAL_CANDIDATE_STATUSES = new Set([
  */
 export function isDatePlausible(input: LinkInput, candidate: LinkCandidate): boolean {
   if (!input.receivedAt) return true;
-  const floor = candidate.submittedAt ?? candidate.createdAt;
+  // created_at is deliberately NOT a fallback. For a pursuit the inbox inferred
+  // it records when the backfill ran, which is after every message the backfill
+  // read -- so using it as the floor declared the whole mailbox impossible and
+  // filtered out every candidate before it could be scored. first_seen_at is
+  // the date of the mail that opened the pursuit, which is a real date about
+  // the pursuit; where neither it nor submitted_at exists we simply do not know
+  // when the application was sent, and inventing a floor is worse than having
+  // none.
+  const floor = candidate.submittedAt ?? candidate.firstSeenAt;
+  if (!floor) return true;
   // One day of slack: submitted_at is often the user's own date entry, and an
   // auto-ack can beat it across a timezone boundary.
   return input.receivedAt.getTime() >= floor.getTime() - DAY_MS;
@@ -530,7 +577,18 @@ export function decideLink(
     // normal, and the more recent open attempt is where new mail belongs. The
     // sort has already put it first. An ambiguity is two DIFFERENT roles
     // scoring the same, and that is what goes to review.
-    const sameRole = runnerUp && runnerUp.candidate.roleId === best.candidate.roleId;
+    //
+    // Same role, though, is not the same role *row*: duplicate pursuits at one
+    // company carrying the same title are the thing the queue was full of, and
+    // asking which of two identical rows a message belongs to is a question
+    // with no answer worth the interruption. Two rows naming one job at one
+    // employer are one pursuit however many times they were written.
+    const sameRole =
+      runnerUp &&
+      (runnerUp.candidate.roleId === best.candidate.roleId ||
+        (runnerUp.candidate.companyId === best.candidate.companyId &&
+          roleIdentityKey(runnerUp.candidate.roleTitle) ===
+            roleIdentityKey(best.candidate.roleTitle)));
     const tied = runnerUp && !sameRole && best.confidence - runnerUp.confidence < 0.1;
     if (!tied) {
       return {

@@ -14,6 +14,7 @@ import {
 import { PARSER_VERSION, verifyExtraction, type ExtractedMessage } from '@/lib/jobs/email/extract';
 import {
   decideLink,
+  roleIdentityKey,
   type LinkCandidate,
   type LinkCompany,
   type LinkDecision,
@@ -55,7 +56,19 @@ const EXTRACT_CONCURRENCY = 6;
  */
 export const PLACEHOLDER_ROLE_TITLE = 'Role from email';
 
-export type OpenPursuit = { roleId: string; roleTitle: string; applicationId: string };
+export type KnownPursuit = {
+  roleId: string;
+  roleTitle: string;
+  applicationId: string;
+  /**
+   * Whether the pipeline has already closed this pursuit out.
+   *
+   * Carried rather than filtered on, because the answer differs by question.
+   * Which pursuit a *named* message belongs to does not depend on whether that
+   * pursuit is still alive; which one an *unnamed* message belongs to does.
+   */
+  closed: boolean;
+};
 
 export type PursuitChoice =
   | { kind: 'create' }
@@ -71,26 +84,49 @@ export type PursuitChoice =
  * read is not evidence of a second pursuit -- it is the absence of evidence
  * either way.
  *
- * The two placeholder cases both insist on exactly one candidate. Where a
+ * Closed pursuits used to be filtered out before this function ever saw them,
+ * and that is the bug that filled the queue. A rejection closes the pursuit;
+ * the next mail about the same job then matched nothing, opened a second row,
+ * which was itself immediately closed, and so on -- sixteen applications at one
+ * employer, five of them carrying the identical role title, each one asking to
+ * be confirmed. Mail about a job you were already turned down for is mail about
+ * that same job. Being over is not being a different pursuit.
+ *
+ * The placeholder cases still insist on exactly one *live* candidate. Where a
  * company has several things open, which one an untitled message belongs to is
  * a guess, and silently attaching mail to the wrong role is worse than a
  * duplicate row you can see and merge.
  */
-export function choosePursuit(open: readonly OpenPursuit[], title: string): PursuitChoice {
-  const wanted = title.toLowerCase();
-  const isPlaceholder = (pursuit: OpenPursuit) =>
-    pursuit.roleTitle.toLowerCase() === PLACEHOLDER_ROLE_TITLE.toLowerCase();
+export function choosePursuit(pursuits: readonly KnownPursuit[], title: string): PursuitChoice {
+  const wanted = roleIdentityKey(title);
+  const placeholderKey = roleIdentityKey(PLACEHOLDER_ROLE_TITLE);
+  const isPlaceholder = (pursuit: KnownPursuit) =>
+    roleIdentityKey(pursuit.roleTitle) === placeholderKey;
 
-  const sameTitle = open.find((pursuit) => pursuit.roleTitle.toLowerCase() === wanted);
+  // The same job by name, whatever became of it. A live one first: where a role
+  // was re-applied to, new mail belongs to the attempt still running.
+  const named = pursuits.filter(
+    (pursuit) => !isPlaceholder(pursuit) && roleIdentityKey(pursuit.roleTitle) === wanted,
+  );
+  const sameTitle = named.find((pursuit) => !pursuit.closed) ?? named[0];
   if (sameTitle) return { kind: 'adopt', applicationId: sameTitle.applicationId };
 
-  if (wanted === PLACEHOLDER_ROLE_TITLE.toLowerCase()) {
-    return open.length === 1
-      ? { kind: 'adopt', applicationId: open[0].applicationId }
+  const live = pursuits.filter((pursuit) => !pursuit.closed);
+
+  if (wanted === placeholderKey) {
+    // An existing placeholder is the best home for a message that names no
+    // role, open or closed: neither row claims a title, so joining them
+    // discards nothing and answers a question nobody could have answered.
+    const placeholders = pursuits.filter(isPlaceholder);
+    const existing = placeholders.find((pursuit) => !pursuit.closed) ?? placeholders[0];
+    if (existing) return { kind: 'adopt', applicationId: existing.applicationId };
+
+    return live.length === 1
+      ? { kind: 'adopt', applicationId: live[0].applicationId }
       : { kind: 'create' };
   }
 
-  const placeholders = open.filter(isPlaceholder);
+  const placeholders = live.filter(isPlaceholder);
   if (placeholders.length === 1) {
     return {
       kind: 'rename',
@@ -723,20 +759,26 @@ async function createInferredApplication(
     .eq('user_id', opts.userId)
     .eq('company_id', opts.companyId);
 
-  const open: OpenPursuit[] = [];
+  // Every pursuit at this company, closed ones included -- choosePursuit needs
+  // to see them to recognise the job by name. One row per role: where a role
+  // has been applied to twice, the live attempt represents it, otherwise the
+  // last one to close.
+  const pursuits: KnownPursuit[] = [];
   for (const role of existingRoles ?? []) {
     const applications = (role.applications ?? []) as Array<{ id: string; status: string }>;
     const live = applications.find((a) => !isTerminal(a.status as ApplicationStatus));
-    if (live) {
-      open.push({
+    const chosen = live ?? applications[applications.length - 1];
+    if (chosen) {
+      pursuits.push({
         roleId: role.id as string,
         roleTitle: role.title as string,
-        applicationId: live.id,
+        applicationId: chosen.id,
+        closed: !live,
       });
     }
   }
 
-  const choice = choosePursuit(open, title);
+  const choice = choosePursuit(pursuits, title);
 
   if (choice.kind === 'rename') {
     // The message that names the role arrives after one that could not. Adopt

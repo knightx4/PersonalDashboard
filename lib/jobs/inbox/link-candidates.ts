@@ -18,7 +18,7 @@ export async function loadLinkCandidates(
     .from('applications')
     .select(
       `id, role_id, status, attempt, submitted_at, created_at,
-       roles!inner ( id, title, ats_job_id, company_id,
+       roles!inner ( id, title, ats_job_id, company_id, first_seen_at,
                      companies!inner ( id, name, domains ) )`,
     )
     .eq('user_id', userId)
@@ -39,6 +39,7 @@ export async function loadLinkCandidates(
       title: string;
       ats_job_id: string | null;
       company_id: string;
+      first_seen_at: string | null;
       companies: { id: string; name: string; domains: string[] };
     };
   };
@@ -74,6 +75,7 @@ export async function loadLinkCandidates(
     roleTitle: row.roles.title,
     atsJobId: row.roles.ats_job_id,
     submittedAt: row.submitted_at ? new Date(row.submitted_at) : null,
+    firstSeenAt: row.roles.first_seen_at ? new Date(row.roles.first_seen_at) : null,
     createdAt: new Date(row.created_at),
     status: row.status,
     attempt: row.attempt,

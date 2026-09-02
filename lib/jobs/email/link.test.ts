@@ -13,6 +13,7 @@ import {
   decideLink,
   isDatePlausible,
   normalizeCompanyName,
+  REVIEW_FLOOR,
   scoreCandidate,
   titleSimilarity,
   type LinkCandidate,
@@ -34,6 +35,7 @@ function candidate(over: Partial<LinkCandidate> = {}): LinkCandidate {
     roleTitle: 'Strategic Finance Analyst',
     atsJobId: '4318822',
     submittedAt: new Date('2026-04-01T10:00:00Z'),
+    firstSeenAt: new Date('2026-04-01T10:00:00Z'),
     createdAt: new Date('2026-04-01T10:00:00Z'),
     status: 'submitted',
     attempt: 1,
@@ -607,5 +609,109 @@ describe('the acceptance criteria', () => {
       candidate({ atsJobId: null, roleTitle: 'Warehouse Operative' }),
     );
     expect(wrong.confidence).toBeLessThan(right.confidence);
+  });
+});
+
+describe('a role title the message names exactly', () => {
+  it('links a closed pursuit whose title matches character for character', () => {
+    // The EliseAI complaint, as arithmetic. The domain was worth 0.55 and a
+    // matching title 0.25, which came to 0.80 -- under the 0.85 threshold by
+    // exactly the margin that made a person link it by hand, every time, for
+    // mail that could not have been about anything else.
+    const decision = decideLink(
+      message({
+        threadId: null,
+        extractedAtsJobId: null,
+        extractedCompany: null,
+        fromAddress: 'emma@ramp.com',
+        replyToAddress: null,
+        subject: 'Following up',
+        extractedRole: 'Engagement Lead, Future Platforms | Housing',
+      }),
+      [
+        candidate({
+          atsJobId: null,
+          status: 'rejected',
+          roleTitle: 'Engagement Lead, Future Platforms | Housing',
+        }),
+      ],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('link');
+  });
+
+  it('does not link on the title alone, however exact', () => {
+    // No domain, no company name, no ATS id: an identical title at an
+    // unidentified employer is a coincidence, not a match.
+    const scored = scoreCandidate(
+      message({
+        threadId: null,
+        extractedAtsJobId: null,
+        extractedCompany: null,
+        fromAddress: 'someone@unrelated-agency.example',
+        replyToAddress: null,
+        subject: 'A role you might like',
+      }),
+      candidate({ atsJobId: null }),
+    );
+    expect(scored.confidence).toBeLessThan(REVIEW_FLOOR);
+  });
+
+  it('treats two identically titled rows at one company as one pursuit', () => {
+    // Duplicates are what the queue was full of. "Which of these two identical
+    // rows did you mean?" is a question with no answer worth interrupting for.
+    const decision = decideLink(
+      message({ threadId: null, extractedAtsJobId: null }),
+      [
+        candidate({ applicationId: 'a-1', roleId: 'r-1', atsJobId: null }),
+        candidate({ applicationId: 'a-2', roleId: 'r-2', atsJobId: null }),
+      ],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('link');
+  });
+
+  it('still holds when two genuinely different roles match equally', () => {
+    const decision = decideLink(
+      message({ threadId: null, extractedRole: null, extractedAtsJobId: null }),
+      [
+        candidate({ applicationId: 'a-1', roleId: 'r-1', atsJobId: null }),
+        candidate({
+          applicationId: 'a-2',
+          roleId: 'r-2',
+          roleTitle: 'Finance Manager',
+          atsJobId: null,
+        }),
+      ],
+      { companies: COMPANIES, now: new Date('2026-04-06T10:00:00Z') },
+    );
+    expect(decision.action).toBe('review');
+  });
+});
+
+describe('the date floor for a pursuit the inbox inferred', () => {
+  it('does not date it from the backfill that wrote the row', () => {
+    // created_at on an inferred pursuit is when the sync ran, which is after
+    // every message the sync read. Used as a floor it declared the entire
+    // mailbox impossible and filtered out every candidate before scoring.
+    expect(
+      isDatePlausible(
+        message({ receivedAt: new Date('2026-04-27T10:00:00Z') }),
+        candidate({
+          submittedAt: null,
+          firstSeenAt: null,
+          createdAt: new Date('2026-08-31T10:00:00Z'),
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('uses the date the mail that opened the pursuit arrived', () => {
+    expect(
+      isDatePlausible(
+        message({ receivedAt: new Date('2026-03-01T10:00:00Z') }),
+        candidate({ submittedAt: null, firstSeenAt: new Date('2026-04-01T10:00:00Z') }),
+      ),
+    ).toBe(false);
   });
 });

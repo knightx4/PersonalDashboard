@@ -42,6 +42,15 @@ export interface ReviewMessageRow {
   id: string;
   subject: string | null;
   fromAddress: string | null;
+  /**
+   * The rest of the envelope, carried so the page can re-score with the same
+   * signals the linker had. Thread continuity is the most precise one there is
+   * -- a reply belongs to the conversation it is a reply to -- and the review
+   * screen used to throw it away, which is why a queue full of "Re: ..." rows
+   * offered nothing but the three most recent pursuits.
+   */
+  threadId: string | null;
+  replyToAddress: string | null;
   receivedAt: string | null;
   classification: string;
   reason: string;
@@ -133,7 +142,7 @@ export async function loadReviewQueue(
       ? supabase
           .from('inbox_messages')
           .select(
-            'id, email_account_id, thread_id, provider_message_id, subject, from_address, received_at, classification, error, link_confidence',
+            'id, email_account_id, thread_id, provider_message_id, subject, from_address, reply_to_address, received_at, classification, error, link_confidence',
           )
           .in('email_account_id', accountIds)
           .eq('parse_status', 'needs_review')
@@ -166,6 +175,8 @@ export async function loadReviewQueue(
       id: raw.id as string,
       subject: (raw.subject as string) ?? null,
       fromAddress: (raw.from_address as string) ?? null,
+      threadId: (raw.thread_id as string) ?? null,
+      replyToAddress: (raw.reply_to_address as string) ?? null,
       receivedAt: (raw.received_at as string) ?? null,
       classification: (raw.classification as string) ?? 'unknown',
       reason:

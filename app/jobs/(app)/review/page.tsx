@@ -43,10 +43,16 @@ export default async function ReviewPage({
   const withCandidates = rows.map((row) => {
     if (row.kind !== 'message') return row;
 
+    // The envelope as it actually was. What the model read out of the body is
+    // gone -- bodies are never stored -- but the envelope is not, and nulling
+    // it here threw away the one signal that settles a conversation outright:
+    // a reply belongs to the thread it replies to, at confidence 1. A queue
+    // largely made of "Re: ..." was scoring every one of them on the sender
+    // domain alone, and offering three recent pursuits when that missed.
     const input: LinkInput = {
-      threadId: null,
+      threadId: row.threadId,
       fromAddress: row.fromAddress,
-      replyToAddress: null,
+      replyToAddress: row.replyToAddress,
       subject: row.subject,
       bodyPreview: null,
       receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,

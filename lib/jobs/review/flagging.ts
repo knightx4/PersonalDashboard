@@ -61,6 +61,14 @@ export interface InferredFlagInput {
  * the row is visible and editable either way. The flag is reserved for "this
  * might not be a real pursuit", because that is the only error that quietly
  * corrupts the funnel.
+ *
+ * Nor is the status, and it cannot be: a pursuit's status is derived in SQL
+ * from events that are written after this decision is made. But the answer
+ * stops mattering the moment the pursuit closes -- a rejected lead counts for
+ * nothing whether the inbox imagined it or not -- so the flag is cleared on
+ * close by job_search.clear_review_flag_when_closed(), a trigger added in
+ * migration 0037. That is the same rule as this one, applied where the status
+ * is actually known.
  */
 export function inferredApplicationNeedsReview(input: InferredFlagInput): boolean {
   // A lead is the inbox's opinion that inbound mail is worth tracking. That is

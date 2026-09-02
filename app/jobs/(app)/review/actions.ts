@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
+import { unappliedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -68,7 +69,14 @@ export async function linkMessage(
   if (kind) {
     // The same backwards-transition rule applies to a hand link: the event is
     // recorded, and it does not reopen a closed pursuit.
-    const wouldReopen = isTerminal(application.status as ApplicationStatus);
+    //
+    // Whether that is worth telling you about is a separate question, and the
+    // answer is the ingestion's -- unappliedEventNeedsReview. Flagging every
+    // such event meant filing a message by hand put a fresh row back in the
+    // queue you were clearing, including for the echoes (a second rejection, a
+    // confirmation arriving after the close) that ask nobody anything.
+    const wouldReopen =
+      isTerminal(application.status as ApplicationStatus) && unappliedEventNeedsReview(kind);
     await supabase.from('application_events').insert({
       user_id: user.id,
       application_id: parsed.data.applicationId,
