@@ -3,10 +3,9 @@ import { CalendarClock, CheckCircle2, Clock, MailQuestion, PenLine, Video } from
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { formatDateTime } from '@/lib/jobs/applications/load';
-import { DEFAULT_GHOST_THRESHOLD_DAYS } from '@/lib/jobs/pipeline';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
 import { ReminderActions } from './reminder-actions';
-import { QuietActions, WaitingActions } from './waiting-quiet-actions';
+import { WaitingActions } from './waiting-actions';
 
 export const metadata = { title: 'This week' };
 
@@ -25,15 +24,13 @@ export default async function TodayPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, timezone, ghost_threshold_days')
+    .select('display_name, timezone')
     .eq('id', user.id)
     .maybeSingle();
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
-  const ghostDays = (profile?.ghost_threshold_days as number) ?? DEFAULT_GHOST_THRESHOLD_DAYS;
 
   const board = await loadToday(supabase, user.id, {
-    ghostThresholdDays: ghostDays,
     senderName: (profile?.display_name as string) ?? null,
   });
 
@@ -57,8 +54,8 @@ export default async function TodayPage() {
           />
           <p className="mt-3 text-sm font-medium text-ink">Nothing needs you today.</p>
           <p className="mt-1 text-[13px] text-ink-muted">
-            No interviews in the next {INTERVIEW_HORIZON_DAYS} days, nothing waiting on a reply,
-            and nothing about to go quiet.
+            No interviews in the next {INTERVIEW_HORIZON_DAYS} days, and nothing waiting on a
+            reply.
           </p>
           <Link
             href="/jobs/pipeline"
@@ -179,36 +176,6 @@ export default async function TodayPage() {
           </Section>
         )}
 
-        {board.quiet.length > 0 && (
-          <Section
-            icon={Clock}
-            title="About to go quiet"
-            hint={`Written off as ghosted at ${ghostDays} days of silence.`}
-          >
-            <ul className="divide-y divide-border">
-              {board.quiet.map((row) => (
-                <li key={row.applicationId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5">
-                  <span className="tabular w-full text-[12px] text-accent-orange sm:w-44">
-                    {row.daysUntilGhosted === 0
-                      ? 'today'
-                      : `${row.daysUntilGhosted} ${row.daysUntilGhosted === 1 ? 'day' : 'days'} left`}
-                  </span>
-                  <Link
-                    href={`/jobs/roles/${row.roleId}`}
-                    className="text-[13px] font-medium text-ink hover:text-brand"
-                  >
-                    {row.companyName} · {row.roleTitle}
-                  </Link>
-                  <span className="tabular text-[12px] text-ink-muted">
-                    quiet {row.daysSinceActivity} days
-                  </span>
-                  {row.followUpHref && <DraftLink href={row.followUpHref} />}
-                  <QuietActions applicationId={row.applicationId} />
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
       </div>
     </>
   );
