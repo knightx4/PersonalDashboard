@@ -49,29 +49,26 @@ export async function snoozeReminder(id: string): Promise<{ error: string | null
 }
 
 /**
- * Dismiss a "Waiting on you" or "About to go quiet" row on This week.
+ * Dismiss a "Waiting on you" row on This week.
  *
- * Neither has a row of its own to mark done -- both are recomputed from the
- * event log and the pipeline on every load -- so the dismissal lives in its
- * own small table instead, upserted so re-dismissing an already-dismissed row
- * just updates it rather than erroring. `until: null` is "Done", for good;
- * a date is "Later", the same distinction reminders draw with completed_at
- * vs due_at.
+ * It has no row of its own to mark done -- it is recomputed from the event log
+ * on every load -- so the dismissal lives in its own small table instead,
+ * upserted so re-dismissing an already-dismissed row just updates it rather
+ * than erroring. `until: null` is "Done", for good; a date is "Later", the
+ * same distinction reminders draw with completed_at vs due_at.
  */
-async function dismiss(
-  table: 'waiting_dismissals' | 'quiet_dismissals',
-  column: 'application_event_id' | 'application_id',
-  id: string,
+async function dismissWaiting(
+  eventId: string,
   until: string | null,
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from(table)
+    .from('waiting_dismissals')
     .upsert(
-      { user_id: user.id, [column]: id, dismissed_until: until },
-      { onConflict: `user_id,${column}` },
+      { user_id: user.id, application_event_id: eventId, dismissed_until: until },
+      { onConflict: 'user_id,application_event_id' },
     );
 
   if (error) return { error: error.message };
@@ -80,27 +77,9 @@ async function dismiss(
 }
 
 export async function completeWaiting(eventId: string): Promise<{ error: string | null }> {
-  return dismiss('waiting_dismissals', 'application_event_id', eventId, null);
+  return dismissWaiting(eventId, null);
 }
 
 export async function snoozeWaiting(eventId: string): Promise<{ error: string | null }> {
-  return dismiss(
-    'waiting_dismissals',
-    'application_event_id',
-    eventId,
-    new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString(),
-  );
-}
-
-export async function completeQuiet(applicationId: string): Promise<{ error: string | null }> {
-  return dismiss('quiet_dismissals', 'application_id', applicationId, null);
-}
-
-export async function snoozeQuiet(applicationId: string): Promise<{ error: string | null }> {
-  return dismiss(
-    'quiet_dismissals',
-    'application_id',
-    applicationId,
-    new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString(),
-  );
+  return dismissWaiting(eventId, new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString());
 }

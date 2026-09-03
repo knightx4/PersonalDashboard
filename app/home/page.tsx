@@ -1,81 +1,106 @@
 import Link from 'next/link';
-import { Briefcase, ListChecks, NotebookPen, ShoppingBag } from 'lucide-react';
+import { Briefcase, LayoutGrid, ListChecks, NotebookText, ShoppingBag } from 'lucide-react';
 import { requireUser, createClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { MODULES, type ModuleId } from '@/lib/modules';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { FeedbackButton } from '@/components/shell/feedback-button';
+import { NotificationsButton } from '@/components/shell/notifications-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import { countOpenTasks } from '@/lib/todo/tasks/load';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
-import type { ModuleId } from '@/lib/modules';
 
 export const metadata = { title: 'Home' };
 
 /**
- * The front door to the account, not to any one workspace.
+ * The front door to the account, not to either module.
  *
- * It used to be two tiles and two counts, and no reason to visit. What it was
- * missing is the one question none of the workspaces can answer on its own --
- * what has to happen today -- so the top of the agenda goes here, above the
- * tiles, and the tiles become what they always were: the way in.
+ * One account now does several unrelated things, and none should have to
+ * stand in for another's landing page. This is where onboarding and a
+ * signed-in visit to `/` both end up; each tile goes straight into that
+ * module rather than by way of another menu.
  *
- * A switched-off workspace is not listed. That is what the switch means.
+ * The tiles come from lib/modules.ts, the same list the workspace switcher
+ * uses, so a module added there appears here too -- with a count if one is
+ * written below, and its description if not. The vault was added to the
+ * switcher and missed here, which is the bug this arrangement removes.
+ *
+ * Above the tiles: the two or three things that actually need today. That is
+ * the one question none of the modules can answer on its own, and it is what
+ * this page was missing -- it showed counts, which is news about the account
+ * rather than anything to do. A front door showing forty rows would be a list,
+ * and /todo is already the list.
+ *
+ * A module switched off under Account is not listed. That is what the switch
+ * means, and a tile for a hidden module would make it a lie.
  */
 export default async function HomePage() {
   const user = await requireUser();
   const settings = await loadAccountSettings(user.id);
 
-  const [counts, agenda] = await Promise.all([
-    loadCounts(user.id, settings.enabledModules),
-    moduleEnabled(settings, 'todo') ? loadAgenda(user.id) : null,
+  const supabase = await createClient();
+  const jobs = await createJobsClient();
+
+  const vault = await createVaultClient();
+
+  const [
+    { count: itemCount },
+    { count: pursuitCount },
+    { count: noteCount },
+    taskCount,
+    agenda,
+  ] = await Promise.all([
+    supabase
+      .from('inventory_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    jobs
+      .from('applications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`),
+    // RLS scopes this to the signed-in user, and an unconnected vault is
+    // simply zero rather than an error.
+    vault.from('notes').select('id', { count: 'exact', head: true }),
+    countOpenTasks(user.id),
+    // The agenda reads three schemas; a failure in any of them must cost this
+    // page a section, not the whole front door.
+    loadAgenda(user.id).catch(() => null),
   ]);
+
+  const plural = (count: number | null, one: string, many = `${one}s`) =>
+    `${count ?? 0} ${count === 1 ? one : many}`;
+
+  /** A module with no line written here falls back to its description. */
+  const STATS: Partial<Record<ModuleId, string>> = {
+    shopping: plural(itemCount, 'item') + ' tracked',
+    jobs: plural(pursuitCount, 'open pursuit'),
+    vault: plural(noteCount, 'note') + ' mirrored',
+    todo: plural(taskCount, 'thing') + ' to do',
+  };
+
+  // Partial, with a generic fallback: a module added to the list must never
+  // fail to render because nobody has chosen its icon yet.
+  const ICONS: Partial<
+    Record<ModuleId, React.ComponentType<{ className?: string; strokeWidth?: number }>>
+  > = {
+    shopping: ShoppingBag,
+    jobs: Briefcase,
+    vault: NotebookText,
+    todo: ListChecks,
+  };
+
+  // Overdue and today only, capped. Everything else is a page away.
+  const due = (agenda?.piles ?? [])
+    .filter((pile) => pile.bucket === 'overdue' || pile.bucket === 'today')
+    .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })))
+    .slice(0, 4);
 
   const displayName = settings.displayName;
   const initial = (displayName || user.email || '').charAt(0).toUpperCase();
-
-  // The two or three things that actually need today, not the whole agenda.
-  // A front door showing forty rows is a list, and there is already a page for
-  // the list.
-  const due = (agenda?.piles ?? [])
-    .filter((pile) => pile.bucket === 'overdue' || pile.bucket === 'today')
-    .flatMap((pile) => pile.entries.map((entry) => ({ pile: pile.bucket, entry })))
-    .slice(0, 4);
-
-  const tiles = [
-    {
-      module: 'todo' as ModuleId,
-      href: '/todo',
-      icon: ListChecks,
-      title: 'Todo',
-      stat: counts.tasks === null ? '—' : `${counts.tasks} open`,
-    },
-    {
-      module: 'shopping' as ModuleId,
-      href: '/shopping/dashboard',
-      icon: ShoppingBag,
-      title: 'Shopping',
-      stat: counts.items === null ? '—' : `${counts.items} item${counts.items === 1 ? '' : 's'} tracked`,
-    },
-    {
-      module: 'jobs' as ModuleId,
-      href: '/jobs/today',
-      icon: Briefcase,
-      title: 'Job search',
-      stat:
-        counts.pursuits === null
-          ? '—'
-          : `${counts.pursuits} open pursuit${counts.pursuits === 1 ? '' : 's'}`,
-    },
-    {
-      module: 'vault' as ModuleId,
-      href: '/vault',
-      icon: NotebookPen,
-      title: 'Vault',
-      stat: counts.notes === null ? '—' : `${counts.notes} note${counts.notes === 1 ? '' : 's'}`,
-    },
-  ].filter((tile) => moduleEnabled(settings, tile.module));
 
   return (
     <div className="min-h-full">
@@ -83,6 +108,7 @@ export default async function HomePage() {
         <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
           <WorkspaceSwitcher current={null} enabled={settings.enabledModules} />
           <div className="flex-1" />
+          <NotificationsButton />
           <FeedbackButton />
           <Link
             href="/account"
@@ -100,7 +126,7 @@ export default async function HomePage() {
 
         {/* Nothing at all when there is nothing at all -- no "0 things due",
             no empty card. A quiet day should look quiet, and a front door that
-            insists on saying something is a front door people stop reading. */}
+            insists on saying something is one people stop reading. */}
         {due.length > 0 && (
           <section className="mt-6 rounded-card border border-border bg-surface p-5">
             <div className="flex items-baseline justify-between gap-2">
@@ -114,9 +140,9 @@ export default async function HomePage() {
             </div>
 
             <ul className="mt-2 divide-y divide-border">
-              {due.map(({ pile, entry }) => (
+              {due.map(({ bucket, entry }) => (
                 <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
-                  {pile === 'overdue' && (
+                  {bucket === 'overdue' && (
                     <span className="shrink-0 text-[11px] font-medium text-status-rejected">
                       {BUCKET_LABELS.overdue}
                     </span>
@@ -131,68 +157,19 @@ export default async function HomePage() {
         )}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {tiles.map((tile) => (
-            <ModuleCard key={tile.module} {...tile} />
+          {MODULES.filter((module) => moduleEnabled(settings, module.id)).map((module) => (
+            <ModuleCard
+              key={module.id}
+              href={module.home}
+              icon={ICONS[module.id] ?? LayoutGrid}
+              title={module.label}
+              stat={STATS[module.id] ?? module.description}
+            />
           ))}
         </div>
       </main>
     </div>
   );
-}
-
-/**
- * One count per workspace, and only for the ones that are on.
- *
- * Each is allowed to fail on its own. A vault whose token expired must not
- * cost you the front door -- the tile says "—" and the rest of the page is
- * unchanged.
- */
-async function loadCounts(
-  userId: string,
-  enabled: readonly ModuleId[],
-): Promise<{
-  items: number | null;
-  pursuits: number | null;
-  notes: number | null;
-  tasks: number | null;
-}> {
-  const wanted = <T,>(module: ModuleId, run: () => Promise<T>): Promise<T | null> =>
-    enabled.includes(module) ? run().catch(() => null) : Promise.resolve(null);
-
-  const [items, pursuits, notes, tasks] = await Promise.all([
-    wanted('shopping', async () => {
-      const supabase = await createClient();
-      const { count } = await supabase
-        .from('inventory_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId);
-      return count ?? 0;
-    }),
-    wanted('jobs', async () => {
-      const supabase = await createJobsClient();
-      const { count } = await supabase
-        .from('applications')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`);
-      return count ?? 0;
-    }),
-    wanted('vault', async () => {
-      const supabase = await createVaultClient();
-      const { count } = await supabase
-        .from('notes')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .is('deleted_at', null);
-      return count ?? 0;
-    }),
-    wanted('todo', async () => {
-      const { countOpenTasks } = await import('@/lib/todo/tasks/load');
-      return countOpenTasks(userId);
-    }),
-  ]);
-
-  return { items, pursuits, notes, tasks };
 }
 
 function ModuleCard({

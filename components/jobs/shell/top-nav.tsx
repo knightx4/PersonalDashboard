@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
+import { NotificationsButton } from '@/components/shell/notifications-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 import type { ModuleId } from '@/lib/modules';
 
@@ -27,6 +28,7 @@ const SECTIONS = [
   { href: '/jobs/interviews', label: 'Interviews' },
   { href: '/jobs/answers', label: 'Answers' },
   { href: '/jobs/analytics', label: 'Analytics' },
+  { href: '/jobs/activity', label: 'Activity' },
   { href: '/jobs/review', label: 'Review' },
 ] as const;
 
@@ -75,6 +77,7 @@ export function TopNav({
           })}
         </nav>
 
+        <NotificationsButton />
         <FeedbackButton allHref="/jobs/feedback" />
 
         <Link

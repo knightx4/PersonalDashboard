@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import { MODULES, type ModuleId } from '@/lib/modules';
+import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import { isSupportedDisplayCurrency, normalizeCurrencyCode } from '@/lib/fx/money-fx';
 
 export interface AccountState {
@@ -83,7 +83,7 @@ export async function updateEnabledModules(
   _prev: AccountState,
   formData: FormData,
 ): Promise<AccountState> {
-  const chosen = MODULES.filter((module) => formData.get(`module:${module}`) === 'on');
+  const chosen = MODULE_IDS.filter((id) => formData.get(`module:${id}`) === 'on');
 
   // The database refuses an empty array as well. Saying so here is friendlier
   // than a constraint violation, and the constraint is what makes it true.

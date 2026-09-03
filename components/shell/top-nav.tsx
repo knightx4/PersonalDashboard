@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
+import { NotificationsButton } from '@/components/shell/notifications-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 import type { ModuleId } from '@/lib/modules';
 
@@ -73,6 +74,7 @@ export function TopNav({
           })}
         </nav>
 
+        <NotificationsButton />
         <FeedbackButton />
 
         <Link

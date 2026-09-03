@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { Briefcase, NotebookPen, ShoppingBag, ListChecks } from 'lucide-react';
+import { Briefcase, LayoutGrid, ListChecks, NotebookText, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select } from '@/components/ui/field';
@@ -10,11 +10,21 @@ import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
 
-const MODULE_LABELS: Record<ModuleId, { label: string; hint: string; icon: typeof Briefcase }> = {
-  shopping: { label: 'Shopping', hint: 'Orders, inventory, returns and resale', icon: ShoppingBag },
-  jobs: { label: 'Job search', hint: 'Pipeline, roles, companies and interviews', icon: Briefcase },
-  vault: { label: 'Vault', hint: 'Your Obsidian notes, mirrored and searchable', icon: NotebookPen },
-  todo: { label: 'Todo', hint: 'What has to happen, across everything', icon: ListChecks },
+/**
+ * Icons only.
+ *
+ * Labels and descriptions come from lib/modules.ts, the one list -- writing
+ * them again here is precisely the second list that list exists to remove.
+ * Partial with a fallback, the same way the home page does it: a module added
+ * to that list must never fail to render because nobody chose its icon yet.
+ */
+const ICONS: Partial<
+  Record<ModuleId, React.ComponentType<{ className?: string; strokeWidth?: number }>>
+> = {
+  shopping: ShoppingBag,
+  jobs: Briefcase,
+  vault: NotebookText,
+  todo: ListChecks,
 };
 
 export function AccountView({
@@ -119,22 +129,24 @@ function ModulesSection({ enabled }: { enabled: ModuleId[] }) {
 
       <form action={action} className="mt-4 space-y-3">
         {MODULES.map((module) => {
-          const { label, hint, icon: Icon } = MODULE_LABELS[module];
+          const Icon = ICONS[module.id] ?? LayoutGrid;
           return (
             <label
-              key={module}
+              key={module.id}
               className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5"
             >
               <input
                 type="checkbox"
-                name={`module:${module}`}
-                defaultChecked={enabled.includes(module)}
+                name={`module:${module.id}`}
+                defaultChecked={enabled.includes(module.id)}
                 className="mt-1 size-4 accent-[var(--color-brand)]"
               />
               <Icon className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
               <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium text-ink">{label}</span>
-                <span className="block text-[12px] leading-snug text-ink-muted">{hint}</span>
+                <span className="block text-[13px] font-medium text-ink">{module.label}</span>
+                <span className="block text-[12px] leading-snug text-ink-muted">
+                  {module.description}
+                </span>
               </span>
             </label>
           );

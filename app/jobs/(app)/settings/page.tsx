@@ -45,8 +45,13 @@ export default async function SettingsPage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [{ data: profile }, { data: accounts }, { data: resumes }, { data: evidence }, { data: excludedSenders }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: accounts },
+    { data: resumes },
+    { data: evidence },
+    { data: excludedSenders },
+  ] = await Promise.all([
       supabase
         .from('profiles')
         .select(

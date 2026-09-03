@@ -4,6 +4,8 @@ import { createVaultServiceSupabase } from '@/inngest/vault/supabase-admin';
 import { decryptAccessToken, vaultPortsFor } from '@/lib/vault/db/ports';
 import { VaultAuthError } from '@/lib/vault/providers';
 import { runVaultSync, type VaultConnectionRow } from '@/lib/vault/sync/run';
+import { activeRun } from '@/lib/vault/sync/manual';
+import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
 /**
@@ -23,6 +25,14 @@ import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
  */
 const CONNECTION_COLUMNS =
   'id, user_id, repo_owner, repo_name, branch, subpath, access_token, sync_cursor, backfill_after_path, backfill_commit_sha, backfill_completed_at' as const;
+
+/** The same list plus status, written out for the same reason. */
+const CONNECTION_COLUMNS_WITH_STATUS =
+  'id, user_id, repo_owner, repo_name, branch, subpath, access_token, sync_cursor, backfill_after_path, backfill_commit_sha, backfill_completed_at, status' as const;
+
+/** What activeRun() needs to tell a live run from an abandoned row. */
+const RUN_COLUMNS =
+  'id, type, status, notes_seen, notes_written, notes_deleted, notes_skipped, started_at, finished_at, error' as const;
 
 type ConnectionWithToken = VaultConnectionRow & { access_token: string | null };
 
@@ -68,6 +78,53 @@ export async function runVaultSyncForAll(): Promise<VaultSyncSummary> {
   }
 
   return summary;
+}
+
+/**
+ * One user's vault, on demand.
+ *
+ * The nightly pass is the norm and this is the impatient path: connect a vault
+ * at nine in the morning and waiting until tomorrow to see a single note is
+ * not a reasonable answer. Same work, same run log, so a hand-started sync and
+ * a scheduled one are indistinguishable afterwards -- which is the point.
+ *
+ * The service client is used here rather than in the route: this module is
+ * inside the boundary that may bypass RLS, and every query below filters by
+ * the user id the caller established from the session.
+ */
+export type ManualVaultSyncResult =
+  | { started: false; reason: 'no_connection' | 'needs_reauth' | 'already_running' }
+  | { started: true; run: Promise<void> };
+
+export async function runVaultSyncForUser(userId: string): Promise<ManualVaultSyncResult> {
+  const supabase = createVaultServiceSupabase();
+
+  const { data } = await supabase
+    .from('vault_connections')
+    .select(CONNECTION_COLUMNS_WITH_STATUS)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const connection = data as (ConnectionWithToken & { status: string }) | null;
+  if (!connection) return { started: false, reason: 'no_connection' };
+  if (connection.status !== 'active') return { started: false, reason: 'needs_reauth' };
+
+  const { data: runRows } = await supabase
+    .from('sync_runs')
+    .select(RUN_COLUMNS)
+    .eq('connection_id', connection.id)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (activeRun((runRows ?? []) as unknown as SyncRunSummary[])) {
+    return { started: false, reason: 'already_running' };
+  }
+
+  // Handed back rather than awaited: the caller decides whether to hold the
+  // request open for it. A rejection is swallowed here because syncOneConnection
+  // has already written the failure to sync_runs, and an unhandled rejection in
+  // a background task would take the process down with it.
+  return { started: true, run: syncOneConnection(supabase, connection).then(() => {}, () => {}) };
 }
 
 /**

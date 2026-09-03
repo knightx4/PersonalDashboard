@@ -17,6 +17,7 @@ import {
   type DomainLinker,
   type FanOutResult,
 } from '@/lib/core/inbox/fan-out';
+import type { SyncPhase } from '@/lib/core/inbox/progress';
 
 export { incrementalFallbackQuery };
 
@@ -152,6 +153,7 @@ async function ensureJob(
       email_account_id: opts.accountId,
       type: opts.type,
       status: 'running',
+      phase: 'listing' satisfies SyncPhase,
       started_at: new Date().toISOString(),
     })
     .select('id')
@@ -159,6 +161,40 @@ async function ensureJob(
 
   if (error || !data) throw new Error(`Could not start sync job: ${error?.message ?? 'unknown'}`);
   return { jobId: data.id as string, prior: emptyEnvelopeCounters() };
+}
+
+/**
+ * Say where the run has got to, without letting that be what breaks it.
+ *
+ * The counters and the phase are read only by the page watching the run. A
+ * failure to write them is not a reason to fail the sync, so this swallows
+ * one -- the next write, or the final one, corrects the row anyway.
+ */
+async function markPhase(
+  supabase: CoreSupabaseClient,
+  jobId: string,
+  patch: {
+    phase: SyncPhase;
+    messagesTotal?: number | null;
+    counters?: EnvelopeCounters;
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from('sync_jobs')
+    .update({
+      phase: patch.phase,
+      ...(patch.messagesTotal === undefined ? {} : { messages_total: patch.messagesTotal }),
+      ...(patch.counters
+        ? {
+            messages_seen: patch.counters.seen,
+            messages_classified: patch.counters.fetched,
+          }
+        : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', jobId);
+
+  if (error) console.error('sync phase write failed', jobId, error.message);
 }
 
 async function failJob(
@@ -194,6 +230,8 @@ async function processPage(
     linkers: readonly DomainLinker[];
     progress: SyncProgress;
     refetchScrubbed?: boolean;
+    /** Where to record that the reading is done and the sorting has started. */
+    jobId?: string;
   },
 ): Promise<MessageEnvelope[]> {
   const envelopes = await fetchEnvelopes(supabase, {
@@ -203,6 +241,13 @@ async function processPage(
     counters: opts.progress,
     refetchScrubbed: opts.refetchScrubbed,
   });
+
+  // Reading the mailbox and sorting what came back are the two halves of a
+  // run that take any time, and a bar that cannot tell them apart is a bar
+  // that sits still for the second half.
+  if (opts.jobId) {
+    await markPhase(supabase, opts.jobId, { phase: 'linking', counters: opts.progress });
+  }
 
   opts.progress.linkers = await fanOut(opts.linkers, {
     userId: opts.userId,
@@ -287,6 +332,10 @@ export async function syncEmailAccountBatch(
       nextPageToken: Boolean(listed.nextPageToken),
     });
 
+    // No total on a backfill: its pages each find their own, and a bar whose
+    // denominator resets every page is worse than one the phases carry.
+    await markPhase(supabase, jobId, { phase: 'reading' });
+
     await processPage(supabase, {
       userId: opts.userId,
       accountId: account.id,
@@ -295,6 +344,7 @@ export async function syncEmailAccountBatch(
       messageIds,
       linkers: opts.linkers,
       progress,
+      jobId,
       // A backfill is an explicit "look at everything again", which is the only
       // time a scrubbed envelope is worth re-reading -- see fetchEnvelopes.
       refetchScrubbed: true,
@@ -307,6 +357,7 @@ export async function syncEmailAccountBatch(
       .from('sync_jobs')
       .update({
         status: progress.done ? 'completed' : 'queued',
+        phase: (progress.done ? 'done' : 'listing') satisfies SyncPhase,
         messages_seen: progress.seen,
         messages_classified: progress.fetched,
         finished_at: progress.done ? new Date().toISOString() : null,
@@ -413,6 +464,10 @@ export async function syncEmailAccountIncrementalBatch(
       }
     }
 
+    // A check reads one list, so what it found is the whole of the run and
+    // the bar can be a real proportion rather than a phase weighting.
+    await markPhase(supabase, jobId, { phase: 'reading', messagesTotal: messageIds.length });
+
     await processPage(supabase, {
       userId: opts.userId,
       accountId: account.id,
@@ -421,12 +476,14 @@ export async function syncEmailAccountIncrementalBatch(
       messageIds,
       linkers: opts.linkers,
       progress,
+      jobId,
     });
 
     await supabase
       .from('sync_jobs')
       .update({
         status: 'completed',
+        phase: 'done' satisfies SyncPhase,
         messages_seen: progress.seen,
         messages_classified: progress.fetched,
         finished_at: new Date().toISOString(),

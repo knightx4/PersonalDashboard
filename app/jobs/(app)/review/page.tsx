@@ -4,7 +4,12 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/jobs/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
-import { loadReviewQueue, parseReviewView, REVIEW_VIEWS } from '@/lib/jobs/review/load';
+import {
+  loadReviewQueue,
+  parseReviewView,
+  REVIEW_VIEWS,
+  type SearchableRole,
+} from '@/lib/jobs/review/load';
 import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
 import { scoreCandidate, type LinkInput } from '@/lib/jobs/email/link';
 import { ReviewList } from './list';
@@ -86,6 +91,22 @@ export default async function ReviewPage({
     };
   });
 
+  // Every pursuit on file, for the "some other role" search. The same rows the
+  // scorer above ranks against the message, so a role the top three missed is
+  // still one keystroke away rather than a page away.
+  const allRoles: SearchableRole[] = candidates
+    .map((candidate) => ({
+      applicationId: candidate.applicationId,
+      companyName: candidate.companyName,
+      roleTitle: candidate.roleTitle,
+      status: candidate.status,
+      everSubmitted: candidate.submittedAt !== null,
+    }))
+    .sort(
+      (a, b) =>
+        a.companyName.localeCompare(b.companyName) || a.roleTitle.localeCompare(b.roleTitle),
+    );
+
   const filtered =
     view === 'all'
       ? withCandidates
@@ -144,6 +165,7 @@ export default async function ReviewPage({
             rows={filtered}
             timezone={(profile?.timezone as string) ?? 'UTC'}
             companyNames={companies.map((company) => company.name).sort()}
+            allRoles={allRoles}
           />
         </div>
       </div>

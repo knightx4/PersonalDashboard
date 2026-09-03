@@ -413,6 +413,9 @@ export async function startIncrementalSync(opts: {
       email_account_id: opts.accountId,
       type: 'incremental',
       status: 'queued',
+      // Queued is already a phase the page can describe: the run exists and
+      // has not looked at anything yet.
+      phase: 'listing',
       started_at: new Date().toISOString(),
     })
     .select('id')

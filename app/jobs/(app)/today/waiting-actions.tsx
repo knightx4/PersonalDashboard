@@ -2,12 +2,11 @@
 
 import { useTransition } from 'react';
 import { SNOOZE_DAYS } from '@/lib/jobs/today/load';
-import { completeQuiet, completeWaiting, snoozeQuiet, snoozeWaiting } from './actions';
+import { completeWaiting, snoozeWaiting } from './actions';
 
 /**
- * Same two answers as a reminder -- dealt with, or not now -- for the two
- * sections that are not backed by a reminder row: a request already
- * answered, or a pursuit that is not actually going anywhere yet.
+ * Same two answers as a reminder -- dealt with, or not now -- for the one
+ * section that is not backed by a reminder row: a request already answered.
  */
 function DismissActions({
   onComplete,
@@ -46,15 +45,6 @@ export function WaitingActions({ eventId }: { eventId: string }) {
     <DismissActions
       onComplete={() => completeWaiting(eventId)}
       onSnooze={() => snoozeWaiting(eventId)}
-    />
-  );
-}
-
-export function QuietActions({ applicationId }: { applicationId: string }) {
-  return (
-    <DismissActions
-      onComplete={() => completeQuiet(applicationId)}
-      onSnooze={() => snoozeQuiet(applicationId)}
     />
   );
 }

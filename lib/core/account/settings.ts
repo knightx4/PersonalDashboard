@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createCoreClient } from '@/lib/core/auth/server';
 import { normalizeTimeZone } from '@/lib/core/timezone';
-import { MODULES, isModuleId, type ModuleId } from '@/lib/modules';
+import { MODULE_IDS, isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
  * The settings that belong to the account rather than to a workspace.
@@ -42,13 +42,13 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   displayName: null,
   timezone: 'UTC',
   displayCurrency: 'USD',
-  enabledModules: [...MODULES],
+  enabledModules: [...MODULE_IDS],
 };
 
 function toModuleIds(raw: unknown): ModuleId[] {
-  if (!Array.isArray(raw)) return [...MODULES];
+  if (!Array.isArray(raw)) return [...MODULE_IDS];
   const known = raw.filter((m): m is ModuleId => typeof m === 'string' && isModuleId(m));
-  return known.length > 0 ? known : [...MODULES];
+  return known.length > 0 ? known : [...MODULE_IDS];
 }
 
 export async function loadAccountSettings(userId: string): Promise<AccountSettings> {

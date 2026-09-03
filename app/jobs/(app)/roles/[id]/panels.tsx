@@ -43,6 +43,7 @@ import {
   declineCandidateMessage,
   deleteInterview,
   linkCandidateMessage,
+  linkReminderMessage,
   matchRoleRequirements,
   removeInterviewer,
   saveInterview,
@@ -141,7 +142,13 @@ export interface PanelProps {
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
   /** Open to-dos you set for yourself, not events the inbox produced. */
-  todos: Array<{ id: string; body: string; dueAt: string }>;
+  todos: Array<{
+    id: string;
+    body: string;
+    dueAt: string;
+    /** The email that asked for it, where one has been named. */
+    message: { id: string; subject: string | null; gmailHref: string | null } | null;
+  }>;
   messages: Array<{
     id: string;
     subject: string | null;
@@ -336,10 +343,15 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
   );
 }
 
-function Timeline({ events, timezone, otherAttempts, todos, applicationId }: PanelProps) {
+function Timeline({ events, timezone, otherAttempts, todos, applicationId, messages }: PanelProps) {
   return (
     <div className="space-y-4">
-      <Todos todos={todos} applicationId={applicationId} timezone={timezone} />
+      <Todos
+        todos={todos}
+        applicationId={applicationId}
+        timezone={timezone}
+        messages={messages}
+      />
 
       {otherAttempts.length > 0 && (
         <section className="rounded-card border border-border bg-surface p-4">
@@ -420,10 +432,12 @@ function Todos({
   todos,
   applicationId,
   timezone,
+  messages,
 }: {
   todos: PanelProps['todos'];
   applicationId: string;
   timezone: string;
+  messages: PanelProps['messages'];
 }) {
   const [body, setBody] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -434,12 +448,15 @@ function Todos({
     <section className="rounded-card border border-border bg-surface p-4">
       <h3 className="mb-2 text-[13px] font-semibold text-ink">To-dos</h3>
       {todos.length > 0 && (
-        <ul className="mb-3 space-y-1.5">
+        <ul className="mb-3 space-y-2">
           {todos.map((todo) => (
-            <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-              <span className="tabular text-ink-faint">{formatDate(todo.dueAt, timezone)}</span>
-              <span className="text-ink">{todo.body}</span>
-              <ReminderActions id={todo.id} />
+            <li key={todo.id} className="text-[13px]">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="tabular text-ink-faint">{formatDate(todo.dueAt, timezone)}</span>
+                <span className="text-ink">{todo.body}</span>
+                <ReminderActions id={todo.id} />
+              </div>
+              <TodoMail todo={todo} messages={messages} timezone={timezone} />
             </li>
           ))}
         </ul>
@@ -484,6 +501,106 @@ function Todos({
         {error && <span className="text-[12px] text-status-rejected">{error}</span>}
       </div>
     </section>
+  );
+}
+
+/**
+ * The email a to-do is about.
+ *
+ * "Submit the take-home" and the mail that sent the take-home were the same
+ * thing in two tabs, joined only by remembering the subject line. Named here,
+ * the to-do carries the link to the mailbox with it.
+ *
+ * The picker is the mail already linked to this pursuit, which is the whole of
+ * what a to-do on this role could sensibly point at -- and it stays closed
+ * until asked for, so a list of to-dos does not become a list of dropdowns.
+ */
+function TodoMail({
+  todo,
+  messages,
+  timezone,
+}: {
+  todo: PanelProps['todos'][number];
+  messages: PanelProps['messages'];
+  timezone: string;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function save(messageId: string | null) {
+    startTransition(async () => {
+      const result = await linkReminderMessage({ reminderId: todo.id, messageId });
+      setError(result.error);
+      if (!result.error) setPicking(false);
+    });
+  }
+
+  if (todo.message) {
+    return (
+      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-0.5 text-[12px] text-ink-muted">
+        <Mail className="size-3 shrink-0 text-ink-faint" strokeWidth={1.75} aria-hidden />
+        {todo.message.gmailHref ? (
+          <GmailLink href={todo.message.gmailHref}>
+            {todo.message.subject ?? '(no subject)'}
+          </GmailLink>
+        ) : (
+          <span>{todo.message.subject ?? 'An email no longer linked to this role'}</span>
+        )}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => save(null)}
+          className="text-ink-faint underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
+        >
+          Unlink
+        </button>
+        {error && <span className="text-status-rejected">{error}</span>}
+      </p>
+    );
+  }
+
+  if (messages.length === 0) return null;
+
+  if (!picking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="mt-0.5 pl-0.5 text-[12px] text-ink-faint underline underline-offset-2 hover:text-brand"
+      >
+        Link an email
+      </button>
+    );
+  }
+
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-2 pl-0.5 text-[12px]">
+      <Select
+        aria-label="Email this to-do is about"
+        defaultValue=""
+        disabled={pending}
+        className="max-w-full sm:max-w-[28rem]"
+        onChange={(event) => {
+          if (event.target.value) save(event.target.value);
+        }}
+      >
+        <option value="">Pick an email…</option>
+        {messages.map((message) => (
+          <option key={message.id} value={message.id}>
+            {formatDate(message.receivedAt, timezone)} — {message.subject ?? '(no subject)'}
+          </option>
+        ))}
+      </Select>
+      <button
+        type="button"
+        onClick={() => setPicking(false)}
+        className="text-ink-faint underline underline-offset-2 hover:text-ink"
+      >
+        Cancel
+      </button>
+      {error && <span className="text-status-rejected">{error}</span>}
+    </p>
   );
 }
 
