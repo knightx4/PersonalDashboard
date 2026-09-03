@@ -9,7 +9,7 @@ import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { allSources } from '@/lib/todo/agenda/registry';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
-import type { AgendaItem, SourceContext } from '@/lib/todo/agenda/sources';
+import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
  * Everything the agenda needs, fetched in parallel and merged by a pure
@@ -55,7 +55,7 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
       moduleEnabled(account, source.module),
   );
 
-  const [items, failed] = await runSources(active, ctx);
+  const [items, context, failed] = await runSources(active, ctx);
 
   const links = await loadLinksForTasks(tasks.map((task) => task.id));
   const anchors = await resolveAnchors(links);
@@ -68,6 +68,7 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
     piles: mergeAgenda({
       tasks,
       items,
+      context,
       dismissals,
       anchors,
       timezone: account.timezone,
@@ -82,19 +83,26 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
 async function runSources(
   sources: ReturnType<typeof allSources>,
   ctx: SourceContext,
-): Promise<[AgendaItem[], string[]]> {
-  const settled = await Promise.allSettled(sources.map((source) => source.fetch(ctx)));
+): Promise<[AgendaItem[], DayContext[], string[]]> {
+  const settled = await Promise.allSettled(
+    sources.map(async (source) => ({
+      items: await source.fetch(ctx),
+      context: (await source.context?.(ctx)) ?? [],
+    })),
+  );
 
   const items: AgendaItem[] = [];
+  const context: DayContext[] = [];
   const failed: string[] = [];
 
   settled.forEach((result, index) => {
     if (result.status === 'fulfilled') {
-      items.push(...result.value);
+      items.push(...result.value.items);
+      context.push(...result.value.context);
     } else {
       failed.push(sources[index].label);
     }
   });
 
-  return [items, failed];
+  return [items, context, failed];
 }

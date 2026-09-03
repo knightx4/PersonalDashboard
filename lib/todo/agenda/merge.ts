@@ -7,7 +7,7 @@ import {
   type Bucket,
   type Task,
 } from '@/lib/todo/tasks/model';
-import type { AgendaItem } from '@/lib/todo/agenda/sources';
+import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
 
 /**
  * Putting the agenda together.
@@ -33,11 +33,18 @@ export interface AgendaEntry {
 export interface AgendaPile {
   bucket: Bucket;
   entries: AgendaEntry[];
+  /**
+   * What is already in these days -- interviews, and whatever else turns out
+   * to be an appointment rather than a task. Shown above the entries, without
+   * a checkbox, because you do not tick off a meeting.
+   */
+  context: DayContext[];
 }
 
 export interface MergeInput {
   tasks: Task[];
   items: AgendaItem[];
+  context?: DayContext[];
   /** Keys of source items deferred or dismissed, and until when. */
   dismissals: Map<string, { until: string | null }>;
   anchors?: Map<string, { label: string; href: string }>;
@@ -99,9 +106,25 @@ export function mergeAgenda(input: MergeInput): AgendaPile[] {
     });
   }
 
-  return ORDER.filter((bucket) => (piles.get(bucket)?.length ?? 0) > 0).map((bucket) => ({
+  const contextByBucket = new Map<Bucket, DayContext[]>();
+  for (const entry of input.context ?? []) {
+    const bucket = bucketOf(entry.day, today, horizon);
+    contextByBucket.set(bucket, [...(contextByBucket.get(bucket) ?? []), entry]);
+  }
+
+  // A pile with only context and nothing to do is still worth showing: "you
+  // have an interview on Thursday and nothing else" is an answer, and an empty
+  // Thursday that silently omits the interview is not.
+  const buckets = ORDER.filter(
+    (bucket) => (piles.get(bucket)?.length ?? 0) > 0 || (contextByBucket.get(bucket)?.length ?? 0) > 0,
+  );
+
+  return buckets.map((bucket) => ({
     bucket,
     entries: [...(piles.get(bucket) ?? [])].sort(compare),
+    context: [...(contextByBucket.get(bucket) ?? [])].sort((a, b) =>
+      (a.at ?? a.day) < (b.at ?? b.day) ? -1 : 1,
+    ),
   }));
 }
 

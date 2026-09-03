@@ -79,6 +79,24 @@ export interface SourceContext {
   now: Date;
 }
 
+/**
+ * Something already in a day that is not a task.
+ *
+ * An interview is an appointment: you do not tick it off, and putting a
+ * checkbox beside one would be inviting a person to lie to their own list. It
+ * belongs on the agenda as context -- what is already in this day -- and
+ * nothing more.
+ */
+export interface DayContext {
+  key: string;
+  /** A calendar day, YYYY-MM-DD, in the reader's zone. */
+  day: string;
+  at: string | null;
+  label: string;
+  detail: string | null;
+  link: AgendaItemLink | null;
+}
+
 export interface AgendaSource {
   id: SourceId;
   label: string;
@@ -88,6 +106,8 @@ export interface AgendaSource {
   description: string;
   /** Everything this source has for the window. */
   fetch(ctx: SourceContext): Promise<AgendaItem[]>;
+  /** Appointments in the window, shown as day context rather than as items. */
+  context?(ctx: SourceContext): Promise<DayContext[]>;
   /** "Done", where the source can express it. */
   complete?(ctx: SourceContext, key: string): Promise<void>;
   /** "Later", by however this source defers things. */

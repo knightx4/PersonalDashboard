@@ -1,4 +1,4 @@
-import { ListChecks, TriangleAlert } from 'lucide-react';
+import { CalendarClock, ListChecks, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAgenda } from '@/lib/todo/agenda/load';
@@ -59,7 +59,7 @@ export default async function TodoPage() {
         </div>
       ) : (
         <div className="mt-6 space-y-6">
-          {agenda.piles.map(({ bucket, entries }) => (
+          {agenda.piles.map(({ bucket, entries, context }) => (
             <section key={bucket}>
               <h2
                 className={cn(
@@ -68,10 +68,49 @@ export default async function TodoPage() {
                 )}
               >
                 {BUCKET_LABELS[bucket]}
-                <span className="tabular ml-2 text-[12px] font-normal text-ink-faint">
-                  {entries.length}
-                </span>
+                {entries.length > 0 && (
+                  <span className="tabular ml-2 text-[12px] font-normal text-ink-faint">
+                    {entries.length}
+                  </span>
+                )}
               </h2>
+              {/* What is already in these days. No checkbox: you do not tick
+                  off a meeting, and offering to would be inviting someone to
+                  lie to their own list. */}
+              {context.length > 0 && (
+                <ul className="mt-1 space-y-1">
+                  {context.map((entry) => (
+                    <li
+                      key={entry.key}
+                      className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-brand-tint px-3 py-1.5 text-[12px] text-ink"
+                    >
+                      <CalendarClock className="size-3.5 shrink-0 text-brand" strokeWidth={1.75} aria-hidden />
+                      {entry.at && (
+                        <span className="tabular font-medium">
+                          {new Intl.DateTimeFormat('en-GB', {
+                            timeZone: agenda.timezone,
+                            weekday: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }).format(new Date(entry.at))}
+                        </span>
+                      )}
+                      <span className="font-medium">{entry.label}</span>
+                      {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
+                      {entry.link && (
+                        <a
+                          href={entry.link.href}
+                          className="font-medium text-brand underline underline-offset-2"
+                        >
+                          {entry.link.label}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {entries.length > 0 && (
               <div className="mt-1 divide-y divide-border rounded-card border border-border bg-surface px-3">
                 {entries.map((entry) =>
                   entry.kind === 'task' && entry.task ? (
@@ -86,6 +125,7 @@ export default async function TodoPage() {
                   ) : null,
                 )}
               </div>
+              )}
             </section>
           ))}
         </div>

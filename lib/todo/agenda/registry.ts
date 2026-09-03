@@ -1,16 +1,16 @@
 import 'server-only';
 
 import type { AgendaSource, SourceId } from '@/lib/todo/agenda/sources';
+import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
 
 /**
  * Every source there is, in one place.
  *
- * Empty on purpose in this step. The interface and the wiring around it are
- * what needed deciding; a scaffold with nothing plugged into it sounds like a
- * step to skip, and it is the step that decides whether the next two are one
- * file each or a rewrite.
+ * Adding one is a file under sources/ and a line here. Nothing else changes --
+ * not the page, not the merge, not the schema -- which is what the interface
+ * was for.
  */
-const SOURCES: AgendaSource[] = [];
+const SOURCES: AgendaSource[] = [jobRemindersSource];
 
 export function allSources(): AgendaSource[] {
   return SOURCES;

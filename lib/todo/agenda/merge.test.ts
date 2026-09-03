@@ -160,6 +160,58 @@ describe('mergeAgenda', () => {
     expect(merge()).toEqual([]);
   });
 
+  it('shows a day that holds only an appointment', () => {
+    // "You have an interview on Thursday and nothing else" is an answer. An
+    // empty Thursday that silently omits the interview is not.
+    const piles = merge({
+      context: [
+        {
+          key: 'interview:1',
+          day: '2026-03-12',
+          at: '2026-03-12T14:00:00.000Z',
+          label: 'Acme · Staff Engineer',
+          detail: 'screen · 45 min',
+          link: null,
+        },
+      ],
+    });
+
+    expect(piles).toHaveLength(1);
+    expect(piles[0].bucket).toBe('soon');
+    expect(piles[0].entries).toEqual([]);
+    expect(piles[0].context.map((c) => c.label)).toEqual(['Acme · Staff Engineer']);
+  });
+
+  it('files an appointment into the same pile a task on that day would get', () => {
+    const piles = merge({
+      tasks: [task({ id: 'a', dueOn: '2026-03-10' })],
+      context: [
+        {
+          key: 'interview:1',
+          day: '2026-03-10',
+          at: '2026-03-10T14:00:00.000Z',
+          label: 'Acme',
+          detail: null,
+          link: null,
+        },
+      ],
+    });
+
+    expect(piles).toHaveLength(1);
+    expect(piles[0].entries).toHaveLength(1);
+    expect(piles[0].context).toHaveLength(1);
+  });
+
+  it('never gives an appointment a checkbox by turning it into an entry', () => {
+    const piles = merge({
+      context: [
+        { key: 'i', day: '2026-03-10', at: null, label: 'Acme', detail: null, link: null },
+      ],
+    });
+
+    expect(piles[0].entries).toEqual([]);
+  });
+
   it('files an item with no day under someday, not under overdue', () => {
     // Sources always give a day today, but a future one might not, and
     // "unknown" must never present as "late".
