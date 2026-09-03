@@ -60,8 +60,8 @@ const VAULT_PROVIDER_IMPORT = `import { GithubVaultSource } from '@/lib/vault/pr
 export const source = GithubVaultSource;
 `;
 
-const SELL_IMPORT = `import { loadSellGames } from '@/lib/sell/load-games';
-export const load = loadSellGames;
+const SELL_IMPORT = `import { runPriceLookups } from '@/lib/sell/price-run';
+export const load = runPriceLookups;
 `;
 
 const BGG_IMPORT = `import { searchGames } from '@/lib/games/providers/bgg';

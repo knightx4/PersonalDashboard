@@ -390,6 +390,12 @@ export const inventoryItems = pgTable(
     /** User intent: show on the sell page, whatever a catalog does or does not know. */
     forSale: boolean('for_sale').notNull().default(false),
     /**
+     * A sell price you typed yourself, for an item with no detail row to hold
+     * one. Read only when book_details and game_details are both absent, so an
+     * item never has two manual prices to choose between.
+     */
+    manualExpectedPriceCents: integer('manual_expected_price_cents'),
+    /**
      * Provenance for this physical unit. For order-backed rows this mirrors
      * orders.source; for standalone owned items (scanned books, etc.) it is
      * set directly (manual / photo / receipt_photo).
@@ -591,6 +597,36 @@ export const gamePriceQuotes = pgTable(
   (t) => [
     uniqueIndex('game_price_quotes_bgg_source_key').on(t.bggId, t.source),
     index('game_price_quotes_fetched_at_idx').on(t.fetchedAt),
+  ],
+);
+
+/**
+ * Quotes for an item that is neither a book nor a board game — keyed by the
+ * item, because a title search is all the identity it has.
+ *
+ * Not shared the way the two caches above are: "what a grey desk lamp goes for"
+ * is only an answer to the person who named it that, so this is user-scoped
+ * through inventory_items. See 0045.
+ */
+export const itemPriceQuotes = pgTable(
+  'item_price_quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    source: bookPriceQuoteSource('source').notNull(),
+    quotedCents: integer('quoted_cents'),
+    shippingCents: integer('shipping_cents').notNull().default(0),
+    vendorName: text('vendor_name'),
+    vendorUrl: text('vendor_url'),
+    payload: jsonb('payload'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('item_price_quotes_item_source_key').on(t.inventoryItemId, t.source),
+    index('item_price_quotes_fetched_at_idx').on(t.fetchedAt),
   ],
 );
 
