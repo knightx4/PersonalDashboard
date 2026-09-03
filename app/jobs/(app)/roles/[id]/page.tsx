@@ -134,7 +134,7 @@ export default async function RoleDetailPage({
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
       supabase
         .from('reminders')
-        .select('id, body, due_at')
+        .select('id, body, due_at, ingested_message_id')
         .eq('application_id', current.id)
         .is('completed_at', null)
         .order('due_at', { ascending: true }),
@@ -399,11 +399,31 @@ export default async function RoleDetailPage({
           pinned: note.pinned as boolean,
           createdAt: note.created_at as string,
         }))}
-        todos={(reminders ?? []).map((reminder) => ({
-          id: reminder.id as string,
-          body: reminder.body as string,
-          dueAt: reminder.due_at as string,
-        }))}
+        todos={(reminders ?? []).map((reminder) => {
+          // The mail a to-do points at is already loaded for the Linked mail
+          // tab, so the subject and the deep link come from there rather than
+          // from a second query.
+          const messageId = (reminder.ingested_message_id as string) ?? null;
+          const linked = messageId
+            ? ((messages ?? []).find((message) => message.id === messageId) ?? null)
+            : null;
+          return {
+            id: reminder.id as string,
+            body: reminder.body as string,
+            dueAt: reminder.due_at as string,
+            message: linked
+              ? {
+                  id: linked.id as string,
+                  subject: (linked.subject as string) ?? null,
+                  gmailHref: gmailHrefByMessage.get(linked.id as string) ?? null,
+                }
+              : messageId
+                // Linked to mail this pursuit no longer carries. Saying so is
+                // better than the link silently not being there.
+                ? { id: messageId, subject: null, gmailHref: null }
+                : null,
+          };
+        })}
         messages={(messages ?? []).map((message) => ({
           id: message.id as string,
           subject: (message.subject as string) ?? null,

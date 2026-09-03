@@ -271,6 +271,56 @@ export async function addReminder(input: {
   return { error: null };
 }
 
+const reminderMessageSchema = z.object({
+  reminderId: z.string().uuid(),
+  /** Null unlinks: the to-do stands on its own again. */
+  messageId: z.string().uuid().nullable(),
+});
+
+/**
+ * Point a to-do at the email that asked for it.
+ *
+ * "Submit the take-home" and the mail that sent the take-home are one thing
+ * seen twice, and they lived in two tabs with nothing joining them. Linking
+ * them is a second step rather than part of adding a to-do, because the mail
+ * usually arrives first and the to-do is written from it -- and because the
+ * one you want is often not the one you were looking at.
+ */
+export async function linkReminderMessage(input: {
+  reminderId: string;
+  messageId: string | null;
+}): Promise<{ error: string | null }> {
+  const parsed = reminderMessageSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not an email to link.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS already scopes both rows to the owner; the message check is here so a
+  // stale picker says so instead of writing a link to nothing.
+  if (parsed.data.messageId) {
+    const { data: message } = await supabase
+      .from('inbox_messages')
+      .select('id')
+      .eq('id', parsed.data.messageId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!message) return { error: 'That email is no longer linked to this role.' };
+  }
+
+  const { error } = await supabase
+    .from('reminders')
+    .update({ ingested_message_id: parsed.data.messageId })
+    .eq('id', parsed.data.reminderId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/today');
+  return { error: null };
+}
+
 export async function saveInterview(
   interviewId: string,
   patch: {
