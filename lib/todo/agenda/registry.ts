@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { AgendaSource, SourceId } from '@/lib/todo/agenda/sources';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
+import { returnDeadlinesSource } from '@/lib/todo/agenda/sources/return-deadlines';
 
 /**
  * Every source there is, in one place.
@@ -10,7 +11,7 @@ import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
  * not the page, not the merge, not the schema -- which is what the interface
  * was for.
  */
-const SOURCES: AgendaSource[] = [jobRemindersSource];
+const SOURCES: AgendaSource[] = [jobRemindersSource, returnDeadlinesSource];
 
 export function allSources(): AgendaSource[] {
   return SOURCES;
