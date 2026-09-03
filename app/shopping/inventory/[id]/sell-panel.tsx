@@ -4,8 +4,7 @@ import { useActionState } from 'react';
 import {
   priceOneItem,
   searchItemPrice,
-  setManualGamePrice,
-  setManualPrice,
+  setSellPrice,
   type PriceSearchState,
   type SellActionState,
 } from '@/app/shopping/sell/actions';
@@ -50,10 +49,7 @@ export function ItemSellPanel({
     searchItemPrice,
     initialSearch,
   );
-  const [manualState, manualAction, manualPending] = useActionState(
-    quote.kind === 'game' ? setManualGamePrice : setManualPrice,
-    initial,
-  );
+  const [manualState, manualAction, manualPending] = useActionState(setSellPrice, initial);
 
   const price = quote.expectedSelfListCents;
   const searchLabel = SEARCH_LABEL[quote.priceSource] ?? 'Search for a price';
