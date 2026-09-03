@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design language — Personal Tracker</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEMES
+   A theme is a ground, an ink, a border, and a mood. Everything else in the
+   system is derived. Five ship; the mechanism is what matters.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root, [data-theme="paper"] {
+  color-scheme: light;
+  --canvas:#faf9f6; --surface:#ffffff; --raised:#ffffff; --sunken:#f2f0ea;
+  --border:#e8e5df; --border-strong:#d5d1c8;
+  --ink:#1a1a18; --ink-muted:#6b6b66; --ink-faint:#80807a;
+  --accent:#4a5fd0; --accent-hover:#3f52bd; --accent-tint:#eef1fe; --accent-soft:#6a82fb;
+  --w-shopping:#b8420f; --w-shopping-tint:#fff1e9;
+  --w-jobs:#8b3a72;     --w-jobs-tint:#fceff8;
+  --w-todo:#2e7d5b;     --w-todo-tint:#ecf7f1;
+  --w-vault:#8a6212;    --w-vault-tint:#fdf4e3;
+  --positive:#2e7d5b; --positive-soft:#3fa37a; --positive-tint:#ecf7f1;
+  --caution:#b8420f; --caution-fill:#ff8a4c; --caution-tint:#fff1e9;
+  --danger:#b91c1c; --danger-tint:#fef2f2;
+  --s-lead:#6f6864;      --s-lead-tint:#f5f5f4;
+  --s-submitted:#2563eb; --s-submitted-tint:#eff6ff;
+  --s-process:#b45309;   --s-process-tint:#fffbeb;
+  --s-final:#7c3aed;     --s-final-tint:#f5f3ff;
+  --s-offer:#047857;     --s-offer-tint:#ecfdf5;
+  --s-rejected:#b91c1c;  --s-rejected-tint:#fef2f2;
+  --s-ghosted:#78716c;
+  --grain-opacity:0.035; --grain-blend:multiply;
+  --texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  --font-ui:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-display:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --font-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  --display-style:normal;
+}
+
+[data-theme="ink"] {
+  color-scheme: dark;
+  --canvas:#141311; --surface:#1c1b18; --raised:#262421; --sunken:#100f0e;
+  --border:#302d29; --border-strong:#3d3934;
+  --ink:#f4f1ea; --ink-muted:#a8a49b; --ink-faint:#7d7870;
+  --accent:#9db0ff; --accent-hover:#b6c4ff; --accent-tint:#1e2140; --accent-soft:#7b8cf0;
+  --w-shopping:#ff9d63; --w-shopping-tint:#2e1d13;
+  --w-jobs:#e896c9;     --w-jobs-tint:#2c1626;
+  --w-todo:#6fd39c;     --w-todo-tint:#13271d;
+  --w-vault:#e8bd68;    --w-vault-tint:#2b2313;
+  --positive:#6fd39c; --positive-soft:#3fa37a; --positive-tint:#13271d;
+  --caution:#ff9d63; --caution-fill:#c2601f; --caution-tint:#2e1d13;
+  --danger:#f08a8a; --danger-tint:#301a1a;
+  --s-lead:#b6aca6;      --s-lead-tint:#26241f;
+  --s-submitted:#8ab0ff; --s-submitted-tint:#161d33;
+  --s-process:#e8a84e;   --s-process-tint:#2a2113;
+  --s-final:#bfa0ff;     --s-final-tint:#231a38;
+  --s-offer:#62c79a;     --s-offer-tint:#12261d;
+  --s-rejected:#f08a8a;  --s-rejected-tint:#2d1919;
+  --s-ghosted:#a9a19b;
+  --grain-opacity:0.05; --grain-blend:overlay;
+}
+
+[data-theme="riso"] {
+  color-scheme: light;
+  --canvas:#f6f2e8; --surface:#fffdf7; --raised:#fffdf7; --sunken:#ece6d7;
+  --border:#ded5c0; --border-strong:#c9bda0;
+  --ink:#191713; --ink-muted:#6a6353; --ink-faint:#867e6b;
+  --accent:#0b4fa8; --accent-hover:#093f87; --accent-tint:#e2ecfb; --accent-soft:#2f76d8;
+  --w-shopping:#b3300f; --w-shopping-tint:#fbe6df;
+  --w-jobs:#8a2a63;     --w-jobs-tint:#f8e4f0;
+  --w-todo:#1d6b48;     --w-todo-tint:#e0f0e6;
+  --w-vault:#7a5408;    --w-vault-tint:#f8ecd4;
+  --positive:#1d6b48; --positive-soft:#2f9268; --positive-tint:#e0f0e6;
+  --caution:#b3300f; --caution-fill:#ef6033; --caution-tint:#fbe6df;
+  --danger:#a3160f; --danger-tint:#fbe3e0;
+  --grain-opacity:0.11; --grain-blend:multiply;
+  --texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='1.4' cy='1.4' r='1.1' fill='%23000'/%3E%3C/svg%3E");
+}
+
+[data-theme="terminal"] {
+  color-scheme: dark;
+  --canvas:#080a08; --surface:#0e120e; --raised:#151a15; --sunken:#040604;
+  --border:#1d271d; --border-strong:#2c392c;
+  --ink:#d8f5d8; --ink-muted:#8fbe93; --ink-faint:#5d825f;
+  --accent:#7dfba0; --accent-hover:#a2ffbd; --accent-tint:#0f2416; --accent-soft:#4fd97a;
+  --w-shopping:#ffc66d; --w-shopping-tint:#2a2011;
+  --w-jobs:#c7a4ff;     --w-jobs-tint:#1e1730;
+  --w-todo:#7dfba0;     --w-todo-tint:#0f2416;
+  --w-vault:#8fe3ff;    --w-vault-tint:#0d2430;
+  --positive:#7dfba0; --positive-soft:#4fd97a; --positive-tint:#0f2416;
+  --caution:#ffc66d; --caution-fill:#b8862c; --caution-tint:#2a2011;
+  --danger:#ff8f8f; --danger-tint:#301616;
+  --grain-opacity:0.07; --grain-blend:overlay;
+  --s-lead:#b6aca6;      --s-lead-tint:#26241f;
+  --s-submitted:#8ab0ff; --s-submitted-tint:#161d33;
+  --s-process:#e8a84e;   --s-process-tint:#2a2113;
+  --s-final:#bfa0ff;     --s-final-tint:#231a38;
+  --s-offer:#62c79a;     --s-offer-tint:#12261d;
+  --s-rejected:#f08a8a;  --s-rejected-tint:#2d1919;
+  --s-ghosted:#a9a19b;
+  --font-display:var(--font-mono);
+  --display-style:normal;
+}
+
+[data-theme="dusk"] {
+  color-scheme: dark;
+  --canvas:#16121c; --surface:#1e1926; --raised:#282133; --sunken:#100d15;
+  --border:#332b40; --border-strong:#42384f;
+  --ink:#f0ebf6; --ink-muted:#aca2ba; --ink-faint:#7f7590;
+  --accent:#c4a7ff; --accent-hover:#d6c1ff; --accent-tint:#291f3a; --accent-soft:#a184e6;
+  --w-shopping:#ffa07a; --w-shopping-tint:#331f1c;
+  --w-jobs:#f0a0d8;     --w-jobs-tint:#33203a;
+  --w-todo:#7fd7b4;     --w-todo-tint:#152e2a;
+  --w-vault:#f2c97e;    --w-vault-tint:#2f2718;
+  --positive:#7fd7b4; --positive-soft:#4fae8c; --positive-tint:#152e2a;
+  --caution:#ffa07a; --caution-fill:#c26a45; --caution-tint:#331f1c;
+  --danger:#f492a4; --danger-tint:#331a22;
+  --s-lead:#b6aca6;      --s-lead-tint:#26241f;
+  --s-submitted:#8ab0ff; --s-submitted-tint:#161d33;
+  --s-process:#e8a84e;   --s-process-tint:#2a2113;
+  --s-final:#bfa0ff;     --s-final-tint:#231a38;
+  --s-offer:#62c79a;     --s-offer-tint:#12261d;
+  --s-rejected:#f08a8a;  --s-rejected-tint:#2d1919;
+  --s-ghosted:#a9a19b;
+  --grain-opacity:0.06; --grain-blend:overlay;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --canvas:#141311; --surface:#1c1b18; --raised:#262421; --sunken:#100f0e;
+    --border:#302d29; --border-strong:#3d3934;
+    --ink:#f4f1ea; --ink-muted:#a8a49b; --ink-faint:#7d7870;
+    --accent:#9db0ff; --accent-hover:#b6c4ff; --accent-tint:#1e2140;
+    --positive:#6fd39c; --positive-tint:#13271d;
+    --caution:#ff9d63; --caution-tint:#2e1d13;
+    --danger:#f08a8a; --danger-tint:#301a1a;
+    --grain-opacity:0.05; --grain-blend:overlay;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOCUMENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:7rem}
+body{
+  margin:0;background:var(--canvas);color:var(--ink);
+  font-family:var(--font-ui);font-size:15px;line-height:1.62;
+  -webkit-font-smoothing:antialiased;position:relative;
+}
+/* The grain. One fixed layer, pointer-events none, blend mode per theme. */
+body::before{
+  content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background-image:var(--texture);background-repeat:repeat;
+  opacity:var(--grain-opacity);mix-blend-mode:var(--grain-blend);
+}
+.tabular{font-variant-numeric:tabular-nums}
+
+header.doc{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(10px) saturate(1.2);border-bottom:1px solid var(--border)}
+header.doc .bar{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:.7rem;height:58px;padding:0 1.25rem}
+header.doc .mark{width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;color:#fff;font-size:13px;background-image:linear-gradient(135deg,var(--accent-soft) 0%,var(--w-jobs) 100%)}
+header.doc strong{font-size:15px;letter-spacing:-.011em}
+header.doc .themes{margin-left:auto;display:flex;gap:.25rem;align-items:center}
+header.doc .themes button{
+  width:22px;height:22px;border-radius:7px;border:1px solid var(--border-strong);
+  cursor:pointer;padding:0;position:relative;transition:transform 150ms cubic-bezier(.22,1,.36,1)
+}
+header.doc .themes button:hover{transform:translateY(-2px) rotate(-4deg)}
+header.doc .themes button[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:2px}
+nav.toc{max-width:1000px;margin:0 auto;padding:.55rem 1.25rem;display:flex;gap:.15rem;flex-wrap:wrap;border-top:1px solid var(--border)}
+nav.toc a{font-size:11.5px;font-weight:500;color:var(--ink-muted);text-decoration:none;padding:.22rem .5rem;border-radius:7px}
+nav.toc a:hover{background:var(--sunken);color:var(--ink)}
+
+main{max-width:1000px;margin:0 auto;padding:2.75rem 1.25rem 7rem}
+h1{font-family:var(--font-display);font-style:var(--display-style);font-size:46px;line-height:1.05;letter-spacing:-.02em;margin:0 0 .6rem;font-weight:400}
+h2{font-family:var(--font-display);font-style:var(--display-style);font-weight:400;font-size:30px;letter-spacing:-.015em;margin:4rem 0 .3rem;padding-top:2rem;border-top:1px solid var(--border)}
+h2:first-of-type{border-top:0;padding-top:0}
+h3{font-size:16.5px;margin:2.1rem 0 .4rem;letter-spacing:-.008em}
+h4{font-size:11px;margin:1.4rem 0 .4rem;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-muted);font-weight:600}
+p{margin:.55rem 0;max-width:70ch}
+ul,ol{margin:.55rem 0;padding-left:1.25rem;max-width:70ch}
+li{margin:.22rem 0}
+a{color:var(--accent)}
+.lede{font-size:18px;color:var(--ink-muted);max-width:64ch;line-height:1.55}
+
+code{font-family:var(--font-mono);font-size:.86em;background:var(--sunken);border:1px solid var(--border);border-radius:4px;padding:.08em .34em}
+pre{background:var(--sunken);border:1px solid var(--border);border-radius:10px;padding:.9rem 1.05rem;overflow-x:auto;font-size:12.5px;line-height:1.6;font-family:var(--font-mono)}
+pre code{background:none;border:0;padding:0;font-size:inherit}
+pre .c{color:var(--ink-faint)}
+pre .k{color:var(--w-shopping)}
+pre .s{color:var(--positive)}
+
+.rule{border-left:3px solid var(--accent);background:var(--accent-tint);border-radius:0 10px 10px 0;padding:.8rem 1.05rem;margin:1.1rem 0}
+.rule strong{color:var(--accent)}
+.rule p{margin:0;max-width:66ch}
+
+.law{display:flex;gap:.9rem;align-items:flex-start;padding:.85rem 0;border-bottom:1px solid var(--border)}
+.law:last-child{border-bottom:0}
+.law .n{flex:none;width:26px;height:26px;border-radius:999px;background:var(--accent-tint);color:var(--accent);font-size:12px;font-weight:700;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.law div p{margin:.15rem 0 0;font-size:14px;color:var(--ink-muted);max-width:64ch}
+.law div strong{font-size:15px}
+
+table.spec{width:100%;border-collapse:collapse;font-size:13px;margin:.9rem 0;display:block;overflow-x:auto}
+table.spec th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);font-weight:600;padding:.45rem .6rem;border-bottom:1px solid var(--border-strong);white-space:nowrap}
+table.spec td{padding:.45rem .6rem;border-bottom:1px solid var(--border);vertical-align:top}
+table.spec tr:last-child td{border-bottom:0}
+table.spec code{white-space:nowrap}
+.pass{color:var(--positive);font-weight:600}
+.fail{color:var(--danger);font-weight:600}
+
+.demo{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:1.15rem;margin:1rem 0}
+.demo.on-canvas{background:var(--canvas)}
+.demo-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);font-weight:600;margin-bottom:.75rem}
+.split{display:grid;gap:.75rem;grid-template-columns:1fr}
+@media(min-width:760px){.split{grid-template-columns:1fr 1fr}}
+.do,.dont{border-radius:12px;padding:.85rem 1rem;font-size:13.5px;border:1px solid var(--border);background:var(--surface)}
+.do{border-left:3px solid var(--positive)}
+.dont{border-left:3px solid var(--danger)}
+.do h5,.dont h5{margin:0 0 .3rem;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em}
+.do h5{color:var(--positive)}.dont h5{color:var(--danger)}
+.do p,.dont p{margin:.22rem 0;font-size:13.5px}
+
+.swatches{display:grid;gap:.55rem;grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}
+.sw{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
+.sw .chip{height:42px}
+.sw .meta{padding:.42rem .55rem;font-size:11px;line-height:1.45}
+.sw .meta b{display:block;font-size:12px}
+.sw .meta span{display:block;color:var(--ink-muted);font-family:var(--font-mono);font-size:10.5px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:8px;font-weight:500;border:1px solid transparent;font-family:inherit;cursor:pointer;transition:background-color 150ms cubic-bezier(.22,1,.36,1),border-color 150ms,transform 150ms}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:var(--surface)}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--border)}
+.btn-secondary:hover{background:var(--sunken);border-color:var(--border-strong)}
+.btn-ghost{background:transparent;color:var(--ink-muted)}
+.btn-ghost:hover{background:var(--accent-tint);color:var(--accent)}
+.btn-danger{background:var(--surface);color:var(--danger);border-color:var(--border)}
+.btn-danger:hover{background:var(--danger-tint)}
+.sz-sm{height:32px;padding:0 .75rem;font-size:13px}
+.sz-md{height:40px;padding:0 1rem;font-size:14px}
+.sz-lg{height:44px;padding:0 1.25rem;font-size:15px}
+
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:.1rem .5rem;font-size:11px;font-weight:500;white-space:nowrap}
+.count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--caution-fill);color:#1a1a18;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.pills{display:flex;gap:.2rem;flex-wrap:wrap}
+.pills a{border-radius:8px;padding:.32rem .68rem;font-size:13px;font-weight:500;color:var(--ink-muted);text-decoration:none;position:relative}
+.pills a[aria-current]{background:var(--accent-tint);color:var(--accent)}
+.pills a:not([aria-current]):hover{background:var(--sunken);color:var(--ink)}
+
+.tabs{display:flex;gap:.2rem;border-bottom:1px solid var(--border);overflow-x:auto}
+.tabs button{display:inline-flex;align-items:center;gap:.4rem;flex:none;border:0;border-bottom:2px solid transparent;background:none;padding:.5rem .72rem;font:inherit;font-size:13px;font-weight:500;color:var(--ink-muted);cursor:pointer}
+.tabs button[aria-current]{border-bottom-color:var(--accent);color:var(--accent)}
+
+.rail{width:190px}
+.rail h6{margin:0 0 .35rem;padding:0 .25rem;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted)}
+.rail a{display:flex;align-items:center;gap:.5rem;border-radius:8px;padding:.32rem .6rem;font-size:13px;color:var(--ink-muted);text-decoration:none}
+.rail a[aria-current]{background:var(--accent-tint);color:var(--accent);font-weight:500}
+.rail a .dot{width:10px;height:10px;border-radius:999px;flex:none}
+.rail a .n{margin-left:auto;color:var(--ink-muted);font-variant-numeric:tabular-nums;font-size:12px}
+
+.rows{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
+.rows .row{display:flex;align-items:center;gap:.75rem;padding:.6rem .75rem;border-bottom:1px solid var(--border)}
+.rows .row:last-child{border-bottom:0}
+.rows .row:hover{background:var(--sunken)}
+.rows .thumb{width:44px;height:44px;border-radius:8px;background:var(--sunken);border:1px solid var(--border);flex:none}
+.rows .main{min-width:0;flex:1}
+.rows .main b{display:block;font-size:14px;font-weight:500}
+.rows .main span{display:block;font-size:13px;color:var(--ink-muted)}
+.rows .right{text-align:right;font-variant-numeric:tabular-nums;font-size:14px;font-weight:500}
+
+.banner{display:flex;gap:.6rem;align-items:flex-start;border-radius:12px;border:1px solid var(--border);padding:.7rem .9rem;font-size:13.5px}
+.banner.info{background:var(--accent-tint)}
+.banner.warn{background:var(--caution-tint)}
+.banner.bad{background:var(--danger-tint)}
+.banner.good{background:var(--positive-tint)}
+.banner .ic{flex:none;font-size:15px;line-height:1.35}
+
+.empty{border:1px dashed var(--border-strong);border-radius:12px;background:var(--surface);padding:2.4rem 1.5rem;text-align:center}
+.empty .glyph{width:52px;height:52px;border-radius:999px;background:var(--accent-tint);margin:0 auto .85rem;display:grid;place-items:center;color:var(--accent);font-size:21px}
+.empty h5{margin:0;font-size:16px}
+.empty p{margin:.35rem auto 0;max-width:42ch;font-size:14px;color:var(--ink-muted)}
+.empty .acts{margin-top:1.1rem;display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
+
+.skel{position:relative;overflow:hidden;background:var(--border);border-radius:6px;height:12px}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background-image:linear-gradient(90deg,transparent,color-mix(in srgb,var(--surface) 70%,transparent),transparent);animation:shimmer 1.6s infinite}
+@keyframes shimmer{100%{transform:translateX(100%)}}
+
+.marks{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center}
+.marks .m{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:15px;flex:none;box-shadow:inset 0 1px 0 rgb(255 255 255 / .28)}
+
+.wsdemo{display:grid;gap:.55rem;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.wscard{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:.75rem .85rem}
+.wscard .top{display:flex;align-items:center;gap:.5rem;margin-bottom:.55rem}
+.wscard .sq{width:24px;height:24px;border-radius:8px;flex:none;display:grid;place-items:center;color:#fff;font-size:12px}
+.wscard b{font-size:13.5px}
+.wscard .pill{display:inline-block;border-radius:7px;padding:.2rem .5rem;font-size:12px;font-weight:500}
+
+.sticky-note{
+  display:inline-block;background:var(--caution-tint);border:1px solid var(--border);
+  border-radius:3px;padding:.6rem .75rem;font-size:13px;max-width:230px;
+  transform:rotate(-1.6deg);box-shadow:2px 3px 0 color-mix(in srgb,var(--ink) 8%,transparent);
+}
+.statusline{
+  display:flex;align-items:center;gap:.5rem;font-family:var(--font-mono);font-size:11.5px;
+  color:var(--ink-muted);border-top:1px solid var(--border);background:var(--sunken);
+  padding:.4rem .7rem;border-radius:0 0 12px 12px
+}
+.statusline .live{width:6px;height:6px;border-radius:999px;background:var(--positive);flex:none;animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.keyhint{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border-strong);border-bottom-width:2px;background:var(--surface);font-family:var(--font-mono);font-size:11px;color:var(--ink-muted)}
+
+.checklist{list-style:none;padding:0;max-width:72ch}
+.checklist li{padding:.5rem 0 .5rem 1.75rem;border-bottom:1px solid var(--border);position:relative;font-size:14px}
+.checklist li:last-child{border-bottom:0}
+.checklist li::before{content:"";position:absolute;left:0;top:.72rem;width:14px;height:14px;border:1.5px solid var(--border-strong);border-radius:3px}
+
+.sigil{width:88px;height:88px;border-radius:14px;background:var(--accent-tint);display:grid;place-items:center}
+
+footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13px;color:var(--ink-muted);border-top:1px solid var(--border)}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+
+<header class="doc">
+  <div class="bar">
+    <span class="mark" aria-hidden="true">◐</span>
+    <strong>Design language</strong>
+    <div class="themes" role="group" aria-label="Preview theme">
+      <button data-set="paper"    aria-pressed="true"  title="Paper — default light"    style="background:#faf9f6"></button>
+      <button data-set="ink"      aria-pressed="false" title="Ink — default dark"       style="background:#1c1b18"></button>
+      <button data-set="riso"     aria-pressed="false" title="Riso — printed light"     style="background:#f6f2e8"></button>
+      <button data-set="terminal" aria-pressed="false" title="Terminal — phosphor dark" style="background:#0e120e"></button>
+      <button data-set="dusk"     aria-pressed="false" title="Dusk — plum dark"         style="background:#1e1926"></button>
+    </div>
+  </div>
+  <nav class="toc">
+    <a href="#laws">Laws</a><a href="#personality">Personality</a><a href="#colour">Colour</a>
+    <a href="#themes">Themes</a><a href="#texture">Texture</a><a href="#type">Type</a>
+    <a href="#space">Space</a><a href="#shell">Shell</a><a href="#containers">Containers</a>
+    <a href="#data">Data</a><a href="#states">States</a><a href="#forms">Forms</a>
+    <a href="#motion">Motion</a><a href="#alive">Alive</a><a href="#a11y">A11y</a>
+    <a href="#voice">Voice</a><a href="#checklist">Checklist</a><a href="#never">Never</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Design language</h1>
+<p class="lede">
+  Personal Tracker is a <strong>quiet, honest instrument panel that belongs to one person</strong>.
+  It has the precision of a good production tool and the personality of a room someone actually
+  lives in. Those two things are usually opposites. Holding them together is the whole design brief.
+</p>
+
+<div class="demo" style="margin-top:1.5rem">
+  <div class="demo-label">Try the five themes — top right. Everything on this page is built from the tokens it documents.</div>
+  <p style="margin:0;font-size:14px;color:var(--ink-muted)">
+    This document is not a picture of the design system. It <em>is</em> the design system, running.
+    If a rule here cannot be demonstrated on this page, it is not a rule yet.
+  </p>
+</div>
+
+<h2 id="brief">The tension, stated plainly</h2>
+
+<p>
+  Most tools you admire are <strong>precise but anonymous</strong>. They are built to look correct
+  in a screenshot on someone else's laptop, so every decision trends toward the safe middle: one
+  grey, one blue, one radius, no texture, no jokes, no risk. That discipline is why they feel good
+  to use. It is also why they all feel the same.
+</p>
+<p>
+  The old web had the opposite problem. Every page was <strong>personal but incoherent</strong> —
+  your own colours, your own cursor, your own tiled background, and no craft holding it together.
+</p>
+
+<div class="rule">
+  <p>
+    <strong>This app takes the craft from the first and the ownership from the second.</strong>
+    Rigorous grid, rigorous contrast, rigorous motion — and then, inside that frame, real colour,
+    real texture, and a handful of ideas a large product would never ship because they cannot be
+    justified to a committee. This is one person's dashboard. It does not need to be justified to a
+    committee.
+  </p>
+</div>
+
+<h2 id="laws">The eight laws</h2>
+
+<p>
+  These are the product's character, not style preferences. They are what makes four unrelated
+  workspaces feel like one place. Every other section of this document is these laws applied to a
+  surface.
+</p>
+
+<div class="demo">
+  <div class="law"><span class="n">1</span><div><strong>A quiet day looks quiet.</strong>
+    <p>An empty section is not rendered — no "0 items", no empty card, no skeleton of nothing. Sections appear because they have something to say. A wholly empty page gets a real empty state, and that empty state is allowed to be beautiful.</p></div></div>
+  <div class="law"><span class="n">2</span><div><strong>Never lie by omission.</strong>
+    <p>If a source failed, say so in place. A short list and a broken list look identical, and that is the worst failure this app can have. Stale mirror, mid-flight sync, a statistic too young to mean anything — the page says it, where it happened.</p></div></div>
+  <div class="law"><span class="n">3</span><div><strong>Never invent precision.</strong>
+    <p>A task due "Tuesday" shows "Tuesday", not "Tuesday 00:00". A role never matched shows nothing, not "0/0". No prior period shows "No prior period to compare", not "0%".</p></div></div>
+  <div class="law"><span class="n">4</span><div><strong>Colour is a claim.</strong>
+    <p>Green means money came back — never spending, never generic success. The pipeline hues mean one stage each and appear nowhere else. Workspace accent means "you are here". If you need a colour and none of the meanings is true, use ink and a shape.</p></div></div>
+  <div class="law"><span class="n">5</span><div><strong>View state lives in the URL.</strong>
+    <p>Filters, search, sort, grouping, tabs, pagination — query parameters, all of them. A narrowed view survives a refresh, the back button, and being pasted into a note. Component state is for the genuinely ephemeral: an open menu, a confirm step, an unsent draft.</p></div></div>
+  <div class="law"><span class="n">6</span><div><strong>It works before JavaScript does.</strong>
+    <p>Search and filters are GET forms and links. Server components render data. Client components exist for interaction, not fetching. A slow connection degrades to a working page, not a spinner.</p></div></div>
+  <div class="law"><span class="n">7</span><div><strong>Personality lives in the chrome, never in the data.</strong>
+    <p>Texture, colour, whimsy and motion belong to the frame: nav, empty states, marks, themes, transitions. The numbers themselves are set plainly, in tabular figures, on a clean ground. <em>Decorate the room, not the instruments.</em></p></div></div>
+  <div class="law"><span class="n">8</span><div><strong>Reasoning goes in the code.</strong>
+    <p>Every non-obvious decision carries a comment saying <em>why</em>, in the file where it lives. This codebase is unusually good at that and it must stay that way — it is the only thing stopping the next contributor from re-deriving a decision badly.</p></div></div>
+</div>
+
+<h2 id="personality">Personality, and the contract that keeps it usable</h2>
+
+<p>
+  Law 7 is the one doing the load-bearing work, so it gets its own section. Whimsy in a data tool
+  fails when it competes with the data. It succeeds when it occupies the space around the data that
+  would otherwise be dead air.
+</p>
+
+<h4>Where personality is welcome</h4>
+<ul>
+  <li>The <strong>frame</strong>: top bar, workspace marks, the switcher, focus rings, the status line.</li>
+  <li>The <strong>ground</strong>: texture, theme, canvas colour.</li>
+  <li><strong>Empty and finished states</strong> — the moments where there is genuinely nothing to read.</li>
+  <li><strong>Transitions</strong> between states, and the feel of a control under the hand.</li>
+  <li><strong>Anything the user explicitly turned on.</strong></li>
+</ul>
+
+<h4>Where it is forbidden</h4>
+<ul>
+  <li>Anywhere a <strong>number, date, amount or status</strong> is being read.</li>
+  <li>Any surface where the user is <strong>deciding something</strong> — a review queue, a confirm, a form.</li>
+  <li>Anything that <strong>delays</strong> the user by even 100ms to be charming.</li>
+  <li>Anything a person cannot turn off if it stops being charming on the four-hundredth viewing.</li>
+</ul>
+
+<div class="split">
+  <div class="do"><h5>Do</h5>
+    <p>A hand-drawn underline under the active nav item — chrome, static, costs nothing, and is different in every workspace.</p>
+    <p>A generative sigil on the "nothing needs you today" state — a moment that is otherwise empty.</p>
+  </div>
+  <div class="dont"><h5>Don't</h5>
+    <p>A wobble on the spend figure. That figure is the reason the page exists; it gets tabular numerals and nothing else.</p>
+    <p>A confetti burst on completing a task. Fine once; it is contempt by the fiftieth time.</p>
+  </div>
+</div>
+
+<div class="rule">
+  <p>
+    <strong>The one-second rule.</strong> Any flourish must be over in under a second, must never
+    block input, and must vanish entirely under <code>prefers-reduced-motion</code>. If it cannot
+    meet all three, it is not a flourish, it is an obstacle.
+  </p>
+</div>
+
+<h2 id="colour">Colour</h2>
+
+<p>
+  Every colour is a token in <code>app/globals.css</code>, and every token is defined
+  <strong>twice</strong> — once per theme. <strong>Never write a raw Tailwind palette class.</strong>
+  No <code>bg-emerald-50</code>, no <code>text-amber-700</code>, no <code>border-red-200</code>: a
+  raw palette colour is a colour that cannot follow the theme, and it will be wrong in four of the
+  five themes the moment it is written.
+</p>
+
+<h3>The ground and the ink</h3>
+
+<p>
+  Four grounds and three inks. That is the entire neutral system, and it is enough because depth
+  comes from a hairline border, not from a shadow.
+</p>
+
+<div class="demo">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:var(--sunken);border-bottom:1px solid var(--border)"></div><div class="meta"><b>sunken</b><span>--sunken</span>hover, wells, code</div></div>
+    <div class="sw"><div class="chip" style="background:var(--canvas);border-bottom:1px solid var(--border)"></div><div class="meta"><b>canvas</b><span>--canvas</span>the page ground</div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface);border-bottom:1px solid var(--border)"></div><div class="meta"><b>surface</b><span>--surface</span>cards, rows, bars</div></div>
+    <div class="sw"><div class="chip" style="background:var(--raised);border-bottom:1px solid var(--border)"></div><div class="meta"><b>raised</b><span>--raised</span>menus, popovers</div></div>
+    <div class="sw"><div class="chip" style="background:var(--ink)"></div><div class="meta"><b>ink</b><span>--ink</span>what the row is</div></div>
+    <div class="sw"><div class="chip" style="background:var(--ink-muted)"></div><div class="meta"><b>ink-muted</b><span>--ink-muted</span>everything supporting</div></div>
+    <div class="sw"><div class="chip" style="background:var(--ink-faint)"></div><div class="meta"><b>ink-faint</b><span>--ink-faint</span>decoration only</div></div>
+  </div>
+</div>
+
+<div class="rule">
+  <p>
+    <strong>The three-ink rule.</strong> <code>ink</code> is what the row <em>is</em>.
+    <code>ink-muted</code> is everything that supports it — and it is <em>the only grey allowed to
+    carry information you would miss</em>. <code>ink-faint</code> is decoration: placeholders,
+    disabled controls, redundant glyphs, hairline dividers.
+    <em>A count, a timestamp, a table header or a hint is information, and takes
+    <code>ink-muted</code>.</em> This one substitution fixes roughly 130 sub-threshold contrast
+    failures in the current code.
+  </p>
+</div>
+
+<h3>Workspace accents — the app changes colour with the room</h3>
+
+<p>
+  This is the single most visible personal touch, and the one a large product would refuse. Each
+  workspace owns a hue. It tints the nav's active state, the rail, the focus ring, links and the
+  workspace mark — so you know where you are peripherally, before you read a word. Switching
+  workspace does not just change the content; it changes the light in the room.
+</p>
+
+<div class="demo">
+  <div class="wsdemo">
+    <div class="wscard" style="--accent:var(--w-shopping);--accent-tint:var(--w-shopping-tint)">
+      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-shopping),var(--caution-fill))">🛍</span><b>Shopping</b></div>
+      <span class="pill" style="background:var(--w-shopping-tint);color:var(--w-shopping)">Inventory</span>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">ember — <code>--w-shopping</code></p>
+    </div>
+    <div class="wscard">
+      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-jobs),var(--accent-soft))">💼</span><b>Job search</b></div>
+      <span class="pill" style="background:var(--w-jobs-tint);color:var(--w-jobs)">Pipeline</span>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">plum — <code>--w-jobs</code></p>
+    </div>
+    <div class="wscard">
+      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-todo),var(--accent-soft))">✓</span><b>Todo</b></div>
+      <span class="pill" style="background:var(--w-todo-tint);color:var(--w-todo)">Agenda</span>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">moss — <code>--w-todo</code></p>
+    </div>
+    <div class="wscard">
+      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-vault),var(--w-shopping))">📓</span><b>Vault</b></div>
+      <span class="pill" style="background:var(--w-vault-tint);color:var(--w-vault)">Notes</span>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">ochre — <code>--w-vault</code></p>
+    </div>
+  </div>
+</div>
+
+<h4>How it works mechanically</h4>
+<pre><code><span class="c">/* The shell sets one variable. Nothing below it knows or cares. */</span>
+&lt;div data-workspace=<span class="s">"shopping"</span>&gt;   <span class="c">// → --accent: var(--w-shopping)</span>
+
+<span class="c">/* Components only ever reference --accent. Never --w-shopping directly. */</span>
+.nav-item[aria-current] { background: var(--accent-tint); color: var(--accent); }</code></pre>
+
+<div class="rule">
+  <p>
+    <strong>Chrome takes the accent; content takes its own meaning.</strong> The jobs workspace is
+    plum — but a pipeline card is still <em>submitted-blue</em>, because that colour is a claim
+    about the pursuit, not about where you are standing. When accent and semantic colour meet, the
+    semantic one wins and the accent retreats to the frame. This is the rule that stops per-workspace
+    colour becoming per-workspace chaos.
+  </p>
+</div>
+
+<h3>Semantic colour</h3>
+
+<div class="demo">
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:var(--positive)"></div><div class="meta"><b>positive</b><span>--positive</span>refunds, savings, offer</div></div>
+    <div class="sw"><div class="chip" style="background:var(--caution)"></div><div class="meta"><b>caution</b><span>--caution</span>needs attention</div></div>
+    <div class="sw"><div class="chip" style="background:var(--caution-fill)"></div><div class="meta"><b>caution-fill</b><span>--caution-fill</span>count badges</div></div>
+    <div class="sw"><div class="chip" style="background:var(--danger)"></div><div class="meta"><b>danger</b><span>--danger</span>destructive, rejected</div></div>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem;align-items:center">
+    <span class="badge" style="background:var(--positive-tint);color:var(--positive)">+ $42.00 refunded</span>
+    <span class="badge" style="background:var(--caution-tint);color:var(--caution)">Return window closes Friday</span>
+    <span class="badge" style="background:var(--danger-tint);color:var(--danger)">Rejected</span>
+    <span class="count">7</span>
+    <span style="font-size:12px;color:var(--ink-muted)">← count badge: dark ink on the fill, never white</span>
+  </div>
+</div>
+
+<div class="rule">
+  <p>
+    <strong>Green means money came back.</strong> Money leaving is not a positive event, so spend is
+    never green — not when it falls, not when it is under budget. Green is also not a generic
+    "success" colour: a saved form does not turn green, it just saves. The only other place green
+    is allowed is the pipeline's <code>offer</code> status, which has earned it.
+  </p>
+</div>
+
+<h3>Pipeline status — seven hues, one meaning each</h3>
+
+<p>
+  On the job board a colour is a claim about where a pursuit stands. The map lives in
+  <code>globals.css</code> and is consumed in exactly one component,
+  <code>components/jobs/ui/status-badge.tsx</code>. These seven may not be reused for anything
+  else, anywhere, in any theme. Each is legible on its own tint in both light and dark.
+</p>
+
+<div class="demo">
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+    <span class="badge" style="background:var(--s-lead-tint);color:var(--s-lead)">Lead</span>
+    <span class="badge" style="background:var(--s-submitted-tint);color:var(--s-submitted)">Submitted</span>
+    <span class="badge" style="background:var(--s-process-tint);color:var(--s-process)">In process</span>
+    <span class="badge" style="background:var(--s-final-tint);color:var(--s-final)">Final round</span>
+    <span class="badge" style="background:var(--s-offer-tint);color:var(--s-offer)">Offer</span>
+    <span class="badge" style="background:var(--s-rejected-tint);color:var(--s-rejected)">Rejected</span>
+    <span class="badge" style="background:transparent;color:var(--s-ghosted);border:1px solid var(--border-strong)">Ghosted</span>
+  </div>
+  <table class="spec" style="margin-top:1rem">
+    <thead><tr><th>Status</th><th>The claim</th><th>Light ink / ground</th><th>Dark ink / ground</th><th>On tint</th></tr></thead>
+    <tbody>
+      <tr><td>lead · drafting</td><td>Yours to move, not theirs</td><td><code>#6f6864</code> / <code>#f5f5f4</code></td><td><code>#b6aca6</code> / <code>#26241f</code></td><td class="pass">5.0</td></tr>
+      <tr><td>submitted · acknowledged</td><td>Sent; nothing has happened yet</td><td><code>#2563eb</code> / <code>#eff6ff</code></td><td><code>#8ab0ff</code> / <code>#161d33</code></td><td class="pass">4.8</td></tr>
+      <tr><td>in_process</td><td>A human is involved</td><td><code>#b45309</code> / <code>#fffbeb</code></td><td><code>#e8a84e</code> / <code>#2a2113</code></td><td class="pass">4.8</td></tr>
+      <tr><td>final_round</td><td>Nearly there</td><td><code>#7c3aed</code> / <code>#f5f3ff</code></td><td><code>#bfa0ff</code> / <code>#231a38</code></td><td class="pass">5.2</td></tr>
+      <tr><td>offer</td><td>Offer</td><td><code>#047857</code> / <code>#ecfdf5</code></td><td><code>#62c79a</code> / <code>#12261d</code></td><td class="pass">5.2</td></tr>
+      <tr><td>rejected</td><td>Information, not alarm</td><td><code>#b91c1c</code> / <code>#fef2f2</code></td><td><code>#f08a8a</code> / <code>#2d1919</code></td><td class="pass">5.9</td></tr>
+      <tr><td>ghosted · role_closed</td><td>A non-answer</td><td><code>#78716c</code> / <em>outline</em></td><td><code>#a9a19b</code> / <em>outline</em></td><td class="pass">4.6</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px;color:var(--ink-muted);margin-top:.6rem">
+    <strong>Ghosted is drained by carrying less ink, not less contrast.</strong> It is the one badge
+    rendered as an outline with no fill. A washed-out grey nobody can read is not "quiet", it is
+    broken — and that is exactly what the current <code>#a8a29e</code> on <code>#fafaf9</code>
+    (2.4:1) is.
+  </p>
+</div>
+
+<h3>Contrast is a hard gate, in every theme</h3>
+
+<table class="spec">
+  <thead><tr><th>Use</th><th>Minimum</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Text under 18px, or under 14px bold</td><td><strong>4.5:1</strong></td><td>Effectively everything in this app.</td></tr>
+    <tr><td>Display figures 24px+</td><td>3:1</td><td>The one headline number per page.</td></tr>
+    <tr><td>Icons, meaningful borders, focus rings, chart marks</td><td>3:1</td><td>Status dots, input borders, series colours.</td></tr>
+    <tr><td>Purely decorative</td><td>none</td><td>Gradient marks, grain, the shimmer.</td></tr>
+  </tbody>
+</table>
+
+<div class="rule">
+  <p>
+    <strong>A new theme is not done until every pair has been measured.</strong> Ship the checker
+    with the theme: a script that walks the token pairs and fails the build on anything under
+    threshold. Five themes is five times the surface for a contrast bug to hide in, and "it looked
+    fine on my screen" is how all of them get shipped.
+  </p>
+</div>
+
+<h2 id="themes">Themes</h2>
+
+<p>
+  A theme is a small, closed set of variables — four grounds, three inks, two borders, an accent
+  family, four workspace hues, a texture and its opacity. Nothing else. That constraint is what
+  makes a theme something a person could plausibly write themselves, which is the entire point.
+</p>
+
+<pre><code><span class="c">/* The whole contract. Anything not in this list is derived. */</span>
+[data-theme=<span class="s">"yours"</span>] {
+  color-scheme: light | dark;
+  --canvas --surface --raised --sunken
+  --border --border-strong
+  --ink --ink-muted --ink-faint
+  --accent --accent-hover --accent-tint --accent-soft
+  --w-shopping --w-jobs --w-todo --w-vault  <span class="c">(+ their tints)</span>
+  --positive --caution --danger             <span class="c">(+ their tints)</span>
+  --texture --grain-opacity --grain-blend
+  --font-ui --font-display --font-mono      <span class="c">(optional)</span>
+}</code></pre>
+
+<h4>The five that ship</h4>
+<table class="spec">
+  <thead><tr><th>Theme</th><th>Mood</th><th>Ground</th><th>Texture</th><th>For</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Paper</strong></td><td>Warm, quiet, printed</td><td>Light <code>#faf9f6</code></td><td>Fine grain, 3.5%</td><td>The default. Daylight, long sessions.</td></tr>
+    <tr><td><strong>Ink</strong></td><td>Warm near-black, not cold grey</td><td>Dark <code>#141311</code></td><td>Grain, 5%, overlay</td><td>The default dark. Evening.</td></tr>
+    <tr><td><strong>Riso</strong></td><td>Duotone print, high chroma</td><td>Cream <code>#f6f2e8</code></td><td>Halftone dots, 11%</td><td>The loudest one. Deliberately imperfect.</td></tr>
+    <tr><td><strong>Terminal</strong></td><td>Phosphor green, monospace display</td><td>Near-black <code>#080a08</code></td><td>Grain, 7%</td><td>Focus. Also the joke, and it is allowed to be.</td></tr>
+    <tr><td><strong>Dusk</strong></td><td>Plum-cast dark, soft edges</td><td>Dark <code>#16121c</code></td><td>Grain, 6%</td><td>Late. Lower contrast ceiling, still AA.</td></tr>
+  </tbody>
+</table>
+
+<h4>Rules</h4>
+<ul>
+  <li><strong>Themes are named, not numbered.</strong> "Riso", not "Theme 3". A named thing is a thing you choose; a numbered thing is a setting you tolerate.</li>
+  <li><strong>Default follows the system</strong> (<code>prefers-color-scheme</code>) until the user picks. Once they pick, that choice sticks and the system preference stops mattering.</li>
+  <li>The choice lives on <code>core.account_settings</code>, so it follows the account across devices — and is mirrored into a cookie so the server renders the right theme on first paint. <strong>A theme that flashes white before going dark is worse than no dark mode.</strong></li>
+  <li><strong>Every theme must pass the same contrast gate.</strong> There is no "expressive theme" exemption. Riso is louder <em>and</em> passes.</li>
+  <li>The picker previews live on hover — you see the room before you move into it.</li>
+</ul>
+
+<h2 id="texture">Texture and material</h2>
+
+<p>
+  One fixed, non-interactive grain layer over the whole viewport. It is the difference between a
+  surface and a void, and it costs a single <code>::before</code> with an inline SVG — no image
+  request, no layout, no repaint.
+</p>
+
+<pre><code>body::before {
+  content: <span class="s">""</span>; position: fixed; inset: 0;
+  z-index: 9999; pointer-events: none;          <span class="c">/* never intercepts a click */</span>
+  background-image: var(--texture);
+  opacity: var(--grain-opacity);                 <span class="c">/* 3–11%, per theme */</span>
+  mix-blend-mode: var(--grain-blend);            <span class="c">/* multiply light, overlay dark */</span>
+}</code></pre>
+
+<ul>
+  <li><strong>3–5% on the neutral themes. 11% on Riso, where it is the point.</strong> Above ~12% it stops reading as material and starts reading as a rendering bug.</li>
+  <li><code>pointer-events: none</code> is not optional — a full-viewport overlay that swallows clicks is a catastrophic, hard-to-diagnose bug.</li>
+  <li>The texture never sits <em>between</em> the user and text they are reading closely. Long-form prose — a vault note — lifts onto <code>--surface</code>, which the grain sits over at a lower effective contrast because the surface is lighter. If it ever reduces legibility, the grain loses.</li>
+  <li>No texture inside charts, tables, or any element the user is measuring by eye.</li>
+</ul>
+
+<h4>Other materials, used sparingly</h4>
+<ul>
+  <li><strong>Inset accent bar</strong> — <code>box-shadow: inset 3px 0 0 {colour}</code> on a thumbnail or row. Already in the inventory row and it is one of the best details in the app.</li>
+  <li><strong>Keycap borders</strong> — a 2px bottom border on the keyboard-hint chips, so they read as physical. <span class="keyhint">⌘</span> <span class="keyhint">K</span></li>
+  <li><strong>Paper offset shadow</strong> — a hard, un-blurred 2px offset shadow, only on things pretending to be paper (marginalia). Never on cards.</li>
+</ul>
+
+<h2 id="type">Typography</h2>
+
+<p>
+  Three families. <strong>Inter</strong> does all the work. <strong>Instrument Serif</strong> is the
+  voice — page titles and the one big figure, and nothing else. <strong>A mono</strong> for the
+  status line, keycaps, and anything that is literally a machine talking.
+</p>
+
+<div class="demo">
+  <p style="font-family:var(--font-display);font-style:var(--display-style);font-size:44px;line-height:1.06;margin:0;letter-spacing:-.02em;font-weight:400">You already own two of these.</p>
+  <p style="margin:.7rem 0 0;font-size:14px;color:var(--ink-muted);max-width:56ch">The display face is where the app stops sounding like software. Use it big or not at all — Instrument Serif at 13px is just a serif, and a serif at 13px in a data table is a mistake.</p>
+  <p class="tabular" style="font-family:var(--font-display);font-style:var(--display-style);font-size:52px;margin:1.2rem 0 0;letter-spacing:-.025em;font-weight:400">$1,284.60</p>
+  <p style="margin:.2rem 0 0;font-size:13px;color:var(--ink-muted)">One figure per page. Tabular. Display family. This is the thing the page is <em>for</em>.</p>
+</div>
+
+<div class="rule">
+  <p>
+    <strong>Use the named steps. Never write <code>text-[Npx]</code>.</strong> The code currently
+    carries six arbitrary sizes plus four Tailwind names, and <code>text-sm</code> (14px) and
+    <code>text-[13px]</code> are used interchangeably for the same role in different files. That
+    ambiguity is what this scale exists to remove.
+  </p>
+</div>
+
+<table class="spec">
+  <thead><tr><th>Token</th><th>Size</th><th>Family</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td><code>text-micro</code></td><td>11px</td><td>UI</td><td>Badges, counts, uppercase eyebrows, table headers. Eyebrows also take <code>tracking-wider</code>.</td></tr>
+    <tr><td><code>text-small</code></td><td>12px</td><td>UI</td><td>Row metadata, field hints, timestamps, secondary detail.</td></tr>
+    <tr><td><code>text-ui</code></td><td>13px</td><td>UI</td><td><strong>The default for chrome.</strong> Nav, rail, table cells, list rows, small buttons, menu items.</td></tr>
+    <tr><td><code>text-body</code></td><td>14px</td><td>UI</td><td><strong>The default for content.</strong> Page descriptions, prose, inputs, empty-state copy, banners.</td></tr>
+    <tr><td><code>text-lead</code></td><td>15px</td><td>UI</td><td>Card titles, module names, the workspace label.</td></tr>
+    <tr><td><code>text-title</code></td><td>22px</td><td><strong>Display</strong></td><td>Page title (<code>h1</code>). <code>tracking-tight</code>.</td></tr>
+    <tr><td><code>text-figure</code></td><td>32 / 52px</td><td><strong>Display</strong></td><td>The single headline number. <code>tabular</code>. At most one per screen.</td></tr>
+    <tr><td><code>text-machine</code></td><td>11.5px</td><td><strong>Mono</strong></td><td>Status line, keycaps, IDs, paths, raw values.</td></tr>
+  </tbody>
+</table>
+
+<h4>Numbers</h4>
+<p>
+  <strong>Anything in a column of numbers takes <code>.tabular</code>.</strong> Money, counts, dates,
+  percentages, ages, durations. A column of proportional digits that shifts as it updates is the
+  cheapest possible way to make a dashboard feel unreliable. Money is always formatted through
+  <code>lib/money.ts</code> — never an inline <code>toFixed</code>.
+</p>
+
+<h2 id="space">Space, radius, depth</h2>
+
+<p>Everything on a 4px grid. This table is all a new component should need.</p>
+
+<table class="spec">
+  <thead><tr><th>Measure</th><th>Value</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>Page gutter</td><td><code>px-4 sm:px-6</code></td><td>The <code>main</code> in every shell layout.</td></tr>
+    <tr><td>Page top / bottom</td><td><code>py-6</code></td><td>Same.</td></tr>
+    <tr><td>Rail ↔ content</td><td><code>gap-6</code></td><td>The two-column filter layout.</td></tr>
+    <tr><td>Between unrelated sections</td><td><code>space-y-6</code></td><td></td></tr>
+    <tr><td>Between related cards</td><td><code>gap-4</code></td><td></td></tr>
+    <tr><td>Card padding — standard</td><td><code>p-5</code></td><td>A card the eye rests on: dashboard tiles, settings sections.</td></tr>
+    <tr><td>Card padding — dense</td><td><code>p-4</code></td><td>A card holding a list: agenda piles, today sections.</td></tr>
+    <tr><td>List row</td><td><code>px-3 py-2.5</code></td><td>Rows inside a bordered list.</td></tr>
+    <tr><td>Table cell</td><td><code>px-2 py-1.5</code></td><td>Dense tables.</td></tr>
+    <tr><td>Under the page header</td><td><code>mb-5</code></td><td>Owned by <code>PageHeader</code>. Do not add your own.</td></tr>
+  </tbody>
+</table>
+
+<table class="spec">
+  <thead><tr><th>Radius</th><th>Value</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td><code>rounded-card</code></td><td>12px</td><td>Cards, panels, bordered lists, banners, empty states.</td></tr>
+    <tr><td><code>rounded-lg</code></td><td>8px</td><td>Buttons, inputs, nav pills, rail items, menus, thumbnails.</td></tr>
+    <tr><td><code>rounded-md</code> · <code>rounded</code></td><td>6px · 4px</td><td>Elements nested inside a control.</td></tr>
+    <tr><td><code>rounded-full</code></td><td>—</td><td>Badges, counts, avatars, status dots, icon buttons.</td></tr>
+  </tbody>
+</table>
+
+<div class="rule">
+  <p>
+    <strong>No shadow at rest.</strong> Depth is a 1px border on a surface over a canvas. Shadow
+    exists only for things genuinely floating — menus and popovers — and transiently on
+    <code>lift</code> hover. A card with a resting drop shadow is wrong in every theme, and in the
+    dark themes it is invisible as well as wrong.
+  </p>
+</div>
+
+<h2 id="shell">The shell</h2>
+
+<h3>Top bar</h3>
+
+<p>
+  <strong>One component</strong>, <code>&lt;WorkspaceNav&gt;</code>, configured per module. There
+  must never again be four near-identical copies — that is how Todo lost its notifications button
+  and Jobs ended up a pixel smaller than everyone else.
+</p>
+
+<pre><code>&lt;<span class="k">WorkspaceNav</span>
+  module=<span class="s">"jobs"</span>                 <span class="c">// sets data-workspace → --accent</span>
+  sections={JOB_SECTIONS}       <span class="c">// [{ href, label, exact?, badge? }]</span>
+  settingsHref=<span class="s">"/jobs/settings"</span>
+  displayName={...} email={...} enabledModules={...}
+/&gt;</code></pre>
+
+<p>Left to right, and this order is fixed:</p>
+<ol>
+  <li><strong>Workspace mark and switcher</strong> — which workspace, and the way out.</li>
+  <li><strong>Section navigation</strong> — where in it.</li>
+  <li><strong>Notifications, feedback</strong> — cross-cutting, identical everywhere.</li>
+  <li><strong>Module settings (gear)</strong>, then <strong>account (avatar)</strong>.</li>
+</ol>
+
+<div class="rule">
+  <p>
+    <strong>Two settings entries, and the line is fixed:</strong> the gear is this module's
+    settings; the avatar is the account's. A setting belongs to the account if it would still mean
+    anything with the module switched off — your name, timezone, display currency, <em>theme</em>.
+    Everything else belongs to the module it is about.
+  </p>
+</div>
+
+<div class="demo on-canvas">
+  <div class="demo-label">Section nav — active state carries the workspace accent</div>
+  <div class="pills">
+    <a href="#shell">Dashboard</a>
+    <a href="#shell" aria-current="page">Inventory</a>
+    <a href="#shell">Orders</a>
+    <a href="#shell">Returns</a>
+    <a href="#shell">Review <span class="count" style="margin-left:.3rem">3</span></a>
+  </div>
+</div>
+
+<h4>Section nav rules</h4>
+<ul>
+  <li>Pill. Active is <code>bg-accent-tint text-accent</code>; rest <code>text-ink-muted</code> with <code>hover:bg-sunken hover:text-ink</code>. Always <code>text-ui</code> (13px) — never <code>text-sm</code>.</li>
+  <li><code>aria-current="page"</code> on the active item. Always.</li>
+  <li>Prefix match by default; <code>exact</code> where an href is a parent of the others (<code>/todo</code>, <code>/vault</code>).</li>
+  <li><strong>A badge only where an unattended count causes silent data damage.</strong> Review has earned one — an unworked queue is how the dashboard quietly becomes wrong. Nothing else has. Badges are <code>caution-fill</code> with dark ink, never white on orange (2.3:1).</li>
+  <li><strong>Eight sections is the ceiling.</strong> Past that, group them or move something into module settings. Jobs has ten and it is the app's worst surface on a phone.</li>
+  <li>On overflow: horizontal scroll, an edge fade, and <code>scrollIntoView({ block:'nearest', inline:'center' })</code> on the active item at mount. <strong>A user must never land on a page whose own tab is off-screen with no cue that it exists.</strong></li>
+</ul>
+
+<h3 id="switcher">The workspace mark and switcher</h3>
+
+<p>
+  The most-repeated navigation in a four-workspace app, so it gets real attention. It is
+  <strong>one mark, one label, one chevron — one hit target</strong>. Home is the first row of the
+  menu, not a second mystery square beside the first.
+</p>
+
+<div class="demo">
+  <div class="demo-label">The mark: workspace gradient as field, workspace glyph knocked out</div>
+  <div class="marks">
+    <span class="m" style="background-image:linear-gradient(135deg,var(--accent-soft),var(--w-jobs))">◐</span>
+    <span class="m" style="background-image:linear-gradient(135deg,var(--w-shopping),var(--caution-fill))">🛍</span>
+    <span class="m" style="background-image:linear-gradient(135deg,var(--w-jobs),var(--accent-soft))">💼</span>
+    <span class="m" style="background-image:linear-gradient(135deg,var(--w-todo),var(--accent-soft))">✓</span>
+    <span class="m" style="background-image:linear-gradient(135deg,var(--w-vault),var(--w-shopping))">📓</span>
+    <span style="font-size:12.5px;color:var(--ink-muted)">Home · Shopping · Jobs · Todo · Vault</span>
+  </div>
+  <p style="font-size:13.5px;color:var(--ink-muted);margin-top:.9rem;max-width:66ch">
+    In the real component the glyph is the module's Lucide icon in white, not an emoji. The gradient
+    alone was decoration — three of the four current gradients start on the same blue, so a hue is
+    not something a person can identify a workspace by. <strong>The glyph is the mnemonic; the
+    gradient is the mood.</strong>
+  </p>
+</div>
+
+<div class="rule">
+  <p>
+    <strong>One icon language per module, everywhere.</strong> Switcher, home tiles and the Account
+    workspace toggles all use the same Lucide glyph for a given module. Glyph, gradient, accent,
+    label and description all live in <code>lib/modules.ts</code> and are read from there — that
+    list exists precisely so a second list cannot drift out of sync with it.
+  </p>
+</div>
+
+<h4>The menu</h4>
+<ul>
+  <li><strong>Every row carries a live count</strong> — "6 open pursuits", "3 due today", "2 to review". The switcher is the only surface that can answer <em>"is anything happening in the workspaces I am not looking at"</em>, so it should. Those figures already exist on the home page; extract one <code>loadModuleCounts()</code> and share it.</li>
+  <li>Rows: mark, label, description, count, check on the current one.</li>
+  <li>The current module is always listed, even when switched off in Account. You can only be there by URL, and a menu that will not admit where you are is worse than one showing a hidden module.</li>
+  <li><strong>Switching returns you where you were</strong> in that workspace, not to its home, when a last path is known.</li>
+  <li>Keyboard: <code>↑↓</code> move, <code>Home</code>/<code>End</code> jump, <code>Enter</code> activates, <code>Esc</code> closes and returns focus to the trigger. Roving <code>tabindex</code> — a <code>role="menu"</code> that is really a list of tab stops lies to a screen reader.</li>
+  <li><span class="keyhint">⌘</span><span class="keyhint">K</span> opens it. <span class="keyhint">⌘</span><span class="keyhint">1</span>–<span class="keyhint">4</span> jump straight to a workspace.</li>
+</ul>
+
+<h3>Notifications, feedback, account</h3>
+
+<div class="rule">
+  <p>
+    <strong>The bell only exists once it has something to say.</strong> A permanently empty
+    notifications panel teaches people to stop looking, and by the time the first real notification
+    arrives nobody will see it. Either it is wired to real events or it is not rendered. It is
+    currently furniture on three of four navs.
+  </p>
+</div>
+
+<p>What belongs in it — all of these already happen, and are currently shouted as full-width page banners instead:</p>
+<ul>
+  <li>A Gmail sync finished, and what it found.</li>
+  <li>A return window closes in <em>n</em> days.</li>
+  <li>An interview is tomorrow and has no prep notes.</li>
+  <li>The vault token expired and nothing has mirrored since a date.</li>
+  <li>The review queue crossed a threshold.</li>
+</ul>
+<p>
+  A notification is <strong>one line, written as the thing that happened</strong>, optionally a
+  detail line and a link to where it happened. Not "You have 1 new notification" — "Your Amazon
+  return window closes Friday".
+</p>
+
+<h4>Popover contract</h4>
+<ul>
+  <li>Trigger: 32px round icon button, <code>aria-expanded</code>, <code>aria-haspopup="dialog"</code>, active state <code>bg-accent-tint text-accent</code>.</li>
+  <li>Panel: <code>rounded-card border bg-raised shadow-lg</code>.</li>
+  <li><strong>Below <code>sm</code> it pins to the viewport</strong> (<code>fixed inset-x-4 top-16</code>), not to the trigger. Anchored to a right-hand button it hangs off the left edge of a phone, where nothing can scroll it back and Safari answers a focused field by zooming the whole page out to reach it.</li>
+  <li>Closes on <code>Esc</code> and outside click; the outside-click listener attaches on a deferred tick so the opening click does not immediately close it.</li>
+  <li><strong>Focus moves into the panel on open, is trapped while open, and returns to the trigger on close.</strong> <code>aria-modal="true"</code>. This is the part currently missing everywhere.</li>
+</ul>
+
+<h4>Account</h4>
+<p>
+  The avatar is the account initial on <code>bg-accent-tint</code>, linking to <code>/account</code>.
+  <strong><code>/account</code> must always offer sign-out.</strong> Sign-out currently lives only in
+  Shopping settings, so a user who switches Shopping off has no way to sign out — an account-level
+  action can never live inside a module.
+</p>
+
+<h3 id="widths">Page widths</h3>
+<table class="spec">
+  <thead><tr><th>Width</th><th>Use</th><th>Examples</th></tr></thead>
+  <tbody>
+    <tr><td><code>max-w-[1400px]</code></td><td>Set by the shell. Anything with a filter rail, table, board or card grid.</td><td>Inventory, Orders, Pipeline, Roles, Dashboard</td></tr>
+    <tr><td><code>max-w-3xl</code></td><td>Read top to bottom in one column. Nest inside the shell with <code>mx-auto</code>.</td><td>Agenda, All tasks, a note, a role, Sell</td></tr>
+    <tr><td><code>max-w-2xl</code></td><td>A single focused form.</td><td>New order, new role, onboarding</td></tr>
+  </tbody>
+</table>
+<p><strong>Choose one and say why in a comment.</strong> These are currently applied per page with no stated rule, which is how the same kind of page ends up two different widths in two workspaces.</p>
+
+<h2 id="containers">Containers</h2>
+
+<div class="rule">
+  <p>
+    <strong>Use <code>&lt;Card&gt;</code>. Do not hand-write the utility string.</strong> The
+    primitive exists and is used about twelve times; <code>rounded-card border border-border
+    bg-surface</code> is hand-written in over a hundred places — fifteen in one file. That is why
+    card padding is currently <code>p-3</code>, <code>p-4</code>, <code>p-5</code> and
+    <code>p-8</code> depending on who wrote it, and why nothing can be restyled centrally.
+  </p>
+</div>
+
+<pre><code>&lt;<span class="k">Card</span> padding=<span class="s">"dense"</span>&gt;                    <span class="c">// "standard" | "dense" | "none"</span>
+  &lt;<span class="k">CardHeader</span> title=<span class="s">"Where it went"</span> action={...} /&gt;
+  &lt;<span class="k">CardBody</span>&gt;…&lt;/<span class="k">CardBody</span>&gt;
+&lt;/<span class="k">Card</span>&gt;
+
+<span class="c">// Headerless is first-class — most cards do not need a title bar.</span>
+&lt;<span class="k">Card</span> padding=<span class="s">"standard"</span>&gt;…&lt;/<span class="k">Card</span>&gt;</code></pre>
+
+<div class="demo on-canvas">
+  <div class="demo-label">Card · standard padding · no shadow at rest</div>
+  <div style="border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:1.25rem;max-width:340px">
+    <div style="font-size:13px;font-weight:600">Spent · this month</div>
+    <p class="tabular" style="font-family:var(--font-display);font-style:var(--display-style);font-size:40px;margin:.5rem 0 0;letter-spacing:-.02em;font-weight:400">$1,284.60</p>
+    <p style="margin:.4rem 0 0;font-size:13px;color:var(--ink-muted)">14 orders · $86.40 refunded</p>
+    <p style="margin:.5rem 0 0;font-size:13px;color:var(--ink-muted)"><span style="color:var(--positive);font-weight:600">↓ 12%</span> vs prior period</p>
+  </div>
+</div>
+
+<h3>Banners</h3>
+<p>
+  One component, four tones. The codebase currently has three unrelated banner implementations, one
+  of them in raw <code>emerald-50</code> with no token in sight.
+</p>
+
+<div class="demo">
+  <div style="display:flex;flex-direction:column;gap:.55rem">
+    <div class="banner info"><span class="ic">◐</span><div><strong>Sync running.</strong> Checking Gmail for new orders — seen 412, parsed 38.</div></div>
+    <div class="banner warn"><span class="ic">▲</span><div><strong>The vault token expired.</strong> Nothing has mirrored since 12 Aug. <a href="#containers">Reconnect the vault</a> to pick it back up.</div></div>
+    <div class="banner bad"><span class="ic">■</span><div><strong>Job search could not be read just now</strong>, so anything from it is missing from this page.</div></div>
+    <div class="banner good"><span class="ic">●</span><div><strong>$86.40 refunded</strong> across two returns this month.</div></div>
+  </div>
+</div>
+
+<table class="spec">
+  <thead><tr><th>Tone</th><th>Means</th><th>Ground</th></tr></thead>
+  <tbody>
+    <tr><td><code>info</code></td><td>Something is happening that you did not start and need not act on.</td><td><code>accent-tint</code></td></tr>
+    <tr><td><code>warn</code></td><td>Something is wrong and only you can fix it. Always carries the action.</td><td><code>caution-tint</code></td></tr>
+    <tr><td><code>bad</code></td><td>A source failed. This page is incomplete and says so. <em>Law 2.</em></td><td><code>danger-tint</code></td></tr>
+    <tr><td><code>good</code></td><td>Money came back. Nothing else.</td><td><code>positive-tint</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="data">Showing data</h2>
+
+<div class="rule">
+  <p><strong>Pick the shape from the question the user is asking.</strong></p>
+</div>
+
+<table class="spec">
+  <thead><tr><th>Shape</th><th>When</th><th>Examples</th></tr></thead>
+  <tbody>
+    <tr><td><strong>List</strong> — <code>divide-y</code> inside a bordered card</td><td>Scanning one thing per row. The row has an identity and a couple of facts.</td><td>Inventory, Orders, Vault notes, Returns, Agenda</td></tr>
+    <tr><td><strong>Table</strong></td><td>Comparing <em>across</em> columns. Sorting matters. Four or more parallel values.</td><td>Roles, Companies, Interviews, Analytics</td></tr>
+    <tr><td><strong>Card grid</strong></td><td>The image <em>is</em> the identifier.</td><td>Saved items, home tiles</td></tr>
+    <tr><td><strong>Board</strong></td><td>Position is the state, and moving is the primary verb.</td><td>Pipeline only</td></tr>
+  </tbody>
+</table>
+
+<div class="demo on-canvas">
+  <div class="demo-label">List row anatomy</div>
+  <div class="rows">
+    <div class="row">
+      <span class="thumb" style="box-shadow:inset 3px 0 0 var(--w-shopping)"></span>
+      <span class="main"><b>Fellow Stagg EKG kettle</b><span>Amazon · matte black · 14 Aug</span></span>
+      <span class="right">$165.00</span>
+    </div>
+    <div class="row">
+      <span class="thumb" style="box-shadow:inset 3px 0 0 var(--w-todo)"></span>
+      <span class="main"><b>Muji gel pens, 10-pack <span class="badge" style="background:var(--caution-tint);color:var(--caution);margin-left:.35rem">To return</span></b><span>Muji · 0.38mm · 2 Aug</span></span>
+      <span class="right">$12.40</span>
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-muted);margin-top:.7rem">
+    Thumb (with the category accent inset) · title in <code>ink</code> · supporting facts joined by
+    <code> · </code> in <code>ink-muted</code> · the number right-aligned and tabular. Actions live at
+    the far right, revealed on hover for pointers and <strong>always visible on touch</strong>.
+  </p>
+</div>
+
+<h4>Row rules</h4>
+<ul>
+  <li><strong>The whole row is the link.</strong> Use a stretched pseudo-element (<code>&lt;span class="absolute inset-0"&gt;</code>) so the hit area is the row, not the six characters of the title.</li>
+  <li>Supporting facts join with <code> · </code> and truncate as one line. Never wrap a metadata line to two.</li>
+  <li><strong>Hover-reveal on pointer, always-visible on touch</strong>: <code>opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100</code>. A row whose actions never appear is a row a phone user cannot act on. This pattern exists in <code>task-row.tsx</code> and should be everywhere.</li>
+  <li>Destructive row actions use an <strong>inline two-step confirm</strong>, never <code>window.confirm</code> — it is blocked in enough contexts to be unreliable, and it is ugly in every theme.</li>
+</ul>
+
+<h4>Table rules</h4>
+<ul>
+  <li><code>overflow-x-auto</code> wrapper, <code>min-w-[720px]</code> on the table, and a <strong>right edge fade</strong> so the scroll is discoverable. A silently scrollable table on a phone is a table with hidden columns.</li>
+  <li>Headers: <code>text-micro</code>, uppercase, <code>tracking-wider</code>, <code>ink-muted</code>, bottom border <code>border-strong</code>.</li>
+  <li>Sortable headers are links that write <code>?sort=</code>, with the active one in <code>accent</code> and an arrow. If a table has more than ten rows it is sortable.</li>
+  <li>Numeric columns right-aligned and <code>tabular</code>. Always.</li>
+  <li>Below <code>sm</code>, a table with more than four columns <strong>becomes a list</strong>. Do not ship a five-column table to a phone and call the horizontal scroll a design.</li>
+</ul>
+
+<h3>Filters</h3>
+
+<div class="demo on-canvas">
+  <div style="display:flex;gap:1.25rem;flex-wrap:wrap">
+    <div class="rail">
+      <h6>Category</h6>
+      <a href="#data" aria-current="page"><span class="dot" style="background:var(--accent)"></span>All<span class="n">128</span></a>
+      <a href="#data"><span class="dot" style="background:var(--w-shopping)"></span>Kitchen<span class="n">24</span></a>
+      <a href="#data"><span class="dot" style="background:var(--w-todo)"></span>Outdoors<span class="n">11</span></a>
+      <a href="#data"><span class="dot" style="background:var(--w-vault)"></span>Books<span class="n">63</span></a>
+    </div>
+    <div style="flex:1;min-width:220px">
+      <div class="demo-label">Active filter chips — the missing piece</div>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center">
+        <span class="badge" style="background:var(--accent-tint);color:var(--accent)">Books ✕</span>
+        <span class="badge" style="background:var(--accent-tint);color:var(--accent)">Amazon ✕</span>
+        <span class="badge" style="background:var(--accent-tint);color:var(--accent)">“kettle” ✕</span>
+        <a href="#data" style="font-size:12px;margin-left:.2rem">Clear all</a>
+      </div>
+      <p style="font-size:13px;color:var(--ink-muted);margin-top:.6rem">
+        Inventory can carry seven simultaneous filters and the only way to see what is applied is to
+        scroll the rail hunting for tint. Every page with a rail gets this chip row under the header.
+      </p>
+    </div>
+  </div>
+</div>
+
+<ul>
+  <li><strong>One <code>LeftRail</code>.</strong> There are currently two, with different widths and opposite mobile defaults.</li>
+  <li>Every rail item is a <strong>link that writes a query parameter</strong> — never local state. Counts on the right, swatch or glyph on the left, <code>aria-current</code> on the active one.</li>
+  <li><strong>One interaction model per filter surface.</strong> Inventory currently mixes instant-apply rail links with a select that needs an Apply button. Pick instant, and make the selects submit on change.</li>
+  <li>Below <code>lg</code> the rail is a <strong>sheet</strong>, not a stack of filters shoved above the content you opened the page to read.</li>
+</ul>
+
+<h2 id="states">States</h2>
+
+<h3>Empty</h3>
+<p>
+  The app's existing empty states are its best feature and the pattern is non-negotiable:
+  <strong>every empty state branches on whether a filter is applied</strong>, and each branch gets
+  its own copy and its own action.
+</p>
+
+<div class="demo on-canvas">
+  <div class="empty">
+    <div class="glyph">◇</div>
+    <h5>No matching items</h5>
+    <p>Nothing matched that search across names, tags and categories. You probably don't own it.</p>
+    <div class="acts">
+      <button class="btn btn-primary sz-md">Clear filters</button>
+      <button class="btn btn-secondary sz-md">Add an order</button>
+    </div>
+  </div>
+</div>
+
+<ul>
+  <li><strong>Filtered empty</strong> → "No matching items" + <em>Clear filters</em>. Never suggest creating something when they were searching for something.</li>
+  <li><strong>Genuinely empty</strong> → say what will fill it and offer the action that does so.</li>
+  <li><strong>Finished empty</strong> → this is a reward, not an absence. "Nothing needs you today." It gets the generative sigil (see <a href="#alive">Alive</a>) and a quiet way back to the data.</li>
+</ul>
+
+<h3>Loading</h3>
+
+<div class="rule">
+  <p>
+    <strong>Skeletons, never spinners — and there are currently neither.</strong> The app has zero
+    <code>loading.tsx</code> files, zero <code>&lt;Suspense&gt;</code> boundaries and exactly one use
+    of the <code>.skeleton</code> utility, while every page performs four to seven sequential
+    database round-trips before rendering anything. This is the largest perceived-performance gap in
+    the product.
+  </p>
+</div>
+
+<div class="demo">
+  <div style="display:flex;gap:.75rem;align-items:center">
+    <span class="skel" style="width:44px;height:44px;border-radius:8px;flex:none"></span>
+    <span style="flex:1"><span class="skel" style="display:block;width:58%;height:13px"></span><span class="skel" style="display:block;width:34%;height:11px;margin-top:.4rem"></span></span>
+    <span class="skel" style="width:64px;height:13px;flex:none"></span>
+  </div>
+</div>
+
+<ul>
+  <li>Every route group gets a <code>loading.tsx</code> that renders the page's <strong>real shape</strong> in skeletons — the header, the rail, three rows. Not a centred spinner.</li>
+  <li>Wrap slow, independent regions in <code>&lt;Suspense&gt;</code> so a slow chart does not hold the whole page.</li>
+  <li>A skeleton that appears for under ~200ms is a flicker. Delay it.</li>
+</ul>
+
+<h3>Error, and honest failure</h3>
+<ul>
+  <li>Every route group gets an <code>error.tsx</code>. There are currently none — <code>inventory/page.tsx</code> throws straight into the framework's default screen.</li>
+  <li><strong>A partial failure is stated in place</strong> and never silently swallowed. The agenda's "Job search could not be read just now, so anything from it is missing from this page" is the model for the whole app.</li>
+  <li>An error message says <em>what could not be done</em>, not what the exception was. If there is a retry, it is a button.</li>
+</ul>
+
+<h2 id="forms">Forms and buttons</h2>
+
+<div class="demo">
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
+    <button class="btn btn-primary sz-md">Save</button>
+    <button class="btn btn-secondary sz-md">Cancel</button>
+    <button class="btn btn-ghost sz-md">Skip</button>
+    <button class="btn btn-danger sz-md">Delete</button>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary sz-sm">Small</button>
+    <button class="btn btn-primary sz-md">Medium</button>
+    <button class="btn btn-primary sz-lg">Large</button>
+  </div>
+</div>
+
+<ul>
+  <li><strong>One primary per view.</strong> If two things look equally primary, neither is.</li>
+  <li><code>primary</code> = accent fill. <code>secondary</code> = surface + border. <code>ghost</code> = the third-most-important thing on a row. <code>danger</code> = destructive only, and never the primary of a form.</li>
+  <li>Sizes: <code>sm</code> in rows and headers, <code>md</code> in forms, <code>lg</code> only on marketing and onboarding.</li>
+  <li>A button that triggers async work shows its own pending label ("Saving…") and disables. It never leaves the user guessing whether the click landed.</li>
+</ul>
+
+<h4>Fields</h4>
+<ul>
+  <li><code>text-base sm:text-sm</code> on every input. 16px on a phone is what stops iOS zooming the page on focus; anything smaller is a bug.</li>
+  <li>One <code>&lt;Field&gt;</code> composing label, control, hint and error — hints are currently hand-rolled <code>text-[11px] text-ink-faint</code> in dozens of places, which is both off-scale and under contrast.</li>
+  <li>Errors are inline, under the field, in <code>danger</code>. Form-level results use the <code>Banner</code> component, not a bespoke coloured paragraph.</li>
+  <li>Search boxes are <strong>GET forms</strong>. Debounced client-side search is an enhancement layered on a working form, never a replacement for one.</li>
+</ul>
+
+<h2 id="motion">Motion</h2>
+
+<p>
+  The existing motion system is genuinely good and mostly needs protecting rather than changing:
+  <strong>one duration, one easing, three utilities</strong>.
+</p>
+
+<table class="spec">
+  <thead><tr><th>Token</th><th>Value</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td>duration</td><td><code>150ms</code></td><td>Everything. A second duration needs a written reason.</td></tr>
+    <tr><td>easing</td><td><code>cubic-bezier(.22,1,.36,1)</code></td><td>Everything.</td></tr>
+    <tr><td><code>lift</code></td><td><code>translateY(-2px)</code> + soft shadow</td><td>Interactive cards.</td></tr>
+    <tr><td><code>press</code></td><td><code>scale(.98)</code></td><td>Every button and icon button.</td></tr>
+    <tr><td><code>dragging</code></td><td><code>scale(.98) rotate(-.5deg)</code>, 55% opacity</td><td>The pipeline card mid-drag — the app's most-used interaction, so it earns its own treatment.</td></tr>
+  </tbody>
+</table>
+
+<div class="rule">
+  <p>
+    <strong><code>prefers-reduced-motion</code> removes all of it, with no exceptions</strong> —
+    including the dashboard count-up and the grain shimmer. This is already implemented correctly and
+    must stay that way. Any new animation is added to that block in the same commit that adds the
+    animation.
+  </p>
+</div>
+
+<h2 id="alive">Alive — the things a big product would not ship</h2>
+
+<p>
+  Each of these is deliberately outside what a large team could justify. Each is here because this
+  is one person's dashboard, and because the cost of being wrong is a setting someone switches off
+  rather than a churned enterprise account. Each obeys law 7: <strong>chrome, never data</strong>.
+</p>
+
+<h3>1 · The quiet-day sigil</h3>
+<div class="demo">
+  <div style="display:flex;gap:1.25rem;align-items:center;flex-wrap:wrap">
+    <div class="sigil">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <circle cx="32" cy="32" r="22" stroke="currentColor" stroke-width="1.2" opacity=".35" style="color:var(--accent)"/>
+        <path d="M32 10 L48 32 L32 54 L16 32 Z" stroke="currentColor" stroke-width="1.4" style="color:var(--accent)" fill="none"/>
+        <path d="M18 24 Q32 40 46 24" stroke="currentColor" stroke-width="1.4" style="color:var(--accent)" fill="none" opacity=".7"/>
+        <circle cx="32" cy="32" r="3.2" fill="currentColor" style="color:var(--accent)"/>
+        <circle cx="32" cy="12" r="1.8" fill="currentColor" style="color:var(--accent)" opacity=".6"/>
+        <circle cx="50" cy="42" r="1.4" fill="currentColor" style="color:var(--accent)" opacity=".45"/>
+      </svg>
+    </div>
+    <div style="flex:1;min-width:240px">
+      <p style="margin:0;font-size:15px;font-weight:500">Nothing needs you today.</p>
+      <p style="margin:.25rem 0 0;font-size:13.5px;color:var(--ink-muted)">No interviews in the next 10 days, and nothing waiting on a reply.</p>
+    </div>
+  </div>
+</div>
+<p>
+  A small mark, generated deterministically from <code>hash(user_id + date)</code>, drawn in the
+  workspace accent. <strong>It is different every day and it is yours</strong> — the same date gives
+  the same mark forever, so it is a fact about the day rather than a random flourish. It appears in
+  exactly one situation: the page is empty <em>because you are finished</em>, not because you have
+  nothing yet.
+</p>
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  <strong>Why it is safe:</strong> it occupies a moment that is otherwise dead space, it never
+  appears next to data, it costs one inline SVG, and a person who hates it never sees it on a busy
+  day anyway.
+</p>
+
+<h3>2 · The status line</h3>
+<div class="demo" style="padding:0;overflow:hidden">
+  <div style="padding:1.15rem 1.15rem .9rem"><p style="margin:0;font-size:13.5px;color:var(--ink-muted)">A persistent one-line ticker at the bottom of the shell — what the system just did, in monospace, unprompted.</p></div>
+  <div class="statusline">
+    <span class="live" aria-hidden="true"></span>
+    <span>mirrored 12 notes · imported 4 orders from gmail · 2 items need review</span>
+    <span style="margin-left:auto;opacity:.7">14:22</span>
+  </div>
+</div>
+<p>
+  Straight out of 1994, and genuinely the right answer for an app whose whole job is ingesting things
+  in the background. It replaces most of what the notification bell would otherwise shout, it makes
+  a quiet system feel <em>alive</em> rather than broken, and it directly serves law 2 — the app is
+  visibly telling you what it did.
+</p>
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  <strong>Rules:</strong> one line, never taller. Never blocks anything. Fades to
+  <code>ink-faint</code> after ten seconds and stays there. Clicking it opens the full activity log.
+  Off is a setting.
+</p>
+
+<h3>3 · Marginalia</h3>
+<div class="demo">
+  <div style="display:flex;gap:1.25rem;align-items:flex-start;flex-wrap:wrap">
+    <span class="sticky-note">the second kettle was a gift — don't count it against the budget</span>
+    <p style="flex:1;min-width:240px;margin:0;font-size:13.5px;color:var(--ink-muted)">
+      Pin a note anywhere, on any page, at a slight angle. It belongs to the page path, so it is
+      still there next time. This is the single most "your own homepage" idea in the system, and no
+      production tool ships it because it does not fit a data model.
+    </p>
+  </div>
+</div>
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  <strong>Rules:</strong> rotation is at most 2°, derived from a hash of the note id so it never
+  jitters between renders. Hard offset shadow, no blur — it is paper, not a floating panel. Never
+  overlaps content: it lays out in a margin column and collapses to an inline block below
+  <code>lg</code>.
+</p>
+
+<h3>4 · Hold ⌘ to see everything</h3>
+<div class="demo">
+  <div class="pills" style="gap:.5rem;align-items:center">
+    <span style="position:relative"><a href="#alive" aria-current="page">Inventory</a><span class="keyhint" style="position:absolute;top:-8px;right:-10px">3</span></span>
+    <span style="position:relative"><a href="#alive">Orders</a><span class="keyhint" style="position:absolute;top:-8px;right:-10px">2</span></span>
+    <span style="position:relative"><a href="#alive">Returns</a><span class="keyhint" style="position:absolute;top:-8px;right:-10px">4</span></span>
+    <span style="margin-left:.6rem;font-size:13px;color:var(--ink-muted)">hold <span class="keyhint">⌘</span> and every shortcut appears in place</span>
+  </div>
+</div>
+<p>
+  Not a modal cheat-sheet listing shortcuts in the abstract — the hints appear <strong>on the actual
+  controls</strong>, so you learn the keyboard by looking at the thing you were already about to
+  click. Release and they vanish. This is the fastest way anyone has ever learned a keyboard-driven
+  app, and it is almost never built because it is fiddly.
+</p>
+
+<h3>5 · The density dial</h3>
+<p>
+  <strong>Comfortable · Snug · Dense</strong>, live in the top bar, changing the whole app's rhythm
+  by scaling one spacing variable. Most products bury this in a settings page if they ship it at all.
+  Here it is one click, because "how much do I want to see at once" changes with what you are doing —
+  reading a note versus working a review queue of forty.
+</p>
+<pre><code><span class="c">/* One variable, three values. Every padding derives from it. */</span>
+[data-density=<span class="s">"comfortable"</span>] { --row-y: .625rem; --card-p: 1.25rem; }
+[data-density=<span class="s">"snug"</span>]        { --row-y: .5rem;   --card-p: 1rem; }
+[data-density=<span class="s">"dense"</span>]       { --row-y: .375rem; --card-p: .75rem; }</code></pre>
+
+<h3>6 · Seams mode</h3>
+<p>
+  A toggle that reveals <strong>where every number came from</strong> — this figure is 14 orders from
+  two inboxes, last synced 09:12; this note was mirrored from a git tree with no timestamp, so the
+  date you are seeing is from its frontmatter. Law 2 taken to its logical end: an app that refuses to
+  lie by omission should be able to <em>show its working</em> on demand.
+</p>
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  Off by default. When on, provenance renders as a dotted underline on any derived figure with the
+  detail on hover and focus.
+</p>
+
+<h3>7 · Sound, off by default</h3>
+<p>
+  One sound: a short, soft, low-volume click when something completes — an import finishes, a queue
+  empties. Under 80ms, never on a page load, never for errors, off unless explicitly enabled. This is
+  the riskiest item on the list and it is the reason it needs the strictest rules.
+</p>
+
+<div class="rule">
+  <p>
+    <strong>Everything on this page is a setting, and every setting defaults to the calm option.</strong>
+    Themes, the status line, sigils, marginalia, sound, density, seams. The personality is opt-in
+    depth, not a tax the user pays on first run. A person who turns all of it off still gets a
+    precise, well-built, contrast-correct tool — that is the floor, and the flourishes are the
+    ceiling.
+  </p>
+</div>
+
+<h2 id="a11y">Accessibility contract</h2>
+<ul>
+  <li><strong>4.5:1 for text, in every theme.</strong> Non-negotiable and machine-checked.</li>
+  <li><strong>Visible focus.</strong> <code>:focus-visible</code> is a 2px accent outline at 2px offset, on every interactive element, in every theme. Never <code>outline: none</code> without a replacement.</li>
+  <li><strong>Every interactive element is reachable and operable from a keyboard.</strong> The pipeline board's drag is currently mouse-only; a keyboard and touch path (a status picker on the card) is required, not optional.</li>
+  <li><strong>Popovers and dialogs</strong>: <code>aria-modal</code>, focus moved in, focus trapped, focus returned. Menus get a real menu keyboard model with roving <code>tabindex</code>.</li>
+  <li><strong>Icon-only controls carry an accessible name</strong> — <code>aria-label</code> or an <code>sr-only</code> span. A <code>title</code> alone is not a name.</li>
+  <li><strong>Never colour alone.</strong> A status is a badge with a word in it, not a bare dot. A star rating is <code>"★★★"</code> plus a label saying out of what.</li>
+  <li><strong>Touch targets are 44px</strong> or have 44px of spacing around them. The 18px agenda checkbox is on the edge and gets padding rather than a bigger box.</li>
+  <li><code>aria-current="page"</code> on every active nav item, rail item and tab.</li>
+</ul>
+
+<h2 id="voice">Voice</h2>
+<p>
+  The app talks like a knowledgeable friend who respects your time — plain, specific, unhurried,
+  never chirpy. The existing copy is already excellent; this is a description of it, not a change to
+  it.
+</p>
+
+<div class="split">
+  <div class="do"><h5>Do</h5>
+    <p>"Nothing matched that search across names, tags and categories. You probably don't own it."</p>
+    <p>"A month is marked <em>too early</em> until its newest applications are 21 days old. Including them would drag every rate toward zero and make recent effort look like failure."</p>
+    <p>"You do not tick off a meeting."</p>
+  </div>
+  <div class="dont"><h5>Don't</h5>
+    <p>"Oops! No results found 😅"</p>
+    <p>"Data unavailable."</p>
+    <p>"Are you sure you want to do this? This action cannot be undone."</p>
+  </div>
+</div>
+
+<ul>
+  <li><strong>Say what happened, not that something happened.</strong> "Your Amazon return window closes Friday", not "You have 1 notification".</li>
+  <li><strong>Explain the rule when the rule is surprising.</strong> If a figure excludes something, the page says what and why, in one sentence, next to the figure.</li>
+  <li><strong>Sentence case everywhere.</strong> Title Case is for proper nouns.</li>
+  <li><strong>No exclamation marks. No emoji in product copy.</strong> Emoji are fine in a user's own note text; they are never in the app's voice.</li>
+  <li><strong>Buttons are verbs</strong> the user is doing: "Add an order", "Clear filters", "Reconnect the vault". Never "Submit", "OK", "Confirm".</li>
+  <li><strong>Numbers are formatted, always</strong> — money through <code>lib/money.ts</code>, dates in the account's timezone, never a raw ISO string.</li>
+</ul>
+
+<h2 id="checklist">Before you ship a surface</h2>
+<ul class="checklist">
+  <li>Every colour is a token. No raw Tailwind palette classes anywhere in the diff.</li>
+  <li>It has been looked at in <strong>Paper, Ink and one of Riso/Terminal/Dusk</strong>. Nothing disappears, nothing glows.</li>
+  <li>Every text/ground pair clears 4.5:1 in every theme.</li>
+  <li>Type uses named steps. No <code>text-[Npx]</code>. Chrome is 13px, content is 14px.</li>
+  <li>Numbers in a column are <code>.tabular</code>. Money went through <code>lib/money.ts</code>.</li>
+  <li>Containers use <code>&lt;Card&gt;</code>; banners use <code>&lt;Banner&gt;</code>; empty states use <code>&lt;EmptyState&gt;</code>.</li>
+  <li>The empty state branches on filtered vs unfiltered, with different copy and different actions.</li>
+  <li>A section with nothing in it is <strong>not rendered</strong>. No "0 of 0".</li>
+  <li>A source that could fail says so in place when it does.</li>
+  <li>Filters, search, sort and tab live in the URL and survive a refresh and the back button.</li>
+  <li>Search works with JavaScript disabled.</li>
+  <li>There is a <code>loading.tsx</code> rendering this page's real shape, and an <code>error.tsx</code>.</li>
+  <li>Keyboard: tab order is sane, focus is visible, every action is reachable, popovers trap and return focus.</li>
+  <li>Touch: actions are visible without hover; targets are 44px; nothing depends on a pointer.</li>
+  <li>Checked at 375px wide. Tables became lists or scroll with a visible edge. The active nav tab is on screen.</li>
+  <li>Any new animation is in the <code>prefers-reduced-motion</code> block in the same commit.</li>
+  <li>Any flourish is chrome, is under a second, and can be switched off.</li>
+  <li>Every non-obvious decision carries a comment saying why.</li>
+</ul>
+
+<h2 id="never">Never</h2>
+<ul>
+  <li><strong>Never</strong> a raw Tailwind palette colour. <code>bg-emerald-50</code> is a bug in four themes.</li>
+  <li><strong>Never</strong> green for spending, or for generic success.</li>
+  <li><strong>Never</strong> a pipeline status hue for anything but that pipeline status.</li>
+  <li><strong>Never</strong> <code>text-ink-faint</code> on something the user needs to read.</li>
+  <li><strong>Never</strong> white text on <code>accent-orange</code> (2.3:1). Dark ink on the fill.</li>
+  <li><strong>Never</strong> a fourth copy of the top bar, page header or left rail.</li>
+  <li><strong>Never</strong> hand-write <code>rounded-card border border-border bg-surface</code>.</li>
+  <li><strong>Never</strong> a tab, filter or sort that lives only in <code>useState</code>.</li>
+  <li><strong>Never</strong> <code>window.confirm</code> or <code>window.alert</code>. Inline two-step confirm.</li>
+  <li><strong>Never</strong> a resting drop shadow on a card.</li>
+  <li><strong>Never</strong> a spinner where a skeleton of the real shape would do.</li>
+  <li><strong>Never</strong> an empty section rendered as "0".</li>
+  <li><strong>Never</strong> a silently shortened list when a source failed.</li>
+  <li><strong>Never</strong> a flourish next to a number.</li>
+  <li><strong>Never</strong> a flourish that cannot be turned off.</li>
+</ul>
+
+</main>
+
+<footer class="doc">
+  <p>
+    <strong>docs/design-language.html</strong> — the binding reference for anyone, human or agent,
+    building UI in this repository. Migration of the existing code onto this language is tracked in
+    <strong>docs/DESIGN-UPDATE-PLAN.md</strong>.
+  </p>
+  <p>
+    Change this file when a decision changes, in the same commit as the code that changes it. A
+    design language that lags the code is worse than none, because people will follow it.
+  </p>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var buttons = document.querySelectorAll('.themes button');
+  var saved = null;
+  try { saved = localStorage.getItem('dl-theme'); } catch (e) {}
+  if (saved) apply(saved);
+
+  function apply(name) {
+    root.setAttribute('data-theme', name);
+    buttons.forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.set === name));
+    });
+    try { localStorage.setItem('dl-theme', name); } catch (e) {}
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () { apply(b.dataset.set); });
+  });
+})();
+</script>
+</body>
+</html>
