@@ -4,77 +4,26 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { HOME_MARK, MODULES, moduleById, type ModuleId } from '@/lib/modules';
 
 /**
- * The two halves of the app, and the switch between them.
+ * Which module you are in, and the way out.
  *
  * This sits where each product's wordmark used to. One login, one deployment
- * and one database now carry two unrelated domains, and the thing a person
- * needs top-left is no longer a name -- it is which of the two they are
- * currently in, and the way out.
+ * and one database now carry several unrelated domains, and the thing a person
+ * needs top-left is no longer a name -- it is which one they are currently in.
  *
- * `home` is where switching lands you: the page that answers "what is going on"
- * for that domain, not its settings or its root.
+ * The list itself lives in lib/modules.ts, shared with the home page's tiles,
+ * so a new module shows up in both without anyone remembering the second one.
  */
-const WORKSPACES = [
-  {
-    id: 'shopping',
-    prefix: '/shopping',
-    home: '/shopping/dashboard',
-    label: 'Shopping',
-    description: 'Orders, inventory, returns and resale',
-    // Warm, and the only mark that does not start on brand blue -- the two
-    // module marks sit next to the home mark rather than under it, so they
-    // read best when they are not variations on the same first colour.
-    gradient:
-      'linear-gradient(135deg, var(--color-accent-orange) 0%, var(--color-accent-pink) 100%)',
-  },
-  {
-    id: 'jobs',
-    prefix: '/jobs',
-    home: '/jobs/today',
-    label: 'Job search',
-    description: 'Pipeline, roles, companies and interviews',
-    gradient:
-      'linear-gradient(135deg, var(--color-brand) 0%, var(--color-status-final) 100%)',
-  },
-  {
-    id: 'vault',
-    prefix: '/vault',
-    // The note list, not settings: "what is in here" is the question this
-    // workspace answers, and it is the only page it has that answers one.
-    home: '/vault',
-    label: 'Vault',
-    description: 'Your Obsidian notes, mirrored and searchable',
-    gradient:
-      'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-orange) 100%)',
-  },
-] as const;
-
-export type WorkspaceId = (typeof WORKSPACES)[number]['id'];
-
-/**
- * The mark for the whole app, on the largest icon in the topbar and on the
- * button when no workspace is active.
- *
- * Blue into pink, which is what the signed-out pages -- the marketing page,
- * sign-in, onboarding -- have always used for the product itself. It belongs
- * on the icon that means "the whole thing" rather than on one of the two
- * modules inside it, and it replaces a brand-into-grey gradient that only ever
- * looked like a mark waiting to be chosen.
- */
-const HOME = {
-  label: 'Home',
-  gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
-} as const;
+export type WorkspaceId = ModuleId;
 
 export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const workspace =
-    current === null ? null : (WORKSPACES.find((w) => w.id === current) ?? WORKSPACES[0]);
-  const active = workspace ?? HOME;
+  const workspace = moduleById(current);
+  const active = workspace ?? HOME_MARK;
 
   useEffect(() => {
     if (!open) return;
@@ -100,7 +49,7 @@ export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) 
         <Link href="/home" className="press flex items-center rounded-md" title="Home">
           <span
             className="size-8 rounded-lg bg-brand"
-            style={{ backgroundImage: HOME.gradient }}
+            style={{ backgroundImage: HOME_MARK.gradient }}
             aria-hidden
           />
           <span className="sr-only">Home</span>
@@ -140,7 +89,7 @@ export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) 
           aria-label="Workspaces"
           className="absolute left-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-border bg-surface p-1 shadow-lg"
         >
-          {WORKSPACES.map((workspace) => {
+          {MODULES.map((workspace) => {
             const isCurrent = workspace.id === current;
             return (
               <Link
