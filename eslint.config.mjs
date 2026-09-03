@@ -42,6 +42,37 @@ const VAULT_PROVIDER_PATTERN = {
 };
 
 /**
+ * The shared link is a window, never an engine.
+ *
+ * A page an anonymous stranger can open must not be able to spend money, hit a
+ * third party's rate limit, or queue work. Every module named here can do one
+ * of those: lib/sell reaches eBay and, on the web-estimate path, a *billed*
+ * Anthropic lookup; the game and book providers are rate-limited against
+ * someone else's terms of service; lib/fx fetches Frankfurter; lib/email and
+ * inngest are ingestion.
+ *
+ * The rule exists because "the price is missing, let's just fetch it" is a
+ * reasonable-sounding change that would quietly turn every page view into an
+ * outbound call, on a URL that can be forwarded to anyone. See
+ * docs/SHARE-LINKS-SPEC.md.
+ */
+const SHARE_READ_NETWORK_PATTERN = {
+  group: [
+    "@/lib/sell/*", "**/lib/sell/*",
+    "@/lib/games/providers/*", "**/games/providers/*",
+    "@/lib/books/providers/*", "**/books/providers/*",
+    "@/lib/email/*", "**/lib/email/*",
+    "@/lib/fx/*", "**/lib/fx/*",
+    "@/inngest/*", "**/inngest/*",
+    "@anthropic-ai/sdk",
+    "googleapis",
+    "google-auth-library",
+  ],
+  message:
+    "The shared link reads what is already in the database and does nothing else -- no lookup, no enrichment, no billed call, no job. A missing price renders blank; it is not a reason to go and find one. Enrichment belongs on the signed-in side, and lands in these tables before the link is ever opened.",
+};
+
+/**
  * Pages, components and the proxy render for a signed-in user, so they must go
  * through RLS. They also must not care which ATS a role came from, or where a
  * vault is stored.
@@ -113,6 +144,45 @@ const serviceRoleExceptions = {
   },
 };
 
+/**
+ * The anonymous read path.
+ *
+ * NOTE the repeated pattern groups. `app/s/**` overlaps renderBoundaries'
+ * glob, and ESLint keeps only the LAST entry setting a given rule for a file
+ * rather than merging them -- so listing only the new group here would switch
+ * the service-role, ATS and vault rules OFF for exactly the pages a stranger
+ * can reach. That is the failure mode this file's header warns about, and the
+ * one place it would hurt most.
+ *
+ * `no-restricted-globals` is safe to set alone: nothing else in this config
+ * uses that rule, so there is nothing for it to replace. It bans bare fetch(),
+ * which is the one way to reach the network without importing anything.
+ */
+const shareReadBoundaries = {
+  files: ["app/s/**/*.{ts,tsx}", "app/api/s/**/*.ts", "lib/share/read/**/*.ts"],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          SERVICE_ROLE_PATTERN,
+          ATS_PATTERN,
+          VAULT_PROVIDER_PATTERN,
+          SHARE_READ_NETWORK_PATTERN,
+        ],
+      },
+    ],
+    "no-restricted-globals": [
+      "error",
+      {
+        name: "fetch",
+        message:
+          "The shared link never calls out. It reads cached rows and renders what is there -- see docs/SHARE-LINKS-SPEC.md.",
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -121,6 +191,9 @@ const eslintConfig = defineConfig([
   jdBoundary,
   // Must come after renderBoundaries: it narrows what that rule forbids.
   serviceRoleExceptions,
+  // Must come after renderBoundaries too: it widens what that rule forbids,
+  // and repeats its groups so nothing is lost in the replacement.
+  shareReadBoundaries,
   // Override default ignores of eslint-config-next.
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);
