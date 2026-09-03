@@ -2,13 +2,27 @@ import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import {
+  InventoryBulkBar,
+  InventorySelectionProvider,
+} from '@/components/inventory/inventory-selection';
+import { LeftRail, RailChip, RailGroup, RailItem, RailPicker } from '@/components/shell/left-rail';
+import { AttributeFilterPicker } from './attribute-filter-picker';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
+import {
+  attributeFacets,
+  attributeLabelMap,
+  matchesAttributeFilters,
+  parseAttributeFilters,
+  serializeAttributeFilter,
+  type AttributeFilter,
+} from '@/lib/inventory/attribute-filters';
+import { parseAttributeValues, parseTemplateFields } from '@/lib/inventory/attributes';
 import {
   GROUP_OPTIONS,
   groupInventoryItems,
@@ -53,6 +67,7 @@ function inventoryHref(opts: {
   sort?: string;
   group?: string;
   person?: string;
+  attrs?: AttributeFilter[];
 }): string {
   const params = new URLSearchParams();
   if (opts.range && opts.range !== 'all') params.set('range', opts.range);
@@ -63,6 +78,7 @@ function inventoryHref(opts: {
   if (opts.sort && opts.sort !== 'newest') params.set('sort', opts.sort);
   if (opts.group && opts.group !== 'none') params.set('group', opts.group);
   if (opts.person) params.set('person', opts.person);
+  for (const attr of opts.attrs ?? []) params.append('attr', serializeAttributeFilter(attr));
   const qs = params.toString();
   return qs ? `/shopping/inventory?${qs}` : '/shopping/inventory';
 }
@@ -110,6 +126,7 @@ export default async function InventoryPage({
     sort?: string;
     group?: string;
     person?: string;
+    attr?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -123,6 +140,7 @@ export default async function InventoryPage({
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
   const sort = parseSortId(params.sort);
   const group = parseGroupId(params.group);
+  const attrFilters = parseAttributeFilters(params.attr);
 
   await backfillUserInventoryDisplay(supabase, user.id);
 
@@ -132,7 +150,13 @@ export default async function InventoryPage({
   const byPerson = peopleById(people);
   const showPeople = people.length > 1;
 
-  const [{ data: categories }, { data: lists }, merchants, { data: profile }] = await Promise.all([
+  const [
+    { data: categories },
+    { data: lists },
+    merchants,
+    { data: profile },
+    { data: attributeTemplates },
+  ] = await Promise.all([
     supabase
       .from('categories')
       .select('id, name, color, slug')
@@ -145,6 +169,7 @@ export default async function InventoryPage({
       .order('name'),
     loadUserMerchants(supabase, user.id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    supabase.from('category_attribute_templates').select('fields').eq('user_id', user.id),
   ]);
 
   const timezone = profile?.timezone ?? 'UTC';
@@ -163,7 +188,7 @@ export default async function InventoryPage({
   const selectWithOptionalInner = activeMerchant
     ? `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
-        image_url, return_planned, search_tags,
+        image_url, return_planned, for_sale, search_tags, attributes,
         categories(name, color, slug),
         ${membershipJoin},
         order_items!inner (
@@ -176,7 +201,7 @@ export default async function InventoryPage({
       `
     : `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
-        image_url, return_planned, search_tags,
+        image_url, return_planned, for_sale, search_tags, attributes,
         categories(name, color, slug),
         ${membershipJoin},
         order_items (
@@ -224,7 +249,9 @@ export default async function InventoryPage({
     category_id: string | null;
     image_url: string | null;
     return_planned: boolean;
+    for_sale: boolean;
     search_tags: string[] | null;
+    attributes: unknown;
     inventory_item_lists:
       | { list_id: string }
       | { list_id: string }[]
@@ -277,6 +304,7 @@ export default async function InventoryPage({
     search_tags: string[] | null;
     merchant_name: string | null;
     category_name: string | null;
+    attributes: Record<string, string>;
   })[] = rawItems.map((item) => {
     const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
     const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
@@ -295,7 +323,9 @@ export default async function InventoryPage({
       acquired_at: item.acquired_at,
       image_url: item.image_url ?? orderItem?.image_url ?? null,
       return_planned: item.return_planned,
+      for_sale: item.for_sale,
       search_tags: item.search_tags,
+      attributes: parseAttributeValues(item.attributes),
       person: showPeople ? (byPerson.get(item.person_id ?? '') ?? null) : null,
       category_name: category?.name ?? null,
       category_color: category?.color ?? null,
@@ -305,13 +335,26 @@ export default async function InventoryPage({
     };
   });
 
-  const searched = q ? filterAndRankBySearch(mapped, q) : mapped;
+  // Facets come from everything the other filters left, so the properties on
+  // offer do not vanish the moment one of them is picked.
+  const facets = attributeFacets(
+    mapped,
+    attributeLabelMap(
+      (attributeTemplates ?? []).map((row) => parseTemplateFields(row.fields)),
+      (categories ?? []).map((category) => category.slug),
+    ),
+  );
+  const byAttributes = attrFilters.length
+    ? mapped.filter((item) => matchesAttributeFilters(item.attributes, attrFilters))
+    : mapped;
+
+  const searched = q ? filterAndRankBySearch(byAttributes, q) : byAttributes;
   // Relevance wins while searching; otherwise honor the sort control.
   const finalItems = q ? searched : sortInventoryItems(searched, sort);
   const groups = groupInventoryItems(finalItems, group);
 
   const filtered = Boolean(
-    q || categoryId || activeMerchant || activeList || range !== 'all',
+    q || categoryId || activeMerchant || activeList || range !== 'all' || attrFilters.length,
   );
 
   // The shares that exist, so a filtered shelf can be sent to one in a click.
@@ -330,7 +373,38 @@ export default async function InventoryPage({
     sort,
     group,
     person: personId ?? undefined,
+    attrs: attrFilters,
   };
+
+  // Every value a property can be filtered to, as a ready-made link, so the
+  // picker stays a client component that only chooses between hrefs.
+  const attrHrefs: Record<string, Record<string, string>> = {};
+  for (const facet of facets) {
+    attrHrefs[facet.key] = Object.fromEntries(
+      facet.values
+        .filter(
+          (value) =>
+            !attrFilters.some(
+              (filter) =>
+                filter.key === facet.key &&
+                filter.value.toLowerCase() === value.toLowerCase(),
+            ),
+        )
+        .map((value) => [
+          value,
+          inventoryHref({
+            ...hrefBase,
+            // One value per property: picking another replaces it.
+            attrs: [
+              ...attrFilters.filter((filter) => filter.key !== facet.key),
+              { key: facet.key, value },
+            ],
+          }),
+        ]),
+    );
+  }
+
+  const facetLabels = new Map(facets.map((facet) => [facet.key, facet.label]));
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -379,20 +453,40 @@ export default async function InventoryPage({
             />
           ))}
         </RailGroup>
-        <RailGroup label="Merchant">
-          <RailItem
-            label="Any"
-            active={!activeMerchant}
-            href={inventoryHref({ ...hrefBase, merchant: undefined })}
-          />
-          {merchants.map((merchant) => (
-            <RailItem
-              key={merchant.id}
-              label={merchant.name}
-              active={merchant.id === activeMerchant}
-              href={inventoryHref({ ...hrefBase, merchant: merchant.id })}
-            />
-          ))}
+        <RailPicker
+          label="Merchant"
+          activeId={activeMerchant}
+          anyHref={inventoryHref({ ...hrefBase, merchant: undefined })}
+          placeholder="Type a merchant…"
+          options={merchants.map((merchant) => ({
+            id: merchant.id,
+            label: merchant.name,
+            href: inventoryHref({ ...hrefBase, merchant: merchant.id }),
+          }))}
+        />
+        <RailGroup label="Property">
+          {attrFilters.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1 px-1">
+              {attrFilters.map((filter) => (
+                <RailChip
+                  key={`${filter.key}:${filter.value}`}
+                  label={`${facetLabels.get(filter.key) ?? filter.key}: ${filter.value}`}
+                  removeHref={inventoryHref({
+                    ...hrefBase,
+                    attrs: attrFilters.filter(
+                      (entry) => !(entry.key === filter.key && entry.value === filter.value),
+                    ),
+                  })}
+                />
+              ))}
+            </div>
+          )}
+          <AttributeFilterPicker facets={facets} hrefFor={attrHrefs} />
+          {facets.length === 0 && (
+            <p className="px-2.5 py-1.5 text-[13px] text-ink-faint">
+              None of these items have details recorded yet.
+            </p>
+          )}
         </RailGroup>
         <RailGroup label="Category">
           <RailItem
@@ -440,6 +534,15 @@ export default async function InventoryPage({
             <input type="hidden" name="merchant" value={activeMerchant} />
           )}
           {activeList && <input type="hidden" name="list" value={activeList} />}
+          {personId && <input type="hidden" name="person" value={personId} />}
+          {attrFilters.map((filter) => (
+            <input
+              key={`${filter.key}:${filter.value}`}
+              type="hidden"
+              name="attr"
+              value={serializeAttributeFilter(filter)}
+            />
+          ))}
 
           <div className="relative">
             <Search
@@ -527,40 +630,43 @@ export default async function InventoryPage({
             }
           />
         ) : (
-          <div className="space-y-5">
-            {groups.map((section) => {
-              const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
-              return (
-                <section key={section.key} className="space-y-2">
-                  {group !== 'none' && (
-                    <div className="flex items-baseline justify-between gap-3 px-1">
-                      <h2 className="text-[13px] font-semibold text-ink">
-                        {section.label}
-                        <span className="ml-2 font-normal text-ink-faint">
-                          {section.items.length}
-                        </span>
-                      </h2>
-                      <p className="tabular text-[12px] text-ink-muted">
-                        {formatMoney(subtotal)}
-                      </p>
-                    </div>
-                  )}
-                  <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-                    {section.items.map((item) => (
-                      <InventoryRow
-                        key={item.id}
-                        item={item}
-                        lists={(lists ?? []).map((list) => ({
-                          id: list.id,
-                          name: list.name,
-                        }))}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
+          <InventorySelectionProvider>
+            <InventoryBulkBar allIds={finalItems.map((item) => item.id)} />
+            <div className="space-y-5">
+              {groups.map((section) => {
+                const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
+                return (
+                  <section key={section.key} className="space-y-2">
+                    {group !== 'none' && (
+                      <div className="flex items-baseline justify-between gap-3 px-1">
+                        <h2 className="text-[13px] font-semibold text-ink">
+                          {section.label}
+                          <span className="ml-2 font-normal text-ink-faint">
+                            {section.items.length}
+                          </span>
+                        </h2>
+                        <p className="tabular text-[12px] text-ink-muted">
+                          {formatMoney(subtotal)}
+                        </p>
+                      </div>
+                    )}
+                    <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                      {section.items.map((item) => (
+                        <InventoryRow
+                          key={item.id}
+                          item={item}
+                          lists={(lists ?? []).map((list) => ({
+                            id: list.id,
+                            name: list.name,
+                          }))}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          </InventorySelectionProvider>
         )}
       </div>
     </div>

@@ -18,10 +18,12 @@ import {
   searchProviderFor,
   templateFor,
 } from '@/lib/inventory/attributes';
-import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
+import { DisposeForm, ItemListsForm, ReturnForm } from './item-forms';
 import { BookDetailsPanel } from './book-details-panel';
-import { ItemAttributesPanel } from './attributes-panel';
+import { GameDetailsPanel } from './game-details-panel';
+import { ItemDetailsPanel } from './item-details-panel';
 import { ItemSellPanel } from './sell-panel';
+import { MarkForSaleButton } from './mark-for-sale-button';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -41,6 +43,7 @@ export default async function InventoryItemPage({
     { data: memberships },
     { data: profile },
     { data: bookRow },
+    { data: gameRow },
   ] = await Promise.all([
     supabase
       .from('inventory_items')
@@ -48,7 +51,7 @@ export default async function InventoryItemPage({
         `
         id, name, short_name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
-        return_planned, source, attributes,
+        return_planned, for_sale, source, attributes,
         categories ( id, name, color, slug ),
         order_items (
           order_id, product_url, image_url,
@@ -83,6 +86,17 @@ export default async function InventoryItemPage({
         `
         inventory_item_id, isbn_13, isbn_10, authors, edition, publisher,
         published_year, condition, needs_confirmation, match_confidence, resolution_source,
+        candidates, confirmation_reason, auto_imported
+      `,
+      )
+      .eq('inventory_item_id', id)
+      .maybeSingle(),
+    supabase
+      .from('game_details')
+      .select(
+        `
+        inventory_item_id, bgg_id, year_published, publisher, min_players, max_players,
+        playing_time_minutes, needs_confirmation, match_confidence, resolution_source,
         candidates, confirmation_reason, auto_imported
       `,
       )
@@ -311,8 +325,33 @@ export default async function InventoryItemPage({
         />
       )}
 
-      <ItemAttributesPanel
+      {gameRow && (
+        <GameDetailsPanel
+          game={{
+            inventoryItemId: gameRow.inventory_item_id,
+            title: item.name,
+            imageUrl,
+            bggId: gameRow.bgg_id,
+            yearPublished: gameRow.year_published,
+            publisher: gameRow.publisher,
+            minPlayers: gameRow.min_players,
+            maxPlayers: gameRow.max_players,
+            playingTimeMinutes: gameRow.playing_time_minutes,
+            needsConfirmation: gameRow.needs_confirmation,
+            confirmationReason: gameRow.confirmation_reason ?? null,
+            candidates: Array.isArray(gameRow.candidates) ? gameRow.candidates : [],
+            autoImported: Boolean(gameRow.auto_imported),
+            matchConfidence:
+              gameRow.match_confidence != null ? Number(gameRow.match_confidence) : null,
+            resolutionSource: gameRow.resolution_source,
+          }}
+        />
+      )}
+
+      <ItemDetailsPanel
         itemId={item.id}
+        item={{ name: item.name, variant: item.variant, notes: item.notes }}
+        categories={categories ?? []}
         categoryId={item.category_id}
         categoryName={category?.name ?? null}
         template={attributeTemplate}
@@ -322,6 +361,22 @@ export default async function InventoryItemPage({
       />
 
       {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
+
+      {item.status === 'owned' && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Sell this</h2>
+            <p className="mt-1 text-[13px] text-ink-muted">
+              Puts it on the{' '}
+              <Link href="/shopping/sell" className="text-brand hover:underline">
+                sell page
+              </Link>
+              , whether or not it is something the assistant can price.
+            </p>
+          </div>
+          <MarkForSaleButton itemId={item.id} forSale={Boolean(item.for_sale)} />
+        </section>
+      )}
 
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
@@ -338,20 +393,6 @@ export default async function InventoryItemPage({
           <PlanReturnButton itemId={item.id} planned={Boolean(item.return_planned)} />
         </section>
       )}
-
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Edit</h2>
-        <EditInventoryForm
-          item={{
-            id: item.id,
-            name: item.name,
-            variant: item.variant,
-            categoryId: item.category_id,
-            notes: item.notes,
-          }}
-          categories={categories ?? []}
-        />
-      </section>
 
       <ItemListsForm
         itemId={item.id}

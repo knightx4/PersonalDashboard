@@ -472,6 +472,90 @@ export async function priceOneItem(
   return { message: `Priced at ${formatMoney(cents)}.` };
 }
 
+export type PriceSearchState = SellActionState & {
+  /** What the source is asking, when it found anything. */
+  foundCents?: number | null;
+  /** What was searched for, so a wrong answer explains itself. */
+  query?: string;
+};
+
+/**
+ * Ask the price source what this item is going for, without committing to it.
+ *
+ * priceOneItem is the cached, identity-keyed path: it needs a confirmed ISBN or
+ * BGG id, writes the quote to the shared cache, and refuses everything else.
+ * This is the button next to it — a plain title search that answers for an item
+ * whose edition is not settled, and hands the number back for the user to
+ * accept rather than filing it against an identity nobody has confirmed.
+ */
+export async function searchItemPrice(
+  _prev: PriceSearchState,
+  formData: FormData,
+): Promise<PriceSearchState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('inventory_item_id'));
+  if (!id.success) return { error: 'Missing item.' };
+
+  const { data: item } = await supabase
+    .from('inventory_items')
+    .select('id, name')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!item) return { error: 'Item not found.' };
+
+  const keys = {
+    ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
+    ebayClientSecret: process.env.EBAY_CLIENT_SECRET ?? null,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+  };
+  if (expectedPriceSourceKind(keys) === 'none') {
+    return { error: 'No price source configured.' };
+  }
+  const provider = await createExpectedPriceSource(keys);
+
+  const identity = await sellIdentityOf(supabase, item.id);
+  const subject =
+    identity?.kind === 'game'
+      ? gamePriceQuery({
+          name: item.name as string,
+          yearPublished: identity.yearPublished,
+          publisher: identity.publisher,
+        })
+      : {
+          query: item.name as string,
+          hint: 'Used copy in good condition, sold on eBay.',
+        };
+
+  let cents: number | null = null;
+  try {
+    // A confirmed ISBN is a far better query than the title, so use it when
+    // there is one; everything else searches on what the item is called.
+    cents =
+      identity?.kind === 'book' && identity.isbn13 && !identity.needsConfirmation
+        ? await provider.expectedSelfListCents(identity.isbn13)
+        : await provider.expectedSelfListCentsFor(subject);
+  } catch (error) {
+    console.error('price search failed', item.id, error);
+    return { error: 'The price search failed. Try again in a moment.' };
+  }
+
+  if (cents == null) {
+    return {
+      query: subject.query,
+      foundCents: null,
+      message: `Nothing comparable is listed for “${subject.query}”.`,
+    };
+  }
+  return {
+    query: subject.query,
+    foundCents: cents,
+    message: `${formatMoney(cents)} for “${subject.query}”.`,
+  };
+}
+
 /** Set (or clear) a price by hand. Free, and it beats every lookup. */
 export async function setManualPrice(
   _prev: SellActionState,

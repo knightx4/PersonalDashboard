@@ -387,6 +387,8 @@ export const inventoryItems = pgTable(
     attributes: jsonb('attributes').notNull().default({}),
     /** User intent: show on the returns tracker “to return” filter. */
     returnPlanned: boolean('return_planned').notNull().default(false),
+    /** User intent: show on the sell page, whatever a catalog does or does not know. */
+    forSale: boolean('for_sale').notNull().default(false),
     /**
      * Provenance for this physical unit. For order-backed rows this mirrors
      * orders.source; for standalone owned items (scanned books, etc.) it is

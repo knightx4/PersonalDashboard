@@ -77,49 +77,6 @@ async function loadItem(
   };
 }
 
-/** Save the values typed into the item's detail fields. */
-export async function updateItemAttributes(
-  _prev: AttributeActionState,
-  formData: FormData,
-): Promise<AttributeActionState> {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const id = z.string().uuid().safeParse(formData.get('id'));
-  if (!id.success) return { error: 'Missing item.' };
-
-  const item = await loadItem(supabase, user.id, id.data);
-  if (!item) return { error: 'Item not found.' };
-
-  const submitted: AttributeValues = {};
-  for (const [name, value] of formData.entries()) {
-    if (!name.startsWith('attr_') || typeof value !== 'string') continue;
-    const key = attributeKey(name.slice('attr_'.length));
-    if (key) submitted[key] = value;
-  }
-
-  // One-off field added from the item itself, without touching the template:
-  // the shape of a single object is not always the shape of its category.
-  const newLabel = String(formData.get('new_label') ?? '').trim();
-  const newValue = String(formData.get('new_value') ?? '').trim();
-  if (newLabel && newValue) {
-    const key = attributeKey(newLabel);
-    if (!key) return { error: 'That field name has no letters or numbers in it.' };
-    submitted[key] = newValue;
-  }
-
-  const next = mergeAttributeValues(item.values, submitted);
-  const { error } = await supabase
-    .from('inventory_items')
-    .update({ attributes: next })
-    .eq('id', item.id)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
-
-  revalidatePath(`/shopping/inventory/${item.id}`);
-  return { message: 'Details saved.' };
-}
-
 /**
  * Rewrite the template for this item's category.
  *
