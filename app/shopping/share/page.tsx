@@ -41,6 +41,14 @@ export default async function SharesPage() {
       <PageHeader
         title="Shared forms"
         description="A list someone can open and fill in without an account. Their answers land here."
+        actions={
+          <Link
+            href="/shopping/share/families"
+            className="text-[13px] text-ink-muted hover:text-ink"
+          >
+            Grouping
+          </Link>
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
