@@ -213,9 +213,9 @@ Or set them in the dashboard under **Authentication → URL Configuration**:
 
 | Field | Value |
 |---|---|
-| Site URL | `https://shopping.selveyknight.com` |
-| Redirect URLs | `https://shopping.selveyknight.com/auth/callback` |
-| | `https://shopping.selveyknight.com/**` |
+| Site URL | `https://dash.selveyknight.com` |
+| Redirect URLs | `https://dash.selveyknight.com/auth/callback` |
+| | `https://dash.selveyknight.com/**` |
 | | `https://shopping-manager-amber.vercel.app/auth/callback` |
 | | `http://localhost:3000/auth/callback` |
 
