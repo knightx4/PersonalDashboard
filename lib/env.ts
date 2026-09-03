@@ -85,6 +85,10 @@ export function serverEnv() {
       ISBNDB_API_KEY: z.string().min(1).optional(),
       /** Gate for in-app bug reports and feature requests. */
       FEEDBACK_CODE: z.string().min(1).optional(),
+      /** Bearer token for firing the Claude Code routine that works the queue. */
+      CLAUDE_API_KEY: z.string().min(1).optional(),
+      /** Overrides the routine that "Run Feature Routine" fires. */
+      CLAUDE_FEATURE_ROUTINE_ID: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */
