@@ -5,7 +5,6 @@ import { Copy, Mail, ShieldAlert, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
-import { TimezoneField } from '@/components/ui/timezone-field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
@@ -25,8 +24,6 @@ export function SettingsView(props: {
   gmailConfigured: boolean;
   appOrigin: string;
   profile: {
-    displayName: string;
-    timezone: string;
     targetTitles: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
@@ -87,8 +84,6 @@ function ProfileSection({
   email,
 }: {
   profile: {
-    displayName: string;
-    timezone: string;
     targetTitles: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
@@ -101,22 +96,19 @@ function ProfileSection({
 
   return (
     <section className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Profile</h2>
+      <h2 className="text-sm font-semibold text-ink">Job search</h2>
       <p className="mt-0.5 text-[13px] text-ink-muted">{email}</p>
+      <p className="mt-2 text-[12px] text-ink-faint">
+        Your name and timezone are account settings now — they hold across every workspace, so
+        they live under{' '}
+        <a href="/account" className="font-medium text-brand underline underline-offset-2">
+          Account
+        </a>
+        .
+      </p>
 
       <form action={action} className="mt-4 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="displayName">Name</Label>
-            <Input id="displayName" name="displayName" defaultValue={profile.displayName} />
-          </div>
-          <div>
-            <Label htmlFor="timezone">Timezone</Label>
-            <TimezoneField id="timezone" name="timezone" defaultValue={profile.timezone} />
-            <p className="mt-1 text-[11px] text-ink-faint">
-              Interview times and &ldquo;this week&rdquo; are read in this zone.
-            </p>
-          </div>
           <div>
             <Label htmlFor="searchStartedOn">Search started</Label>
             <Input

@@ -9,7 +9,7 @@ import {
   type RejectionStage,
   type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
-import { safeTimeZone } from '@/lib/jobs/timezone';
+import { safeTimeZone } from '@/lib/core/timezone';
 
 /**
  * Reading the pipeline.
@@ -222,7 +222,7 @@ export function formatDate(iso: string | null, timezone = 'UTC'): string {
     year: 'numeric',
     // Through safeTimeZone, because the value comes from a free-text profile
     // field: Intl throws on a zone it does not know, and an uncaught throw in
-    // a server component is a 500, not a wrong date. See lib/jobs/timezone.ts.
+    // a server component is a 500, not a wrong date. See lib/core/timezone.ts.
     timeZone: safeTimeZone(timezone),
   }).format(date);
 }

@@ -273,3 +273,84 @@ describe('re-reading a scrubbed envelope', () => {
     expect(verdicts.n).toBe(2);
   });
 });
+
+/**
+ * Account settings: one row per account, yours only, and the mirrors kept true.
+ *
+ * The mirror assertions are the ones that matter. Two `profiles.timezone`
+ * columns still exist and roughly thirty call sites still read them; they are
+ * only safe because the database propagates every write, and a propagation
+ * that silently stops is a return deadline computed in the wrong day and no
+ * error anywhere.
+ */
+describe('core.account_settings', () => {
+  it('creates exactly one row per account, by trigger', async () => {
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from account_settings where user_id = ${userA}`;
+    expect(Number(row.n)).toBe(1);
+  });
+
+  it('is readable only by its owner', async () => {
+    const mine = await asUser(userA, async (tx) => {
+      return tx<{ user_id: string }[]>`select user_id from account_settings`;
+    });
+    expect(mine.map((r) => r.user_id)).toEqual([userA]);
+
+    const theirs = await asUser(userB, async (tx) => {
+      return tx<{ user_id: string }[]>`
+        select user_id from account_settings where user_id = ${userA}`;
+    });
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('refuses a write aimed at somebody else', async () => {
+    await asUser(userB, async (tx) => {
+      const changed = await tx`
+        update account_settings set timezone = 'Antarctica/Troll' where user_id = ${userA}`;
+      expect(changed.count).toBe(0);
+    });
+
+    const [row] = await admin<{ timezone: string }[]>`
+      select timezone from account_settings where user_id = ${userA}`;
+    expect(row.timezone).not.toBe('Antarctica/Troll');
+  });
+
+  it('mirrors the timezone into both profiles rows', async () => {
+    await asUser(userA, async (tx) => {
+      await tx`update account_settings set timezone = 'Europe/London' where user_id = ${userA}`;
+    });
+
+    const [shopping] = await admin<{ timezone: string }[]>`
+      select timezone from public.profiles where id = ${userA}`;
+    const [jobs] = await admin<{ timezone: string }[]>`
+      select timezone from job_search.profiles where id = ${userA}`;
+
+    expect(shopping.timezone).toBe('Europe/London');
+    expect(jobs.timezone).toBe('Europe/London');
+  });
+
+  it('mirrors the display currency, which only the commerce side has', async () => {
+    await asUser(userA, async (tx) => {
+      await tx`update account_settings set display_currency = 'GBP' where user_id = ${userA}`;
+    });
+
+    const [shopping] = await admin<{ display_currency: string }[]>`
+      select display_currency from public.profiles where id = ${userA}`;
+    expect(shopping.display_currency).toBe('GBP');
+  });
+
+  it('refuses an empty module list, which would hide the app from itself', async () => {
+    await expect(
+      admin`update account_settings set enabled_modules = '{}' where user_id = ${userA}`,
+    ).rejects.toThrow(/account_settings_modules_ck/);
+  });
+
+  it('goes when the account does', async () => {
+    const throwaway = await createUser('core-settings-gone@example.com');
+    await admin`delete from auth.users where id = ${throwaway}`;
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from account_settings where user_id = ${throwaway}`;
+    expect(Number(row.n)).toBe(0);
+  });
+});

@@ -5,6 +5,7 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 
 export const metadata = { title: 'Home' };
 
@@ -21,7 +22,7 @@ export default async function HomePage() {
   const supabase = await createClient();
   const jobs = await createJobsClient();
 
-  const [{ count: itemCount }, { count: pursuitCount }, { data: profile }] = await Promise.all([
+  const [{ count: itemCount }, { count: pursuitCount }, settings] = await Promise.all([
     supabase
       .from('inventory_items')
       .select('id', { count: 'exact', head: true })
@@ -31,26 +32,26 @@ export default async function HomePage() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .not('status', 'in', `(${TERMINAL_STATUSES.join(',')})`),
-    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
+    loadAccountSettings(user.id),
   ]);
 
-  const displayName = profile?.display_name ?? null;
+  const displayName = settings.displayName;
   const initial = (displayName || user.email || '').charAt(0).toUpperCase();
 
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-          <WorkspaceSwitcher current={null} />
+          <WorkspaceSwitcher current={null} enabled={settings.enabledModules} />
           <div className="flex-1" />
           <FeedbackButton />
           <Link
-            href="/shopping/settings"
+            href="/account"
             className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[13px] font-semibold text-brand"
             title={displayName ?? user.email ?? ''}
           >
             {initial}
-            <span className="sr-only">Account and settings</span>
+            <span className="sr-only">Account</span>
           </Link>
         </div>
       </header>

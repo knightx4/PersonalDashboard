@@ -1,6 +1,12 @@
 /**
  * Timezones, kept to ones the platform can actually format in.
  *
+ * In `core` rather than in either workspace: a timezone is a fact about the
+ * account, not about a job search, and since `core.account_settings` became the
+ * one place it is stored, the module that parses it cannot sensibly live inside
+ * one of the things that reads it. It was in `lib/jobs/` first only because the
+ * job side is where the bug below surfaced.
+ *
  * The settings field is free text, so it accepted "ET" — which is how people
  * write a timezone and is not an IANA zone name. Nothing validated it going in
  * and nothing guarded it coming out, so every page that formatted a date in

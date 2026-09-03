@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { TopNav } from '@/components/jobs/shell/top-nav';
 import { InboxSyncBanner } from '@/components/jobs/shell/inbox-sync-banner';
@@ -30,10 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/jobs/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox] = await Promise.all([
+  const [{ data: profile }, reviewCount, inbox, settings] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
     loadInboxBannerState(user.id),
+    loadAccountSettings(user.id),
   ]);
 
   const { accountIds, initialJob } = inbox;
@@ -44,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
         reviewCount={reviewCount}
+        enabledModules={settings.enabledModules}
       />
       <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>

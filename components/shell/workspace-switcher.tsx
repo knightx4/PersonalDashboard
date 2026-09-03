@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import type { ModuleId } from '@/lib/modules';
 
 /**
  * The two halves of the app, and the switch between them.
@@ -68,13 +69,33 @@ const HOME = {
   gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
 } as const;
 
-export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) {
+/**
+ * `enabled` is the account's switched-on modules. Omitted means all of them --
+ * a switcher rendered before the settings are known must not show an empty
+ * menu, because a person whose workspaces vanished cannot tell a bug from a
+ * setting they do not remember changing.
+ *
+ * The current workspace is always listed even when switched off. You can only
+ * be here by URL, and a page that will not admit where you are is worse than
+ * one showing a workspace you meant to hide.
+ */
+export function WorkspaceSwitcher({
+  current,
+  enabled,
+}: {
+  current: WorkspaceId | null;
+  enabled?: readonly ModuleId[];
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const workspace =
     current === null ? null : (WORKSPACES.find((w) => w.id === current) ?? WORKSPACES[0]);
   const active = workspace ?? HOME;
+
+  const visible = WORKSPACES.filter(
+    (w) => enabled === undefined || enabled.includes(w.id) || w.id === current,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -140,7 +161,7 @@ export function WorkspaceSwitcher({ current }: { current: WorkspaceId | null }) 
           aria-label="Workspaces"
           className="absolute left-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-border bg-surface p-1 shadow-lg"
         >
-          {WORKSPACES.map((workspace) => {
+          {visible.map((workspace) => {
             const isCurrent = workspace.id === current;
             return (
               <Link

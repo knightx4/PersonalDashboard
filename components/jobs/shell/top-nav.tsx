@@ -2,12 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
+import type { ModuleId } from '@/lib/modules';
 
 /**
- * Workspace switcher top left, sections across the top, avatar top right.
+ * Workspace switcher top left, sections across the top, then this workspace's
+ * own settings and the account avatar top right. The gear is the module's
+ * settings, the avatar is the account's -- the dividing line being whether the
+ * setting would still mean anything with this module switched off.
  *
  * Review carries a count because an unattended review queue is exactly how the
  * funnel quietly becomes wrong, and a number you can see is the cheapest way to
@@ -28,10 +33,12 @@ const SECTIONS = [
 export function TopNav({
   displayName,
   email,
+  enabledModules,
   reviewCount = 0,
 }: {
   displayName: string | null;
   email: string;
+  enabledModules?: readonly ModuleId[];
   reviewCount?: number;
 }) {
   const pathname = usePathname();
@@ -40,7 +47,7 @@ export function TopNav({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-        <WorkspaceSwitcher current="jobs" />
+        <WorkspaceSwitcher current="jobs" enabled={enabledModules} />
 
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto" aria-label="Sections">
           {SECTIONS.map((section) => {
@@ -72,11 +79,21 @@ export function TopNav({
 
         <Link
           href="/jobs/settings"
+          aria-current={pathname.startsWith('/jobs/settings') ? 'page' : undefined}
+          className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-canvas hover:text-ink"
+          title="Job search settings"
+        >
+          <Settings className="size-4" strokeWidth={1.75} aria-hidden />
+          <span className="sr-only">Job search settings</span>
+        </Link>
+
+        <Link
+          href="/account"
           className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[13px] font-semibold text-brand"
           title={displayName ?? email}
         >
           {initial}
-          <span className="sr-only">Account and settings</span>
+          <span className="sr-only">Account</span>
         </Link>
       </div>
     </header>

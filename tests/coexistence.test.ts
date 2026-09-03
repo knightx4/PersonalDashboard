@@ -111,9 +111,16 @@ describe('coexistence with the commerce app in public', () => {
     // touch_updated_at and not for handle_new_user because it has updated_at
     // columns but creates nothing on sign-up: a vault exists once someone
     // connects a repository, not once they have an account.
+    //
+    // `core` appears for touch_updated_at because account_settings has an
+    // updated_at, and its sign-up function is deliberately NOT called
+    // handle_new_user: a third function of that name would be a fourth chance
+    // for one of these to replace another, and `create or replace function`
+    // does not error the way a duplicate table does.
     const owners: Record<string, string[]> = {
       handle_new_user: [APP_SCHEMA, 'public'],
-      touch_updated_at: [APP_SCHEMA, 'obsidian', 'public'],
+      handle_new_user_settings: ['core'],
+      touch_updated_at: ['core', APP_SCHEMA, 'obsidian', 'public'],
     };
 
     for (const [fn, expected] of Object.entries(owners)) {
@@ -135,12 +142,15 @@ describe('coexistence with the commerce app in public', () => {
     expect(rows.map((r) => r.tgname)).toEqual([
       'on_auth_user_created',
       'on_auth_user_created_job_search',
+      'on_auth_user_created_settings',
     ]);
   });
 
   it.runIf(neighbourPresent)('gives one signup a profile in each app', async () => {
     // The point of sharing auth.users: one login, and each app seeds its own
-    // profile row without knowing the other exists.
+    // profile row without knowing the other exists. Account settings make it
+    // three rows now -- the two profiles plus the one place the settings that
+    // belong to neither app actually live.
     await admin`insert into auth.users (email) values ('shared@example.com')`;
 
     const [ours] = await admin<{ count: number }[]>`
@@ -150,8 +160,13 @@ describe('coexistence with the commerce app in public', () => {
       select count(*)::int from public.profiles p
       join auth.users u on u.id = p.id where u.email = 'shared@example.com'`;
 
+    const [settings] = await admin<{ count: number }[]>`
+      select count(*)::int from core.account_settings s
+      join auth.users u on u.id = s.user_id where u.email = 'shared@example.com'`;
+
     expect(ours.count).toBe(1);
     expect(theirs.count).toBe(1);
+    expect(settings.count).toBe(1);
   });
 
   it.runIf(neighbourPresent)('cascades a deleted account out of both apps', async () => {

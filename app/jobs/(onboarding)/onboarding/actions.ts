@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { markOnboardingComplete } from '@/lib/jobs/onboarding';
 import { domainFromUrl, slugify } from '@/lib/jobs/slug';
-import { normalizeTimeZone } from '@/lib/jobs/timezone';
+import { normalizeTimeZone } from '@/lib/core/timezone';
 
 export interface OnboardingState {
   error?: string;

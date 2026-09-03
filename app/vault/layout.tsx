@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { VaultTopNav } from '@/components/vault/shell/top-nav';
 
 /**
@@ -18,15 +19,18 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('display_name')
-    .eq('id', user.id)
-    .single();
+  const [{ data: profile }, settings] = await Promise.all([
+    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
+    loadAccountSettings(user.id),
+  ]);
 
   return (
     <div className="min-h-full">
-      <VaultTopNav displayName={profile?.display_name ?? null} email={user.email ?? ''} />
+      <VaultTopNav
+        displayName={profile?.display_name ?? null}
+        email={user.email ?? ''}
+        enabledModules={settings.enabledModules}
+      />
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
     </div>
   );

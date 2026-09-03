@@ -1,6 +1,8 @@
-import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User, Wallet } from 'lucide-react';
+import Link from 'next/link';
+import { Heart, ListChecks, Mail, RotateCcw, ShieldCheck, Tag, Tags, User } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadPeople } from '@/lib/people/load';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +11,6 @@ import { signOut } from '@/app/(auth)/actions';
 import { loadMerchantReturnPolicies } from '@/lib/returns/policies';
 import { CategoriesSection } from './categories-section';
 import { DeletedOrdersSection, DeletedOrdersTitle } from './deleted-orders-section';
-import { DisplayCurrencySection } from './display-currency-section';
 import { InboxSection } from './inbox-section';
 import { ListsSection } from './lists-section';
 import { MutedMerchantsSection, MutedMerchantsTitle } from './muted-merchants';
@@ -34,11 +35,7 @@ export default async function SettingsPage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('display_name, timezone, display_currency')
-    .eq('id', user.id)
-    .single();
+  const settings = await loadAccountSettings(user.id);
 
   const { data: accounts } = await core
     .from('email_accounts')
@@ -159,32 +156,31 @@ export default async function SettingsPage({
           </CardBody>
         </Card>
 
+        {/* Name, timezone and display currency moved to /account: they hold
+            across every workspace, and having a copy of the timezone here was
+            how the shopping side ended up silently on UTC while the job side
+            was not. */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="size-4 text-ink-muted" strokeWidth={1.75} />
-              Profile
+              Account
             </CardTitle>
           </CardHeader>
           <CardBody className="space-y-1 text-sm text-ink-muted">
-            <p>{profile?.display_name ?? '—'}</p>
+            <p>{settings.displayName ?? '—'}</p>
             <p>{user.email}</p>
-            {/* Period boundaries use this, so "this month" means their month. */}
-            <p>Timezone: {profile?.timezone ?? 'UTC'}</p>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="size-4 text-ink-muted" strokeWidth={1.75} />
-              Currency
-            </CardTitle>
-          </CardHeader>
-          <CardBody>
-            <DisplayCurrencySection
-              displayCurrency={profile?.display_currency ?? 'USD'}
-            />
+            <p>
+              {settings.timezone} · {settings.displayCurrency}
+            </p>
+            <p className="pt-1">
+              <Link
+                href="/account"
+                className="text-[13px] font-medium text-brand underline underline-offset-2"
+              >
+                Change these under Account
+              </Link>
+            </p>
           </CardBody>
         </Card>
 

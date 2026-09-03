@@ -50,7 +50,7 @@ export default async function SettingsPage({
       supabase
         .from('profiles')
         .select(
-          'display_name, timezone, target_titles, search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions',
+          'target_titles, search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions',
         )
         .eq('id', user.id)
         .single(),
@@ -108,15 +108,16 @@ export default async function SettingsPage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Settings" description="Your profile, your inboxes, and your data." />
+      <PageHeader
+        title="Settings"
+        description="What the job search needs. Your name and timezone are under Account."
+      />
       <SettingsView
         email={user.email ?? ''}
         banner={inboxBanner(params.inbox)}
         gmailConfigured={isGmailOAuthConfigured()}
         appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
         profile={{
-          displayName: (profile?.display_name as string) ?? '',
-          timezone: (profile?.timezone as string) ?? 'UTC',
           targetTitles: ((profile?.target_titles as string[]) ?? []).join(', '),
           searchStartedOn: (profile?.search_started_on as string) ?? '',
           ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,

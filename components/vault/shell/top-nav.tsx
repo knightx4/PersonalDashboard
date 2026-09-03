@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
+import type { ModuleId } from '@/lib/modules';
 
 /**
  * The vault's own top bar.
@@ -23,9 +24,11 @@ const SECTIONS = [
 export function VaultTopNav({
   displayName,
   email,
+  enabledModules,
 }: {
   displayName: string | null;
   email: string;
+  enabledModules?: readonly ModuleId[];
 }) {
   const pathname = usePathname();
   const initial = (displayName || email).charAt(0).toUpperCase();
@@ -33,7 +36,7 @@ export function VaultTopNav({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-        <WorkspaceSwitcher current="vault" />
+        <WorkspaceSwitcher current="vault" enabled={enabledModules} />
 
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto" aria-label="Sections">
           {SECTIONS.map((section) => {
@@ -64,12 +67,12 @@ export function VaultTopNav({
         <FeedbackButton />
 
         <Link
-          href="/vault/settings"
+          href="/account"
           className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[13px] font-semibold text-brand"
           title={displayName ?? email}
         >
           {initial}
-          <span className="sr-only">Account and settings</span>
+          <span className="sr-only">Account</span>
         </Link>
       </div>
     </header>
