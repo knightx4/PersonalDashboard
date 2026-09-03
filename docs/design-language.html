@@ -11,19 +11,25 @@
    system is derived. Five ship; the mechanism is what matters.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ---------------------------------------------------------------------------
+   PAPER — the default light. Warm, printed, quiet.
+   --------------------------------------------------------------------------- */
 :root, [data-theme="paper"] {
   color-scheme: light;
   --canvas:#faf9f6; --surface:#ffffff; --raised:#ffffff; --sunken:#f2f0ea;
   --border:#e8e5df; --border-strong:#d5d1c8;
   --ink:#1a1a18; --ink-muted:#6b6b66; --ink-faint:#80807a;
-  --accent:#4a5fd0; --accent-hover:#3f52bd; --accent-tint:#eef1fe; --accent-soft:#6a82fb;
-  --w-shopping:#b8420f; --w-shopping-tint:#fff1e9;
-  --w-jobs:#8b3a72;     --w-jobs-tint:#fceff8;
-  --w-todo:#2e7d5b;     --w-todo-tint:#ecf7f1;
-  --w-vault:#8a6212;    --w-vault-tint:#fdf4e3;
-  --positive:#2e7d5b; --positive-soft:#3fa37a; --positive-tint:#ecf7f1;
-  --caution:#b8420f; --caution-fill:#ff8a4c; --caution-tint:#fff1e9;
-  --danger:#b91c1c; --danger-tint:#fef2f2;
+
+  --accent:#4a5fd0; --accent-hover:#3f52bd; --accent-tint:#eef1fe;
+  --w-shopping:#be1250;  --w-shopping-tint:#fdecf2;
+  --w-jobs:#7c3aed;      --w-jobs-tint:#f4f0fe;
+  --w-todo:#036695;      --w-todo-tint:#e6f4fb;
+  --w-vault:#a21caf;     --w-vault-tint:#fcecfd;
+
+  --positive:#2e7d5b; --positive-tint:#ecf7f1;
+  --caution:#b45309;  --caution-fill:#f0a63f; --caution-tint:#fdf3e3;
+  --danger:#b91c1c;   --danger-tint:#fef2f2;
+
   --s-lead:#6f6864;      --s-lead-tint:#f5f5f4;
   --s-submitted:#2563eb; --s-submitted-tint:#eff6ff;
   --s-process:#b45309;   --s-process-tint:#fffbeb;
@@ -31,6 +37,7 @@
   --s-offer:#047857;     --s-offer-tint:#ecfdf5;
   --s-rejected:#b91c1c;  --s-rejected-tint:#fef2f2;
   --s-ghosted:#78716c;
+
   --grain-opacity:0.035; --grain-blend:multiply;
   --texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
   --font-ui:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -39,105 +46,152 @@
   --display-style:normal;
 }
 
+/* ---------------------------------------------------------------------------
+   INK — the default dark. Near-black, low chroma, elevation by lightening.
+   The accent ramp is one arc: sky → indigo → violet → fuchsia → pink.
+   --------------------------------------------------------------------------- */
 [data-theme="ink"] {
   color-scheme: dark;
-  --canvas:#141311; --surface:#1c1b18; --raised:#262421; --sunken:#100f0e;
-  --border:#302d29; --border-strong:#3d3934;
-  --ink:#f4f1ea; --ink-muted:#a8a49b; --ink-faint:#7d7870;
-  --accent:#9db0ff; --accent-hover:#b6c4ff; --accent-tint:#1e2140; --accent-soft:#7b8cf0;
-  --w-shopping:#ff9d63; --w-shopping-tint:#2e1d13;
-  --w-jobs:#e896c9;     --w-jobs-tint:#2c1626;
-  --w-todo:#6fd39c;     --w-todo-tint:#13271d;
-  --w-vault:#e8bd68;    --w-vault-tint:#2b2313;
-  --positive:#6fd39c; --positive-soft:#3fa37a; --positive-tint:#13271d;
-  --caution:#ff9d63; --caution-fill:#c2601f; --caution-tint:#2e1d13;
-  --danger:#f08a8a; --danger-tint:#301a1a;
-  --s-lead:#b6aca6;      --s-lead-tint:#26241f;
-  --s-submitted:#8ab0ff; --s-submitted-tint:#161d33;
-  --s-process:#e8a84e;   --s-process-tint:#2a2113;
-  --s-final:#bfa0ff;     --s-final-tint:#231a38;
-  --s-offer:#62c79a;     --s-offer-tint:#12261d;
-  --s-rejected:#f08a8a;  --s-rejected-tint:#2d1919;
-  --s-ghosted:#a9a19b;
-  --grain-opacity:0.05; --grain-blend:overlay;
+  --canvas:#08090a; --surface:#0f1011; --raised:#191a1c; --sunken:#050506;
+  --border:#212225; --border-strong:#2e3033;
+  --ink:#f7f8f8; --ink-muted:#9096a0; --ink-faint:#646a73;
+
+  --accent:#8b9dff; --accent-hover:#a3b2ff; --accent-tint:#161a33;
+  --w-shopping:#ff8fa8;  --w-shopping-tint:#301620;
+  --w-jobs:#b39bff;      --w-jobs-tint:#1e1733;
+  --w-todo:#4cc2f1;      --w-todo-tint:#0b2130;
+  --w-vault:#e690f2;     --w-vault-tint:#2a1430;
+
+  --positive:#54d6a0; --positive-tint:#0c2119;
+  --caution:#f0a63f;  --caution-fill:#f0a63f; --caution-tint:#2a1c09;
+  --danger:#ff8b8b;   --danger-tint:#2b1315;
+
+  --s-lead:#a8a49b;      --s-lead-tint:#1c1c1e;
+  --s-submitted:#7ea9ff; --s-submitted-tint:#111a2e;
+  --s-process:#e8a84e;   --s-process-tint:#2a1c09;
+  --s-final:#c0a5ff;     --s-final-tint:#1d1730;
+  --s-offer:#54d6a0;     --s-offer-tint:#0c2119;
+  --s-rejected:#ff8b8b;  --s-rejected-tint:#2b1315;
+  --s-ghosted:#8b9099;
+
+  --grain-opacity:0.04; --grain-blend:overlay;
 }
 
+/* ---------------------------------------------------------------------------
+   RISO — printed light. Cream ground, high chroma, halftone.
+   --------------------------------------------------------------------------- */
 [data-theme="riso"] {
   color-scheme: light;
   --canvas:#f6f2e8; --surface:#fffdf7; --raised:#fffdf7; --sunken:#ece6d7;
   --border:#ded5c0; --border-strong:#c9bda0;
   --ink:#191713; --ink-muted:#6a6353; --ink-faint:#867e6b;
-  --accent:#0b4fa8; --accent-hover:#093f87; --accent-tint:#e2ecfb; --accent-soft:#2f76d8;
-  --w-shopping:#b3300f; --w-shopping-tint:#fbe6df;
-  --w-jobs:#8a2a63;     --w-jobs-tint:#f8e4f0;
-  --w-todo:#1d6b48;     --w-todo-tint:#e0f0e6;
-  --w-vault:#7a5408;    --w-vault-tint:#f8ecd4;
-  --positive:#1d6b48; --positive-soft:#2f9268; --positive-tint:#e0f0e6;
-  --caution:#b3300f; --caution-fill:#ef6033; --caution-tint:#fbe6df;
-  --danger:#a3160f; --danger-tint:#fbe3e0;
+
+  --accent:#2438b8; --accent-hover:#1c2d98; --accent-tint:#e6e9fb;
+  --w-shopping:#b3104a;  --w-shopping-tint:#fbe3ec;
+  --w-jobs:#6b21d6;      --w-jobs-tint:#efe7fc;
+  --w-todo:#03607f;      --w-todo-tint:#e0f0f7;
+  --w-vault:#96128f;     --w-vault-tint:#fae5f7;
+
+  --positive:#1d6b48; --positive-tint:#e0f0e6;
+  --caution:#9a4409;  --caution-fill:#ef8f33; --caution-tint:#fbebdc;
+  --danger:#a3160f;   --danger-tint:#fbe3e0;
+
+  --s-lead:#5f584f;      --s-lead-tint:#efeade;
+  --s-submitted:#1642b5; --s-submitted-tint:#e4e9f8;
+  --s-process:#9a4409;   --s-process-tint:#fbebdc;
+  --s-final:#6b21d6;     --s-final-tint:#efe7fc;
+  --s-offer:#1d6b48;     --s-offer-tint:#e0f0e6;
+  --s-rejected:#a3160f;  --s-rejected-tint:#fbe3e0;
+  --s-ghosted:#7d7566;
+
   --grain-opacity:0.11; --grain-blend:multiply;
   --texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='1.4' cy='1.4' r='1.1' fill='%23000'/%3E%3C/svg%3E");
 }
 
+/* ---------------------------------------------------------------------------
+   TERMINAL — cyan phosphor, monospace display. The joke, and it works.
+   --------------------------------------------------------------------------- */
 [data-theme="terminal"] {
   color-scheme: dark;
-  --canvas:#080a08; --surface:#0e120e; --raised:#151a15; --sunken:#040604;
-  --border:#1d271d; --border-strong:#2c392c;
-  --ink:#d8f5d8; --ink-muted:#8fbe93; --ink-faint:#5d825f;
-  --accent:#7dfba0; --accent-hover:#a2ffbd; --accent-tint:#0f2416; --accent-soft:#4fd97a;
-  --w-shopping:#ffc66d; --w-shopping-tint:#2a2011;
-  --w-jobs:#c7a4ff;     --w-jobs-tint:#1e1730;
-  --w-todo:#7dfba0;     --w-todo-tint:#0f2416;
-  --w-vault:#8fe3ff;    --w-vault-tint:#0d2430;
-  --positive:#7dfba0; --positive-soft:#4fd97a; --positive-tint:#0f2416;
-  --caution:#ffc66d; --caution-fill:#b8862c; --caution-tint:#2a2011;
-  --danger:#ff8f8f; --danger-tint:#301616;
-  --grain-opacity:0.07; --grain-blend:overlay;
-  --s-lead:#b6aca6;      --s-lead-tint:#26241f;
-  --s-submitted:#8ab0ff; --s-submitted-tint:#161d33;
-  --s-process:#e8a84e;   --s-process-tint:#2a2113;
-  --s-final:#bfa0ff;     --s-final-tint:#231a38;
-  --s-offer:#62c79a;     --s-offer-tint:#12261d;
-  --s-rejected:#f08a8a;  --s-rejected-tint:#2d1919;
-  --s-ghosted:#a9a19b;
+  --canvas:#020c11; --surface:#04141a; --raised:#082028; --sunken:#010609;
+  --border:#0e2c36; --border-strong:#16404e;
+  --ink:#ccf2ff; --ink-muted:#7fb8cc; --ink-faint:#4d7d8f;
+
+  --accent:#5fe3ff; --accent-hover:#8eecff; --accent-tint:#082b36;
+  --w-shopping:#ff9ec4;  --w-shopping-tint:#2e1522;
+  --w-jobs:#c0a5ff;      --w-jobs-tint:#1d1733;
+  --w-todo:#5fe3ff;      --w-todo-tint:#082b36;
+  --w-vault:#eb9ff5;     --w-vault-tint:#2a1430;
+
+  --positive:#54d6a0; --positive-tint:#062018;
+  --caution:#f0c052;  --caution-fill:#f0c052; --caution-tint:#241d08;
+  --danger:#ff9494;   --danger-tint:#2b1314;
+
+  --s-lead:#9aa8ad;      --s-lead-tint:#0d1a1e;
+  --s-submitted:#7fc4ff; --s-submitted-tint:#08202e;
+  --s-process:#f0c052;   --s-process-tint:#241d08;
+  --s-final:#c0a5ff;     --s-final-tint:#1d1733;
+  --s-offer:#54d6a0;     --s-offer-tint:#062018;
+  --s-rejected:#ff9494;  --s-rejected-tint:#2b1314;
+  --s-ghosted:#6f8f9b;
+
+  --grain-opacity:0.06; --grain-blend:overlay;
   --font-display:var(--font-mono);
-  --display-style:normal;
 }
 
+/* ---------------------------------------------------------------------------
+   DUSK — plum-cast dark, softer edges, same accent arc shifted warm.
+   --------------------------------------------------------------------------- */
 [data-theme="dusk"] {
   color-scheme: dark;
-  --canvas:#16121c; --surface:#1e1926; --raised:#282133; --sunken:#100d15;
-  --border:#332b40; --border-strong:#42384f;
-  --ink:#f0ebf6; --ink-muted:#aca2ba; --ink-faint:#7f7590;
-  --accent:#c4a7ff; --accent-hover:#d6c1ff; --accent-tint:#291f3a; --accent-soft:#a184e6;
-  --w-shopping:#ffa07a; --w-shopping-tint:#331f1c;
-  --w-jobs:#f0a0d8;     --w-jobs-tint:#33203a;
-  --w-todo:#7fd7b4;     --w-todo-tint:#152e2a;
-  --w-vault:#f2c97e;    --w-vault-tint:#2f2718;
-  --positive:#7fd7b4; --positive-soft:#4fae8c; --positive-tint:#152e2a;
-  --caution:#ffa07a; --caution-fill:#c26a45; --caution-tint:#331f1c;
-  --danger:#f492a4; --danger-tint:#331a22;
-  --s-lead:#b6aca6;      --s-lead-tint:#26241f;
-  --s-submitted:#8ab0ff; --s-submitted-tint:#161d33;
-  --s-process:#e8a84e;   --s-process-tint:#2a2113;
-  --s-final:#bfa0ff;     --s-final-tint:#231a38;
-  --s-offer:#62c79a;     --s-offer-tint:#12261d;
-  --s-rejected:#f08a8a;  --s-rejected-tint:#2d1919;
-  --s-ghosted:#a9a19b;
-  --grain-opacity:0.06; --grain-blend:overlay;
+  --canvas:#110d1a; --surface:#191426; --raised:#241d35; --sunken:#0b0812;
+  --border:#2c2440; --border-strong:#3b3153;
+  --ink:#f2eefa; --ink-muted:#a79fc0; --ink-faint:#736c8a;
+
+  --accent:#b9a5ff; --accent-hover:#cbbcff; --accent-tint:#241c3d;
+  --w-shopping:#ff9ab5;  --w-shopping-tint:#331a29;
+  --w-jobs:#c0a5ff;      --w-jobs-tint:#271e42;
+  --w-todo:#6fcdf0;      --w-todo-tint:#132833;
+  --w-vault:#ec9df3;     --w-vault-tint:#301a3a;
+
+  --positive:#68d9aa; --positive-tint:#13291f;
+  --caution:#f2b25a;  --caution-fill:#f2b25a; --caution-tint:#2e2210;
+  --danger:#ff96a4;   --danger-tint:#331a22;
+
+  --s-lead:#a89fb8;      --s-lead-tint:#211b2e;
+  --s-submitted:#8fb4ff; --s-submitted-tint:#1a2038;
+  --s-process:#f2b25a;   --s-process-tint:#2e2210;
+  --s-final:#c0a5ff;     --s-final-tint:#271e42;
+  --s-offer:#68d9aa;     --s-offer-tint:#13291f;
+  --s-rejected:#ff96a4;  --s-rejected-tint:#331a22;
+  --s-ghosted:#8e86a3;
+
+  --grain-opacity:0.05; --grain-blend:overlay;
 }
 
+/* An unset choice follows the system, and the system dark is Ink. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --canvas:#141311; --surface:#1c1b18; --raised:#262421; --sunken:#100f0e;
-    --border:#302d29; --border-strong:#3d3934;
-    --ink:#f4f1ea; --ink-muted:#a8a49b; --ink-faint:#7d7870;
-    --accent:#9db0ff; --accent-hover:#b6c4ff; --accent-tint:#1e2140;
-    --positive:#6fd39c; --positive-tint:#13271d;
-    --caution:#ff9d63; --caution-tint:#2e1d13;
-    --danger:#f08a8a; --danger-tint:#301a1a;
-    --grain-opacity:0.05; --grain-blend:overlay;
+    --canvas:#08090a; --surface:#0f1011; --raised:#191a1c; --sunken:#050506;
+    --border:#212225; --border-strong:#2e3033;
+    --ink:#f7f8f8; --ink-muted:#9096a0; --ink-faint:#646a73;
+    --accent:#8b9dff; --accent-hover:#a3b2ff; --accent-tint:#161a33;
+    --w-shopping:#ff8fa8; --w-shopping-tint:#301620;
+    --w-jobs:#b39bff;     --w-jobs-tint:#1e1733;
+    --w-todo:#4cc2f1;     --w-todo-tint:#0b2130;
+    --w-vault:#e690f2;    --w-vault-tint:#2a1430;
+    --positive:#54d6a0; --positive-tint:#0c2119;
+    --caution:#f0a63f;  --caution-fill:#f0a63f; --caution-tint:#2a1c09;
+    --danger:#ff8b8b;   --danger-tint:#2b1315;
+    --s-lead:#a8a49b;      --s-lead-tint:#1c1c1e;
+    --s-submitted:#7ea9ff; --s-submitted-tint:#111a2e;
+    --s-process:#e8a84e;   --s-process-tint:#2a1c09;
+    --s-final:#c0a5ff;     --s-final-tint:#1d1730;
+    --s-offer:#54d6a0;     --s-offer-tint:#0c2119;
+    --s-rejected:#ff8b8b;  --s-rejected-tint:#2b1315;
+    --s-ghosted:#8b9099;
+    --grain-opacity:0.04; --grain-blend:overlay;
   }
 }
 
@@ -161,7 +215,9 @@ body::before{
 
 header.doc{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(10px) saturate(1.2);border-bottom:1px solid var(--border)}
 header.doc .bar{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:.7rem;height:58px;padding:0 1.25rem}
-header.doc .mark{width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;color:#fff;font-size:13px;background-image:linear-gradient(135deg,var(--accent-soft) 0%,var(--w-jobs) 100%)}
+header.doc .mark{width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--accent) 14%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--accent) 32%,transparent);color:var(--accent)}
 header.doc strong{font-size:15px;letter-spacing:-.011em}
 header.doc .themes{margin-left:auto;display:flex;gap:.25rem;align-items:center}
 header.doc .themes button{
@@ -245,7 +301,7 @@ table.spec code{white-space:nowrap}
 .sz-lg{height:44px;padding:0 1.25rem;font-size:15px}
 
 .badge{display:inline-flex;align-items:center;border-radius:999px;padding:.1rem .5rem;font-size:11px;font-weight:500;white-space:nowrap}
-.count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--caution-fill);color:#1a1a18;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--caution-fill);color:#14100a;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
 
 .pills{display:flex;gap:.2rem;flex-wrap:wrap}
 .pills a{border-radius:8px;padding:.32rem .68rem;font-size:13px;font-weight:500;color:var(--ink-muted);text-decoration:none;position:relative}
@@ -278,10 +334,11 @@ table.spec code{white-space:nowrap}
 .banner.warn{background:var(--caution-tint)}
 .banner.bad{background:var(--danger-tint)}
 .banner.good{background:var(--positive-tint)}
-.banner .ic{flex:none;font-size:15px;line-height:1.35}
+.banner .ic{flex:none;width:16px;height:16px;margin-top:.12rem}
 
 .empty{border:1px dashed var(--border-strong);border-radius:12px;background:var(--surface);padding:2.4rem 1.5rem;text-align:center}
-.empty .glyph{width:52px;height:52px;border-radius:999px;background:var(--accent-tint);margin:0 auto .85rem;display:grid;place-items:center;color:var(--accent);font-size:21px}
+.empty .glyph{width:52px;height:52px;border-radius:999px;background:var(--accent-tint);margin:0 auto .85rem;display:grid;place-items:center;color:var(--accent)}
+.empty .glyph .ico{width:23px;height:23px}
 .empty h5{margin:0;font-size:16px}
 .empty p{margin:.35rem auto 0;max-width:42ch;font-size:14px;color:var(--ink-muted)}
 .empty .acts{margin-top:1.1rem;display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
@@ -291,12 +348,23 @@ table.spec code{white-space:nowrap}
 @keyframes shimmer{100%{transform:translateX(100%)}}
 
 .marks{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center}
-.marks .m{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:15px;flex:none;box-shadow:inset 0 1px 0 rgb(255 255 255 / .28)}
+/* A mark is a flat tint of its own hue with the glyph stroked in it. No gradient:
+   a two-hue diagonal ramp is decoration pretending to be identity, and it is the
+   first thing that looks cheap when the theme changes. */
+.marks .m,.wscard .sq{
+  border-radius:9px;display:grid;place-items:center;flex:none;
+  background:color-mix(in srgb,var(--mk) 13%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--mk) 30%,transparent);
+  color:var(--mk)}
+.marks .m{width:32px;height:32px}
+.ico{width:1em;height:1em;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;fill:none;display:block}
+.marks .m .ico,.wscard .sq .ico{width:17px;height:17px}
+.wscard .sq .ico{width:14px;height:14px}
 
 .wsdemo{display:grid;gap:.55rem;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
 .wscard{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:.75rem .85rem}
 .wscard .top{display:flex;align-items:center;gap:.5rem;margin-bottom:.55rem}
-.wscard .sq{width:24px;height:24px;border-radius:8px;flex:none;display:grid;place-items:center;color:#fff;font-size:12px}
+.wscard .sq{width:24px;height:24px}
 .wscard b{font-size:13.5px}
 .wscard .pill{display:inline-block;border-radius:7px;padding:.2rem .5rem;font-size:12px;font-weight:500}
 
@@ -331,16 +399,31 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-shopping" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></symbol>
+<symbol id="i-jobs" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+<symbol id="i-todo" viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></symbol>
+<symbol id="i-vault" viewBox="0 0 24 24"><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9.5 8h5"/><path d="M9.5 12H16"/><path d="M9.5 16H14"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.3 21a2 2 0 0 0 3.4 0"/><path d="M3.3 15.3A1 1 0 0 0 4 17h16a1 1 0 0 0 .7-1.7C19.4 14 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.4 6-2.7 7.3"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-search-x" viewBox="0 0 24 24"><path d="m13.5 8.5-5 5"/><path d="m8.5 8.5 5 5"/><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-4.5"/></symbol>
+</defs></svg>
+
 <header class="doc">
   <div class="bar">
-    <span class="mark" aria-hidden="true">◐</span>
+    <span class="mark" aria-hidden="true"><svg class="ico" style="width:15px;height:15px"><use href="#i-home"/></svg></span>
     <strong>Design language</strong>
     <div class="themes" role="group" aria-label="Preview theme">
       <button data-set="paper"    aria-pressed="true"  title="Paper — default light"    style="background:#faf9f6"></button>
-      <button data-set="ink"      aria-pressed="false" title="Ink — default dark"       style="background:#1c1b18"></button>
+      <button data-set="ink"      aria-pressed="false" title="Ink — default dark"        style="background:#0f1011"></button>
       <button data-set="riso"     aria-pressed="false" title="Riso — printed light"     style="background:#f6f2e8"></button>
-      <button data-set="terminal" aria-pressed="false" title="Terminal — phosphor dark" style="background:#0e120e"></button>
-      <button data-set="dusk"     aria-pressed="false" title="Dusk — plum dark"         style="background:#1e1926"></button>
+      <button data-set="terminal" aria-pressed="false" title="Terminal — cyan phosphor"  style="background:#04141a"></button>
+      <button data-set="dusk"     aria-pressed="false" title="Dusk — plum dark"          style="background:#191426"></button>
     </div>
   </div>
   <nav class="toc">
@@ -348,7 +431,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
     <a href="#themes">Themes</a><a href="#texture">Texture</a><a href="#type">Type</a>
     <a href="#space">Space</a><a href="#shell">Shell</a><a href="#containers">Containers</a>
     <a href="#data">Data</a><a href="#states">States</a><a href="#forms">Forms</a>
-    <a href="#motion">Motion</a><a href="#alive">Alive</a><a href="#a11y">A11y</a>
+    <a href="#motion">Motion</a><a href="#interaction">Interaction</a><a href="#alive">Alive</a><a href="#a11y">A11y</a>
     <a href="#voice">Voice</a><a href="#checklist">Checklist</a><a href="#never">Never</a>
   </nav>
 </header>
@@ -513,28 +596,36 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   workspace mark — so you know where you are peripherally, before you read a word. Switching
   workspace does not just change the content; it changes the light in the room.
 </p>
+<p>
+  The four are stops on <strong>one arc — sky, violet, fuchsia, rose</strong> — with indigo as the
+  app's own accent at the blue end. Drawing them from a single sweep rather than from around the
+  wheel is what keeps four differently-coloured workspaces reading as one product instead of four
+  products sharing a login. <strong>Colour is reinforcement, never the identifier</strong>: the
+  glyph tells you which workspace you are in and the hue confirms it, which is also why two adjacent
+  stops being similar is not a problem.
+</p>
 
 <div class="demo">
   <div class="wsdemo">
     <div class="wscard" style="--accent:var(--w-shopping);--accent-tint:var(--w-shopping-tint)">
-      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-shopping),var(--caution-fill))">🛍</span><b>Shopping</b></div>
+      <div class="top"><span class="sq" style="--mk:var(--w-shopping)"><svg class="ico"><use href="#i-shopping"/></svg></span><b>Shopping</b></div>
       <span class="pill" style="background:var(--w-shopping-tint);color:var(--w-shopping)">Inventory</span>
-      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">ember — <code>--w-shopping</code></p>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">rose — <code>--w-shopping</code></p>
     </div>
     <div class="wscard">
-      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-jobs),var(--accent-soft))">💼</span><b>Job search</b></div>
+      <div class="top"><span class="sq" style="--mk:var(--w-jobs)"><svg class="ico"><use href="#i-jobs"/></svg></span><b>Job search</b></div>
       <span class="pill" style="background:var(--w-jobs-tint);color:var(--w-jobs)">Pipeline</span>
-      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">plum — <code>--w-jobs</code></p>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">violet — <code>--w-jobs</code></p>
     </div>
     <div class="wscard">
-      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-todo),var(--accent-soft))">✓</span><b>Todo</b></div>
+      <div class="top"><span class="sq" style="--mk:var(--w-todo)"><svg class="ico"><use href="#i-todo"/></svg></span><b>Todo</b></div>
       <span class="pill" style="background:var(--w-todo-tint);color:var(--w-todo)">Agenda</span>
-      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">moss — <code>--w-todo</code></p>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">sky — <code>--w-todo</code></p>
     </div>
     <div class="wscard">
-      <div class="top"><span class="sq" style="background-image:linear-gradient(135deg,var(--w-vault),var(--w-shopping))">📓</span><b>Vault</b></div>
+      <div class="top"><span class="sq" style="--mk:var(--w-vault)"><svg class="ico"><use href="#i-vault"/></svg></span><b>Vault</b></div>
       <span class="pill" style="background:var(--w-vault-tint);color:var(--w-vault)">Notes</span>
-      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">ochre — <code>--w-vault</code></p>
+      <p style="margin:.5rem 0 0;font-size:12px;color:var(--ink-muted)">fuchsia — <code>--w-vault</code></p>
     </div>
   </div>
 </div>
@@ -549,7 +640,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 <div class="rule">
   <p>
     <strong>Chrome takes the accent; content takes its own meaning.</strong> The jobs workspace is
-    plum — but a pipeline card is still <em>submitted-blue</em>, because that colour is a claim
+    violet — but a pipeline card is still <em>submitted-blue</em>, because that colour is a claim
     about the pursuit, not about where you are standing. When accent and semantic colour meet, the
     semantic one wins and the accent retreats to the frame. This is the rule that stops per-workspace
     colour becoming per-workspace chaos.
@@ -643,6 +734,44 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   </p>
 </div>
 
+<h3>Gradients and marks</h3>
+
+<div class="rule">
+  <p>
+    <strong>One hue, or none.</strong> A gradient may move at most ~20% in lightness within a
+    single hue. <strong>Never blend two hues</strong> — an orange-to-pink diagonal ramp is
+    decoration pretending to be identity, it is the first thing that looks cheap when the theme
+    changes, and it makes four workspace marks that are only distinguishable if you already know
+    which is which.
+  </p>
+</div>
+
+<p>
+  A workspace mark is a <strong>flat tint of its own hue with the glyph stroked in it</strong>:
+  13% of the accent over the surface, a 30% accent border, the icon in the accent at full strength.
+  It reads at 16px, it survives every theme, and it is the same object as the icon used on the home
+  tiles and in Account.
+</p>
+
+<div class="demo">
+  <div class="marks">
+    <span class="m" style="--mk:var(--accent)"><svg class="ico"><use href="#i-home"/></svg></span>
+    <span class="m" style="--mk:var(--w-shopping)"><svg class="ico"><use href="#i-shopping"/></svg></span>
+    <span class="m" style="--mk:var(--w-jobs)"><svg class="ico"><use href="#i-jobs"/></svg></span>
+    <span class="m" style="--mk:var(--w-todo)"><svg class="ico"><use href="#i-todo"/></svg></span>
+    <span class="m" style="--mk:var(--w-vault)"><svg class="ico"><use href="#i-vault"/></svg></span>
+    <span style="font-size:12.5px;color:var(--ink-muted)">flat tint · 1px hairline · glyph in the hue</span>
+  </div>
+</div>
+
+<h3>Icons</h3>
+<ul>
+  <li><strong>Lucide, 1.75 stroke, <code>currentColor</code>, never filled.</strong> One library, one weight, no exceptions.</li>
+  <li><strong>Never an emoji as an interface icon.</strong> Emoji render differently on every platform, cannot take a colour, cannot take a stroke weight, and carry a tone this app does not have. They are fine inside a user's own note text; they are never in the interface.</li>
+  <li>16px in rows and buttons, 14px inside a badge or chip, 20px+ only in an empty state.</li>
+  <li>A decorative icon takes <code>aria-hidden</code>. An icon that <em>is</em> the control takes an accessible name.</li>
+</ul>
+
 <h2 id="themes">Themes</h2>
 
 <p>
@@ -657,7 +786,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   --canvas --surface --raised --sunken
   --border --border-strong
   --ink --ink-muted --ink-faint
-  --accent --accent-hover --accent-tint --accent-soft
+  --accent --accent-hover --accent-tint
   --w-shopping --w-jobs --w-todo --w-vault  <span class="c">(+ their tints)</span>
   --positive --caution --danger             <span class="c">(+ their tints)</span>
   --texture --grain-opacity --grain-blend
@@ -669,10 +798,10 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   <thead><tr><th>Theme</th><th>Mood</th><th>Ground</th><th>Texture</th><th>For</th></tr></thead>
   <tbody>
     <tr><td><strong>Paper</strong></td><td>Warm, quiet, printed</td><td>Light <code>#faf9f6</code></td><td>Fine grain, 3.5%</td><td>The default. Daylight, long sessions.</td></tr>
-    <tr><td><strong>Ink</strong></td><td>Warm near-black, not cold grey</td><td>Dark <code>#141311</code></td><td>Grain, 5%, overlay</td><td>The default dark. Evening.</td></tr>
+    <tr><td><strong>Ink</strong></td><td>Near-black, low chroma, blue-to-pink accent arc</td><td>Dark <code>#08090a</code></td><td>Grain, 4%, overlay</td><td>The default dark.</td></tr>
     <tr><td><strong>Riso</strong></td><td>Duotone print, high chroma</td><td>Cream <code>#f6f2e8</code></td><td>Halftone dots, 11%</td><td>The loudest one. Deliberately imperfect.</td></tr>
-    <tr><td><strong>Terminal</strong></td><td>Phosphor green, monospace display</td><td>Near-black <code>#080a08</code></td><td>Grain, 7%</td><td>Focus. Also the joke, and it is allowed to be.</td></tr>
-    <tr><td><strong>Dusk</strong></td><td>Plum-cast dark, soft edges</td><td>Dark <code>#16121c</code></td><td>Grain, 6%</td><td>Late. Lower contrast ceiling, still AA.</td></tr>
+    <tr><td><strong>Terminal</strong></td><td>Cyan phosphor, monospace display</td><td>Near-black <code>#020c11</code></td><td>Grain, 6%</td><td>Focus. Also the joke, and it is allowed to be.</td></tr>
+    <tr><td><strong>Dusk</strong></td><td>Plum-cast dark, soft edges</td><td>Dark <code>#110d1a</code></td><td>Grain, 5%</td><td>Late. Lower contrast ceiling, still AA.</td></tr>
   </tbody>
 </table>
 
@@ -866,11 +995,11 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 <div class="demo">
   <div class="demo-label">The mark: workspace gradient as field, workspace glyph knocked out</div>
   <div class="marks">
-    <span class="m" style="background-image:linear-gradient(135deg,var(--accent-soft),var(--w-jobs))">◐</span>
-    <span class="m" style="background-image:linear-gradient(135deg,var(--w-shopping),var(--caution-fill))">🛍</span>
-    <span class="m" style="background-image:linear-gradient(135deg,var(--w-jobs),var(--accent-soft))">💼</span>
-    <span class="m" style="background-image:linear-gradient(135deg,var(--w-todo),var(--accent-soft))">✓</span>
-    <span class="m" style="background-image:linear-gradient(135deg,var(--w-vault),var(--w-shopping))">📓</span>
+    <span class="m" style="--mk:var(--accent)"><svg class="ico"><use href="#i-home"/></svg></span>
+    <span class="m" style="--mk:var(--w-shopping)"><svg class="ico"><use href="#i-shopping"/></svg></span>
+    <span class="m" style="--mk:var(--w-jobs)"><svg class="ico"><use href="#i-jobs"/></svg></span>
+    <span class="m" style="--mk:var(--w-todo)"><svg class="ico"><use href="#i-todo"/></svg></span>
+    <span class="m" style="--mk:var(--w-vault)"><svg class="ico"><use href="#i-vault"/></svg></span>
     <span style="font-size:12.5px;color:var(--ink-muted)">Home · Shopping · Jobs · Todo · Vault</span>
   </div>
   <p style="font-size:13.5px;color:var(--ink-muted);margin-top:.9rem;max-width:66ch">
@@ -991,10 +1120,10 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 
 <div class="demo">
   <div style="display:flex;flex-direction:column;gap:.55rem">
-    <div class="banner info"><span class="ic">◐</span><div><strong>Sync running.</strong> Checking Gmail for new orders — seen 412, parsed 38.</div></div>
-    <div class="banner warn"><span class="ic">▲</span><div><strong>The vault token expired.</strong> Nothing has mirrored since 12 Aug. <a href="#containers">Reconnect the vault</a> to pick it back up.</div></div>
-    <div class="banner bad"><span class="ic">■</span><div><strong>Job search could not be read just now</strong>, so anything from it is missing from this page.</div></div>
-    <div class="banner good"><span class="ic">●</span><div><strong>$86.40 refunded</strong> across two returns this month.</div></div>
+    <div class="banner info"><svg class="ico ic" style="color:var(--accent)"><use href="#i-info"/></svg><div><strong>Sync running.</strong> Checking Gmail for new orders — seen 412, parsed 38.</div></div>
+    <div class="banner warn"><svg class="ico ic" style="color:var(--caution)"><use href="#i-alert"/></svg><div><strong>The vault token expired.</strong> Nothing has mirrored since 12 Aug. <a href="#containers">Reconnect the vault</a> to pick it back up.</div></div>
+    <div class="banner bad"><svg class="ico ic" style="color:var(--danger)"><use href="#i-x-circle"/></svg><div><strong>Job search could not be read just now</strong>, so anything from it is missing from this page.</div></div>
+    <div class="banner good"><svg class="ico ic" style="color:var(--positive)"><use href="#i-check-circle"/></svg><div><strong>$86.40 refunded</strong> across two returns this month.</div></div>
   </div>
 </div>
 
@@ -1107,7 +1236,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 
 <div class="demo on-canvas">
   <div class="empty">
-    <div class="glyph">◇</div>
+    <div class="glyph"><svg class="ico"><use href="#i-search-x"/></svg></div>
     <h5>No matching items</h5>
     <p>Nothing matched that search across names, tags and categories. You probably don't own it.</p>
     <div class="acts">
@@ -1213,6 +1342,235 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
     animation.
   </p>
 </div>
+
+<h2 id="interaction">Interaction</h2>
+
+<p class="lede" style="font-size:16px">
+  Everything above describes how the app <em>looks</em>. This describes how it <em>behaves</em>,
+  which is the half that decides whether it is actually good to use.
+</p>
+
+<h3>The four loops</h3>
+
+<p>
+  Every workspace runs some subset of the same four-beat loop. Naming them is what stops a page from
+  quietly becoming the wrong kind of page — the failure that turns an agenda into an archive, and a
+  review queue into a list nobody works.
+</p>
+
+<table class="spec">
+  <thead><tr><th>Beat</th><th>The question</th><th>Design obligation</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Capture</strong></td><td>"Get this out of my head / inbox."</td><td>Must cost almost nothing. One field, always reachable, never a page transition. Ingestion counts as capture: mail arriving <em>is</em> the user capturing.</td></tr>
+    <tr><td><strong>Triage</strong></td><td>"Is this real, and is it mine?"</td><td>A queue with a keyboard rhythm and a default. Every item leaves the queue in one keystroke. <strong>An unworked triage queue is how the data quietly becomes wrong</strong> — this is the beat the app most often skips.</td></tr>
+    <tr><td><strong>Act</strong></td><td>"Do the thing."</td><td>The action is on the row. Nothing that can be done from a list should require opening a detail page.</td></tr>
+    <tr><td><strong>Review</strong></td><td>"Is this working?"</td><td>Aggregates, cohorts, funnels. Honest about sample size and about what is too young to mean anything.</td></tr>
+  </tbody>
+</table>
+
+<div class="rule">
+  <p>
+    <strong>Every loop needs an entry point at most one click from anywhere in its workspace,</strong>
+    and the page that answers <em>"what do I do"</em> is never the same page as the one that answers
+    <em>"what is going on"</em>. <code>/jobs/today</code> and <code>/todo</code> get this exactly
+    right and are the model. <code>/shopping</code> has no equivalent — its dashboard answers
+    "what is going on" and nothing answers "what do I do", which is why the returns deadline is the
+    thing people miss.
+  </p>
+</div>
+
+<h3>Where am I, and how do I get back</h3>
+
+<ul>
+  <li><strong>Three levels, and that is the budget.</strong> Workspace → section → thing. If you need a fourth, it is a tab inside the thing, not a deeper route.</li>
+  <li><strong>Every page answers "where am I" without reading a word</strong> — the workspace accent, the mark, the active tab.</li>
+  <li><strong>A detail page always names its way back</strong>, to the specific list you came from with its filters intact, not to a generic parent. The vault note's "All notes" link is right in form and wrong in fidelity: it drops the search you arrived from.</li>
+  <li><strong>The browser back button is a first-class control.</strong> This is most of why law 5 exists. If back does not undo the last view change, the view change was written in the wrong place.</li>
+  <li><strong>Never a modal for anything with content in it.</strong> Modals cannot be linked, cannot be back-buttoned, and trap on a phone. Popovers for menus; pages for content; inline expansion for detail.</li>
+</ul>
+
+<h3>Latency: what is instant, what waits</h3>
+
+<p>Three tiers, and every interaction is assigned to one deliberately.</p>
+
+<table class="spec">
+  <thead><tr><th>Tier</th><th>Feels</th><th>Use for</th><th>Mechanism</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Instant</strong></td><td>No perceptible delay</td><td>Filters, sort, tabs, expand/collapse, theme, density</td><td>Client-side, or a server round-trip the UI does not wait for.</td></tr>
+    <tr><td><strong>Optimistic</strong></td><td>Done immediately, reverts loudly if it fails</td><td>Check a task, move a card, pin, snooze, toggle a preference</td><td><code>useOptimistic</code> + server action. On failure: revert <em>and</em> say why.</td></tr>
+    <tr><td><strong>Pending</strong></td><td>Visibly working</td><td>Anything creating a row, sending mail, hitting a third party</td><td>Disabled control with its own label — "Saving…", "Importing…". Never a full-page spinner.</td></tr>
+  </tbody>
+</table>
+
+<div class="rule">
+  <p>
+    <strong>Optimistic without a visible failure path is a lie.</strong> The pipeline board already
+    does this correctly — it reverts the card and shows the error. Every optimistic write must have
+    that second half written at the same time, or it silently drops user actions.
+  </p>
+</div>
+
+<h3>Undo beats confirm</h3>
+
+<p>
+  A confirm dialog asks the user to predict the consequences of an action they have not seen yet. An
+  undo lets them look at the result and change their mind. <strong>Undo is almost always the better
+  design</strong>, and it is faster in the common case, which is the case where they meant it.
+</p>
+
+<table class="spec">
+  <thead><tr><th>Action</th><th>Pattern</th></tr></thead>
+  <tbody>
+    <tr><td>Reversible, low blast radius — complete, drop, snooze, dismiss, mark returned</td><td><strong>Do it, then offer undo</strong> in the status line for ~10 seconds.</td></tr>
+    <tr><td>Reversible but expensive to reverse — delete an order, remove a pursuit</td><td><strong>Soft delete + an undo,</strong> and a recoverable list in settings. <code>orders.deleted_at</code> already works this way and it is the right instinct.</td></tr>
+    <tr><td>Genuinely irreversible — delete the account, revoke a grant, disconnect a mailbox</td><td><strong>Inline two-step confirm</strong> that names what will be lost. Never <code>window.confirm</code>.</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  The codebase currently reaches for confirm at every tier, including a <code>window.confirm</code>
+  in <code>action-menu.tsx</code> whose own comment warns against it.
+</p>
+
+<h3>Bulk</h3>
+
+<p>
+  A list where you routinely act on ten things needs a way to act on ten things. Today there is none
+  anywhere in the app, which means clearing a triage backlog is forty individual clicks — and that
+  is precisely why triage backlogs do not get cleared.
+</p>
+<ul>
+  <li>Selection appears <strong>on hover of the row's left edge</strong>, not as a permanently visible checkbox column that taxes every ordinary scan.</li>
+  <li><code>Shift</code>-click extends a range. <code>⌘</code>-click toggles one.</li>
+  <li>A selection turns the page header into an <strong>action bar</strong> — "3 selected · Confirm · Discard · Clear" — replacing the header rather than stacking below it.</li>
+  <li><code>Esc</code> clears the selection. Always.</li>
+  <li>A bulk action gets <strong>one undo for the whole batch</strong>, not one per row.</li>
+</ul>
+
+<h3>The keyboard model</h3>
+
+<p>Not a bag of shortcuts — a small, consistent model that generalises.</p>
+
+<table class="spec">
+  <thead><tr><th>Key</th><th>Everywhere it means</th></tr></thead>
+  <tbody>
+    <tr><td><code>⌘K</code></td><td>Go anywhere / do anything. The one entry point worth memorising.</td></tr>
+    <tr><td><code>⌘1</code>–<code>⌘4</code></td><td>Jump to a workspace.</td></tr>
+    <tr><td><code>/</code></td><td>Focus this page's search.</td></tr>
+    <tr><td><code>j</code> / <code>k</code> or <code>↑</code> / <code>↓</code></td><td>Move through the rows of the current list.</td></tr>
+    <tr><td><code>Enter</code></td><td>Open the focused row.</td></tr>
+    <tr><td><code>x</code></td><td>Select the focused row.</td></tr>
+    <tr><td><code>e</code></td><td>The list's primary verb on the focused row — complete a task, confirm an order, advance a pursuit.</td></tr>
+    <tr><td><code>Esc</code></td><td>Back out one level: close the popover, clear the selection, blur the search, leave the confirm.</td></tr>
+    <tr><td><code>⌘Z</code></td><td>Undo the last undoable action.</td></tr>
+    <tr><td>hold <code>⌘</code></td><td>Show every shortcut, on the controls themselves.</td></tr>
+  </tbody>
+</table>
+
+<p>
+  <strong>A queue you are meant to work through must be workable without the mouse.</strong> The
+  review queues and the agenda are the two places this matters most and the two places it is
+  currently absent.
+</p>
+
+<h3>Search is one system</h3>
+
+<p>
+  There are four search implementations in the app today — a debounced client field, a plain GET
+  form, a relevance-ranked in-memory filter, and a Postgres full-text query — each with its own
+  behaviour and its own placeholder conventions. They should differ in <em>backend</em> and agree in
+  <em>behaviour</em>.
+</p>
+<ul>
+  <li><strong>Always a GET form underneath</strong>, enhanced with debounce, never replaced by it.</li>
+  <li><strong>The query lives in <code>?q=</code></strong>, and typing uses <code>replace</code> so a search does not leave one history entry per keystroke between you and the page you came from.</li>
+  <li><strong>Say what was searched and how.</strong> "12 notes matching 'kettle'". If results are relevance-ranked, say so and disable the sort control — the app already does this on inventory and it is exactly right.</li>
+  <li><strong>Show why a row matched</strong> — an excerpt around the hit, with the term marked. A result list that does not show the match makes the user open every row to find out.</li>
+  <li><strong>A search with no results is a filtered empty state</strong>, never a blank area.</li>
+  <li><code>⌘K</code> searches <em>across</em> workspaces; the page field searches within. Two scopes, two entry points, no ambiguity.</li>
+</ul>
+
+<h3>Forms: the save model</h3>
+
+<ul>
+  <li><strong>Pick one model per surface and make it obvious which.</strong> Settings-shaped things autosave on blur with a quiet "Saved" in the status line. Object-shaped things (an order, a role) have an explicit Save. Never mix them in one panel.</li>
+  <li><strong>Validate on blur, not on keystroke.</strong> Telling someone their email is invalid while they are still typing it is scolding them for not having finished.</li>
+  <li><strong>Re-validate and show every error on submit</strong>, and move focus to the first one.</li>
+  <li><strong>Never lose typing.</strong> A form with unsaved changes warns before navigation; a multi-step form keeps state in the URL or in storage.</li>
+  <li><strong>Server errors land on the field that caused them</strong> where possible, and in the form's banner only when they genuinely belong to the whole form.</li>
+</ul>
+
+<h3>Cross-workspace flow</h3>
+
+<div class="rule">
+  <p>
+    <strong>This is the app's actual differentiator</strong> and it deserves its own rules. A return
+    window closing is a shopping fact, a job follow-up is a jobs fact, and the agenda shows both
+    without owning either. <em>Nothing is ever copied.</em> The todo module reads from the workspace
+    that owns the row, at render time, and writes back to it when you act.
+  </p>
+</div>
+
+<ul>
+  <li><strong>The owning workspace is always named and always reachable</strong> from the borrowed row. A row you cannot trace back to its source is a row you cannot trust.</li>
+  <li><strong>Acting on a borrowed row writes to the owner</strong>, and the owner's own page shows the change immediately. There is no second state to reconcile.</li>
+  <li><strong>A source that fails is named, not omitted.</strong> Law 2, and the single most important rule on any page that reads more than one schema.</li>
+  <li><strong>A borrowed row is never editable in the borrower.</strong> You can act on it — snooze, complete, dismiss — but you rename it where it lives.</li>
+  <li><strong>Every source is switchable off,</strong> and everything except your own list starts off. A cross-workspace feature that opts you in is a feature that floods the page you rely on.</li>
+</ul>
+
+<h3>The attention ladder</h3>
+
+<p>
+  What earns an interruption, from cheapest to most expensive. <strong>Use the lowest rung that
+  works</strong>; each rung up costs the user more and can only be spent so often.
+</p>
+
+<table class="spec">
+  <thead><tr><th>Rung</th><th>Cost</th><th>Earns it</th></tr></thead>
+  <tbody>
+    <tr><td>Status line</td><td>Nearly free</td><td>Anything the system did on its own. The default rung.</td></tr>
+    <tr><td>A count on a nav item</td><td>Cheap, but permanent until cleared</td><td>A queue whose neglect corrupts data. Review, and almost nothing else.</td></tr>
+    <tr><td>An entry in the bell</td><td>Cheap, deferred</td><td>Something happened that you will want to know about, but not right now.</td></tr>
+    <tr><td>An in-page banner</td><td>Moderate — it moves the layout</td><td><em>This page is not telling you the whole truth right now.</em> Only that.</td></tr>
+    <tr><td>A blocking dialog</td><td>Expensive</td><td>Irreversible destruction, and consent. Nothing else, ever.</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  Today almost everything is on rung four. The sync banner, the vault status banner and the agenda
+  failure notice are all full-width layout-shifting bars; only the last one has earned it.
+</p>
+
+<h3>Finding one row in five hundred</h3>
+
+<ul>
+  <li><strong>Sort, filter, group and search are four different questions</strong> and a list of any size needs all four. Inventory has them; nothing else does.</li>
+  <li><strong>Group headers carry a subtotal</strong> — a group you cannot total is a group that only reorders the problem.</li>
+  <li><strong>The default order answers the page's own question.</strong> An agenda sorts by when it runs out. An archive sorts by recency. A vault sorts by path, because a git tree carries no timestamps and sorting a mostly-null column looks like a bug.</li>
+  <li><strong>Never paginate what can be virtualised</strong>, and never virtualise what fits. Pagination is a last resort: it breaks ⌘F, which is the tool people actually reach for.</li>
+  <li><strong>Row density is scannable at a glance</strong>: one strong line, one supporting line, one number. A third line means the row is trying to be a detail page.</li>
+</ul>
+
+<h3>First run</h3>
+
+<ul>
+  <li><strong>A new account is empty on every surface</strong>, so every surface needs its empty state written before it ships. This is already policy and it is why the app survives being new.</li>
+  <li><strong>Onboarding asks for exactly one thing</strong> and explains what it gets you before it asks. The Gmail pre-consent screen is the model.</li>
+  <li><strong>Skip is always available</strong> and never punished. A workspace that will not open without a connected mailbox is a workspace that loses the person who wanted to try it.</li>
+  <li><strong>The empty-to-full transition is a designed moment.</strong> A first sync mid-flight says so, says what it has found so far, and does not pretend to be finished.</li>
+</ul>
+
+<h3>Touch</h3>
+
+<ul>
+  <li><strong>Nothing depends on hover.</strong> Row actions are visible on touch and revealed on hover — <code>opacity-100 sm:opacity-0</code>, not the other way round.</li>
+  <li><strong>Nothing depends on drag.</strong> Every drag has a menu equivalent on the same object.</li>
+  <li><strong>44px targets</strong>, or 44px of clear space around a smaller one.</li>
+  <li><strong>Sheets, not popovers</strong>, below <code>sm</code> — pinned to the viewport, not anchored to a button that is three-quarters of the way across the screen.</li>
+  <li><strong>16px inputs</strong>, always, or iOS zooms the page on focus and the layout you designed is gone.</li>
+  <li><strong>The primary action is reachable with a thumb.</strong> If the page has one obvious verb, it is not in the top-right corner on a phone.</li>
+</ul>
 
 <h2 id="alive">Alive — the things a big product would not ship</h2>
 
@@ -1410,16 +1768,25 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   <li>Checked at 375px wide. Tables became lists or scroll with a visible edge. The active nav tab is on screen.</li>
   <li>Any new animation is in the <code>prefers-reduced-motion</code> block in the same commit.</li>
   <li>Any flourish is chrome, is under a second, and can be switched off.</li>
+  <li>Every write is assigned a latency tier — instant, optimistic or pending — and an optimistic one has its failure path written in the same commit.</li>
+  <li>Reversible actions offer undo rather than asking for confirmation. Only irreversible ones confirm.</li>
+  <li>The list can be worked from the keyboard: move, open, select, act, escape.</li>
+  <li>A borrowed row from another workspace names its owner and is reachable from it. Nothing is copied.</li>
+  <li>The interruption uses the lowest rung of the attention ladder that works.</li>
+  <li>Icons are Lucide at 1.75 stroke in <code>currentColor</code>. No emoji.</li>
+  <li>No gradient blends two hues.</li>
   <li>Every non-obvious decision carries a comment saying why.</li>
 </ul>
 
 <h2 id="never">Never</h2>
 <ul>
   <li><strong>Never</strong> a raw Tailwind palette colour. <code>bg-emerald-50</code> is a bug in four themes.</li>
+  <li><strong>Never</strong> a two-hue gradient. One hue, 20% lightness at most, or nothing.</li>
+  <li><strong>Never</strong> an emoji as an interface icon.</li>
   <li><strong>Never</strong> green for spending, or for generic success.</li>
   <li><strong>Never</strong> a pipeline status hue for anything but that pipeline status.</li>
   <li><strong>Never</strong> <code>text-ink-faint</code> on something the user needs to read.</li>
-  <li><strong>Never</strong> white text on <code>accent-orange</code> (2.3:1). Dark ink on the fill.</li>
+  <li><strong>Never</strong> white text on <code>caution-fill</code> (2.3:1). Dark ink on the fill.</li>
   <li><strong>Never</strong> a fourth copy of the top bar, page header or left rail.</li>
   <li><strong>Never</strong> hand-write <code>rounded-card border border-border bg-surface</code>.</li>
   <li><strong>Never</strong> a tab, filter or sort that lives only in <code>useState</code>.</li>

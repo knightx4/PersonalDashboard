@@ -177,7 +177,18 @@ Two `PageHeader` definitions differing only in `string` vs `ReactNode` props —
 `ReactNode` one. Two `LeftRail`s differing in width (`w-56` vs `w-52`) and, more
 importantly, in **opposite mobile defaults** (open vs closed). Keep closed.
 
-### 1.5 A `Field` component
+### 1.5 An icon convention
+
+Lucide is already used consistently across 70 files and there is no emoji anywhere in the
+app — so this is a rule to write down and keep, not a migration. **One library, 1.75
+stroke, `currentColor`, never filled. Never an emoji as an interface icon.** 16px in rows
+and buttons, 14px in a badge, 20px+ only in an empty state. Decorative icons take
+`aria-hidden`; an icon that *is* the control takes an accessible name.
+
+The one change: the module glyph moves into `lib/modules.ts` next to the label, gradient
+and accent, so the switcher, the home tiles and the Account toggles cannot drift apart.
+
+### 1.6 A `Field` component
 
 Label + control + hint + error in one place. Hints are currently hand-rolled as
 `text-[11px] text-ink-faint` in dozens of files — both off-scale and under contrast, so
@@ -191,7 +202,10 @@ The visible half of the work. Only safe once Phase 1 has removed the hand-writte
 
 ### 2.1 Ship Paper and Ink
 
-The two defaults. Follow `prefers-color-scheme` until the user chooses; once they choose,
+The two defaults. **Ink is a proper near-black** — canvas `#08090a`, surface `#0f1011`,
+elevation by lightening rather than by shadow, hairline borders at `#212225`, text
+`#f7f8f8` on top. Low chroma in the neutrals so the accent arc is the only colour in the
+frame. Follow `prefers-color-scheme` until the user chooses; once they choose,
 it sticks. Store on `core.account_settings` so it follows the account, and mirror to a
 cookie so the server renders the right theme on first paint.
 
@@ -211,7 +225,17 @@ This is the most visible personal touch in the whole plan and it costs almost no
 card is still submitted-blue inside the plum workspace, because that colour is a claim
 about the pursuit, not about where you are standing.
 
-### 2.3 The grain
+### 2.3 Marks without gradients
+
+The four workspace marks are currently two-hue diagonal gradients — orange to pink, blue
+to violet — and three of the four start on the same blue, which makes the mark decoration
+rather than identification. They become a **flat 13% tint of the workspace hue, a 30%
+hairline, and the module's Lucide glyph stroked in the hue at full strength**.
+
+New rule, in the language file: a gradient moves at most ~20% in lightness within a single
+hue, or there is no gradient. Never two hues.
+
+### 2.4 The grain
 
 One fixed `body::before` with an inline SVG `feTurbulence`, 3–5% opacity, blend mode per
 theme, `pointer-events: none`. No image request, no layout, no repaint.
@@ -219,7 +243,7 @@ theme, `pointer-events: none`. No image request, no layout, no repaint.
 `pointer-events: none` is not optional — a full-viewport overlay that swallows clicks is a
 catastrophic and very confusing bug.
 
-### 2.4 Riso, Terminal, Dusk
+### 2.5 Riso, Terminal, Dusk
 
 The three optional themes, plus the picker with live hover preview. This is where the
 "customize your own space" idea actually lands, and it is cheap: each is roughly twenty
@@ -328,9 +352,69 @@ reading a source that can fail independently says so when it does.
 
 ---
 
-## Phase 5 — Page-level corrections
+## Phase 5 — Interaction
 
-### 5.1 Filter chips and clear-all
+The behavioural half. Everything above makes the app look right; this makes it work right,
+and it is where the remaining UX debt actually sits.
+
+### 5.1 Undo instead of confirm
+
+A confirm asks the user to predict the consequences of something they have not seen. An
+undo lets them look and change their mind, and it is faster in the common case — the one
+where they meant it.
+
+Three tiers: reversible actions (complete, drop, snooze, dismiss, mark returned) just
+happen, with an undo in the status line for ten seconds. Expensive-to-reverse actions
+(delete an order, remove a pursuit) soft-delete with an undo and a recoverable list —
+`orders.deleted_at` already works this way and is the right instinct to generalise. Only
+genuinely irreversible things (delete the account, revoke a grant) get an inline two-step
+confirm.
+
+Removes the `window.confirm` in `components/ui/action-menu.tsx`, whose own comment warns
+against it, and the several bespoke inline confirms that reimplement the same thing.
+
+### 5.2 Bulk actions
+
+There are none anywhere in the app, which means clearing a triage backlog is forty
+individual clicks — and that is exactly why triage backlogs do not get cleared.
+
+Selection on hover of the row's left edge, not a permanent checkbox column taxing every
+ordinary scan. Shift-click extends, ⌘-click toggles, `Esc` clears. A selection turns the
+page header into an action bar rather than stacking a second bar below it. One undo for
+the whole batch.
+
+Start with the two review queues and `/todo/all`, which is where it pays for itself
+immediately.
+
+### 5.3 The keyboard model
+
+Not a bag of shortcuts — one small model that generalises: `⌘K` go anywhere, `⌘1`–`⌘4`
+workspaces, `/` search, `j`/`k` move, `Enter` open, `x` select, `e` the list's primary
+verb, `Esc` back out one level, `⌘Z` undo, hold `⌘` to see all of it in place.
+
+**A queue you are meant to work through must be workable without the mouse.** The review
+queues and the agenda are where this matters most and where it is entirely absent.
+
+### 5.4 Search as one system
+
+Four implementations today — a debounced client field, a plain GET form, a
+relevance-ranked in-memory filter, and a Postgres full-text query — each with its own
+behaviour and placeholder conventions. They should differ in backend and agree in
+behaviour: GET underneath, `?q=` in the URL, `replace` not `push`, a count line saying
+what was searched, an excerpt showing *why* a row matched, and a filtered empty state
+when nothing does.
+
+The vault is the clearest gap: it has full-text search and shows the note's generic
+excerpt, so you cannot see what matched.
+
+### 5.5 Tabs into the URL
+
+`app/jobs/(app)/roles/[id]/panels.tsx` holds six tabs of substantial content in
+`useState` — not linkable, not back-button-safe, lost on refresh. The one deep link that
+exists (`?tab=posting`) only seeds initial state, so it breaks silently after any
+interaction. This is the single place the app contradicts its own law 5.
+
+### 5.6 Filter chips and clear-all
 
 `/shopping/inventory` can carry seven simultaneous filters (`q`, `category`, `merchant`,
 `list`, `range`, `sort`, `group`, `person`) and the only way to see what is applied is to
@@ -340,30 +424,32 @@ page with a rail.
 Also: inventory mixes instant-apply rail links with selects that need an Apply button.
 One model — submit on change.
 
-### 5.2 Tabs into the URL
+### 5.7 The attention ladder
 
-`app/jobs/(app)/roles/[id]/panels.tsx` has six tabs of substantial content in
-`useState` — not linkable, not back-button-safe, lost on refresh. The one deep link that
-exists (`?tab=posting`) only seeds initial state, so it breaks silently after any
-interaction. This is the one place the app contradicts its own law 5.
+Almost every system message in the app is currently a full-width, layout-shifting banner.
+Reassign each to the lowest rung that works: status line for anything the system did on
+its own, a nav count only where neglect corrupts data, the bell for deferred news, a
+banner *only* for "this page is not telling you the whole truth right now", and a blocking
+dialog for nothing except irreversible destruction and consent.
 
-### 5.3 A keyboard and touch path for the pipeline
+Depends on 6.1 (the status line) for the bottom rung to exist.
+
+### 5.8 A keyboard and touch path for the pipeline
 
 HTML5 `draggable` with no keyboard alternative and no touch support — on the interaction
 the code itself calls *"the most-used interaction in the app"*. `StatusPicker` already
 exists as the alternative; put it on the card.
 
-### 5.4 Tables on a phone
+### 5.9 Smaller, but real
 
-`overflow-x-auto` with `min-w-[720px]` and no edge fade is a table with hidden columns.
-Add the fade; below `sm`, a table with more than four columns becomes a list.
-
-### 5.5 Star ratings
-
-`'★'.repeat(n)` with no accessible label and no empty stars — "★★★" does not tell you it
-is out of five. Appears on the pipeline card and the roles table.
-
----
+- **Tables on a phone.** `overflow-x-auto` with `min-w-[720px]` and no edge fade is a table
+  with hidden columns. Add the fade; below `sm`, a table with more than four columns
+  becomes a list.
+- **Star ratings.** `'★'.repeat(n)` with no accessible label and no empty stars — "★★★"
+  does not tell you it is out of five.
+- **A detail page returns you to the list you came from,** filters intact. The vault
+  note's "All notes" link drops the search you arrived through.
+- **Group headers carry a subtotal.** A group you cannot total only reorders the problem.
 
 ## Phase 6 — Alive
 
@@ -448,7 +534,7 @@ Phase 1  Card · Banner · WorkspaceNav · rail · Field   ← removes the drift
 Phase 2  Paper + Ink · workspace accent · grain · 3 themes
 Phase 3  switcher · mobile nav · the bell · focus · sign-out
 Phase 4  loading · error · honest failure
-Phase 5  filter chips · tabs in URL · keyboard drag · tables · stars
+Phase 5  undo · bulk · keyboard model · search · tabs in URL · attention ladder
 Phase 6  status line · sigil · key hints · density · marginalia · seams · sound
 ```
 
@@ -463,5 +549,8 @@ it is safe before them.
 - Every route group has a loading and an error state.
 - Filters, search, sort and tabs are all in the URL, everywhere.
 - The app is usable, and looks deliberate, at 375px.
-- Every action is reachable from a keyboard.
+- Every action is reachable from a keyboard, and every queue is workable without a mouse.
+- Reversible actions offer undo instead of asking for confirmation.
+- Lists you work in bulk can be worked in bulk.
+- Search behaves the same way everywhere, and shows why a row matched.
 - And it looks like it belongs to somebody.
