@@ -57,6 +57,29 @@ export function formatMoney(
 }
 
 /**
+ * Format a price that might not be known.
+ *
+ * `formatMoney` takes a number, so a caller holding `number | null` has to
+ * decide what null looks like -- and the decision it reaches for is `?? 0`,
+ * which renders "$0.00". Zero is a claim, and on a page asking someone whether
+ * to sell a board game the claim is both false and expensive: a game shown as
+ * worth nothing is a game she gives away.
+ *
+ * So an unknown price is nothing at all. This lives here, next to
+ * `formatMoney`, because the lint rule keeping `Intl.NumberFormat` out of
+ * components is what makes "money has one home" true rather than aspirational.
+ */
+export function formatMoneyOrBlank(
+  cents: number | null | undefined,
+  currency: CurrencyCode = 'USD',
+  options: { showCents?: boolean; locale?: string; blank?: string } = {},
+): string {
+  const { blank = '', ...rest } = options;
+  if (cents == null || !Number.isFinite(cents)) return blank;
+  return formatMoney(cents, currency, rest);
+}
+
+/**
  * Parse a dollars string from a form into integer cents.
  *
  * Accepts "12", "12.3", "12.99", "$12.99", "1,299.00". Rejects more than two
