@@ -47,6 +47,12 @@ create index if not exists category_attribute_templates_user_idx
 
 alter table category_attribute_templates enable row level security;
 
+-- RLS decides which rows; this decides whether the role may reach the table at
+-- all. 0004 granted the tables that existed then, so every table added since
+-- carries its own grant -- without it PostgREST answers "permission denied"
+-- whatever the policy says.
+grant select, insert, update, delete on category_attribute_templates to authenticated;
+
 drop policy if exists category_attribute_templates_all on category_attribute_templates;
 create policy category_attribute_templates_all on category_attribute_templates
   for all to authenticated
