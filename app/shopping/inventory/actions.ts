@@ -483,3 +483,71 @@ export async function deleteInventoryItem(formData: FormData): Promise<void> {
   revalidatePath('/shopping/returns');
   revalidatePath('/shopping/dashboard');
 }
+
+/** Every page whose contents change when an item is flagged for sale. */
+function revalidateSellSurfaces(itemIds: string[]): void {
+  revalidatePath('/shopping/inventory');
+  revalidatePath('/shopping/sell');
+  for (const id of itemIds) revalidatePath(`/shopping/inventory/${id}`);
+}
+
+/**
+ * Flag owned items for sale, or clear the flag.
+ *
+ * The sell assistant routes what it can price, which means books and games
+ * with a confirmed identity. This is the other half: the user saying "I want
+ * to sell this" about anything they own, which the sell page then lists
+ * whether or not a catalog has ever heard of it.
+ *
+ * Takes a list because the inventory page selects rows — one item is the same
+ * call with one id.
+ */
+export async function setItemsForSale(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const forSale = String(formData.get('for_sale') ?? 'true') === 'true';
+  const ids = formData
+    .getAll('id')
+    .map((value) => String(value))
+    .filter((value) => z.string().uuid().safeParse(value).success);
+  if (ids.length === 0) return { error: 'Pick at least one item first.' };
+
+  // Owned only, and only this user's: a disposed or returned unit is not
+  // something to put on the sell page.
+  const { data: owned } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('status', 'owned')
+    .in('id', ids);
+  const ownedIds = (owned ?? []).map((row) => row.id as string);
+  if (ownedIds.length === 0) {
+    return { error: 'None of those are owned items.' };
+  }
+
+  const { error } = await supabase
+    .from('inventory_items')
+    .update({ for_sale: forSale })
+    .eq('user_id', user.id)
+    .eq('status', 'owned')
+    .in('id', ownedIds);
+  if (error) return { error: error.message };
+
+  revalidateSellSurfaces(ownedIds);
+  const noun = ownedIds.length === 1 ? 'item' : 'items';
+  return {
+    message: forSale
+      ? `${ownedIds.length} ${noun} marked for sale.`
+      : `${ownedIds.length} ${noun} taken off the sell page.`,
+  };
+}
+
+/** Form-action friendly wrapper for list-row icon buttons. */
+export async function toggleItemForSaleForm(formData: FormData): Promise<void> {
+  const result = await setItemsForSale({}, formData);
+  if (result.error) throw new Error(result.error);
+}

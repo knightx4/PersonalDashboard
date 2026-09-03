@@ -18,12 +18,17 @@ import {
   switchBookEdition,
   type BookActionState,
 } from '@/app/shopping/inventory/add/actions';
-import { disposeInventoryItem, type ActionState } from '@/app/shopping/inventory/actions';
+import {
+  disposeInventoryItem,
+  setItemsForSale,
+  type ActionState,
+} from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input, Label } from '@/components/ui/field';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { SellBookRow, SellPendingRow } from '@/lib/sell/load';
 import type { SellGameRow } from '@/lib/sell/load-games';
+import type { SellMarkedRow } from '@/lib/sell/load-marked';
 import type { SellPath } from '@/lib/sell/route';
 
 const PATH_LABEL: Record<SellPath, string> = {
@@ -600,5 +605,68 @@ function SellGameRowActions({ row }: { row: SellGameRow }) {
       )}
       <FieldError>{priceState.error ?? disposeState.error ?? noteState.error}</FieldError>
     </div>
+  );
+}
+
+/**
+ * What the user flagged for sale themselves.
+ *
+ * No routing and no price: the router needs an identity, and these rows are
+ * exactly the ones that do not have one. What this section owes them is to
+ * exist — a flag that quietly went nowhere would be worse than no flag — and
+ * to be easy to take back off.
+ */
+export function SellMarkedGroup({ rows }: { rows: SellMarkedRow[] }) {
+  const [state, action, pending] = useActionState(setItemsForSale, {} as ActionState);
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-ink">
+          Marked for sale <span className="font-normal text-ink-muted">({rows.length})</span>
+        </h2>
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Flagged by you from inventory. Anything the assistant can price is routed above as
+          well — these are listed here so the flag always leads somewhere.
+        </p>
+      </div>
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+        {rows.map((row) => (
+          <li key={row.inventoryItemId} className="flex items-center gap-3 px-4 py-3">
+            {row.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
+              <img
+                src={row.imageUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded bg-canvas object-cover"
+              />
+            ) : (
+              <div className="h-12 w-12 shrink-0 rounded bg-canvas" />
+            )}
+            <div className="min-w-0 flex-1">
+              <Link
+                href={`/shopping/inventory/${row.inventoryItemId}`}
+                className="font-medium text-ink hover:underline"
+              >
+                {row.shortName || row.name}
+              </Link>
+              <p className="text-[13px] text-ink-muted">
+                {row.categoryName ?? 'Uncategorized'} · paid {formatMoney(row.costCents)}
+                {row.routedElsewhere ? ' · routed above' : ''}
+              </p>
+            </div>
+            <form action={action}>
+              <input type="hidden" name="id" value={row.inventoryItemId} />
+              <input type="hidden" name="for_sale" value="false" />
+              <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+                Unmark
+              </Button>
+            </form>
+          </li>
+        ))}
+      </ul>
+      <FieldError>{state.error}</FieldError>
+    </section>
   );
 }

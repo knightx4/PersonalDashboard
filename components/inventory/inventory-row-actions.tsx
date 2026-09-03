@@ -1,10 +1,11 @@
 'use client';
 
-import { ListPlus, RotateCcw, Trash2 } from 'lucide-react';
+import { ListPlus, RotateCcw, Tag, Trash2 } from 'lucide-react';
 import {
   deleteInventoryItem,
   quickDisposeInventoryItem,
   toggleInventoryItemList,
+  toggleItemForSaleForm,
 } from '@/app/shopping/inventory/actions';
 import { toggleReturnPlannedForm } from '@/app/shopping/returns/actions';
 import { ActionMenu, IconActionButton, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -23,12 +24,14 @@ export function InventoryRowActions({
   itemId,
   itemName,
   returnPlanned,
+  forSale,
   listIds,
   lists,
 }: {
   itemId: string;
   itemName: string;
   returnPlanned: boolean;
+  forSale: boolean;
   listIds: string[];
   lists: InventoryListOption[];
 }) {
@@ -93,6 +96,15 @@ export function InventoryRowActions({
         planned: returnPlanned ? 'false' : 'true',
       },
     },
+    {
+      id: 'toggle-for-sale',
+      label: forSale ? 'Not for sale' : 'Mark for sale',
+      formAction: toggleItemForSaleForm,
+      formFields: {
+        id: itemId,
+        for_sale: forSale ? 'false' : 'true',
+      },
+    },
     ...disposeItems.map((item) => ({
       ...item,
       id: `mobile-${item.id}`,
@@ -121,6 +133,18 @@ export function InventoryRowActions({
             active={returnPlanned}
           >
             <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+          </IconActionButton>
+        </form>
+
+        <form action={toggleItemForSaleForm}>
+          <input type="hidden" name="id" value={itemId} />
+          <input type="hidden" name="for_sale" value={forSale ? 'false' : 'true'} />
+          <IconActionButton
+            type="submit"
+            label={forSale ? 'Not for sale' : 'Mark for sale'}
+            active={forSale}
+          >
+            <Tag className="size-4" strokeWidth={2} aria-hidden />
           </IconActionButton>
         </form>
 

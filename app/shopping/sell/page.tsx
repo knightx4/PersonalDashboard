@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { BookOpen } from 'lucide-react';
 import { loadSellAssistant } from '@/lib/sell/load';
 import { loadSellGames } from '@/lib/sell/load-games';
+import { loadMarkedForSale } from '@/lib/sell/load-marked';
 import { formatMoney } from '@/lib/money';
 import { GAME_SHIP_FLAT_CENTS } from '@/lib/sell/pricing';
 import {
@@ -13,6 +14,7 @@ import {
   ImportBooksFromOrdersButton,
   SellConfirmQueue,
   SellGamePathGroup,
+  SellMarkedGroup,
   SellPathGroup,
   SellSettingsForm,
   TestEbayConnectionButton,
@@ -50,6 +52,9 @@ export default async function SellPage() {
     netFloorCents,
     effortCents,
   });
+
+  // Flagged by hand, so it needs no identity and no lookup to belong here.
+  const marked = await loadMarkedForSale({ supabase, userId: user.id });
 
   const PRICE_SOURCE_NOTE: Record<typeof priceSource, string | null> = {
     ebay_browse: 'Prices from active eBay listings (asking, not sold).',
@@ -107,13 +112,15 @@ export default async function SellPage() {
 
       {rows.length === 0 &&
       pending.length === 0 &&
+      marked.length === 0 &&
       games.rows.length === 0 &&
       games.needsConfirmationCount === 0 ? (
         <EmptyState
           icon={BookOpen}
           title="Nothing sell-ready yet"
-          description="Books from your order emails land here automatically. You can also scan or search to add books and board games you already own."
+          description="Books from your order emails land here automatically. You can also scan or search to add books and board games you already own, or mark anything in your inventory for sale."
           action={{ label: 'Add owned items', href: '/shopping/inventory/add' }}
+          secondaryAction={{ label: 'Mark something for sale', href: '/shopping/inventory' }}
         />
       ) : (
         <>
@@ -165,6 +172,8 @@ export default async function SellPage() {
               ))}
             </section>
           )}
+
+          <SellMarkedGroup rows={marked} />
         </>
       )}
     </div>

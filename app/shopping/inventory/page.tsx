@@ -2,6 +2,10 @@ import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
+import {
+  InventoryBulkBar,
+  InventorySelectionProvider,
+} from '@/components/inventory/inventory-selection';
 import { LeftRail, RailChip, RailGroup, RailItem, RailPicker } from '@/components/shell/left-rail';
 import { AttributeFilterPicker } from './attribute-filter-picker';
 import { PageHeader } from '@/components/shell/page-header';
@@ -182,7 +186,7 @@ export default async function InventoryPage({
   const selectWithOptionalInner = activeMerchant
     ? `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
-        image_url, return_planned, search_tags, attributes,
+        image_url, return_planned, for_sale, search_tags, attributes,
         categories(name, color, slug),
         ${membershipJoin},
         order_items!inner (
@@ -195,7 +199,7 @@ export default async function InventoryPage({
       `
     : `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
-        image_url, return_planned, search_tags, attributes,
+        image_url, return_planned, for_sale, search_tags, attributes,
         categories(name, color, slug),
         ${membershipJoin},
         order_items (
@@ -243,6 +247,7 @@ export default async function InventoryPage({
     category_id: string | null;
     image_url: string | null;
     return_planned: boolean;
+    for_sale: boolean;
     search_tags: string[] | null;
     attributes: unknown;
     inventory_item_lists:
@@ -316,6 +321,7 @@ export default async function InventoryPage({
       acquired_at: item.acquired_at,
       image_url: item.image_url ?? orderItem?.image_url ?? null,
       return_planned: item.return_planned,
+      for_sale: item.for_sale,
       search_tags: item.search_tags,
       attributes: parseAttributeValues(item.attributes),
       person: showPeople ? (byPerson.get(item.person_id ?? '') ?? null) : null,
@@ -611,40 +617,43 @@ export default async function InventoryPage({
             }
           />
         ) : (
-          <div className="space-y-5">
-            {groups.map((section) => {
-              const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
-              return (
-                <section key={section.key} className="space-y-2">
-                  {group !== 'none' && (
-                    <div className="flex items-baseline justify-between gap-3 px-1">
-                      <h2 className="text-[13px] font-semibold text-ink">
-                        {section.label}
-                        <span className="ml-2 font-normal text-ink-faint">
-                          {section.items.length}
-                        </span>
-                      </h2>
-                      <p className="tabular text-[12px] text-ink-muted">
-                        {formatMoney(subtotal)}
-                      </p>
-                    </div>
-                  )}
-                  <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-                    {section.items.map((item) => (
-                      <InventoryRow
-                        key={item.id}
-                        item={item}
-                        lists={(lists ?? []).map((list) => ({
-                          id: list.id,
-                          name: list.name,
-                        }))}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
+          <InventorySelectionProvider>
+            <InventoryBulkBar allIds={finalItems.map((item) => item.id)} />
+            <div className="space-y-5">
+              {groups.map((section) => {
+                const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
+                return (
+                  <section key={section.key} className="space-y-2">
+                    {group !== 'none' && (
+                      <div className="flex items-baseline justify-between gap-3 px-1">
+                        <h2 className="text-[13px] font-semibold text-ink">
+                          {section.label}
+                          <span className="ml-2 font-normal text-ink-faint">
+                            {section.items.length}
+                          </span>
+                        </h2>
+                        <p className="tabular text-[12px] text-ink-muted">
+                          {formatMoney(subtotal)}
+                        </p>
+                      </div>
+                    )}
+                    <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                      {section.items.map((item) => (
+                        <InventoryRow
+                          key={item.id}
+                          item={item}
+                          lists={(lists ?? []).map((list) => ({
+                            id: list.id,
+                            name: list.name,
+                          }))}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          </InventorySelectionProvider>
         )}
       </div>
     </div>

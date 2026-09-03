@@ -21,6 +21,7 @@ import { BookDetailsPanel } from './book-details-panel';
 import { GameDetailsPanel } from './game-details-panel';
 import { ItemDetailsPanel } from './item-details-panel';
 import { ItemSellPanel } from './sell-panel';
+import { MarkForSaleButton } from './mark-for-sale-button';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -48,7 +49,7 @@ export default async function InventoryItemPage({
         `
         id, name, short_name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
-        return_planned, source, attributes,
+        return_planned, for_sale, source, attributes,
         categories ( id, name, color, slug ),
         order_items (
           order_id, product_url, image_url,
@@ -351,6 +352,22 @@ export default async function InventoryItemPage({
       />
 
       {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
+
+      {item.status === 'owned' && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Sell this</h2>
+            <p className="mt-1 text-[13px] text-ink-muted">
+              Puts it on the{' '}
+              <Link href="/shopping/sell" className="text-brand hover:underline">
+                sell page
+              </Link>
+              , whether or not it is something the assistant can price.
+            </p>
+          </div>
+          <MarkForSaleButton itemId={item.id} forSale={Boolean(item.for_sale)} />
+        </section>
+      )}
 
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
