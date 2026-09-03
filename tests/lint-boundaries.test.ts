@@ -9,9 +9,9 @@
  * `no-restricted-syntax` over the same files -- so both selectors now live in
  * one config entry, and the last two cases below are what proves it.
  */
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const ROOT = process.cwd();
@@ -19,6 +19,12 @@ const created: string[] = [];
 
 function lint(relativePath: string, source: string): string {
   const target = join(ROOT, relativePath);
+  // A probe may name a directory that does not exist yet -- app/api/s/ is
+  // covered by the share-read boundary but holds no route today, because the
+  // form writes through a server action. The rule should still be asserted, so
+  // the probe makes its own directory rather than the test quietly depending
+  // on one some other feature happened to leave behind.
+  mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, source);
   created.push(target);
   try {
