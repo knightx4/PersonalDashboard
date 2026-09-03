@@ -130,7 +130,8 @@ describe('EbayBrowseExpectedPriceSource', () => {
     });
     expect(await forbidden.expectedSelfListCents('9780735211292')).toBeNull();
     expect(forbidden.lastFailure?.stage).toBe('search');
-    expect(forbidden.lastFailure?.detail).toContain('Buy APIs');
+    expect(forbidden.lastFailure?.status).toBe(403);
+    expect(forbidden.lastFailure?.detail).toContain('Insufficient permissions');
 
     const empty = new EbayBrowseExpectedPriceSource({
       clientId: 'App-App-PRD-1-2',

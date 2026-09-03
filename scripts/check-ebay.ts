@@ -9,10 +9,8 @@
  */
 import { existsSync } from 'node:fs';
 import { config as loadEnvFile } from 'dotenv';
-import {
-  EbayBrowseExpectedPriceSource,
-  ebayKeysetEnvironment,
-} from '../lib/sell/expected-price';
+import { checkEbayConnection, EBAY_CHECK_ISBN } from '../lib/sell/ebay-check';
+import { ebayKeysetEnvironment } from '../lib/sell/expected-price';
 import { formatMoney } from '../lib/money';
 
 /**
@@ -36,7 +34,7 @@ function loadEnvironment(): string[] {
 
 async function main(): Promise<void> {
   const loaded = loadEnvironment();
-  const isbn = process.argv[2] ?? '9780735211292';
+  const isbn = process.argv[2] ?? EBAY_CHECK_ISBN;
   const rawId = process.env.EBAY_CLIENT_ID ?? '';
   const rawSecret = process.env.EBAY_CLIENT_SECRET ?? '';
 
@@ -59,37 +57,27 @@ async function main(): Promise<void> {
     console.warn('trims it, but the copy stored in your host probably has it too.');
   }
 
-  const environment = ebayKeysetEnvironment(rawId);
-  console.log('keyset       :', environment);
-  if (environment === 'sandbox') {
-    console.error('\nThis is a sandbox keyset. Sandbox returns invented listings, so the');
-    console.error('sell assistant refuses it. Use the production keyset instead.');
-    process.exit(1);
-  }
-  if (environment === 'unknown') {
-    console.warn('\nWarning: this client id carries neither -PRD- nor -SBX-, so it does');
-    console.warn('not look like an eBay keyset. Check you copied the App ID (Client ID).');
-  }
-
-  const source = new EbayBrowseExpectedPriceSource({
-    clientId: rawId,
-    clientSecret: rawSecret,
-  });
+  console.log('keyset       :', ebayKeysetEnvironment(rawId));
 
   console.log('\nquerying Browse for', isbn, '…');
-  const cents = await source.expectedSelfListCents(isbn);
+  const result = await checkEbayConnection({
+    clientId: rawId,
+    clientSecret: rawSecret,
+    isbn,
+  });
 
-  if (cents == null) {
-    const failure = source.lastFailure;
-    console.log('result       : no usable price');
-    console.log('stage        :', failure?.stage ?? 'unknown');
-    if (failure?.status) console.log('http status  :', failure.status);
-    console.log('reason       :', failure?.detail ?? 'no reason recorded');
-    // Only `no_results` is about the book; every other stage is configuration.
-    process.exit(failure?.stage === 'no_results' ? 0 : 1);
+  console.log('result       :', result.headline);
+  if (result.priceCents != null) {
+    console.log('price        :', formatMoney(result.priceCents), '(25th pct of asks)');
   }
-  console.log('result       :', formatMoney(cents), '(25th percentile of active asks)');
-  console.log('\nCredentials work. The sell assistant will use eBay Browse.');
+  if (result.stage !== 'ok') console.log('stage        :', result.stage);
+  if (result.status) console.log('http status  :', result.status);
+  console.log('detail       :', result.detail);
+  if (result.hint) console.log('\n' + result.hint);
+
+  // `no_results` is about the book, not the setup, so it is not a failure to
+  // script against -- CI can treat a non-zero exit as "the integration is broken".
+  if (!result.ok && result.stage !== 'no_results') process.exit(1);
 }
 
 main().catch((error) => {

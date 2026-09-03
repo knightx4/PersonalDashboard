@@ -8,7 +8,9 @@ import {
   noteListingIntent,
   setManualGamePrice,
   setManualPrice,
+  testEbayConnection,
   updateSellSettings,
+  type EbayCheckState,
   type SellActionState,
 } from './actions';
 import {
@@ -343,6 +345,69 @@ export function ImportBooksFromOrdersButton() {
   );
 }
 
+
+
+/**
+ * Run one live eBay lookup and show what came back.
+ *
+ * The credentials live in a hosting dashboard and are used by a deployed app,
+ * so "are they working" was previously answerable only by reading server logs.
+ * This asks, on the page where the answer matters.
+ */
+export function TestEbayConnectionButton() {
+  const [state, action, pending] = useActionState(
+    testEbayConnection,
+    {} as EbayCheckState,
+  );
+  const result = state.result;
+
+  // A failure that is only about the searched book still means the wiring
+  // works, so it is not painted as an error.
+  const failed = result ? !result.ok && result.stage !== 'no_results' : false;
+
+  return (
+    <form action={action} className="space-y-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+          {pending ? 'Testing…' : 'Test eBay connection'}
+        </Button>
+        <span className="text-[13px] text-ink-muted">
+          Runs one live lookup. Free — Browse is not billed per call.
+        </span>
+      </div>
+
+      {result && (
+        <div
+          className={
+            'rounded-lg border px-3 py-2 text-[13px] ' +
+            (result.ok
+              ? 'border-green-200 bg-green-50 text-green-900'
+              : failed
+                ? 'border-red-200 bg-red-50 text-red-900'
+                : 'border-border bg-surface text-ink')
+          }
+        >
+          <p className="font-medium">
+            {result.ok ? '✓ ' : failed ? '✗ ' : ''}
+            {result.headline}
+            {result.priceCents != null && ` · ${formatMoney(result.priceCents)}`}
+          </p>
+          {/* eBay's own words, so an unfamiliar error is still searchable. */}
+          <p className="mt-1 break-words opacity-90">
+            {result.stage !== 'ok' && result.stage !== 'unconfigured' && (
+              <span className="font-mono text-[12px]">
+                [{result.stage}
+                {result.status ? ` ${result.status}` : ''}]{' '}
+              </span>
+            )}
+            {result.detail}
+          </p>
+          {result.hint && <p className="mt-1 opacity-90">{result.hint}</p>}
+        </div>
+      )}
+    </form>
+  );
+}
 
 /**
  * Billed price lookups, run only on request. The label says how many books

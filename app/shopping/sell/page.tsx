@@ -15,6 +15,7 @@ import {
   SellGamePathGroup,
   SellPathGroup,
   SellSettingsForm,
+  TestEbayConnectionButton,
 } from './sell-ui';
 import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/load';
 import type { SellPath } from '@/lib/sell/route';
@@ -86,6 +87,9 @@ export default async function SellPage() {
           {PRICE_SOURCE_NOTE[priceSource]}
         </p>
       )}
+
+      {/* Sits under the source note because it is the note's evidence. */}
+      <TestEbayConnectionButton />
 
       <EstimatePricesButton
         unpricedCount={unpricedCount + games.unpricedCount}

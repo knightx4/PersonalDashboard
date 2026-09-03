@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { createExpectedPriceSource } from '@/lib/sell/expected-price';
+import { checkEbayConnection, type EbayCheckResult } from '@/lib/sell/ebay-check';
 import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/load';
 import { gamePriceQuery } from '@/lib/sell/game-query';
 import { quoteIsCurrent, type CachedQuote } from '@/lib/sell/quote-cache';
@@ -15,6 +16,27 @@ export type SellActionState = {
   error?: string;
   message?: string;
 };
+
+export type EbayCheckState = {
+  result?: EbayCheckResult;
+};
+
+/**
+ * Run one live eBay lookup and hand back the verdict.
+ *
+ * Reads the credentials on the server and returns only the verdict, so the
+ * page can say what is wrong without either key going near the browser.
+ */
+export async function testEbayConnection(): Promise<EbayCheckState> {
+  // Gated on a signed-in user: the result names the failing stage, which is
+  // more than an anonymous visitor should learn about the deployment.
+  await requireUser();
+  const result = await checkEbayConnection({
+    clientId: process.env.EBAY_CLIENT_ID ?? null,
+    clientSecret: process.env.EBAY_CLIENT_SECRET ?? null,
+  });
+  return { result };
+}
 
 export async function updateSellSettings(
   _prev: SellActionState,

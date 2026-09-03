@@ -157,9 +157,7 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
     if (ebayKeysetEnvironment(this.clientId) === 'sandbox') {
       return this.fail({
         stage: 'credentials',
-        detail:
-          'this is a sandbox keyset (-SBX-), and sandbox returns invented listings. ' +
-          'Use the production keyset from the same eBay application.',
+        detail: 'sandbox keyset (-SBX-); sandbox returns invented listings',
       });
     }
     const basic = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
@@ -177,12 +175,7 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
         return this.fail({
           stage: 'oauth',
           status: res.status,
-          detail:
-            res.status === 400 || res.status === 401
-              ? `eBay refused the keyset (${res.status} ${detail}). Check the client id ` +
-                'and secret, and that the application has accepted the API License ' +
-                'Agreement in the eBay developer portal.'
-              : `${res.status} ${detail}`,
+          detail: `${res.status} ${detail}`,
         });
       }
       const data = (await res.json()) as { access_token?: string; expires_in?: number };
@@ -234,16 +227,11 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
       if (!res.ok) {
         const detail = summarizeEbayError(await res.text().catch(() => ''));
         // A keyset can authenticate fine and still not be cleared for Browse:
-        // the Buy APIs are granted separately, and that arrives as a 403.
+        // the Buy APIs are granted separately, and that arrives here as a 403.
         return this.fail({
           stage: 'search',
           status: res.status,
-          detail:
-            res.status === 403
-              ? `Browse refused the token (403 ${detail}). The keyset authenticates, ` +
-                'but the Buy APIs are granted separately — check the application has ' +
-                'Browse access, not just a production keyset.'
-              : `${res.status} ${detail}`,
+          detail: `${res.status} ${detail}`,
         });
       }
       const data = (await res.json()) as EbaySearchResponse;
