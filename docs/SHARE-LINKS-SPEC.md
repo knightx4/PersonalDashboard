@@ -33,6 +33,63 @@ Ruled out on purpose, each because it costs something real later.
   deliberate action on my side. A shared link that can silently flip forty rows
   to `sold` is a link you cannot send.
 
+## The link is a window, never an engine
+
+**The shared page reads what is already in the database and does nothing else.**
+No lookup, no search, no enrichment, no LLM call, no outbound HTTP of any kind,
+no background job queued, nothing written except the answer she just typed.
+
+This is a hard rule rather than a preference, and it is worth being blunt about
+why, because every one of these is a real path that already exists in this
+codebase and would be easy to reach for:
+
+- `loadSellGames()` calls the eBay Browse API on load, and on the
+  `web_estimate` path an Anthropic lookup that is **billed per call**. An
+  unauthenticated URL that spends money per page view is a bug waiting to be
+  found by a crawler, and `noindex` is a request, not a control.
+- `lib/games/providers/bgg.ts` and `wikidata.ts` are rate-limited against
+  someone else's terms of service. A link passed around a family group chat is
+  not a caller you can rate-limit by politeness.
+- Ingestion, sync, backfill and estimate jobs are all reachable from the
+  shopping schema. None of them may be triggered by a stranger opening a page.
+- Latency and failure: a page that waits on a third party is a page that hangs
+  or errors on someone who cannot debug it and cannot ask you to.
+
+So the page's data comes from four tables and nothing else — `inventory_items`
+(name, `short_name`, `image_url`), `game_details` (bgg id, condition,
+`manual_expected_price_cents`), `game_price_quotes` (whatever was **already**
+cached, never refreshed from here), and the share tables. A missing price is
+rendered as a missing price. It is not a reason to go and find one.
+
+Enrichment is my side's job, done while signed in, and it lands in those tables
+long before she opens the link. If a game has no photo and no price, the honest
+fix is that I enrich it in `/shopping` and her page shows it on the next load —
+not that her page goes looking.
+
+### How it is enforced, not just intended
+
+1. **A lint boundary**, the same shape as the `lib/vault/providers/` rule the
+   repo already runs: nothing under `app/s/`, `app/api/s/` or `lib/share/read/`
+   may import `lib/sell/`, `lib/games/providers/`, `lib/books/providers/`,
+   `lib/email/`, `inngest/`, `@anthropic-ai/sdk`, or `lib/db/admin.ts`. Added to
+   `eslint.config.mjs` and asserted still-firing in
+   `tests/lint-boundaries.test.ts`, so deleting the rule fails the build.
+2. **One loader with one job.** `lib/share/read/load-disposition.ts` is the only
+   module the anonymous page reads through. It takes a Supabase client and a
+   token and returns a plain projection. It has no network import to remove
+   later because it never had one.
+3. **A test that asserts the absence.** `global.fetch` is stubbed to throw in
+   `tests/share-read.test.ts`; rendering a full share page with every price
+   cache row missing must still succeed. A page that reaches out fails the
+   suite loudly.
+4. **The read function is `stable`, not `volatile`.** `share_page()` is declared
+   `language sql stable`, so it cannot write, and there is no `pg_net`,
+   `http` or `pg_cron` call anywhere in it.
+
+The single exception is `share_respond()`, which writes exactly three integers,
+a capped note, one event row and a `last_seen_at` — all inside the database,
+all scoped to the one share the token names.
+
 ## Three layers
 
 The stack is deliberately three separable things, because only the top one is
@@ -315,14 +372,13 @@ enforcing that money has one home.
 The price shown is the unit price, not the line total, because the quantity is
 right there next to it.
 
-### The price read must not fetch
+### Where the price comes from
 
-`loadSellGames()` calls eBay and, in the `web_estimate` path, a billed
-Anthropic lookup. **The anonymous page never runs that.** It reads
-`game_details.manual_expected_price_cents` first, falls back to a cached row in
-`game_price_quotes`, and takes null for an answer. An unauthenticated URL that
-spends money per page view is a bug waiting to be found by a crawler, and the
-`noindex` header is not a security control.
+`game_details.manual_expected_price_cents` first, then whatever row already
+sits in `game_price_quotes` for that bgg id, then null. Nothing is fetched and
+nothing is refreshed — see *The link is a window, never an engine* above, which
+is the rule this is one instance of. A price that is stale is shown as it is; a
+price that is absent is shown as nothing.
 
 ### Bringing decisions back
 
@@ -391,6 +447,11 @@ Following the existing files rather than inventing a new style.
 - `lib/share/grouping.test.ts` — identical BGG ids stack; different ids with the
   same title do not; an expansion is not folded into its base's quantity;
   regroup remaps unambiguously and refuses to guess otherwise.
+- `tests/share-read.test.ts` — `global.fetch` stubbed to throw. A full share
+  page renders with no cached prices, no photos and no confirmed bgg ids. If the
+  read path ever grows a lookup, this is what fails.
+- `tests/lint-boundaries.test.ts` — extend, so the share-read import boundary is
+  asserted to still fire, exactly as the vault providers rule is.
 - `tests/schema-exposed.test.ts` — extend, so the new tables are asserted
   unreachable over PostgREST as `anon`.
 
@@ -401,18 +462,23 @@ Each step is a commit that leaves the app working.
 1. `0039_share_links.sql` + `0040_item_families.sql` + `0041_share_rpcs.sql`,
    Drizzle schema in `lib/db/schema.ts`, `tests/rls-share.test.ts` green.
 2. `lib/share/grouping.ts` and its tests. No UI.
-3. `formatMoneyOrBlank`, and the read-only price snapshot loader
-   (`lib/share/load-disposition.ts`) that never fetches.
-4. `/s/[token]` read-only: the grouped page, photos, prices, quantities.
+3. The import boundary in `eslint.config.mjs` and its assertion in
+   `tests/lint-boundaries.test.ts` — **before** the read path exists, so it is
+   never possible to write a version that reaches out.
+4. `formatMoneyOrBlank`, and `lib/share/read/load-disposition.ts`: the one
+   loader the anonymous page reads through, plus `tests/share-read.test.ts`
+   with `fetch` stubbed to throw.
+5. `/s/[token]` read-only: the grouped page, photos, prices, quantities.
    Sendable at this point, just not answerable.
-5. The respond route and the steppers. The form works.
-6. `/shopping/share` — create, copy, revoke, and the responses view.
-7. Send-to-form and add-by-filter on inventory.
-8. Family suggestions (BGG expansion links + title clustering) and the accept UI.
-9. `scripts/share-add.ts` and the `share:add` npm script.
-10. Apply-a-decision.
+6. The respond route and the steppers. The form works.
+7. `/shopping/share` — create, copy, revoke, and the responses view.
+8. Send-to-form and add-by-filter on inventory.
+9. Family suggestions (BGG expansion links + title clustering) and the accept
+   UI. Note this is enrichment, so it lives entirely on my authenticated side.
+10. `scripts/share-add.ts` and the `share:add` npm script.
+11. Apply-a-decision.
 
-Steps 1–5 are the whole thing she needs. 6–10 are the parts that make it
+Steps 1–6 are the whole thing she needs. 7–11 are the parts that make it
 pleasant and repeatable.
 
 ## Open questions
@@ -436,3 +502,8 @@ pleasant and repeatable.
   delete, or re-price anything.
 - No public discovery. Every share page is `noindex` and reachable only by its
   token.
+- **No work performed by the link.** No price lookups, no catalog searches, no
+  enrichment, no jobs, no LLM calls, no outbound HTTP. Opening the page costs a
+  few indexed reads and nothing else, forever. This is the non-goal most likely
+  to get quietly violated by a well-meaning "the price is missing, let's just
+  fetch it" — it is a lint rule and a test for that reason.
