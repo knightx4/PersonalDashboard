@@ -50,6 +50,8 @@ export type BggThing = {
   maxPlayers: number | null;
   playingTimeMinutes: number | null;
   imageUrl: string | null;
+  /** BGG's average user rating, when the response carries statistics. */
+  averageRating: number | null;
 };
 
 export type BggSearchHit = {
@@ -68,6 +70,13 @@ function intOrNull(raw: string | null): number | null {
   if (!raw) return null;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** A rating is a decimal, and BGG writes an unrated game as 0. */
+function ratingOrNull(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
 
 function decodeXmlEntities(raw: string): string {
@@ -123,6 +132,7 @@ export function parseThingXml(xml: string): BggThing | null {
     maxPlayers: intOrNull(attrValue(body, /<maxplayers\b[^>]*value="([^"]*)"/)),
     playingTimeMinutes: intOrNull(attrValue(body, /<playingtime\b[^>]*value="([^"]*)"/)),
     imageUrl: image ?? thumbnail,
+    averageRating: ratingOrNull(attrValue(body, /<average\b[^>]*value="([^"]*)"/)),
   };
 }
 
@@ -247,7 +257,8 @@ export function createBggProvider(options: BggOptions = {}) {
     },
 
     async thing(bggId: number): Promise<BggThing | null> {
-      const xml = await getXml(`/thing?id=${bggId}`, options, hosts);
+      // stats=1 adds the ratings block; without it there is no average to read.
+      const xml = await getXml(`/thing?id=${bggId}&stats=1`, options, hosts);
       return xml ? parseThingXml(xml) : null;
     },
   };

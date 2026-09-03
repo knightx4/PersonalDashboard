@@ -379,6 +379,12 @@ export const inventoryItems = pgTable(
     disposalMethod: disposalMethod('disposal_method'),
     disposalProceedsCents: integer('disposal_proceeds_cents'),
     notes: text('notes'),
+    /**
+     * Free-form structured details, keyed by the template field's key.
+     * See lib/inventory/attributes.ts; identity still lives in the detail
+     * tables (book_details, game_details), which is what pricing reads.
+     */
+    attributes: jsonb('attributes').notNull().default({}),
     /** User intent: show on the returns tracker “to return” filter. */
     returnPlanned: boolean('return_planned').notNull().default(false),
     /**
@@ -394,6 +400,30 @@ export const inventoryItems = pgTable(
     index('inventory_order_item_idx').on(t.orderItemId),
     index('inventory_category_idx').on(t.categoryId),
     index('inventory_fp_loose_idx').on(t.fingerprintLoose),
+  ],
+);
+
+/**
+ * Which structured details items in a category should carry, per user.
+ * A row exists only once the user has edited the template; before that the
+ * built-in defaults in lib/inventory/attributes.ts apply.
+ */
+export const categoryAttributeTemplates = pgTable(
+  'category_attribute_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    /** [{ key, label, type }] — see AttributeField. */
+    fields: jsonb('fields').notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('category_attribute_templates_user_category_idx').on(t.userId, t.categoryId),
   ],
 );
 
