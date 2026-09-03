@@ -1,7 +1,7 @@
 /**
  * A missing Exposed-schemas entry must say so.
  *
- * Three schemas back this app and only `public` is exposed by default. When
+ * Five schemas back this app and only `public` is exposed by default. When
  * `job_search` or `core` is missing from that dashboard list, every query
  * against it fails with PGRST106 — and because callers routinely ignore the
  * error object, a count read as zero and a profile read as absent. The app then
@@ -28,6 +28,10 @@ describe('assertSchemaExposed', () => {
     // The fix is a dashboard setting, so the message has to say where.
     expect(message).toContain('Exposed schemas');
     expect(message).toContain('job_search');
+    // Every schema the app needs, so adding one and forgetting the dashboard
+    // produces a message that still names it.
+    expect(message).toContain('obsidian');
+    expect(message).toContain('todo');
   });
 
   it('ignores every other error, which callers still handle themselves', () => {

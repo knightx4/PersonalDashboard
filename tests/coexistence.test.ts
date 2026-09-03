@@ -112,6 +112,10 @@ describe('coexistence with the commerce app in public', () => {
     // columns but creates nothing on sign-up: a vault exists once someone
     // connects a repository, not once they have an account.
     //
+    // `todo` appears for the same reason as obsidian: tasks have an updated_at
+    // and nothing in the module is created on sign-up -- a list exists because
+    // you wrote something on it.
+    //
     // `core` appears for touch_updated_at because account_settings has an
     // updated_at, and its sign-up function is deliberately NOT called
     // handle_new_user: a third function of that name would be a fourth chance
@@ -120,7 +124,7 @@ describe('coexistence with the commerce app in public', () => {
     const owners: Record<string, string[]> = {
       handle_new_user: [APP_SCHEMA, 'public'],
       handle_new_user_settings: ['core'],
-      touch_updated_at: ['core', APP_SCHEMA, 'obsidian', 'public'],
+      touch_updated_at: ['core', APP_SCHEMA, 'obsidian', 'public', 'todo'],
     };
 
     for (const [fn, expected] of Object.entries(owners)) {

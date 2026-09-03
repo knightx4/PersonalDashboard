@@ -11,6 +11,7 @@
 #   supabase/migrations             -> public,     the commerce side
 #   supabase/migrations-job-search  -> job_search, the job search side
 #   supabase/migrations-vault       -> obsidian,   the Obsidian mirror
+#   supabase/migrations-todo        -> todo,       the todo module
 #
 # They are separate directories rather than one because the sets were numbered
 # independently and each starts at 0001 -- and the job_search versions are
@@ -81,5 +82,8 @@ apply_range migrations "$CORE_HANDOVER" after
 
 echo "==> migrations-vault (obsidian)"
 for f in "$ROOT/supabase/migrations-vault"/*.sql; do apply_file "$f"; done
+
+echo "==> migrations-todo (todo)"
+for f in "$ROOT/supabase/migrations-todo"/*.sql; do apply_file "$f"; done
 
 echo "==> done"
