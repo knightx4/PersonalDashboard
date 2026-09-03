@@ -3,6 +3,10 @@
 A fourth workspace: the things you have to do, across all three of the others
 and outside all of them.
 
+> **Built**, as build order steps 24–31. What this document got wrong on
+> contact with the code is recorded at the end, under "What changed in the
+> building". Everything else here still describes what is there.
+
 It is specified in full here because the interesting part is not the todo list —
 that is a table with a title and a due date, and it is an afternoon — but the
 integration, and the integration is where every todo app that has ever been
@@ -859,6 +863,40 @@ file against the interface from step 28.
   the right first cut. Whether `job_search.profiles` and `public.profiles`
   eventually become one table of module preferences is a question for whenever
   the second one of them is nearly empty.
+
+## What changed in the building
+
+Recorded rather than edited away, because each of these is a place the spec was
+confident and the code disagreed.
+
+- **The timezone could not simply move.** About thirty call sites read
+  `profiles.timezone`, and rewriting them all would have turned a prerequisite
+  into a refactor of two products. `core.account_settings` is the one writer;
+  a trigger keeps both `profiles` columns true. They are mirrors maintained by
+  the database, not a second writer, and they retire whenever their readers do.
+- **The ownership trigger has to let the check constraint speak.** A BEFORE
+  trigger runs first, so a link pointing at nothing was answered with "you do
+  not own that" — sending someone after a permissions problem they do not have.
+  It now returns early when the row does not name exactly one target.
+- **Interviews needed their own type.** `AgendaItem` assumed everything could
+  at least be dismissed; an interview cannot sensibly be. `DayContext` sits
+  alongside it, is rendered without a checkbox, and a day holding only an
+  interview still renders — "an interview on Thursday and nothing else" is an
+  answer.
+- **`lastCorrespondents` moved** out of `lib/jobs/today/load.ts` into
+  `lib/jobs/followup/recipients.ts`. Two pages address the same draft now, and
+  two copies of that logic would have drifted.
+- **The select list in `lib/todo/links/load.ts` is written out by hand.**
+  supabase-js parses it at the type level and a computed string degrades the
+  whole result to an error type. A test asserts it names every target column,
+  because otherwise a seventh target would be added everywhere else and simply
+  never come back from the query.
+- **`todo.agenda_settings` was not in the schema section** and needed to be:
+  the horizon and the source switches are module settings, and the source
+  registry is useless without somewhere to record which sources are on.
+- **`countOpenTasks` is imported dynamically on `/home`.** A static import
+  pulled the todo client into a page that must still render when the module is
+  switched off.
 
 ## What this unlocks (not v1)
 

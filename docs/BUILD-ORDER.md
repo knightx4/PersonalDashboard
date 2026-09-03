@@ -105,9 +105,27 @@ called `vault`, which is Supabase's own — see the head of the migration.
 
 ### Todo — the fourth workspace
 
-Specified in full in [TODO-SPEC.md](TODO-SPEC.md), built in none of it yet.
-Eight steps, in this order, and none of them depends on 19. The module is
-worth having after step 26.
+Specified in full in [TODO-SPEC.md](TODO-SPEC.md). All eight steps are done.
+
+What the spec got wrong on contact with the code, recorded because the next
+module will be tempted by the same things:
+
+- **The timezone move could not be a refactor.** About thirty call sites read
+  `profiles.timezone`, so `core.account_settings` became the one writer and a
+  trigger keeps both columns true. Mirrors maintained by the database, not a
+  second writer -- they retire whenever their readers do.
+- **The ownership trigger had to let the check constraint speak.** A BEFORE
+  trigger runs first, so a link pointing at nothing was answered with "you do
+  not own that", which sends someone looking for a permissions problem they do
+  not have.
+- **`lastCorrespondents` moved to `lib/jobs/followup/recipients.ts`.** Two pages
+  address the same draft now, and two ways of doing it would have drifted.
+- **Interviews needed their own shape.** They are appointments, so `DayContext`
+  exists alongside `AgendaItem` -- a checkbox beside a meeting invites a person
+  to lie to their own list.
+- **The select list in `links/load.ts` is written by hand.** supabase-js parses
+  it at the type level and a computed string degrades the whole result to an
+  error type, so a test asserts it names every target column instead.
 
 The rule everything else follows from: an obligation is displayed by whoever
 needs to show it and written by whoever owns it. The module owns the tasks you
@@ -115,7 +133,7 @@ typed into it. A job reminder is finished and deferred on the job side's own
 row, so both pages agree; a return deadline gets a dismissal and nothing else.
 No import job, no second copy, and nothing read out of the vault at all in v1.
 
-24. **Account settings.** `core.account_settings`, and the timezone moved into
+24. ✅ **Account settings.** `core.account_settings`, and the timezone moved into
     it — there are currently two `profiles` tables with a `timezone` each, both
     defaulting to UTC, and only the jobs one has an edit screen, so the shopping
     half of the account has silently been on UTC. Account-level settings
@@ -123,34 +141,34 @@ No import job, no second copy, and nothing read out of the vault at all in v1.
     behind the account icon; each module keeps its own gear for its own
     settings. A change to all three existing workspaces, and first because
     everything below renders a date.
-25. **Schema and the isolation test.** New `todo` schema in
+25. ✅ **Schema and the isolation test.** New `todo` schema in
     `supabase/migrations-todo/`, applied last by `db-reset.sh` because its
     foreign keys point into the other three. RLS **and** the link-ownership
     trigger, with the cross-user isolation test covering both before any feature
     code -- the same rule as steps 2 and 20, and it matters more here: a
     foreign key is not an ownership check, because referential integrity in
     Postgres bypasses RLS.
-26. **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
+26. ✅ **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
     snooze, due dates, pinned. Fourth entry in `WORKSPACES`. Zero integration,
     and already worth having.
-27. **Links and the inline sections.** `todo.task_links` -- real cross-schema
+27. ✅ **Links and the inline sections.** `todo.task_links` -- real cross-schema
     foreign keys, one parent from six, the shape `job_search.notes` already
     uses. A Tasks section on the role, company, contact and interview pages and
     on a note. This is the entire vault integration for now, and it is the half
     that costs nothing.
-28. **The source registry.** The `AgendaSource` interface, the switches in
+28. ✅ **The source registry.** The `AgendaSource` interface, the switches in
     `/todo/settings` (all off), batched label lookups and the pure merge, with
     no sources implemented. A scaffold with nothing plugged into it sounds like
     a step to skip; it is the step that decides whether the next two are one
     file each or a rewrite.
-29. **The job source.** Reminders on the agenda with the follow-up composer
+29. ✅ **The job source.** Reminders on the agenda with the follow-up composer
     intact (`fd33268` applies here with full force), completion writing
     `completed_at` and deferral moving `due_at`, both on the job row.
     Interviews as day context rather than as items.
-30. **The shopping source.** `orders.return_deadline` within the horizon. Last
+30. ✅ **The shopping source.** `orders.return_deadline` within the horizon. Last
     of the sources because it is the thinnest.
-31. **`/home`.** The top slice of the agenda on the front door, which currently
-    shows two counts and no reason to visit.
+31. ✅ **`/home`.** The top slice of the agenda on the front door, plus tiles
+    for the vault and the todo module, which it never had.
 
 Deliberately not a step: reading `- [ ]` checkboxes out of notes. A checkbox is
 a line of text inside a note rather than a row, and every way of extracting one
@@ -175,7 +193,8 @@ none of them is chosen yet.
 - The vault block (20–23) is independent of 19. Either order is fine, and
   neither blocks the other.
 - Step 24 before everything else in the block: two timezones that disagree
-  cannot render one agenda. Step 25 before 26, for the third time and the same
+  cannot render one agenda. This held in practice -- every later step reads
+  `loadAccountSettings`. Step 25 before 26, for the third time and the same
   reason a missing policy has to fail immediately. Steps 26 and 27 are worth
   having on their own and can ship without any of 28–31. Step 28 before 29 and
   30, which are otherwise independent of each other. Step 27 needs the vault

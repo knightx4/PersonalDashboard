@@ -1,6 +1,6 @@
 # Personal Tracker
 
-Three workspaces behind one login, one deployment and one database.
+Four workspaces behind one login, one deployment and one database.
 
 **Shopping** (`/shopping`) tracks what you have already bought, prevents double
 buying, and holds things you want to buy in a queue instead of a cart. The
@@ -12,6 +12,11 @@ you already own two of these and spent $340 at this merchant last month.
 board, the roles and companies behind it, contacts, interviews, an answer bank
 and the funnel maths over all of it.
 
+**Todo** (`/todo`) holds the things you have to do that belong to no workspace,
+and merges in the ones that do — a follow-up the job search is waiting on, a
+return window about to close — without copying a single row. Each of those is a
+source you switch on, and everything but your own list starts off.
+
 **Vault** (`/vault`) mirrors an Obsidian vault from a git repository and makes
 it readable and searchable here. Markdown only — attachments are never even
 requested. It is a viewer today; what it is *for* is in
@@ -19,9 +24,10 @@ requested. It is a viewer today; what it is *for* is in
 
 They share an account and a design system, and the first two share one mailbox.
 Otherwise nothing. Each owns its own Postgres schema in one Supabase project —
-`public` for shopping, `job_search` for the job side, `obsidian` for the notes —
-and ingestion sits in `core`, because an order confirmation and a rejection
-letter arrive on the same sync and neither workspace owns that fact. See
+`public` for shopping, `job_search` for the job side, `obsidian` for the notes,
+`todo` for the list — and ingestion and account settings sit in `core`, because
+an order confirmation and a rejection letter arrive on the same sync, your
+timezone belongs to none of them, and no workspace owns any of those facts. See
 [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
@@ -31,11 +37,10 @@ Build order steps 1–14 and books/sell assistant (16–18) are done. See
 side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
 next body of work.
 
-A fourth workspace — **Todo**, the things you have to do, merged across the
-other three and outside all of them — is specified but not built:
-[docs/TODO-SPEC.md](docs/TODO-SPEC.md), build order steps 24–31. Step 24 is
-account-wide rather than todo-specific: the timezone is currently stored twice,
-in two `profiles` tables, and moves into one place behind the account icon.
+The fourth workspace — **Todo** — is built: build order steps 24–31, specified
+in [docs/TODO-SPEC.md](docs/TODO-SPEC.md). Reading `- [ ]` checkboxes out of
+vault notes is deliberately not part of it and waits for the vault to hold
+notes as something more structured than text.
 
 | | |
 |---|---|
@@ -61,6 +66,8 @@ in two `profiles` tables, and moves into one place behind the account icon.
 | Company enrichment from Wikidata | done |
 | JD backfill from the employer's own ATS board | done |
 | Vault workspace (schema, git sync, viewer, connect UI) | done |
+| Account settings, one timezone for the whole account | done |
+| Todo workspace (schema, list, links, agenda sources) | done |
 
 ## Getting started
 
@@ -87,6 +94,8 @@ app/
   (auth)/          login, signup, reset, callback
   (app)/           dashboard | orders | inventory | saved | review | settings
   vault/           notes | note detail | settings
+  todo/            agenda | all | settings
+  account/         settings that hold across every workspace
   (legal)/         privacy, terms   (required for Google verification)
 proxy.ts           session refresh + route protection
 lib/
@@ -99,6 +108,10 @@ lib/
 lib/
   vault/           providers/ (the git source, contained), sync/ (pure planning
                    + the runner), markdown/ (frontmatter and Obsidian syntax)
+lib/
+  core/account/    account settings -- the one timezone, and which modules are on
+  todo/            tasks/ (pure model + queries), links/ (what a task is about),
+                   agenda/ (the source interface, the registry, the pure merge)
 supabase/
   migrations/      the source of truth for the database
   local/           auth shim for the local test database only
@@ -139,6 +152,24 @@ These are enforced by tests and lint rules, not by convention.
 - **Notes render without raw HTML.** `rehype-raw` is not installed and must not
   be: with raw HTML disabled, `react-markdown` will not render the arbitrary
   markup a web-clipper note carries. That absence is the sanitizer.
+- **A foreign key is not an ownership check.** Referential integrity in
+  Postgres bypasses RLS, so every cross-schema link in `todo.task_links` is
+  checked by a trigger as well, and `tests/rls-todo.test.ts` asserts a link to
+  another account's row is refused. An isolation suite covering only the tables
+  with their own `user_id` would pass with that hole wide open.
+- **The todo module never copies a row out of another schema.** A foreign
+  obligation is read at query time by its source and written back where it
+  lives — finishing a job reminder sets `completed_at` on the job row,
+  deferring it moves that row's `due_at`. There is no second place a reminder
+  can be hidden, because two places would disagree.
+- **Settings that survive every module being off belong to the account**, in
+  `core.account_settings`, behind the account icon. Everything else belongs to
+  its module's own gear. The two `profiles.timezone` columns are mirrors kept
+  by a trigger, not a second writer.
+- **A due date and a due instant are different columns.** "Tuesday" must not
+  move because you flew to Lisbon; 14:30 must. Which also rules out indexing
+  `coalesce(due_on, due_at::date)` — Postgres refuses it, because
+  timestamptz → date is not immutable.
 - **The vault sync never advances its cursor past work it did not do.** A
   cursor is a promise that everything up to a commit is mirrored, and a promise
   made early is a permanent gap — the next run only asks for what changed since

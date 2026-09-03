@@ -10,12 +10,14 @@ most of the way through the project. Do not front-load it.
 
 ---
 
-## Three apps, one Supabase project
+## Four apps, one Supabase project
 
-This deployment carries three workspaces behind one login: the commerce side at
-`/shopping`, the job search side at `/jobs`, and the vault at `/vault`. They
-share a Supabase project and take a schema each — `public`, `job_search` and
-`obsidian` — plus `core`, which belongs to none of them.
+This deployment carries four workspaces behind one login: the commerce side at
+`/shopping`, the job search side at `/jobs`, the vault at `/vault` and the todo
+module at `/todo`. They share a Supabase project and take a schema each —
+`public`, `job_search`, `obsidian` and `todo` — plus `core`, which belongs to
+none of them and holds both ingestion and the account settings (your timezone
+is not a fact about any one workspace).
 
 The notes workspace is called Vault everywhere a person sees it, but its schema
 is `obsidian`: `vault` is taken by Supabase Vault on every hosted project, and
@@ -73,7 +75,7 @@ schemas, so the join has to be in the database.
 ### The one step that is not in this repository
 
 In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search`, `core` and `obsidian`** alongside `public`.
+must include **`job_search`, `core`, `obsidian` and `todo`** alongside `public`.
 
 Without it PostgREST refuses every request against the missing schema with
 *"The schema must be one of the following"*, and because it is a dashboard
@@ -82,9 +84,10 @@ project restore or when setting up a second environment. Three things have to
 agree — the migrations, the `db: { schema }` option on every client, and this
 setting — and only the first two are in version control.
 
-`obsidian` is the newest and therefore the one most likely to be missing: the
-symptom is a Vault workspace that reports no connection and no notes on an
-account that has both.
+`todo` is the newest and therefore the one most likely to be missing: the
+symptom is a Todo workspace that reports an empty list on an account that has
+one, and — because the account settings live in `core` — a timezone that
+silently reverts to UTC everywhere if that one is missing too.
 
 **Never add `vault` to that list.** That schema is Supabase's own — Supabase
 Vault, the encrypted secrets store — and `vault.secrets` carries no RLS
@@ -93,13 +96,20 @@ called Vault and lives in `obsidian` for exactly this reason.
 
 ### Migrations
 
-Three directories, and the order is **not** directory by directory:
+Four directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
-| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0036` |
-| `supabase/migrations-job-search` | `job_search` | `0001`–`0013` |
+| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0037` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
 | `supabase/migrations-vault` | `obsidian` | `0001` |
+| `supabase/migrations-todo` | `todo` | `0001`–`0002` |
+
+`migrations-todo` goes **last**, after all three of the others. Its
+`task_links` table carries foreign keys into `job_search` and `obsidian`, so
+applying it earlier fails on a table that does not exist yet.
+`scripts/db-reset.sh` already sequences the directories this way; a fresh
+project must be migrated in the same order.
 
 They are separate because the sets were numbered independently from `0001`, and
 the `job_search` versions are already recorded remotely under exactly those
