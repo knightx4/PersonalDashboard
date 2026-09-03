@@ -13,6 +13,7 @@ import {
   type SyncJobStaleRow,
 } from '@/lib/core/inbox/sync-job-stale';
 import { backfillResumable, type BackfillState } from '@/lib/core/inbox/resume';
+import { isSyncPhase } from '@/lib/core/inbox/progress';
 
 export const maxDuration = 300;
 
@@ -20,9 +21,11 @@ type JobRow = {
   id: string;
   type?: string;
   status: string;
+  phase?: string | null;
   messages_seen: number;
   messages_classified: number;
   messages_parsed: number;
+  messages_total?: number | null;
   error: string | null;
   started_at: string | null;
   finished_at: string | null;
@@ -43,6 +46,10 @@ function jobToProgress(job: JobRow) {
     jobId: job.id,
     type: job.type ?? 'backfill',
     status: job.status,
+    // What it is doing right now, so a watching page can say so rather than
+    // showing a bar that only ever reads nought or one.
+    phase: isSyncPhase(job.phase) ? job.phase : null,
+    messagesTotal: job.messages_total ?? null,
     messagesSeen: job.messages_seen,
     messagesClassified: job.messages_classified,
     messagesParsed: job.messages_parsed,
@@ -73,7 +80,7 @@ function backfillStateOf(
 }
 
 const JOB_SELECT =
-  'id, type, status, messages_seen, messages_classified, messages_parsed, error, started_at, finished_at, updated_at';
+  'id, type, status, phase, messages_seen, messages_classified, messages_parsed, messages_total, error, started_at, finished_at, updated_at';
 
 /**
  * GET — poll the latest sync job for an account (session-scoped).

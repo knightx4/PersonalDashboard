@@ -776,9 +776,13 @@ export const syncJobs = pgTable(
       .references(() => emailAccounts.id, { onDelete: 'cascade' }),
     type: syncJobType('type').notNull(),
     status: syncJobStatus('status').notNull().default('queued'),
+    /** listing | reading | linking | done — see lib/core/inbox/progress.ts. */
+    phase: text('phase'),
     messagesSeen: integer('messages_seen').notNull().default(0),
     messagesClassified: integer('messages_classified').notNull().default(0),
     messagesParsed: integer('messages_parsed').notNull().default(0),
+    /** What the list step found, where that is a whole run's worth. */
+    messagesTotal: integer('messages_total'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     error: text('error'),
