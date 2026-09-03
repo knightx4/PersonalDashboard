@@ -28,7 +28,7 @@ export function ApplyDecision({
 
   if (sellQty === 0 && giveawayQty === 0) {
     // Keep is not an action, so there is nothing to apply.
-    return <span className="text-[12px] text-ink-faint">Keeping</span>;
+    return <span className="text-small text-ink-muted">Keeping</span>;
   }
 
   const label = [
@@ -41,7 +41,7 @@ export function ApplyDecision({
   return (
     <div className="flex items-center gap-2">
       {note ? (
-        <span className="text-[12px] text-ink-muted">{note}</span>
+        <span className="text-small text-ink-muted">{note}</span>
       ) : (
         <Button
           size="sm"

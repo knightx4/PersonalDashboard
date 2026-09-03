@@ -371,7 +371,7 @@ export default async function OrdersPage({
           {activeTag && <input type="hidden" name="tag" value={activeTag} />}
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -413,13 +413,13 @@ export default async function OrdersPage({
               return (
                 <section key={key}>
                   <div className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                    <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
                       {monthLabel(key)}
-                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-faint">
+                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-muted">
                         {monthOrders.length}
                       </span>
                     </h2>
-                    <p className="tabular text-[12px] text-ink-muted">
+                    <p className="tabular text-small text-ink-muted">
                       {formatMoney(monthTotal, displayCurrency)}
                     </p>
                   </div>

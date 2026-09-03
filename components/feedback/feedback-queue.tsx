@@ -30,7 +30,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
   return (
     <>
       {blocked.length > 0 && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[13px] text-ink">
+        <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-ui text-ink">
           {blocked.length} note(s) blocked, waiting on an answer from you. They are listed
           first below with the question.
         </p>
@@ -39,7 +39,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
       <div className="space-y-6">
         {outstanding.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-ink">
+            <h2 className="text-body font-semibold text-ink">
               Outstanding <span className="font-normal text-ink-muted">({outstanding.length})</span>
             </h2>
             <FeedbackList rows={outstanding} />
@@ -47,7 +47,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
         )}
         {closed.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-ink">
+            <h2 className="text-body font-semibold text-ink">
               Closed <span className="font-normal text-ink-muted">({closed.length})</span>
             </h2>
             <FeedbackList rows={closed} />

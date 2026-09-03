@@ -19,14 +19,14 @@ export function MerchantBreakdown({
       </CardHeader>
       <CardBody className="pt-0">
         {top.length === 0 ? (
-          <p className="text-[13px] text-ink-muted">No orders in this period.</p>
+          <p className="text-ui text-ink-muted">No orders in this period.</p>
         ) : (
           <ul className="space-y-3">
             {top.map((slice) => {
               const width = max === 0 ? 0 : Math.round((slice.cents / max) * 100);
               return (
                 <li key={slice.merchantId ?? slice.name}>
-                  <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
+                  <div className="mb-1 flex items-baseline justify-between gap-3 text-ui">
                     <span className="truncate font-medium text-ink">{slice.name}</span>
                     <span className="tabular shrink-0 text-ink">
                       {formatMoney(slice.cents, currency)}
@@ -34,7 +34,7 @@ export function MerchantBreakdown({
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-canvas">
                     <div
-                      className="h-full rounded-full bg-brand"
+                      className="h-full rounded-full bg-accent"
                       style={{ width: `${width}%` }}
                     />
                   </div>
@@ -44,9 +44,9 @@ export function MerchantBreakdown({
           </ul>
         )}
         {slices.length > 0 && (
-          <p className="mt-4 text-[12px] text-ink-faint">
+          <p className="mt-4 text-small text-ink-muted">
             Gross orders placed in this period.{' '}
-            <Link href="/shopping/orders" className="text-brand hover:underline">
+            <Link href="/shopping/orders" className="text-accent hover:underline">
               See all orders
             </Link>
           </p>

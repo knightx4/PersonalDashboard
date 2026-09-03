@@ -1,9 +1,9 @@
 import { CheckCheck } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import {
   loadReviewQueue,
   parseReviewView,
@@ -155,7 +155,7 @@ export default async function ReviewPage({
               />
             ))}
           </RailGroup>
-          <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="px-1 text-micro leading-relaxed text-ink-muted">
             Bodies are never stored, so each row links out to Gmail for the full message.
           </p>
         </LeftRail>

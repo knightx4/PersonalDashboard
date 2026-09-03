@@ -1,6 +1,6 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
 import { loadActivity } from '@/lib/jobs/activity/load';
 

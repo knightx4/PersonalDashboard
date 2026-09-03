@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
 import { publicEnv } from '@/lib/env';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
@@ -219,9 +219,9 @@ export default async function RoleDetailPage({
               <Link
                 href={`/jobs/roles/${role.id}?tab=posting`}
                 className={cn(
-                  'tabular rounded-full px-2 py-0.5 text-[12px]',
+                  'tabular rounded-full px-2 py-0.5 text-small',
                   coverage.gaps > 0
-                    ? 'bg-accent-orange-tint text-ink'
+                    ? 'bg-caution-tint text-ink'
                     : 'bg-status-offer-tint text-status-offer',
                 )}
                 title={
@@ -243,7 +243,7 @@ export default async function RoleDetailPage({
                 href={role.jd_url as string}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-[13px] text-ink-muted underline underline-offset-2 hover:text-ink"
+                className="text-ui text-ink-muted underline underline-offset-2 hover:text-ink"
               >
                 Original posting
               </a>
@@ -253,14 +253,14 @@ export default async function RoleDetailPage({
       />
 
       {current.needs_review && (
-        <p className="mb-4 rounded-lg bg-accent-orange-tint px-3 py-2 text-[13px] text-ink">
+        <p className="mb-4 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
           {current.created_by === 'email_inferred'
             ? 'This was created from a confirmation email nobody logged. Check the role and the date, then clear the flag from the review queue.'
             : 'Flagged for review.'}
         </p>
       )}
 
-      <dl className="mb-6 grid gap-px overflow-hidden rounded-card border border-border bg-border text-[13px] sm:grid-cols-4">
+      <dl className="mb-6 grid gap-px overflow-hidden rounded-card border border-border bg-border text-ui sm:grid-cols-4">
         <Fact label="Applied" value={formatDate(current.submitted_at as string | null, timezone)} />
         <Fact
           label="Confirmed"
@@ -487,7 +487,7 @@ function debriefDue(iso: string | null): boolean {
 function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="bg-surface px-3 py-2.5">
-      <dt className="text-[11px] uppercase tracking-wider text-ink-faint">{label}</dt>
+      <dt className="text-micro uppercase tracking-wider text-ink-muted">{label}</dt>
       <dd className="tabular mt-0.5 truncate text-ink" title={hint}>
         {value}
       </dd>

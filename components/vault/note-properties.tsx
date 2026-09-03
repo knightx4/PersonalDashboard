@@ -15,7 +15,7 @@ export function NoteProperties({ frontmatter }: { frontmatter: Record<string, un
   if (entries.length === 0) return null;
 
   return (
-    <dl className="mb-6 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 rounded-card border border-border bg-canvas px-4 py-3 text-[13px]">
+    <dl className="mb-6 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 rounded-card border border-border bg-canvas px-4 py-3 text-ui">
       {entries.map(([key, value]) => (
         <div key={key} className="contents">
           <dt className="font-medium text-ink-muted">{key}</dt>

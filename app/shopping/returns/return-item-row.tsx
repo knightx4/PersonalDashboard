@@ -19,7 +19,7 @@ export function ReturnItemRow({
 }) {
   const urgency =
     row.daysLeft != null && row.daysLeft <= 7
-      ? 'text-accent-orange font-medium'
+      ? 'text-caution font-medium'
       : 'text-ink-muted';
   const returned = row.status === 'returned';
 
@@ -31,27 +31,27 @@ export function ReturnItemRow({
             <p className="truncate font-medium text-ink">
               {row.name}
               {row.returnPlanned && !returned && (
-                <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
+                <span className="ml-2 text-micro font-semibold uppercase tracking-wide text-accent">
                   To return
                 </span>
               )}
               {returned && (
-                <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                <span className="ml-2 text-micro font-semibold uppercase tracking-wide text-ink-muted">
                   Returned
                 </span>
               )}
             </p>
-            <p className="truncate text-[13px] text-ink-muted">
+            <p className="truncate text-ui text-ink-muted">
               {[nested ? null : row.merchantName, displayVariant(row.variant)]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
           </div>
-          <p className="tabular shrink-0 text-sm font-medium text-ink">
+          <p className="tabular shrink-0 text-body font-medium text-ink">
             {formatMoney(row.costCents)}
           </p>
         </div>
-        <p className={`mt-1 text-[12px] ${returned ? 'text-ink-muted' : urgency}`}>
+        <p className={`mt-1 text-small ${returned ? 'text-ink-muted' : urgency}`}>
           {returned
             ? row.refundedAt
               ? `Returned ${row.refundedAt}`
@@ -75,7 +75,7 @@ export function ReturnItemRow({
         {!nested && (
           <Link
             href={`/shopping/orders/${row.orderId}`}
-            className="text-[12px] text-ink-muted hover:text-brand hover:underline"
+            className="text-small text-ink-muted hover:text-accent hover:underline"
           >
             View order
           </Link>

@@ -58,17 +58,17 @@ export function LinkedTasks({
   return (
     <section className={cn(!compact && 'rounded-card border border-border bg-surface p-4')}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+        <h3 className="flex items-center gap-1.5 text-ui font-semibold text-ink">
           <ListChecks className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
           {title}
           {tasks.length > 0 && (
-            <span className="tabular text-[12px] font-normal text-ink-faint">{tasks.length}</span>
+            <span className="tabular text-small font-normal text-ink-muted">{tasks.length}</span>
           )}
         </h3>
         <button
           type="button"
           onClick={() => setAdding((open) => !open)}
-          className="press flex items-center gap-1 text-[12px] font-medium text-brand"
+          className="press flex items-center gap-1 text-small font-medium text-accent"
         >
           <Plus className="size-3.5" strokeWidth={2} aria-hidden />
           {adding ? 'Cancel' : 'Add'}
@@ -87,13 +87,13 @@ export function LinkedTasks({
               Add
             </Button>
           </div>
-          {state.error && <p className="text-[12px] text-status-rejected">{state.error}</p>}
+          {state.error && <p className="text-small text-status-rejected">{state.error}</p>}
         </form>
       )}
 
       {tasks.length === 0 ? (
         !adding && (
-          <p className="mt-2 text-[12px] text-ink-faint">Nothing outstanding.</p>
+          <p className="mt-2 text-small text-ink-muted">Nothing outstanding.</p>
         )
       ) : (
         <ul className="mt-2 divide-y divide-border">
@@ -138,19 +138,19 @@ function LinkedRow({
         className={cn(
           'press flex size-4 shrink-0 items-center justify-center rounded border',
           done
-            ? 'border-status-offer bg-status-offer text-white'
-            : 'border-border-strong hover:border-brand',
+            ? 'border-status-offer bg-status-offer text-surface'
+            : 'border-control hover:border-accent',
         )}
       >
         {done && <Check className="size-2.5" strokeWidth={3} aria-hidden />}
       </button>
 
-      <span className={cn('min-w-0 flex-1 truncate text-[13px] text-ink', done && 'text-ink-muted line-through')}>
+      <span className={cn('min-w-0 flex-1 truncate text-ui text-ink', done && 'text-ink-muted line-through')}>
         {task.title}
       </span>
 
       {(task.dueOn || task.dueAt) && (
-        <span className="tabular shrink-0 text-[12px] text-ink-muted">
+        <span className="tabular shrink-0 text-small text-ink-muted">
           {formatDue(task, timezone)}
         </span>
       )}
@@ -161,7 +161,7 @@ function LinkedRow({
         type="button"
         title="Detach from this"
         onClick={() => start(() => detachTask(task.id, target, targetId, returnTo))}
-        className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-faint opacity-100 hover:bg-canvas hover:text-ink sm:opacity-0 sm:group-hover:opacity-100"
+        className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted opacity-100 hover:bg-canvas hover:text-ink sm:opacity-0 sm:group-hover:opacity-100"
       >
         <Unlink className="size-3" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Detach from this</span>
@@ -190,7 +190,7 @@ function formatDue(task: Task, timezone: string): string {
 /** A link to the agenda, for a section that has more than it can show. */
 export function AllTasksLink() {
   return (
-    <Link href="/todo" className="text-[12px] font-medium text-brand underline underline-offset-2">
+    <Link href="/todo" className="text-small font-medium text-accent underline underline-offset-2">
       All tasks
     </Link>
   );

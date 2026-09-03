@@ -48,7 +48,7 @@ export default async function VaultSettingsPage() {
             <CardTitle>Connect your vault</CardTitle>
           </CardHeader>
           <CardBody className="space-y-4">
-            <p className="text-sm leading-relaxed text-ink-muted">
+            <p className="text-body leading-relaxed text-ink-muted">
               Keep your Obsidian vault in a private GitHub repository — the{' '}
               <strong className="font-medium text-ink">Obsidian Git</strong> plugin will commit and
               push it on a schedule — and this mirrors every markdown file in it. Images, PDFs and
@@ -65,21 +65,21 @@ export default async function VaultSettingsPage() {
                 {connection.repoOwner}/{connection.repoName}
               </CardTitle>
               {connection.status === 'active' ? (
-                <span className="shrink-0 text-[12px] text-ink-muted">
+                <span className="shrink-0 text-small text-ink-muted">
                   {STATUS_LABEL[connection.status]}
                 </span>
               ) : (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-orange-tint px-2 py-0.5 text-[12px] font-medium text-accent-orange">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-caution-tint px-2 py-0.5 text-small font-medium text-caution">
                   <AlertTriangle className="size-3" strokeWidth={2.5} aria-hidden />
                   {STATUS_LABEL[connection.status] ?? connection.status}
                 </span>
               )}
             </CardHeader>
             <CardBody className="space-y-3">
-              <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+              <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui">
                 <dt className="text-ink-muted">Branch</dt>
                 <dd className="flex items-center gap-1 text-ink">
-                  <GitBranch className="size-3.5 text-ink-faint" strokeWidth={2} aria-hidden />
+                  <GitBranch className="size-3.5 text-ink-muted" strokeWidth={2} aria-hidden />
                   {connection.branch}
                 </dd>
 
@@ -102,30 +102,30 @@ export default async function VaultSettingsPage() {
               {progress && <SyncProgressBar progress={progress} />}
 
               {connection.lastError && (
-                <p className="rounded-lg bg-accent-orange-tint px-3 py-2 text-[13px] text-ink">
+                <p className="rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
                   Last run reported: {connection.lastError}
                 </p>
               )}
 
               {runs.length > 0 && (
                 <details className="rounded-lg border border-border">
-                  <summary className="cursor-pointer px-3 py-2 text-[13px] text-ink-muted">
+                  <summary className="cursor-pointer px-3 py-2 text-ui text-ink-muted">
                     Recent runs
                   </summary>
                   <ul className="divide-y divide-border border-t border-border">
                     {runs.map((run) => (
                       <li key={run.id} className="flex flex-wrap items-baseline gap-x-3 px-3 py-2">
-                        <span className="w-24 text-[12px] font-medium text-ink">
+                        <span className="w-24 text-small font-medium text-ink">
                           {run.type === 'backfill' ? 'First sync' : 'Update'}
                         </span>
-                        <span className="tabular w-32 text-[12px] text-ink-faint">
+                        <span className="tabular w-32 text-small text-ink-muted">
                           {run.startedAt ? formatWhen(run.startedAt) : '—'}
                         </span>
                         <span
                           className={
                             run.status === 'failed'
-                              ? 'flex-1 text-[12px] text-accent-orange'
-                              : 'flex-1 text-[12px] text-ink-muted'
+                              ? 'flex-1 text-small text-caution'
+                              : 'flex-1 text-small text-ink-muted'
                           }
                         >
                           {describeRun(run)}
@@ -136,7 +136,7 @@ export default async function VaultSettingsPage() {
                 </details>
               )}
 
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-ui text-ink-muted">
                 Syncing runs once a day, on the same schedule as the mailbox. Press Sync now to
                 pull anything you have pushed since.
               </p>
@@ -156,7 +156,7 @@ export default async function VaultSettingsPage() {
                   </Button>
                 </form>
               </div>
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-ui text-ink-muted">
                 Re-reading walks the whole tree again and re-fetches only what actually changed.
                 Disconnecting removes this copy of your notes; your vault itself is untouched.
               </p>
@@ -171,7 +171,7 @@ export default async function VaultSettingsPage() {
             </CardHeader>
             <CardBody className="space-y-4">
               {connection.status === 'needs_reauth' && (
-                <p className="text-sm leading-relaxed text-ink-muted">
+                <p className="text-body leading-relaxed text-ink-muted">
                   Fine-grained tokens expire — a year at most — so this is routine rather than a
                   fault. Generate a new one with <strong>Contents: Read-only</strong> and paste it
                   below. Your notes and sync position are kept, so nothing is re-read.
@@ -204,17 +204,17 @@ export default async function VaultSettingsPage() {
 function SyncProgressBar({ progress }: { progress: SyncProgress }) {
   const tone =
     progress.phase === 'failed'
-      ? 'bg-accent-orange'
+      ? 'bg-caution-fill'
       : progress.phase === 'up_to_date'
         ? 'bg-status-offer'
-        : 'bg-brand';
+        : 'bg-accent';
 
   return (
     <div className="rounded-lg bg-canvas px-3 py-2.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[13px] font-medium text-ink">{progress.headline}</span>
+        <span className="text-ui font-medium text-ink">{progress.headline}</span>
         {progress.percent !== null && (
-          <span className="tabular text-[12px] text-ink-muted">{progress.percent}%</span>
+          <span className="tabular text-small text-ink-muted">{progress.percent}%</span>
         )}
       </div>
 
@@ -234,7 +234,7 @@ function SyncProgressBar({ progress }: { progress: SyncProgress }) {
         </div>
       )}
 
-      <p className="mt-1.5 text-[12px] text-ink-muted">{progress.detail}</p>
+      <p className="mt-1.5 text-small text-ink-muted">{progress.detail}</p>
     </div>
   );
 }

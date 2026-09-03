@@ -34,7 +34,7 @@ export function ConnectVaultForm({
           placeholder="owner/my-vault"
           autoComplete="off"
         />
-        <p className="mt-1 text-[13px] text-ink-muted">
+        <p className="mt-1 text-ui text-ink-muted">
           A full GitHub URL works too. The repository can stay private.
         </p>
       </div>
@@ -58,7 +58,7 @@ export function ConnectVaultForm({
             placeholder="notes"
             autoComplete="off"
           />
-          <p className="mt-1 text-[13px] text-ink-muted">
+          <p className="mt-1 text-ui text-ink-muted">
             Only if the vault is a subfolder of the repository.
           </p>
         </div>
@@ -74,7 +74,7 @@ export function ConnectVaultForm({
           placeholder="github_pat_…"
           autoComplete="off"
         />
-        <p className="mt-1 text-[13px] text-ink-muted">
+        <p className="mt-1 text-ui text-ink-muted">
           Needs <strong>Contents: Read-only</strong> on this one repository, and nothing else. It
           is encrypted before it is stored and never sent back to your browser.
         </p>
@@ -83,7 +83,7 @@ export function ConnectVaultForm({
       {state.error && <FieldError>{state.error}</FieldError>}
       {/* Not `text-positive`: green is the savings-and-refunds colour and means
           money in this design system, which a saved form does not. */}
-      {state.message && <p className="text-[13px] text-ink-muted">{state.message}</p>}
+      {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
       <Button type="submit" disabled={pending}>
         {pending ? 'Saving…' : submitLabel}

@@ -62,7 +62,7 @@ export function PhotoCapturePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Photos are processed and discarded. Any phone photo works, iPhone HEIC
         included. You must confirm the detected list before anything is saved —
         spine OCR is never trusted blindly.
@@ -94,7 +94,7 @@ export function PhotoCapturePanel() {
           id="photo"
           type="file"
           accept={PHOTO_ACCEPT}
-          className="block w-full text-sm text-ink-muted"
+          className="block w-full text-body text-ink-muted"
           onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
         />
       </div>
@@ -119,9 +119,9 @@ export function PhotoCapturePanel() {
 
       <FieldError>{imageError ?? extractState.error ?? saveState.error}</FieldError>
       {extractState.message && (
-        <p className="text-sm text-ink-muted">{extractState.message}</p>
+        <p className="text-body text-ink-muted">{extractState.message}</p>
       )}
-      {saveState.message && <p className="text-sm text-brand">{saveState.message}</p>}
+      {saveState.message && <p className="text-body text-accent">{saveState.message}</p>}
 
       {extractState.results && extractState.results.length > 0 && (
         <form action={saveAction} className="flex flex-col gap-3">
@@ -131,9 +131,9 @@ export function PhotoCapturePanel() {
             {extractState.results.map((row, resultIndex) => {
               if (!row.book) {
                 return (
-                  <li key={resultIndex} className="px-4 py-3 text-sm text-ink-muted">
+                  <li key={resultIndex} className="px-4 py-3 text-body text-ink-muted">
                     <span className="font-medium text-ink">{row.raw}</span>
-                    <span className="ml-2 text-red-600">{row.error ?? 'No match'}</span>
+                    <span className="ml-2 text-danger">{row.error ?? 'No match'}</span>
                   </li>
                 );
               }
@@ -149,11 +149,11 @@ export function PhotoCapturePanel() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-ink">{row.book.title}</p>
-                    <p className="text-[13px] text-ink-muted">
+                    <p className="text-ui text-ink-muted">
                       {row.book.authors.join(', ')}
                       {row.book.isbn13 ? ` · ${row.book.isbn13}` : ''}
                     </p>
-                    <label className="mt-2 flex items-center gap-2 text-[13px] text-accent-orange">
+                    <label className="mt-2 flex items-center gap-2 text-ui text-caution">
                       <input
                         type="checkbox"
                         name="confirmed"

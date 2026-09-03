@@ -277,7 +277,7 @@ export function TimezoneField({
           if (open) close();
           else setOpen(true);
         }}
-        className="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-ink-faint hover:text-ink"
+        className="absolute right-0 top-0 flex h-10 w-9 items-center justify-center text-ink-muted hover:text-ink"
       >
         <ChevronDown
           className={cn('size-4 transition-transform', open && 'rotate-180')}
@@ -307,17 +307,17 @@ export function TimezoneField({
               }}
               onMouseEnter={() => setActive(index)}
               className={cn(
-                'flex cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-[13px]',
-                index === active ? 'bg-brand-tint text-brand' : 'text-ink',
+                'flex cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-ui',
+                index === active ? 'bg-accent-tint text-accent' : 'text-ink',
               )}
             >
               <span className="truncate">
                 {match.zone.replace(/_/g, ' ')}
                 {match.zone === detected && (
-                  <span className="ml-2 text-[11px] text-ink-faint">this computer</span>
+                  <span className="ml-2 text-micro text-ink-muted">this computer</span>
                 )}
               </span>
-              <span className="shrink-0 text-[11px] text-ink-faint">{match.offset}</span>
+              <span className="shrink-0 text-micro text-ink-muted">{match.offset}</span>
             </li>
           ))}
         </ul>
@@ -332,7 +332,7 @@ export function TimezoneField({
         <button
           type="button"
           onClick={() => choose(detected)}
-          className="mt-1 text-[11px] text-brand hover:underline"
+          className="mt-1 text-micro text-accent hover:underline"
         >
           Use {detected.replace(/_/g, ' ')} — detected from this computer
         </button>

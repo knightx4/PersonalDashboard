@@ -7,12 +7,12 @@ import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
 
 const STATUS_STYLES: Record<string, string> = {
-  ordered: 'bg-brand-tint text-brand',
-  shipped: 'bg-brand-tint text-brand',
+  ordered: 'bg-accent-tint text-accent',
+  shipped: 'bg-accent-tint text-accent',
   delivered: 'bg-canvas text-ink-muted',
-  partially_returned: 'bg-accent-orange-tint text-accent-orange',
+  partially_returned: 'bg-caution-tint text-caution',
   returned: 'bg-positive-tint text-positive',
-  cancelled: 'bg-canvas text-ink-faint',
+  cancelled: 'bg-canvas text-ink-muted',
 };
 
 function formatOrderDate(iso: string): string {
@@ -87,21 +87,21 @@ export function OrderRow({ order }: { order: OrderRowData }) {
             </span>
             <PersonBadge person={order.person} />
           </div>
-          <p className="mt-0.5 truncate text-[13px] text-ink-muted">
+          <p className="mt-0.5 truncate text-ui text-ink-muted">
             {order.items_label}
             {order.item_hint && !order.items_label.includes(order.item_hint)
               ? ` · ${order.item_hint}`
               : ''}
           </p>
-          <p className="mt-0.5 truncate text-[12px] text-ink-faint">{meta.join(' · ')}</p>
+          <p className="mt-0.5 truncate text-small text-ink-muted">{meta.join(' · ')}</p>
         </div>
 
-        <p className="tabular shrink-0 text-right text-[15px] font-semibold text-ink">
+        <p className="tabular shrink-0 text-right text-lead font-semibold text-ink">
           {formatMoney(order.total_cents, order.currency)}
           {order.native_currency &&
             order.native_total_cents != null &&
             order.native_currency !== order.currency && (
-              <span className="mt-0.5 block text-[11px] font-normal text-ink-faint">
+              <span className="mt-0.5 block text-micro font-normal text-ink-muted">
                 {formatMoney(order.native_total_cents, order.native_currency)}
               </span>
             )}

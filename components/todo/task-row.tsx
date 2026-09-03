@@ -49,8 +49,8 @@ export function TaskRow({
         className={cn(
           'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border',
           done
-            ? 'border-status-offer bg-status-offer text-white'
-            : 'border-border-strong hover:border-brand',
+            ? 'border-status-offer bg-status-offer text-surface'
+            : 'border-control hover:border-accent',
         )}
       >
         {done && <Check className="size-3" strokeWidth={3} aria-hidden />}
@@ -62,7 +62,7 @@ export function TaskRow({
             type="button"
             onClick={() => setEditing(true)}
             className={cn(
-              'text-left text-[13px] font-medium text-ink hover:text-brand',
+              'text-left text-ui font-medium text-ink hover:text-accent',
               (done || dropped) && 'text-ink-muted line-through',
             )}
           >
@@ -70,7 +70,7 @@ export function TaskRow({
           </button>
 
           {task.pinned && !done && !dropped && (
-            <Pin className="size-3 text-brand" strokeWidth={2} aria-label="Pinned" />
+            <Pin className="size-3 text-accent" strokeWidth={2} aria-label="Pinned" />
           )}
 
           <DueLabel task={task} timezone={timezone} />
@@ -78,17 +78,17 @@ export function TaskRow({
           {anchor && (
             <a
               href={anchor.href}
-              className="truncate text-[12px] text-ink-muted underline decoration-border underline-offset-2 hover:text-brand"
+              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 hover:text-accent"
             >
               {anchor.label}
             </a>
           )}
 
-          {dropped && <span className="text-[11px] text-ink-faint">dropped</span>}
+          {dropped && <span className="text-micro text-ink-muted">dropped</span>}
         </div>
 
         {task.body && (
-          <p className="mt-0.5 whitespace-pre-wrap text-[12px] leading-snug text-ink-muted">
+          <p className="mt-0.5 whitespace-pre-wrap text-small leading-snug text-ink-muted">
             {task.body}
           </p>
         )}
@@ -150,7 +150,7 @@ function IconButton({
       type="button"
       title={label}
       onClick={onClick}
-      className="press flex size-7 items-center justify-center rounded text-ink-faint hover:bg-canvas hover:text-ink"
+      className="press flex size-7 items-center justify-center rounded text-ink-muted hover:bg-canvas hover:text-ink"
     >
       {children}
       <span className="sr-only">{label}</span>
@@ -182,5 +182,5 @@ function DueLabel({ task, timezone }: { task: Task; timezone: string }) {
         month: 'short',
       }).format(new Date(`${task.dueOn}T00:00:00Z`));
 
-  return <span className="tabular text-[12px] text-ink-muted">{text}</span>;
+  return <span className="tabular text-small text-ink-muted">{text}</span>;
 }

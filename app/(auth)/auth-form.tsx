@@ -15,9 +15,9 @@ function Submit({ label }: { label: string }) {
 }
 
 const field =
-  'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink ' +
-  'placeholder:text-ink-faint transition-colors duration-150 ' +
-  'focus:border-brand focus:outline-none';
+  'w-full rounded-lg border border-border bg-surface px-3 py-2 text-body text-ink ' +
+  'placeholder:text-ink-ghost transition-colors duration-150 ' +
+  'focus:border-accent focus:outline-none';
 
 export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: string }) {
   const action = mode === 'signin' ? signIn : signUp;
@@ -57,7 +57,7 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-border" />
-        <span className="text-[11px] uppercase tracking-wider text-ink-faint">or</span>
+        <span className="text-micro uppercase tracking-wider text-ink-muted">or</span>
         <span className="h-px flex-1 bg-border" />
       </div>
 
@@ -65,7 +65,7 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
         <input type="hidden" name="next" value={next ?? '/onboarding'} />
 
         <div>
-          <label htmlFor="email" className="mb-1 block text-[13px] font-medium text-ink">
+          <label htmlFor="email" className="mb-1 block text-ui font-medium text-ink">
             Email
           </label>
           <input
@@ -80,7 +80,7 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1 block text-[13px] font-medium text-ink">
+          <label htmlFor="password" className="mb-1 block text-ui font-medium text-ink">
             Password
           </label>
           <input
@@ -96,12 +96,12 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
         </div>
 
         {state.error && (
-          <p role="alert" className="text-[13px] text-red-600">
+          <p role="alert" className="text-ui text-danger">
             {state.error}
           </p>
         )}
         {state.message && (
-          <p role="status" className="text-[13px] text-positive">
+          <p role="status" className="text-ui text-positive">
             {state.message}
           </p>
         )}

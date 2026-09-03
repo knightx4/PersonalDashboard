@@ -12,18 +12,18 @@ export default async function SignupPage({
 
   return (
     <>
-      <h1 className="font-display text-lg font-semibold tracking-tight text-ink">
+      <h1 className="font-display text-title tracking-tight text-ink">
         Create your account
       </h1>
-      <p className="mt-1 mb-5 text-sm text-ink-muted">
+      <p className="mt-1 mb-5 text-body text-ink-muted">
         You can connect an inbox later — or never.
       </p>
 
       <AuthForm mode="signup" next={next} />
 
-      <p className="mt-5 text-center text-[13px] text-ink-muted">
+      <p className="mt-5 text-center text-ui text-ink-muted">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-brand hover:underline">
+        <Link href="/login" className="font-medium text-accent hover:underline">
           Sign in
         </Link>
       </p>

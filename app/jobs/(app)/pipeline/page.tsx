@@ -5,8 +5,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import Link from 'next/link';
 import { PipelineBoard, type PipelineView } from '@/components/jobs/pipeline/board';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -214,7 +214,7 @@ export default async function PipelinePage({
             </RailGroup>
           )}
 
-          <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="px-1 text-micro leading-relaxed text-ink-muted">
             Priority lives on the company, not the pursuit —{' '}
             <Link href="/jobs/companies" className="underline underline-offset-2">
               set it there

@@ -19,7 +19,7 @@ export function CreateShareForm() {
 
   return (
     <Card className="h-fit p-4">
-      <h2 className="text-sm font-semibold text-ink">New shared form</h2>
+      <h2 className="text-body font-semibold text-ink">New shared form</h2>
       <form action={action} className="mt-3 space-y-3">
         <Input name="title" placeholder="Board games" required maxLength={120} />
         <textarea
@@ -27,13 +27,13 @@ export function CreateShareForm() {
           rows={3}
           maxLength={2000}
           placeholder="A note for whoever opens it."
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-body text-ink placeholder:text-ink-ghost focus-visible:outline-2 focus-visible:outline-offset-2"
         />
         <Button type="submit" disabled={pending} className="w-full">
           {pending ? 'Creating…' : 'Create'}
         </Button>
-        {state.error && <p className="text-[13px] text-red-600">{state.error}</p>}
-        {state.message && <p className="text-[13px] text-ink-muted">{state.message}</p>}
+        {state.error && <p className="text-ui text-danger">{state.error}</p>}
+        {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
       </form>
     </Card>
   );
@@ -65,8 +65,8 @@ export function ShareLinkRow({
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] text-ink">{url}</p>
-        <p className="text-[12px] text-ink-faint">
+        <p className="truncate text-ui text-ink">{url}</p>
+        <p className="text-small text-ink-muted">
           {label}
           {revoked
             ? ' · revoked'
@@ -146,7 +146,7 @@ export function ShareControls({ shareId, archived }: { shareId: string; archived
           Archive
         </Button>
       )}
-      {note && <span className="text-[13px] text-ink-muted">{note}</span>}
+      {note && <span className="text-ui text-ink-muted">{note}</span>}
     </div>
   );
 }

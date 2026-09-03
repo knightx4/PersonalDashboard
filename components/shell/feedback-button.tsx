@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { usePopover } from '@/lib/use-popover';
 
 /**
  * Always-available capture for bugs and ideas.
@@ -33,35 +34,18 @@ export function FeedbackButton({
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<'bug' | 'feature'>('feature');
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [state, action, pending] = useActionState(
     submitFeedback,
     {} as FeedbackActionState,
   );
 
-  // Close on Escape, and on a click outside the panel.
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
-    }
-    function onClick(event: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('keydown', onKey);
-    // Deferred so the click that opened the panel does not close it.
-    const timer = setTimeout(() => document.addEventListener('click', onClick), 0);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('click', onClick);
-      clearTimeout(timer);
-    };
-  }, [open]);
+  usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
 
   return (
     <div className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
@@ -69,7 +53,7 @@ export function FeedbackButton({
         title="Report a bug or request a feature"
         className={cn(
           'press flex size-8 items-center justify-center rounded-full transition-colors',
-          open ? 'bg-brand-tint text-brand' : 'text-ink-muted hover:bg-canvas hover:text-ink',
+          open ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
         )}
       >
         <MessageSquarePlus className="size-4" aria-hidden />
@@ -80,7 +64,9 @@ export function FeedbackButton({
         <div
           ref={panelRef}
           role="dialog"
+          aria-modal="true"
           aria-label="Send feedback"
+          tabIndex={-1}
           // On a phone the button sits far enough right that a panel anchored
           // to it hangs off the left edge of the screen, where nothing can
           // scroll it back into view -- and Safari answers a field focused out
@@ -104,9 +90,9 @@ export function FeedbackButton({
                   type="button"
                   onClick={() => setKind(option)}
                   className={cn(
-                    'flex-1 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors',
+                    'flex-1 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors',
                     kind === option
-                      ? 'bg-brand-tint text-brand'
+                      ? 'bg-accent-tint text-accent'
                       : 'text-ink-muted hover:bg-canvas hover:text-ink',
                   )}
                 >
@@ -130,7 +116,7 @@ export function FeedbackButton({
                     : 'The change, and what it would let you do.'
                 }
               />
-              <p className="mt-1 text-[12px] text-ink-faint">
+              <p className="mt-1 text-small text-ink-muted">
                 Saved with the page you are on ({pathname}).
               </p>
             </div>
@@ -155,7 +141,7 @@ export function FeedbackButton({
                 <RunRoutineButton variant="inline" />
                 <Link
                   href={allHref}
-                  className="text-[13px] text-brand hover:underline"
+                  className="text-ui text-accent hover:underline"
                   onClick={() => setOpen(false)}
                 >
                   See all
@@ -165,7 +151,7 @@ export function FeedbackButton({
 
             <FieldError>{state.error}</FieldError>
             {state.message && (
-              <p className="text-[13px] text-brand">{state.message}</p>
+              <p className="text-ui text-accent">{state.message}</p>
             )}
           </form>
         </div>

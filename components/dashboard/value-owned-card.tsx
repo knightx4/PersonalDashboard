@@ -19,10 +19,10 @@ export function ValueOwnedCard({
         <CardTitle>Value owned</CardTitle>
       </CardHeader>
       <CardBody className="pt-0">
-        <p className="font-display text-3xl font-semibold tracking-tight text-ink tabular">
+        <p className="font-display text-3xl font-normal tracking-tight text-ink tabular">
           <CountUpMoney cents={cents} currency={currency} />
         </p>
-        <p className="mt-2 text-[13px] text-ink-muted">
+        <p className="mt-2 text-ui text-ink-muted">
           Landed cost of items you still own — a stock figure, not what you
           spent this period.
         </p>

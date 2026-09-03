@@ -112,8 +112,8 @@ function Research({
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-[13px] font-semibold text-ink">What you know about this place</h2>
-      <p className="mt-0.5 text-[12px] text-ink-muted">
+      <h2 className="text-ui font-semibold text-ink">What you know about this place</h2>
+      <p className="mt-0.5 text-small text-ink-muted">
         The one long-form field. It outlives every posting.
       </p>
       <Textarea
@@ -137,7 +137,7 @@ function Research({
         >
           Save
         </Button>
-        {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        {saved && <span className="text-small text-ink-muted">{saved}</span>}
       </div>
     </section>
   );
@@ -179,7 +179,7 @@ function Details({
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-[13px] font-semibold text-ink">Details</h2>
+      <h2 className="text-ui font-semibold text-ink">Details</h2>
 
       <div className="mt-3 space-y-3">
         <div>
@@ -190,7 +190,7 @@ function Details({
             onChange={(event) => set('domains')(event.target.value)}
             placeholder="ramp.com, ramp.co"
           />
-          <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="mt-1 text-micro leading-relaxed text-ink-muted">
             This is what lets a recruiter&rsquo;s personal work address find this company. It is
             also the list the second inbox query searches, which is how direct outreach gets
             caught at all.
@@ -243,7 +243,7 @@ function Details({
               href={form.website}
               target="_blank"
               rel="noreferrer noopener"
-              className="mt-1 inline-block text-[12px] text-brand underline underline-offset-2"
+              className="mt-1 inline-block text-small text-accent underline underline-offset-2"
             >
               Open
             </a>
@@ -292,7 +292,7 @@ function Details({
         >
           Save
         </Button>
-        {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        {saved && <span className="text-small text-ink-muted">{saved}</span>}
       </div>
 
       <Enrichment companyId={companyId} />
@@ -341,21 +341,21 @@ function Enrichment({ companyId }: { companyId: string }) {
         <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={lookUp}>
           {pending ? 'Looking up…' : 'Look up on Wikidata'}
         </Button>
-        {message && <span className="text-[12px] text-ink-muted">{message}</span>}
+        {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 
-      <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+      <p className="mt-1 text-micro leading-relaxed text-ink-muted">
         Fills blank fields only — anything you have typed is left exactly as it is.
       </p>
 
       {proposal && (
         <div className="mt-3 rounded-card border border-border bg-canvas p-3">
-          <p className="text-[13px] font-medium text-ink">{proposal.label}</p>
+          <p className="text-ui font-medium text-ink">{proposal.label}</p>
           {proposal.description && (
-            <p className="text-[12px] text-ink-muted">{proposal.description}</p>
+            <p className="text-small text-ink-muted">{proposal.description}</p>
           )}
 
-          <p className="mt-1 text-[11px] text-ink-faint">
+          <p className="mt-1 text-micro text-ink-muted">
             {proposal.verified
               ? 'Matched on the company’s own website, so this is the right one.'
               : 'Matched on name only — no website on the record to check it against. Have a look before applying.'}
@@ -363,7 +363,7 @@ function Enrichment({ companyId }: { companyId: string }) {
 
           <ul className="mt-2 space-y-0.5">
             {proposal.changes.map((change) => (
-              <li key={change} className="text-[12px] text-ink-muted">
+              <li key={change} className="text-small text-ink-muted">
                 {change}
               </li>
             ))}
@@ -438,10 +438,10 @@ function AiEnrichment({ companyId }: { companyId: string }) {
         <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={lookUp}>
           {pending ? 'Searching…' : 'Search with AI'}
         </Button>
-        {message && <span className="text-[12px] text-ink-muted">{message}</span>}
+        {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 
-      <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+      <p className="mt-1 text-micro leading-relaxed text-ink-muted">
         For the companies Wikidata has never heard of. Reads the web for a homepage and a plain
         summary; fills blank fields only.
       </p>
@@ -453,19 +453,19 @@ function AiEnrichment({ companyId }: { companyId: string }) {
               href={proposal.website}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-[13px] font-medium text-brand underline underline-offset-2"
+              className="text-ui font-medium text-accent underline underline-offset-2"
             >
               {proposal.website}
             </a>
           )}
           {proposal.summary && (
-            <p className="mt-1 text-[12px] text-ink-muted">{proposal.summary}</p>
+            <p className="mt-1 text-small text-ink-muted">{proposal.summary}</p>
           )}
 
           {proposal.changes.length > 0 && (
             <ul className="mt-2 space-y-0.5">
               {proposal.changes.map((change) => (
-                <li key={change} className="text-[12px] text-ink-muted">
+                <li key={change} className="text-small text-ink-muted">
                   {change}
                 </li>
               ))}
@@ -473,7 +473,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
           )}
 
           {proposal.sources.length > 0 && (
-            <p className="mt-2 text-[11px] text-ink-faint">
+            <p className="mt-2 text-micro text-ink-muted">
               Sources:{' '}
               {proposal.sources.map((source, index) => (
                 <span key={source.url}>
@@ -514,9 +514,9 @@ function AiEnrichment({ companyId }: { companyId: string }) {
 function Contacts({ contacts }: { contacts: CompanyContact[] }) {
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-[13px] font-semibold text-ink">People</h2>
+      <h2 className="text-ui font-semibold text-ink">People</h2>
       {contacts.length === 0 ? (
-        <p className="mt-2 text-[13px] text-ink-faint">
+        <p className="mt-2 text-ui text-ink-muted">
           Nobody recorded here yet. Add people from the contacts page.
         </p>
       ) : (
@@ -525,22 +525,22 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
             <li key={contact.id} className="flex flex-wrap items-baseline gap-2 py-2">
               <Link
                 href={`/jobs/contacts/${contact.id}`}
-                className="text-[13px] font-medium text-ink hover:underline"
+                className="text-ui font-medium text-ink hover:underline"
                 title="See details, notes and logged sends"
               >
                 {contact.fullName}
               </Link>
-              {contact.title && <span className="text-[12px] text-ink-muted">{contact.title}</span>}
-              <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
+              {contact.title && <span className="text-small text-ink-muted">{contact.title}</span>}
+              <span className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted">
                 {contact.relationship.replace(/_/g, ' ')}
               </span>
-              <span className="text-[11px] text-ink-faint">{contact.status.replace(/_/g, ' ')}</span>
+              <span className="text-micro text-ink-muted">{contact.status.replace(/_/g, ' ')}</span>
               {contact.linkedinUrl && (
                 <a
                   href={contact.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-[12px] text-brand underline underline-offset-2"
+                  className="text-small text-accent underline underline-offset-2"
                 >
                   LinkedIn
                 </a>
@@ -549,7 +549,7 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
           ))}
         </ul>
       )}
-      <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+      <p className="mt-2 text-micro leading-relaxed text-ink-muted">
         Name, title, public professional URL and work email only. This is other people&rsquo;s
         data, and it has no product value beyond contacting them.
       </p>
@@ -589,15 +589,15 @@ function Touches({
   return (
     <section className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[13px] font-semibold text-ink">Outreach</h2>
+        <h2 className="text-ui font-semibold text-ink">Outreach</h2>
         {outbound.length > 0 && (
-          <span className="tabular text-[12px] text-ink-muted">
+          <span className="tabular text-small text-ink-muted">
             {answered.length} of {outbound.length} answered
           </span>
         )}
       </div>
       {touches.length === 0 ? (
-        <p className="mt-2 text-[13px] text-ink-faint">
+        <p className="mt-2 text-ui text-ink-muted">
           No sends recorded. Response rate is only computable if the sends are recorded from the
           start, which is why logging them is in the MVP and drafting them is not.
         </p>
@@ -605,20 +605,20 @@ function Touches({
         <ul className="mt-2 divide-y divide-border">
           {touches.map((touch) => (
             <li key={touch.id} className="py-2">
-              <div className="flex flex-wrap items-baseline gap-2 text-[13px]">
+              <div className="flex flex-wrap items-baseline gap-2 text-ui">
                 <span className="font-medium text-ink">{touch.contactName}</span>
                 <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
-                <span className="tabular text-[12px] text-ink-faint">
+                <span className="tabular text-small text-ink-muted">
                   {formatDate(touch.sentAt, timezone)}
                 </span>
                 {touch.respondedAt ? (
-                  <span className="text-[11px] text-status-offer">replied</span>
+                  <span className="text-micro text-status-offer">replied</span>
                 ) : (
-                  <span className="text-[11px] text-ink-faint">no reply yet</span>
+                  <span className="text-micro text-ink-muted">no reply yet</span>
                 )}
               </div>
               {touch.message && (
-                <p className="mt-0.5 line-clamp-2 text-[12px] text-ink-muted">{touch.message}</p>
+                <p className="mt-0.5 line-clamp-2 text-small text-ink-muted">{touch.message}</p>
               )}
             </li>
           ))}
@@ -643,7 +643,7 @@ function Notes({
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-[13px] font-semibold text-ink">Notes</h2>
+      <h2 className="text-ui font-semibold text-ink">Notes</h2>
       <Textarea
         rows={3}
         value={body}
@@ -666,14 +666,14 @@ function Notes({
         >
           Add
         </Button>
-        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
 
       <ul className="mt-3 space-y-2">
         {notes.map((note) => (
           <li key={note.id} className="rounded-lg bg-canvas p-2.5">
-            <p className="whitespace-pre-wrap text-[13px] text-ink">{note.body}</p>
-            <p className="tabular mt-1 text-[11px] text-ink-faint">
+            <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+            <p className="tabular mt-1 text-micro text-ink-muted">
               {formatDate(note.createdAt, timezone)}
             </p>
           </li>

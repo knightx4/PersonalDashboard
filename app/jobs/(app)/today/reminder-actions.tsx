@@ -19,7 +19,7 @@ export function ReminderActions({ id }: { id: string }) {
         type="button"
         disabled={busy}
         onClick={() => startTransition(() => void snoozeReminder(id))}
-        className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
+        className="text-small text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
       >
         Later
       </button>
@@ -27,7 +27,7 @@ export function ReminderActions({ id }: { id: string }) {
         type="button"
         disabled={busy}
         onClick={() => startTransition(() => void completeReminder(id))}
-        className="press rounded-lg border border-border bg-canvas px-2 py-0.5 text-[12px] font-medium text-ink disabled:opacity-50"
+        className="press rounded-lg border border-border bg-canvas px-2 py-0.5 text-small font-medium text-ink disabled:opacity-50"
         title={`Snoozing pushes it ${SNOOZE_DAYS} days`}
       >
         Done

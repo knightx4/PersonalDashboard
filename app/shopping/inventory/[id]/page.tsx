@@ -212,13 +212,13 @@ export default async function InventoryItemPage({
           )}
         </div>
         {item.short_name && item.short_name !== item.name && (
-          <p className="border-t border-border px-4 py-2 text-[13px] text-ink-muted">
+          <p className="border-t border-border px-4 py-2 text-ui text-ink-muted">
             Full title: <span className="text-ink">{item.name}</span>
           </p>
         )}
       </div>
 
-      <dl className="grid gap-3 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
+      <dl className="grid gap-3 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
         <div>
           <dt className="text-ink-muted">Landed cost</dt>
           <dd className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</dd>
@@ -239,7 +239,7 @@ export default async function InventoryItemPage({
             <dd
               className={
                 daysLeft != null && daysLeft <= 7
-                  ? 'font-medium text-accent-orange'
+                  ? 'font-medium text-caution'
                   : 'text-ink'
               }
             >
@@ -248,7 +248,7 @@ export default async function InventoryItemPage({
                 <span className="ml-2 text-ink-muted">({returnDeadline})</span>
               ) : null}
               {item.return_planned ? (
-                <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
+                <span className="ml-2 text-micro font-semibold uppercase tracking-wide text-accent">
                   To return
                 </span>
               ) : null}
@@ -259,7 +259,7 @@ export default async function InventoryItemPage({
           <div className="sm:col-span-2">
             <dt className="text-ink-muted">From order</dt>
             <dd>
-              <Link href={`/shopping/orders/${order.id}`} className="text-brand hover:underline">
+              <Link href={`/shopping/orders/${order.id}`} className="text-accent hover:underline">
                 {merchant?.name ?? 'Order'}
                 {order.external_order_number ? ` · #${order.external_order_number}` : ''}
               </Link>
@@ -326,10 +326,10 @@ export default async function InventoryItemPage({
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
           <div>
-            <h2 className="text-sm font-semibold text-ink">Plan a return</h2>
-            <p className="mt-1 text-[13px] text-ink-muted">
+            <h2 className="text-body font-semibold text-ink">Plan a return</h2>
+            <p className="mt-1 text-ui text-ink-muted">
               Marks this unit on the{' '}
-              <Link href="/shopping/returns?view=marked" className="text-brand hover:underline">
+              <Link href="/shopping/returns?view=marked" className="text-accent hover:underline">
                 returns tracker
               </Link>{' '}
               without recording a refund yet.
@@ -340,7 +340,7 @@ export default async function InventoryItemPage({
       )}
 
       <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Edit</h2>
+        <h2 className="mb-4 text-body font-semibold text-ink">Edit</h2>
         <EditInventoryForm
           item={{
             id: item.id,
@@ -364,7 +364,7 @@ export default async function InventoryItemPage({
           {item.order_item_id ? (
             <ReturnForm itemId={item.id} defaultRefundCents={item.cost_cents} />
           ) : (
-            <div className="rounded-card border border-dashed border-border bg-surface p-4 text-sm text-ink-muted">
+            <div className="rounded-card border border-dashed border-border bg-surface p-4 text-body text-ink-muted">
               This owned item is not linked to an order, so it cannot be marked returned.
             </div>
           )}

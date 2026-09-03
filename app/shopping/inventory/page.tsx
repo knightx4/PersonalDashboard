@@ -443,7 +443,7 @@ export default async function InventoryPage({
 
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -457,7 +457,7 @@ export default async function InventoryPage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
+            <label className="inline-flex items-center gap-1.5 text-small text-ink-muted">
               <ArrowUpDown className="size-3.5" strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Sort</span>
               <Select
@@ -474,7 +474,7 @@ export default async function InventoryPage({
                 ))}
               </Select>
             </label>
-            <label className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
+            <label className="inline-flex items-center gap-1.5 text-small text-ink-muted">
               <Layers className="size-3.5" strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Group</span>
               <Select
@@ -492,12 +492,12 @@ export default async function InventoryPage({
             </label>
             <button
               type="submit"
-              className="press h-9 rounded-lg border border-border bg-surface px-3 text-[13px] font-medium text-ink-muted hover:text-ink"
+              className="press h-9 rounded-lg border border-border bg-surface px-3 text-ui font-medium text-ink-muted hover:text-ink"
             >
               Apply
             </button>
             {q && (
-              <p className="text-[12px] text-ink-faint">
+              <p className="text-small text-ink-muted">
                 Sorted by relevance while searching
               </p>
             )}
@@ -534,13 +534,13 @@ export default async function InventoryPage({
                 <section key={section.key} className="space-y-2">
                   {group !== 'none' && (
                     <div className="flex items-baseline justify-between gap-3 px-1">
-                      <h2 className="text-[13px] font-semibold text-ink">
+                      <h2 className="text-ui font-semibold text-ink">
                         {section.label}
-                        <span className="ml-2 font-normal text-ink-faint">
+                        <span className="ml-2 font-normal text-ink-muted">
                           {section.items.length}
                         </span>
                       </h2>
-                      <p className="tabular text-[12px] text-ink-muted">
+                      <p className="tabular text-small text-ink-muted">
                         {formatMoney(subtotal)}
                       </p>
                     </div>

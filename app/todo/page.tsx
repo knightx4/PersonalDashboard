@@ -40,7 +40,7 @@ export default async function TodoPage() {
           agenda would be the worst possible failure for this page: it looks
           exactly like a quiet day. */}
       {agenda.failed.length > 0 && (
-        <p className="mt-4 flex items-start gap-2 rounded-lg bg-accent-orange-tint px-3 py-2 text-[13px] text-ink">
+        <p className="mt-4 flex items-start gap-2 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
           <span>
             {agenda.failed.join(' and ')} could not be read just now, so anything from{' '}
@@ -52,8 +52,8 @@ export default async function TodoPage() {
       {empty ? (
         <div className="mt-6 rounded-card border border-border bg-surface p-8 text-center">
           <ListChecks className="mx-auto size-8 text-status-offer" strokeWidth={1.5} aria-hidden />
-          <p className="mt-3 text-sm font-medium text-ink">Nothing on the list.</p>
-          <p className="mt-1 text-[13px] text-ink-muted">
+          <p className="mt-3 text-body font-medium text-ink">Nothing on the list.</p>
+          <p className="mt-1 text-ui text-ink-muted">
             Write the next thing down and it will be here.
           </p>
         </div>
@@ -63,13 +63,13 @@ export default async function TodoPage() {
             <section key={bucket}>
               <h2
                 className={cn(
-                  'text-[13px] font-semibold',
+                  'text-ui font-semibold',
                   bucket === 'overdue' ? 'text-status-rejected' : 'text-ink',
                 )}
               >
                 {BUCKET_LABELS[bucket]}
                 {entries.length > 0 && (
-                  <span className="tabular ml-2 text-[12px] font-normal text-ink-faint">
+                  <span className="tabular ml-2 text-small font-normal text-ink-muted">
                     {entries.length}
                   </span>
                 )}
@@ -82,9 +82,9 @@ export default async function TodoPage() {
                   {context.map((entry) => (
                     <li
                       key={entry.key}
-                      className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-brand-tint px-3 py-1.5 text-[12px] text-ink"
+                      className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
                     >
-                      <CalendarClock className="size-3.5 shrink-0 text-brand" strokeWidth={1.75} aria-hidden />
+                      <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
                       {entry.at && (
                         <span className="tabular font-medium">
                           {new Intl.DateTimeFormat('en-GB', {
@@ -100,7 +100,7 @@ export default async function TodoPage() {
                       {entry.link && (
                         <a
                           href={entry.link.href}
-                          className="font-medium text-brand underline underline-offset-2"
+                          className="font-medium text-accent underline underline-offset-2"
                         >
                           {entry.link.label}
                         </a>

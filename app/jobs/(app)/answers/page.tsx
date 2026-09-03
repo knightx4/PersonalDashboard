@@ -1,8 +1,8 @@
 import { MessageSquareText } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { AnswerBank } from './bank';
 
 export const metadata = { title: 'Answers' };
@@ -100,7 +100,7 @@ export default async function AnswersPage({
               />
             ))}
           </RailGroup>
-          <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="px-1 text-micro leading-relaxed text-ink-muted">
             Questions are deduped by fingerprint, so the same question asked in different words
             lands on one row.
           </p>

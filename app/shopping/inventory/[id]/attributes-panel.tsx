@@ -61,8 +61,8 @@ export function ItemAttributesPanel({
     <section className="space-y-4 rounded-card border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Details</h2>
-          <p className="mt-1 text-[13px] text-ink-muted">
+          <h2 className="text-body font-semibold text-ink">Details</h2>
+          <p className="mt-1 text-ui text-ink-muted">
             {categoryName
               ? `The fields ${categoryName} items carry. Change them for every item in the category below.`
               : 'Give this item a category to get a set of fields for its kind.'}
@@ -77,12 +77,12 @@ export function ItemAttributesPanel({
       </div>
 
       {!searchAvailable && (
-        <p className="text-[13px] text-ink-faint">
+        <p className="text-ui text-ink-muted">
           Search is not set up for the {categoryName ?? 'uncategorized'} category yet — board
           games look themselves up on BoardGameGeek.
         </p>
       )}
-      {lookupState.message && <p className="text-sm text-positive">{lookupState.message}</p>}
+      {lookupState.message && <p className="text-body text-positive">{lookupState.message}</p>}
       <FieldError>{lookupState.error}</FieldError>
 
       <form action={saveAction} className="space-y-4">
@@ -105,7 +105,7 @@ export function ItemAttributesPanel({
                     href={values[field.key]}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-1 inline-block text-[12px] text-brand hover:underline"
+                    className="mt-1 inline-block text-small text-accent hover:underline"
                   >
                     Open link
                   </a>
@@ -114,7 +114,7 @@ export function ItemAttributesPanel({
             ))}
           </div>
         ) : (
-          <p className="text-[13px] text-ink-faint">
+          <p className="text-ui text-ink-muted">
             No fields yet. Add one below, or set up the template for this category.
           </p>
         )}
@@ -144,7 +144,7 @@ export function ItemAttributesPanel({
               {editingTemplate ? 'Hide template' : `Edit ${categoryName ?? 'category'} template`}
             </Button>
           )}
-          {saveState.message && <p className="text-sm text-positive">{saveState.message}</p>}
+          {saveState.message && <p className="text-body text-positive">{saveState.message}</p>}
         </div>
         <FieldError>{saveState.error}</FieldError>
       </form>
@@ -177,10 +177,10 @@ function CategoryTemplateForm({
     <form action={action} className="space-y-3 rounded-card border border-border bg-canvas p-4">
       <input type="hidden" name="category_id" value={categoryId} />
       <div>
-        <h3 className="text-sm font-semibold text-ink">
+        <h3 className="text-body font-semibold text-ink">
           {categoryName ?? 'Category'} template
         </h3>
-        <p className="mt-1 text-[13px] text-ink-muted">
+        <p className="mt-1 text-ui text-ink-muted">
           Every item in this category shows these fields. Clearing a name removes the field;
           values already recorded under it stay on their items.
         </p>
@@ -224,7 +224,7 @@ function CategoryTemplateForm({
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? 'Saving…' : 'Save template'}
         </Button>
-        {state.message && <p className="text-sm text-positive">{state.message}</p>}
+        {state.message && <p className="text-body text-positive">{state.message}</p>}
       </div>
       <FieldError>{state.error}</FieldError>
     </form>

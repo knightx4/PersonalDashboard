@@ -3,6 +3,7 @@ import 'server-only';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { normalizeTimeZone } from '@/lib/core/timezone';
 import { MODULE_IDS, isModuleId, type ModuleId } from '@/lib/modules';
+import { parseTheme, type ThemeChoice } from '@/lib/theme';
 
 /**
  * The settings that belong to the account rather than to a workspace.
@@ -29,6 +30,8 @@ export interface AccountSettings {
   timezone: string;
   displayCurrency: string;
   enabledModules: ModuleId[];
+  /** Null means follow the system, which is not the same as choosing light. */
+  theme: ThemeChoice;
 }
 
 /**
@@ -43,6 +46,7 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   timezone: 'UTC',
   displayCurrency: 'USD',
   enabledModules: [...MODULE_IDS],
+  theme: null,
 };
 
 function toModuleIds(raw: unknown): ModuleId[] {
@@ -56,7 +60,7 @@ export async function loadAccountSettings(userId: string): Promise<AccountSettin
 
   const { data } = await supabase
     .from('account_settings')
-    .select('display_name, timezone, display_currency, enabled_modules')
+    .select('display_name, timezone, display_currency, enabled_modules, theme')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -67,6 +71,7 @@ export async function loadAccountSettings(userId: string): Promise<AccountSettin
     timezone: normalizeTimeZone(data.timezone as string) ?? 'UTC',
     displayCurrency: (data.display_currency as string) ?? 'USD',
     enabledModules: toModuleIds(data.enabled_modules),
+    theme: parseTheme(data.theme as string | null),
   };
 }
 

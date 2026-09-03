@@ -55,7 +55,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
             autoFocus={compact}
           />
           {!compact && (
-            <p className="mt-1.5 text-[13px] text-ink-muted">
+            <p className="mt-1.5 text-ui text-ink-muted">
               We pull title, image and price from the page when we can. You can edit
               everything before saving.
             </p>
@@ -82,14 +82,14 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
 
           {(preview.ownedMatches?.length ?? 0) > 0 && (
             <div
-              className="rounded-card border border-accent-orange/40 bg-accent-orange-tint px-4 py-3"
+              className="rounded-card border border-caution/40 bg-caution-tint px-4 py-3"
               role="status"
             >
-              <p className="text-sm font-medium text-ink">You may already own this</p>
-              <ul className="mt-2 space-y-1 text-[13px] text-ink-muted">
+              <p className="text-body font-medium text-ink">You may already own this</p>
+              <ul className="mt-2 space-y-1 text-ui text-ink-muted">
                 {preview.ownedMatches!.map((match) => (
                   <li key={match.id}>
-                    <a href={`/shopping/inventory/${match.id}`} className="text-brand hover:underline">
+                    <a href={`/shopping/inventory/${match.id}`} className="text-accent hover:underline">
                       {match.name}
                       {match.variant ? ` · ${match.variant}` : ''}
                     </a>
@@ -100,7 +100,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-[12px] text-ink-faint">
+              <p className="mt-2 text-small text-ink-muted">
                 Warning only — you can still save it to the queue.
               </p>
             </div>
@@ -116,7 +116,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                   className="aspect-square w-full rounded-card border border-border object-cover bg-canvas"
                 />
               ) : (
-                <div className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border bg-canvas text-[12px] text-ink-faint">
+                <div className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border bg-canvas text-small text-ink-muted">
                   No image
                 </div>
               )}
@@ -164,7 +164,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                   placeholder="Size, colour, why you want it…"
                 />
               </div>
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-ui text-ink-muted">
                 {preview.merchantName
                   ? `Merchant: ${preview.merchantName}`
                   : 'Merchant unknown from this URL'}

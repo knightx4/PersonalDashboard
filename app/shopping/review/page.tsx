@@ -107,24 +107,24 @@ export default async function ReviewPage({
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <Link
                           href={`/shopping/orders/${row.orderId}`}
-                          className="font-medium text-ink hover:text-brand"
+                          className="font-medium text-ink hover:text-accent"
                         >
                           {row.merchantName}
                         </Link>
-                        <span className="text-[12px] font-medium uppercase tracking-wide text-amber-700">
+                        <span className="text-small font-medium uppercase tracking-wide text-caution">
                           Order to confirm
                         </span>
                       </div>
-                      <p className="text-sm text-ink-muted">
+                      <p className="text-body text-ink-muted">
                         {row.orderDate}
                         {row.externalOrderNumber ? ` · #${row.externalOrderNumber}` : ''}
                         {' · '}
                         {row.itemSummary}
                       </p>
-                      <p className="text-[13px] text-ink-faint">{row.reason}</p>
+                      <p className="text-ui text-ink-muted">{row.reason}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
-                      <p className="text-right text-sm font-medium tabular-nums text-ink">
+                      <p className="text-right text-body font-medium tabular-nums text-ink">
                         {formatMoney(row.totalCents, row.currency)}
                       </p>
                       <div className="flex flex-wrap justify-end gap-2">
@@ -162,11 +162,11 @@ export default async function ReviewPage({
                       <p className="font-medium text-ink">
                         {row.subject?.trim() || 'Email without subject'}
                       </p>
-                      <span className="text-[12px] font-medium uppercase tracking-wide text-ink-muted">
+                      <span className="text-small font-medium uppercase tracking-wide text-ink-muted">
                         {classificationLabel(row.classification)}
                       </span>
                     </div>
-                    <p className="text-sm text-ink-muted">
+                    <p className="text-body text-ink-muted">
                       {row.receivedAt
                         ? new Date(row.receivedAt).toLocaleString(undefined, {
                             dateStyle: 'medium',
@@ -176,7 +176,7 @@ export default async function ReviewPage({
                       {row.fromAddress ? ` · ${row.fromAddress}` : ''}
                       {row.inboxEmail ? ` · via ${row.inboxEmail}` : ''}
                     </p>
-                    <p className="text-[13px] text-ink-faint">{row.reason}</p>
+                    <p className="text-ui text-ink-muted">{row.reason}</p>
                   </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-2">
                     {row.linkedOrderId && (

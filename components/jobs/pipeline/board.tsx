@@ -125,13 +125,13 @@ export function PipelineBoard({
             onDrop={() => drop(column.setStatus)}
             className={cn(
               'rounded-card border border-border bg-canvas transition-colors duration-150',
-              over === column.setStatus && 'border-brand bg-brand-tint',
+              over === column.setStatus && 'border-accent bg-accent-tint',
             )}
           >
             <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
-              <span className="text-[13px] font-semibold text-ink">{column.label}</span>
-              <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
-              {column.hint && <span className="text-[11px] text-ink-faint">{column.hint}</span>}
+              <span className="text-ui font-semibold text-ink">{column.label}</span>
+              <span className="tabular text-ui text-ink-muted">{columnRows.length}</span>
+              {column.hint && <span className="text-micro text-ink-muted">{column.hint}</span>}
             </summary>
             <div className="space-y-2 px-2 pb-2">
               {columnRows.map((row) => (
@@ -144,7 +144,7 @@ export function PipelineBoard({
                 />
               ))}
               {columnRows.length === 0 && (
-                <p className="px-1.5 py-2 text-[12px] text-ink-faint">Nothing here</p>
+                <p className="px-1.5 py-2 text-small text-ink-muted">Nothing here</p>
               )}
             </div>
           </details>
@@ -162,16 +162,16 @@ export function PipelineBoard({
           onDrop={() => drop(column.setStatus)}
           className={cn(
             'w-64 shrink-0 rounded-card border border-border bg-canvas p-2 transition-colors duration-150',
-            over === column.setStatus && 'border-brand bg-brand-tint',
+            over === column.setStatus && 'border-accent bg-accent-tint',
           )}
           aria-label={column.label}
         >
           <header className="mb-2 flex items-baseline justify-between px-1.5 pt-1">
-            <h2 className="text-[13px] font-semibold text-ink">{column.label}</h2>
-            <span className="tabular text-[13px] text-ink-faint">{columnRows.length}</span>
+            <h2 className="text-ui font-semibold text-ink">{column.label}</h2>
+            <span className="tabular text-ui text-ink-muted">{columnRows.length}</span>
           </header>
           {column.hint && (
-            <p className="mb-2 px-1.5 text-[11px] leading-snug text-ink-faint">{column.hint}</p>
+            <p className="mb-2 px-1.5 text-micro leading-snug text-ink-muted">{column.hint}</p>
           )}
 
           <div className="space-y-2">
@@ -185,7 +185,7 @@ export function PipelineBoard({
               />
             ))}
             {columnRows.length === 0 && (
-              <p className="px-1.5 py-6 text-center text-[12px] text-ink-faint">Nothing here</p>
+              <p className="px-1.5 py-6 text-center text-small text-ink-muted">Nothing here</p>
             )}
           </div>
         </section>
@@ -195,7 +195,7 @@ export function PipelineBoard({
   return (
     <div className="space-y-4">
       {error && (
-        <p role="alert" className="rounded-lg bg-status-rejected-tint px-3 py-2 text-[13px] text-status-rejected">
+        <p role="alert" className="rounded-lg bg-status-rejected-tint px-3 py-2 text-ui text-status-rejected">
           {error}
         </p>
       )}
@@ -212,7 +212,7 @@ export function PipelineBoard({
 
       {closedRows.length > 0 && (
         <details className="rounded-card border border-border bg-surface">
-          <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-ink-muted">
+          <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink-muted">
             Closed — {closedRows.length}
           </summary>
           <div className="grid gap-2 border-t border-border p-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -260,7 +260,7 @@ function Card({
       <div className="flex items-start gap-1.5">
         {!muted && (
           <GripVertical
-            className="mt-0.5 size-3.5 shrink-0 text-ink-faint opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            className="mt-0.5 size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
             strokeWidth={1.75}
             aria-hidden
           />
@@ -268,19 +268,19 @@ function Card({
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/roles/${row.roleId}`}
-            className="block truncate text-[13px] font-medium text-ink hover:text-brand"
+            className="block truncate text-ui font-medium text-ink hover:text-accent"
           >
             {row.roleTitle}
           </Link>
-          <p className="truncate text-[12px] text-ink-muted">
+          <p className="truncate text-small text-ink-muted">
             {row.companyName}
             {row.attempt > 1 && (
-              <span className="ml-1 text-ink-faint">· attempt {row.attempt}</span>
+              <span className="ml-1 text-ink-muted">· attempt {row.attempt}</span>
             )}
           </p>
         </div>
         {row.excitement !== null && (
-          <span className="tabular shrink-0 text-[11px] text-ink-faint" title="Excitement">
+          <span className="tabular shrink-0 text-micro text-ink-muted" title="Excitement">
             {'★'.repeat(row.excitement)}
           </span>
         )}
@@ -293,9 +293,9 @@ function Card({
       </div>
 
       {row.nextAction && (
-        <p className="mt-1.5 truncate rounded bg-canvas px-1.5 py-1 text-[11px] text-ink-muted">
+        <p className="mt-1.5 truncate rounded bg-canvas px-1.5 py-1 text-micro text-ink-muted">
           {row.nextAction}
-          {row.nextActionDue && <span className="ml-1 text-accent-orange">· {row.nextActionDue}</span>}
+          {row.nextActionDue && <span className="ml-1 text-caution">· {row.nextActionDue}</span>}
         </p>
       )}
 
@@ -309,8 +309,8 @@ function Card({
           {coverage && (
             <span
               className={cn(
-                'tabular text-[11px]',
-                row.coverage.gaps > 0 ? 'text-accent-orange' : 'text-ink-faint',
+                'tabular text-micro',
+                row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
               )}
               title={`${coverage} covered by your evidence`}
             >
@@ -318,10 +318,10 @@ function Card({
             </span>
           )}
           {row.needsReview && (
-            <AlertTriangle className="size-3.5 text-accent-orange" strokeWidth={2} aria-label="Needs review" />
+            <AlertTriangle className="size-3.5 text-caution" strokeWidth={2} aria-label="Needs review" />
           )}
           <span
-            className={cn('tabular text-[11px]', stale ? 'text-accent-orange' : 'text-ink-faint')}
+            className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
             title="Time since the last thing that happened"
           >
             {age}
@@ -358,14 +358,14 @@ function QuickReject({ row }: { row: PipelineRow }) {
               setConfirming(false);
             })
           }
-          className="press rounded px-1.5 py-0.5 text-[11px] font-medium text-status-rejected hover:bg-status-rejected-tint"
+          className="press rounded px-1.5 py-0.5 text-micro font-medium text-status-rejected hover:bg-status-rejected-tint"
         >
           {pending ? 'Moving…' : 'Reject'}
         </button>
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="press rounded px-1 py-0.5 text-[11px] text-ink-faint hover:text-ink"
+          className="press rounded px-1 py-0.5 text-micro text-ink-muted hover:text-ink"
         >
           Keep
         </button>
@@ -378,7 +378,7 @@ function QuickReject({ row }: { row: PipelineRow }) {
       type="button"
       title="Send straight to rejected"
       onClick={() => setConfirming(true)}
-      className="press shrink-0 rounded p-0.5 text-ink-faint opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
+      className="press shrink-0 rounded p-0.5 text-ink-muted opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
     >
       <Ban className="size-3.5" strokeWidth={2} aria-hidden />
       <span className="sr-only">Send straight to rejected</span>
@@ -412,14 +412,14 @@ function Dismiss({ row }: { row: PipelineRow }) {
               await dismissPursuit(row.applicationId);
             })
           }
-          className="press rounded px-1.5 py-0.5 text-[11px] font-medium text-status-rejected hover:bg-status-rejected-tint"
+          className="press rounded px-1.5 py-0.5 text-micro font-medium text-status-rejected hover:bg-status-rejected-tint"
         >
           {pending ? 'Removing…' : 'Remove'}
         </button>
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="press rounded px-1 py-0.5 text-[11px] text-ink-faint hover:text-ink"
+          className="press rounded px-1 py-0.5 text-micro text-ink-muted hover:text-ink"
         >
           Keep
         </button>
@@ -432,7 +432,7 @@ function Dismiss({ row }: { row: PipelineRow }) {
       type="button"
       title="Not a real pursuit — remove it"
       onClick={() => setConfirming(true)}
-      className="press shrink-0 rounded p-0.5 text-ink-faint opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
+      className="press shrink-0 rounded p-0.5 text-ink-muted opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
     >
       <X className="size-3.5" strokeWidth={2} aria-hidden />
       <span className="sr-only">Not a real pursuit — remove it</span>

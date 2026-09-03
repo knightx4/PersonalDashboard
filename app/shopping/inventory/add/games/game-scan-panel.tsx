@@ -100,7 +100,7 @@ export function GameScanPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Point the camera at the barcode on the box. Book barcodes are recognised and
         sent to the book flow instead.
       </p>
@@ -119,14 +119,14 @@ export function GameScanPanel() {
         )}
       </div>
 
-      {lastCode && <p className="font-mono text-sm text-ink-muted">Last code: {lastCode}</p>}
-      {searchPending && <p className="text-sm text-ink-muted">Looking up barcode…</p>}
+      {lastCode && <p className="font-mono text-body text-ink-muted">Last code: {lastCode}</p>}
+      {searchPending && <p className="text-body text-ink-muted">Looking up barcode…</p>}
       <FieldError>{cameraError ?? searchState.error ?? saveState.error}</FieldError>
 
       {isbnHit && (
-        <p className="text-sm text-ink">
+        <p className="text-body text-ink">
           That is a book barcode (ISBN {isbnHit}).{' '}
-          <Link href="/shopping/inventory/add?mode=scan" className="text-brand underline">
+          <Link href="/shopping/inventory/add?mode=scan" className="text-accent underline">
             Scan it in Add books
           </Link>
           .
@@ -134,7 +134,7 @@ export function GameScanPanel() {
       )}
 
       {saveState.message && (
-        <p className="text-sm text-brand">
+        <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
             <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>

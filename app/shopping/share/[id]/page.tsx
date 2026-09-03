@@ -82,7 +82,7 @@ export default async function ShareDetailPage({
     <>
       <Link
         href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:text-ink"
+        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted hover:text-ink"
       >
         <ArrowLeft className="size-3.5" aria-hidden /> Shared forms
       </Link>
@@ -100,9 +100,9 @@ export default async function ShareDetailPage({
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div>
           {groups.length === 0 ? (
-            <Card className="p-6 text-sm text-ink-muted">
+            <Card className="p-6 text-body text-ink-muted">
               Nothing on this form yet. Add things from{' '}
-              <Link href="/shopping/inventory" className="text-brand hover:underline">
+              <Link href="/shopping/inventory" className="text-accent hover:underline">
                 your inventory
               </Link>
               .
@@ -120,22 +120,22 @@ export default async function ShareDetailPage({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={group.imageUrl} alt="" className="size-full object-cover" />
                         ) : (
-                          <div className="flex size-full items-center justify-center text-ink-faint">
+                          <div className="flex size-full items-center justify-center text-ink-muted">
                             <Package className="size-4" aria-hidden />
                           </div>
                         )}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-ink">
+                        <p className="text-body font-medium text-ink">
                           {group.name}
                           {group.quantity > 1 && (
-                            <span className="ml-1.5 text-ink-faint">× {group.quantity}</span>
+                            <span className="ml-1.5 text-ink-muted">× {group.quantity}</span>
                           )}
                         </p>
-                        <p className="mt-0.5 text-[13px] text-ink-muted">
+                        <p className="mt-0.5 text-ui text-ink-muted">
                           {decided === 0 ? (
-                            <span className="text-ink-faint">Not answered</span>
+                            <span className="text-ink-muted">Not answered</span>
                           ) : (
                             [
                               group.keepQty > 0 && `keep ${group.keepQty}`,
@@ -146,10 +146,10 @@ export default async function ShareDetailPage({
                               .join(' · ')
                           )}
                           {/* Blank, not $0.00, when the price is unknown. */}
-                          {price && <span className="text-ink-faint"> · {price}</span>}
+                          {price && <span className="text-ink-muted"> · {price}</span>}
                         </p>
                         {group.note && (
-                          <p className="mt-1 text-[13px] text-ink-muted italic">
+                          <p className="mt-1 text-ui text-ink-muted italic">
                             “{group.note}”
                           </p>
                         )}
@@ -173,7 +173,7 @@ export default async function ShareDetailPage({
 
         <div className="space-y-4">
           <Card className="p-4">
-            <h2 className="mb-2 text-sm font-semibold text-ink">Links</h2>
+            <h2 className="mb-2 text-body font-semibold text-ink">Links</h2>
             <div className="space-y-2">
               {(tokens ?? []).map((token) => (
                 <ShareLinkRow
@@ -186,26 +186,26 @@ export default async function ShareDetailPage({
                 />
               ))}
             </div>
-            <p className="mt-3 text-[12px] text-ink-faint">
+            <p className="mt-3 text-small text-ink-muted">
               Anyone holding a live link can read and change these answers. Revoke
               one and it stops working immediately; the answers it left stay.
             </p>
           </Card>
 
           <Card className="p-4">
-            <h2 className="mb-2 text-sm font-semibold text-ink">Recent activity</h2>
+            <h2 className="mb-2 text-body font-semibold text-ink">Recent activity</h2>
             {(events ?? []).length === 0 ? (
-              <p className="text-[13px] text-ink-faint">Nothing yet.</p>
+              <p className="text-ui text-ink-muted">Nothing yet.</p>
             ) : (
               <ul className="space-y-1.5">
                 {(events ?? []).map((event) => (
-                  <li key={event.id} className="text-[12px] text-ink-muted">
-                    <span className="text-ink-faint">
+                  <li key={event.id} className="text-small text-ink-muted">
+                    <span className="text-ink-muted">
                       {new Date(event.created_at).toLocaleString()}
                     </span>{' '}
                     {event.kind.replace(/_/g, ' ')}
                     {event.group_key && (
-                      <span className="text-ink-faint"> · {event.group_key}</span>
+                      <span className="text-ink-muted"> · {event.group_key}</span>
                     )}
                   </li>
                 ))}

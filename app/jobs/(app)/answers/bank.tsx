@@ -49,17 +49,17 @@ function QuestionCard({
   return (
     <section className="rounded-card border border-border bg-surface p-4">
       <header className="flex flex-wrap items-baseline gap-2">
-        <h2 className="min-w-0 flex-1 text-[13px] font-medium text-ink">{question.text}</h2>
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
+        <h2 className="min-w-0 flex-1 text-ui font-medium text-ink">{question.text}</h2>
+        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted">
           {question.kind}
         </span>
-        <span className="tabular text-[11px] text-ink-faint">
+        <span className="tabular text-micro text-ink-muted">
           seen {question.timesSeen}×
         </span>
       </header>
 
       {suggestion && (
-        <p className="mt-2 rounded bg-brand-tint px-2 py-1.5 text-[12px] text-brand">
+        <p className="mt-2 rounded bg-accent-tint px-2 py-1.5 text-small text-accent">
           You approved an answer for this on one application. Make it your default so the next one
           fills itself in.
         </p>
@@ -88,9 +88,9 @@ function QuestionCard({
         >
           {question.canonicalAnswer ? 'Update default' : 'Set as default'}
         </Button>
-        {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {question.usedIn > 0 && (
-          <span className="ml-auto text-[11px] text-ink-faint">
+          <span className="ml-auto text-micro text-ink-muted">
             used on {question.usedIn} application{question.usedIn === 1 ? '' : 's'}
           </span>
         )}

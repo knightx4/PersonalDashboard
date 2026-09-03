@@ -62,7 +62,7 @@ export function InventoryRow({
               className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
             />
           ) : (
-            <span className="flex size-full items-center justify-center text-ink-faint">
+            <span className="flex size-full items-center justify-center text-ink-muted">
               <CategoryGlyph slug={item.category_slug} className="size-4" />
             </span>
           )}
@@ -73,13 +73,13 @@ export function InventoryRow({
             {title}
             <PersonBadge person={item.person} className="ml-2 align-middle" />
             {item.return_planned && (
-              <span className="ml-2 inline-flex items-center gap-1 align-middle text-[11px] font-semibold uppercase tracking-wide text-brand">
+              <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-accent">
                 <RotateCcw className="size-3" strokeWidth={2} aria-hidden />
                 To return
               </span>
             )}
           </p>
-          <p className="truncate text-[13px] text-ink-muted">
+          <p className="truncate text-ui text-ink-muted">
             {[item.merchant_name, variant, item.acquired_at].filter(Boolean).join(' · ')}
           </p>
         </div>
@@ -87,7 +87,7 @@ export function InventoryRow({
         <div className="flex shrink-0 flex-col items-end gap-1">
           <p className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</p>
           {item.category_name && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-ink-faint">
+            <span className="inline-flex items-center gap-1 text-micro text-ink-muted">
               <CategoryGlyph slug={item.category_slug} className="size-3" />
               {item.category_name}
             </span>
@@ -116,7 +116,7 @@ export function InventoryImageFallback({
   className?: string;
 }) {
   return (
-    <span className={cn('flex items-center justify-center bg-canvas text-ink-faint', className)}>
+    <span className={cn('flex items-center justify-center bg-canvas text-ink-muted', className)}>
       <CategoryGlyph slug={categorySlug} className="size-8" strokeWidth={1.5} />
     </span>
   );

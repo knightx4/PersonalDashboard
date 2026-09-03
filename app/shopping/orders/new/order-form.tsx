@@ -178,7 +178,7 @@ export function OrderForm({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-ink">Line items</h2>
+          <h2 className="text-body font-semibold text-ink">Line items</h2>
           <Button
             type="button"
             variant="secondary"
@@ -343,7 +343,7 @@ export function OrderForm({
       </section>
 
       <div className="flex flex-wrap items-end justify-between gap-4 rounded-card border border-border bg-surface px-4 py-3">
-        <div className="space-y-1 text-sm text-ink-muted">
+        <div className="space-y-1 text-body text-ink-muted">
           <p>
             Subtotal{' '}
             <span className="tabular text-ink">{formatMoney(preview.subtotalCents)}</span>
@@ -354,7 +354,7 @@ export function OrderForm({
               {formatMoney(preview.totalCents)}
             </span>
           </p>
-          <p className="text-[12px] text-ink-faint">
+          <p className="text-small text-ink-muted">
             Each physical unit lands in inventory with a proportional share of tax,
             shipping and discount.
           </p>

@@ -12,13 +12,13 @@ export type SettingsTag = {
 export function TagsSection({ tags }: { tags: SettingsTag[] }) {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Tags are specific labels on order lines — shoes, sneakers, makeup — while categories stay
         high-level (clothing, beauty). They are suggested on import and used to filter and search
         orders.
       </p>
       {tags.length === 0 ? (
-        <p className="text-sm text-ink-faint">
+        <p className="text-body text-ink-muted">
           None yet — tags appear automatically when orders are imported, or add one on an order.
         </p>
       ) : (
@@ -26,7 +26,7 @@ export function TagsSection({ tags }: { tags: SettingsTag[] }) {
           {tags.map((tag) => (
             <li
               key={tag.id}
-              className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+              className="flex items-center justify-between gap-3 px-3 py-2.5 text-body"
             >
               <span className="font-medium text-ink">{tag.name}</span>
               <form action={deleteItemTag}>

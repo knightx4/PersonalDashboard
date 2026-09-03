@@ -20,7 +20,7 @@ export function CategoryDonut({
       </CardHeader>
       <CardBody className="pt-0">
         {slices.length === 0 || total === 0 ? (
-          <p className="text-[13px] text-ink-muted">No categorized spend in this period.</p>
+          <p className="text-ui text-ink-muted">No categorized spend in this period.</p>
         ) : (
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
             <div className="mx-auto h-44 w-44 shrink-0">
@@ -62,7 +62,7 @@ export function CategoryDonut({
                 return (
                   <li
                     key={slice.categoryId ?? slice.name}
-                    className="flex items-center gap-2 text-[13px]"
+                    className="flex items-center gap-2 text-ui"
                   >
                     <span
                       className="size-2.5 shrink-0 rounded-full"

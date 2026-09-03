@@ -112,7 +112,7 @@ export function ReviewList({
 
   return (
     <div ref={containerRef} className="space-y-2">
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-micro text-ink-muted">
         <kbd className="rounded border border-border bg-surface px-1">j</kbd>/
         <kbd className="rounded border border-border bg-surface px-1">k</kbd> to move,{' '}
         <kbd className="rounded border border-border bg-surface px-1">1</kbd>–
@@ -121,7 +121,7 @@ export function ReviewList({
       </p>
 
       {message && (
-        <p role="status" className="rounded-lg bg-brand-tint px-3 py-2 text-[13px] text-brand">
+        <p role="status" className="rounded-lg bg-accent-tint px-3 py-2 text-ui text-accent">
           {message}
         </p>
       )}
@@ -132,7 +132,7 @@ export function ReviewList({
           onClick={() => setCursor(index)}
           className={cn(
             'rounded-card border bg-surface p-4 transition-colors duration-150',
-            index === cursor ? 'border-brand ring-2 ring-brand/15' : 'border-border',
+            index === cursor ? 'border-accent ring-2 ring-accent/15' : 'border-border',
           )}
         >
           {row.kind === 'message' && (
@@ -180,22 +180,22 @@ function MessageRow({
   return (
     <>
       <header className="flex flex-wrap items-baseline gap-2">
-        <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-ink-muted">
+        <span className="rounded-full bg-canvas px-2 py-0.5 text-micro font-medium text-ink-muted">
           {classificationLabel(row.classification)}
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+        <h3 className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
           {row.subject ?? '(no subject)'}
         </h3>
-        <span className="tabular text-[12px] text-ink-faint">
+        <span className="tabular text-small text-ink-muted">
           {formatDate(row.receivedAt, timezone)}
         </span>
       </header>
 
-      <p className="mt-0.5 truncate text-[12px] text-ink-muted">{row.fromAddress ?? 'unknown sender'}</p>
-      <p className="mt-1.5 text-[12px] text-ink-muted">{row.reason}</p>
+      <p className="mt-0.5 truncate text-small text-ink-muted">{row.fromAddress ?? 'unknown sender'}</p>
+      <p className="mt-1.5 text-small text-ink-muted">{row.reason}</p>
 
       {row.candidates.length === 0 ? (
-        <p className="mt-3 text-[13px] text-ink-faint">
+        <p className="mt-3 text-ui text-ink-muted">
           {companyCount === 0
             ? 'No companies on file yet, so there is nothing to match against. Add a role and this becomes linkable.'
             : 'No pursuits to link this to yet.'}
@@ -204,12 +204,12 @@ function MessageRow({
         <ul className="mt-3 space-y-1.5">
           {row.candidates.map((candidate, index) => (
             <li key={candidate.applicationId} className="flex flex-wrap items-center gap-2">
-              <kbd className="rounded border border-border bg-canvas px-1.5 text-[11px] text-ink-faint">
+              <kbd className="rounded border border-border bg-canvas px-1.5 text-micro text-ink-muted">
                 {index + 1}
               </kbd>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] text-ink">{candidate.label}</p>
-                <p className="truncate text-[11px] text-ink-faint">
+                <p className="truncate text-ui text-ink">{candidate.label}</p>
+                <p className="truncate text-micro text-ink-muted">
                   {candidate.reason}
                   {candidate.confidence !== null &&
                     ` · ${Math.round(candidate.confidence * 100)}% match`}
@@ -258,7 +258,7 @@ function MessageRow({
             href={row.gmailHref}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+            className="inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 hover:text-ink"
           >
             Open in Gmail
             <ExternalLink className="size-3" strokeWidth={1.75} />
@@ -299,7 +299,7 @@ function OtherRolePicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-1 text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+        className="mt-3 inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
       >
         <Search className="size-3.5" strokeWidth={1.75} aria-hidden />
         Some other role — search all {roles.length}
@@ -322,7 +322,7 @@ function OtherRolePicker({
       />
 
       {matches.length === 0 ? (
-        <p className="mt-2 text-[12px] text-ink-faint">No role matches that.</p>
+        <p className="mt-2 text-small text-ink-muted">No role matches that.</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {matches.map((role) => (
@@ -340,7 +340,7 @@ function OtherRolePicker({
                 }
                 className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface disabled:opacity-50"
               >
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                <span className="min-w-0 flex-1 truncate text-ui text-ink">
                   {role.companyName} · {role.roleTitle}
                 </span>
                 <StatusBadge
@@ -356,7 +356,7 @@ function OtherRolePicker({
       <button
         type="button"
         onClick={() => setOpen(false)}
-        className="mt-2 text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+        className="mt-2 text-small text-ink-muted underline underline-offset-2 hover:text-ink"
       >
         Cancel
       </button>
@@ -393,7 +393,7 @@ function NewRoleForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-1 text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+        className="mt-3 inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
       >
         <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
         None of these — start a new role
@@ -420,7 +420,7 @@ function NewRoleForm({
 
   return (
     <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
-      <p className="text-[12px] font-medium text-ink">Start a new role from this message</p>
+      <p className="text-small font-medium text-ink">Start a new role from this message</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <div>
           <Label htmlFor={`company-${row.id}`}>Company</Label>
@@ -460,9 +460,9 @@ function NewRoleForm({
         >
           Cancel
         </Button>
-        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
-      <p className="mt-2 text-[11px] text-ink-faint">
+      <p className="mt-2 text-micro text-ink-muted">
         No applied date is set: this message writes the event its kind implies, and the status
         follows from that.
       </p>
@@ -499,19 +499,19 @@ function ApplicationRow({
   return (
     <>
       <header className="flex flex-wrap items-baseline gap-2">
-        <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-medium text-brand">
+        <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-medium text-accent">
           Created from email
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+        <h3 className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
           {row.companyName} · {row.roleTitle}
         </h3>
         <StatusBadge status={row.status as ApplicationStatus} everSubmitted={row.submittedAt !== null} />
-        <span className="tabular text-[12px] text-ink-faint">
+        <span className="tabular text-small text-ink-muted">
           {formatDate(row.submittedAt, timezone)}
         </span>
       </header>
 
-      <p className="mt-1.5 text-[12px] text-ink-muted">{row.reason}</p>
+      <p className="mt-1.5 text-small text-ink-muted">{row.reason}</p>
 
       <footer className="mt-3 flex flex-wrap items-center gap-2">
         <Button
@@ -529,7 +529,7 @@ function ApplicationRow({
         </Button>
         <Link
           href={`/jobs/roles/${row.roleId}`}
-          className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+          className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
         >
           Edit the details
         </Link>
@@ -568,22 +568,22 @@ function EventRow({
   return (
     <>
       <header className="flex flex-wrap items-baseline gap-2">
-        <span className="rounded-full bg-accent-orange-tint px-2 py-0.5 text-[11px] font-medium text-ink">
+        <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-ink">
           Arrived after it closed
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+        <h3 className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
           {row.companyName} · {row.roleTitle}
         </h3>
         <StatusBadge status={row.status as ApplicationStatus} />
-        <span className="tabular text-[12px] text-ink-faint">
+        <span className="tabular text-small text-ink-muted">
           {formatDate(row.occurredAt, timezone)}
         </span>
       </header>
 
-      <p className="mt-1.5 text-[13px] text-ink">
+      <p className="mt-1.5 text-ui text-ink">
         {row.summary ?? row.eventKind.replace(/_/g, ' ')}
       </p>
-      <p className="mt-0.5 text-[12px] text-ink-muted">{row.reason}</p>
+      <p className="mt-0.5 text-small text-ink-muted">{row.reason}</p>
 
       <footer className="mt-3 flex flex-wrap items-center gap-2">
         <Button

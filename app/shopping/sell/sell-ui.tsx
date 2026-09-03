@@ -54,7 +54,7 @@ function SellRowActions({ row }: { row: SellBookRow }) {
           href={row.buyback.url}
           target="_blank"
           rel="noreferrer"
-          className="text-[13px] text-brand underline"
+          className="text-ui text-accent underline"
         >
           Open {row.buyback.vendor}
         </a>
@@ -115,7 +115,7 @@ function SellRowActions({ row }: { row: SellBookRow }) {
       )}
       <FieldError>{disposeState.error ?? noteState.error ?? priceState.error}</FieldError>
       {(disposeState.message || noteState.message) && (
-        <p className="w-full text-[13px] text-brand">
+        <p className="w-full text-ui text-accent">
           {disposeState.message ?? noteState.message}
         </p>
       )}
@@ -155,7 +155,7 @@ export function SellSettingsForm({
         {pending ? 'Saving…' : 'Update'}
       </Button>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
+      {state.message && <p className="text-ui text-accent">{state.message}</p>}
     </form>
   );
 }
@@ -170,7 +170,7 @@ export function SellPathGroup({
   if (rows.length === 0) return null;
   return (
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink">
+      <h2 className="text-body font-semibold text-ink">
         {PATH_LABEL[path]}{' '}
         <span className="font-normal text-ink-muted">({rows.length})</span>
       </h2>
@@ -194,12 +194,12 @@ export function SellPathGroup({
               >
                 {row.shortName || row.name}
               </Link>
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-ui text-ink-muted">
                 {row.authors.join(', ')}
                 {row.isbn13 ? ` · ${row.isbn13}` : ''}
               </p>
-              <p className="mt-1 text-[12px] text-ink-faint">{row.reason}</p>
-              <p className="mt-1 text-[13px] text-ink-muted">
+              <p className="mt-1 text-small text-ink-muted">{row.reason}</p>
+              <p className="mt-1 text-ui text-ink-muted">
                 {row.netSelfCents != null && (
                   <span className="mr-3">
                     Self net {formatMoney(row.netSelfCents)}
@@ -262,13 +262,13 @@ function PendingBookRow({ row }: { row: SellPendingRow }) {
           {row.title}
         </Link>
         {row.authors.length > 0 && (
-          <p className="text-[13px] text-ink-muted">{row.authors.join(', ')}</p>
+          <p className="text-ui text-ink-muted">{row.authors.join(', ')}</p>
         )}
-        <p className="text-[13px] text-ink-faint">
+        <p className="text-ui text-ink-muted">
           {editionLine(row)}
           {row.isbn13 ? ` · ISBN ${row.isbn13}` : ' · no ISBN yet'}
         </p>
-        <p className="mt-1 text-[12px] text-ink-muted">
+        <p className="mt-1 text-small text-ink-muted">
           {row.confirmationReason ??
             'More than one printing matches this title, and buyback quotes are per ISBN.'}
           {row.autoImported ? ' Imported from an order email.' : ''}
@@ -294,7 +294,7 @@ function PendingBookRow({ row }: { row: SellPendingRow }) {
           {row.candidates.length > 2 && (
             <Link
               href={`/shopping/inventory/${row.inventoryItemId}`}
-              className="text-[13px] text-brand hover:underline"
+              className="text-ui text-accent hover:underline"
             >
               {row.candidates.length - 2} more printing(s)
             </Link>
@@ -311,11 +311,11 @@ export function SellConfirmQueue({ rows }: { rows: SellPendingRow[] }) {
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-ink">
+        <h2 className="text-body font-semibold text-ink">
           Confirm the edition{' '}
           <span className="font-normal text-ink-muted">({rows.length})</span>
         </h2>
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-ui text-ink-muted">
           Price follows the printing, so these sit out of routing until you pick one.
         </p>
       </div>
@@ -340,7 +340,7 @@ export function ImportBooksFromOrdersButton() {
         {pending ? 'Scanning orders…' : 'Scan past orders for books'}
       </Button>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
+      {state.message && <p className="text-ui text-accent">{state.message}</p>}
     </form>
   );
 }
@@ -371,7 +371,7 @@ export function TestEbayConnectionButton() {
         <Button type="submit" variant="secondary" size="sm" disabled={pending}>
           {pending ? 'Testing…' : 'Test eBay connection'}
         </Button>
-        <span className="text-[13px] text-ink-muted">
+        <span className="text-ui text-ink-muted">
           Runs one live lookup. Free — Browse is not billed per call.
         </span>
       </div>
@@ -379,11 +379,11 @@ export function TestEbayConnectionButton() {
       {result && (
         <div
           className={
-            'rounded-lg border px-3 py-2 text-[13px] ' +
+            'rounded-lg border px-3 py-2 text-ui ' +
             (result.ok
-              ? 'border-green-200 bg-green-50 text-green-900'
+              ? 'border-border bg-positive-tint text-positive'
               : failed
-                ? 'border-red-200 bg-red-50 text-red-900'
+                ? 'border-danger bg-danger-tint text-danger'
                 : 'border-border bg-surface text-ink')
           }
         >
@@ -395,7 +395,7 @@ export function TestEbayConnectionButton() {
           {/* eBay's own words, so an unfamiliar error is still searchable. */}
           <p className="mt-1 break-words opacity-90">
             {result.stage !== 'ok' && result.stage !== 'unconfigured' && (
-              <span className="font-mono text-[12px]">
+              <span className="font-mono text-small">
                 [{result.stage}
                 {result.status ? ` ${result.status}` : ''}]{' '}
               </span>
@@ -443,7 +443,7 @@ export function EstimatePricesButton({
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? 'Pricing…' : `Estimate prices for ${thisRun} book(s)`}
           </Button>
-          <span className="text-[13px] text-ink-muted">
+          <span className="text-ui text-ink-muted">
             {unpricedCount} unpriced
             {cost(thisRun)}
             {unpricedCount > batchLimit ? ' · run again for the rest' : ''}
@@ -468,14 +468,14 @@ export function EstimatePricesButton({
           >
             {pending ? 'Pricing…' : `Rescan ${rescanRun} book(s)`}
           </Button>
-          <span className="text-[13px] text-ink-muted">
+          <span className="text-ui text-ink-muted">
             fetches fresh prices, ignoring what is cached{cost(rescanRun)}
           </span>
         </>
       )}
 
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
+      {state.message && <p className="text-ui text-accent">{state.message}</p>}
     </form>
   );
 }
@@ -498,7 +498,7 @@ export function SellGamePathGroup({
   if (rows.length === 0) return null;
   return (
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-ink">
+      <h2 className="text-body font-semibold text-ink">
         {PATH_LABEL[path]} <span className="font-normal text-ink-muted">({rows.length})</span>
       </h2>
       <ul className="divide-y divide-border rounded-card border border-border bg-surface">
@@ -521,12 +521,12 @@ export function SellGamePathGroup({
               >
                 {row.shortName || row.name}
               </Link>
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-ui text-ink-muted">
                 {[row.publisher, row.yearPublished].filter(Boolean).join(' · ') ||
                   'Board game'}
               </p>
-              <p className="mt-1 text-[12px] text-ink-faint">{row.reason}</p>
-              <p className="mt-1 text-[13px] text-ink-muted">
+              <p className="mt-1 text-small text-ink-muted">{row.reason}</p>
+              <p className="mt-1 text-ui text-ink-muted">
                 {row.netSelfCents != null && (
                   <span className="mr-3">
                     Self net {formatMoney(row.netSelfCents)}

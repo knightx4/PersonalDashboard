@@ -40,11 +40,11 @@ export function RunRoutineButton({
           <Play className="size-3.5" aria-hidden />
           {pending ? 'Starting…' : 'Run Feature Routine'}
         </Button>
-        <p className="text-[13px] text-ink-muted">
+        <p className="text-ui text-ink-muted">
           Works the outstanding notes now instead of waiting for the schedule.
         </p>
       </div>
-      {state.message && <p className="text-[13px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-ui text-positive">{state.message}</p>}
       <FieldError>{state.error}</FieldError>
     </form>
   );
@@ -65,13 +65,13 @@ function InlineRunButton() {
             setState(await runFeatureRoutine({}, new FormData()));
           })
         }
-        className="text-[13px] text-brand hover:underline disabled:opacity-60"
+        className="text-ui text-accent hover:underline disabled:opacity-60"
       >
         {pending ? 'Starting…' : 'Run routine'}
       </button>
-      {state.message && <span className="text-[12px] text-ink-muted">Started</span>}
+      {state.message && <span className="text-small text-ink-muted">Started</span>}
       {state.error && (
-        <span className="text-[12px] text-red-500" title={state.error}>
+        <span className="text-small text-danger" title={state.error}>
           Failed
         </span>
       )}

@@ -44,7 +44,7 @@ export default async function SharesPage() {
         actions={
           <Link
             href="/shopping/share/families"
-            className="text-[13px] text-ink-muted hover:text-ink"
+            className="text-ui text-ink-muted hover:text-ink"
           >
             Grouping
           </Link>
@@ -73,13 +73,13 @@ export default async function SharesPage() {
                       <Card interactive className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-ink">{share.title}</p>
-                            <p className="mt-0.5 text-[13px] text-ink-muted">
+                            <p className="text-body font-medium text-ink">{share.title}</p>
+                            <p className="mt-0.5 text-ui text-ink-muted">
                               {items} {items === 1 ? 'item' : 'items'} · {answers} answered
                               {share.status !== 'active' && ' · archived'}
                             </p>
                           </div>
-                          <span className="flex shrink-0 items-center gap-1 text-[12px] text-ink-faint">
+                          <span className="flex shrink-0 items-center gap-1 text-small text-ink-muted">
                             <Link2 className="size-3.5" aria-hidden />
                             {live.length} live
                             {seen && ' · opened'}

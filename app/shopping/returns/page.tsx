@@ -128,7 +128,7 @@ export default async function ReturnsPage({
           actions={
             <Link
               href="/shopping/settings#return-policies"
-              className="text-sm font-medium text-brand hover:underline"
+              className="text-body font-medium text-accent hover:underline"
             >
               Edit return policies
             </Link>

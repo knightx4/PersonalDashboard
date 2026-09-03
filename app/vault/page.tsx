@@ -59,7 +59,7 @@ export default async function VaultPage({
       <form className="mb-5" role="search">
         <div className="relative max-w-md">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
             strokeWidth={2}
             aria-hidden
           />
@@ -88,7 +88,7 @@ export default async function VaultPage({
         />
       ) : (
         <>
-          <p className="mb-3 text-sm text-ink-muted">
+          <p className="mb-3 text-body text-ink-muted">
             {notes.length} {notes.length === 1 ? 'note' : 'notes'}
             {search ? ` matching “${search}”` : ''}
           </p>
@@ -96,7 +96,7 @@ export default async function VaultPage({
           <div className="space-y-6">
             {groups.map((group) => (
               <section key={group.folder || '(root)'}>
-                <h2 className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-ink-muted">
+                <h2 className="mb-2 flex items-center gap-1.5 text-ui font-semibold text-ink-muted">
                   <FolderTree className="size-3.5" strokeWidth={2} aria-hidden />
                   {group.folder || 'Vault root'}
                 </h2>
@@ -107,9 +107,9 @@ export default async function VaultPage({
                         href={`/vault/n/${note.path.split('/').map(encodeURIComponent).join('/')}`}
                         className="block px-4 py-3 transition-colors duration-150 hover:bg-canvas"
                       >
-                        <span className="block text-sm font-medium text-ink">{note.title}</span>
+                        <span className="block text-body font-medium text-ink">{note.title}</span>
                         {note.excerpt && (
-                          <span className="mt-0.5 block truncate text-[13px] text-ink-muted">
+                          <span className="mt-0.5 block truncate text-ui text-ink-muted">
                             {note.excerpt}
                           </span>
                         )}

@@ -27,7 +27,7 @@ export function MerchantAvatar({
   return (
     <span
       className={cn(
-        'relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-canvas text-[12px] font-semibold tracking-wide text-ink-muted',
+        'relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-canvas text-small font-semibold tracking-wide text-ink-muted',
         className,
       )}
       aria-hidden

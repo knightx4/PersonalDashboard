@@ -35,17 +35,17 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Built-in categories are shared and read-only. Add your own — email import will consider
         them when auto-categorizing new items.
       </p>
 
       <div>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
           Your categories
         </h3>
         {custom.length === 0 && !creating ? (
-          <p className="text-sm text-ink-faint">None yet — create one below.</p>
+          <p className="text-body text-ink-muted">None yet — create one below.</p>
         ) : custom.length > 0 ? (
           <ul className="divide-y divide-border rounded-lg border border-border">
             {custom.map((category) => (
@@ -86,20 +86,20 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
             New category
           </Button>
           {createState.message && (
-            <p className="text-sm text-positive">{createState.message}</p>
+            <p className="text-body text-positive">{createState.message}</p>
           )}
         </div>
       )}
 
       <div>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
           Built-in
         </h3>
         <ul className="flex flex-wrap gap-2">
           {system.map((category) => (
             <li
               key={category.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-[13px] text-ink-muted"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-ui text-ink-muted"
             >
               <span
                 className="size-2 rounded-full"
@@ -144,10 +144,10 @@ function CustomCategoryRow({ category }: { category: SettingsCategory }) {
       </form>
       <div className="flex items-center gap-2">
         {renameState.error && (
-          <p className="text-[12px] text-red-600">{renameState.error}</p>
+          <p className="text-small text-danger">{renameState.error}</p>
         )}
         {renameState.message && (
-          <p className="text-[12px] text-positive">{renameState.message}</p>
+          <p className="text-small text-positive">{renameState.message}</p>
         )}
         <form action={deleteCustomCategory}>
           <input type="hidden" name="id" value={category.id} />

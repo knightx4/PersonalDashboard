@@ -210,7 +210,7 @@ export default async function OrderDetailPage({
       />
 
       {isDeleted && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p className="rounded-lg border border-border bg-caution-tint px-3 py-2 text-body text-caution">
           This order is in Deleted orders. Its inventory is hidden from your owned list until you
           restore it. Manage it in{' '}
           <Link href="/shopping/settings#deleted-orders" className="underline underline-offset-2">
@@ -221,10 +221,10 @@ export default async function OrderDetailPage({
       )}
 
       {!isDeleted && order.needs_review && (
-        <div className="flex flex-col gap-3 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-card border border-border bg-caution-tint px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-amber-950">Needs review</p>
-            <p className="text-[13px] text-amber-900/80">
+            <p className="text-body font-medium text-caution">Needs review</p>
+            <p className="text-ui text-caution/80">
               Imported with the fallback parser. Confirm the totals and items, or discard if this
               should not count toward spend.
             </p>
@@ -238,19 +238,19 @@ export default async function OrderDetailPage({
 
       {(shipments?.length ?? 0) > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
+          <h2 className="text-body font-semibold uppercase tracking-wider text-ink-muted">
             Shipments
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
             {(shipments ?? []).map((shipment) => {
               const links = shipmentEmailLinks.get(shipment.id) ?? {};
               return (
-                <li key={shipment.id} className="px-4 py-3 text-sm">
+                <li key={shipment.id} className="px-4 py-3 text-body">
                   <p className="font-medium text-ink">
                     {shipment.status.replaceAll('_', ' ')}
                     {shipment.carrier ? ` · ${shipment.carrier}` : ''}
                   </p>
-                  <p className="mt-1 text-[13px] text-ink-muted">
+                  <p className="mt-1 text-ui text-ink-muted">
                     {[
                       shipment.tracking_number ? `Tracking ${shipment.tracking_number}` : null,
                       shipment.shipped_at
@@ -269,7 +269,7 @@ export default async function OrderDetailPage({
                         href={shipment.tracking_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[13px] text-brand hover:underline"
+                        className="text-ui text-accent hover:underline"
                       >
                         Track package
                       </a>
@@ -279,7 +279,7 @@ export default async function OrderDetailPage({
                         href={links.shippingHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[13px] text-ink-faint hover:text-brand hover:underline"
+                        className="text-ui text-ink-muted hover:text-accent hover:underline"
                       >
                         Open shipping email
                       </a>
@@ -289,7 +289,7 @@ export default async function OrderDetailPage({
                         href={links.deliveryHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[13px] text-ink-faint hover:text-brand hover:underline"
+                        className="text-ui text-ink-muted hover:text-accent hover:underline"
                       >
                         Open delivery email
                       </a>
@@ -304,12 +304,12 @@ export default async function OrderDetailPage({
 
       {(returnRows?.length ?? 0) > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-faint">
+          <h2 className="text-body font-semibold uppercase tracking-wider text-ink-muted">
             Returns
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
             {(displayReturns ?? []).map((row) => (
-              <li key={row.id} className="flex justify-between gap-4 px-4 py-3 text-sm">
+              <li key={row.id} className="flex justify-between gap-4 px-4 py-3 text-body">
                 <span className="text-ink">
                   {row.status.replaceAll('_', ' ')}
                   {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
@@ -324,8 +324,8 @@ export default async function OrderDetailPage({
       )}
 
       <section className="overflow-hidden rounded-card border border-border bg-surface">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border text-left text-[12px] uppercase tracking-wider text-ink-faint">
+        <table className="w-full text-body">
+          <thead className="border-b border-border text-left text-small uppercase tracking-wider text-ink-muted">
             <tr>
               <th className="px-4 py-2 font-semibold">Item</th>
               <th className="px-4 py-2 font-semibold">Qty</th>
@@ -343,7 +343,7 @@ export default async function OrderDetailPage({
                 <tr key={item.id}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-ink">{item.name}</p>
-                    <p className="text-[13px] text-ink-muted">
+                    <p className="text-ui text-ink-muted">
                       {[item.variant, category?.name].filter(Boolean).join(' · ') || '—'}
                     </p>
                     <OrderItemTags
@@ -361,7 +361,7 @@ export default async function OrderDetailPage({
                           href={item.product_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[13px] text-brand hover:underline"
+                          className="text-ui text-accent hover:underline"
                         >
                           View product
                         </a>
@@ -376,12 +376,12 @@ export default async function OrderDetailPage({
                           >
                             <Link
                               href={`/shopping/inventory/${unit.id}`}
-                              className="text-[13px] font-medium text-brand hover:underline"
+                              className="text-ui font-medium text-accent hover:underline"
                             >
                               View in inventory
                               {units.length > 1 ? ` (${index + 1} of ${units.length})` : ''}
                             </Link>
-                            <span className="tabular text-[13px] text-ink-muted">
+                            <span className="tabular text-ui text-ink-muted">
                               Landed {moneyLabel(unit.display_cost_cents, unit.cost_cents)}
                             </span>
                             <span className="rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
@@ -409,7 +409,7 @@ export default async function OrderDetailPage({
         </table>
       </section>
 
-      <dl className="grid gap-2 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
+      <dl className="grid gap-2 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
         <div className="flex justify-between gap-4 sm:col-span-2">
           <dt className="text-ink-muted">Subtotal</dt>
           <dd className="tabular text-ink">
@@ -455,7 +455,7 @@ export default async function OrderDetailPage({
           <dd className="text-right text-ink">
             {order.source.replaceAll('_', ' ')}
             {inboxAddress ? (
-              <span className="mt-0.5 block text-[13px] font-normal text-ink-faint">
+              <span className="mt-0.5 block text-ui font-normal text-ink-muted">
                 {inboxAddress}
               </span>
             ) : null}

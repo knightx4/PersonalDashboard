@@ -38,7 +38,7 @@ export function ActivityFeed({
   return (
     <div className="space-y-4">
       <section className="rounded-card border border-border bg-surface p-5">
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui">
           <dt className="text-ink-muted">Last inbox sync</dt>
           <dd className="text-ink">
             {latestRun
@@ -57,21 +57,21 @@ export function ActivityFeed({
         </dl>
 
         {latestRun?.error && (
-          <p className="mt-3 rounded-lg bg-accent-orange-tint px-3 py-2 text-[12px] text-ink">
+          <p className="mt-3 rounded-lg bg-caution-tint px-3 py-2 text-small text-ink">
             Last run reported: {latestRun.error}
           </p>
         )}
       </section>
 
       {activity.entries.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface px-4 py-3 text-[13px] text-ink-muted">
+        <p className="rounded-card border border-border bg-surface px-4 py-3 text-ui text-ink-muted">
           Nothing has changed yet. Once a scan has run, everything it writes shows up here.
         </p>
       ) : (
         <div className="space-y-4 rounded-card border border-border bg-surface p-5">
           {days.map((group) => (
             <div key={group.day}>
-              <h2 className="text-[12px] font-medium text-ink-faint">
+              <h2 className="text-small font-medium text-ink-muted">
                 {formatDate(group.entries[0].at, timezone)}
               </h2>
               <ul className="mt-1 divide-y divide-border">
@@ -80,23 +80,23 @@ export function ActivityFeed({
                     key={entry.id}
                     className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1.5"
                   >
-                    <span className="w-14 shrink-0 text-[11px] text-ink-faint">
+                    <span className="w-14 shrink-0 text-micro text-ink-muted">
                       {SOURCE_LABEL[entry.source]}
                     </span>
                     {entry.roleId ? (
                       <Link
                         href={`/jobs/roles/${entry.roleId}`}
-                        className="text-[13px] text-ink first-letter:uppercase hover:text-brand"
+                        className="text-ui text-ink first-letter:uppercase hover:text-accent"
                       >
                         {entry.headline}
                       </Link>
                     ) : (
-                      <span className="text-[13px] text-ink first-letter:uppercase">
+                      <span className="text-ui text-ink first-letter:uppercase">
                         {entry.headline}
                       </span>
                     )}
                     {entry.detail && (
-                      <span className="w-full text-[12px] text-ink-muted sm:w-auto sm:flex-1 sm:truncate">
+                      <span className="w-full text-small text-ink-muted sm:w-auto sm:flex-1 sm:truncate">
                         {entry.detail}
                       </span>
                     )}

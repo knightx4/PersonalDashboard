@@ -86,7 +86,7 @@ export function SyncNowButton({ active }: { active: boolean }) {
         {active ? 'Syncing…' : busy ? 'Starting…' : 'Sync now'}
       </Button>
       {note && (
-        <span role="status" className="text-[12px] text-ink-muted">
+        <span role="status" className="text-small text-ink-muted">
           {note}
         </span>
       )}

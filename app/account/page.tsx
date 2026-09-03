@@ -1,8 +1,8 @@
-import Link from 'next/link';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { FeedbackButton } from '@/components/shell/feedback-button';
-import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
+import { WorkspaceNav } from '@/components/shell/workspace-nav';
+import { loadModuleCounts } from '@/lib/modules/counts';
+import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { AccountView } from './view';
 
 export const metadata = { title: 'Account' };
@@ -25,32 +25,26 @@ export const metadata = { title: 'Account' };
  */
 export default async function AccountPage() {
   const user = await requireUser();
-  const settings = await loadAccountSettings(user.id);
-
-  const initial = (settings.displayName || user.email || '').charAt(0).toUpperCase();
+  const [settings, counts] = await Promise.all([
+    loadAccountSettings(user.id),
+    loadModuleCounts(user.id),
+  ]);
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-          <WorkspaceSwitcher current={null} enabled={settings.enabledModules} />
-          <div className="flex-1" />
-          <FeedbackButton />
-          <Link
-            href="/account"
-            aria-current="page"
-            className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-tint text-[13px] font-semibold text-brand"
-            title={settings.displayName ?? user.email ?? ''}
-          >
-            {initial}
-            <span className="sr-only">Account</span>
-          </Link>
-        </div>
-      </header>
+      <WorkspaceNav
+        module={null}
+        sections={[]}
+        displayName={settings.displayName}
+        email={user.email ?? ''}
+        enabledModules={settings.enabledModules}
+        counts={switcherCounts(counts)}
+        theme={settings.theme}
+      />
 
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">Account</h1>
-        <p className="mt-1 text-[13px] text-ink-muted">
+        <h1 className="font-display text-3xl tracking-tight text-ink">Account</h1>
+        <p className="mt-1 text-ui text-ink-muted">
           Settings that hold across every workspace.
         </p>
 

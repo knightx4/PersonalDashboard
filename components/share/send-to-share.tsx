@@ -45,7 +45,7 @@ export function SendToShare({
     });
   }
 
-  if (note) return <span className="text-[13px] text-ink-muted">{note}</span>;
+  if (note) return <span className="text-ui text-ink-muted">{note}</span>;
 
   // A single share is the common case and does not deserve a menu.
   if (shares.length === 1) {
@@ -75,7 +75,7 @@ export function SendToShare({
               <button
                 type="button"
                 onClick={() => send(share.id)}
-                className="w-full px-3 py-1.5 text-left text-[13px] text-ink hover:bg-canvas"
+                className="w-full px-3 py-1.5 text-left text-ui text-ink hover:bg-canvas"
               >
                 {share.title}
               </button>

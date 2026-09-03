@@ -75,7 +75,7 @@ export default async function SellPage() {
 
       <SellSettingsForm netFloorCents={netFloorCents} effortCents={effortCents} />
 
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Floor {formatMoney(netFloorCents)} · Effort {formatMoney(effortCents)}
         {needsConfirmationCount > 0
           ? ` · ${needsConfirmationCount} book(s) waiting on edition confirm`
@@ -83,7 +83,7 @@ export default async function SellPage() {
       </p>
 
       {PRICE_SOURCE_NOTE[priceSource] && (
-        <p className="rounded-lg border border-border bg-surface px-3 py-2 text-[13px] text-ink-muted">
+        <p className="rounded-lg border border-border bg-surface px-3 py-2 text-ui text-ink-muted">
           {PRICE_SOURCE_NOTE[priceSource]}
         </p>
       )}
@@ -119,7 +119,7 @@ export default async function SellPage() {
         <>
           {rows.length > 0 && (
             <section className="space-y-4">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+              <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
                 Books
               </h2>
               {PATH_ORDER.map((path) => (
@@ -134,10 +134,10 @@ export default async function SellPage() {
 
           {(games.rows.length > 0 || games.needsConfirmationCount > 0) && (
             <section className="space-y-4">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+              <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
                 Board games
               </h2>
-              <p className="text-[13px] text-ink-muted">
+              <p className="text-ui text-ink-muted">
                 Shipping is assumed flat at {formatMoney(GAME_SHIP_FLAT_CENTS)} a game, and
                 there is no buyback path — nothing buys board games back the way a vendor
                 buys textbooks.
@@ -148,7 +148,7 @@ export default async function SellPage() {
                     confirm and are not routed yet —{' '}
                     <Link
                       href="/shopping/inventory"
-                      className="underline underline-offset-2 hover:text-brand"
+                      className="underline underline-offset-2 hover:text-accent"
                     >
                       confirm them in inventory
                     </Link>

@@ -17,14 +17,14 @@ export function FamilySuggestionCard({ family }: { family: PendingSuggestion }) 
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<string | null>(null);
 
-  if (done) return <p className="text-[13px] text-ink-muted">{done}</p>;
+  if (done) return <p className="text-ui text-ink-muted">{done}</p>;
 
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink">{family.name}</h2>
-          <p className="text-[13px] text-ink-muted">{family.members.length} games</p>
+          <h2 className="text-body font-semibold text-ink">{family.name}</h2>
+          <p className="text-ui text-ink-muted">{family.members.length} games</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -69,9 +69,9 @@ export function FamilySuggestionCard({ family }: { family: PendingSuggestion }) 
 
       <ul className="mt-3 space-y-1">
         {family.members.map((member) => (
-          <li key={member.inventoryItemId} className="text-[13px] text-ink">
+          <li key={member.inventoryItemId} className="text-ui text-ink">
             {member.name}
-            <span className="text-ink-faint"> — {ROLE_LABEL[member.role] ?? member.role}</span>
+            <span className="text-ink-muted"> — {ROLE_LABEL[member.role] ?? member.role}</span>
           </li>
         ))}
       </ul>

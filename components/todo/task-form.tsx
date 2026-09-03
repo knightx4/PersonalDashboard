@@ -59,7 +59,7 @@ export function AddTask() {
       <button
         type="button"
         onClick={() => setExpanded((open) => !open)}
-        className="mt-2 text-[12px] font-medium text-ink-muted hover:text-ink"
+        className="mt-2 text-small font-medium text-ink-muted hover:text-ink"
       >
         {expanded ? 'Less' : 'Details'}
       </button>
@@ -77,7 +77,7 @@ export function AddTask() {
       </div>
 
       {state.error && (
-        <p className="mt-2 text-[13px] text-status-rejected">{state.error}</p>
+        <p className="mt-2 text-ui text-status-rejected">{state.error}</p>
       )}
     </form>
   );
@@ -113,7 +113,7 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
 
       <PinnedField id={`pinned-${task.id}`} defaultChecked={task.pinned} />
 
-      {state.error && <p className="text-[13px] text-status-rejected">{state.error}</p>}
+      {state.error && <p className="text-ui text-status-rejected">{state.error}</p>}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
@@ -145,7 +145,7 @@ function DueFields({ defaultDay = '', defaultTime = '' }: { defaultDay?: string;
       <div>
         <Label htmlFor="dueTime">At (optional)</Label>
         <Input id="dueTime" name="dueTime" type="time" defaultValue={defaultTime} />
-        <p className="mt-1 text-[11px] text-ink-faint">
+        <p className="mt-1 text-micro text-ink-muted">
           Leave empty for a day with no particular hour.
         </p>
       </div>
@@ -155,13 +155,13 @@ function DueFields({ defaultDay = '', defaultTime = '' }: { defaultDay?: string;
 
 function PinnedField({ id, defaultChecked = false }: { id: string; defaultChecked?: boolean }) {
   return (
-    <label htmlFor={id} className="flex items-center gap-2 text-[13px] text-ink">
+    <label htmlFor={id} className="flex items-center gap-2 text-ui text-ink">
       <input
         id={id}
         type="checkbox"
         name="pinned"
         defaultChecked={defaultChecked}
-        className="size-4 accent-[var(--color-brand)]"
+        className="size-4 accent-[var(--color-accent)]"
       />
       Pin to the top
     </label>

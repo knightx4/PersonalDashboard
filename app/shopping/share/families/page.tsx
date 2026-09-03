@@ -26,7 +26,7 @@ export default async function FamiliesPage() {
     <>
       <Link
         href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:text-ink"
+        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted hover:text-ink"
       >
         <ArrowLeft className="size-3.5" aria-hidden /> Shared forms
       </Link>

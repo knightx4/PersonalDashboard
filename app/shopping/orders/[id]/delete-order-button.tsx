@@ -37,7 +37,7 @@ export function DeleteOrderButton({
 
   return (
     <div className="inline-flex flex-col items-end gap-1">
-      <p className="max-w-[16rem] text-right text-[12px] text-ink-muted">
+      <p className="max-w-[16rem] text-right text-small text-ink-muted">
         Delete {label}? You can restore it later from Settings.
       </p>
       <div className="flex items-center gap-2">

@@ -49,8 +49,8 @@ export function ItemSellPanel({
     <section className="space-y-3 rounded-card border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-ink">Sell</h2>
-          <p className="mt-1 text-[13px] text-ink-muted">
+          <h2 className="text-body font-semibold text-ink">Sell</h2>
+          <p className="mt-1 text-ui text-ink-muted">
             {quote.kind === 'game'
               ? 'Asking prices for the same game, less eBay fees, shipping and effort.'
               : 'Asking prices for the same edition, less eBay fees, shipping and effort.'}
@@ -67,11 +67,11 @@ export function ItemSellPanel({
       </div>
 
       {!quote.priceable ? (
-        <p className="text-[13px] text-ink-faint">
+        <p className="text-ui text-ink-muted">
           {quote.needsConfirmation ? (
             <>
               Confirm which {quote.kind === 'game' ? 'game' : 'edition'} this is on the{' '}
-              <Link href="/shopping/sell" className="text-brand hover:underline">
+              <Link href="/shopping/sell" className="text-accent hover:underline">
                 sell page
               </Link>{' '}
               before it can be priced.
@@ -83,18 +83,18 @@ export function ItemSellPanel({
           )}
         </p>
       ) : quote.priceSource === 'none' ? (
-        <p className="text-[13px] text-ink-faint">
+        <p className="text-ui text-ink-muted">
           No price source is configured, so prices can only be set by hand.
         </p>
       ) : null}
 
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+      <dl className="grid gap-3 text-body sm:grid-cols-2">
         <div>
           <dt className="text-ink-muted">Expected price</dt>
           <dd className="tabular font-medium text-ink">
             {price != null ? formatMoney(price) : 'Not priced yet'}
             {price != null && (
-              <span className="ml-2 text-[12px] font-normal text-ink-muted">
+              <span className="ml-2 text-small font-normal text-ink-muted">
                 {quote.priceIsManual
                   ? 'your price'
                   : quote.priceSource === 'web_estimate'
@@ -121,12 +121,12 @@ export function ItemSellPanel({
                   href={quote.buyback.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="ml-2 text-[12px] text-brand underline"
+                  className="ml-2 text-small text-accent underline"
                 >
                   {quote.buyback.vendor}
                 </a>
               ) : (
-                <span className="ml-2 text-[12px] text-ink-muted">{quote.buyback.vendor}</span>
+                <span className="ml-2 text-small text-ink-muted">{quote.buyback.vendor}</span>
               )}
             </dd>
           </div>
@@ -138,7 +138,7 @@ export function ItemSellPanel({
               <span className="font-medium">{PATH_LABEL[quote.path]}</span>{' '}
               <span className="text-ink-muted">{quote.reason}</span>
               {quote.path === 'donate' && quote.donateFmvCents > 0 && (
-                <span className="ml-2 text-[12px] text-ink-muted">
+                <span className="ml-2 text-small text-ink-muted">
                   FMV hint {formatMoney(quote.donateFmvCents)} (not tax advice)
                 </span>
               )}
@@ -161,11 +161,11 @@ export function ItemSellPanel({
         <Button type="submit" size="sm" variant="secondary" disabled={manualPending}>
           {manualPending ? 'Saving…' : 'Set price'}
         </Button>
-        <span className="text-[12px] text-ink-faint">Beats any lookup; clear it to go back.</span>
+        <span className="text-small text-ink-muted">Beats any lookup; clear it to go back.</span>
       </form>
 
       {(priceState.message || manualState.message) && (
-        <p className="text-sm text-positive">{priceState.message ?? manualState.message}</p>
+        <p className="text-body text-positive">{priceState.message ?? manualState.message}</p>
       )}
       <FieldError>{priceState.error ?? manualState.error}</FieldError>
     </section>

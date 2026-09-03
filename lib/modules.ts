@@ -22,8 +22,27 @@ export type AppModule = {
   home: string;
   label: string;
   description: string;
-  gradient: string;
+  /**
+   * The workspace's own hue, as a CSS variable name. The shell sets
+   * data-workspace and globals.css resolves it to --color-accent, so no
+   * component ever names a workspace colour directly.
+   *
+   * The four are stops on one arc -- sky, violet, fuchsia, rose -- with the
+   * app's indigo at the blue end. Drawn from a single sweep rather than from
+   * around the wheel, which is what keeps four differently-coloured
+   * workspaces reading as one product rather than four sharing a login.
+   */
+  accent: `--color-w-${ModuleId}`;
+  /** Lucide icon name, resolved by components/ui/module-icon.tsx. */
+  icon: ModuleIconName;
 };
+
+/**
+ * One glyph per module, everywhere it appears -- the switcher, the home
+ * tiles, the Account toggles. Named here rather than imported here so this
+ * file stays free of client-only code and can be read on the server.
+ */
+export type ModuleIconName = 'shopping' | 'jobs' | 'todo' | 'vault' | 'home';
 
 export const MODULES: readonly AppModule[] = [
   {
@@ -32,11 +51,8 @@ export const MODULES: readonly AppModule[] = [
     home: '/shopping/dashboard',
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
-    // Warm, and the only mark that does not start on brand blue -- the two
-    // module marks sit next to the home mark rather than under it, so they
-    // read best when they are not variations on the same first colour.
-    gradient:
-      'linear-gradient(135deg, var(--color-accent-orange) 0%, var(--color-accent-pink) 100%)',
+    accent: '--color-w-shopping',
+    icon: 'shopping',
   },
   {
     id: 'jobs',
@@ -44,7 +60,8 @@ export const MODULES: readonly AppModule[] = [
     home: '/jobs/today',
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
-    gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-status-final) 100%)',
+    accent: '--color-w-jobs',
+    icon: 'jobs',
   },
   {
     id: 'todo',
@@ -54,7 +71,8 @@ export const MODULES: readonly AppModule[] = [
     home: '/todo',
     label: 'Todo',
     description: 'What has to happen, across everything',
-    gradient: 'linear-gradient(135deg, var(--color-status-offer) 0%, var(--color-brand) 100%)',
+    accent: '--color-w-todo',
+    icon: 'todo',
   },
   {
     id: 'vault',
@@ -64,22 +82,25 @@ export const MODULES: readonly AppModule[] = [
     home: '/vault',
     label: 'Vault',
     description: 'Your Obsidian notes, mirrored and searchable',
-    gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-orange) 100%)',
+    accent: '--color-w-vault',
+    icon: 'vault',
   },
 ] as const;
 
 /**
- * The mark for the whole app, on the largest icon in the topbar and on the
- * button when no module is active.
+ * The mark for the whole app: the topbar when no module is active, and every
+ * signed-out page.
  *
- * Blue into pink, which is what the signed-out pages -- the marketing page,
- * sign-in, onboarding -- have always used for the product itself. It belongs
- * on the icon that means "the whole thing" rather than on one of the modules
- * inside it.
+ * The app's own accent rather than a module's, and flat rather than a
+ * gradient. A two-hue ramp was decoration pretending to be identity -- three
+ * of the four module marks started on the same blue, so the hue was not
+ * something a person could identify a workspace by. The glyph is the
+ * mnemonic; the hue confirms it.
  */
 export const HOME_MARK = {
   label: 'Home',
-  gradient: 'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
+  accent: '--color-accent',
+  icon: 'home',
 } as const;
 
 export function moduleById(id: ModuleId | null): AppModule | null {

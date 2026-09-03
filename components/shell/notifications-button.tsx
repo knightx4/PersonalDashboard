@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { usePopover } from '@/lib/use-popover';
 
 export type Notification = {
   id: string;
@@ -16,11 +17,19 @@ export type Notification = {
 /**
  * Where the app tells you something happened.
  *
- * Deliberately empty for now: nothing in the app has earned a notification
- * yet, and inventing some to fill the panel would teach the user to ignore it
- * before the first real one arrives. The seam is the `notifications` prop —
- * a shell that has something to say passes it, the badge counts it, and the
- * panel lists it, with no further work here.
+ * It renders nothing at all until it has something to say, which is a change
+ * from the version that sat on three of the four navs as a permanently empty
+ * panel. The old comment defended that on the grounds that inventing
+ * notifications would teach people to ignore the bell -- true, but a bell that
+ * has never once rung teaches the same lesson, and by the time the first real
+ * notification arrives nobody is looking.
+ *
+ * The seam is unchanged: a shell with something to say passes `notifications`,
+ * the badge counts them and the panel lists them. What belongs here is
+ * anything the system did or noticed on its own -- a return window closing, an
+ * interview tomorrow with no prep, a vault token that expired -- all of which
+ * are currently shouted as full-width page banners instead. See the attention
+ * ladder in docs/design-language.html.
  */
 export function NotificationsButton({
   notifications = [],
@@ -29,89 +38,68 @@ export function NotificationsButton({
 } = {}) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const count = notifications.length;
 
-  // Close on Escape, and on a click outside the panel. Same contract as the
-  // feedback button beside it, so the two behave identically.
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
-    }
-    function onClick(event: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('keydown', onKey);
-    const timer = setTimeout(() => document.addEventListener('click', onClick), 0);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('click', onClick);
-      clearTimeout(timer);
-    };
-  }, [open]);
+  usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
+
+  if (count === 0) return null;
 
   return (
     <div className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title={count > 0 ? `${count} notification(s)` : 'Notifications'}
+        title={`${count} notification${count === 1 ? '' : 's'}`}
         className={cn(
           'press relative flex size-8 items-center justify-center rounded-full transition-colors',
-          open ? 'bg-brand-tint text-brand' : 'text-ink-muted hover:bg-canvas hover:text-ink',
+          open ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
         )}
       >
         <Bell className="size-4" aria-hidden />
-        {count > 0 && (
-          <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-accent-orange px-1 text-[10px] font-semibold leading-4 text-white">
-            {count > 9 ? '9+' : count}
-          </span>
-        )}
-        <span className="sr-only">
-          {count > 0 ? `Notifications, ${count} unread` : 'Notifications'}
+        <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-[#14100a]">
+          {count > 9 ? '9+' : count}
         </span>
+        <span className="sr-only">Notifications, {count} unread</span>
       </button>
 
       {open && (
         <div
           ref={panelRef}
           role="dialog"
+          aria-modal="true"
           aria-label="Notifications"
-          // Pinned to the viewport on a phone for the same reason the feedback
-          // panel is: anchored to the button it hangs off the left edge.
-          className="fixed inset-x-4 top-16 z-50 rounded-card border border-border bg-surface p-4 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-80"
+          tabIndex={-1}
+          // Pinned to the viewport on a phone: anchored to a button this far
+          // right, the panel hangs off the left edge where nothing can scroll
+          // it back, and Safari answers a field focused out there by zooming
+          // the whole page out to reach it.
+          className="fixed inset-x-4 top-16 z-50 rounded-card border border-border bg-raised p-4 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-80"
         >
-          <h2 className="text-sm font-semibold text-ink">Notifications</h2>
-          {count === 0 ? (
-            <p className="mt-2 text-[13px] text-ink-muted">
-              Nothing yet. This is where the app will tell you something happened.
-            </p>
-          ) : (
-            <ul className="mt-2 divide-y divide-border">
-              {notifications.map((notification) => (
-                <li key={notification.id} className="py-2">
-                  {notification.href ? (
-                    <a
-                      href={notification.href}
-                      className="text-[13px] text-ink hover:text-brand"
-                      onClick={() => setOpen(false)}
-                    >
-                      {notification.headline}
-                    </a>
-                  ) : (
-                    <span className="text-[13px] text-ink">{notification.headline}</span>
-                  )}
-                  {notification.detail && (
-                    <p className="text-[12px] text-ink-muted">{notification.detail}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <h2 className="text-ui font-semibold text-ink">Notifications</h2>
+          <ul className="mt-2 divide-y divide-border">
+            {notifications.map((notification) => (
+              <li key={notification.id} className="py-2">
+                {notification.href ? (
+                  <a
+                    href={notification.href}
+                    className="text-ui text-ink hover:text-accent"
+                    onClick={() => setOpen(false)}
+                  >
+                    {notification.headline}
+                  </a>
+                ) : (
+                  <span className="text-ui text-ink">{notification.headline}</span>
+                )}
+                {notification.detail && (
+                  <p className="text-small text-ink-muted">{notification.detail}</p>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

@@ -33,7 +33,7 @@ export function RoleCompany({
   if (!editing) {
     return (
       <span className="inline-flex items-center gap-1.5">
-        <Link href={`/jobs/companies/${slug}`} className="hover:text-brand">
+        <Link href={`/jobs/companies/${slug}`} className="hover:text-accent">
           {name}
         </Link>
         <button
@@ -47,7 +47,7 @@ export function RoleCompany({
           aria-label="Move this role to another company"
         >
           <Pencil
-            className="size-3 shrink-0 text-ink-faint hover:text-brand"
+            className="size-3 shrink-0 text-ink-muted hover:text-accent"
             strokeWidth={1.75}
             aria-hidden
           />
@@ -92,7 +92,7 @@ export function RoleCompany({
             setEditing(false);
           }
         }}
-        className="rounded-lg border border-border bg-surface px-2 py-0.5 text-[13px] text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+        className="rounded-lg border border-border bg-surface px-2 py-0.5 text-ui text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
       />
       <datalist id="role-companies">
         {companies.map((company) => (
@@ -103,7 +103,7 @@ export function RoleCompany({
         type="button"
         disabled={pending}
         onClick={save}
-        className="text-[12px] text-brand underline underline-offset-2 disabled:opacity-50"
+        className="text-small text-accent underline underline-offset-2 disabled:opacity-50"
       >
         {pending ? 'Moving…' : 'Move'}
       </button>
@@ -111,11 +111,11 @@ export function RoleCompany({
         type="button"
         disabled={pending}
         onClick={() => setEditing(false)}
-        className="text-[12px] text-ink-faint underline underline-offset-2 disabled:opacity-50"
+        className="text-small text-ink-muted underline underline-offset-2 disabled:opacity-50"
       >
         Cancel
       </button>
-      {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+      {error && <span className="text-small text-status-rejected">{error}</span>}
     </span>
   );
 }

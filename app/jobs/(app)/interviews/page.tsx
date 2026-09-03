@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { CalendarClock } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
@@ -66,14 +66,14 @@ export default async function InterviewsPage() {
       />
 
       {needDebrief.length > 0 && (
-        <section className="mb-6 rounded-card border border-accent-orange bg-accent-orange-tint p-4">
-          <h2 className="text-[13px] font-semibold text-ink">Write these up tonight</h2>
+        <section className="mb-6 rounded-card border border-caution bg-caution-tint p-4">
+          <h2 className="text-ui font-semibold text-ink">Write these up tonight</h2>
           <ul className="mt-2 space-y-1">
             {needDebrief.map((row) => (
-              <li key={row.id} className="text-[13px]">
+              <li key={row.id} className="text-ui">
                 <Link
                   href={`/jobs/roles/${row.applications.roles.id}`}
-                  className="font-medium text-ink hover:text-brand"
+                  className="font-medium text-ink hover:text-accent"
                 >
                   {row.applications.roles.companies.name} · {row.applications.roles.title}
                 </Link>
@@ -144,11 +144,11 @@ function Section({
 
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-[13px] font-semibold text-ink">{title}</h2>
+      <h2 className="mb-2 text-ui font-semibold text-ink">{title}</h2>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+        <table className="w-full min-w-[720px] border-collapse text-ui">
           <thead>
-            <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
               <th className="px-2 py-2 font-semibold">When</th>
               <th className="px-2 py-2 font-semibold">Company</th>
               <th className="px-2 py-2 font-semibold">Role</th>
@@ -169,14 +169,14 @@ function Section({
                 <td className="px-2 py-1.5">
                   <Link
                     href={`/jobs/roles/${row.applications.roles.id}`}
-                    className="font-medium text-ink hover:text-brand"
+                    className="font-medium text-ink hover:text-accent"
                   >
                     {row.applications.roles.title}
                   </Link>
                 </td>
                 <td className="tabular px-2 py-1.5 text-ink-muted">{row.round}</td>
                 <td className="px-2 py-1.5 text-ink-muted">{row.kind.replace(/_/g, ' ')}</td>
-                <td className="px-2 py-1.5 text-ink-faint">
+                <td className="px-2 py-1.5 text-ink-muted">
                   {row.notes ? 'written' : '—'}
                 </td>
               </tr>

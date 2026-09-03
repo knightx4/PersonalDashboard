@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Instrument_Sans } from 'next/font/google';
+import { Inter, Instrument_Serif } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
+import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 
-// Inter for UI at 14px base; Instrument Sans is the slightly warmer face used
-// for the large dashboard numbers.
+// Inter does all the work. Instrument Serif is the voice: page titles and the
+// one big figure, and nothing else -- it is the face that stops the app
+// sounding like software. It ships at 400 only, so nothing wearing
+// `font-display` may also ask for a bold; a synthesised serif bold looks
+// exactly as bad as it sounds.
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
-const instrument = Instrument_Sans({ variable: '--font-instrument', subsets: ['latin'] });
+const instrument = Instrument_Serif({
+  variable: '--font-instrument',
+  subsets: ['latin'],
+  weight: '400',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -36,11 +45,31 @@ export const viewport: Viewport = {
   minimumScale: 1,
 };
 
-export default function RootLayout({
+/**
+ * The theme is read from a cookie, here, on the server.
+ *
+ * That cookie is a mirror of core.account_settings.theme rather than the
+ * source of truth. It exists for one reason: so `data-theme` is in the first
+ * byte of HTML we send. A theme that flashes white before going dark is worse
+ * than having no dark mode at all, and that flash is precisely what you get
+ * when the choice is only readable after hydration.
+ *
+ * No cookie means no choice has been made, which is not the same as choosing
+ * light: the attribute is left off entirely and globals.css falls through to
+ * `prefers-color-scheme`.
+ */
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const jar = await cookies();
+  const theme = parseTheme(jar.get(THEME_COOKIE)?.value);
+
   return (
-    <html lang="en" className={`${inter.variable} ${instrument.variable} h-full`}>
+    <html
+      lang="en"
+      data-theme={theme ?? undefined}
+      className={`${inter.variable} ${instrument.variable} h-full`}
+    >
       <body className="min-h-full">{children}</body>
     </html>
   );

@@ -229,16 +229,16 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
               onClick={() => setTab(entry.id)}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium transition-colors duration-150',
+                'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-ui font-medium transition-colors duration-150',
                 active
-                  ? 'border-brand text-brand'
+                  ? 'border-accent text-accent'
                   : 'border-transparent text-ink-muted hover:text-ink',
               )}
             >
               <entry.icon className="size-3.5" strokeWidth={1.75} />
               {entry.label}
               {count !== undefined && count > 0 && (
-                <span className="tabular text-ink-faint">{count}</span>
+                <span className="tabular text-ink-muted">{count}</span>
               )}
             </button>
           );
@@ -281,7 +281,7 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
     <div className="mt-8 border-t border-border pt-4">
       {confirming ? (
         <div className="space-y-2">
-          <p className="text-[13px] text-ink">
+          <p className="text-ui text-ink">
             Remove this pursuit? The role goes with it, and the company too if nothing else is
             attached to it. Any mail that created it is marked not relevant, so the next sync
             will not bring it back.
@@ -306,13 +306,13 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
               Cancel
             </Button>
           </div>
-          {error && <p className="text-[13px] text-status-rejected">{error}</p>}
+          {error && <p className="text-ui text-status-rejected">{error}</p>}
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="text-[12px] text-ink-faint hover:text-status-rejected hover:underline"
+          className="text-small text-ink-muted hover:text-status-rejected hover:underline"
         >
           This was not a real pursuit — remove it
         </button>
@@ -334,10 +334,10 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 hover:text-brand hover:decoration-brand"
+      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 hover:text-accent hover:decoration-accent"
     >
       <span>{children}</span>
-      <ExternalLink className="size-3 shrink-0 self-center text-ink-faint" strokeWidth={1.75} aria-hidden />
+      <ExternalLink className="size-3 shrink-0 self-center text-ink-muted" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Open in Gmail</span>
     </a>
   );
@@ -355,19 +355,19 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
 
       {otherAttempts.length > 0 && (
         <section className="rounded-card border border-border bg-surface p-4">
-          <h3 className="text-[13px] font-semibold text-ink">Earlier attempts</h3>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
+          <h3 className="text-ui font-semibold text-ink">Earlier attempts</h3>
+          <p className="mt-0.5 text-small text-ink-muted">
             Kept as history rather than overwritten — which is the whole reason a pursuit is a
             separate row from the posting.
           </p>
           <ul className="mt-2 space-y-1.5">
             {otherAttempts.map((attempt) => (
-              <li key={attempt.id} className="flex items-center gap-2 text-[13px]">
-                <span className="tabular text-ink-faint">#{attempt.attempt}</span>
+              <li key={attempt.id} className="flex items-center gap-2 text-ui">
+                <span className="tabular text-ink-muted">#{attempt.attempt}</span>
                 <StatusBadge status={attempt.status} everSubmitted={attempt.submittedAt !== null} />
                 <span className="text-ink-muted">{formatDate(attempt.submittedAt, timezone)}</span>
                 {attempt.rejectionStage && (
-                  <span className="text-ink-faint">at {attempt.rejectionStage}</span>
+                  <span className="text-ink-muted">at {attempt.rejectionStage}</span>
                 )}
               </li>
             ))}
@@ -376,7 +376,7 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
       )}
 
       {events.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
           Nothing has happened yet. Events appear here as mail arrives, or when you move the card.
         </p>
       ) : (
@@ -386,14 +386,14 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
               key={event.id}
               className={cn(
                 'flex gap-3 rounded-card border border-border bg-surface px-4 py-2.5',
-                event.needsReview && 'border-accent-orange bg-accent-orange-tint',
+                event.needsReview && 'border-caution bg-caution-tint',
               )}
             >
-              <span className="tabular w-28 shrink-0 text-[12px] text-ink-faint">
+              <span className="tabular w-28 shrink-0 text-small text-ink-muted">
                 {formatDate(event.occurredAt, timezone)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] text-ink">
+                <p className="text-ui text-ink">
                   {event.gmailHref ? (
                     <GmailLink href={event.gmailHref}>
                       {event.summary ?? event.kind.replace(/_/g, ' ')}
@@ -402,12 +402,12 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
                     (event.summary ?? event.kind.replace(/_/g, ' '))
                   )}
                 </p>
-                <p className="text-[11px] text-ink-faint">
+                <p className="text-micro text-ink-muted">
                   {event.kind.replace(/_/g, ' ')} · {event.source}
                 </p>
                 {event.needsReview && (
-                  <p className="mt-1 flex items-start gap-1.5 text-[12px] text-ink">
-                    <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-accent-orange" strokeWidth={2} />
+                  <p className="mt-1 flex items-start gap-1.5 text-small text-ink">
+                    <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-caution" strokeWidth={2} />
                     Recorded, but it did not change the status — that would have moved this
                     backwards.
                   </p>
@@ -446,13 +446,13 @@ function Todos({
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h3 className="mb-2 text-[13px] font-semibold text-ink">To-dos</h3>
+      <h3 className="mb-2 text-ui font-semibold text-ink">To-dos</h3>
       {todos.length > 0 && (
         <ul className="mb-3 space-y-2">
           {todos.map((todo) => (
-            <li key={todo.id} className="text-[13px]">
+            <li key={todo.id} className="text-ui">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="tabular text-ink-faint">{formatDate(todo.dueAt, timezone)}</span>
+                <span className="tabular text-ink-muted">{formatDate(todo.dueAt, timezone)}</span>
                 <span className="text-ink">{todo.body}</span>
                 <ReminderActions id={todo.id} />
               </div>
@@ -498,7 +498,7 @@ function Todos({
         >
           Add
         </Button>
-        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
     </section>
   );
@@ -538,8 +538,8 @@ function TodoMail({
 
   if (todo.message) {
     return (
-      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-0.5 text-[12px] text-ink-muted">
-        <Mail className="size-3 shrink-0 text-ink-faint" strokeWidth={1.75} aria-hidden />
+      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-0.5 text-small text-ink-muted">
+        <Mail className="size-3 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         {todo.message.gmailHref ? (
           <GmailLink href={todo.message.gmailHref}>
             {todo.message.subject ?? '(no subject)'}
@@ -551,7 +551,7 @@ function TodoMail({
           type="button"
           disabled={pending}
           onClick={() => save(null)}
-          className="text-ink-faint underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
+          className="text-ink-muted underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
         >
           Unlink
         </button>
@@ -567,7 +567,7 @@ function TodoMail({
       <button
         type="button"
         onClick={() => setPicking(true)}
-        className="mt-0.5 pl-0.5 text-[12px] text-ink-faint underline underline-offset-2 hover:text-brand"
+        className="mt-0.5 pl-0.5 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
       >
         Link an email
       </button>
@@ -575,7 +575,7 @@ function TodoMail({
   }
 
   return (
-    <p className="mt-1 flex flex-wrap items-center gap-2 pl-0.5 text-[12px]">
+    <p className="mt-1 flex flex-wrap items-center gap-2 pl-0.5 text-small">
       <Select
         aria-label="Email this to-do is about"
         defaultValue=""
@@ -595,7 +595,7 @@ function TodoMail({
       <button
         type="button"
         onClick={() => setPicking(false)}
-        className="text-ink-faint underline underline-offset-2 hover:text-ink"
+        className="text-ink-muted underline underline-offset-2 hover:text-ink"
       >
         Cancel
       </button>
@@ -611,7 +611,7 @@ function TodoMail({
  */
 const VERDICT_STYLE: Record<MatchVerdict, { dot: string; label: string; text: string }> = {
   strong: { dot: 'bg-status-offer', label: 'Strong', text: 'text-status-offer' },
-  partial: { dot: 'bg-accent-orange', label: 'Partial', text: 'text-accent-orange' },
+  partial: { dot: 'bg-caution-fill', label: 'Partial', text: 'text-caution' },
   gap: { dot: 'bg-status-rejected', label: 'Gap', text: 'text-status-rejected' },
 };
 
@@ -657,7 +657,7 @@ function Posting({
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-card border border-border bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-[13px] font-semibold text-ink">Requirement map</h3>
+          <h3 className="text-ui font-semibold text-ink">Requirement map</h3>
           {requirements.length > 0 && (
             <Button
               type="button"
@@ -683,34 +683,34 @@ function Posting({
             </Button>
           )}
         </div>
-        <p className="mt-0.5 text-[12px] text-ink-muted">
+        <p className="mt-0.5 text-small text-ink-muted">
           {matches
             ? 'Your best evidence beside each line. A gap is the useful answer — it is the hour you do not spend.'
             : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'}
         </p>
 
         {matches && requirementMatchesAt && !stale && (
-          <p className="mt-1 text-[12px] text-ink-faint">
+          <p className="mt-1 text-small text-ink-muted">
             Matched {formatDateTime(requirementMatchesAt, timezone)}.
           </p>
         )}
         {stale && (
-          <p className="mt-1 text-[12px] text-accent-orange">
+          <p className="mt-1 text-small text-caution">
             The description or your bank has changed since this was matched.
           </p>
         )}
         {bankSize === 0 && (
-          <p className="mt-1 text-[12px] text-ink-faint">
+          <p className="mt-1 text-small text-ink-muted">
             Your evidence bank is empty, so there is nothing to match against.{' '}
             <Link href="/jobs/settings" className="underline underline-offset-2 hover:text-ink">
               Fill it in Settings.
             </Link>
           </p>
         )}
-        {matchError && <p className="mt-1 text-[12px] text-status-rejected">{matchError}</p>}
+        {matchError && <p className="mt-1 text-small text-status-rejected">{matchError}</p>}
 
         {requirements.length === 0 ? (
-          <p className="mt-3 text-[13px] text-ink-faint">
+          <p className="mt-3 text-ui text-ink-muted">
             No description saved yet, so there is nothing to map.
           </p>
         ) : (
@@ -720,7 +720,7 @@ function Posting({
               if (items.length === 0) return null;
               return (
                 <div key={group.kind}>
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                  <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
                     {group.label}
                   </h4>
                   <ul className="mt-1 space-y-1">
@@ -728,7 +728,7 @@ function Posting({
                       const match = verdictFor.get(item.text);
                       const style = match ? VERDICT_STYLE[match.verdict] : null;
                       return (
-                        <li key={`${group.kind}-${index}`} className="flex gap-2 text-[13px] text-ink">
+                        <li key={`${group.kind}-${index}`} className="flex gap-2 text-ui text-ink">
                           <span
                             className={cn(
                               'mt-1.5 size-1.5 shrink-0 rounded-full',
@@ -739,7 +739,7 @@ function Posting({
                           <span className="min-w-0">
                             {item.text}
                             {match && style && (
-                              <span className="block text-[12px] text-ink-muted">
+                              <span className="block text-small text-ink-muted">
                                 <span className={cn('font-medium', style.text)}>{style.label}</span>
                                 {' — '}
                                 {match.why}
@@ -823,8 +823,8 @@ function ShareCaseCard({
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h3 className="text-[13px] font-semibold text-ink">Share the map</h3>
-      <p className="mt-0.5 text-[12px] leading-relaxed text-ink-muted">
+      <h3 className="text-ui font-semibold text-ink">Share the map</h3>
+      <p className="mt-0.5 text-small leading-relaxed text-ink-muted">
         A private link showing this role&rsquo;s requirements with your evidence beside each one. It
         is a work sample and a cover letter in one. Gaps are never on it, and the link expires.
       </p>
@@ -842,11 +842,11 @@ function ShareCaseCard({
 
       {url && (
         <div className="mt-3 rounded-lg bg-canvas p-2">
-          <p className="break-all font-mono text-[11px] text-ink">{url}</p>
+          <p className="break-all font-mono text-micro text-ink">{url}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="text-[12px] text-brand hover:underline"
+              className="text-small text-accent hover:underline"
               onClick={() => {
                 navigator.clipboard.writeText(url);
                 setCopied(true);
@@ -855,7 +855,7 @@ function ShareCaseCard({
               {copied ? 'Copied' : 'Copy link'}
             </button>
             {liveExpiry && (
-              <span className="text-[11px] text-ink-faint">
+              <span className="text-micro text-ink-muted">
                 Expires {formatDate(liveExpiry, timezone)}
               </span>
             )}
@@ -890,7 +890,7 @@ function ShareCaseCard({
         {liveSlug && (
           <button
             type="button"
-            className="text-[12px] text-ink-faint hover:text-status-rejected"
+            className="text-small text-ink-muted hover:text-status-rejected"
             onClick={() => {
               setError(null);
               startTransition(async () => {
@@ -909,11 +909,11 @@ function ShareCaseCard({
           </button>
         )}
 
-        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
 
       {liveSlug && (
-        <p className="mt-1.5 text-[11px] text-ink-faint">
+        <p className="mt-1.5 text-micro text-ink-muted">
           Re-issuing gives a new link and breaks the old one, which is how you take a shared page
           back.
         </p>
@@ -988,44 +988,44 @@ function RoleDetailsCard({
     return (
       <section className="rounded-card border border-border bg-surface p-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[13px] font-semibold text-ink">Details</h3>
+          <h3 className="text-ui font-semibold text-ink">Details</h3>
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-ink-faint hover:text-ink"
+            className="text-ink-muted hover:text-ink"
             title="Edit posting details"
           >
             <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
           </button>
         </div>
-        <dl className="mt-2 space-y-1.5 text-[13px]">
+        <dl className="mt-2 space-y-1.5 text-ui">
           <div className="flex items-baseline gap-2">
-            <dt className="w-24 shrink-0 text-ink-faint">Posting link</dt>
+            <dt className="w-24 shrink-0 text-ink-muted">Posting link</dt>
             <dd className="min-w-0 flex-1 truncate">
               {jdUrl ? (
                 <a
                   href={jdUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-brand underline underline-offset-2"
+                  className="text-accent underline underline-offset-2"
                 >
                   {jdUrl}
                 </a>
               ) : (
-                <span className="text-ink-faint">—</span>
+                <span className="text-ink-muted">—</span>
               )}
             </dd>
           </div>
           <div className="flex items-baseline gap-2">
-            <dt className="w-24 shrink-0 text-ink-faint">ATS job id</dt>
-            <dd className="text-ink">{atsJobId ?? <span className="text-ink-faint">—</span>}</dd>
+            <dt className="w-24 shrink-0 text-ink-muted">ATS job id</dt>
+            <dd className="text-ink">{atsJobId ?? <span className="text-ink-muted">—</span>}</dd>
           </div>
           <div className="flex items-baseline gap-2">
-            <dt className="w-24 shrink-0 text-ink-faint">Compensation</dt>
+            <dt className="w-24 shrink-0 text-ink-muted">Compensation</dt>
             <dd className="text-ink">
-              {compBand ?? <span className="text-ink-faint">—</span>}
+              {compBand ?? <span className="text-ink-muted">—</span>}
               {compBand && compSource && (
-                <span className="ml-1.5 text-[12px] text-ink-faint">from the {compSource}</span>
+                <span className="ml-1.5 text-small text-ink-muted">from the {compSource}</span>
               )}
             </dd>
           </div>
@@ -1036,7 +1036,7 @@ function RoleDetailsCard({
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      <h3 className="text-[13px] font-semibold text-ink">Details</h3>
+      <h3 className="text-ui font-semibold text-ink">Details</h3>
       <div className="mt-2 space-y-2">
         <div>
           <Label htmlFor={`jdurl-${roleId}`}>Posting link</Label>
@@ -1077,7 +1077,7 @@ function RoleDetailsCard({
           </div>
         </div>
       </div>
-      {error && <p className="mt-2 text-[13px] text-status-rejected">{error}</p>}
+      {error && <p className="mt-2 text-ui text-status-rejected">{error}</p>}
       <div className="mt-3 flex gap-2">
         <Button type="button" size="sm" disabled={pending} onClick={save}>
           {pending ? 'Saving…' : 'Save'}
@@ -1145,7 +1145,7 @@ function JobDescriptionCard({
   return (
     <section className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-ink">Job description</h3>
+        <h3 className="text-ui font-semibold text-ink">Job description</h3>
         {!editing && (
           <div className="flex items-center gap-1">
             {!jdText && (
@@ -1177,7 +1177,7 @@ function JobDescriptionCard({
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Paste the full posting here."
           />
-          {error && <p className="mt-2 text-[13px] text-status-rejected">{error}</p>}
+          {error && <p className="mt-2 text-ui text-status-rejected">{error}</p>}
           <div className="mt-2 flex gap-2">
             <Button type="button" size="sm" disabled={pending} onClick={save}>
               {pending ? 'Saving…' : 'Save'}
@@ -1194,11 +1194,11 @@ function JobDescriptionCard({
           </div>
         </div>
       ) : jdText ? (
-        <pre className="mt-2 max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-ink-muted">
+        <pre className="mt-2 max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-ui leading-relaxed text-ink-muted">
           {jdText}
         </pre>
       ) : (
-        <p className="mt-3 text-[13px] text-ink-faint">
+        <p className="mt-3 text-ui text-ink-muted">
           Nothing saved. Add the description to build the requirement map and fill in the comp
           band automatically.
         </p>
@@ -1209,7 +1209,7 @@ function JobDescriptionCard({
           thing is how a panel stops being read. */}
       {!editing && lookup && (
         <div className="mt-3 border-t border-border pt-3">
-          <p className={cn('text-[12px]', lookup.ok ? 'text-ink-muted' : 'text-ink-faint')}>
+          <p className={cn('text-small', lookup.ok ? 'text-ink-muted' : 'text-ink-muted')}>
             {lookup.message}
           </p>
           {/* The ambiguous case is the one worth spending pixels on: the board
@@ -1218,7 +1218,7 @@ function JobDescriptionCard({
           {lookup.candidates && lookup.candidates.length > 0 && (
             <ul className="mt-2 space-y-1">
               {lookup.candidates.map((candidate) => (
-                <li key={`${candidate.title}-${candidate.url ?? ''}`} className="text-[12px]">
+                <li key={`${candidate.title}-${candidate.url ?? ''}`} className="text-small">
                   {candidate.url ? (
                     <a
                       href={candidate.url}
@@ -1243,7 +1243,7 @@ function JobDescriptionCard({
           on its own asks you for nothing and explains nothing. Hidden while
           editing, where the box you are typing in is the answer. */}
       {!editing && !lookup && jdLookupNote && (
-        <p className="mt-3 border-t border-border pt-3 text-[12px] text-ink-faint">
+        <p className="mt-3 border-t border-border pt-3 text-small text-ink-muted">
           {jdLookupNote}
         </p>
       )}
@@ -1259,8 +1259,8 @@ function Answers({ answers, applicationId, bankSize }: PanelProps) {
   return (
     <div className="space-y-4">
       <section className="rounded-card border border-border bg-surface p-4">
-        <h3 className="text-[13px] font-semibold text-ink">Add the application questions</h3>
-        <p className="mt-0.5 text-[12px] text-ink-muted">
+        <h3 className="text-ui font-semibold text-ink">Add the application questions</h3>
+        <p className="mt-0.5 text-small text-ink-muted">
           Use the bookmarklet on the application page, or paste them here — one per line, or
           numbered. Both work; the paste box always works.
         </p>
@@ -1286,12 +1286,12 @@ function Answers({ answers, applicationId, bankSize }: PanelProps) {
           >
             Add questions
           </Button>
-          {message && <span className="text-[12px] text-ink-muted">{message}</span>}
+          {message && <span className="text-small text-ink-muted">{message}</span>}
         </div>
       </section>
 
       {answers.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
           No questions captured for this application yet.
         </p>
       ) : (
@@ -1331,8 +1331,8 @@ function AnswerCard({
     <section className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[13px] font-medium text-ink">{answer.questionText}</p>
-          <p className="mt-0.5 text-[11px] text-ink-faint">
+          <p className="text-ui font-medium text-ink">{answer.questionText}</p>
+          <p className="mt-0.5 text-micro text-ink-muted">
             {answer.questionKind}
             {answer.timesSeen > 1 && ` · asked ${answer.timesSeen} times`}
           </p>
@@ -1343,7 +1343,7 @@ function AnswerCard({
       </div>
 
       {usingCanonical && (
-        <p className="mt-2 rounded bg-brand-tint px-2 py-1 text-[12px] text-brand">
+        <p className="mt-2 rounded bg-accent-tint px-2 py-1 text-small text-accent">
           Filled from your default answer for this question. Edit it if this one needs tailoring.
         </p>
       )}
@@ -1354,11 +1354,11 @@ function AnswerCard({
         live only in the session that generated it.
       */}
       {!draft && answer.unsupportedClaims.length > 0 && (
-        <div className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5">
-          <p className="text-[12px] font-medium text-ink">
+        <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
+          <p className="text-small font-medium text-ink">
             This answer states things your bank does not carry:
           </p>
-          <ul className="mt-0.5 list-disc pl-4 text-[12px] text-ink">
+          <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
             {answer.unsupportedClaims.map((claim) => (
               <li key={claim}>{claim}</li>
             ))}
@@ -1445,24 +1445,24 @@ function AnswerCard({
         >
           {drafting ? 'Drafting…' : 'Draft from my evidence'}
         </Button>
-        {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
-        {draftError && <span className="text-[12px] text-status-rejected">{draftError}</span>}
+        {saved && <span className="text-small text-ink-muted">{saved}</span>}
+        {draftError && <span className="text-small text-status-rejected">{draftError}</span>}
       </div>
 
       {draft && (
         <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h4 className="text-[12px] font-medium text-ink">A draft, from your own stories</h4>
-            <span className="text-[11px] text-ink-faint">
+            <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
+            <span className="text-micro text-ink-muted">
               Nothing is saved until you insert it and save.
             </span>
           </div>
 
-          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
+          <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">
             {draft.text}
           </p>
 
-          <p className="mt-2 text-[11px] text-ink-faint">
+          <p className="mt-2 text-micro text-ink-muted">
             Draws on{' '}
             {draft.evidenceItemIds.length === 1
               ? 'one item'
@@ -1471,23 +1471,23 @@ function AnswerCard({
           </p>
 
           {draft.unsupportedClaims.length > 0 && (
-            <div className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5">
-              <p className="text-[12px] font-medium text-ink">
+            <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
+              <p className="text-small font-medium text-ink">
                 Not grounded in anything you wrote:
               </p>
-              <ul className="mt-0.5 list-disc pl-4 text-[12px] text-ink">
+              <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
                 {draft.unsupportedClaims.map((claim) => (
                   <li key={claim}>{claim}</li>
                 ))}
               </ul>
-              <p className="mt-1 text-[11px] text-ink-muted">
+              <p className="mt-1 text-micro text-ink-muted">
                 Check each of these before it goes out, or cut it.
               </p>
             </div>
           )}
 
           {draft.bannedFound.length > 0 && (
-            <p className="mt-2 text-[12px] text-accent-orange">
+            <p className="mt-2 text-small text-caution">
               Uses {draft.bannedFound.map((phrase) => `“${phrase}”`).join(', ')} — on your banned
               list.
             </p>
@@ -1520,7 +1520,7 @@ function AnswerCard({
             </Button>
             <button
               type="button"
-              className="text-[12px] text-ink-faint hover:text-ink"
+              className="text-small text-ink-muted hover:text-ink"
               onClick={() => setDraft(null)}
             >
               Discard
@@ -1553,7 +1553,7 @@ function Interviews({
   return (
     <div className="space-y-3">
       {interviews.length === 0 ? (
-        <div className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+        <div className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
           {interviewMail.length > 0 ? (
             <>
               <p className="text-ink">
@@ -1625,13 +1625,13 @@ function Interviewers({
     });
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-small">
+      <span className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
         Interviewers
       </span>
 
       {interview.participants.length === 0 && !adding && (
-        <span className="text-ink-faint">Nobody named yet</span>
+        <span className="text-ink-muted">Nobody named yet</span>
       )}
 
       {interview.participants.map((participant) => (
@@ -1641,13 +1641,13 @@ function Interviewers({
         >
           <Link
             href={`/jobs/contacts/${participant.contactId}`}
-            className="text-ink underline underline-offset-2 hover:text-brand"
+            className="text-ink underline underline-offset-2 hover:text-accent"
             title={participant.title ?? undefined}
           >
             {participant.name}
           </Link>
           {participant.role !== 'interviewer' && (
-            <span className="text-ink-faint">{participant.role}</span>
+            <span className="text-ink-muted">{participant.role}</span>
           )}
           <button
             type="button"
@@ -1661,7 +1661,7 @@ function Interviewers({
                 }),
               )
             }
-            className="text-ink-faint hover:text-status-rejected"
+            className="text-ink-muted hover:text-status-rejected"
           >
             ×
           </button>
@@ -1674,7 +1674,7 @@ function Interviewers({
             aria-label="Add an interviewer"
             defaultValue=""
             disabled={pending}
-            className="h-7 w-56 py-0 text-[12px]"
+            className="h-7 w-56 py-0 text-small"
             onChange={(event) => event.target.value && add(event.target.value)}
           >
             <option value="">Pick a contact…</option>
@@ -1688,7 +1688,7 @@ function Interviewers({
           // No picker without anyone to pick: an interviewer has to exist as a
           // contact first, and inventing one from here would put a person on
           // the company with nothing but a name.
-          <span className="text-ink-faint">
+          <span className="text-ink-muted">
             No contacts at this company yet — add them on the company page first.
           </span>
         )
@@ -1696,7 +1696,7 @@ function Interviewers({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="text-ink-faint underline underline-offset-2 hover:text-brand"
+          className="text-ink-muted underline underline-offset-2 hover:text-accent"
         >
           Add
         </button>
@@ -1739,14 +1739,14 @@ function InterviewCard({
       ref={ref}
       className={cn(
         'rounded-card border border-border bg-surface p-4',
-        focused && 'ring-2 ring-brand ring-offset-2 ring-offset-canvas',
+        focused && 'ring-2 ring-accent ring-offset-2 ring-offset-canvas',
       )}
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-ink">
+        <h3 className="text-ui font-semibold text-ink">
           Round {interview.round} · {interview.kind.replace(/_/g, ' ')}
         </h3>
-        <span className="tabular text-[12px] text-ink-muted">
+        <span className="tabular text-small text-ink-muted">
           {formatDateTime(interview.scheduledAt, timezone)}
         </span>
       </header>
@@ -1754,7 +1754,7 @@ function InterviewCard({
       <Interviewers interview={interview} companyContacts={companyContacts} />
 
       {needsDebrief && (
-        <p className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5 text-[12px] text-ink">
+        <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
           Write the debrief tonight. One written three days later is worth very little.
         </p>
       )}
@@ -1770,10 +1770,10 @@ function InterviewCard({
 
       {interview.questionsAsked.length > 0 && (
         <div className="mt-3">
-          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+          <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
             Questions they asked
           </h4>
-          <ul className="mt-1 space-y-0.5 text-[13px] text-ink-muted">
+          <ul className="mt-1 space-y-0.5 text-ui text-ink-muted">
             {interview.questionsAsked.map((question, index) => (
               <li key={index}>· {question}</li>
             ))}
@@ -1795,23 +1795,23 @@ function InterviewCard({
         >
           Save notes
         </Button>
-        {saved && <span className="text-[12px] text-ink-muted">{saved}</span>}
+        {saved && <span className="text-small text-ink-muted">{saved}</span>}
         <span className="ml-auto">
           {confirmingDelete ? (
             <span className="flex items-center gap-2">
-              <span className="text-[12px] text-ink-muted">Delete this round?</span>
+              <span className="text-small text-ink-muted">Delete this round?</span>
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => startTransition(() => void deleteInterview(interview.id))}
-                className="press text-[12px] font-medium text-status-rejected"
+                className="press text-small font-medium text-status-rejected"
               >
                 Delete
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(false)}
-                className="text-[12px] text-ink-faint hover:text-ink"
+                className="text-small text-ink-muted hover:text-ink"
               >
                 Cancel
               </button>
@@ -1820,7 +1820,7 @@ function InterviewCard({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="text-[12px] text-ink-faint underline underline-offset-2 hover:text-status-rejected"
+              className="text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected"
             >
               Not a real round — remove it
             </button>
@@ -1849,7 +1849,7 @@ function CollapsibleField({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-faint"
+        className="flex w-full items-center gap-1 text-left text-micro font-semibold uppercase tracking-wider text-ink-muted"
       >
         <ChevronDown
           className={cn('size-3.5 shrink-0 transition-transform duration-150', !open && '-rotate-90')}
@@ -1910,7 +1910,7 @@ function AddInterview({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-[13px] text-ink-muted hover:border-brand hover:text-brand"
+        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
       >
         Add a round
       </button>
@@ -1920,7 +1920,7 @@ function AddInterview({
   return (
     <section className="rounded-card border border-border bg-surface p-4">
       {usedSeed && (
-        <p className="mb-3 text-[12px] text-ink-muted">
+        <p className="mb-3 text-small text-ink-muted">
           From{' '}
           <span className="text-ink">{usedSeed.fromSubject ?? 'the linked message'}</span> — that
           mail says when it is; put the time in below.
@@ -1977,10 +1977,10 @@ function AddInterview({
         >
           Add round {nextRound}
         </Button>
-        <button type="button" onClick={close} className="text-[12px] text-ink-faint hover:text-ink">
+        <button type="button" onClick={close} className="text-small text-ink-muted hover:text-ink">
           Cancel
         </button>
-        {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
     </section>
   );
@@ -2015,14 +2015,14 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
           >
             Add note
           </Button>
-          {error && <span className="text-[12px] text-status-rejected">{error}</span>}
+          {error && <span className="text-small text-status-rejected">{error}</span>}
         </div>
       </section>
 
       {notes.map((note) => (
         <article key={note.id} className="rounded-card border border-border bg-surface p-4">
-          <p className="whitespace-pre-wrap text-[13px] text-ink">{note.body}</p>
-          <p className="tabular mt-1.5 text-[11px] text-ink-faint">
+          <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+          <p className="tabular mt-1.5 text-micro text-ink-muted">
             {formatDate(note.createdAt, timezone)}
           </p>
         </article>
@@ -2044,14 +2044,14 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
       />
 
       {messages.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
           No mail has been linked to this pursuit yet.
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-[13px]">
+          <table className="w-full min-w-[720px] border-collapse text-ui">
             <thead>
-              <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+              <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
                 <th className="px-2 py-2 font-semibold">Received</th>
                 <th className="px-2 py-2 font-semibold">Subject</th>
                 <th className="px-2 py-2 font-semibold">Kind</th>
@@ -2077,7 +2077,7 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                   <td className="px-2 py-1.5 text-ink-muted">
                     {message.classification.replace(/_/g, ' ')}
                   </td>
-                  <td className="tabular px-2 py-1.5 text-ink-faint">
+                  <td className="tabular px-2 py-1.5 text-ink-muted">
                     {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
                     {message.linkConfidence !== null &&
                       ` (${Math.round(message.linkConfidence * 100)}%)`}
@@ -2093,7 +2093,7 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                               fromSubject: message.subject,
                             })
                           }
-                          className="whitespace-nowrap text-[12px] text-ink-muted underline underline-offset-2 hover:text-brand"
+                          className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 hover:text-accent"
                         >
                           Add interview
                         </button>
@@ -2105,7 +2105,7 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-[11px] text-ink-faint">
+          <p className="mt-2 text-micro text-ink-muted">
             Subjects and senders only. Message bodies are never stored.
           </p>
         </div>
@@ -2132,7 +2132,7 @@ function UnlinkMessage({
 
   return (
     <span className="inline-flex items-center gap-2">
-      {error && <span className="text-[11px] text-status-rejected">{error}</span>}
+      {error && <span className="text-micro text-status-rejected">{error}</span>}
       <button
         type="button"
         disabled={pending}
@@ -2149,7 +2149,7 @@ function UnlinkMessage({
             setError(result.error);
           });
         }}
-        className="whitespace-nowrap text-[12px] text-ink-faint underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
+        className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
       >
         {pending ? 'Unlinking…' : 'Unlink'}
       </button>
@@ -2196,11 +2196,11 @@ function MatchCandidates({
     <div className="space-y-2">
       {visible.length > 0 && (
         <details className="rounded-card border border-border bg-surface">
-          <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-ink">
+          <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink">
             Possible matches — {visible.length}
           </summary>
           <div className="space-y-2 border-t border-border p-3">
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-micro text-ink-muted">
               Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not a
               match and it will not be suggested again for this pursuit.
             </p>
@@ -2220,7 +2220,7 @@ function MatchCandidates({
         </details>
       )}
 
-      {error && <p className="text-[12px] text-status-rejected">{error}</p>}
+      {error && <p className="text-small text-status-rejected">{error}</p>}
 
       {searching ? (
         <AddOtherSearch applicationId={applicationId} timezone={timezone} onClose={() => setSearching(false)} />
@@ -2228,7 +2228,7 @@ function MatchCandidates({
         <button
           type="button"
           onClick={() => setSearching(true)}
-          className="text-[12px] font-medium text-brand underline underline-offset-2"
+          className="text-small font-medium text-accent underline underline-offset-2"
         >
           Add other
         </button>
@@ -2252,8 +2252,8 @@ function MatchRow({
   onLink: () => void;
 }) {
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-canvas px-2.5 py-2 text-[13px]">
-      <span className="tabular w-full text-[11px] text-ink-faint sm:w-32">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-canvas px-2.5 py-2 text-ui">
+      <span className="tabular w-full text-micro text-ink-muted sm:w-32">
         {formatDate(message.receivedAt, timezone)}
       </span>
       <span className="min-w-0 flex-1 truncate text-ink">
@@ -2263,14 +2263,14 @@ function MatchRow({
           (message.subject ?? '—')
         )}
       </span>
-      <span className="truncate text-[11px] text-ink-faint">{message.fromAddress ?? ''}</span>
+      <span className="truncate text-micro text-ink-muted">{message.fromAddress ?? ''}</span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {onDecline && (
           <button
             type="button"
             disabled={busy}
             onClick={onDecline}
-            className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
+            className="text-small text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
           >
             Not a match
           </button>
@@ -2279,7 +2279,7 @@ function MatchRow({
           type="button"
           disabled={busy}
           onClick={onLink}
-          className="press rounded-lg border border-border bg-surface px-2 py-0.5 text-[12px] font-medium text-ink disabled:opacity-50"
+          className="press rounded-lg border border-border bg-surface px-2 py-0.5 text-small font-medium text-ink disabled:opacity-50"
         >
           Link
         </button>
@@ -2339,16 +2339,16 @@ function AddOtherSearch({
         <button
           type="button"
           onClick={onClose}
-          className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+          className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
         >
           Close
         </button>
       </div>
-      {error && <p className="mt-2 text-[12px] text-status-rejected">{error}</p>}
+      {error && <p className="mt-2 text-small text-status-rejected">{error}</p>}
       {results !== null && (
         <ul className="mt-2 space-y-1.5">
           {results.length === 0 && (
-            <li className="text-[12px] text-ink-faint">No unlinked mail matches that.</li>
+            <li className="text-small text-ink-muted">No unlinked mail matches that.</li>
           )}
           {results
             .filter((message) => !linked.has(message.id))

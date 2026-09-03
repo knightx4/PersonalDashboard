@@ -171,7 +171,7 @@ export function InboxSyncButton({
         </Button>
       </div>
       {progress && (
-        <p className="text-xs text-ink-muted" aria-live="polite">
+        <p className="text-small text-ink-muted" aria-live="polite">
           {isIncremental ? 'Sync' : 'Import'} — seen {progress.messagesSeen} · parsed{' '}
           {progress.messagesParsed}
           {progress.messagesClassified
@@ -185,20 +185,20 @@ export function InboxSyncButton({
         </p>
       )}
       {message && (
-        <p className="text-xs text-ink-muted" aria-live="polite">
+        <p className="text-small text-ink-muted" aria-live="polite">
           {message}
         </p>
       )}
       {(error || progress?.error) && (
-        <p className="text-xs text-red-700">{error ?? progress?.error}</p>
+        <p className="text-small text-danger">{error ?? progress?.error}</p>
       )}
       {active && (
-        <p className="text-xs text-ink-faint">
+        <p className="text-small text-ink-muted">
           You can leave this page — work keeps going on the server. Come back anytime to check
           progress.
         </p>
       )}
-      <p className="text-xs text-ink-faint">
+      <p className="text-small text-ink-muted">
         Import skips messages it already saw. After the first import, Sync now (or the hourly
         cron) picks up new mail via Gmail history. Use{' '}
         <span className="text-ink-muted">Re-parse with latest parser</span> to refresh existing
@@ -211,7 +211,7 @@ export function InboxSyncButton({
         progress.messagesSeen === 0 &&
         !progress.error &&
         !error && (
-          <p className="text-xs text-amber-900">
+          <p className="text-small text-caution">
             No matching mail in the last ~180 days. Confirm order emails exist in this Gmail
             account (Primary/Updates), then try again. If you only shop from other addresses,
             connect that inbox instead.

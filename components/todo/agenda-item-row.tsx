@@ -24,7 +24,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           type="button"
           aria-label="Mark done"
           onClick={() => start(() => completeItem(item.source, item.key))}
-          className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-border-strong hover:border-brand"
+          className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-control hover:border-accent"
         >
           <Check className="size-3 opacity-0 group-hover:opacity-40" strokeWidth={3} aria-hidden />
         </button>
@@ -40,16 +40,16 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           {item.link ? (
             <a
               href={item.link.href}
-              className="text-[13px] font-medium text-ink hover:text-brand"
+              className="text-ui font-medium text-ink hover:text-accent"
             >
               {item.title}
             </a>
           ) : (
-            <span className="text-[13px] font-medium text-ink">{item.title}</span>
+            <span className="text-ui font-medium text-ink">{item.title}</span>
           )}
 
           {item.at && (
-            <span className="tabular text-[12px] text-ink-muted">
+            <span className="tabular text-small text-ink-muted">
               {new Intl.DateTimeFormat('en-GB', {
                 timeZone: timezone,
                 hour: '2-digit',
@@ -58,14 +58,14 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             </span>
           )}
 
-          {item.detail && <span className="text-[12px] text-ink-muted">{item.detail}</span>}
+          {item.detail && <span className="text-small text-ink-muted">{item.detail}</span>}
 
           {item.action && (
             <a
               href={item.action.href}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[12px] font-medium text-brand underline underline-offset-2"
+              className="inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
             >
               <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
               {item.action.label}
@@ -79,7 +79,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           type="button"
           title="Later"
           onClick={() => start(() => deferItem(item.source, item.key))}
-          className="press flex size-7 items-center justify-center rounded text-ink-faint hover:bg-canvas hover:text-ink"
+          className="press flex size-7 items-center justify-center rounded text-ink-muted hover:bg-canvas hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Later</span>
@@ -88,7 +88,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           type="button"
           title="Not this one"
           onClick={() => start(() => dismissItem(item.source, item.key))}
-          className="press flex size-7 items-center justify-center rounded text-ink-faint hover:bg-canvas hover:text-ink"
+          className="press flex size-7 items-center justify-center rounded text-ink-muted hover:bg-canvas hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Not this one</span>

@@ -31,11 +31,11 @@ export function EmptyState({
         className,
       )}
     >
-      <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-brand-tint">
-        <Icon className="size-6 text-brand" strokeWidth={1.75} />
+      <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-accent-tint">
+        <Icon className="size-6 text-accent" strokeWidth={1.75} />
       </div>
       <h3 className="text-base font-semibold text-ink">{title}</h3>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-ink-muted">{description}</p>
+      <p className="mt-1.5 max-w-sm text-body leading-relaxed text-ink-muted">{description}</p>
       {(action || secondaryAction) && (
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {action && (

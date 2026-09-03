@@ -61,9 +61,9 @@ export default async function AllTasksPage({
                 href={href}
                 aria-current={filter.id === status ? 'page' : undefined}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-150',
+                  'rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-150',
                   filter.id === status
-                    ? 'bg-brand-tint text-brand'
+                    ? 'bg-accent-tint text-accent'
                     : 'text-ink-muted hover:bg-canvas hover:text-ink',
                 )}
               >
@@ -83,13 +83,13 @@ export default async function AllTasksPage({
             defaultValue={search}
             placeholder="Search titles"
             aria-label="Search titles"
-            className="h-9 w-48 rounded-lg border border-border bg-surface px-3 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="h-9 w-48 rounded-lg border border-border bg-surface px-3 text-body text-ink placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
           />
         </form>
       </div>
 
       {tasks.length === 0 ? (
-        <p className="mt-6 rounded-card border border-border bg-surface p-8 text-center text-[13px] text-ink-muted">
+        <p className="mt-6 rounded-card border border-border bg-surface p-8 text-center text-ui text-ink-muted">
           {search ? `Nothing matching “${search}”.` : 'Nothing here.'}
         </p>
       ) : (

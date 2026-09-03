@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { TodoTopNav } from '@/components/todo/shell/top-nav';
+import { WorkspaceNav, type NavSection } from '@/components/shell/workspace-nav';
+import { loadModuleCounts } from '@/lib/modules/counts';
+import { switcherCounts } from '@/lib/modules/switcher-counts';
 
 /**
  * Shell for the todo workspace.
@@ -18,14 +20,33 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
   const user = await getUser();
   if (!user) redirect('/login');
 
-  const settings = await loadAccountSettings(user.id);
+  const [settings, counts] = await Promise.all([
+    loadAccountSettings(user.id),
+    loadModuleCounts(user.id),
+  ]);
+
+  /**
+   * Two sections and nothing else. "Agenda" is what needs you; "All" is
+   * everything, including what is finished. A todo module that grows a third
+   * section has probably grown a feature it did not need.
+   */
+  const sections: NavSection[] = [
+    { href: '/todo', label: 'Agenda', exact: true },
+    { href: '/todo/all', label: 'All' },
+  ];
 
   return (
-    <div className="min-h-full">
-      <TodoTopNav
+    <div className="min-h-full" data-workspace="todo">
+      <WorkspaceNav
+        module="todo"
+        sections={sections}
+        settingsHref="/todo/settings"
+        settingsLabel="Todo settings"
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        counts={switcherCounts(counts)}
+        theme={settings.theme}
       />
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
     </div>

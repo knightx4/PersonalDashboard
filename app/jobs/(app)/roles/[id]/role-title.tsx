@@ -30,7 +30,7 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
       >
         {shown}
         <Pencil
-          className="size-3.5 shrink-0 text-ink-faint opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           strokeWidth={1.75}
           aria-hidden
         />
@@ -75,9 +75,9 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
             setEditing(false);
           }
         }}
-        className="rounded-lg border border-border bg-surface px-2 py-1 font-display text-xl font-semibold tracking-tight text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+        className="rounded-lg border border-border bg-surface px-2 py-1 font-display text-xl font-normal tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
       />
-      {error && <span className="text-[12px] font-normal text-status-rejected">{error}</span>}
+      {error && <span className="text-small font-normal text-status-rejected">{error}</span>}
     </span>
   );
 }

@@ -140,7 +140,7 @@ export default async function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardBody className="flex flex-wrap items-center justify-between gap-3">
-            <p className="max-w-md text-sm text-ink-muted">
+            <p className="max-w-md text-body text-ink-muted">
               Shopping Manager is free. If it helps you spend less or lose less stuff, a tip
               keeps the lights on.
             </p>
@@ -167,7 +167,7 @@ export default async function SettingsPage({
               Account
             </CardTitle>
           </CardHeader>
-          <CardBody className="space-y-1 text-sm text-ink-muted">
+          <CardBody className="space-y-1 text-body text-ink-muted">
             <p>{settings.displayName ?? '—'}</p>
             <p>{user.email}</p>
             <p>
@@ -176,7 +176,7 @@ export default async function SettingsPage({
             <p className="pt-1">
               <Link
                 href="/account"
-                className="text-[13px] font-medium text-brand underline underline-offset-2"
+                className="text-ui font-medium text-accent underline underline-offset-2"
               >
                 Change these under Account
               </Link>
@@ -294,7 +294,7 @@ export default async function SettingsPage({
             </CardTitle>
           </CardHeader>
           <CardBody className="space-y-3">
-            <p className="text-sm text-ink-muted">
+            <p className="text-body text-ink-muted">
               We never store the contents of your email. Deleting your account revokes our
               access to your inbox and removes every row we hold. Arrives with build step 15.
             </p>

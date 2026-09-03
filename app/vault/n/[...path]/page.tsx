@@ -51,17 +51,17 @@ export default async function NotePage({ params }: { params: Promise<{ path: str
     <article className="mx-auto max-w-3xl">
       <Link
         href="/vault"
-        className="mb-4 inline-flex items-center gap-1 text-[13px] font-medium text-ink-muted hover:text-ink"
+        className="mb-4 inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
       >
         <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
         All notes
       </Link>
 
       <header className="mb-5">
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
+        <h1 className="font-display text-2xl font-normal tracking-tight text-ink">
           {note.title}
         </h1>
-        <p className="mt-1 text-[13px] text-ink-muted">
+        <p className="mt-1 text-ui text-ink-muted">
           {folder ? `${folder}/` : 'Vault root'}
           {note.gitUpdatedAt && <> · updated {formatDay(note.gitUpdatedAt)}</>}
         </p>

@@ -75,7 +75,7 @@ export function EditSavedForm({
         <Button type="submit" disabled={pending}>
           {pending ? 'Saving…' : 'Save changes'}
         </Button>
-        {state.message && <p className="text-sm text-positive">{state.message}</p>}
+        {state.message && <p className="text-body text-positive">{state.message}</p>}
       </div>
       <FieldError>{state.error}</FieldError>
     </form>
@@ -103,7 +103,7 @@ function StatusForm({
         {pending ? pendingLabel : label}
       </Button>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[13px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-ui text-positive">{state.message}</p>}
     </form>
   );
 }

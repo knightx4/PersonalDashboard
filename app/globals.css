@@ -1,74 +1,490 @@
 @import "tailwindcss";
 
-/**
- * Design tokens.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THEMES
  *
- * Light palette, neutral base, with pops of blue, orange and pink. The blue
- * anchor is #6A82FB. Green is reserved exclusively for savings and refunds and
- * must never be used for spend -- money leaving is not a positive event.
+ * A theme is a ground, an ink, a border and a mood. Everything else is
+ * derived. That constraint is deliberate: a theme small enough to read in one
+ * screen is a theme a person could plausibly write themselves, which is the
+ * whole point of having more than two.
  *
- * Every category carries a colour so the dashboard donut and the inventory
- * filters share one visual language; those live in the `categories` table and
- * are seeded in supabase/migrations/0005.
- */
+ * The raw values live here, per theme, as `--c-*` variables. The `@theme
+ * inline` block at the bottom maps them onto Tailwind's utility names, so
+ * `bg-surface` compiles to `background-color: var(--c-surface)` and follows
+ * whatever theme is active rather than baking one theme's hex into the CSS.
+ *
+ * See docs/design-language.html for the rules these values exist to serve.
+ * Every text/ground pair below is checked by scripts/check-contrast.ts, which
+ * fails CI on anything under threshold. Do not hand-tune a value without
+ * re-running it.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ---------------------------------------------------------------------------
+ * PAPER — the default light. Warm, printed, quiet.
+ * ------------------------------------------------------------------------- */
+:root,
+[data-theme='paper'] {
+  color-scheme: light;
+
+  --c-canvas: #faf9f6;
+  --c-surface: #ffffff;
+  --c-raised: #ffffff;
+  --c-sunken: #f2f0ea;
+  --c-border: #e8e5df;
+  --c-border-strong: #d5d1c8;
+
+  --c-ink: #1a1a18;
+  --c-ink-muted: #6b6b66;
+  /* Decoration only -- placeholders, disabled controls, redundant glyphs.
+   * Never anything the reader would miss. See the three-ink rule. */
+  --c-ink-ghost: #85857e;
+  --c-border-control: #85857e;
+
+  --c-accent-base: #4a5fd0;
+  --c-accent-hover: #3f52bd;
+  --c-accent-tint-base: #eef1fe;
+
+  --c-w-shopping: #be1250;
+  --c-w-shopping-tint: #fdecf2;
+  --c-w-jobs: #7c3aed;
+  --c-w-jobs-tint: #f4f0fe;
+  --c-w-todo: #036695;
+  --c-w-todo-tint: #e6f4fb;
+  --c-w-vault: #a21caf;
+  --c-w-vault-tint: #fcecfd;
+
+  --c-positive: #286f50;
+  --c-positive-tint: #ecf7f1;
+  --c-caution: #a34a07;
+  --c-caution-fill: #f0a63f;
+  --c-caution-tint: #fdf3e3;
+  --c-danger: #b91c1c;
+  --c-danger-tint: #fef2f2;
+
+  --c-status-lead: #6f6864;
+  --c-status-lead-tint: #f5f5f4;
+  --c-status-submitted: #2563eb;
+  --c-status-submitted-tint: #eff6ff;
+  --c-status-process: #b45309;
+  --c-status-process-tint: #fffbeb;
+  --c-status-final: #7c3aed;
+  --c-status-final-tint: #f5f3ff;
+  --c-status-offer: #047857;
+  --c-status-offer-tint: #ecfdf5;
+  --c-status-rejected: #b91c1c;
+  --c-status-rejected-tint: #fef2f2;
+  --c-status-ghosted: #78716c;
+  --c-status-ghosted-tint: #fafaf9;
+
+  --grain-opacity: 0.035;
+  --grain-blend: multiply;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------------------
+ * INK — the default dark. Near-black, low chroma in the neutrals, elevation
+ * by lightening rather than by shadow. The accent set is one arc through
+ * blue, violet and pink, so four differently-coloured workspaces still read
+ * as one product.
+ * ------------------------------------------------------------------------- */
+[data-theme='ink'] {
+  color-scheme: dark;
+
+  --c-canvas: #08090a;
+  --c-surface: #0f1011;
+  --c-raised: #191a1c;
+  --c-sunken: #050506;
+  --c-border: #212225;
+  --c-border-strong: #2e3033;
+
+  --c-ink: #f7f8f8;
+  --c-ink-muted: #9096a0;
+  --c-ink-ghost: #6a707a;
+  --c-border-control: #6a707a;
+
+  --c-accent-base: #8b9dff;
+  --c-accent-hover: #a3b2ff;
+  --c-accent-tint-base: #161a33;
+
+  --c-w-shopping: #ff8fa8;
+  --c-w-shopping-tint: #301620;
+  --c-w-jobs: #b39bff;
+  --c-w-jobs-tint: #1e1733;
+  --c-w-todo: #4cc2f1;
+  --c-w-todo-tint: #0b2130;
+  --c-w-vault: #e690f2;
+  --c-w-vault-tint: #2a1430;
+
+  --c-positive: #54d6a0;
+  --c-positive-tint: #0c2119;
+  --c-caution: #f0a63f;
+  --c-caution-fill: #f0a63f;
+  --c-caution-tint: #2a1c09;
+  --c-danger: #ff8b8b;
+  --c-danger-tint: #2b1315;
+
+  --c-status-lead: #a8a49b;
+  --c-status-lead-tint: #1c1c1e;
+  --c-status-submitted: #7ea9ff;
+  --c-status-submitted-tint: #111a2e;
+  --c-status-process: #e8a84e;
+  --c-status-process-tint: #2a1c09;
+  --c-status-final: #c0a5ff;
+  --c-status-final-tint: #1d1730;
+  --c-status-offer: #54d6a0;
+  --c-status-offer-tint: #0c2119;
+  --c-status-rejected: #ff8b8b;
+  --c-status-rejected-tint: #2b1315;
+  --c-status-ghosted: #8b9099;
+  --c-status-ghosted-tint: #141516;
+
+  --grain-opacity: 0.04;
+  --grain-blend: overlay;
+}
+
+/* ---------------------------------------------------------------------------
+ * RISO — printed light. Cream ground, high chroma, halftone rather than grain.
+ * ------------------------------------------------------------------------- */
+[data-theme='riso'] {
+  color-scheme: light;
+
+  --c-canvas: #f6f2e8;
+  --c-surface: #fffdf7;
+  --c-raised: #fffdf7;
+  --c-sunken: #ece6d7;
+  --c-border: #ded5c0;
+  --c-border-strong: #c9bda0;
+
+  --c-ink: #191713;
+  --c-ink-muted: #6a6353;
+  --c-ink-ghost: #817967;
+  --c-border-control: #817967;
+
+  --c-accent-base: #2438b8;
+  --c-accent-hover: #1c2d98;
+  --c-accent-tint-base: #e6e9fb;
+
+  --c-w-shopping: #b3104a;
+  --c-w-shopping-tint: #fbe3ec;
+  --c-w-jobs: #6b21d6;
+  --c-w-jobs-tint: #efe7fc;
+  --c-w-todo: #03607f;
+  --c-w-todo-tint: #e0f0f7;
+  --c-w-vault: #96128f;
+  --c-w-vault-tint: #fae5f7;
+
+  --c-positive: #1d6b48;
+  --c-positive-tint: #e0f0e6;
+  --c-caution: #9a4409;
+  --c-caution-fill: #ef8f33;
+  --c-caution-tint: #fbebdc;
+  --c-danger: #a3160f;
+  --c-danger-tint: #fbe3e0;
+
+  --c-status-lead: #5f584f;
+  --c-status-lead-tint: #efeade;
+  --c-status-submitted: #1642b5;
+  --c-status-submitted-tint: #e4e9f8;
+  --c-status-process: #9a4409;
+  --c-status-process-tint: #fbebdc;
+  --c-status-final: #6b21d6;
+  --c-status-final-tint: #efe7fc;
+  --c-status-offer: #1d6b48;
+  --c-status-offer-tint: #e0f0e6;
+  --c-status-rejected: #a3160f;
+  --c-status-rejected-tint: #fbe3e0;
+  --c-status-ghosted: #6d6555;
+  --c-status-ghosted-tint: #f2eee2;
+
+  --grain-opacity: 0.11;
+  --grain-blend: multiply;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='1.4' cy='1.4' r='1.1' fill='%23000'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------------------
+ * TERMINAL — cyan phosphor, monospace display. The joke, and it works.
+ * ------------------------------------------------------------------------- */
+[data-theme='terminal'] {
+  color-scheme: dark;
+
+  --c-canvas: #020c11;
+  --c-surface: #04141a;
+  --c-raised: #082028;
+  --c-sunken: #010609;
+  --c-border: #0e2c36;
+  --c-border-strong: #16404e;
+
+  --c-ink: #ccf2ff;
+  --c-ink-muted: #7fb8cc;
+  --c-ink-ghost: #4d7d8f;
+  --c-border-control: #4d7d8f;
+
+  --c-accent-base: #5fe3ff;
+  --c-accent-hover: #8eecff;
+  --c-accent-tint-base: #082b36;
+
+  --c-w-shopping: #ff9ec4;
+  --c-w-shopping-tint: #2e1522;
+  --c-w-jobs: #c0a5ff;
+  --c-w-jobs-tint: #1d1733;
+  --c-w-todo: #5fe3ff;
+  --c-w-todo-tint: #082b36;
+  --c-w-vault: #eb9ff5;
+  --c-w-vault-tint: #2a1430;
+
+  --c-positive: #54d6a0;
+  --c-positive-tint: #062018;
+  --c-caution: #f0c052;
+  --c-caution-fill: #f0c052;
+  --c-caution-tint: #241d08;
+  --c-danger: #ff9494;
+  --c-danger-tint: #2b1314;
+
+  --c-status-lead: #9aa8ad;
+  --c-status-lead-tint: #0d1a1e;
+  --c-status-submitted: #7fc4ff;
+  --c-status-submitted-tint: #08202e;
+  --c-status-process: #f0c052;
+  --c-status-process-tint: #241d08;
+  --c-status-final: #c0a5ff;
+  --c-status-final-tint: #1d1733;
+  --c-status-offer: #54d6a0;
+  --c-status-offer-tint: #062018;
+  --c-status-rejected: #ff9494;
+  --c-status-rejected-tint: #2b1314;
+  --c-status-ghosted: #7f9ba6;
+  --c-status-ghosted-tint: #06171d;
+
+  --grain-opacity: 0.06;
+  --grain-blend: overlay;
+  --font-display: var(--font-mono-stack);
+}
+
+/* ---------------------------------------------------------------------------
+ * DUSK — plum-cast dark, softer edges, the same accent arc shifted warm.
+ * ------------------------------------------------------------------------- */
+[data-theme='dusk'] {
+  color-scheme: dark;
+
+  --c-canvas: #110d1a;
+  --c-surface: #191426;
+  --c-raised: #241d35;
+  --c-sunken: #0b0812;
+  --c-border: #2c2440;
+  --c-border-strong: #3b3153;
+
+  --c-ink: #f2eefa;
+  --c-ink-muted: #a79fc0;
+  --c-ink-ghost: #7a7394;
+  --c-border-control: #7a7394;
+
+  --c-accent-base: #b9a5ff;
+  --c-accent-hover: #cbbcff;
+  --c-accent-tint-base: #241c3d;
+
+  --c-w-shopping: #ff9ab5;
+  --c-w-shopping-tint: #331a29;
+  --c-w-jobs: #c0a5ff;
+  --c-w-jobs-tint: #271e42;
+  --c-w-todo: #6fcdf0;
+  --c-w-todo-tint: #132833;
+  --c-w-vault: #ec9df3;
+  --c-w-vault-tint: #301a3a;
+
+  --c-positive: #68d9aa;
+  --c-positive-tint: #13291f;
+  --c-caution: #f2b25a;
+  --c-caution-fill: #f2b25a;
+  --c-caution-tint: #2e2210;
+  --c-danger: #ff96a4;
+  --c-danger-tint: #331a22;
+
+  --c-status-lead: #a89fb8;
+  --c-status-lead-tint: #211b2e;
+  --c-status-submitted: #8fb4ff;
+  --c-status-submitted-tint: #1a2038;
+  --c-status-process: #f2b25a;
+  --c-status-process-tint: #2e2210;
+  --c-status-final: #c0a5ff;
+  --c-status-final-tint: #271e42;
+  --c-status-offer: #68d9aa;
+  --c-status-offer-tint: #13291f;
+  --c-status-rejected: #ff96a4;
+  --c-status-rejected-tint: #331a22;
+  --c-status-ghosted: #9a91af;
+  --c-status-ghosted-tint: #1c1728;
+
+  --grain-opacity: 0.05;
+  --grain-blend: overlay;
+}
+
+/* An unset choice follows the system, and the system dark is Ink. Kept in sync
+ * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --c-canvas: #08090a;
+    --c-surface: #0f1011;
+    --c-raised: #191a1c;
+    --c-sunken: #050506;
+    --c-border: #212225;
+    --c-border-strong: #2e3033;
+
+    --c-ink: #f7f8f8;
+    --c-ink-muted: #9096a0;
+    --c-ink-ghost: #6a707a;
+    --c-border-control: #6a707a;
+
+    --c-accent-base: #8b9dff;
+    --c-accent-hover: #a3b2ff;
+    --c-accent-tint-base: #161a33;
+
+    --c-w-shopping: #ff8fa8;
+    --c-w-shopping-tint: #301620;
+    --c-w-jobs: #b39bff;
+    --c-w-jobs-tint: #1e1733;
+    --c-w-todo: #4cc2f1;
+    --c-w-todo-tint: #0b2130;
+    --c-w-vault: #e690f2;
+    --c-w-vault-tint: #2a1430;
+
+    --c-positive: #54d6a0;
+    --c-positive-tint: #0c2119;
+    --c-caution: #f0a63f;
+    --c-caution-fill: #f0a63f;
+    --c-caution-tint: #2a1c09;
+    --c-danger: #ff8b8b;
+    --c-danger-tint: #2b1315;
+
+    --c-status-lead: #a8a49b;
+    --c-status-lead-tint: #1c1c1e;
+    --c-status-submitted: #7ea9ff;
+    --c-status-submitted-tint: #111a2e;
+    --c-status-process: #e8a84e;
+    --c-status-process-tint: #2a1c09;
+    --c-status-final: #c0a5ff;
+    --c-status-final-tint: #1d1730;
+    --c-status-offer: #54d6a0;
+    --c-status-offer-tint: #0c2119;
+    --c-status-rejected: #ff8b8b;
+    --c-status-rejected-tint: #2b1315;
+    --c-status-ghosted: #8b9099;
+    --c-status-ghosted-tint: #141516;
+
+    --grain-opacity: 0.04;
+    --grain-blend: overlay;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WORKSPACE ACCENT
+ *
+ * The shell sets data-workspace once. Everything below it references
+ * `--color-accent` and never a workspace token directly, so a component works
+ * unchanged in every workspace and picks up the right hue for free.
+ *
+ * Chrome takes the accent; content keeps its own meaning. A pipeline card is
+ * still submitted-blue inside the violet workspace, because that colour is a
+ * claim about the pursuit rather than about where you are standing.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+[data-workspace='shopping'] { --c-accent: var(--c-w-shopping); --c-accent-tint: var(--c-w-shopping-tint); }
+[data-workspace='jobs']     { --c-accent: var(--c-w-jobs);     --c-accent-tint: var(--c-w-jobs-tint); }
+[data-workspace='todo']     { --c-accent: var(--c-w-todo);     --c-accent-tint: var(--c-w-todo-tint); }
+[data-workspace='vault']    { --c-accent: var(--c-w-vault);    --c-accent-tint: var(--c-w-vault-tint); }
+
+:root {
+  /* No workspace -- home, account, auth, legal. The app's own accent. */
+  --c-accent: var(--c-accent-base);
+  --c-accent-tint: var(--c-accent-tint-base);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TOKENS
+ *
+ * `@theme inline` maps the variables above onto Tailwind's utility names
+ * without inlining their values, which is what lets one class follow five
+ * themes. Anything that is not themeable -- the type scale, the radii, the
+ * easing -- is a plain value.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-sunken: var(--c-sunken);
+  --color-border: var(--c-border);
+  --color-border-strong: var(--c-border-strong);
+
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-ghost: var(--c-ink-ghost);
+  --color-control: var(--c-border-control);
+
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-tint: var(--c-accent-tint);
+
+  --color-w-shopping: var(--c-w-shopping);
+  --color-w-shopping-tint: var(--c-w-shopping-tint);
+  --color-w-jobs: var(--c-w-jobs);
+  --color-w-jobs-tint: var(--c-w-jobs-tint);
+  --color-w-todo: var(--c-w-todo);
+  --color-w-todo-tint: var(--c-w-todo-tint);
+  --color-w-vault: var(--c-w-vault);
+  --color-w-vault-tint: var(--c-w-vault-tint);
+
+  --color-positive: var(--c-positive);
+  --color-positive-tint: var(--c-positive-tint);
+  --color-caution: var(--c-caution);
+  --color-caution-fill: var(--c-caution-fill);
+  --color-caution-tint: var(--c-caution-tint);
+  --color-danger: var(--c-danger);
+  --color-danger-tint: var(--c-danger-tint);
+
+  --color-status-lead: var(--c-status-lead);
+  --color-status-lead-tint: var(--c-status-lead-tint);
+  --color-status-submitted: var(--c-status-submitted);
+  --color-status-submitted-tint: var(--c-status-submitted-tint);
+  --color-status-process: var(--c-status-process);
+  --color-status-process-tint: var(--c-status-process-tint);
+  --color-status-final: var(--c-status-final);
+  --color-status-final-tint: var(--c-status-final-tint);
+  --color-status-offer: var(--c-status-offer);
+  --color-status-offer-tint: var(--c-status-offer-tint);
+  --color-status-rejected: var(--c-status-rejected);
+  --color-status-rejected-tint: var(--c-status-rejected-tint);
+  --color-status-ghosted: var(--c-status-ghosted);
+  --color-status-ghosted-tint: var(--c-status-ghosted-tint);
+}
 
 @theme {
-  /* Surfaces */
-  --color-canvas: #fafaf8;
-  --color-surface: #ffffff;
-  --color-border: #e8e6e1;
-  --color-border-strong: #d6d3cc;
-
-  /* Text */
-  --color-ink: #1a1a18;
-  --color-ink-muted: #6b6b66;
-  --color-ink-faint: #9a9a94;
-
-  /* Primary */
-  --color-brand: #6a82fb;
-  --color-brand-hover: #5a72eb;
-  --color-brand-tint: #eef1fe;
-
-  /* Accents */
-  --color-accent-orange: #ff8a4c;
-  --color-accent-orange-tint: #fff1e8;
-  --color-accent-pink: #ff6b9d;
-  --color-accent-pink-tint: #ffeef4;
-
-  /* -------------------------------------------------------------------------
-   * Pipeline status, for the job search workspace. One colour per stage, used
-   * only for that stage. On that board a colour is a claim about where a
-   * pursuit stands, so they are fixed once, here, and used nowhere else for
-   * anything else.
-   *   gray    lead, drafting          -- yours to move, not theirs
-   *   blue    submitted, acknowledged -- sent, nothing has happened yet
-   *   amber   in process              -- a human is involved
-   *   purple  final round             -- nearly there
-   *   green   offer
-   *   red     rejected                -- muted, because it is information not alarm
-   *   faded   ghosted                 -- visibly drained, because it is a non-answer
-   * ---------------------------------------------------------------------- */
-  --color-status-lead: #78716c;
-  --color-status-lead-tint: #f5f5f4;
-  --color-status-submitted: #2563eb;
-  --color-status-submitted-tint: #eff6ff;
-  --color-status-process: #d97706;
-  --color-status-process-tint: #fffbeb;
-  --color-status-final: #7c3aed;
-  --color-status-final-tint: #f5f3ff;
-  --color-status-offer: #059669;
-  --color-status-offer-tint: #ecfdf5;
-  --color-status-rejected: #b91c1c;
-  --color-status-rejected-tint: #fef2f2;
-  --color-status-ghosted: #a8a29e;
-  --color-status-ghosted-tint: #fafaf9;
-
-  /* Savings and refunds only. Never spend. */
-  --color-positive: #3fa37a;
-  --color-positive-tint: #ecf7f2;
+  /* ---------------------------------------------------------------------------
+   * Type scale.
+   *
+   * Named steps only -- never `text-[Npx]`. The ambiguity this removes: 13px
+   * and 14px were being used interchangeably for the same role in different
+   * files. `text-ui` is interface chrome; `text-body` is content.
+   * ------------------------------------------------------------------------- */
+  --text-micro: 11px;
+  --text-micro--line-height: 1.45;
+  --text-small: 12px;
+  --text-small--line-height: 1.5;
+  --text-ui: 13px;
+  --text-ui--line-height: 1.5;
+  --text-body: 14px;
+  --text-body--line-height: 1.55;
+  --text-lead: 15px;
+  --text-lead--line-height: 1.5;
+  --text-title: 20px;
+  --text-title--line-height: 1.25;
+  --text-figure: 32px;
+  --text-figure--line-height: 1.05;
+  --text-figure-lg: 48px;
+  --text-figure-lg--line-height: 1;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-instrument), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-mono-stack);
 
   --radius-card: 0.75rem;
 
@@ -77,18 +493,40 @@
 }
 
 :root {
-  color-scheme: light;
+  --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
 body {
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--c-canvas);
+  color: var(--c-ink);
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Anything in a column of money lines up. */
+/* ---------------------------------------------------------------------------
+ * The grain.
+ *
+ * One fixed layer over the whole viewport. It is the difference between a
+ * surface and a void, and it costs a single pseudo-element with an inline SVG
+ * -- no image request, no layout, no repaint.
+ *
+ * pointer-events: none is not optional. A full-viewport overlay that swallows
+ * clicks is a catastrophic and very hard-to-diagnose bug.
+ * ------------------------------------------------------------------------- */
+body::before {
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  background-image: var(--grain);
+  background-repeat: repeat;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+  content: "";
+  pointer-events: none;
+}
+
+/* Anything in a column of numbers lines up. */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
@@ -97,9 +535,9 @@ body {
 /* ---------------------------------------------------------------------------
  * Motion
  *
- * Subtle lift on card hover, 0.98 scale on press. All of it drops when the
- * user has asked for reduced motion -- no exceptions, including the dashboard
- * count-up.
+ * One duration, one easing, three utilities. All of it drops under
+ * prefers-reduced-motion -- no exceptions, including the dashboard count-up.
+ * Any new animation is added to that block in the same commit.
  * ------------------------------------------------------------------------- */
 
 @utility lift {
@@ -110,7 +548,7 @@ body {
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px -6px rgb(26 26 24 / 0.13);
+    box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.18);
   }
 }
 
@@ -140,7 +578,7 @@ body {
 @utility skeleton {
   position: relative;
   overflow: hidden;
-  background-color: var(--color-border);
+  background-color: var(--c-border);
   border-radius: 0.375rem;
 
   &::after {
@@ -149,13 +587,19 @@ body {
     transform: translateX(-100%);
     background-image: linear-gradient(
       90deg,
-      rgb(255 255 255 / 0),
-      rgb(255 255 255 / 0.6),
-      rgb(255 255 255 / 0)
+      transparent,
+      color-mix(in srgb, var(--c-surface) 65%, transparent),
+      transparent
     );
     animation: shimmer 1.6s infinite;
     content: "";
   }
+}
+
+/* The right edge of a horizontally scrollable region, so the scroll is
+ * discoverable. A silently scrollable table is a table with hidden columns. */
+@utility scroll-fade-x {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -187,7 +631,7 @@ body {
 
 /* Visible focus for keyboard users, invisible for mouse users. */
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--c-accent);
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
@@ -204,7 +648,7 @@ body {
  * document, and applying them to the app's own interface would be wrong.
  * ------------------------------------------------------------------------ */
 .vault-prose {
-  color: var(--color-ink);
+  color: var(--c-ink);
   font-size: 15px;
   line-height: 1.7;
   /* Around 70 characters, which is where long lines stop being readable. */
@@ -234,7 +678,7 @@ body {
 .vault-prose > :first-child { margin-top: 0; }
 
 .vault-prose a {
-  color: var(--color-brand);
+  color: var(--c-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -255,22 +699,22 @@ body {
 }
 
 .vault-prose blockquote {
-  border-left: 3px solid var(--color-border-strong);
-  color: var(--color-ink-muted);
+  border-left: 3px solid var(--c-border-strong);
+  color: var(--c-ink-muted);
   padding-left: 1em;
 }
 
 .vault-prose code {
-  background: var(--color-canvas);
-  border: 1px solid var(--color-border);
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
   border-radius: 0.25rem;
   font-size: 0.9em;
   padding: 0.1em 0.35em;
 }
 
 .vault-prose pre {
-  background: var(--color-canvas);
-  border: 1px solid var(--color-border);
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
   border-radius: 0.5rem;
   overflow-x: auto;
   padding: 0.9em 1em;
@@ -293,18 +737,18 @@ body {
 
 .vault-prose th,
 .vault-prose td {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--c-border);
   padding: 0.4em 0.7em;
   text-align: left;
 }
 
 .vault-prose th {
-  background: var(--color-canvas);
+  background: var(--c-sunken);
   font-weight: 600;
 }
 
 .vault-prose hr {
   border: 0;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--c-border);
   margin: 2em 0;
 }

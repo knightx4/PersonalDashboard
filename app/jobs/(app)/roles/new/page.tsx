@@ -1,5 +1,5 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { RoleForm } from './role-form';
 
 export const metadata = { title: 'Add a role' };

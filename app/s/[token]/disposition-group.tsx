@@ -26,20 +26,20 @@ const CHOICES: Array<{ id: Choice; label: string; tint: string; active: string }
   {
     id: 'keep',
     label: 'Keep',
-    tint: 'hover:border-brand hover:text-brand',
-    active: 'border-brand bg-brand-tint text-brand',
+    tint: 'hover:border-accent hover:text-accent',
+    active: 'border-accent bg-accent-tint text-accent',
   },
   {
     id: 'sell',
     label: 'Sell',
-    tint: 'hover:border-accent-orange hover:text-accent-orange',
-    active: 'border-accent-orange bg-accent-orange-tint text-accent-orange',
+    tint: 'hover:border-caution hover:text-caution',
+    active: 'border-caution bg-caution-tint text-caution',
   },
   {
     id: 'giveaway',
     label: 'Give away',
-    tint: 'hover:border-accent-pink hover:text-accent-pink',
-    active: 'border-accent-pink bg-accent-pink-tint text-accent-pink',
+    tint: 'hover:border-w-shopping hover:text-w-shopping',
+    active: 'border-w-shopping bg-w-shopping-tint text-w-shopping',
   },
 ];
 
@@ -149,26 +149,26 @@ export function DispositionGroup({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={group.imageUrl} alt="" className="size-full object-cover" />
           ) : (
-            <div className="flex size-full items-center justify-center text-ink-faint">
+            <div className="flex size-full items-center justify-center text-ink-muted">
               <Package className="size-5" aria-hidden />
             </div>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-ink">
+          <p className="text-body font-medium text-ink">
             {group.name}
-            {quantity > 1 && <span className="ml-1.5 text-ink-faint">× {quantity}</span>}
+            {quantity > 1 && <span className="ml-1.5 text-ink-muted">× {quantity}</span>}
           </p>
           {/* Empty when the price is unknown: nothing at all, never $0.00. */}
           {priceLabel && (
-            <p className="mt-0.5 text-[13px] text-ink-muted">
+            <p className="mt-0.5 text-ui text-ink-muted">
               {priceLabel}
-              {quantity > 1 && <span className="text-ink-faint"> each</span>}
+              {quantity > 1 && <span className="text-ink-muted"> each</span>}
             </p>
           )}
           {quantity > 1 && (
-            <p className="mt-0.5 text-[12px] text-ink-faint">
+            <p className="mt-0.5 text-small text-ink-muted">
               {undecided === 0 ? 'All decided' : `${undecided} still to decide`}
             </p>
           )}
@@ -186,7 +186,7 @@ export function DispositionGroup({
                   onClick={() => toggle(choice.id)}
                   aria-pressed={counts[choice.id] === 1}
                   className={cn(
-                    'press h-9 rounded-lg border px-3 text-[13px] font-medium transition-colors duration-150',
+                    'press h-9 rounded-lg border px-3 text-ui font-medium transition-colors duration-150',
                     counts[choice.id] === 1
                       ? choice.active
                       : cn('border-border bg-surface text-ink-muted', choice.tint),
@@ -206,7 +206,7 @@ export function DispositionGroup({
                     counts[choice.id] > 0 ? choice.active : 'border-border text-ink-muted',
                   )}
                 >
-                  <span className="pl-1 text-[13px] font-medium">{choice.label}</span>
+                  <span className="pl-1 text-ui font-medium">{choice.label}</span>
                   <span className="flex items-center gap-1">
                     <button
                       type="button"
@@ -217,7 +217,7 @@ export function DispositionGroup({
                     >
                       <Minus className="size-3.5" aria-hidden />
                     </button>
-                    <span className="w-4 text-center text-sm tabular-nums">
+                    <span className="w-4 text-center text-body tabular-nums">
                       {counts[choice.id]}
                     </span>
                     <button
@@ -237,7 +237,7 @@ export function DispositionGroup({
         </div>
       )}
 
-      {error && <p className="mt-2 text-[13px] text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-ui text-danger">{error}</p>}
     </li>
   );
 }

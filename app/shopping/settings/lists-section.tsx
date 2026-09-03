@@ -33,17 +33,17 @@ export function ListsSection({ lists }: { lists: SettingsList[] }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Lists are personal trackers — gifts to wrap, things to return, a trip packing set —
         not taxonomy like categories. Filter inventory by a list anytime.
       </p>
 
       <div>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
           Your lists
         </h3>
         {lists.length === 0 && !creating ? (
-          <p className="text-sm text-ink-faint">None yet — create one below.</p>
+          <p className="text-body text-ink-muted">None yet — create one below.</p>
         ) : lists.length > 0 ? (
           <ul className="divide-y divide-border rounded-lg border border-border">
             {lists.map((list) => (
@@ -84,7 +84,7 @@ export function ListsSection({ lists }: { lists: SettingsList[] }) {
             New list
           </Button>
           {createState.message && (
-            <p className="text-sm text-positive">{createState.message}</p>
+            <p className="text-body text-positive">{createState.message}</p>
           )}
         </div>
       )}
@@ -117,9 +117,9 @@ function ListRow({ list }: { list: SettingsList }) {
         </Button>
       </form>
       <div className="flex items-center gap-2">
-        {renameState.error && <p className="text-[12px] text-red-600">{renameState.error}</p>}
+        {renameState.error && <p className="text-small text-danger">{renameState.error}</p>}
         {renameState.message && (
-          <p className="text-[12px] text-positive">{renameState.message}</p>
+          <p className="text-small text-positive">{renameState.message}</p>
         )}
         <form action={deleteItemList}>
           <input type="hidden" name="id" value={list.id} />

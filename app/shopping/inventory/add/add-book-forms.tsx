@@ -41,8 +41,8 @@ export function AddBookManualForm({
     >
       {compact && (
         <div>
-          <p className="text-sm font-medium text-ink">Add it by hand</p>
-          <p className="text-[13px] text-ink-muted">
+          <p className="text-body font-medium text-ink">Add it by hand</p>
+          <p className="text-ui text-ink-muted">
             {isbn
               ? 'We keep the scanned ISBN, so buyback and eBay quotes still work.'
               : 'No catalog record needed.'}
@@ -95,7 +95,7 @@ export function AddBookManualForm({
       </Button>
       <FieldError>{state.error}</FieldError>
       {state.message && (
-        <p className="text-sm text-brand">
+        <p className="text-body text-accent">
           {state.message}{' '}
           {state.savedIds?.[0] && (
             <Link className="underline" href={`/shopping/inventory/${state.savedIds[0]}`}>
@@ -130,28 +130,28 @@ function BookCard({
           className="h-28 w-20 shrink-0 rounded-md object-cover bg-canvas"
         />
       ) : (
-        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md bg-canvas text-xs text-ink-faint">
+        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md bg-canvas text-small text-ink-muted">
           No cover
         </div>
       )}
       <div className="min-w-0 flex-1">
         <p className="font-medium text-ink">{book.title}</p>
         {book.authors.length > 0 && (
-          <p className="text-sm text-ink-muted">{book.authors.join(', ')}</p>
+          <p className="text-body text-ink-muted">{book.authors.join(', ')}</p>
         )}
-        <p className="mt-1 text-[13px] text-ink-faint">
+        <p className="mt-1 text-ui text-ink-muted">
           {[book.publisher, book.publishedYear, book.edition].filter(Boolean).join(' · ')}
         </p>
         {book.isbn13 && (
-          <p className="mt-1 font-mono text-[12px] text-ink-muted">ISBN {book.isbn13}</p>
+          <p className="mt-1 font-mono text-small text-ink-muted">ISBN {book.isbn13}</p>
         )}
         {book.needsConfirmation ? (
-          <p className="mt-2 text-[13px] text-accent-orange">
+          <p className="mt-2 text-ui text-caution">
             {book.confirmationReason ??
               'More than one printing matches — confirm the edition before selling.'}
           </p>
         ) : (
-          <p className="mt-2 text-[13px] text-brand">
+          <p className="mt-2 text-ui text-accent">
             Exact ISBN match — edition is settled, sell-ready.
           </p>
         )}
@@ -179,7 +179,7 @@ function BookCard({
 
         {book.needsConfirmation && (book.alternates?.length ?? 0) > 0 && (
           <div className="mt-3">
-            <p className="text-[13px] font-medium text-ink">Other printings we found</p>
+            <p className="text-ui font-medium text-ink">Other printings we found</p>
             <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
               {book.alternates?.map((candidate, index) => (
                 <li
@@ -187,8 +187,8 @@ function BookCard({
                   className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-[13px] text-ink">{candidate.title}</p>
-                    <p className="text-[12px] text-ink-muted">
+                    <p className="text-ui text-ink">{candidate.title}</p>
+                    <p className="text-small text-ink-muted">
                       {[
                         candidate.authors.join(', ') || null,
                         candidate.edition,
@@ -199,7 +199,7 @@ function BookCard({
                         .join(' · ') || 'Edition not stated by the catalog'}
                     </p>
                     {candidate.isbn13 && (
-                      <p className="font-mono text-[12px] text-ink-faint">
+                      <p className="font-mono text-small text-ink-muted">
                         ISBN {candidate.isbn13}
                       </p>
                     )}
@@ -288,7 +288,7 @@ export function AddBookSearchForm() {
       </form>
       <FieldError>{searchState.error ?? saveState.error}</FieldError>
       {saveState.message && (
-        <p className="text-sm text-brand">
+        <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
             <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>
@@ -348,7 +348,7 @@ export function AddBookPasteForm() {
         </Button>
       </form>
       <FieldError>{previewState.error ?? saveState.error}</FieldError>
-      {saveState.message && <p className="text-sm text-brand">{saveState.message}</p>}
+      {saveState.message && <p className="text-body text-accent">{saveState.message}</p>}
 
       {previewState.results && previewState.results.length > 0 && (
         <form action={saveAction} className="flex flex-col gap-3">
@@ -357,9 +357,9 @@ export function AddBookPasteForm() {
             {previewState.results.map((row, resultIndex) => {
               if (!row.book) {
                 return (
-                  <li key={resultIndex} className="px-4 py-3 text-sm text-ink-muted">
+                  <li key={resultIndex} className="px-4 py-3 text-body text-ink-muted">
                     <span className="font-medium text-ink">{row.raw}</span>
-                    <span className="ml-2 text-red-600">{row.error ?? 'No match'}</span>
+                    <span className="ml-2 text-danger">{row.error ?? 'No match'}</span>
                   </li>
                 );
               }
@@ -375,12 +375,12 @@ export function AddBookPasteForm() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-ink">{row.book.title}</p>
-                    <p className="text-[13px] text-ink-muted">
+                    <p className="text-ui text-ink-muted">
                       {row.book.authors.join(', ')}
                       {row.book.isbn13 ? ` · ${row.book.isbn13}` : ''}
                     </p>
                     {row.book.needsConfirmation && (
-                      <p className="mt-1 text-[12px] text-ink-faint">
+                      <p className="mt-1 text-small text-ink-muted">
                         {[
                           row.book.edition,
                           row.book.publisher,
@@ -394,7 +394,7 @@ export function AddBookPasteForm() {
                       </p>
                     )}
                     {row.book.needsConfirmation && (
-                      <label className="mt-2 flex items-center gap-2 text-[13px] text-accent-orange">
+                      <label className="mt-2 flex items-center gap-2 text-ui text-caution">
                         <input
                           type="checkbox"
                           name="confirmed"

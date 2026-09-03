@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';
@@ -93,7 +93,7 @@ export default async function CompanyDetailPage({
             .join(' · ') || 'No detail recorded yet.'
         }
         actions={
-          <div className="flex items-center gap-2 text-[13px]">
+          <div className="flex items-center gap-2 text-ui">
             <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-muted">
               {company.priority as string}
             </span>
@@ -112,7 +112,7 @@ export default async function CompanyDetailPage({
       />
 
       <section className="mb-6 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-[13px] font-semibold text-ink">Roles here, across cycles</h2>
+        <h2 className="text-ui font-semibold text-ink">Roles here, across cycles</h2>
         <RolesList
           companyId={company.id as string}
           timezone={timezone}

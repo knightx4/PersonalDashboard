@@ -32,15 +32,15 @@ export function AgendaSettingsForm({
   return (
     <form action={action} className="space-y-6">
       <section className="rounded-card border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold text-ink">Sources</h2>
-        <p className="mt-0.5 text-[13px] text-ink-muted">
+        <h2 className="text-body font-semibold text-ink">Sources</h2>
+        <p className="mt-0.5 text-ui text-ink-muted">
           Things the other workspaces already know about, shown on your agenda. They are read
           where they live and never copied here — finishing one writes to the workspace that owns
           it.
         </p>
 
         {sources.length === 0 ? (
-          <p className="mt-4 text-[13px] text-ink-faint">
+          <p className="mt-4 text-ui text-ink-muted">
             No sources yet. The agenda shows the tasks you typed.
           </p>
         ) : (
@@ -58,11 +58,11 @@ export function AgendaSettingsForm({
                   name={`source:${source.id}`}
                   defaultChecked={enabled.includes(source.id)}
                   disabled={!source.available}
-                  className="mt-1 size-4 accent-[var(--color-brand)]"
+                  className="mt-1 size-4 accent-[var(--color-accent)]"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-medium text-ink">{source.label}</span>
-                  <span className="block text-[12px] leading-snug text-ink-muted">
+                  <span className="block text-ui font-medium text-ink">{source.label}</span>
+                  <span className="block text-small leading-snug text-ink-muted">
                     {source.available
                       ? source.description
                       : 'That workspace is switched off under Account.'}
@@ -75,8 +75,8 @@ export function AgendaSettingsForm({
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold text-ink">Horizon</h2>
-        <p className="mt-0.5 text-[13px] text-ink-muted">
+        <h2 className="text-body font-semibold text-ink">Horizon</h2>
+        <p className="mt-0.5 text-ui text-ink-muted">
           How far ahead counts as &ldquo;this week&rdquo;. Anything further out waits under Later.
         </p>
         <div className="mt-3 flex items-end gap-2">
@@ -95,8 +95,8 @@ export function AgendaSettingsForm({
         </div>
       </section>
 
-      {state.error && <p className="text-[13px] text-status-rejected">{state.error}</p>}
-      {state.message && <p className="text-[13px] text-status-offer">{state.message}</p>}
+      {state.error && <p className="text-ui text-status-rejected">{state.error}</p>}
+      {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
 
       <Button type="submit">Save</Button>
     </form>

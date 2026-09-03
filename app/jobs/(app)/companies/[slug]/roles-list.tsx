@@ -45,7 +45,7 @@ export function RolesList({
   const [pending, startTransition] = useTransition();
 
   if (roles.length === 0) {
-    return <p className="mt-2 text-[13px] text-ink-faint">No roles saved at this company yet.</p>;
+    return <p className="mt-2 text-ui text-ink-muted">No roles saved at this company yet.</p>;
   }
 
   function toggle(roleId: string) {
@@ -82,7 +82,7 @@ export function RolesList({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-micro text-ink-muted">
           {picking
             ? 'Pick the roles that are really the same posting, then which one to keep.'
             : null}
@@ -91,7 +91,7 @@ export function RolesList({
           <button
             type="button"
             onClick={() => (picking ? cancel() : setPicking(true))}
-            className="ml-auto flex shrink-0 items-center gap-1 text-[12px] font-medium text-ink-muted underline underline-offset-2 hover:text-ink"
+            className="ml-auto flex shrink-0 items-center gap-1 text-small font-medium text-ink-muted underline underline-offset-2 hover:text-ink"
           >
             <GitMerge className="size-3.5" strokeWidth={1.75} aria-hidden />
             {picking ? 'Cancel' : 'Merge roles'}
@@ -113,11 +113,11 @@ export function RolesList({
             )}
             <Link
               href={`/jobs/roles/${role.id}`}
-              className="flex-1 text-[13px] font-medium text-ink hover:text-brand"
+              className="flex-1 text-ui font-medium text-ink hover:text-accent"
             >
               {role.title}
             </Link>
-            {role.location && <span className="text-[12px] text-ink-faint">{role.location}</span>}
+            {role.location && <span className="text-small text-ink-muted">{role.location}</span>}
             {role.applications.map((application) => (
               <span key={application.id} className="flex items-center gap-1.5">
                 <StatusPicker
@@ -125,7 +125,7 @@ export function RolesList({
                   status={application.status}
                   submittedAt={application.submittedAt}
                 />
-                <span className="tabular text-[11px] text-ink-faint">
+                <span className="tabular text-micro text-ink-muted">
                   {application.attempt > 1 && `#${application.attempt} `}
                   {formatDate(application.submittedAt, timezone)}
                 </span>
@@ -137,14 +137,14 @@ export function RolesList({
 
       {picking && selected.size >= 2 && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas p-2.5">
-          <label className="text-[12px] text-ink-muted" htmlFor="merge-survivor">
+          <label className="text-small text-ink-muted" htmlFor="merge-survivor">
             Keep
           </label>
           <select
             id="merge-survivor"
             value={survivorId ?? ''}
             onChange={(event) => setSurvivorId(event.target.value)}
-            className="rounded-lg border border-border bg-surface px-2 py-1 text-[13px] text-ink"
+            className="rounded-lg border border-border bg-surface px-2 py-1 text-ui text-ink"
           >
             {[...selected].map((id) => {
               const role = roles.find((r) => r.id === id);
@@ -156,7 +156,7 @@ export function RolesList({
               );
             })}
           </select>
-          <span className="text-[12px] text-ink-faint">
+          <span className="text-small text-ink-muted">
             {selected.size - 1} other{selected.size - 1 === 1 ? '' : 's'} fold into it as one
             application.
           </span>
@@ -166,7 +166,7 @@ export function RolesList({
         </div>
       )}
 
-      {error && <p className="mt-2 text-[12px] text-status-rejected">{error}</p>}
+      {error && <p className="mt-2 text-small text-status-rejected">{error}</p>}
     </div>
   );
 }

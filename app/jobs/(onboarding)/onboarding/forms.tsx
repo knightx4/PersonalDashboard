@@ -49,7 +49,7 @@ export function WelcomeForm() {
       </div>
 
       {state.error && (
-        <p role="alert" className="text-[13px] text-status-rejected">
+        <p role="alert" className="text-ui text-status-rejected">
           {state.error}
         </p>
       )}
@@ -72,7 +72,7 @@ export function CompaniesForm() {
           rows={6}
           placeholder={'Ramp, ramp.com\nLinear, linear.app\nFigma'}
         />
-        <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+        <p className="mt-1 text-micro leading-relaxed text-ink-muted">
           One per line, name first, email domain after a comma if you know it. The domain is what
           lets a recruiter&rsquo;s personal work address find its company, and it is the list the
           direct-outreach inbox query searches.
@@ -80,7 +80,7 @@ export function CompaniesForm() {
       </div>
 
       {state.error && (
-        <p role="alert" className="text-[13px] text-status-rejected">
+        <p role="alert" className="text-ui text-status-rejected">
           {state.error}
         </p>
       )}

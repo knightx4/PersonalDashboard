@@ -45,9 +45,9 @@ export default async function TodoSettingsPage() {
         horizonDays={agenda.horizonDays}
       />
 
-      <p className="mt-6 text-[13px] text-ink-muted">
+      <p className="mt-6 text-ui text-ink-muted">
         Your timezone decides what counts as today here, and it holds across every workspace.{' '}
-        <Link href="/account" className="font-medium text-brand underline underline-offset-2">
+        <Link href="/account" className="font-medium text-accent underline underline-offset-2">
           Account settings
         </Link>
       </p>

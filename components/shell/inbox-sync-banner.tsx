@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { Banner } from '@/components/ui/banner';
 
 type JobProgress = {
   jobId: string;
@@ -59,15 +60,20 @@ export function InboxSyncBanner({
   const label = job.type === 'incremental' ? 'Checking Gmail for new orders' : 'Importing from Gmail';
 
   return (
-    <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-950">
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2">
-        <p>
+    <div className="mx-auto max-w-[1400px] px-4 pt-4 sm:px-6">
+      {/* info, not good: a sync running is something the app is doing, not
+          money coming back. The tones are claims, not decoration. */}
+      <Banner tone="info" className="flex-wrap items-center justify-between">
+        <span className="tabular">
           {label} in the background — seen {job.messagesSeen}, parsed {job.messagesParsed}.
-        </p>
-        <Link href="/shopping/settings#inboxes" className="underline underline-offset-2">
+        </span>{' '}
+        <Link
+          href="/shopping/settings#inboxes"
+          className="font-medium text-accent underline underline-offset-2"
+        >
           View progress
         </Link>
-      </div>
+      </Banner>
     </div>
   );
 }
