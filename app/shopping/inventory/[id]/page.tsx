@@ -16,10 +16,10 @@ import {
   searchProviderFor,
   templateFor,
 } from '@/lib/inventory/attributes';
-import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
+import { DisposeForm, ItemListsForm, ReturnForm } from './item-forms';
 import { BookDetailsPanel } from './book-details-panel';
 import { GameDetailsPanel } from './game-details-panel';
-import { ItemAttributesPanel } from './attributes-panel';
+import { ItemDetailsPanel } from './item-details-panel';
 import { ItemSellPanel } from './sell-panel';
 
 export const metadata = { title: 'Inventory item' };
@@ -338,8 +338,10 @@ export default async function InventoryItemPage({
         />
       )}
 
-      <ItemAttributesPanel
+      <ItemDetailsPanel
         itemId={item.id}
+        item={{ name: item.name, variant: item.variant, notes: item.notes }}
+        categories={categories ?? []}
         categoryId={item.category_id}
         categoryName={category?.name ?? null}
         template={attributeTemplate}
@@ -365,20 +367,6 @@ export default async function InventoryItemPage({
           <PlanReturnButton itemId={item.id} planned={Boolean(item.return_planned)} />
         </section>
       )}
-
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Edit</h2>
-        <EditInventoryForm
-          item={{
-            id: item.id,
-            name: item.name,
-            variant: item.variant,
-            categoryId: item.category_id,
-            notes: item.notes,
-          }}
-          categories={categories ?? []}
-        />
-      </section>
 
       <ItemListsForm
         itemId={item.id}

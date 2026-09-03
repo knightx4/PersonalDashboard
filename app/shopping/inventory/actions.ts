@@ -11,6 +11,12 @@ import {
 import { parseDollarsToCents, todayInTimezone } from '@/lib/money';
 import { slugifyCategoryName } from '@/lib/categories/slugify';
 import { enrichItemDisplay } from '@/lib/inventory/enrich-display';
+import {
+  attributeKey,
+  mergeAttributeValues,
+  parseAttributeValues,
+  type AttributeValues,
+} from '@/lib/inventory/attributes';
 import { pickListGradient } from '@/lib/lists/gradients';
 
 export interface ActionState {
@@ -23,6 +29,14 @@ async function userTimezone(supabase: Awaited<ReturnType<typeof createClient>>, 
   return data?.timezone ?? 'UTC';
 }
 
+/**
+ * Save everything on the item's Details panel in one submit.
+ *
+ * Name, variant, category and notes used to be a separate "Edit" card from the
+ * per-category detail fields, which meant two panels, two Save buttons, and no
+ * way to tell which one you had actually pressed. They are one form now, so
+ * this action carries the `attr_<key>` fields as well as the core columns.
+ */
 export async function updateInventoryItem(
   _prev: ActionState,
   formData: FormData,
@@ -73,6 +87,33 @@ export async function updateInventoryItem(
     categoryName,
   });
 
+  const submitted: AttributeValues = {};
+  for (const [name, value] of formData.entries()) {
+    if (!name.startsWith('attr_') || typeof value !== 'string') continue;
+    const key = attributeKey(name.slice('attr_'.length));
+    if (key) submitted[key] = value;
+  }
+
+  // One-off field added from the item itself, without touching the template:
+  // the shape of a single object is not always the shape of its category.
+  const newLabel = String(formData.get('new_label') ?? '').trim();
+  const newValue = String(formData.get('new_value') ?? '').trim();
+  if (newLabel && newValue) {
+    const key = attributeKey(newLabel);
+    if (!key) return { error: 'That field name has no letters or numbers in it.' };
+    submitted[key] = newValue;
+  }
+
+  // Read-then-merge rather than replace: a value whose field the template has
+  // since dropped is still the item's, and is not in this submit to defend it.
+  const { data: current } = await supabase
+    .from('inventory_items')
+    .select('attributes')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!current) return { error: 'That item could not be found.' };
+
   const { error } = await supabase
     .from('inventory_items')
     .update({
@@ -82,6 +123,7 @@ export async function updateInventoryItem(
       category_id: parsed.data.categoryId ?? null,
       notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
       search_tags: enriched.searchTags,
+      attributes: mergeAttributeValues(parseAttributeValues(current.attributes), submitted),
     })
     .eq('id', parsed.data.id)
     .eq('user_id', user.id);
