@@ -3,6 +3,8 @@ import {
   allocateLandedCost,
   computeOrderTotalCents,
   formatCentsAsDollarsInput,
+  formatMoney,
+  formatMoneyOrBlank,
   formatPercentChange,
   formatReconciliation,
   parseDollarsToCents,
@@ -503,5 +505,25 @@ describe('parseDollarsToCents', () => {
         discountCents: 200,
       }),
     ).toBe(11_100);
+  });
+});
+
+describe('formatMoneyOrBlank', () => {
+  it('formats a known price exactly as formatMoney does', () => {
+    expect(formatMoneyOrBlank(1250)).toBe(formatMoney(1250));
+  });
+
+  it('renders nothing for an unknown price, never zero', () => {
+    // The whole point: a game shown as worth $0.00 is a game she gives away.
+    expect(formatMoneyOrBlank(null)).toBe('');
+    expect(formatMoneyOrBlank(undefined)).toBe('');
+  });
+
+  it('still renders a real zero, which is a different claim', () => {
+    expect(formatMoneyOrBlank(0)).toBe('$0.00');
+  });
+
+  it('takes a placeholder when the layout needs one', () => {
+    expect(formatMoneyOrBlank(null, 'USD', { blank: '—' })).toBe('—');
   });
 });

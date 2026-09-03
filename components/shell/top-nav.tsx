@@ -26,6 +26,7 @@ const SECTIONS = [
   { href: '/shopping/sell', label: 'Sell' },
   { href: '/shopping/returns', label: 'Returns' },
   { href: '/shopping/saved', label: 'Saved' },
+  { href: '/shopping/share', label: 'Share' },
   { href: '/shopping/review', label: 'Review' },
 ] as const;
 

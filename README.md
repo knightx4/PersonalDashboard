@@ -35,7 +35,9 @@ timezone belongs to none of them, and no workspace owns any of those facts. See
 Build order steps 1–14 and books/sell assistant (16–18) are done. See
 [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next on the shopping
 side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
-next body of work.
+next body of work. [docs/SHARE-LINKS-SPEC.md](docs/SHARE-LINKS-SPEC.md) describes
+share links — a page a person with no account opens and fills in — which now
+carry a keep/sell/give-away form over the board game shelf.
 
 The fourth workspace — **Todo** — is built: build order steps 24–31, specified
 in [docs/TODO-SPEC.md](docs/TODO-SPEC.md). Reading `- [ ]` checkboxes out of
@@ -68,6 +70,7 @@ notes as something more structured than text.
 | Vault workspace (schema, git sync, viewer, connect UI) | done |
 | Account settings, one timezone for the whole account | done |
 | Todo workspace (schema, list, links, agenda sources) | done |
+| Share links (anonymous form, item families, disposition) | done |
 
 ## Getting started
 
@@ -170,6 +173,15 @@ These are enforced by tests and lint rules, not by convention.
   move because you flew to Lisbon; 14:30 must. Which also rules out indexing
   `coalesce(due_on, due_at::date)` — Postgres refuses it, because
   timestamptz → date is not immutable.
+- **A shared link is a window, never an engine.** The anonymous page reads
+  rows that already exist and does nothing else: no lookup, no enrichment, no
+  billed call, no job, no outbound HTTP. `share_page()` is declared `stable`
+  so Postgres will not let it write; an ESLint boundary keeps `lib/sell`, the
+  game and book providers, `lib/fx`, `lib/email`, `inngest` and the Anthropic
+  SDK out of `app/s/`, `app/api/s/` and `lib/share/read/`, and bans a bare
+  `fetch` there; and `tests/share-read.test.ts` renders the page with `fetch`
+  stubbed to throw. An unknown price renders blank, never `$0.00` — zero is a
+  claim, and a game shown as worth nothing is a game someone gives away.
 - **The vault sync never advances its cursor past work it did not do.** A
   cursor is a promise that everything up to a commit is mirrored, and a promise
   made early is a permanent gap — the next run only asks for what changed since

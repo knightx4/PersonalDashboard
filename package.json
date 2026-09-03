@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:reset": "./scripts/db-reset.sh",
     "check:ebay": "tsx scripts/check-ebay.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "share:add": "tsx scripts/share-add.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

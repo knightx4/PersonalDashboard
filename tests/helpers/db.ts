@@ -33,6 +33,21 @@ export async function asUser<T>(
   }) as Promise<T>;
 }
 
+/**
+ * Run a callback as `anon` -- no session, no JWT claims. This is the role a
+ * visitor with a share link actually has, and the only thing it may usefully
+ * reach is the two functions in 0041.
+ */
+export async function asAnon<T>(
+  fn: (tx: postgres.TransactionSql) => Promise<T>,
+): Promise<T> {
+  return sql.begin(async (tx) => {
+    await tx.unsafe(`set local role anon`);
+    await tx.unsafe(`set local search_path = public, extensions`);
+    return fn(tx);
+  }) as Promise<T>;
+}
+
 /** Create an auth.users row (and, via trigger, its profile). */
 export async function createUser(email: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`

@@ -40,6 +40,11 @@ const PUBLIC_PATHS = [
   // through one security definer function that checks both; see
   // supabase/migrations-job-search/0017_public_case_page.sql.
   '/jobs/p',
+  // The shared disposition form. Authorized by an unguessable token and read
+  // and written through two security definer functions that check it; see
+  // supabase/migrations/0042_share_rpcs.sql. Its writes are a server action,
+  // which POSTs back to this same path, so nothing else needs opening.
+  '/s',
 ];
 
 function isPublic(pathname: string): boolean {

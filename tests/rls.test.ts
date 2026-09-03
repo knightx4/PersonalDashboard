@@ -211,6 +211,56 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.order_item_tags = orderItemTag.id;
 
+  const [family] = await admin<{ id: string }[]>`
+    insert into item_families (user_id, name, slug)
+    values (${userId}, ${`${tag} monopoly`}, ${`${tag}-monopoly`})
+    returning id`;
+  ids.item_families = family.id;
+
+  const [familyMember] = await admin<{ id: string }[]>`
+    insert into inventory_item_families (inventory_item_id, family_id, role, confirmed_at)
+    values (${inventoryItem.id}, ${family.id}, 'base', now())
+    returning id`;
+  ids.inventory_item_families = familyMember.id;
+
+  const [inventoryTag] = await admin<{ id: string }[]>`
+    insert into inventory_item_tags (inventory_item_id, tag_id)
+    values (${inventoryItem.id}, ${itemTag.id})
+    returning id`;
+  ids.inventory_item_tags = inventoryTag.id;
+
+  const [share] = await admin<{ id: string }[]>`
+    insert into share_links (user_id, title, intro)
+    values (${userId}, ${`${tag} keep or sell`}, 'Pick what stays.')
+    returning id`;
+  ids.share_links = share.id;
+
+  const [shareToken] = await admin<{ id: string }[]>`
+    insert into share_link_tokens (share_link_id, token)
+    values (${share.id}, ${`${tag}-token-with-plenty-of-entropy-0001`})
+    returning id`;
+  ids.share_link_tokens = shareToken.id;
+
+  const [shareItem] = await admin<{ id: string }[]>`
+    insert into share_link_items (share_link_id, subject_id, group_key, family_key)
+    values (${share.id}, ${inventoryItem.id}, ${`game:bgg:${tag === 'alice' ? 13 : 822}`},
+            ${`${tag}-monopoly`})
+    returning id`;
+  ids.share_link_items = shareItem.id;
+
+  const [shareResponse] = await admin<{ id: string }[]>`
+    insert into share_link_responses (share_link_id, group_key, keep_qty, answered_by_token)
+    values (${share.id}, ${`game:bgg:${tag === 'alice' ? 13 : 822}`}, 1, ${shareToken.id})
+    returning id`;
+  ids.share_link_responses = shareResponse.id;
+
+  const [shareEvent] = await admin<{ id: string }[]>`
+    insert into share_link_events (share_link_id, token_id, kind, group_key)
+    values (${share.id}, ${shareToken.id}, 'responded',
+            ${`game:bgg:${tag === 'alice' ? 13 : 822}`})
+    returning id`;
+  ids.share_link_events = shareEvent.id;
+
   const [fxRate] = await admin<{ id: string }[]>`
     insert into fx_rates (rate_date, base_currency, quote_currency, rate, source)
     values (
