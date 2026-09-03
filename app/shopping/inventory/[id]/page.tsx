@@ -9,8 +9,10 @@ import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/shopping/returns/plan-return-button';
 import { displayVariant } from '@/lib/inventory/display';
 import { displayNameOf } from '@/lib/inventory/sort-group';
+import { loadItemSellQuote } from '@/lib/sell/item-quote';
 import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
 import { BookDetailsPanel } from './book-details-panel';
+import { ItemSellPanel } from './sell-panel';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -115,6 +117,13 @@ export default async function InventoryItemPage({
       hasReturnWindow = override.return_window_days != null;
     }
   }
+
+  // Only worth asking for something still owned, and it never spends a lookup:
+  // the price on screen is whatever is already cached.
+  const sellQuote =
+    item.status === 'owned'
+      ? await loadItemSellQuote({ supabase, userId: user.id, inventoryItemId: item.id })
+      : null;
 
   let returnDueCopy: string | null = null;
   if (item.status === 'owned' && order) {
@@ -267,6 +276,8 @@ export default async function InventoryItemPage({
           }}
         />
       )}
+
+      {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
 
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
