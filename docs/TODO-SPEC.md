@@ -20,7 +20,9 @@ in its own way:
 - **Shopping** has `orders.return_deadline`, derived by `sync_order_state()`
   from the delivery date and the merchant's window, and `saved_items.cooldown_until`.
 - **Vault** has whatever you wrote in Obsidian, including every `- [ ]` you have
-  ever left in a daily note.
+  ever left in a daily note. (Reading those is explicitly *not* in v1 — see
+  "Integration: vault notes". It is listed here because it is the reason the
+  agenda is built to take new sources without being rewritten.)
 
 None of those is wrong. Each is the right home for the fact it holds. What is
 missing is the question none of them can answer, because each can only see its
@@ -72,12 +74,45 @@ the difference between "Done" and "Later". This module generalises that table
 and nothing more.
 
 The cost is real and is accepted: **the merged list cannot be sorted or
-paginated by the database.** It is assembled in TypeScript from four queries.
+paginated by the database.** It is assembled in TypeScript from one query per
+enabled source.
 That is affordable because the agenda is bounded by a horizon rather than by a
 page size — a fortnight of obligations is tens of rows, not thousands — and it
 is made testable by keeping the merge a pure function (`lib/todo/agenda/merge.ts`),
 the same way `lib/vault/sync/plan.ts` keeps every decision in a sync away from
 the I/O that performs it.
+
+## Sources are plug-ins, and only one of them is on
+
+The module ships with your own tasks and nothing else. Every other source is a
+switch in `/todo`'s own settings, off until you turn it on.
+
+That is not caution for its own sake. Each source is a separate small module
+behind one interface — given a window of time and a user, return the
+obligations in it — registered in one list:
+
+```ts
+// lib/todo/agenda/sources.ts
+export interface AgendaSource {
+  id: 'job_reminders' | 'return_deadlines' | 'note_checkboxes';
+  label: string;
+  /** Everything this source has for the window. No I/O outside here. */
+  fetch(ctx: SourceContext, window: Window): Promise<AgendaItem[]>;
+  /** What "Later" and "Done" mean for this source's items. */
+  defer(ctx: SourceContext, item: AgendaItem, until: Date): Promise<void>;
+  complete?(ctx: SourceContext, item: AgendaItem): Promise<void>;
+}
+```
+
+The agenda page knows about the interface and the list. It does not know that
+Gmail, git or a return window exist. Adding a fifth source later — a calendar,
+a bank, whatever the account grows next — is one file and one entry, and it
+changes nothing about the page or the merge.
+
+The three sources named in the enum above are the ones this document has
+thought about. Two of them are cheap. The third is not, and the honest position
+on it is [further down](#integration-vault-notes): the mechanism is
+deliberately not chosen yet, and the source is not built in v1.
 
 ## Non-goals
 
@@ -99,22 +134,38 @@ Listing these because they will otherwise get invented.
 - **No natural-language date parsing in v1** ("next tuesday"). A date field is
   not the friction anyone actually complains about.
 - **No LLM anywhere in this module in v1.** Nothing here needs one.
+- **No reading of checkboxes out of notes in v1.** The source exists in the
+  registry as a name with nothing behind it, and the mechanism is deliberately
+  unchosen. See "Integration: vault notes".
+- **Turning a module off never deletes anything.** It is a display setting: the
+  workspace disappears from the switcher and its source stops appearing on the
+  agenda. Nothing is dropped, no link breaks, and turning it back on restores
+  exactly what was there.
 - **Not a replacement for `/jobs/today`.** See below; the duplication is
   deliberate and bounded.
 
-## The four sources, and who owns each
+## The sources, and who owns each
 
-| On the agenda | Owner | The app writes | Completing it |
-|---|---|---|---|
-| A todo you typed | `todo.tasks` | everything | writes `todo.tasks.status` |
-| A job reminder | `job_search.reminders` | nothing new | writes `completed_at` on the job row |
-| A return deadline | `public.orders` (derived) | nothing | dismissal only — the deadline is a fact, not a task |
-| A note checkbox | your vault | **nothing** | dismissal, or promotion into a task of your own |
+| On the agenda | Owner | The app writes | Finishing it | Deferring it |
+|---|---|---|---|---|
+| A todo you typed | `todo.tasks` | everything | `status` on the task | `snoozed_until` on the task |
+| A job reminder | `job_search.reminders` | nothing new | `completed_at` on the job row | `due_at` on the job row, moved forward |
+| A return deadline | `public.orders` (derived) | nothing | not possible -- it is a date, not a task | a row in `todo.dismissals` |
+| A note checkbox | your vault | **nothing, ever** | not possible | deferred entirely; see below |
 
 The second row is the one exception to "never write to another schema", and it
 is not really an exception: `/jobs/today` and `/todo` are two views of one row,
-there is no second copy, and marking a follow-up done from either place does the
-same single `update`. One writer, two windows onto it.
+there is no second copy, and both columns are ones the job side already owns and
+already reads. Deferring a reminder moves its due date, which is what deferring
+a reminder has always meant here — so the two pages agree without either of them
+knowing the other exists.
+
+The alternative was a `todo.dismissals` row for a snoozed reminder, and it was
+wrong in a way worth recording: finishing a reminder would have shown up on both
+pages, because that is one record, while deferring it would have shown up on
+only one, because that would have been two. Hiding something in one place and
+still seeing it in another is the kind of bug that makes a person stop trusting
+a page.
 
 ## Schema
 
@@ -143,7 +194,6 @@ Migrations live in `supabase/migrations-todo/`, applied last by
 
 ```sql
 create type todo.task_status as enum ('open', 'done', 'dropped');
-create type todo.task_source as enum ('manual', 'note');
 
 create table todo.tasks (
   id uuid primary key default gen_random_uuid(),
@@ -170,22 +220,16 @@ create table todo.tasks (
   -- The "Later" half, exactly as the dismissal tables use it.
   snoozed_until timestamptz,
 
-  source todo.task_source not null default 'manual',
-  -- Only for source = 'note': the checkbox this was promoted from, so the note
-  -- lane can suppress a line you have already taken responsibility for. See
-  -- "Checkbox identity" below.
-  source_key text,
-
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
   constraint tasks_title_ck check (title <> '' and length(title) <= 500),
   constraint tasks_one_due_ck check (num_nonnulls(due_on, due_at) <= 1),
+  -- The database stamps these, it does not merely check them. See below.
   constraint tasks_completed_ck check (
     (status = 'done') = (completed_at is not null)
     and (status = 'dropped') = (dropped_at is not null)
-  ),
-  constraint tasks_source_key_ck check ((source = 'note') = (source_key is not null))
+  )
 );
 
 -- Two indexes rather than one over `coalesce(due_on, due_at::date)`, which
@@ -198,14 +242,50 @@ create index tasks_user_due_on_idx on todo.tasks (user_id, due_on)
 create index tasks_user_due_at_idx on todo.tasks (user_id, due_at)
   where status = 'open' and due_at is not null;
 create index tasks_user_status_idx on todo.tasks (user_id, status, created_at desc);
--- Promotion is idempotent: promoting the same checkbox twice is one task.
-create unique index tasks_source_key on todo.tasks (user_id, source_key)
-  where source_key is not null;
 ```
+
+There is no `source` column and no key pointing at where a task came from. Both
+belong to promotion — copying a checkbox out of a note — which is not in v1, and
+a column carrying a deferred feature's shape is a guess about that feature made
+before it was designed. It is one migration when it is real.
 
 `status` is a real column and not derived, unlike order status. There is no
 `sync_task_state()` to own it, because nothing about a todo is computed from
 anything else — you said it was done, and that is the entire rule.
+
+**The timestamps are stamped by a trigger, not by the caller.** The check
+constraint above says a `done` row must have a `completed_at`; on its own that
+turns "mark this done" into an error every time a caller updates the status and
+forgets the timestamp, and one caller eventually will. So the database fills
+them in:
+
+```sql
+create or replace function todo.stamp_task_status()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.status is distinct from old.status then
+    new.completed_at := case when new.status = 'done'    then coalesce(new.completed_at, now()) end;
+    new.dropped_at   := case when new.status = 'dropped' then coalesce(new.dropped_at,   now()) end;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger tasks_stamp_status before update of status on todo.tasks
+  for each row execute function todo.stamp_task_status();
+```
+
+Reopening a finished task clears the timestamp rather than leaving a stale one,
+which is why the `case` has no `else` — a null is the correct value for "not
+finished", and the constraint then agrees with the status by construction. The
+constraint stays anyway: a trigger is a thing that can be dropped, and the rule
+it upholds should not disappear with it.
+
+`touch_updated_at` gets its own copy in this schema, as `obsidian` has its own
+copy, so nothing here depends on another schema's function surviving a
+refactor.
 
 ### `todo.task_links`
 
@@ -244,22 +324,109 @@ The "exactly one parent from N" shape is lifted straight from `job_search.notes`
 which takes one parent from five, and adding a seventh target later is one
 column and one edited check constraint.
 
-`relation` distinguishes *what this is about* from *where it came from*: a task
-promoted out of a note is `source` → that note, and may separately be `about`
-the role you were writing about. Both are useful and they are not the same edge.
+`relation` distinguishes *what this is about* from *where it came from*. Only
+`about` is used in v1; `source` is what a task copied out of a note will carry
+when promotion exists, and it is in the enum now because adding an enum value
+later is a migration and adding a use for one is not.
 
-**The one thing to watch.** These foreign keys make the todo migrations depend
-on the other three sets having been applied first. `db-reset.sh` already
-sequences the directories explicitly and `migrations-todo` goes on the end;
-a fresh Supabase project must be migrated in the same order, which
-[SETUP.md](SETUP.md) will say.
+#### A link must point at something you own
+
+**A foreign key is not an ownership check, and this is the one place in the
+module where getting that wrong would matter.** Postgres performs referential
+integrity checks bypassing row level security — that is documented behaviour and
+not a quirk — so a foreign key to `job_search.roles` is satisfied by *any* role
+in the table, including one belonging to another account. The policy on
+`task_links` only asks who owns the *task*. Nothing above stops a link from
+pointing across accounts.
+
+So the database checks it, rather than the app remembering to. This is the same
+defence `obsidian.notes` already runs, where a note's denormalised `user_id`
+must equal its connection's owner (`notes_owner_matches_connection`):
+
+```sql
+create or replace function todo.task_link_target_is_owned()
+returns trigger
+language plpgsql
+security definer
+set search_path = todo, job_search, obsidian, public
+as $$
+declare
+  owner uuid;
+  task_owner uuid;
+begin
+  select user_id into task_owner from todo.tasks where id = new.task_id;
+
+  select case
+    when new.application_id is not null then (select user_id from job_search.applications where id = new.application_id)
+    when new.role_id        is not null then (select user_id from job_search.roles        where id = new.role_id)
+    when new.company_id     is not null then (select user_id from job_search.companies    where id = new.company_id)
+    when new.contact_id     is not null then (select user_id from job_search.contacts     where id = new.contact_id)
+    when new.interview_id   is not null then (select user_id from job_search.interviews   where id = new.interview_id)
+    when new.note_id        is not null then (select user_id from obsidian.notes          where id = new.note_id)
+  end into owner;
+
+  if owner is null or task_owner is null or owner <> task_owner then
+    raise exception 'a task link must point at something the task''s owner owns';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger task_links_target_is_owned
+  before insert or update on todo.task_links
+  for each row execute function todo.task_link_target_is_owned();
+
+revoke all on function todo.task_link_target_is_owned() from public, anon, authenticated;
+```
+
+`security definer` because the function has to see rows the caller's policies
+would hide — which is exactly why it is written narrowly, revoked from every
+role that could call it directly, and pinned to a fixed `search_path`.
+
+It costs one extra lookup per link written, and links are written when you
+create or edit a task. That is not a hot path and it is not close to one.
+
+`tests/rls-todo.test.ts` asserts this directly: user A creating a link to user
+B's role must fail. A cross-user isolation test that only covers the tables with
+their own `user_id` column would pass while this hole was wide open, which is
+how it came to be written down as "not needed" in the first draft.
+
+#### Foreign keys across schemas: a decision, not an accident
+
+These keys tie `todo`, `job_search`, `obsidian` and `public` together at the
+database level. That is the point — a task about a role that survives the role
+being deleted is a dangling reference, and the database preventing that is worth
+more than any amount of application code trying to.
+
+The cost is one thing, and it is worth naming because the project used to be
+built the other way: `job_search` lived in its own repository, and
+`tests/coexistence.test.ts` still guards the property that the two halves keep
+to their own schemas. These keys mean the job side could no longer be lifted out
+into a separate database without dropping them first. That trade is accepted
+deliberately — this is one integrated app for one person, and integration is
+the entire reason the module exists.
+
+Two things follow from it:
+
+- Turning a module off is a **display** setting, not a database one. It hides a
+  workspace and stops its source appearing on the agenda. It deletes nothing,
+  breaks no link, and is reversible by turning it back on.
+- `tests/coexistence.test.ts` grows an assertion listing the cross-schema
+  foreign keys that are meant to exist. A new one appearing without a line in
+  that test is then a failure rather than a discovery.
+
+The practical consequence is ordering: the todo migrations run last, after the
+three schemas they point into. `scripts/db-reset.sh` already sequences the
+directories explicitly, and a fresh Supabase project must be migrated in the
+same order, which [SETUP.md](SETUP.md) will say.
 
 Every statement in this section was applied to a Postgres 16 before it was
-written down, including the constraint behaviour (a `done` with no
-`completed_at` is refused, a task with both a `due_on` and a `due_at` is
-refused, a second `about` link is refused) and the cross-schema cascade
-(deleting a role removes its link and leaves the task). The sketches are
-starting points for the migration, not the migration.
+written down, and the behaviour checked rather than assumed: marking a task done
+without supplying a timestamp is stamped rather than refused, reopening it
+clears the timestamp, a task with both a `due_on` and a `due_at` is refused, a
+second `about` link is refused, deleting a role removes its link and leaves the
+task, and a link to another account's role is refused by the trigger. The
+sketches are starting points for the migration, not the migration.
 
 ### `todo.dismissals`
 
@@ -267,7 +434,10 @@ The overlay, and the only thing this module stores about an obligation it does
 not own.
 
 ```sql
-create type todo.foreign_source as enum ('job_reminder', 'return_deadline', 'note_checkbox');
+-- One value in v1. It exists as an enum so that a second source is a new value
+-- rather than a migration that reshapes a table with rows in it -- the same
+-- reason obsidian.vault_provider has exactly one value.
+create type todo.foreign_source as enum ('return_deadline');
 
 create table todo.dismissals (
   id uuid primary key default gen_random_uuid(),
@@ -283,70 +453,18 @@ create table todo.dismissals (
 );
 ```
 
+Only return deadlines need this in v1. Job reminders do not, because deferring
+one moves its own `due_at` and both pages then agree without an overlay at all;
+note checkboxes do not, because that source is not built yet.
+
 **Why a text key here when links get real foreign keys.** Because links point at
 *rows* and dismissals point at *observations*. A return deadline is a column on
-an order, not a row; a note checkbox is a line in a file and is not a row
-anywhere at all. An observation has no id to borrow, so it gets a derived one.
+an order, not a row of its own, so there is no id to borrow and it gets a
+derived one: the order's uuid, which is the whole derivation for the only source
+that exists today.
 
-Key derivation, one line each and none of it clever:
-
-- `job_reminder` — the reminder's uuid. (A row, but it is dismissed rather than
-  completed when you mean "not this one, not now", and completion is a write on
-  the job side. Both paths exist.)
-- `return_deadline` — the order's uuid.
-- `note_checkbox` — see below.
-
-### Checkbox identity
-
-The hard one, because the thing being identified is a line of text that moves.
-
-```
-key = `${note_id}#${ordinal}:${sha256(normalized)[0..12]}`
-```
-
-`normalized` is the line with the `- [ ]` marker, leading whitespace and
-trailing whitespace stripped and internal whitespace collapsed. `ordinal` is the
-index among lines in that note with the *same* normalized text, so a note with
-three identical `- [ ] water the plants` lines yields three distinguishable
-tasks rather than one.
-
-The consequence, which is a feature: **editing the text of a checkbox retires
-the dismissal.** The key changes, the old dismissal no longer matches anything,
-and the task comes back. That is correct — you rewrote it, so it is a different
-task, and a rewrite is the most common way a person signals that something has
-changed. Moving a line within a note does *not* change its key, which is the
-common case and must not resurface anything.
-
-Line numbers were the obvious alternative and are wrong for exactly that reason:
-inserting a paragraph at the top of a daily note would resurrect every dismissed
-task below it.
-
-### The one change to another schema
-
-Finding notes with open checkboxes must not mean scanning every note body on
-every page load. One generated column on `obsidian.notes` and one partial index:
-
-```sql
-alter table obsidian.notes
-  add column has_open_tasks boolean
-  generated always as (body ~ '(?n)^[ \t]*[-*+] \[ \]') stored;
-
-create index notes_open_tasks_idx on obsidian.notes (user_id, git_updated_at desc)
-  where has_open_tasks and deleted_at is null;
-```
-
-`(?n)` is Postgres's newline-sensitive flag, so `^` matches at each line rather
-than only at the start of the body. (Verified against Postgres 16, including in
-a stored generated column, before this was written down.)
-
-A generated column and not a table: it is derived from the mirror by the
-database at write time, so there is no second writer, nothing to backfill and
-nothing that can drift. The vault sync does not learn that the todo module
-exists.
-
-It lives in `supabase/migrations-vault/`, not with the todo module, because the
-vault's shape is described in one place — and the vault's own viewer wants the
-same filter ("notes with something outstanding in them") independently of this.
+The `source_key` is text rather than a uuid because the next source's key is
+unlikely to be one. That is the only reason, and it is enough of one.
 
 ### RLS
 
@@ -361,9 +479,11 @@ create policy task_links_all on todo.task_links for all to authenticated
   with check (...same...);
 ```
 
-`obsidian.notes` denormalises `user_id` and defends it with a trigger because
-its list query is the hottest read in that workspace. `task_links` is never
-read without its task, so it does not need the same trick and does not get it.
+That policy decides who may *read and write a link row*. It says nothing about
+what the row points at, which is a separate question with a separate answer —
+the ownership trigger above. Both are needed and neither substitutes for the
+other: the policy stops you seeing someone else's links, the trigger stops you
+making one.
 
 `tests/rls-todo.test.ts` and `tests/helpers/db-todo.ts` land in the same commit
 as the migration, before any feature code, the way `tests/rls.test.ts` did.
@@ -384,6 +504,15 @@ downgrade, not an integration.
 
 **Completing.** Writes `completed_at` on `job_search.reminders` through a jobs
 client. One row, two views.
+
+**Deferring.** Moves `due_at` forward on that same row, by the seven days
+`SNOOZE_DAYS` already means everywhere else in the account. Deliberately *not* a
+`todo.dismissals` row: a reminder's due date is what "not yet" has always meant
+on the job side, so pushing it is the one write that both pages read. Store the
+deferral in a todo-side table instead and finishing a reminder would agree
+across the two pages while deferring one would not — you would hide something in
+one place and keep seeing it in the other, which is how a person learns not to
+trust either page.
 
 **Interviews are not tasks.** They are appointments; you do not tick them off.
 They appear on the agenda as *day context* — a line at the top of the day saying
@@ -416,51 +545,83 @@ diagnostics rather than obligations.
 
 ## Integration: vault notes
 
-Two directions, and the read-only direction is the one that needs the care.
+Two directions, and only the cheap one is in v1.
 
-**Notes as anchors.** A task can be `about` a note, and a note's page in the
-viewer grows the same small Tasks section a role page gets. No new machinery —
+### Notes as anchors — in v1
+
+A task can be `about` a note, and a note's page in the viewer grows the same
+small Tasks section a role page gets. No new machinery and no parsing:
 `obsidian.notes.id` is stable across a delete and a restore precisely so that
 citations survive a bad afternoon, and a task link is a citation.
 
-**Checkboxes as an agenda lane.** Notes with `has_open_tasks` are read, their
-bodies parsed for `- [ ]` lines by `lib/todo/notes/checkboxes.ts` (pure, tested
-against real Obsidian syntax — nested lists, indentation, `* [ ]`, a checkbox
-inside a callout, `[ ]` in a code fence, which is not a task), and each line
-becomes an agenda entry keyed as above.
+This is most of the value and none of the difficulty. You are reading a note,
+you think of something that has to happen, you write it down without leaving the
+page, and it turns up on your agenda tomorrow anchored to what it came from.
 
-They appear in **their own lane**, visually distinct, labelled by their note,
-and they are **read-only**. There is no checkbox to tick, because ticking it
-would either write to the vault or lie about having done so. What there is:
+### Checkboxes as an agenda source — not yet, and deliberately unchosen
 
-- **Open the note** — the viewer, scrolled to the line.
-- **Later** — a `dismissed_until` dismissal. It comes back after.
-- **Not here** — a permanent dismissal. It stays in your vault; it stops being
-  on this page.
-- **Make it mine** — promotion: creates a real `todo.tasks` row with
-  `source = 'note'`, `source_key` set to the checkbox key and a `source` link to
-  the note. The lane then suppresses that line while the promoted task is open,
-  so it appears exactly once.
+**Nothing reads `- [ ]` out of a note in v1.** The source is in the registry as a
+name and nothing else, off, with no implementation behind it. This section
+exists to record why the decision is being left open rather than made badly now.
 
-Promotion is the interesting one, and it is the same move the evidence layer
-makes: **confirmation at the point of use.** The vault never hands you a queue
-to triage — [VAULT-SPEC.md](VAULT-SPEC.md) is explicit about that and this
-module must not become one by the back door. Taking responsibility for a line
-is a thing you do when you were already looking at it, once, and it costs one
-click.
+The obstacle is not the parsing. It is that **a checkbox is a line of text
+inside a note, not a row in a table**, and every way of turning it into an
+agenda item costs something:
 
-Which is also why the lane has a hard cap and a horizon: the newest N notes with
-open checkboxes, not all of them. A vault with four hundred stale `- [ ]` lines
-in daily notes from 2023 must not turn the agenda into a review queue. If the
-cap is regularly hit the answer is a filter you choose (a folder, a tag), not a
-longer list.
+1. **Read the note text in the app and find the lines there.** Simplest to
+   write. It also means moving whole note bodies — capped at a megabyte each —
+   across the wire on every load of the page you open first thing in the
+   morning. `lib/vault/notes/load.ts` already selects `body` for up to 500 rows,
+   so the pattern exists; but that is the vault's own list page, visited
+   occasionally, not a daily agenda.
+2. **Have the database return just the matching lines.** Far less data moves.
+   The cost is that the rules for what counts as a task move into SQL, where
+   Obsidian's formatting — nested lists, callouts, code fences, templates — is
+   painful to get right and worse to test.
+3. **Keep a small derived table of extracted lines, updated whenever a note
+   changes.** Fastest to read and the only option that scales. It is also the
+   most machinery, and it has to be genuinely derived — written by the database
+   from the note, never by a second process — or it becomes exactly the
+   duplicated-state problem this whole document exists to avoid.
 
-**Which is the master.** Obsidian, always. If the note's line becomes `- [x]`
-upstream, it leaves the lane on the next sync with no action here. If a promoted
-task's note line is ticked upstream, the promoted task does **not** auto-complete
-— it is your task now, in your list, and the app does not close things you did
-not close. Its card says the note's line is now ticked, and closing it is one
-click. Guessing here is how a todo app silently loses a task.
+The first draft of this spec picked a fourth thing — a generated column flagging
+which notes contain a checkbox — and called the problem solved. It is not:
+knowing *which* notes to look at does not reduce how much text has to be read to
+find *which lines*. That column has been removed rather than left in as a
+half-measure that looks like a decision.
+
+**Why it is right to wait.** The vault is going to grow a proper parser — one
+that turns markdown into something structured rather than leaving it as a wall
+of text. When that exists, a checkbox stops being a line of text and becomes
+structured data the vault already holds, and this whole question dissolves: the
+todo module reads what the vault knows, option 3 without anyone building option
+3 on its behalf. Committing to a bespoke extraction now would mean building
+something to throw away, and worse, would put a second reader of note text in a
+module that has no business parsing markdown at all.
+
+So: the agenda's source interface is the commitment, and the checkbox source is
+one implementation of it that gets written when the vault is ready to supply the
+input. Nothing about the pages, the merge or the schema changes when it lands.
+
+### When it does land, these still hold
+
+Recorded now because they are the design, not the implementation, and they will
+be just as true later:
+
+- **Obsidian is the master, always.** A checkbox from a note is read-only here.
+  There is no tick box, because ticking it would either write to your vault —
+  which [VAULT-SPEC.md](VAULT-SPEC.md) forbids in its second sentence — or lie
+  about having done so.
+- **The way to act on one is to promote it**: copy it into a task you own, with
+  a link back to the note it came from. Your copy is yours from that moment; the
+  line in the vault is untouched, and nothing syncs back.
+- **A promoted task never auto-completes** because the note's line was ticked
+  upstream. It is your task now, and the app does not close things you did not
+  close — it says the line has been ticked and lets you close it in one click.
+- **The source is capped and scoped, not exhaustive.** A vault with four hundred
+  stale `- [ ]` lines in daily notes from 2023 must not turn the agenda into a
+  review queue. The vault never hands you a pile to triage, and this module must
+  not become that queue by the back door.
 
 ## Integration: shopping
 
@@ -474,6 +635,61 @@ the shopping side already derives.
 
 `saved_items.cooldown_until` is Phase 2 on the shopping side and waits for it.
 
+## Account settings, and module settings
+
+The agenda has to know what day it is for you, and right now the account cannot
+answer that question once.
+
+**There are two `profiles` tables** — `public.profiles` and
+`job_search.profiles` — each with its own `timezone`, each defaulting to
+`'UTC'`. Only the job side has a screen that edits it
+(`app/jobs/(app)/settings/view.tsx`); shopping merely prints the value
+(`app/shopping/settings/page.tsx`). So the shopping half of the account has
+almost certainly been on UTC since the day it was created, and a page that
+merges all three workspaces has two candidate answers for "today" that are free
+to disagree.
+
+That has to be settled before anything renders a due date, and the fix is a
+structural one that pays for itself across the whole app:
+
+**Account settings, once, under the account icon.** The things that are true
+about *you* regardless of which workspace you are in: timezone, display name,
+display currency, which modules are turned on, and account deletion. One table:
+
+```sql
+create table core.account_settings (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  display_name text,
+  timezone text not null default 'UTC',
+  display_currency text not null default 'USD',
+  -- Which workspaces appear in the switcher and which sources may run.
+  enabled_modules text[] not null default array['shopping','jobs','vault','todo'],
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+```
+
+`core` and not a new schema: this is the definition of a fact that arrives from
+outside any workspace and that none of them owns, which is what `core` is for.
+The migration copies each existing value across, preferring whichever profile
+row has a non-default timezone, so nobody's setting changes underneath them. The
+two `profiles.timezone` columns stay where they are for one release and then go,
+rather than being dropped out from under code that still reads them.
+
+**Module settings, under each module's own gear.** The things that only make
+sense inside one workspace, staying exactly where they are: the Gmail connection
+and merchant return windows in shopping, the ghost threshold and writing style
+in jobs, the repository and token in the vault, and for this module the agenda
+horizon and the source switches.
+
+The line between the two is worth stating because it will be argued about later:
+**if turning the module off would make the setting meaningless, it is a module
+setting.** Timezone survives every module being off. The vault's repository does
+not.
+
+This is a change to the other three workspaces, not just to this one, which is
+why it is its own build step and comes first.
+
 ## Surfaces
 
 **A fourth workspace**, in the switcher, with `/todo` as its home. The switcher's
@@ -481,16 +697,15 @@ model is "which of these am I in", and a merged agenda is genuinely one of them
 rather than a page inside any other.
 
 - `/todo` — the agenda. Overdue, today, this week, then Someday collapsed.
-  Lanes for the three foreign sources, inline in each day, visually secondary to
-  the tasks you own. An empty agenda says so and is not padded out to look busy;
-  `/jobs/today` already sets that tone and it is right.
+  Sources appear inline in each day, visually secondary to the tasks you own. An
+  empty agenda says so and is not padded out to look busy; `/jobs/today` already
+  sets that tone and it is right.
 - `/todo/all` — everything, including done and dropped, filterable by link and
   by status. The archive you consult, kept off the page you use daily.
-- `/todo/settings` — the horizon, and a switch per lane. Someone who does not
-  want their notes on this page should be able to say so once.
+- `/todo/settings` — the horizon, and a switch per source. Sources start off.
 
 Inline, in the other workspaces: a Tasks section on the role, company, contact
-and interview pages, and on a note. Small, list plus one input, no page of its
+and interview pages, and on a note. Small, a list plus one input, no page of its
 own.
 
 **On `/home`**, the top slice of the agenda — the two or three things due today —
@@ -502,15 +717,17 @@ visit it; this is the reason.
 ```
 lib/todo/
   agenda/
-    load.ts        four queries, in parallel, one client per schema
+    sources.ts     the AgendaSource interface and the registry
+    sources/
+      job-reminders.ts
+      return-deadlines.ts
+      (note-checkboxes.ts -- later, when the vault can supply the input)
+    load.ts        the enabled sources, in parallel, plus batched labels
     merge.ts       PURE. lanes, ordering, dismissal application, dedupe
     merge.test.ts
-  notes/
-    checkboxes.ts  parse `- [ ]` out of a note body. PURE.
-    checkboxes.test.ts
   tasks/
     load.ts        list, filter
-    write.ts       create, edit, complete, drop, snooze, promote
+    write.ts       create, edit, complete, drop, snooze
   links/
     load.ts        "tasks about this role", for the inline sections
   db/
@@ -521,17 +738,33 @@ lib/todo/
 
 `merge.ts` takes already-fetched lists, the dismissal rows and an explicit
 `now`, and returns the lanes. No client, no clock of its own, no I/O. Everything
-that could be wrong about an agenda — a snooze that has expired, a promoted
-task double-appearing, an overdue item sorting after a future one, a dismissal
-that should have lapsed because the text changed — is a table test in
+that could be wrong about an agenda — a snooze that has expired, an overdue
+item sorting after a future one, a dismissal that should still be hiding
+something, a day boundary landing in the wrong timezone — is a table test in
 `merge.test.ts` and needs no database. This is the shape `lib/vault/sync/plan.ts`
 uses and the reason that sync's decisions are testable at all.
 
-`load.ts` needs four supabase clients, one per schema, because a client is bound
-to one schema. `app/home/page.tsx` already creates two side by side; this is the
-same thing with two more. They run in one `Promise.all`, and a lane that fails
+`load.ts` needs one supabase client per schema, because a client is bound to one
+schema. `app/home/page.tsx` already creates two side by side; this is the same
+thing with a couple more. They run in one `Promise.all`, and a source that fails
 degrades to empty with the failure surfaced rather than taking the page down —
 your own todos must render when the vault's token has expired.
+
+**Labels are fetched in one pass per module, never per task.** A link stores an
+id; the agenda needs a name — "Acme · Staff Engineer" beside the task, not a
+uuid. Because each module's data is read through its own client, that name is a
+second lookup, and the obvious shape (resolve each task's link as it renders) is
+a query per row. So `load.ts` collects the ids by target type first and asks
+each module once: one query for every role on the page, one for every company,
+and so on. Six extra queries in the worst case, flat, no matter how long the
+list is.
+
+Worth being plain that this makes "one query per source, in parallel"
+optimistic: an
+agenda with tasks anchored to several kinds of thing is closer to ten. All of
+them are indexed primary-key lookups over tens of ids, and they run together —
+but the number is the number, and a later change that turns it into one query
+per row will not feel slow until the list is long.
 
 ## Rules
 
@@ -539,55 +772,77 @@ Candidates for the README's Rules section once this ships, because they are the
 ones that will otherwise be violated by a well-meaning later commit.
 
 - **The todo module never copies a row out of another schema.** A foreign
-  obligation is read at query time; the only thing stored about it is a
-  dismissal. A `source_key` on a promoted task is a key, not a copy — the title
-  is yours from the moment you promote it, and nothing syncs it back.
+  obligation is read at query time by its source; the only thing stored about
+  one is a dismissal.
+- **A foreign key is not an ownership check.** Referential integrity in Postgres
+  bypasses row level security, so every cross-schema link is checked by a
+  trigger as well, and `tests/rls-todo.test.ts` asserts a link to another
+  account's row is refused.
+- **A task about something is a foreign key**, not a text field holding a name.
+  If the role is deleted the link goes with it.
 - **Nothing in this module writes to the vault.** Enforced by the existing
   boundary: the vault's provider interface is read-only and lint already stops
   anything outside `lib/vault/providers/` from reaching git at all.
-- **A task about something is a foreign key**, not a text field holding a name.
-  If the role is deleted the link goes with it.
-- **The agenda merge is pure and takes its clock as an argument.** A function
-  that calls `Date.now()` inside the merge cannot be tested for "overdue" and
-  will not be.
-- **Completing a job reminder writes to `job_search.reminders`.** There is no
-  second copy of that row and there must never be one.
+- **Deferring a job reminder moves its own due date.** There is no second place
+  a job reminder can be hidden, because two places would disagree.
+- **Every source goes through the registry.** A page that queries a workspace
+  directly for agenda items is a source that cannot be switched off, tested in
+  isolation, or replaced when its input changes shape.
+- **The agenda merge is pure and takes its clock and timezone as arguments.** A
+  function that calls `Date.now()` inside cannot be tested for "overdue", and
+  one that reads the timezone itself cannot be tested for "which day is this".
+- **Settings that survive every module being off belong to the account**, under
+  the account icon, in `core.account_settings`. Everything else belongs to its
+  module's own settings page.
 
 ## Build order
 
-Each step is shippable on its own, and the module is useful after step 2.
+Each step is shippable on its own, and the module is useful after step 26.
 
-1. **Schema, RLS, isolation test.** `supabase/migrations-todo/0001_todo_schema.sql`,
-   `tests/rls-todo.test.ts`, `tests/helpers/db-todo.ts`, `todo` added to
-   `db-reset.sh` and to the exposed-schemas assertion. No feature code. This is
-   step 2 of the original build order repeating itself for a reason: a missing
-   policy fails now rather than in six months.
-2. **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
-   snooze, due dates, pinned. Workspace switcher entry. Zero integration —
-   and already worth having.
-3. **Links and the inline sections.** `task_links`, the Tasks section on role,
-   company, contact and interview pages and on a note. Tasks on the agenda group
-   under what they are about.
-4. **The job lane.** Reminders on the agenda with the follow-up composer intact,
-   completion writing through to `job_search`, interviews as day context,
-   dismissals.
-5. **The note lane.** The generated column on `obsidian.notes`,
-   `checkboxes.ts`, the read-only lane, and promotion.
-6. **The shopping lane.** Return deadlines. Half a day; last because it is the
-   thinnest.
-7. **`/home`.** The top slice of the agenda on the front door.
+24. **Account settings.** `core.account_settings`, the timezone moved into it
+    from the two `profiles` rows, an account settings page behind the account
+    icon, and each module's settings left where they are behind its own gear.
+    This is a change to all three existing workspaces and it comes first
+    because everything below renders a date.
+25. **Schema, RLS, isolation test.** `supabase/migrations-todo/0001_todo_schema.sql`,
+    `tests/rls-todo.test.ts`, `tests/helpers/db-todo.ts`, `todo` added to
+    `db-reset.sh` and to the exposed-schemas assertion. The isolation test
+    covers the ownership trigger, not just the policies. No feature code. This
+    is step 2 of the original build order repeating itself for a reason: a
+    missing check fails now rather than in six months.
+26. **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
+    snooze, due dates, pinned. Fourth entry in `WORKSPACES`. Zero integration —
+    and already worth having.
+27. **Links and the inline sections.** `todo.task_links` with its ownership
+    trigger, and a Tasks section on the role, company, contact and interview
+    pages and on a note. This is the whole vault integration for now, and it is
+    the half of it that costs nothing.
+28. **The source registry.** `AgendaSource`, the switches in `/todo/settings`,
+    batched label lookups, and the merge — with zero sources implemented. A
+    scaffold with nothing plugged in sounds like a step to skip; it is the step
+    that decides whether the next three are one file each or a rewrite.
+29. **The job source.** Reminders on the agenda with the follow-up composer
+    intact (`fd33268` applies here with full force), completion writing
+    `completed_at` and deferral moving `due_at`, both on the job row.
+    Interviews as day context rather than as items.
+30. **The shopping source.** `orders.return_deadline` within the horizon, and
+    the one `todo.dismissals` source that exists.
+31. **`/home`.** The top slice of the agenda on the front door, which currently
+    shows two counts and no reason to visit.
+
+Not in this list, deliberately: reading checkboxes out of notes. It waits for
+the vault to hold notes as something more structured than text, and is then one
+file against the interface from step 28.
 
 ## Open questions
 
-- **Does the note lane earn its place?** It is the most interesting integration
-  and the most likely to be noise. If, after a month, the lane is dismissed more
-  often than it is promoted, it should default to off. Instrumenting that is one
-  count against `todo.dismissals` and worth doing at step 5.
-- **Timezone.** `profiles.timezone` exists and `lib/jobs/timezone.ts` already
-  does this work for interviews. "Today" on the agenda must use it, and the
-  `due_on` / `due_at` split above is what makes that possible rather than
-  approximate. Reuse rather than reimplement, and if that means the helper moves
-  out of `lib/jobs/`, move it.
+- **Recurrence, which may not survive being deferred.** "Renew the passport",
+  "pay the service charge", "book the dentist" — personal admin is the most
+  repetition-heavy category there is, and it is the category that justified the
+  module. A v1 without it may miss the point of its own argument. The cheap
+  version is a `repeat_every_days` on the task and a new row generated when one
+  is completed; the correct version is calendar rules and exceptions. If the
+  cheap version is enough, it belongs in step 26 rather than in a later phase.
 - **The horizon.** `/jobs/today` uses 14 days for interviews and 7 for
   reminders. The agenda probably wants 7 with everything beyond it collapsed
   into "later", but that is a number to set after looking at a real week, not
@@ -595,6 +850,15 @@ Each step is shippable on its own, and the module is useful after step 2.
 - **Ordering within a day.** Due time, then pinned, then created? Or a manual
   drag order, which means a `position` column and the fractional-index problem?
   v1 sorts and does not drag. Revisit only if it actually grates.
+- **Whether the fourth workspace is one surface too many.** The smaller version
+  is `todo.tasks`, the inline sections, and the agenda living on `/home` — no
+  switcher entry, no `/todo/all`, two fewer steps. The argument against is that
+  `/home` then has two jobs and does neither of them first.
+- **What replaces the two `profiles` tables in the end.** Step 24 moves the
+  account-level columns out and leaves the module-level ones behind, which is
+  the right first cut. Whether `job_search.profiles` and `public.profiles`
+  eventually become one table of module preferences is a question for whenever
+  the second one of them is nearly empty.
 
 ## What this unlocks (not v1)
 
@@ -614,3 +878,9 @@ Recorded so the v1 shape is legible, and so none of it gets built early.
 - **Notifications**, once there is a day's agenda worth interrupting someone
   for. The cron exists. The judgment about when a person wants to be interrupted
   does not, and inventing it is the whole task.
+- **Checkboxes from notes**, once the vault holds a note as something more
+  structured than a body of text. One file against the source interface, a
+  switch that starts off, and promotion as the only way a line becomes a task
+  you own. Everything about how it should behave is already written down under
+  "Integration: vault notes"; only the mechanism is missing, and it is missing
+  on purpose.

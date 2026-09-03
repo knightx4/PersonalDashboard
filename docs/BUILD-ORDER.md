@@ -106,38 +106,59 @@ called `vault`, which is Supabase's own — see the head of the migration.
 ### Todo — the fourth workspace
 
 Specified in full in [TODO-SPEC.md](TODO-SPEC.md), built in none of it yet.
-Seven steps, in this order, and none of them depends on 19. The module is
-worth having after step 25 and is only *interesting* from 27 on.
+Eight steps, in this order, and none of them depends on 19. The module is
+worth having after step 26.
 
-The thing the spec is really about is the one rule everything else follows from:
-an obligation is displayed by whoever needs to show it and written by whoever
-owns it. The todo module owns the tasks you typed into it, and about a job
-reminder, a return deadline or a checkbox in a note it stores one thing only --
-that you dismissed it. No import job, no second copy, no write-back into the
-vault.
+The rule everything else follows from: an obligation is displayed by whoever
+needs to show it and written by whoever owns it. The module owns the tasks you
+typed into it. A job reminder is finished and deferred on the job side's own
+row, so both pages agree; a return deadline gets a dismissal and nothing else.
+No import job, no second copy, and nothing read out of the vault at all in v1.
 
-24. **Schema and the isolation test.** New `todo` schema in
+24. **Account settings.** `core.account_settings`, and the timezone moved into
+    it — there are currently two `profiles` tables with a `timezone` each, both
+    defaulting to UTC, and only the jobs one has an edit screen, so the shopping
+    half of the account has silently been on UTC. Account-level settings
+    (timezone, display name, currency, which modules are on, deletion) move
+    behind the account icon; each module keeps its own gear for its own
+    settings. A change to all three existing workspaces, and first because
+    everything below renders a date.
+25. **Schema and the isolation test.** New `todo` schema in
     `supabase/migrations-todo/`, applied last by `db-reset.sh` because its
-    foreign keys point into the other three. RLS on all three tables and the
-    cross-user isolation test **before any feature code** -- the same rule as
-    steps 2 and 20. `todo` also joins the exposed-schemas assertion.
-25. **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
+    foreign keys point into the other three. RLS **and** the link-ownership
+    trigger, with the cross-user isolation test covering both before any feature
+    code -- the same rule as steps 2 and 20, and it matters more here: a
+    foreign key is not an ownership check, because referential integrity in
+    Postgres bypasses RLS.
+26. **The list you typed.** `/todo`, `/todo/all`, create, edit, complete, drop,
     snooze, due dates, pinned. Fourth entry in `WORKSPACES`. Zero integration,
     and already worth having.
-26. **Links and the inline sections.** `todo.task_links` -- real cross-schema
+27. **Links and the inline sections.** `todo.task_links` -- real cross-schema
     foreign keys, one parent from six, the shape `job_search.notes` already
     uses. A Tasks section on the role, company, contact and interview pages and
-    on a note.
-27. **The job lane.** Reminders on the agenda with the follow-up composer
-    intact (`fd33268` applies here with full force), completion writing through
-    to `job_search.reminders`, interviews as day context rather than as items.
-28. **The note lane.** One generated column on `obsidian.notes` so finding open
-    checkboxes is an index rather than a scan, the read-only lane, and
-    promotion -- the only way a line in a note becomes a task you own.
-29. **The shopping lane.** `orders.return_deadline` within the horizon. Last
-    because it is the thinnest.
-30. **`/home`.** The top slice of the agenda on the front door, which currently
+    on a note. This is the entire vault integration for now, and it is the half
+    that costs nothing.
+28. **The source registry.** The `AgendaSource` interface, the switches in
+    `/todo/settings` (all off), batched label lookups and the pure merge, with
+    no sources implemented. A scaffold with nothing plugged into it sounds like
+    a step to skip; it is the step that decides whether the next two are one
+    file each or a rewrite.
+29. **The job source.** Reminders on the agenda with the follow-up composer
+    intact (`fd33268` applies here with full force), completion writing
+    `completed_at` and deferral moving `due_at`, both on the job row.
+    Interviews as day context rather than as items.
+30. **The shopping source.** `orders.return_deadline` within the horizon. Last
+    of the sources because it is the thinnest.
+31. **`/home`.** The top slice of the agenda on the front door, which currently
     shows two counts and no reason to visit.
+
+Deliberately not a step: reading `- [ ]` checkboxes out of notes. A checkbox is
+a line of text inside a note rather than a row, and every way of extracting one
+today costs something -- moving whole note bodies to the app, or writing
+Obsidian's formatting rules in SQL, or maintaining a derived table. It waits for
+the vault to hold notes as something more structured than text, and is then one
+file against the step 28 interface. The spec records the three options and why
+none of them is chosen yet.
 
 ### Ordering notes worth respecting
 
@@ -153,11 +174,13 @@ vault.
   connection row inserted by hand is enough to develop against.
 - The vault block (20–23) is independent of 19. Either order is fine, and
   neither blocks the other.
-- Step 24 before 25, for the third time and the same reason. Steps 27, 28 and
-  29 are independent of each other and can land in any order; 26 comes before
-  all three only because the inline sections are what make a merged agenda feel
-  like part of the app rather than a page beside it. Step 28 needs the vault
-  (20–23) shipped; it is the only cross-block dependency in the file.
+- Step 24 before everything else in the block: two timezones that disagree
+  cannot render one agenda. Step 25 before 26, for the third time and the same
+  reason a missing policy has to fail immediately. Steps 26 and 27 are worth
+  having on their own and can ship without any of 28–31. Step 28 before 29 and
+  30, which are otherwise independent of each other. Step 27 needs the vault
+  (20–23) shipped for the note half of it; nothing else in the block depends on
+  another block.
 
 ## Open questions, still open
 
@@ -186,10 +209,11 @@ household one is worth deciding before launch rather than after.
 - **Vault scope, size and freshness.** Three open questions specific to the
   vault, kept in [VAULT-SPEC.md](VAULT-SPEC.md) rather than duplicated here.
   None blocks steps 20–23.
-- **Whether the note lane earns its place.** The most interesting of the todo
-  module's integrations and the most likely to be noise. Four more, specific to
-  it, are kept in [TODO-SPEC.md](TODO-SPEC.md) rather than duplicated here.
-  None blocks steps 24–30.
+- **Whether recurring todos can wait.** Renewals, bills and appointments are
+  the repetition-heavy category that justified the todo module in the first
+  place, so a v1 without them may miss its own point. Four more questions
+  specific to the module are kept in [TODO-SPEC.md](TODO-SPEC.md) rather than
+  duplicated here. None blocks steps 24–31.
 - **Whether Promotions actually contains order confirmations** in practice.
   Measure recall both ways on a real mailbox before hardcoding either behaviour.
   The exclusion is a config flag, default off.
