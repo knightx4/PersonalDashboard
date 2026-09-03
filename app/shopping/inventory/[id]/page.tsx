@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryImageFallback } from '@/components/inventory/inventory-row';
 import { PageHeader } from '@/components/shell/page-header';
+import { SendToShare } from '@/components/share/send-to-share';
+import { loadShareOptions } from '@/lib/share/load-options';
 import { buttonVariants } from '@/components/ui/button';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
@@ -127,6 +129,12 @@ export default async function InventoryItemPage({
     }
   }
 
+  // Offered only while the item is still owned: a form asking whether to keep
+  // something already sold wastes the reader's time, and share_page() filters
+  // those out anyway.
+  const shareOptions =
+    item.status === 'owned' ? await loadShareOptions(supabase, user.id) : [];
+
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
@@ -136,6 +144,7 @@ export default async function InventoryItemPage({
           .join(' · ')}
         actions={
           <div className="flex flex-wrap gap-2">
+            <SendToShare shares={shareOptions} inventoryItemIds={[item.id]} />
             {productUrl && (
               <a
                 href={productUrl}

@@ -21,6 +21,8 @@ import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchan
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
+import { loadShareOptions } from '@/lib/share/load-options';
+import { SendToShare } from '@/components/share/send-to-share';
 
 export const metadata = { title: 'Inventory' };
 
@@ -312,6 +314,11 @@ export default async function InventoryPage({
     q || categoryId || activeMerchant || activeList || range !== 'all',
   );
 
+  // The shares that exist, so a filtered shelf can be sent to one in a click.
+  // This is the "put all the board games on the form" path done by hand: filter
+  // to the category, then add what is on screen.
+  const shareOptions = await loadShareOptions(supabase, user.id);
+
   // person rides in the base, so every other filter link keeps it rather than
   // silently dropping back to everyone.
   const hrefBase = {
@@ -411,12 +418,18 @@ export default async function InventoryPage({
           title="Inventory"
           description="Everything you currently own, so you can check before buying it again."
           actions={
-            <Link
-              href="/shopping/inventory/add"
-              className={buttonVariants({ variant: 'primary', size: 'sm' })}
-            >
-              Add owned books
-            </Link>
+            <>
+              <SendToShare
+                shares={shareOptions}
+                inventoryItemIds={finalItems.map((item) => item.id)}
+              />
+              <Link
+                href="/shopping/inventory/add"
+                className={buttonVariants({ variant: 'primary', size: 'sm' })}
+              >
+                Add owned books
+              </Link>
+            </>
           }
         />
 
