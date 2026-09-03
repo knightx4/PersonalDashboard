@@ -4,6 +4,8 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
 import { publicEnv } from '@/lib/env';
 import { PageHeader } from '@/components/jobs/shell/page-header';
+import { LinkedTasks } from '@/components/todo/linked-tasks';
+import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
@@ -167,6 +169,7 @@ export default async function RoleDetailPage({
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+  const linkedTasks = await loadTasksFor(user.id, 'role', role.id as string);
   const requirements = (role.requirements as Requirement[] | null) ?? [];
 
   const evidence = (bank ?? []).map((item) => ({
@@ -292,6 +295,20 @@ export default async function RoleDetailPage({
           }
         />
       </dl>
+
+      {/* What has to happen about this role, from the todo module. Here rather
+          than inside the panels because it is not one of the tabs: it is the
+          thing you write down while reading the page, and a note you have to
+          go looking for a tab to write is a note that does not get written. */}
+      <div className="mb-6">
+        <LinkedTasks
+          target="role"
+          targetId={role.id as string}
+          returnTo={`/jobs/roles/${role.id as string}`}
+          tasks={linkedTasks}
+          timezone={timezone}
+        />
+      </div>
 
       <RoleDetailPanels
         roleId={role.id as string}

@@ -4,6 +4,8 @@ import { PageHeader } from '@/components/jobs/shell/page-header';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';
+import { LinkedTasks } from '@/components/todo/linked-tasks';
+import { loadTasksFor } from '@/lib/todo/links/load';
 
 export const metadata = { title: 'Company' };
 
@@ -62,6 +64,7 @@ export default async function CompanyDetailPage({
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+  const linkedTasks = await loadTasksFor(user.id, 'company', company.id as string);
 
   type RoleRow = {
     id: string;
@@ -128,6 +131,16 @@ export default async function CompanyDetailPage({
           }))}
         />
       </section>
+
+      <div className="mb-6">
+        <LinkedTasks
+          target="company"
+          targetId={company.id as string}
+          returnTo={`/jobs/companies/${company.slug as string}`}
+          tasks={linkedTasks}
+          timezone={timezone}
+        />
+      </div>
 
       <CompanyPanels
         companyId={company.id as string}

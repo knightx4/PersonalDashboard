@@ -7,6 +7,10 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadLinkTargets, loadNote } from '@/lib/vault/notes/load';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { folderOf } from '@/lib/vault/paths';
+import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { LinkedTasks } from '@/components/todo/linked-tasks';
+import { loadTasksFor } from '@/lib/todo/links/load';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +41,12 @@ export default async function NotePage({ params }: { params: Promise<{ path: str
 
   const folder = folderOf(note.path);
 
+  const user = await requireUser();
+  const [{ timezone }, linkedTasks] = await Promise.all([
+    loadAccountSettings(user.id),
+    loadTasksFor(user.id, 'note', note.id),
+  ]);
+
   return (
     <article className="mx-auto max-w-3xl">
       <Link
@@ -60,6 +70,20 @@ export default async function NotePage({ params }: { params: Promise<{ path: str
       <NoteProperties frontmatter={note.frontmatter} />
 
       <NoteBody markdown={markdown} />
+
+      {/* Tasks ABOUT this note, which is not the same thing as the checkboxes
+          inside it -- those belong to Obsidian and are not read here at all.
+          This is the half of the integration that costs nothing: a note is a
+          row with an id, and a task can point at it. */}
+      <div className="mt-8">
+        <LinkedTasks
+          target="note"
+          targetId={note.id}
+          returnTo={`/vault/n/${note.path.split('/').map(encodeURIComponent).join('/')}`}
+          tasks={linkedTasks}
+          timezone={timezone}
+        />
+      </div>
     </article>
   );
 }
