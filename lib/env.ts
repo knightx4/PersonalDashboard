@@ -94,6 +94,10 @@ export function serverEnv() {
       /** Optional. eBay Browse API (OAuth client credentials). */
       EBAY_CLIENT_ID: z.string().min(1).optional(),
       EBAY_CLIENT_SECRET: z.string().min(1).optional(),
+      /** 32-80 chars of [A-Za-z0-9_-]. Shared with eBay, hashed into the reply. */
+      EBAY_VERIFICATION_TOKEN: z.string().regex(/^[A-Za-z0-9_-]{32,80}$/).optional(),
+      /** Only when the registered endpoint is not NEXT_PUBLIC_APP_URL's. */
+      EBAY_DELETION_ENDPOINT_URL: z.string().url().optional(),
       INNGEST_EVENT_KEY: z.string().optional(),
       INNGEST_SIGNING_KEY: z.string().optional(),
     })

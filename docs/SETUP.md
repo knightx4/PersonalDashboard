@@ -354,6 +354,35 @@ It then applies both migration sets into one database — `public` first, then
 `job_search` — which is what lets `tests/coexistence.test.ts` assert against a
 real neighbour rather than a stand-in for one.
 
+### eBay marketplace account deletion (required)
+
+eBay marks an application **Non Compliant** unless it either receives
+marketplace account deletion notifications or claims an exemption, and
+restricts the production keyset until it is resolved — which looks from the
+outside like credentials that stopped working, not like a policy flag.
+
+This app never sees an eBay user: it authenticates with client credentials and
+stores one price per ISBN, no usernames or item ids. So either route is honest.
+The endpoint is already built, so it is the one that needs no review:
+
+1. Generate a token — `openssl rand -hex 24` — and set `EBAY_VERIFICATION_TOKEN`
+   in Vercel. It must be 32–80 characters of `A-Za-z0-9_-`.
+2. Redeploy, so the running deployment can answer.
+3. In the developer portal, under **Alerts & Notifications → Marketplace Account
+   Deletion**, enter the same token and the endpoint
+   `https://<NEXT_PUBLIC_APP_URL>/api/ebay/account-deletion`, then save.
+
+eBay immediately GETs the endpoint with a `challenge_code` and expects the
+SHA-256 of `challengeCode + verificationToken + endpointURL`, in that order. The
+endpoint in that hash must be byte-identical to the one registered, which is
+what nearly every failed validation turns out to be — set
+`EBAY_DELETION_ENDPOINT_URL` if the registered URL is not the app's own.
+
+The notification itself is answered with 204 and nothing is erased, because
+nothing about an eBay user is held. The alternative, if you would rather hold no
+endpoint at all, is the exemption: same screen, slide **Not persisting eBay
+data** to On and submit a reason.
+
 ### Checking the eBay keyset
 
 The sell assistant prices books from eBay Browse when `EBAY_CLIENT_ID` and
