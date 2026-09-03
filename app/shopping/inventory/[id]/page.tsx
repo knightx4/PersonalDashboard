@@ -18,6 +18,7 @@ import {
 } from '@/lib/inventory/attributes';
 import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
 import { BookDetailsPanel } from './book-details-panel';
+import { GameDetailsPanel } from './game-details-panel';
 import { ItemAttributesPanel } from './attributes-panel';
 import { ItemSellPanel } from './sell-panel';
 
@@ -39,6 +40,7 @@ export default async function InventoryItemPage({
     { data: memberships },
     { data: profile },
     { data: bookRow },
+    { data: gameRow },
   ] = await Promise.all([
     supabase
       .from('inventory_items')
@@ -81,6 +83,17 @@ export default async function InventoryItemPage({
         `
         inventory_item_id, isbn_13, isbn_10, authors, edition, publisher,
         published_year, condition, needs_confirmation, match_confidence, resolution_source,
+        candidates, confirmation_reason, auto_imported
+      `,
+      )
+      .eq('inventory_item_id', id)
+      .maybeSingle(),
+    supabase
+      .from('game_details')
+      .select(
+        `
+        inventory_item_id, bgg_id, year_published, publisher, min_players, max_players,
+        playing_time_minutes, needs_confirmation, match_confidence, resolution_source,
         candidates, confirmation_reason, auto_imported
       `,
       )
@@ -298,6 +311,29 @@ export default async function InventoryItemPage({
             matchConfidence:
               bookRow.match_confidence != null ? Number(bookRow.match_confidence) : null,
             resolutionSource: bookRow.resolution_source,
+          }}
+        />
+      )}
+
+      {gameRow && (
+        <GameDetailsPanel
+          game={{
+            inventoryItemId: gameRow.inventory_item_id,
+            title: item.name,
+            imageUrl,
+            bggId: gameRow.bgg_id,
+            yearPublished: gameRow.year_published,
+            publisher: gameRow.publisher,
+            minPlayers: gameRow.min_players,
+            maxPlayers: gameRow.max_players,
+            playingTimeMinutes: gameRow.playing_time_minutes,
+            needsConfirmation: gameRow.needs_confirmation,
+            confirmationReason: gameRow.confirmation_reason ?? null,
+            candidates: Array.isArray(gameRow.candidates) ? gameRow.candidates : [],
+            autoImported: Boolean(gameRow.auto_imported),
+            matchConfidence:
+              gameRow.match_confidence != null ? Number(gameRow.match_confidence) : null,
+            resolutionSource: gameRow.resolution_source,
           }}
         />
       )}

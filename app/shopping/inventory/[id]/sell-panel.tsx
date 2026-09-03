@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState } from 'react';
-import Link from 'next/link';
 import {
   priceOneItem,
   setManualGamePrice,
@@ -70,11 +69,9 @@ export function ItemSellPanel({
         <p className="text-[13px] text-ink-faint">
           {quote.needsConfirmation ? (
             <>
-              Confirm which {quote.kind === 'game' ? 'game' : 'edition'} this is on the{' '}
-              <Link href="/shopping/sell" className="text-brand hover:underline">
-                sell page
-              </Link>{' '}
-              before it can be priced.
+              Confirm which {quote.kind === 'game' ? 'box' : 'edition'} this is in{' '}
+              {quote.kind === 'game' ? 'Game details' : 'Book details'} above, and this
+              prices itself.
             </>
           ) : quote.kind === 'game' ? (
             'No BoardGameGeek match yet, so there is nothing to look up.'
