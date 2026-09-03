@@ -4,6 +4,7 @@ import { requireUser, createClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { FeedbackButton } from '@/components/shell/feedback-button';
+import { NotificationsButton } from '@/components/shell/notifications-button';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 
 export const metadata = { title: 'Home' };
@@ -43,6 +44,7 @@ export default async function HomePage() {
         <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
           <WorkspaceSwitcher current={null} />
           <div className="flex-1" />
+          <NotificationsButton />
           <FeedbackButton />
           <Link
             href="/shopping/settings"
