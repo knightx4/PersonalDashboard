@@ -354,6 +354,39 @@ It then applies both migration sets into one database — `public` first, then
 `job_search` — which is what lets `tests/coexistence.test.ts` assert against a
 real neighbour rather than a stand-in for one.
 
+### Checking the eBay keyset
+
+The sell assistant prices books from eBay Browse when `EBAY_CLIENT_ID` and
+`EBAY_CLIENT_SECRET` are both set, and falls back to a billed web-search
+estimate when they are not. To find out which one is actually running, read the
+note under the heading on `/shopping/sell` — it names the source.
+
+To test the credentials themselves:
+
+```bash
+npx vercel env pull .env.local   # same values the deployment uses
+npm run check:ebay -- 9780735211292
+```
+
+It loads `.env.local` itself, fetches an application token, runs one Browse
+search, and prints either the price the assistant would use or the reason eBay
+refused — the stage, the HTTP status and eBay's own error text. It exits
+non-zero for a configuration fault and zero for a book that genuinely has no
+listings, so the two cannot be confused.
+
+Three faults account for most failures. The keyset must be the **production**
+one (`-PRD-` in the client id); a sandbox keyset returns invented listings and
+is refused outright. The application must have the **Buy APIs granted** — a
+keyset is issued immediately, Browse access is a separate approval that takes
+days, and until it lands OAuth succeeds while every search returns 403. And on
+Vercel, variables only reach a deployment **built after** they were set, in the
+environment you are actually visiting.
+
+> **This cannot be run from a Claude Code web session** unless `api.ebay.com` is
+> allowed in the environment's network policy; the proxy otherwise returns its
+> own 403, which the script reports verbatim
+> ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)).
+
 ---
 
 ## Cron
