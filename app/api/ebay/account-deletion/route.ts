@@ -31,16 +31,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'challenge_code is required' }, { status: 400 });
   }
 
+  const endpoint = endpointUrl();
+
+  // The endpoint this deployment hashed, echoed where curl -i can see it.
+  // A mismatch with the URL registered at eBay is the usual cause of a failed
+  // validation, and the portal only ever says "validation failed" -- so the
+  // answer should not require reading a log. eBay ignores unknown headers, and
+  // the value is the endpoint's own public URL, so there is nothing to leak.
+  const headers = { 'Content-Type': 'application/json', 'x-ebay-endpoint': endpoint };
+
   const verificationToken = process.env.EBAY_VERIFICATION_TOKEN;
   if (!isValidVerificationToken(verificationToken)) {
     console.error(
       '[ebay] EBAY_VERIFICATION_TOKEN is missing or malformed ' +
         '(needs 32-80 chars of A-Z a-z 0-9 _ -); cannot answer the challenge',
     );
-    return NextResponse.json({ error: 'endpoint not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'endpoint not configured' }, { status: 500, headers });
   }
 
-  const endpoint = endpointUrl();
   console.log(`[ebay] answering account-deletion challenge for ${endpoint}`);
 
   // Exactly this one key: eBay parses the body strictly.
@@ -52,7 +60,7 @@ export async function GET(request: NextRequest) {
         endpoint,
       }),
     },
-    { status: 200, headers: { 'Content-Type': 'application/json' } },
+    { status: 200, headers },
   );
 }
 

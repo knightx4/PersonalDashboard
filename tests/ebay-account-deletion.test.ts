@@ -34,6 +34,10 @@ describe('GET (eBay challenge)', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('application/json');
+    // Says which URL it hashed, so a mismatch is one curl away from obvious.
+    expect(response.headers.get('x-ebay-endpoint')).toBe(
+      'https://shelf.example.com/api/ebay/account-deletion',
+    );
 
     const body = await response.json();
     expect(body).toEqual({
@@ -70,7 +74,10 @@ describe('GET (eBay challenge)', () => {
 
   it('refuses to answer with a missing or malformed token rather than a wrong hash', async () => {
     vi.stubEnv('EBAY_VERIFICATION_TOKEN', '');
-    expect((await get('?challenge_code=abc123')).status).toBe(500);
+    const unconfigured = await get('?challenge_code=abc123');
+    expect(unconfigured.status).toBe(500);
+    // Still reports the endpoint: the misconfiguration might be the URL too.
+    expect(unconfigured.headers.get('x-ebay-endpoint')).toContain('/api/ebay/account-deletion');
 
     // Too short for eBay, so it would be rejected at registration anyway.
     vi.stubEnv('EBAY_VERIFICATION_TOKEN', 'short');
