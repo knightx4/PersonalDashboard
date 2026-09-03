@@ -29,7 +29,9 @@ letter arrive on the same sync and neither workspace owns that fact. See
 Build order steps 1–14 and books/sell assistant (16–18) are done. See
 [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next on the shopping
 side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
-next body of work.
+next body of work. [docs/SHARE-LINKS-SPEC.md](docs/SHARE-LINKS-SPEC.md) designs
+share links — a page a person with no account opens and fills in — starting with
+a keep/sell/give-away form over the board game shelf.
 
 | | |
 |---|---|
