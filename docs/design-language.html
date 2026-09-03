@@ -572,7 +572,8 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
     <div class="sw"><div class="chip" style="background:var(--raised);border-bottom:1px solid var(--border)"></div><div class="meta"><b>raised</b><span>--raised</span>menus, popovers</div></div>
     <div class="sw"><div class="chip" style="background:var(--ink)"></div><div class="meta"><b>ink</b><span>--ink</span>what the row is</div></div>
     <div class="sw"><div class="chip" style="background:var(--ink-muted)"></div><div class="meta"><b>ink-muted</b><span>--ink-muted</span>everything supporting</div></div>
-    <div class="sw"><div class="chip" style="background:var(--ink-faint)"></div><div class="meta"><b>ink-faint</b><span>--ink-faint</span>decoration only</div></div>
+    <div class="sw"><div class="chip" style="background:var(--ink-faint)"></div><div class="meta"><b>ink-ghost</b><span>--color-ink-ghost</span>decoration only</div></div>
+    <div class="sw"><div class="chip" style="background:var(--border-strong)"></div><div class="meta"><b>control</b><span>--color-control</span>input borders</div></div>
   </div>
 </div>
 
@@ -580,11 +581,12 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   <p>
     <strong>The three-ink rule.</strong> <code>ink</code> is what the row <em>is</em>.
     <code>ink-muted</code> is everything that supports it — and it is <em>the only grey allowed to
-    carry information you would miss</em>. <code>ink-faint</code> is decoration: placeholders,
-    disabled controls, redundant glyphs, hairline dividers.
+    carry information you would miss</em>. <code>ink-ghost</code> is decoration: placeholders,
+    disabled controls, redundant glyphs.
     <em>A count, a timestamp, a table header or a hint is information, and takes
-    <code>ink-muted</code>.</em> This one substitution fixes roughly 130 sub-threshold contrast
-    failures in the current code.
+    <code>ink-muted</code>.</em> There is no third informational grey, because an
+    <code>ink-faint</code> that clears 4.5:1 is <code>ink-muted</code> with extra steps — which is
+    what the measurements said when the old one was fixed rather than retired.
   </p>
 </div>
 
@@ -780,6 +782,23 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   makes a theme something a person could plausibly write themselves, which is the entire point.
 </p>
 
+<p>
+  Mechanically: the raw values are declared per theme as <code>--c-*</code> variables, and an
+  <code>@theme inline</code> block maps them onto Tailwind's names. That indirection is the whole
+  trick — <code>bg-surface</code> compiles to <code>background-color: var(--c-surface)</code>
+  rather than baking one theme's hex into the stylesheet, so one class follows five themes.
+</p>
+
+<div class="rule">
+  <p>
+    <strong>Tell <code>tailwind-merge</code> about every named scale you add</strong>, in
+    <code>lib/cn.ts</code>. A size and a colour are both spelled <code>text-*</code>; left untold,
+    it treated <code>text-surface</code> and <code>text-body</code> as the same kind of class and
+    silently deleted the first — which is how the primary button lost its label colour and rendered
+    invisible in three of the five themes. There is a test for it.
+  </p>
+</div>
+
 <pre><code><span class="c">/* The whole contract. Anything not in this list is derived. */</span>
 [data-theme=<span class="s">"yours"</span>] {
   color-scheme: light | dark;
@@ -922,6 +941,12 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 
 <div class="rule">
   <p>
+    <strong>Two borders, and the difference is legal rather than aesthetic.</strong>
+    <code>border</code> is the container hairline. <code>control</code> is the border of an input,
+    a select or a checkbox — often the only thing identifying it as a control, which makes it a
+    user-interface component owing 3:1 under WCAG 1.4.11 that a hairline does not pay.
+  </p>
+  <p style="margin-top:.6rem">
     <strong>No shadow at rest.</strong> Depth is a 1px border on a surface over a canvas. Shadow
     exists only for things genuinely floating — menus and popovers — and transiently on
     <code>lift</code> hover. A card with a resting drop shadow is wrong in every theme, and in the

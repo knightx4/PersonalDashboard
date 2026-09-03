@@ -6,6 +6,33 @@ existing app gets there, in an order where every step ships on its own.
 
 Read the language first. This document assumes it.
 
+## Status
+
+**Phases 0 through 4 are done**, plus the filter chips out of Phase 5. What shipped:
+the dual-mode token system and five themes, the measured contrast fixes and the CI
+checker, the named type scale, one `WorkspaceNav` in place of four top bars, the
+rebuilt switcher, per-workspace accents, the grain, popover focus management, sign-out
+on `/account`, and a `loading.tsx` and `error.tsx` for every route group.
+
+**What is left**, in the order it is worth doing:
+
+| | Why it is still open |
+|---|---|
+| **1.1 The `Card` migration** | `Card` now has the padding variants and the headerless mode it needed, so nothing is blocking it — but the utility string is hand-written in over a hundred places and swapping a `<div>` for a `<Card>` is not a safe `sed`. It wants a JSX-aware codemod or an afternoon, and it changes no pixels. |
+| **1.6 `Field`** | The component exists and is used by new code; the several dozen hand-rolled label/hint/error trios have not been migrated onto it. |
+| **3.3 Wiring the bell** | It renders nothing until it has something to say, which is the correct half. The other half — deriving notifications from the return windows, interview prep, vault token and review queue that already exist — is a feature, not a refactor. |
+| **5.1–5.5, 5.7–5.9** | Undo, bulk actions, the keyboard model, search unification, tabs into the URL, the attention ladder, a keyboard path for the pipeline board. The whole interaction half. |
+| **Phase 6** | The status line, the sigil, key hints, density, marginalia, seams, sound. |
+
+Two things changed from the plan as written, and the reasons are worth keeping:
+
+- **`ink-faint` was retired rather than darkened.** A "faint" grey that clears 4.5:1 measures
+  within a whisker of `ink-muted`, so keeping both would have been a distinction nobody could
+  see. Informational uses moved to `ink-muted`; what remains is `ink-ghost`, decoration only.
+- **A second border token appeared.** An input's border is often the only thing identifying it
+  as an input, which makes it a user-interface component owing 3:1 that the container hairline
+  does not pay. Hence `control` alongside `border`.
+
 ## The shape of the work
 
 The app has **better design thinking than design infrastructure**. The reasoning is

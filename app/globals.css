@@ -629,6 +629,13 @@ body::before {
   }
 }
 
+/* A filter form whose selects submit themselves has no use for its Apply
+ * button -- but the button is what makes the form work with JavaScript off, so
+ * it is hidden rather than removed. See components/shell/submit-on-change.tsx. */
+form[data-auto-submit] [data-fallback-submit] {
+  display: none;
+}
+
 /* Visible focus for keyboard users, invisible for mouse users. */
 :focus-visible {
   outline: 2px solid var(--c-accent);

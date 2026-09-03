@@ -14,6 +14,7 @@ type OrderSourceMessage = {
 import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
@@ -230,6 +231,56 @@ export default async function OrdersPage({
     orders.map((order, index) => [order.id, displayTotals[index] ?? order.total_cents]),
   );
 
+  /** What is narrowing this page, said out loud above the results. */
+  const chips: FilterChip[] = [];
+  if (q) {
+    chips.push({
+      label: 'Search',
+      value: q,
+      clearHref: hrefFor({ range, status, merchant: activeMerchant, tag: activeTag, person: personId ?? undefined }),
+    });
+  }
+  if (activeMerchant) {
+    const merchant = merchants.find((entry) => entry.id === activeMerchant);
+    if (merchant) {
+      chips.push({
+        label: 'Merchant',
+        value: merchant.name,
+        clearHref: hrefFor({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
+      });
+    }
+  }
+  if (activeTag) {
+    const tag = tags.find((entry) => entry.id === activeTag);
+    if (tag) {
+      chips.push({
+        label: 'Tag',
+        value: tag.name,
+        clearHref: hrefFor({ range, status, merchant: activeMerchant, q: q || undefined, person: personId ?? undefined }),
+      });
+    }
+  }
+  if (status) {
+    const entry = STATUSES.find((option) => option.id === status);
+    if (entry) {
+      chips.push({
+        label: 'Status',
+        value: entry.label,
+        clearHref: hrefFor({ range, merchant: activeMerchant, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
+      });
+    }
+  }
+  if (personId) {
+    const person = byPerson.get(personId);
+    if (person) {
+      chips.push({
+        label: 'Whose',
+        value: person.name,
+        clearHref: hrefFor({ range, status, merchant: activeMerchant, tag: activeTag, q: q || undefined }),
+      });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
       <LeftRail>
@@ -361,6 +412,8 @@ export default async function OrdersPage({
             </Link>
           }
         />
+
+        <FilterChips chips={chips} clearAllHref="/shopping/orders" />
 
         <form className="mb-5" action="/shopping/orders" method="get">
           <input type="hidden" name="range" value={range} />

@@ -4,6 +4,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
+import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
@@ -332,6 +334,67 @@ export default async function InventoryPage({
     person: personId ?? undefined,
   };
 
+  /**
+   * What is narrowing this page, said out loud above the results.
+   *
+   * Seven filters can be in force at once here, and the rail alone made you
+   * hunt for a tinted row to find out which. Each chip clears exactly itself
+   * and keeps the rest, which is the whole point -- "clear all" is a blunt
+   * instrument and is offered separately.
+   */
+  const chips: FilterChip[] = [];
+  if (q) chips.push({ label: 'Search', value: q, clearHref: inventoryHref({ ...hrefBase, q: undefined }) });
+  if (categoryId) {
+    const category = (categories ?? []).find((entry) => entry.id === categoryId);
+    if (category) {
+      chips.push({
+        label: 'Category',
+        value: category.name,
+        clearHref: inventoryHref({ ...hrefBase, category: undefined }),
+      });
+    }
+  }
+  if (activeMerchant) {
+    const merchant = merchants.find((entry) => entry.id === activeMerchant);
+    if (merchant) {
+      chips.push({
+        label: 'Merchant',
+        value: merchant.name,
+        clearHref: inventoryHref({ ...hrefBase, merchant: undefined }),
+      });
+    }
+  }
+  if (activeList) {
+    const list = (lists ?? []).find((entry) => entry.id === activeList);
+    if (list) {
+      chips.push({
+        label: 'List',
+        value: list.name,
+        clearHref: inventoryHref({ ...hrefBase, list: undefined }),
+      });
+    }
+  }
+  if (range !== 'all') {
+    const entry = RANGES.find((option) => option.id === range);
+    if (entry) {
+      chips.push({
+        label: 'Acquired',
+        value: entry.label,
+        clearHref: inventoryHref({ ...hrefBase, range: 'all' }),
+      });
+    }
+  }
+  if (personId) {
+    const person = byPerson.get(personId);
+    if (person) {
+      chips.push({
+        label: 'Whose',
+        value: person.name,
+        clearHref: inventoryHref({ ...hrefBase, person: undefined }),
+      });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
       <LeftRail>
@@ -433,6 +496,8 @@ export default async function InventoryPage({
           }
         />
 
+        <FilterChips chips={chips} clearAllHref="/shopping/inventory" />
+
         <form className="mb-4 space-y-3" action="/shopping/inventory" method="get">
           {range !== 'all' && <input type="hidden" name="range" value={range} />}
           {categoryId && <input type="hidden" name="category" value={categoryId} />}
@@ -490,9 +555,13 @@ export default async function InventoryPage({
                 ))}
               </Select>
             </label>
+            <SubmitOnChange />
+            {/* Hidden once the selects submit themselves; still there, and
+                still the only way through, with JavaScript off. */}
             <button
               type="submit"
-              className="press h-9 rounded-lg border border-border bg-surface px-3 text-ui font-medium text-ink-muted hover:text-ink"
+              data-fallback-submit
+              className="press h-9 rounded-lg border border-control bg-surface px-3 text-ui font-medium text-ink-muted hover:text-ink"
             >
               Apply
             </button>
