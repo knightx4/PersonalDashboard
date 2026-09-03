@@ -1,6 +1,7 @@
 import { MessageSquarePlus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FeedbackList } from '@/app/shopping/feedback/feedback-list';
+import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import type { FeedbackQueue } from '@/lib/feedback/load';
 
 /**
@@ -15,11 +16,14 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
 
   if (rows.length === 0) {
     return (
-      <EmptyState
-        icon={MessageSquarePlus}
-        title="Nothing captured yet"
-        description="Use the message button in the header to log a bug or an idea the moment you hit it."
-      />
+      <div className="space-y-6">
+        <EmptyState
+          icon={MessageSquarePlus}
+          title="Nothing captured yet"
+          description="Use the message button in the header to log a bug or an idea the moment you hit it."
+        />
+        <RunRoutineButton />
+      </div>
     );
   }
 
@@ -49,6 +53,9 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
             <FeedbackList rows={closed} />
           </section>
         )}
+
+        {/* Under the whole list: the queue is what the routine works. */}
+        <RunRoutineButton />
       </div>
     </>
   );

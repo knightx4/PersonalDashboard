@@ -9,6 +9,7 @@ import {
   type FeedbackActionState,
 } from '@/app/shopping/feedback/actions';
 import { Button } from '@/components/ui/button';
+import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 
@@ -150,13 +151,16 @@ export function FeedbackButton({
               <Button type="submit" size="sm" disabled={pending}>
                 {pending ? 'Saving…' : 'Send'}
               </Button>
-              <Link
-                href={allHref}
-                className="text-[13px] text-brand hover:underline"
-                onClick={() => setOpen(false)}
-              >
-                See all
-              </Link>
+              <div className="flex items-center gap-3">
+                <RunRoutineButton variant="inline" />
+                <Link
+                  href={allHref}
+                  className="text-[13px] text-brand hover:underline"
+                  onClick={() => setOpen(false)}
+                >
+                  See all
+                </Link>
+              </div>
             </div>
 
             <FieldError>{state.error}</FieldError>

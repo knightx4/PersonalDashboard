@@ -14,7 +14,7 @@ import { respondResultSchema, type RespondResult } from '@/lib/share/read/load-d
  * else.
  *
  * It is callable by anyone who loads the page, which is fine and is the whole
- * design: `share_respond()` in supabase/migrations/0041_share_rpcs.sql is the
+ * design: `share_respond()` in supabase/migrations/0042_share_rpcs.sql is the
  * authorization decision, it takes the token as its first argument, and it
  * counts the quantity itself rather than believing anything sent from here.
  * Nothing in this file is trusted by the database.

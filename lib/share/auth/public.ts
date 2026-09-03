@@ -14,7 +14,7 @@ import { publicEnv } from '@/lib/env';
  *
  * Still the anon key, so RLS applies in full. The only things it can usefully
  * reach are share_page() and share_respond(), which are the whole
- * authorization decision and live in supabase/migrations/0041_share_rpcs.sql
+ * authorization decision and live in supabase/migrations/0042_share_rpcs.sql
  * where they can be read.
  */
 export function createSharePublicClient() {

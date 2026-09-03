@@ -109,7 +109,7 @@ about board games.
 
 ## Layer 1 — share links
 
-### Schema (`supabase/migrations/0039_share_links.sql`)
+### Schema (`supabase/migrations/0040_share_links.sql`)
 
 ```
 share_links
@@ -190,7 +190,7 @@ Owner policies exactly as everywhere else — `user_id = (select auth.uid())` on
 `share_links`, `exists (...)` through the parent on the four child tables.
 `anon` gets no policy and no grant on any of them.
 
-### The anonymous read (`0041_share_rpcs.sql`)
+### The anonymous read (`0042_share_rpcs.sql`)
 
 ```sql
 public.share_page(p_token text) returns jsonb
@@ -212,7 +212,7 @@ A wrong token, a revoked token and an expired token are one outcome — the page
 404s — for the same reason the case page does it: a distinct "this expired"
 message confirms the token was real.
 
-### The anonymous write (`0041_share_rpcs.sql`)
+### The anonymous write (`0042_share_rpcs.sql`)
 
 This is new ground; the case page is read-only.
 
@@ -306,7 +306,7 @@ inventory_item_families
   id, inventory_item_id, family_id, role, position, created_at
 ```
 
-(`supabase/migrations/0040_item_families.sql`)
+(`supabase/migrations/0041_item_families.sql`)
 
 `role` is an enum: `base | expansion | edition | accessory | member`. That is
 what makes this structurally sound rather than a folder — the form can render
@@ -463,10 +463,10 @@ are the useful part.
 
 | | |
 |---|---|
-| `0039_share_links.sql` — the share primitive | done |
-| `0040_item_families.sql` — grouping and inventory tags | done |
-| `0041_share_rpcs.sql` — `share_page`, `share_respond` | done |
-| `0042_share_owned_only.sql` — owned-only, and clamping | done |
+| `0040_share_links.sql` — the share primitive | done |
+| `0041_item_families.sql` — grouping and inventory tags | done |
+| `0042_share_rpcs.sql` — `share_page`, `share_respond` | done |
+| `0043_share_owned_only.sql` — owned-only, and clamping | done |
 | `lib/share/grouping.ts` + tests | done |
 | Import boundary + `no-restricted-globals: fetch` | done |
 | `formatMoneyOrBlank`, `lib/share/read/load-disposition.ts` | done |

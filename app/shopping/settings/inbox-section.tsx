@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AlertCircle, Mail, RefreshCw } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import { publicEnv } from '@/lib/env';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { disconnectInbox } from './actions';
 import { InboxSyncButton, type InboxSyncProgress } from './inbox-sync-button';
@@ -56,7 +57,9 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'exchange':
       return {
         tone: 'err',
-        text: 'Google rejected the token exchange. Confirm the OAuth client redirect URI is exactly https://shopping.selveyknight.com/api/auth/gmail/callback',
+        text:
+          'Google rejected the token exchange. Confirm the OAuth client redirect URI ' +
+          `is exactly ${publicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/auth/gmail/callback`,
       };
     case 'profile':
       return {

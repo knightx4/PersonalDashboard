@@ -91,6 +91,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.game_details = gameDetails.id;
 
+  const [attributeTemplate] = await admin<{ id: string }[]>`
+    insert into category_attribute_templates (user_id, category_id, fields)
+    values (
+      ${userId}, ${category.id},
+      ${admin.json([{ key: 'brand', label: 'Brand', type: 'text' }])}::jsonb
+    )
+    returning id`;
+  ids.category_attribute_templates = attributeTemplate.id;
+
   const [feedback] = await admin<{ id: string }[]>`
     insert into feedback_items (user_id, kind, body, page_path)
     values (${userId}, 'bug', ${`${tag} found a bug`}, '/shopping/dashboard')

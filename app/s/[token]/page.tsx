@@ -15,7 +15,7 @@ import { DispositionGroup } from './disposition-group';
  *
  * This and app/api/s/[token]/respond are the only unauthenticated surface in
  * the shopping workspace. Both go through the two functions in
- * supabase/migrations/0041_share_rpcs.sql, which are the whole authorization
+ * supabase/migrations/0042_share_rpcs.sql, which are the whole authorization
  * decision. There is no service-role client here and no RLS exemption.
  *
  * And it never calls out. No price lookup, no cover art, no enrichment -- see

@@ -10,13 +10,13 @@
 #
 # Optional overrides:
 #   PROJECT_REF=asjztutnqxbecruvyrbj
-#   SITE_URL=https://shopping.selveyknight.com
+#   SITE_URL=https://dash.selveyknight.com
 #   EXTRA_REDIRECTS='https://other.example/auth/callback'
 #
 set -euo pipefail
 
 PROJECT_REF="${PROJECT_REF:-asjztutnqxbecruvyrbj}"
-SITE_URL="${SITE_URL:-https://shopping.selveyknight.com}"
+SITE_URL="${SITE_URL:-https://dash.selveyknight.com}"
 VERCEL_URL="${VERCEL_URL:-https://shopping-manager-amber.vercel.app}"
 
 die() { printf '\n\033[31mError: %s\033[0m\n' "$*" >&2; exit 1; }

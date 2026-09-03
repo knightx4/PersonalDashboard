@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:reset": "./scripts/db-reset.sh",
+    "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts"
   },

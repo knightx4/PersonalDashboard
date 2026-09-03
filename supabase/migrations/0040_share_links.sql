@@ -5,7 +5,7 @@
 -- legal, and that enum is the seam every future use case comes in through.
 -- See docs/SHARE-LINKS-SPEC.md.
 --
--- The read and write functions that anon actually calls live in 0041. This
+-- The read and write functions that anon actually calls live in 0042. This
 -- migration is only the shape of the data, and every table here is closed to
 -- anon: no policy, no grant. An anonymous visitor never touches a table.
 
@@ -69,7 +69,7 @@ create trigger share_links_touch_updated_at
 --
 --   * "share with a specific person" later is an insert with a different
 --     label, and a revoke on the open one. No schema change, and no change to
---     the signature of the functions in 0041.
+--     the signature of the functions in 0042.
 --   * rotating a leaked link is an insert plus a revoke, and the answers
 --     already given survive it.
 --   * `can_respond` exists so a read-only link is expressible without
@@ -114,7 +114,7 @@ create trigger share_link_tokens_touch_updated_at
 -- they are three things I own and one of them might get sold.
 --
 -- `group_key` and `family_key` are denormalized here on purpose. They are
--- computed by the application from the grouping layer (0040) when an item is
+-- computed by the application from the grouping layer (0041) when an item is
 -- added, and recomputed by an explicit regroup. Storing them is what lets the
 -- anonymous write function answer "how many units does this group have?" with
 -- a count against a table it already trusts, instead of taking a quantity from
@@ -243,7 +243,7 @@ create index share_link_events_token_created_idx
 -- ---------------------------------------------------------------------------
 --
 -- Owner-only, everywhere. `anon` gets no policy and no grant on any of these
--- five tables: anonymous access is the two functions in 0041 and nothing else.
+-- five tables: anonymous access is the two functions in 0042 and nothing else.
 -- A policy admitting anon when a token matched would be inherited by every
 -- future query on the table, and the next join would get the exemption free.
 

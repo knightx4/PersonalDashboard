@@ -15,7 +15,7 @@
  *
  * The other half of grouping -- "do these belong together", the Monopoly
  * heading over twelve themed editions -- is a table, not a computation. See
- * supabase/migrations/0040_item_families.sql.
+ * supabase/migrations/0041_item_families.sql.
  */
 import { cleanGameTitle } from '@/lib/games/clean-title';
 import { normalize } from '@/lib/fingerprint';

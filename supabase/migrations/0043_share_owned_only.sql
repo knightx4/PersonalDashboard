@@ -1,6 +1,6 @@
 -- The form only ever asks about things still owned.
 --
--- 0041 joined inventory_items without looking at status, which was fine while
+-- 0042 joined inventory_items without looking at status, which was fine while
 -- nothing acted on her answers. Applying a decision changes status -- 'sold',
 -- 'gifted' -- and without this the box would stay on the form afterwards,
 -- asking her again about something already gone, and the quantity she is

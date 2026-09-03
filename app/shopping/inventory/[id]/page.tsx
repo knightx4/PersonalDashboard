@@ -11,8 +11,17 @@ import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/shopping/returns/plan-return-button';
 import { displayVariant } from '@/lib/inventory/display';
 import { displayNameOf } from '@/lib/inventory/sort-group';
+import { loadItemSellQuote } from '@/lib/sell/item-quote';
+import {
+  fieldsForItem,
+  parseAttributeValues,
+  searchProviderFor,
+  templateFor,
+} from '@/lib/inventory/attributes';
 import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
 import { BookDetailsPanel } from './book-details-panel';
+import { ItemAttributesPanel } from './attributes-panel';
+import { ItemSellPanel } from './sell-panel';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -39,7 +48,7 @@ export default async function InventoryItemPage({
         `
         id, name, short_name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
-        return_planned, source,
+        return_planned, source, attributes,
         categories ( id, name, color, slug ),
         order_items (
           order_id, product_url, image_url,
@@ -117,6 +126,31 @@ export default async function InventoryItemPage({
       hasReturnWindow = override.return_window_days != null;
     }
   }
+
+  // A template row exists only once the user has edited it; until then the
+  // category's built-in fields apply.
+  const { data: templateRow } = item.category_id
+    ? await supabase
+        .from('category_attribute_templates')
+        .select('fields')
+        .eq('user_id', user.id)
+        .eq('category_id', item.category_id)
+        .maybeSingle()
+    : { data: null };
+
+  const attributeValues = parseAttributeValues(item.attributes);
+  const attributeTemplate = templateFor({
+    categorySlug: category?.slug ?? null,
+    savedFields: templateRow?.fields ?? null,
+    hasSavedTemplate: Boolean(templateRow),
+  });
+
+  // Only worth asking for something still owned, and it never spends a lookup:
+  // the price on screen is whatever is already cached.
+  const sellQuote =
+    item.status === 'owned'
+      ? await loadItemSellQuote({ supabase, userId: user.id, inventoryItemId: item.id })
+      : null;
 
   let returnDueCopy: string | null = null;
   if (item.status === 'owned' && order) {
@@ -276,6 +310,18 @@ export default async function InventoryItemPage({
           }}
         />
       )}
+
+      <ItemAttributesPanel
+        itemId={item.id}
+        categoryId={item.category_id}
+        categoryName={category?.name ?? null}
+        template={attributeTemplate}
+        fields={fieldsForItem(attributeTemplate, attributeValues)}
+        values={attributeValues}
+        searchAvailable={searchProviderFor(category?.slug ?? null) !== null}
+      />
+
+      {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
 
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
