@@ -29,9 +29,9 @@ letter arrive on the same sync and neither workspace owns that fact. See
 Build order steps 1–14 and books/sell assistant (16–18) are done. See
 [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next on the shopping
 side, and [docs/EVIDENCE-LAYER.md](docs/EVIDENCE-LAYER.md) for the job side's
-next body of work. [docs/SHARE-LINKS-SPEC.md](docs/SHARE-LINKS-SPEC.md) designs
-share links — a page a person with no account opens and fills in — starting with
-a keep/sell/give-away form over the board game shelf.
+next body of work. [docs/SHARE-LINKS-SPEC.md](docs/SHARE-LINKS-SPEC.md) describes
+share links — a page a person with no account opens and fills in — which now
+carry a keep/sell/give-away form over the board game shelf.
 
 | | |
 |---|---|
@@ -57,6 +57,7 @@ a keep/sell/give-away form over the board game shelf.
 | Company enrichment from Wikidata | done |
 | JD backfill from the employer's own ATS board | done |
 | Vault workspace (schema, git sync, viewer, connect UI) | done |
+| Share links (anonymous form, item families, disposition) | done |
 
 ## Getting started
 
@@ -135,6 +136,15 @@ These are enforced by tests and lint rules, not by convention.
 - **Notes render without raw HTML.** `rehype-raw` is not installed and must not
   be: with raw HTML disabled, `react-markdown` will not render the arbitrary
   markup a web-clipper note carries. That absence is the sanitizer.
+- **A shared link is a window, never an engine.** The anonymous page reads
+  rows that already exist and does nothing else: no lookup, no enrichment, no
+  billed call, no job, no outbound HTTP. `share_page()` is declared `stable`
+  so Postgres will not let it write; an ESLint boundary keeps `lib/sell`, the
+  game and book providers, `lib/fx`, `lib/email`, `inngest` and the Anthropic
+  SDK out of `app/s/`, `app/api/s/` and `lib/share/read/`, and bans a bare
+  `fetch` there; and `tests/share-read.test.ts` renders the page with `fetch`
+  stubbed to throw. An unknown price renders blank, never `$0.00` — zero is a
+  claim, and a game shown as worth nothing is a game someone gives away.
 - **The vault sync never advances its cursor past work it did not do.** A
   cursor is a promise that everything up to a commit is mirrored, and a promise
   made early is a permanent gap — the next run only asks for what changed since

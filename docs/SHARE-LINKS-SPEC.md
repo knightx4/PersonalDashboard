@@ -455,31 +455,77 @@ Following the existing files rather than inventing a new style.
 - `tests/schema-exposed.test.ts` — extend, so the new tables are asserted
   unreachable over PostgREST as `anon`.
 
-## Build order
+## What was built
 
-Each step is a commit that leaves the app working.
+All eleven steps are done. Where the build diverged from the plan above, it is
+recorded here rather than quietly edited into the design, because the reasons
+are the useful part.
 
-1. `0039_share_links.sql` + `0040_item_families.sql` + `0041_share_rpcs.sql`,
-   Drizzle schema in `lib/db/schema.ts`, `tests/rls-share.test.ts` green.
-2. `lib/share/grouping.ts` and its tests. No UI.
-3. The import boundary in `eslint.config.mjs` and its assertion in
-   `tests/lint-boundaries.test.ts` — **before** the read path exists, so it is
-   never possible to write a version that reaches out.
-4. `formatMoneyOrBlank`, and `lib/share/read/load-disposition.ts`: the one
-   loader the anonymous page reads through, plus `tests/share-read.test.ts`
-   with `fetch` stubbed to throw.
-5. `/s/[token]` read-only: the grouped page, photos, prices, quantities.
-   Sendable at this point, just not answerable.
-6. The respond route and the steppers. The form works.
-7. `/shopping/share` — create, copy, revoke, and the responses view.
-8. Send-to-form and add-by-filter on inventory.
-9. Family suggestions (BGG expansion links + title clustering) and the accept
-   UI. Note this is enrichment, so it lives entirely on my authenticated side.
-10. `scripts/share-add.ts` and the `share:add` npm script.
-11. Apply-a-decision.
+| | |
+|---|---|
+| `0039_share_links.sql` — the share primitive | done |
+| `0040_item_families.sql` — grouping and inventory tags | done |
+| `0041_share_rpcs.sql` — `share_page`, `share_respond` | done |
+| `0042_share_owned_only.sql` — owned-only, and clamping | done |
+| `lib/share/grouping.ts` + tests | done |
+| Import boundary + `no-restricted-globals: fetch` | done |
+| `formatMoneyOrBlank`, `lib/share/read/load-disposition.ts` | done |
+| `/s/[token]` — the form itself | done |
+| `/shopping/share` — create, links, answers | done |
+| Send-to-form, on the list and the item page | done |
+| `/shopping/share/families` — suggestions | done |
+| `scripts/share-add.ts` + `npm run share:add` | done |
+| Apply a decision | done |
 
-Steps 1–6 are the whole thing she needs. 7–11 are the parts that make it
-pleasant and repeatable.
+### Six things changed on the way
+
+1. **The read cannot write, so nothing records that she opened it.**
+   `share_page()` is declared `stable`, which means Postgres will not let it
+   write at all — the "opening the link does nothing" promise is enforced by
+   the function's volatility class rather than by the care of whoever edits it
+   next. The price is that `last_seen_at` is touched only when she *answers*.
+   The guarantee is worth more than the analytics.
+
+2. **Writes are a server action, not `app/api/s/[token]/respond`.** With an
+   action the browser never needs `fetch` either, so "the shared link makes no
+   outbound HTTP call" is true on both sides of the wire instead of true on one
+   and excused on the other. The eslint glob for `app/api/s` stays, so a future
+   route handler is covered the day one exists.
+
+3. **`0042` was not in the plan and had to be.** Applying a decision changes an
+   item's status, and without an `status = 'owned'` filter in *both* functions
+   the box stays on the form afterwards — asking her again about something
+   already gone, against a quantity that no longer exists. It also drops items
+   returned, lost or disposed of from the inventory page, with nobody having to
+   remember. Stored answers are clamped to the live quantity on read, so a
+   "sell 2" left over from before one was sold cannot render against a
+   quantity of 1.
+
+4. **Family suggestions are title clustering only; the BoardGameGeek half is
+   deferred.** BGG publishes the real answer, and `lib/games/providers/bgg.ts`
+   says in its own header that BGG refuses requests from datacenter IPs — which
+   is why Wikidata is in that directory at all, and Wikidata does not carry the
+   expansion relation. A fetcher for it would return 401 from every deployment
+   and pass only on a laptop. Publishers name expansions after their base game
+   on the box, so the signal BGG would confirm is already in the title. When a
+   route to those links opens up it belongs beside the clustering as a
+   higher-confidence second source, not as a replacement.
+
+5. **The anon-unreachable assertions live in `tests/rls-share.test.ts`, not in
+   `tests/schema-exposed.test.ts`.** That file turned out to be about handling
+   PGRST106 when a schema is not exposed — a different subject entirely.
+
+6. **Steps 5 and 6 landed together.** They were delivery milestones (sendable,
+   then answerable) rather than architectural ones, and building a read-only
+   card to replace an hour later would have been churn.
+
+### What is not verified
+
+The SQL is exercised directly against Postgres, and the loader against the real
+SQL. The React rendering is typechecked and builds, but has not been seen in a
+browser: this repository has no component-test setup and the anonymous client
+talks to PostgREST, which the local Postgres does not run. Worth a look on a
+phone before the link goes to anyone.
 
 ## Open questions
 
