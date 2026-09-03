@@ -7,12 +7,12 @@ import { cn } from '@/lib/cn';
 import type { ModuleId } from '@/lib/modules';
 
 /**
- * The two halves of the app, and the switch between them.
+ * The workspaces, and the switch between them.
  *
  * This sits where each product's wordmark used to. One login, one deployment
- * and one database now carry two unrelated domains, and the thing a person
- * needs top-left is no longer a name -- it is which of the two they are
- * currently in, and the way out.
+ * and one database now carry several unrelated domains, and the thing a person
+ * needs top-left is no longer a name -- it is which of them they are currently
+ * in, and the way out.
  *
  * `home` is where switching lands you: the page that answers "what is going on"
  * for that domain, not its settings or its root.
@@ -38,6 +38,17 @@ const WORKSPACES = [
     description: 'Pipeline, roles, companies and interviews',
     gradient:
       'linear-gradient(135deg, var(--color-brand) 0%, var(--color-status-final) 100%)',
+  },
+  {
+    id: 'todo',
+    prefix: '/todo',
+    // The agenda, not the archive: "what has to happen" is the question this
+    // workspace answers, and /todo/all is the pile you consult afterwards.
+    home: '/todo',
+    label: 'Todo',
+    description: 'What has to happen, across everything',
+    gradient:
+      'linear-gradient(135deg, var(--color-status-offer) 0%, var(--color-brand) 100%)',
   },
   {
     id: 'vault',
