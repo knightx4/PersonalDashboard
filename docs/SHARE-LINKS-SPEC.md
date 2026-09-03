@@ -467,6 +467,7 @@ are the useful part.
 | `0041_item_families.sql` — grouping and inventory tags | done |
 | `0042_share_rpcs.sql` — `share_page`, `share_respond` | done |
 | `0043_share_owned_only.sql` — owned-only, and clamping | done |
+| `0044_share_tables_deny_anon.sql` — take back Supabase's default grants | done |
 | `lib/share/grouping.ts` + tests | done |
 | Import boundary + `no-restricted-globals: fetch` | done |
 | `formatMoneyOrBlank`, `lib/share/read/load-disposition.ts` | done |
@@ -515,7 +516,22 @@ are the useful part.
    `tests/schema-exposed.test.ts`.** That file turned out to be about handling
    PGRST106 when a schema is not exposed — a different subject entirely.
 
-6. **Steps 5 and 6 landed together.** They were delivery milestones (sendable,
+6. **Deploying found a seventh thing.** Supabase's default privileges hand
+   `anon` full DML on every new table in `public` so the Data API can reach it,
+   and a `CREATE TABLE` inherits that whether or not the migration mentions
+   anon — so all eight tables landed in production with grants the migrations
+   that created them explicitly said they would not give. Nothing leaked (RLS
+   was on and every policy is `to authenticated`, so anon read zero rows), but
+   the protection was resting entirely on the policies, and one policy written
+   without a `TO` clause would have turned a dormant grant into an anonymous
+   write path. `0044` revokes them, which changes nothing about what the shared
+   form can do: `security definer` functions run as their owner and never
+   needed a caller-side table grant. That is the argument for having built the
+   anonymous surface as two functions rather than as a policy, and it only
+   became visible against a real Supabase project — a plain Postgres, which is
+   what the test database is, never had the grants.
+
+7. **Steps 5 and 6 landed together.** They were delivery milestones (sendable,
    then answerable) rather than architectural ones, and building a read-only
    card to replace an hour later would have been churn.
 
