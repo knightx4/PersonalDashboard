@@ -9,12 +9,7 @@ import {
 } from '@/lib/jobs/followup/compose';
 import { lastCorrespondents } from '@/lib/jobs/followup/recipients';
 import { SNOOZE_DAYS } from '@/lib/todo/tasks/model';
-import type {
-  AgendaItem,
-  AgendaSource,
-  DayContext,
-  SourceContext,
-} from '@/lib/todo/agenda/sources';
+import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
  * Follow-ups, prep, thank-yous and deadlines, from job_search.reminders.
@@ -35,6 +30,10 @@ import type {
  * eighty lines rather than twenty: knowing a pursuit has gone quiet is the easy
  * half, and the blank compose window is the half that decides whether anything
  * happens.
+ *
+ * Interviews used to ride along here as day context. They are their own source
+ * now (sources/job-interviews.ts): the diary and the to-do list are different
+ * questions, and one switch could only ever answer both.
  */
 
 type Row = Record<string, unknown>;
@@ -55,7 +54,7 @@ const KIND_LABELS: Record<string, string> = {
 
 export const jobRemindersSource: AgendaSource = {
   id: 'job_reminders',
-  label: 'Job search reminders',
+  label: 'To-dos and follow-ups',
   module: 'jobs',
   description:
     'Follow-ups, prep and thank-yous the job search is holding, with the follow-up already written.',
@@ -118,56 +117,6 @@ export const jobRemindersSource: AgendaSource = {
         }),
         detail: companyName ? `${companyName}${roleTitle ? ` · ${roleTitle}` : ''}` : null,
         completable: true,
-      };
-    });
-  },
-
-  /**
-   * Interviews, as context rather than as items.
-   *
-   * /jobs/today shows these as a section of its own, which is right there --
-   * that page is about the job search. Here they are a line at the top of the
-   * day, because the reason you want to know about Thursday's interview while
-   * reading a general agenda is that it tells you what else Thursday can hold.
-   */
-  async context(ctx: SourceContext): Promise<DayContext[]> {
-    const supabase = await createJobsClient();
-
-    const { data, error } = await supabase
-      .from('interviews')
-      .select(
-        'id, scheduled_at, kind, duration_minutes, meeting_url, applications ( roles ( id, title, companies ( name ) ) )',
-      )
-      .eq('user_id', ctx.userId)
-      .gte('scheduled_at', `${ctx.from}T00:00:00.000Z`)
-      .lte('scheduled_at', `${ctx.to}T23:59:59.999Z`)
-      .order('scheduled_at', { ascending: true })
-      .limit(50);
-
-    if (error) throw new Error(error.message);
-
-    return ((data ?? []) as Row[]).map((row) => {
-      const role = one(one(row.applications)?.roles);
-      const company = one(role?.companies);
-      const scheduledAt = row.scheduled_at as string;
-
-      return {
-        key: `interview:${row.id as string}`,
-        day: dayIn(scheduledAt, ctx.timezone),
-        at: scheduledAt,
-        label: [company?.name, role?.title].filter(Boolean).join(' · ') || 'Interview',
-        detail: [
-          String(row.kind ?? '').replace(/_/g, ' '),
-          row.duration_minutes ? `${row.duration_minutes as number} min` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        link: role
-          ? {
-              href: `/jobs/roles/${role.id as string}?tab=interviews&interview=${row.id as string}`,
-              label: 'Prep',
-            }
-          : null,
       };
     });
   },

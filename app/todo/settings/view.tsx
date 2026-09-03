@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
+import type { ModuleId } from '@/lib/modules';
 import type { SourceId } from '@/lib/todo/agenda/sources';
 import { updateAgendaSettings, type AgendaSettingsState } from './actions';
 
@@ -15,12 +16,19 @@ export interface SourceOption {
   available: boolean;
 }
 
+/** One workspace's sources, so the list reads as "what Job search contributes". */
+export interface SourceGroup {
+  moduleId: ModuleId;
+  moduleLabel: string;
+  sources: SourceOption[];
+}
+
 export function AgendaSettingsForm({
-  sources,
+  groups,
   enabled,
   horizonDays,
 }: {
-  sources: SourceOption[];
+  groups: SourceGroup[];
   enabled: SourceId[];
   horizonDays: number;
 }) {
@@ -39,36 +47,47 @@ export function AgendaSettingsForm({
           it.
         </p>
 
-        {sources.length === 0 ? (
+        {groups.length === 0 ? (
           <p className="mt-4 text-[13px] text-ink-faint">
             No sources yet. The agenda shows the tasks you typed.
           </p>
         ) : (
-          <div className="mt-4 space-y-3">
-            {sources.map((source) => (
-              <label
-                key={source.id}
-                className={cn(
-                  'flex items-start gap-3 rounded-lg border border-border px-3 py-2.5',
-                  !source.available && 'opacity-60',
-                )}
-              >
-                <input
-                  type="checkbox"
-                  name={`source:${source.id}`}
-                  defaultChecked={enabled.includes(source.id)}
-                  disabled={!source.available}
-                  className="mt-1 size-4 accent-[var(--color-brand)]"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-medium text-ink">{source.label}</span>
-                  <span className="block text-[12px] leading-snug text-ink-muted">
-                    {source.available
-                      ? source.description
-                      : 'That workspace is switched off under Account.'}
-                  </span>
-                </span>
-              </label>
+          <div className="mt-4 space-y-5">
+            {groups.map((group) => (
+              <div key={group.moduleId}>
+                <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                  {group.moduleLabel}
+                </h3>
+                <div className="space-y-3">
+                  {group.sources.map((source) => (
+                    <label
+                      key={source.id}
+                      className={cn(
+                        'flex items-start gap-3 rounded-lg border border-border px-3 py-2.5',
+                        !source.available && 'opacity-60',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        name={`source:${source.id}`}
+                        defaultChecked={enabled.includes(source.id)}
+                        disabled={!source.available}
+                        className="mt-1 size-4 accent-[var(--color-brand)]"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-medium text-ink">
+                          {source.label}
+                        </span>
+                        <span className="block text-[12px] leading-snug text-ink-muted">
+                          {source.available
+                            ? source.description
+                            : `${group.moduleLabel} is switched off under Account.`}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
