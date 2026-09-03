@@ -1,14 +1,12 @@
 'use client';
 
 import { useActionState, useEffect, useState, useTransition } from 'react';
-import Link from 'next/link';
 import { Copy, Mail, ShieldAlert, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
 import { TimezoneField } from '@/components/ui/timezone-field';
-import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
-import { groupByDay, type Activity, type ActivityEntry } from '@/lib/jobs/activity/load';
+import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { syncProgress, type SyncPhase } from '@/lib/core/inbox/progress';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
@@ -37,7 +35,6 @@ export function SettingsView(props: {
     bannedConstructions: string;
   };
   accounts: InboxAccount[];
-  activity: Activity;
   resumes: Array<{
     id: string;
     label: string;
@@ -77,7 +74,6 @@ export function SettingsView(props: {
         accounts={props.accounts}
         gmailConfigured={props.gmailConfigured}
       />
-      <ActivitySection activity={props.activity} timezone={props.profile.timezone} />
       <BookmarkletSection appOrigin={props.appOrigin} />
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
@@ -506,121 +502,6 @@ function InboxSection({
         of the companies you track. Add domains on a company page when its mail is not linking, and
         forward anything the scan misses.
       </p>
-    </section>
-  );
-}
-
-/** Where an entry came from, said in one word rather than a colour alone. */
-const SOURCE_LABEL: Record<ActivityEntry['source'], string> = {
-  email: 'inbox',
-  auto: 'derived',
-  sweep: 'nightly',
-  you: 'you',
-};
-
-/**
- * What has changed lately.
- *
- * The counts a sync returns go into the cron's HTTP response and nowhere a
- * person can see, so a run that opened four roles overnight looked exactly
- * like one that did nothing. This shows the rows instead of the counts: what
- * the inbox wrote, what the nightly sweep closed, grouped by the day it
- * landed, each one a link to the role it happened to.
- */
-function ActivitySection({ activity, timezone }: { activity: Activity; timezone: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const days = groupByDay(activity.entries);
-  const shown = expanded ? days : days.slice(0, 2);
-  const latestRun = activity.runs[0] ?? null;
-
-  return (
-    <section id="activity" className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Activity</h2>
-      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
-        What the syncs have actually changed. The inbox reads mail and opens or moves roles; the
-        nightly sweep closes what has gone quiet and raises the nudges on This week.
-      </p>
-
-      <dl className="mt-4 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-        <dt className="text-ink-muted">Last inbox sync</dt>
-        <dd className="text-ink">
-          {latestRun
-            ? `${formatDateTime(latestRun.finishedAt ?? latestRun.startedAt, timezone)} · ${
-                latestRun.messagesSeen
-              } read${latestRun.status === 'failed' ? ' · failed' : ''}`
-            : 'Not yet'}
-        </dd>
-
-        <dt className="text-ink-muted">Nightly sweep</dt>
-        <dd className="text-ink">
-          {activity.lastSweepAt
-            ? `Last changed something ${formatDateTime(activity.lastSweepAt, timezone)}`
-            : 'Has not changed anything yet'}
-        </dd>
-      </dl>
-
-      {latestRun?.error && (
-        <p className="mt-3 rounded-lg bg-accent-orange-tint px-3 py-2 text-[12px] text-ink">
-          Last run reported: {latestRun.error}
-        </p>
-      )}
-
-      {activity.entries.length === 0 ? (
-        <p className="mt-4 rounded-lg bg-canvas px-3 py-2 text-[13px] text-ink-muted">
-          Nothing has changed yet. Once a scan has run, everything it writes shows up here.
-        </p>
-      ) : (
-        <>
-          <div className="mt-4 space-y-4">
-            {shown.map((group) => (
-              <div key={group.day}>
-                <h3 className="text-[12px] font-medium text-ink-faint">
-                  {formatDate(group.entries[0].at, timezone)}
-                </h3>
-                <ul className="mt-1 divide-y divide-border">
-                  {group.entries.map((entry) => (
-                    <li
-                      key={entry.id}
-                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1.5"
-                    >
-                      <span className="w-14 shrink-0 text-[11px] text-ink-faint">
-                        {SOURCE_LABEL[entry.source]}
-                      </span>
-                      {entry.roleId ? (
-                        <Link
-                          href={`/jobs/roles/${entry.roleId}`}
-                          className="text-[13px] text-ink first-letter:uppercase hover:text-brand"
-                        >
-                          {entry.headline}
-                        </Link>
-                      ) : (
-                        <span className="text-[13px] text-ink first-letter:uppercase">
-                          {entry.headline}
-                        </span>
-                      )}
-                      {entry.detail && (
-                        <span className="w-full text-[12px] text-ink-muted sm:w-auto sm:flex-1 sm:truncate">
-                          {entry.detail}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          {days.length > 2 && (
-            <button
-              type="button"
-              onClick={() => setExpanded((open) => !open)}
-              className="mt-3 text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
-            >
-              {expanded ? 'Show less' : `Show all ${days.length} days`}
-            </button>
-          )}
-        </>
-      )}
     </section>
   );
 }
