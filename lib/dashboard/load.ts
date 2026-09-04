@@ -54,6 +54,13 @@ export interface ReturnableRow {
   merchantName: string;
   returnDeadline: string;
   daysLeft: number;
+  /**
+   * The window this deadline came out of -- order date to deadline -- rather
+   * than the merchant's current policy. It is the length that actually
+   * produced this date, and a policy edited since would make the bar disagree
+   * with the words next to it. Null when the order has no date to measure from.
+   */
+  windowDays: number | null;
 }
 
 export interface DashboardData {
@@ -362,6 +369,9 @@ function returnableFromInventory(
       merchantName: merchant?.name ?? 'Unknown merchant',
       returnDeadline: order.return_deadline,
       daysLeft: daysBetween(today, order.return_deadline),
+      windowDays: order.order_date
+        ? daysBetween(order.order_date, order.return_deadline)
+        : null,
     });
   }
 

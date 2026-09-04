@@ -8,6 +8,8 @@ import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
+import { StatusLine } from '@/components/shell/status-line';
+import { CommandPalette } from '@/components/shell/command-palette';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import {
@@ -16,6 +18,8 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
 import type { ThemeChoice } from '@/lib/theme';
+import type { ActivityLine } from '@/lib/shell/activity';
+import type { Brief } from '@/lib/shell/brief';
 
 export type NavSection = {
   href: string;
@@ -70,6 +74,8 @@ export function AppShell({
   counts,
   theme,
   banner,
+  brief,
+  activity = [],
   children,
 }: {
   module: ModuleId | null;
@@ -84,6 +90,10 @@ export function AppShell({
   theme: ThemeChoice;
   /** Rendered above the page, inside the content column. */
   banner?: React.ReactNode;
+  /** The one thing this workspace would say if it could say only one thing. */
+  brief?: Brief | null;
+  /** What the system did while nobody was looking. */
+  activity?: ActivityLine[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -231,9 +241,34 @@ export function AppShell({
               <ModuleMark module={module} size="sm" />
             </span>
 
-            <h2 className="font-display min-w-0 flex-1 truncate text-lead font-semibold tracking-tight text-ink">
+            <h2 className="font-display shrink-0 truncate text-lead font-semibold tracking-tight text-ink">
               {title}
             </h2>
+
+            {/* The middle of the bar was empty. It now carries the one thing
+                this workspace would say if it could say only one -- read on
+                arrival, not watched. Hidden on a phone, where there is no
+                middle. */}
+            {brief && (
+              <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex">
+                {brief.href ? (
+                  <Link
+                    href={brief.href}
+                    className={cn(
+                      'truncate rounded-full px-2.5 py-1 transition-colors',
+                      brief.tone === 'caution'
+                        ? 'bg-caution-tint text-caution hover:bg-caution-tint/70'
+                        : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                    )}
+                  >
+                    {brief.text}
+                  </Link>
+                ) : (
+                  <span className="truncate px-2.5 py-1 text-ink-muted">{brief.text}</span>
+                )}
+              </p>
+            )}
+            {!brief && <span className="min-w-0 flex-1" />}
 
             <div className="flex shrink-0 items-center gap-0.5">
               <ThemePicker value={theme} />
@@ -266,7 +301,10 @@ export function AppShell({
 
         {banner}
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
+        <StatusLine lines={activity} />
       </div>
+
+      <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
     </div>
   );
 }

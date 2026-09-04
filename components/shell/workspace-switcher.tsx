@@ -139,20 +139,14 @@ export function WorkspaceSwitcher({
   }, [open, activeIndex]);
 
   /**
-   * Cmd-K opens it; Cmd-1..4 jump straight to a workspace.
+   * Cmd-1..4 jump straight to a workspace.
    *
-   * In a four-workspace app the switcher is the most repeated navigation there
-   * is, and it otherwise costs a click, a read and a second click.
+   * Cmd-K belongs to the palette, which does the same job with a search box in
+   * front of it. Two handlers on one key is a coin toss.
    */
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setActiveIndex(Math.max(0, rows.findIndex((row) => row.id === current)));
-        setOpen((v) => !v);
-        return;
-      }
       const index = Number(event.key);
       if (!Number.isInteger(index) || index < 1 || index > visible.length) return;
       const target = visible[index - 1];

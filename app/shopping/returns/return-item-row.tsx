@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatMoney } from '@/lib/money';
 import { deadlineLabel } from '@/lib/returns/deadline';
+import { ReturnFuse } from '@/components/ui/return-fuse';
 import { displayVariant } from '@/lib/inventory/display';
 import type { ReturnsTrackerRow } from '@/lib/returns/types';
 import {
@@ -51,6 +52,15 @@ export function ReturnItemRow({
             {formatMoney(row.costCents)}
           </p>
         </div>
+        {/* Time left as a length, above the same fact in words. */}
+        {!returned && (
+          <ReturnFuse
+            daysLeft={row.daysLeft}
+            windowDays={row.returnWindowDays}
+            deadline={row.returnDeadline}
+            className="mt-2 max-w-48"
+          />
+        )}
         <p className={`mt-1 text-small ${returned ? 'text-ink-muted' : urgency}`}>
           {returned
             ? row.refundedAt

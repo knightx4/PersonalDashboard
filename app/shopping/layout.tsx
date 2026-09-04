@@ -5,6 +5,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadActivity } from '@/lib/shell/activity';
+import { loadShoppingBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/onboarding';
@@ -28,13 +30,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox, settings, counts] = await Promise.all([
+  const [{ data: profile }, reviewCount, inbox, settings, counts, activity] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
     loadInboxBannerState(user.id),
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
+    loadActivity(),
   ]);
+
+  const brief = await loadShoppingBrief(user.id, settings.timezone, reviewCount);
 
   /**
    * Review carries a count because an unattended review queue is how the
@@ -66,6 +71,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        activity={activity}
+        brief={brief}
         banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
       >
         {children}

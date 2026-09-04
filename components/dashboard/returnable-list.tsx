@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReturnableRow } from '@/lib/dashboard/load';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { deadlineLabel } from '@/lib/returns/deadline';
+import { ReturnFuse } from '@/components/ui/return-fuse';
 
 export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
   const shown = rows.slice(0, 8);
@@ -30,6 +31,12 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ui font-medium text-ink">{row.name}</p>
                     <p className="truncate text-small text-ink-muted">{row.merchantName}</p>
+                    <ReturnFuse
+                      daysLeft={row.daysLeft}
+                      windowDays={row.windowDays}
+                      deadline={row.returnDeadline}
+                      className="mt-1.5 max-w-40"
+                    />
                   </div>
                   <span
                     className={
