@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { allSources } from '@/lib/todo/agenda/registry';
+import { MODULES } from '@/lib/modules';
 import { PageHeader } from '@/components/shell/page-header';
 import { AgendaSettingsForm } from './view';
 
@@ -22,15 +23,25 @@ export default async function TodoSettingsPage() {
     loadAgendaSettings(user.id),
   ]);
 
-  const sources = allSources().map((source) => ({
-    id: source.id,
-    label: source.label,
-    description: source.description,
-    // A source whose workspace is off cannot be switched on here. Turning off a
-    // workspace has to mean it stops appearing, and a settings page that lets
-    // you contradict that is a settings page that lies.
-    available: moduleEnabled(account, source.module),
-  }));
+  // Grouped by the workspace they read, in the order the switcher lists them:
+  // "what does the job search put on my agenda" is the question being asked,
+  // and one flat list of every source in the app answers it by making you read
+  // all of them.
+  const groups = MODULES.flatMap((module) => {
+    const sources = allSources()
+      .filter((source) => source.module === module.id)
+      .map((source) => ({
+        id: source.id,
+        label: source.label,
+        description: source.description,
+        // A source whose workspace is off cannot be switched on here. Turning
+        // off a workspace has to mean it stops appearing, and a settings page
+        // that lets you contradict that is a settings page that lies.
+        available: moduleEnabled(account, module.id),
+      }));
+    if (sources.length === 0) return [];
+    return [{ moduleId: module.id, moduleLabel: module.label, sources }];
+  });
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -40,7 +51,7 @@ export default async function TodoSettingsPage() {
       />
 
       <AgendaSettingsForm
-        sources={sources}
+        groups={groups}
         enabled={agenda.enabledSources}
         horizonDays={agenda.horizonDays}
       />

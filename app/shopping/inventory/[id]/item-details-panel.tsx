@@ -1,14 +1,11 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import {
-  lookupItemAttributes,
-  saveCategoryTemplate,
-  updateItemAttributes,
-  type AttributeActionState,
-} from './attribute-actions';
+import { lookupItemAttributes, saveCategoryTemplate } from './attribute-actions';
+import type { AttributeActionState } from './attribute-actions';
+import { updateInventoryItem, type ActionState } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Select } from '@/components/ui/field';
+import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
 import {
   ATTRIBUTE_FIELD_TYPES,
   type AttributeField,
@@ -16,6 +13,7 @@ import {
 } from '@/lib/inventory/attributes';
 
 const initial: AttributeActionState = {};
+const initialSave: ActionState = {};
 
 const TYPE_LABEL: Record<string, string> = {
   text: 'Text',
@@ -24,15 +22,21 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 /**
- * The item's own details, the template they come from, and the search that
- * fills them in.
+ * Everything about the item that is editable, in one panel and under one Save.
  *
- * Fields are per category rather than per item, so a board game asks for
- * players and a BGG link while a shirt asks for brand and size — and editing
- * the template here changes every item in that category.
+ * What it is called and what category it is in used to live in a separate
+ * "Edit" card further down the page, while the fields describing it lived up
+ * here — two panels editing one row, each with its own Save button. They are
+ * one form now; the category's own fields are just the second half of it.
+ *
+ * The search and the category-template editor stay separate forms, because
+ * they act on something other than this item: a catalog, and every item in the
+ * category.
  */
-export function ItemAttributesPanel({
+export function ItemDetailsPanel({
   itemId,
+  item,
+  categories,
   categoryId,
   categoryName,
   template,
@@ -41,6 +45,12 @@ export function ItemAttributesPanel({
   searchAvailable,
 }: {
   itemId: string;
+  item: {
+    name: string;
+    variant: string | null;
+    notes: string | null;
+  };
+  categories: { id: string; name: string }[];
   categoryId: string | null;
   categoryName: string | null;
   /** The category's fields — what the template editor starts from. */
@@ -50,7 +60,7 @@ export function ItemAttributesPanel({
   values: AttributeValues;
   searchAvailable: boolean;
 }) {
-  const [saveState, saveAction, savePending] = useActionState(updateItemAttributes, initial);
+  const [saveState, saveAction, savePending] = useActionState(updateInventoryItem, initialSave);
   const [lookupState, lookupAction, lookupPending] = useActionState(
     lookupItemAttributes,
     initial,
@@ -64,8 +74,8 @@ export function ItemAttributesPanel({
           <h2 className="text-body font-semibold text-ink">Details</h2>
           <p className="mt-1 text-ui text-ink-muted">
             {categoryName
-              ? `The fields ${categoryName} items carry. Change them for every item in the category below.`
-              : 'Give this item a category to get a set of fields for its kind.'}
+              ? `What this is, and the fields ${categoryName} items carry. Change those for every item in the category below.`
+              : 'What this is. Give it a category to get a set of fields for its kind.'}
           </p>
         </div>
         <form action={lookupAction}>
@@ -87,8 +97,40 @@ export function ItemAttributesPanel({
 
       <form action={saveAction} className="space-y-4">
         <input type="hidden" name="id" value={itemId} />
+
+        <div>
+          <Label htmlFor="name">Name</Label>
+          <Input id="name" name="name" required defaultValue={item.name} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="variant">Variant</Label>
+            <Input id="variant" name="variant" defaultValue={item.variant ?? ''} />
+          </div>
+          <div>
+            <Label htmlFor="category_id">Category</Label>
+            <Select id="category_id" name="category_id" defaultValue={categoryId ?? ''}>
+              <option value="">Uncategorized</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea
+            id="notes"
+            name="notes"
+            defaultValue={item.notes ?? ''}
+            placeholder="Where it lives, warranty info, anything useful…"
+          />
+        </div>
+
         {fields.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
             {fields.map((field) => (
               <div key={field.key}>
                 <Label htmlFor={`attr_${field.key}`}>{field.label}</Label>
@@ -114,8 +156,8 @@ export function ItemAttributesPanel({
             ))}
           </div>
         ) : (
-          <p className="text-ui text-ink-muted">
-            No fields yet. Add one below, or set up the template for this category.
+          <p className="border-t border-border pt-4 text-ui text-ink-muted">
+            No category fields yet. Add one below, or set up the template for this category.
           </p>
         )}
 

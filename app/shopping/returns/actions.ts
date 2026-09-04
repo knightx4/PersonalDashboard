@@ -80,6 +80,53 @@ export async function toggleReturnPlannedForm(formData: FormData): Promise<void>
 }
 
 /**
+ * The same flag over a selection from the inventory list.
+ *
+ * Separate from setReturnPlanned rather than looping it: this is one update
+ * over a set of ids, so marking twenty items costs one round trip and either
+ * all of them move or none do.
+ */
+export async function setItemsReturnPlanned(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const planned = String(formData.get('planned') ?? 'true') === 'true';
+  const ids = formData
+    .getAll('id')
+    .map((value) => String(value))
+    .filter((value) => z.string().uuid().safeParse(value).success);
+  if (ids.length === 0) return { error: 'Pick at least one item first.' };
+
+  const { data: owned } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('status', 'owned')
+    .in('id', ids);
+  const ownedIds = (owned ?? []).map((row) => row.id as string);
+  if (ownedIds.length === 0) return { error: 'None of those are owned items.' };
+
+  const { error } = await supabase
+    .from('inventory_items')
+    .update({ return_planned: planned })
+    .eq('user_id', user.id)
+    .eq('status', 'owned')
+    .in('id', ownedIds);
+  if (error) return { error: error.message };
+
+  for (const id of ownedIds) revalidateReturnSurfaces(id);
+  const noun = ownedIds.length === 1 ? 'item' : 'items';
+  return {
+    message: planned
+      ? `${ownedIds.length} ${noun} marked to return.`
+      : `${ownedIds.length} ${noun} taken off the to-return list.`,
+  };
+}
+
+/**
  * One-click mark returned from the tracker.
  * Inserts a refunded `returns` row; sync_order_state moves the unit to returned.
  * Refund defaults to landed cost.

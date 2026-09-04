@@ -38,6 +38,19 @@ export const MEDIA_MAIL_1LB_CENTS = 439;
  */
 export const GAME_SHIP_FLAT_CENTS = 500;
 
+/**
+ * What one item of this kind is assumed to cost to ship.
+ *
+ * Media Mail is a real published rate and legally carries only media, so it
+ * applies to books alone. Everything else — a board game, a blender, a lamp —
+ * falls back to the same flat $5 assumption the games use. It is an assumption,
+ * not a rate: heavier things ship dearer, so their net reads a little
+ * optimistic, and the fix if that ever matters is one number above.
+ */
+export function shippingCentsForKind(kind: 'book' | 'game' | 'item'): number {
+  return kind === 'book' ? MEDIA_MAIL_1LB_CENTS : GAME_SHIP_FLAT_CENTS;
+}
+
 /** Default effort penalty when the user has not set profiles.sell_effort_cents. */
 export const DEFAULT_EFFORT_CENTS = 500;
 

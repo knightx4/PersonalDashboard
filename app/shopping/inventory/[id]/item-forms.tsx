@@ -4,82 +4,17 @@ import { useActionState, useState } from 'react';
 import {
   disposeInventoryItem,
   markInventoryReturned,
-  updateInventoryItem,
   updateInventoryItemLists,
   createItemListAndAssign,
   type ActionState,
 } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldError, Input, Label, Select } from '@/components/ui/field';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { formatCentsAsDollarsInput } from '@/lib/money';
 import { listSwatchStyle } from '@/lib/lists/gradients';
 
 const initial: ActionState = {};
-
-interface CategoryOption {
-  id: string;
-  name: string;
-}
-
-export function EditInventoryForm({
-  item,
-  categories,
-}: {
-  item: {
-    id: string;
-    name: string;
-    variant: string | null;
-    categoryId: string | null;
-    notes: string | null;
-  };
-  categories: CategoryOption[];
-}) {
-  const [state, action, pending] = useActionState(updateInventoryItem, initial);
-
-  return (
-    <form action={action} className="space-y-4">
-      <input type="hidden" name="id" value={item.id} />
-      <div>
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" name="name" required defaultValue={item.name} />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="variant">Variant</Label>
-          <Input id="variant" name="variant" defaultValue={item.variant ?? ''} />
-        </div>
-        <div>
-          <Label htmlFor="category_id">Category</Label>
-          <Select id="category_id" name="category_id" defaultValue={item.categoryId ?? ''}>
-            <option value="">Uncategorized</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          name="notes"
-          defaultValue={item.notes ?? ''}
-          placeholder="Where it lives, warranty info, anything useful…"
-        />
-      </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Saving…' : 'Save changes'}
-        </Button>
-        {state.message && <p className="text-body text-positive">{state.message}</p>}
-      </div>
-      <FieldError>{state.error}</FieldError>
-    </form>
-  );
-}
 
 export function DisposeForm({
   itemId,

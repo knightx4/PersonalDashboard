@@ -7,6 +7,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { linkMessage } from '@/app/jobs/(app)/review/actions';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/link-candidates';
+import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchRequirements } from '@/lib/jobs/evidence/match';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -321,21 +322,42 @@ export async function linkReminderMessage(input: {
   return { error: null };
 }
 
+const interviewPatchSchema = z.object({
+  round: z.number().int().min(1, 'Rounds start at 1.').max(99).optional(),
+  kind: z.enum(INTERVIEW_KINDS).optional(),
+});
+
+/**
+ * Update one round.
+ *
+ * Round and kind are here because they are what the card is called, and the
+ * inbox guesses them: a "quick chat" invite becomes a recruiter screen, a
+ * second thread about the same conversation becomes round 3. The guess is
+ * usually close and occasionally wrong, and a wrong name on a card the user
+ * cannot correct is worse than no name — so they are editable like the notes.
+ */
 export async function saveInterview(
   interviewId: string,
   patch: {
     prepNotes?: string;
     notes?: string;
     status?: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+    round?: number;
+    kind?: string;
   },
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
+  const parsed = interviewPatchSchema.safeParse({ round: patch.round, kind: patch.kind });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
   const update: Record<string, unknown> = {};
   if (patch.prepNotes !== undefined) update.prep_notes = patch.prepNotes || null;
   if (patch.notes !== undefined) update.notes = patch.notes || null;
   if (patch.status !== undefined) update.status = patch.status;
+  if (parsed.data.round !== undefined) update.round = parsed.data.round;
+  if (parsed.data.kind !== undefined) update.kind = parsed.data.kind;
 
   const { error } = await supabase
     .from('interviews')
@@ -352,16 +374,7 @@ export async function saveInterview(
 const addInterviewSchema = z.object({
   applicationId: z.string().uuid(),
   round: z.number().int().min(1),
-  kind: z.enum([
-    'recruiter_screen',
-    'hiring_manager',
-    'technical',
-    'case',
-    'panel',
-    'onsite',
-    'final',
-    'informal',
-  ]),
+  kind: z.enum(INTERVIEW_KINDS),
   scheduledAt: z.string().min(1, 'Pick a date.'),
 });
 

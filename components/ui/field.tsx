@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn';
  * container's border does not -- the container is also identified by its fill
  * and its contents -- which is why there are two border tokens.
  *
- * `text-base sm:text-sm` on every field is load-bearing: 16px is what stops
+ * `text-base sm:text-body` on every field is load-bearing: 16px is what stops
  * iOS zooming the page on focus, and anything smaller silently destroys the
  * layout on a phone.
  */
@@ -67,7 +67,7 @@ export function FieldHint({ children }: { children?: React.ReactNode }) {
 /**
  * Label, control, hint and error in one place.
  *
- * Hints were being hand-rolled as `text-[11px] text-ink-faint` in dozens of
+ * Hints were being hand-rolled as `text-micro text-ink-muted` in dozens of
  * files -- both off the type scale and under the contrast floor -- so this
  * lands two fixes at once and stops the third from being written.
  */

@@ -1,9 +1,12 @@
+'use client';
+
 import Link from 'next/link';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Tag } from 'lucide-react';
 import {
   InventoryRowActions,
   type InventoryListOption,
 } from '@/components/inventory/inventory-row-actions';
+import { InventoryRowCheckbox } from '@/components/inventory/inventory-selection';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { formatMoney } from '@/lib/money';
 import { displayNameOf } from '@/lib/inventory/sort-group';
@@ -21,6 +24,7 @@ export type InventoryRowItem = {
   acquired_at: string | null;
   image_url: string | null;
   return_planned: boolean;
+  for_sale: boolean;
   category_name: string | null;
   category_color: string | null;
   category_slug: string | null;
@@ -43,6 +47,7 @@ export function InventoryRow({
 
   return (
     <li className="group flex items-stretch hover:bg-canvas">
+      <InventoryRowCheckbox id={item.id} label={title} />
       <Link
         href={`/shopping/inventory/${item.id}`}
         className={cn(
@@ -78,6 +83,12 @@ export function InventoryRow({
                 To return
               </span>
             )}
+            {item.for_sale && (
+              <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-caution">
+                <Tag className="size-3" strokeWidth={2} aria-hidden />
+                For sale
+              </span>
+            )}
           </p>
           <p className="truncate text-ui text-ink-muted">
             {[item.merchant_name, variant, item.acquired_at].filter(Boolean).join(' · ')}
@@ -100,6 +111,7 @@ export function InventoryRow({
           itemId={item.id}
           itemName={title}
           returnPlanned={item.return_planned}
+          forSale={item.for_sale}
           listIds={item.list_ids ?? []}
           lists={lists}
         />

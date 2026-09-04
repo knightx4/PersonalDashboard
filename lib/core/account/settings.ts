@@ -55,14 +55,40 @@ function toModuleIds(raw: unknown): ModuleId[] {
   return known.length > 0 ? known : [...MODULE_IDS];
 }
 
+/** The columns that have always been here, and the one that may not be yet. */
+const BASE_COLUMNS = 'display_name, timezone, display_currency, enabled_modules';
+
 export async function loadAccountSettings(userId: string): Promise<AccountSettings> {
   const supabase = await createCoreClient();
 
-  const { data } = await supabase
+  const withTheme = await supabase
     .from('account_settings')
-    .select('display_name, timezone, display_currency, enabled_modules, theme')
+    .select(`${BASE_COLUMNS}, theme`)
     .eq('user_id', userId)
     .maybeSingle();
+
+  let data = withTheme.data;
+
+  /**
+   * A deploy that lands before its migration must not look like data loss.
+   *
+   * Selecting a column Postgres has never heard of fails the whole statement,
+   * and this function answers that by returning defaults -- so for the minutes
+   * between the code shipping and 0045 running, every account would appear to
+   * have lost its name, its timezone, its currency and its module choices.
+   * That is exactly the silent wrongness the rest of the app spends its effort
+   * avoiding, so the theme is treated as optional rather than assumed.
+   *
+   * The retry costs one round trip in a window that should never open, and
+   * nothing once the column exists.
+   */
+  if (withTheme.error?.code === '42703') {
+    ({ data } = await supabase
+      .from('account_settings')
+      .select(BASE_COLUMNS)
+      .eq('user_id', userId)
+      .maybeSingle());
+  }
 
   if (!data) return DEFAULT_ACCOUNT_SETTINGS;
 
@@ -71,7 +97,7 @@ export async function loadAccountSettings(userId: string): Promise<AccountSettin
     timezone: normalizeTimeZone(data.timezone as string) ?? 'UTC',
     displayCurrency: (data.display_currency as string) ?? 'USD',
     enabledModules: toModuleIds(data.enabled_modules),
-    theme: parseTheme(data.theme as string | null),
+    theme: parseTheme((data as { theme?: string | null }).theme ?? null),
   };
 }
 

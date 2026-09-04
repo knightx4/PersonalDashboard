@@ -1,11 +1,11 @@
 'use client';
 
 import { useActionState } from 'react';
-import Link from 'next/link';
 import {
   priceOneItem,
-  setManualGamePrice,
-  setManualPrice,
+  searchItemPrice,
+  setSellPrice,
+  type PriceSearchState,
   type SellActionState,
 } from '@/app/shopping/sell/actions';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,13 @@ const PATH_LABEL: Record<SellPath, string> = {
 };
 
 const initial: SellActionState = {};
+const initialSearch: PriceSearchState = {};
+
+/** The button says which source it is about to hit, because they differ a lot. */
+const SEARCH_LABEL: Record<string, string> = {
+  ebay_browse: 'Search eBay',
+  web_estimate: 'Search the web',
+};
 
 /**
  * What this one item is worth, and the button that finds out.
@@ -38,12 +45,14 @@ export function ItemSellPanel({
   quote: ItemSellQuote;
 }) {
   const [priceState, priceAction, pricePending] = useActionState(priceOneItem, initial);
-  const [manualState, manualAction, manualPending] = useActionState(
-    quote.kind === 'game' ? setManualGamePrice : setManualPrice,
-    initial,
+  const [searchState, searchAction, searchPending] = useActionState(
+    searchItemPrice,
+    initialSearch,
   );
+  const [manualState, manualAction, manualPending] = useActionState(setSellPrice, initial);
 
   const price = quote.expectedSelfListCents;
+  const searchLabel = SEARCH_LABEL[quote.priceSource] ?? 'Search for a price';
 
   return (
     <section className="space-y-3 rounded-card border border-border bg-surface p-4">
@@ -56,30 +65,64 @@ export function ItemSellPanel({
               : 'Asking prices for the same edition, less eBay fees, shipping and effort.'}
           </p>
         </div>
-        {quote.priceable && quote.priceSource !== 'none' && (
-          <form action={priceAction}>
-            <input type="hidden" name="inventory_item_id" value={itemId} />
-            <Button type="submit" size="sm" disabled={pricePending}>
-              {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
-            </Button>
-          </form>
+        {quote.priceSource !== 'none' && (
+          <div className="flex flex-wrap gap-2">
+            {/* Always offered: a title search needs no confirmed edition, so
+                this is the one button that works on an unpriceable item. */}
+            <form action={searchAction}>
+              <input type="hidden" name="inventory_item_id" value={itemId} />
+              <Button type="submit" size="sm" variant="secondary" disabled={searchPending}>
+                {searchPending ? 'Searching…' : searchLabel}
+              </Button>
+            </form>
+            {quote.priceable && (
+              <form action={priceAction}>
+                <input type="hidden" name="inventory_item_id" value={itemId} />
+                <Button type="submit" size="sm" disabled={pricePending}>
+                  {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
+                </Button>
+              </form>
+            )}
+          </div>
         )}
       </div>
+
+      {searchState.query && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas px-3 py-2 text-ui">
+          <span className={searchState.foundCents == null ? 'text-ink-muted' : 'text-ink'}>
+            {searchState.foundCents == null
+              ? `Nothing comparable is listed for “${searchState.query}”.`
+              : `Asking about ${formatMoney(searchState.foundCents)} for “${searchState.query}”.`}
+          </span>
+          {searchState.foundCents != null && (
+            <form action={manualAction}>
+              <input type="hidden" name="inventory_item_id" value={itemId} />
+              <input
+                type="hidden"
+                name="price"
+                value={formatCentsAsDollarsInput(searchState.foundCents)}
+              />
+              <Button type="submit" size="sm" variant="secondary" disabled={manualPending}>
+                Use this price
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+      <FieldError>{searchState.error}</FieldError>
 
       {!quote.priceable ? (
         <p className="text-ui text-ink-muted">
           {quote.needsConfirmation ? (
             <>
-              Confirm which {quote.kind === 'game' ? 'game' : 'edition'} this is on the{' '}
-              <Link href="/shopping/sell" className="text-accent hover:underline">
-                sell page
-              </Link>{' '}
-              before it can be priced.
+              Confirm which {quote.kind === 'game' ? 'box' : 'edition'} this is in{' '}
+              {quote.kind === 'game' ? 'Game details' : 'Book details'} above to price and
+              cache it — or search on the title now.
             </>
           ) : quote.kind === 'game' ? (
-            'No BoardGameGeek match yet, so there is nothing to look up.'
+            'No BoardGameGeek match yet, so a search goes on the title alone.'
           ) : (
-            'No ISBN yet, so there is nothing to look up.'
+            'No ISBN yet, so a search goes on the title alone.'
           )}
         </p>
       ) : quote.priceSource === 'none' ? (

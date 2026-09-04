@@ -3,17 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import {
   createExpectedPriceSource,
   expectedPriceSourceKind,
 } from '@/lib/sell/expected-price';
 import { checkEbayConnection, type EbayCheckResult } from '@/lib/sell/ebay-check';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
-import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/load';
+import { runPriceLookups } from '@/lib/sell/price-run';
 import { gamePriceQuery } from '@/lib/sell/game-query';
-import { quoteIsCurrent, type CachedQuote } from '@/lib/sell/quote-cache';
-import { mapPool } from '@/lib/async/map-pool';
 import { formatMoney, parseDollarsToCents } from '@/lib/money';
 
 export type SellActionState = {
@@ -114,264 +111,65 @@ export async function noteListingIntent(
 }
 
 
-/** How many owned units one scan looks at; book lookups are third-party HTTP. */
-const SCAN_LIMIT = 150;
-
 /**
- * Find books among inventory the user already has — orders imported before
- * book detection existed, or manual entries — and give them ISBN identity.
- * New email imports do this automatically during ingestion.
- */
-export async function importBooksFromOrders(
-  // Signature is fixed by useActionState; the scan takes no input of its own.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: SellActionState, _formData: FormData,
-): Promise<SellActionState> {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { data: items, error } = await supabase
-    .from('inventory_items')
-    .select(
-      `
-      id, name, variant, image_url, search_tags,
-      categories ( slug ),
-      order_items ( product_url )
-    `,
-    )
-    .eq('user_id', user.id)
-    .eq('status', 'owned')
-    .order('created_at', { ascending: false })
-    .limit(SCAN_LIMIT);
-  if (error) return { error: error.message };
-  if (!items || items.length === 0) return { message: 'No owned items to scan yet.' };
-
-  const first = <T,>(value: T | T[] | null | undefined): T | null => {
-    if (Array.isArray(value)) return value[0] ?? null;
-    return value ?? null;
-  };
-
-  const result = await attachBookDetailsForInventory(supabase, {
-    userId: user.id,
-    autoImported: true,
-    googleBooksApiKey: process.env.GOOGLE_BOOKS_API_KEY ?? null,
-    isbndbApiKey: process.env.ISBNDB_API_KEY ?? null,
-    lines: items.map((item) => ({
-      inventoryItemId: item.id as string,
-      name: item.name as string,
-      variant: (item.variant as string | null) ?? null,
-      imageUrl: (item.image_url as string | null) ?? null,
-      searchTags: (item.search_tags as string[] | null) ?? [],
-      categorySlug: first(item.categories as { slug: string } | { slug: string }[] | null)?.slug ?? null,
-      productUrl:
-        first(item.order_items as { product_url: string | null } | { product_url: string | null }[] | null)
-          ?.product_url ?? null,
-    })),
-  });
-
-  revalidatePath('/shopping/sell');
-  revalidatePath('/shopping/inventory');
-
-  if (result.attached === 0) {
-    return {
-      message:
-        result.unresolved > 0
-          ? `No new books added — ${result.unresolved} book-looking item(s) had no catalog match.`
-          : 'No new books found in your recent items.',
-    };
-  }
-  return {
-    message: `Added book details for ${result.attached} item(s)${
-      result.unresolved > 0 ? `; ${result.unresolved} had no catalog match` : ''
-    }.`,
-  };
-}
-
-
-/**
- * Spend a capped number of billed price lookups, on request only.
+ * Spend price lookups on what is marked for sale, on request only.
  *
- * Page loads never trigger these: a web estimate costs real money per book,
- * so it happens when the user asks and stops at ESTIMATE_BATCH_LIMIT so one
+ * Page loads never trigger a lookup: a web estimate costs real money per item,
+ * so it happens when the user asks, and stops at ESTIMATE_BATCH_LIMIT so one
  * click cannot run away with a large library.
+ *
+ * Three buttons come through here. `ids` names specific items — one row's
+ * "Price now", or everything ticked — and always fetches fresh, because being
+ * told the cached price is fine does not answer the question that was asked.
+ * With no ids it walks the whole for-sale list, filling in what has no price
+ * unless `rescan` says to price it all again.
  */
-export async function estimateMissingPrices(
+export async function priceSellItems(
   _prev: SellActionState,
   formData: FormData,
 ): Promise<SellActionState> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  // "Rescan" ignores the cache and prices the books again from scratch. The
-  // batch limit still applies, so the click costs the same as any other.
+  const raw = String(formData.get('ids') ?? '').trim();
+  const ids = raw === '' ? undefined : raw.split(',').filter(Boolean);
+  if (ids) {
+    const parsed = z.array(z.string().uuid()).safeParse(ids);
+    if (!parsed.success) return { error: 'Those items could not be read.' };
+    if (parsed.data.length === 0) return { error: 'Nothing selected.' };
+  }
   const rescan = String(formData.get('rescan') ?? '') === '1';
 
-  const provider = await createExpectedPriceSource({
-    ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
-    ebayClientSecret: process.env.EBAY_CLIENT_SECRET ?? null,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+  const result = await runPriceLookups({
+    supabase,
+    userId: user.id,
+    ids,
+    // A named item is always re-fetched; a sweep of the whole list fills gaps.
+    skipPriced: ids === undefined && !rescan,
   });
 
-  const usingWebEstimate = !(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
-  const source = usingWebEstimate ? 'web_estimate' : 'ebay_browse';
-  if (usingWebEstimate && !process.env.ANTHROPIC_API_KEY) {
+  if (result.source === 'none') {
     return { error: 'No price source configured.' };
   }
 
-  // Books and games share the batch. One click, one budget -- otherwise the
-  // shelf with 35 games and 4 books would need the games priced fifteen at a
-  // time behind a button that says "book".
-  const [{ data: books }, { data: games }] = await Promise.all([
-    supabase
-      .from('book_details')
-      .select('isbn_13, manual_expected_price_cents, inventory_items!inner (user_id, status)')
-      .eq('inventory_items.user_id', user.id)
-      .eq('inventory_items.status', 'owned')
-      .eq('needs_confirmation', false)
-      .not('isbn_13', 'is', null),
-    supabase
-      .from('game_details')
-      .select(
-        'bgg_id, year_published, publisher, manual_expected_price_cents, inventory_items!inner (name, user_id, status)',
-      )
-      .eq('inventory_items.user_id', user.id)
-      .eq('inventory_items.status', 'owned')
-      .eq('needs_confirmation', false)
-      .not('bgg_id', 'is', null),
-  ]);
-
-  const isbns = [
-    ...new Set(
-      (books ?? [])
-        .filter((b) => b.manual_expected_price_cents == null)
-        .map((b) => b.isbn_13 as string),
-    ),
-  ];
-
-  const firstInventory = (value: unknown): { name?: string } | null => {
-    if (Array.isArray(value)) return (value[0] as { name?: string }) ?? null;
-    return (value as { name?: string } | null) ?? null;
-  };
-
-  const gameTargets = new Map<number, { bggId: number; query: string; hint: string }>();
-  for (const row of games ?? []) {
-    if (row.manual_expected_price_cents != null) continue;
-    const bggId = row.bgg_id as number | null;
-    const name = firstInventory(row.inventory_items)?.name;
-    if (bggId == null || !name) continue;
-    const subject = gamePriceQuery({
-      name,
-      yearPublished: (row.year_published as number | null) ?? null,
-      publisher: (row.publisher as string | null) ?? null,
-    });
-    gameTargets.set(bggId, { bggId, ...subject });
-  }
-
-  if (isbns.length === 0 && gameTargets.size === 0) {
-    return { message: 'Nothing to price.' };
-  }
-
-  const [{ data: cachedBooks }, { data: cachedGames }] = await Promise.all([
-    isbns.length > 0
-      ? supabase
-          .from('book_price_quotes')
-          .select('isbn_13, quoted_cents, fetched_at')
-          .eq('source', source)
-          .in('isbn_13', isbns)
-      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
-    gameTargets.size > 0
-      ? supabase
-          .from('game_price_quotes')
-          .select('bgg_id, quoted_cents, fetched_at')
-          .eq('source', source)
-          .in('bgg_id', [...gameTargets.keys()])
-      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
-  ]);
-
-  // A row is only a price if it holds one and has not expired -- the same
-  // question the loader asks. Counting every row as a price meant a lookup
-  // that found nothing silenced this button permanently.
-  const pricedIsbns = new Set(
-    rescan
-      ? []
-      : (cachedBooks ?? [])
-          .filter((r) => quoteIsCurrent(r as CachedQuote, source))
-          .map((r) => r.isbn_13 as string),
-  );
-  const pricedGames = new Set(
-    rescan
-      ? []
-      : (cachedGames ?? [])
-          .filter((r) => quoteIsCurrent(r as CachedQuote, source))
-          .map((r) => r.bgg_id as number),
-  );
-
-  type Target =
-    | { kind: 'book'; isbn13: string }
-    | { kind: 'game'; bggId: number; query: string; hint: string };
-
-  const outstanding: Target[] = [
-    ...isbns
-      .filter((isbn) => !pricedIsbns.has(isbn))
-      .map((isbn13) => ({ kind: 'book' as const, isbn13 })),
-    ...[...gameTargets.values()]
-      .filter((game) => !pricedGames.has(game.bggId))
-      .map((game) => ({ kind: 'game' as const, ...game })),
-  ];
-
-  const todo = outstanding.slice(0, ESTIMATE_BATCH_LIMIT);
-  if (todo.length === 0) return { message: 'Everything already has a current price.' };
-
-  let priced = 0;
-  await mapPool(todo, 2, async (target) => {
-    try {
-      const cents =
-        target.kind === 'book'
-          ? await provider.expectedSelfListCents(target.isbn13)
-          : await provider.expectedSelfListCentsFor({
-              query: target.query,
-              hint: target.hint,
-            });
-
-      if (target.kind === 'book') {
-        await supabase.from('book_price_quotes').upsert(
-          {
-            isbn_13: target.isbn13,
-            source,
-            quoted_cents: cents,
-            shipping_cents: 0,
-            fetched_at: new Date().toISOString(),
-          },
-          { onConflict: 'isbn_13,source' },
-        );
-      } else {
-        await supabase.from('game_price_quotes').upsert(
-          {
-            bgg_id: target.bggId,
-            source,
-            quoted_cents: cents,
-            shipping_cents: 0,
-            fetched_at: new Date().toISOString(),
-          },
-          { onConflict: 'bgg_id,source' },
-        );
-      }
-      if (cents != null) priced += 1;
-    } catch (error) {
-      console.error('price estimate failed', target, error);
-    }
-  });
-
   revalidatePath('/shopping/sell');
-  const remaining = outstanding.length - todo.length;
+  for (const id of ids ?? []) revalidatePath(`/shopping/inventory/${id}`);
+
+  if (result.attempted === 0) {
+    return {
+      message:
+        result.skipped > 0
+          ? 'Everything already has a current price.'
+          : 'Nothing to price.',
+    };
+  }
+
+  const remaining =
+    result.remaining > 0 ? ` ${result.remaining} left — run again to continue.` : '';
   const noneFound =
-    priced === 0
-      ? ' No price came back for any of them — the catalog had nothing to go on.'
-      : '';
+    result.priced === 0 ? ' No price came back — nothing comparable was listed.' : '';
   return {
-    message: `Priced ${priced} of ${todo.length} item(s).${
-      remaining > 0 ? ` ${remaining} still unpriced — run again to continue.` : ''
-    }${noneFound}`,
+    message: `Priced ${result.priced} of ${result.attempted} item(s).${remaining}${noneFound}`,
   };
 }
 
@@ -472,55 +270,99 @@ export async function priceOneItem(
   return { message: `Priced at ${formatMoney(cents)}.` };
 }
 
-/** Set (or clear) a price by hand. Free, and it beats every lookup. */
-export async function setManualPrice(
-  _prev: SellActionState,
+export type PriceSearchState = SellActionState & {
+  /** What the source is asking, when it found anything. */
+  foundCents?: number | null;
+  /** What was searched for, so a wrong answer explains itself. */
+  query?: string;
+};
+
+/**
+ * Ask the price source what this item is going for, without committing to it.
+ *
+ * priceOneItem is the cached, identity-keyed path: it needs a confirmed ISBN or
+ * BGG id, writes the quote to the shared cache, and refuses everything else.
+ * This is the button next to it — a plain title search that answers for an item
+ * whose edition is not settled, and hands the number back for the user to
+ * accept rather than filing it against an identity nobody has confirmed.
+ */
+export async function searchItemPrice(
+  _prev: PriceSearchState,
   formData: FormData,
-): Promise<SellActionState> {
+): Promise<PriceSearchState> {
   const user = await requireUser();
   const supabase = await createClient();
 
   const id = z.string().uuid().safeParse(formData.get('inventory_item_id'));
   if (!id.success) return { error: 'Missing item.' };
 
-  const raw = String(formData.get('price') ?? '').trim();
-  let cents: number | null = null;
-  if (raw !== '') {
-    try {
-      cents = parseDollarsToCents(raw);
-    } catch {
-      return { error: 'Price must be a dollar amount like 12.50.' };
-    }
-  }
-
   const { data: item } = await supabase
     .from('inventory_items')
-    .select('id')
+    .select('id, name')
     .eq('id', id.data)
     .eq('user_id', user.id)
     .maybeSingle();
   if (!item) return { error: 'Item not found.' };
 
-  const { error } = await supabase
-    .from('book_details')
-    .update({ manual_expected_price_cents: cents })
-    .eq('inventory_item_id', item.id);
-  if (error) return { error: error.message };
+  const keys = {
+    ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
+    ebayClientSecret: process.env.EBAY_CLIENT_SECRET ?? null,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+  };
+  if (expectedPriceSourceKind(keys) === 'none') {
+    return { error: 'No price source configured.' };
+  }
+  const provider = await createExpectedPriceSource(keys);
 
-  revalidatePath('/shopping/sell');
-  revalidatePath(`/shopping/inventory/${item.id}`);
-  return { message: cents == null ? 'Price cleared.' : 'Price saved.' };
+  const identity = await sellIdentityOf(supabase, item.id);
+  const subject =
+    identity?.kind === 'game'
+      ? gamePriceQuery({
+          name: item.name as string,
+          yearPublished: identity.yearPublished,
+          publisher: identity.publisher,
+        })
+      : {
+          query: item.name as string,
+          hint: 'Used copy in good condition, sold on eBay.',
+        };
+
+  let cents: number | null = null;
+  try {
+    // A confirmed ISBN is a far better query than the title, so use it when
+    // there is one; everything else searches on what the item is called.
+    cents =
+      identity?.kind === 'book' && identity.isbn13 && !identity.needsConfirmation
+        ? await provider.expectedSelfListCents(identity.isbn13)
+        : await provider.expectedSelfListCentsFor(subject);
+  } catch (error) {
+    console.error('price search failed', item.id, error);
+    return { error: 'The price search failed. Try again in a moment.' };
+  }
+
+  if (cents == null) {
+    return {
+      query: subject.query,
+      foundCents: null,
+      message: `Nothing comparable is listed for “${subject.query}”.`,
+    };
+  }
+  return {
+    query: subject.query,
+    foundCents: cents,
+    message: `${formatMoney(cents)} for “${subject.query}”.`,
+  };
 }
 
 /**
- * The same by-hand price for a game.
+ * Set (or clear) a sell price by hand. Free, and it beats every lookup.
  *
- * Separate from setManualPrice because the column lives on game_details, and
- * it earns its keep more here than for books: a title search is a far weaker
- * identifier than an ISBN, so lookups come back empty more often and typing
- * the number yourself is frequently the only way a game gets priced at all.
+ * Which column it lands in follows the item: book_details for a book,
+ * game_details for a game, and the item's own column for everything else. One
+ * action rather than three, because the page it is used from no longer knows
+ * or cares which of the three a row happens to be.
  */
-export async function setManualGamePrice(
+export async function setSellPrice(
   _prev: SellActionState,
   formData: FormData,
 ): Promise<SellActionState> {
@@ -548,10 +390,22 @@ export async function setManualGamePrice(
     .maybeSingle();
   if (!item) return { error: 'Item not found.' };
 
-  const { error } = await supabase
-    .from('game_details')
-    .update({ manual_expected_price_cents: cents })
-    .eq('inventory_item_id', item.id);
+  const identity = await sellIdentityOf(supabase, item.id);
+  const { error } =
+    identity?.kind === 'book'
+      ? await supabase
+          .from('book_details')
+          .update({ manual_expected_price_cents: cents })
+          .eq('inventory_item_id', item.id)
+      : identity?.kind === 'game'
+        ? await supabase
+            .from('game_details')
+            .update({ manual_expected_price_cents: cents })
+            .eq('inventory_item_id', item.id)
+        : await supabase
+            .from('inventory_items')
+            .update({ manual_expected_price_cents: cents })
+            .eq('id', item.id);
   if (error) return { error: error.message };
 
   revalidatePath('/shopping/sell');

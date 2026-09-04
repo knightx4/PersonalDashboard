@@ -18,7 +18,7 @@ import type { ModuleId } from '@/lib/modules';
  */
 
 /** Every source that exists. Off unless the account says otherwise. */
-export const SOURCE_IDS = ['job_reminders', 'return_deadlines'] as const;
+export const SOURCE_IDS = ['job_reminders', 'job_interviews', 'return_deadlines'] as const;
 
 export type SourceId = (typeof SOURCE_IDS)[number];
 
@@ -110,8 +110,13 @@ export interface AgendaSource {
   context?(ctx: SourceContext): Promise<DayContext[]>;
   /** "Done", where the source can express it. */
   complete?(ctx: SourceContext, key: string): Promise<void>;
-  /** "Later", by however this source defers things. */
-  defer(ctx: SourceContext, key: string): Promise<void>;
-  /** "Not this one", for good. */
-  dismiss(ctx: SourceContext, key: string): Promise<void>;
+  /**
+   * "Later" and "Not this one".
+   *
+   * Optional together, because a source that contributes only day context has
+   * no items to act on: an interview is an appointment, and there is no honest
+   * meaning for pushing one from a to-do list.
+   */
+  defer?(ctx: SourceContext, key: string): Promise<void>;
+  dismiss?(ctx: SourceContext, key: string): Promise<void>;
 }

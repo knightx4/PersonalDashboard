@@ -52,7 +52,7 @@ export async function completeItem(sourceId: string, key: string): Promise<void>
 export async function deferItem(sourceId: string, key: string): Promise<void> {
   if (!isSourceId(sourceId)) return;
   const source = sourceById(sourceId);
-  if (!source) return;
+  if (!source?.defer) return;
 
   await source.defer(await context(), key);
   done();
@@ -61,7 +61,7 @@ export async function deferItem(sourceId: string, key: string): Promise<void> {
 export async function dismissItem(sourceId: string, key: string): Promise<void> {
   if (!isSourceId(sourceId)) return;
   const source = sourceById(sourceId);
-  if (!source) return;
+  if (!source?.dismiss) return;
 
   await source.dismiss(await context(), key);
   done();

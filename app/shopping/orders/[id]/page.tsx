@@ -384,7 +384,7 @@ export default async function OrderDetailPage({
                             <span className="tabular text-ui text-ink-muted">
                               Landed {moneyLabel(unit.display_cost_cents, unit.cost_cents)}
                             </span>
-                            <span className="rounded-md bg-canvas px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                            <span className="rounded-md bg-canvas px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
                               {unit.status.replaceAll('_', ' ')}
                             </span>
                           </li>

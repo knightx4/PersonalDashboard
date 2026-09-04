@@ -128,6 +128,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.game_price_quotes = gameQuote.id;
 
+  // Unlike the two above this one is NOT shared reference data: it is keyed by
+  // the item, so the row is as private as the item it prices.
+  const [itemQuote] = await admin<{ id: string }[]>`
+    insert into item_price_quotes (inventory_item_id, source, quoted_cents)
+    values (${inventoryItem.id}, 'web_estimate', ${tag === 'alice' ? 2500 : 1100})
+    returning id`;
+  ids.item_price_quotes = itemQuote.id;
+
   const [use] = await admin<{ id: string }[]>`
     insert into item_uses (inventory_item_id, used_on)
     values (${inventoryItem.id}, current_date) returning id`;

@@ -53,6 +53,11 @@ import {
   unshareCasePage,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
+import {
+  INTERVIEW_KIND_LABEL,
+  INTERVIEW_KINDS,
+  interviewKindLabel,
+} from '@/lib/jobs/interview-kinds';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
 import { Input, Label, Select } from '@/components/ui/field';
 
@@ -1707,6 +1712,115 @@ function Interviewers({
   );
 }
 
+/**
+ * What the round is called, and the way to correct it.
+ *
+ * The round number and kind are inferred from mail — a "quick chat" invite
+ * becomes a recruiter screen, a second thread about one conversation becomes
+ * another round. Close enough to be useful, wrong often enough that a card
+ * with no way to fix its own name is a dead end.
+ */
+function InterviewHeading({
+  interviewId,
+  round,
+  kind,
+  when,
+}: {
+  interviewId: string;
+  round: number;
+  kind: string;
+  when: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftRound, setDraftRound] = useState(String(round));
+  const [draftKind, setDraftKind] = useState(kind);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (!editing) {
+    return (
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-ui font-semibold text-ink">
+          Round {round} · {interviewKindLabel(kind)}
+          <button
+            type="button"
+            onClick={() => {
+              setDraftRound(String(round));
+              setDraftKind(kind);
+              setError(null);
+              setEditing(true);
+            }}
+            className="ml-2 align-middle text-small font-normal text-ink-muted underline underline-offset-2 hover:text-accent"
+          >
+            Rename
+          </button>
+        </h3>
+        <span className="tabular text-small text-ink-muted">{when}</span>
+      </header>
+    );
+  }
+
+  return (
+    <header className="space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <Label htmlFor={`round-${interviewId}`}>Round</Label>
+          <Input
+            id={`round-${interviewId}`}
+            type="number"
+            min={1}
+            max={99}
+            value={draftRound}
+            onChange={(event) => setDraftRound(event.target.value)}
+            className="w-20"
+          />
+        </div>
+        <div>
+          <Label htmlFor={`kind-${interviewId}`}>Kind</Label>
+          <Select
+            id={`kind-${interviewId}`}
+            value={draftKind}
+            onChange={(event) => setDraftKind(event.target.value)}
+            className="w-48"
+          >
+            {INTERVIEW_KINDS.map((option) => (
+              <option key={option} value={option}>
+                {INTERVIEW_KIND_LABEL[option]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const parsedRound = Number(draftRound);
+              if (!Number.isInteger(parsedRound) || parsedRound < 1) {
+                setError('Rounds start at 1.');
+                return;
+              }
+              const result = await saveInterview(interviewId, {
+                round: parsedRound,
+                kind: draftKind,
+              });
+              if (result.error) setError(result.error);
+              else setEditing(false);
+            })
+          }
+        >
+          {pending ? 'Saving…' : 'Save'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="text-small text-status-rejected">{error}</p>}
+    </header>
+  );
+}
+
 function InterviewCard({
   interview,
   timezone,
@@ -1742,14 +1856,12 @@ function InterviewCard({
         focused && 'ring-2 ring-accent ring-offset-2 ring-offset-canvas',
       )}
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-ui font-semibold text-ink">
-          Round {interview.round} · {interview.kind.replace(/_/g, ' ')}
-        </h3>
-        <span className="tabular text-small text-ink-muted">
-          {formatDateTime(interview.scheduledAt, timezone)}
-        </span>
-      </header>
+      <InterviewHeading
+        interviewId={interview.id}
+        round={interview.round}
+        kind={interview.kind}
+        when={formatDateTime(interview.scheduledAt, timezone)}
+      />
 
       <Interviewers interview={interview} companyContacts={companyContacts} />
 
@@ -1935,14 +2047,11 @@ function AddInterview({
             onChange={(event) => setKind(event.target.value)}
             className="w-48"
           >
-            <option value="recruiter_screen">Recruiter screen</option>
-            <option value="hiring_manager">Hiring manager</option>
-            <option value="technical">Technical</option>
-            <option value="case">Case study</option>
-            <option value="panel">Panel</option>
-            <option value="onsite">Onsite</option>
-            <option value="final">Final</option>
-            <option value="informal">Informal</option>
+            {INTERVIEW_KINDS.map((option) => (
+              <option key={option} value={option}>
+                {INTERVIEW_KIND_LABEL[option]}
+              </option>
+            ))}
           </Select>
         </div>
         <div>
