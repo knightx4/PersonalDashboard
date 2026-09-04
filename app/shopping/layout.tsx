@@ -41,14 +41,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    * dashboard quietly becomes wrong. Nothing else here has earned one.
    */
   const sections: NavSection[] = [
-    { href: '/shopping/dashboard', label: 'Dashboard' },
-    { href: '/shopping/orders', label: 'Orders' },
-    { href: '/shopping/inventory', label: 'Inventory' },
-    { href: '/shopping/sell', label: 'Sell' },
-    { href: '/shopping/returns', label: 'Returns' },
-    { href: '/shopping/saved', label: 'Saved' },
-    { href: '/shopping/share', label: 'Share' },
-    { href: '/shopping/review', label: 'Review', badge: reviewCount },
+    { href: '/shopping/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+    { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
+    { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
+    { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
+    { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
+    { href: '/shopping/share', label: 'Share', icon: 'share' },
+    { href: '/shopping/review', label: 'Review', icon: 'review', badge: reviewCount },
   ];
 
   const { accountIds, initialJob } = inbox;

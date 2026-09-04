@@ -48,16 +48,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    * docs/DESIGN-UPDATE-PLAN.md.
    */
   const sections: NavSection[] = [
-    { href: '/jobs/today', label: 'This week' },
-    { href: '/jobs/pipeline', label: 'Pipeline' },
-    { href: '/jobs/roles', label: 'Roles' },
-    { href: '/jobs/companies', label: 'Companies' },
-    { href: '/jobs/contacts', label: 'Contacts' },
-    { href: '/jobs/interviews', label: 'Interviews' },
-    { href: '/jobs/answers', label: 'Answers' },
-    { href: '/jobs/analytics', label: 'Analytics' },
-    { href: '/jobs/activity', label: 'Activity' },
-    { href: '/jobs/review', label: 'Review', badge: reviewCount },
+    { href: '/jobs/today', label: 'This week', icon: 'week' },
+    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+    { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+    { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
+    { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
+    { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
+    { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+    { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
+    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
+    { href: '/jobs/review', label: 'Review', icon: 'review', badge: reviewCount },
   ];
 
   const { accountIds, initialJob } = inbox;

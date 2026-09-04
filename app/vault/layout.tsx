@@ -33,7 +33,7 @@ export default async function VaultLayout({ children }: { children: React.ReactN
    * because this shell was written on its own.
    */
   const sections: NavSection[] = [
-    { href: '/vault', label: 'Notes', exact: true, alsoMatches: ['/vault/n/'] },
+    { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
   ];
 
   return (

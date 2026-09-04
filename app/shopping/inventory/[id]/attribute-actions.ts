@@ -97,6 +97,7 @@ export async function saveCategoryTemplate(
   const labels = formData.getAll('field_label').map((value) => String(value));
   const types = formData.getAll('field_type').map((value) => String(value));
   const keys = formData.getAll('field_key').map((value) => String(value));
+  const inSearch = formData.getAll('field_in_search').map((value) => String(value));
 
   const draft = labels.map((label, index) => ({
     // An existing key is carried in a hidden input so a relabelled field keeps
@@ -104,6 +105,9 @@ export async function saveCategoryTemplate(
     key: keys[index]?.trim() || attributeKey(label),
     label: label.trim(),
     type: types[index] ?? 'text',
+    // A URL is an address rather than a description, so it never joins a
+    // keyword search whatever the form said.
+    inSearch: inSearch[index] === '1' && types[index] !== 'url',
   }));
   const fields: AttributeField[] = parseTemplateFields(
     draft.filter((entry) => entry.label !== ''),

@@ -56,9 +56,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.application_events = event.id;
 
+  const [group] = await admin<{ id: string }[]>`
+    insert into interview_groups (user_id, application_id, label, notes)
+    values (${userId}, ${application.id}, ${`${tag} superday`}, ${`${tag} went well`})
+    returning id`;
+  ids.interview_groups = group.id;
+
   const [interview] = await admin<{ id: string }[]>`
-    insert into interviews (user_id, application_id, round, kind, scheduled_at, format)
-    values (${userId}, ${application.id}, 1, 'recruiter_screen', now(), 'video')
+    insert into interviews (user_id, application_id, group_id, round, kind, scheduled_at, format)
+    values (${userId}, ${application.id}, ${group.id}, 1, 'recruiter_screen', now(), 'video')
     returning id`;
   ids.interviews = interview.id;
 

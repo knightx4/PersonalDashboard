@@ -84,6 +84,7 @@ export default async function RoleDetailPage({
     { data: interviews },
     { data: answers },
     { data: notes },
+    { data: interviewGroups },
     { data: messages },
     { data: profile },
     { data: reminders },
@@ -107,7 +108,7 @@ export default async function RoleDetailPage({
         // that make the name worth clicking.
         .select(
           `id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes,
-           questions_asked,
+           questions_asked, group_id,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
         )
         .eq('application_id', current.id)
@@ -123,6 +124,13 @@ export default async function RoleDetailPage({
         .select('id, body, pinned, created_at')
         .eq('role_id', id)
         .order('created_at', { ascending: false }),
+      // The occasions several rounds belong to -- a superday and its
+      // impression of the day as a whole. Empty for almost every pursuit.
+      supabase
+        .from('interview_groups')
+        .select('id, label, notes')
+        .eq('application_id', current.id)
+        .order('created_at', { ascending: true }),
       supabase
         .from('inbox_messages')
         // provider_message_id, thread_id and email_address are what the Gmail
@@ -169,6 +177,36 @@ export default async function RoleDetailPage({
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+
+  /**
+   * Loose notes written against a round.
+   *
+   * A second round trip rather than part of the batch above, because the
+   * interview ids it filters on come out of that batch. Skipped entirely when
+   * there are no rounds, which is most pursuits.
+   */
+  const interviewIds = (interviews ?? []).map((interview) => interview.id as string);
+  const { data: interviewNotes } = interviewIds.length
+    ? await supabase
+        .from('notes')
+        .select('id, body, created_at, interview_id')
+        .in('interview_id', interviewIds)
+        .order('created_at', { ascending: false })
+    : { data: [] };
+
+  const notesByInterview = new Map<string, Array<{ id: string; body: string; createdAt: string }>>();
+  for (const note of (interviewNotes ?? []) as Array<Record<string, unknown>>) {
+    const key = note.interview_id as string;
+    notesByInterview.set(key, [
+      ...(notesByInterview.get(key) ?? []),
+      {
+        id: note.id as string,
+        body: note.body as string,
+        createdAt: note.created_at as string,
+      },
+    ]);
+  }
+
   const linkedTasks = await loadTasksFor(user.id, 'role', role.id as string);
   const requirements = (role.requirements as Requirement[] | null) ?? [];
 
@@ -363,6 +401,8 @@ export default async function RoleDetailPage({
           status: interview.status as string,
           prepNotes: (interview.prep_notes as string) ?? '',
           notes: (interview.notes as string) ?? '',
+          customNotes: notesByInterview.get(interview.id as string) ?? [],
+          groupId: (interview.group_id as string | null) ?? null,
           questionsAsked: (interview.questions_asked as string[]) ?? [],
           participants: (
             (interview.interview_participants ?? []) as unknown as Array<{
@@ -415,6 +455,11 @@ export default async function RoleDetailPage({
           body: note.body as string,
           pinned: note.pinned as boolean,
           createdAt: note.created_at as string,
+        }))}
+        interviewGroups={(interviewGroups ?? []).map((group) => ({
+          id: group.id as string,
+          label: (group.label as string | null) ?? null,
+          notes: (group.notes as string | null) ?? '',
         }))}
         todos={(reminders ?? []).map((reminder) => {
           // The mail a to-do points at is already loaded for the Linked mail
