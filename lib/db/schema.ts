@@ -401,6 +401,13 @@ export const inventoryItems = pgTable(
      * set directly (manual / photo / receipt_photo).
      */
     source: orderSource('source').notNull().default('manual'),
+    /**
+     * The stack this unit was put in by hand. Null is the norm and means
+     * "stack me by my derived key" (lib/share/grouping.ts); a value means a
+     * person decided, and the derivation no longer gets a vote. See
+     * lib/inventory/item-groups.ts and migration 0047.
+     */
+    groupId: uuid('group_id').references(() => itemGroups.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -408,6 +415,37 @@ export const inventoryItems = pgTable(
     index('inventory_order_item_idx').on(t.orderItemId),
     index('inventory_category_idx').on(t.categoryId),
     index('inventory_fp_loose_idx').on(t.fingerprintLoose),
+    index('inventory_items_group_idx').on(t.groupId),
+  ],
+);
+
+/**
+ * "These copies are one item" — written down, because it is a decision.
+ *
+ * Most stacking needs no row here: units with no `group_id` fold together on
+ * the key derived in lib/share/grouping.ts, which is why a copy bought next
+ * month joins its siblings with nobody doing anything. A row appears only when
+ * someone merges units the derivation kept apart, or splits one it stacked.
+ */
+export const itemGroups = pgTable(
+  'item_groups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /**
+     * The derived key this group stands in for, so later arrivals join it
+     * rather than forming a second stack beside it. Null on a group that
+     * exists only to hold units held out of one.
+     */
+    groupKey: text('group_key'),
+    ...timestamps,
+  },
+  (t) => [
+    index('item_groups_user_idx').on(t.userId),
+    uniqueIndex('item_groups_user_key_key').on(t.userId, t.groupKey),
   ],
 );
 

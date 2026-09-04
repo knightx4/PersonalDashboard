@@ -201,6 +201,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.inventory_item_lists = membership.id;
 
+  const [itemGroup] = await admin<{ id: string }[]>`
+    insert into item_groups (user_id, name, group_key)
+    values (${userId}, ${`${tag} group`}, ${`item:title:${tag}-group`})
+    returning id`;
+  ids.item_groups = itemGroup.id;
+
   const [policy] = await admin<{ id: string }[]>`
     insert into merchant_return_policies (user_id, merchant_id, return_window_days)
     values (${userId}, ${merchant.id}, 30)

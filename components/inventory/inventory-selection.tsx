@@ -14,13 +14,19 @@ import {
   setItemsForSale,
   type ActionState,
 } from '@/app/shopping/inventory/actions';
+import { groupItemsTogether } from '@/app/shopping/inventory/group-actions';
 import { setItemsReturnPlanned } from '@/app/shopping/returns/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 
 type Selection = {
   selected: ReadonlySet<string>;
-  toggle: (id: string) => void;
+  /**
+   * Ticks or unticks a whole row's worth of copies at once. A row can stand
+   * for three physical units, and "mark for sale" said to it means all three,
+   * so the set holds unit ids and a row contributes all of its own.
+   */
+  toggle: (ids: readonly string[]) => void;
   selectAll: (ids: string[]) => void;
   clear: () => void;
 };
@@ -38,10 +44,16 @@ const SelectionContext = createContext<Selection | null>(null);
 export function InventorySelectionProvider({ children }: { children: ReactNode }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
 
-  const toggle = useCallback((id: string) => {
+  const toggle = useCallback((ids: readonly string[]) => {
     setSelected((current) => {
       const next = new Set(current);
-      if (!next.delete(id)) next.add(id);
+      // The row is ticked when every one of its copies is; toggling clears all
+      // of them or adds all of them, never leaves a row half-selected.
+      const allSelected = ids.length > 0 && ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
       return next;
     });
   }, []);
@@ -65,16 +77,27 @@ export function useInventorySelection(): Selection | null {
   return useContext(SelectionContext);
 }
 
-export function InventoryRowCheckbox({ id, label }: { id: string; label: string }) {
+export function InventoryRowCheckbox({
+  id,
+  ids,
+  label,
+}: {
+  id: string;
+  /** Every copy this row stands for. Defaults to the row's own id. */
+  ids?: readonly string[];
+  label: string;
+}) {
   const selection = useInventorySelection();
   if (!selection) return null;
+
+  const all = ids && ids.length > 0 ? ids : [id];
 
   return (
     <label className="flex shrink-0 cursor-pointer items-center pl-3 pr-0.5">
       <input
         type="checkbox"
-        checked={selection.selected.has(id)}
-        onChange={() => selection.toggle(id)}
+        checked={all.every((one) => selection.selected.has(one))}
+        onChange={() => selection.toggle(all)}
         aria-label={`Select ${label}`}
         className="size-4 rounded border-border text-accent focus:ring-accent/30"
       />
@@ -100,6 +123,10 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
     deleteInventoryItems,
     {} as ActionState,
   );
+  const [groupState, groupAction, groupPending] = useActionState(
+    groupItemsTogether,
+    {} as ActionState,
+  );
   // Deleting a shelf-full cannot be undone, so it is asked twice — inline
   // rather than through window.confirm, which browsers are free to suppress.
   // Armed against the exact items it was pressed for, so a selection that
@@ -114,7 +141,7 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
   // without needing to reach back into the selection to prune it.
   const present = new Set(allIds);
   const ids = [...selection.selected].filter((id) => present.has(id));
-  const pending = salePending || returnPending || deletePending;
+  const pending = salePending || returnPending || deletePending || groupPending;
   const armKey = ids.join(',');
   const confirmingDelete = ids.length > 0 && armedFor === armKey;
 
@@ -178,6 +205,18 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
           </Button>
         </form>
 
+        {/* Only ever a merge: two copies of one thing the derived key kept
+            apart. Splitting one back out is on the item's own page, where the
+            copies are listed and you can see which one you mean. */}
+        {ids.length > 1 && (
+          <form action={groupAction} className="contents">
+            {hidden}
+            <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+              {groupPending ? 'Grouping…' : 'Group as one item'}
+            </Button>
+          </form>
+        )}
+
         {confirmingDelete ? (
           <>
             <form action={deleteAction} className="contents">
@@ -220,13 +259,19 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
         </p>
       )}
 
-      {(saleState.message || returnState.message || deleteState.message) && (
+      {(saleState.message ||
+        returnState.message ||
+        deleteState.message ||
+        groupState.message) && (
         <p className="text-ui text-positive">
-          {saleState.message ?? returnState.message ?? deleteState.message}
+          {saleState.message ??
+            returnState.message ??
+            deleteState.message ??
+            groupState.message}
         </p>
       )}
       <FieldError>
-        {saleState.error ?? returnState.error ?? deleteState.error}
+        {saleState.error ?? returnState.error ?? deleteState.error ?? groupState.error}
       </FieldError>
     </div>
   );

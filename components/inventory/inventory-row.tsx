@@ -32,6 +32,19 @@ export type InventoryRowItem = {
   list_ids?: string[];
   /** Whose item this is. Null on a one-person account, and on old data. */
   person?: Person | null;
+  /**
+   * How many copies of this item the row stands for. Absent or 1 for almost
+   * everything; see lib/inventory/item-groups.ts.
+   */
+  quantity?: number;
+  /** What one copy cost. Equal ends when the copies agree, which is the norm. */
+  unit_cost_low?: number;
+  unit_cost_high?: number;
+  /**
+   * Every copy's id. The checkbox ticks the whole stack, because "mark for
+   * sale" said to a row showing three copies means all three.
+   */
+  unit_ids?: string[];
 };
 
 export function InventoryRow({
@@ -44,10 +57,22 @@ export function InventoryRow({
   const title = displayNameOf(item);
   const variant = displayVariant(item.variant);
   const accent = item.category_color ?? '#cfcfc8';
+  const quantity = item.quantity ?? 1;
+  const low = item.unit_cost_low ?? item.cost_cents;
+  const high = item.unit_cost_high ?? item.cost_cents;
+  // `cost_cents` on a stacked row is the whole stack, so the per-copy figure
+  // comes from the range. A range only when the copies really did cost
+  // different amounts — calling any one of them "the price" otherwise.
+  const unitLabel =
+    low === high ? formatMoney(low) : `${formatMoney(low)}–${formatMoney(high)}`;
 
   return (
     <li className="group flex items-stretch hover:bg-canvas">
-      <InventoryRowCheckbox id={item.id} label={title} />
+      <InventoryRowCheckbox
+        id={item.id}
+        ids={item.unit_ids}
+        label={quantity > 1 ? `${title} (${quantity} copies)` : title}
+      />
       <Link
         href={`/shopping/inventory/${item.id}`}
         className={cn(
@@ -95,13 +120,31 @@ export function InventoryRow({
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <p className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</p>
+        {/* Category has its own column rather than sitting under the price:
+            they are unrelated facts, and stacking them read as though the
+            category were a caption on the number. */}
+        <div className="hidden w-28 shrink-0 sm:block">
           {item.category_name && (
-            <span className="inline-flex items-center gap-1 text-micro text-ink-muted">
-              <CategoryGlyph slug={item.category_slug} className="size-3" />
-              {item.category_name}
+            <span className="inline-flex items-center gap-1 truncate text-micro text-ink-muted">
+              <CategoryGlyph slug={item.category_slug} className="size-3 shrink-0" />
+              <span className="truncate">{item.category_name}</span>
             </span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <p className="tabular font-medium text-ink">
+            {unitLabel}
+            {quantity > 1 && (
+              <span className="ml-1.5 rounded bg-sunken px-1.5 py-0.5 text-micro font-semibold text-ink-muted">
+                ×{quantity}
+              </span>
+            )}
+          </p>
+          {quantity > 1 && (
+            <p className="tabular text-micro text-ink-muted">
+              {formatMoney(item.cost_cents)} total
+            </p>
           )}
         </div>
       </Link>

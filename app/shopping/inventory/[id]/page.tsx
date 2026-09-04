@@ -23,9 +23,29 @@ import { BookDetailsPanel } from './book-details-panel';
 import { GameDetailsPanel } from './game-details-panel';
 import { ItemDetailsPanel } from './item-details-panel';
 import { ItemSellPanel } from './sell-panel';
+import { CopiesPanel } from './copies-panel';
 import { MarkForSaleButton } from './mark-for-sale-button';
+import { stackContaining, stackUnits } from '@/lib/inventory/item-groups';
 
 export const metadata = { title: 'Inventory item' };
+
+/** Shape of the copies query above — one row per owned unit. */
+type CopyUnitRow = {
+  id: string;
+  name: string;
+  short_name: string | null;
+  cost_cents: number;
+  acquired_at: string | null;
+  fingerprint_loose: string | null;
+  group_id: string | null;
+  for_sale: boolean;
+  return_planned: boolean;
+  game_details:
+    | { bgg_id: number | null; needs_confirmation: boolean }
+    | { bgg_id: number | null; needs_confirmation: boolean }[]
+    | null;
+  order_items: unknown;
+};
 
 export default async function InventoryItemPage({
   params,
@@ -151,6 +171,76 @@ export default async function InventoryItemPage({
         .eq('category_id', item.category_id)
         .maybeSingle()
     : { data: null };
+
+  // The other copies of this same item. Everything above is about the item;
+  // this is where the boxes differ. See lib/inventory/item-groups.ts.
+  const [{ data: unitRows }, { data: groupRows }] = await Promise.all([
+    supabase
+      .from('inventory_items')
+      .select(
+        `
+        id, name, short_name, cost_cents, acquired_at, fingerprint_loose, group_id,
+        for_sale, return_planned,
+        game_details ( bgg_id, needs_confirmation ),
+        order_items ( orders ( id, deleted_at, merchants ( name ) ) )
+      `,
+      )
+      .eq('user_id', user.id)
+      .eq('status', 'owned'),
+    supabase.from('item_groups').select('id, name, group_key').eq('user_id', user.id),
+  ]);
+
+  const units = ((unitRows ?? []) as unknown as CopyUnitRow[]).map((row) => {
+    const game = Array.isArray(row.game_details) ? row.game_details[0] : row.game_details;
+    const orderItem = Array.isArray(row.order_items) ? row.order_items[0] : row.order_items;
+    const order = orderItem
+      ? Array.isArray(orderItem.orders)
+        ? orderItem.orders[0]
+        : orderItem.orders
+      : null;
+    const rowMerchant = order
+      ? Array.isArray(order.merchants)
+        ? order.merchants[0]
+        : order.merchants
+      : null;
+    return {
+      inventoryItemId: row.id,
+      name: row.name,
+      shortName: row.short_name,
+      bggId: game?.bgg_id ?? null,
+      needsConfirmation: Boolean(game?.needs_confirmation),
+      isGame: Boolean(game),
+      fingerprintLoose: row.fingerprint_loose,
+      groupId: row.group_id,
+      costCents: row.cost_cents,
+      acquiredAt: row.acquired_at,
+      forSale: Boolean(row.for_sale),
+      returnPlanned: Boolean(row.return_planned),
+      merchantName: rowMerchant?.name ?? null,
+      orderId: order?.id ?? null,
+    };
+  });
+
+  const stack = stackContaining(
+    stackUnits(
+      units,
+      (groupRows ?? []).map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        groupKey: (row.group_key as string | null) ?? null,
+      })),
+    ),
+    item.id,
+  );
+  const copies = (stack?.units ?? []).map((unit) => ({
+    id: unit.inventoryItemId,
+    acquiredAt: unit.acquiredAt,
+    costCents: unit.costCents,
+    merchantName: unit.merchantName,
+    orderId: unit.orderId,
+    forSale: unit.forSale,
+    returnPlanned: unit.returnPlanned,
+  }));
 
   const attributeValues = parseAttributeValues(item.attributes);
   const attributeTemplate = templateFor({
@@ -392,6 +482,15 @@ export default async function InventoryItemPage({
           ) : null
         }
       />
+
+      {copies.length > 0 && (
+        <CopiesPanel
+          copies={copies}
+          currentId={item.id}
+          groupId={stack?.groupId ?? null}
+          derived={!stack?.groupId}
+        />
+      )}
 
       {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
 
