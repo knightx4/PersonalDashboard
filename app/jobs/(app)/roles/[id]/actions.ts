@@ -283,6 +283,53 @@ export async function addReminder(input: {
 
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/today');
+  // And on the company, which rolls up the to-dos of every role it has.
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  return { error: null };
+}
+
+const reminderPatchSchema = z.object({
+  reminderId: z.string().uuid(),
+  body: z.string().trim().min(1, 'Say what it is.'),
+  dueAt: z.string().min(1, 'Pick a date.'),
+});
+
+/**
+ * Rename a to-do, or move it.
+ *
+ * The wording of one is a first guess written while reading the mail that
+ * prompted it, and the date is usually a guess too. Until now the only way to
+ * correct either was to finish the to-do and write a new one, which loses the
+ * mail it was linked to.
+ *
+ * The sweep's own reminders are edited here as freely as hand-written ones:
+ * `rule_key` is what stops it re-firing, and it is not touched.
+ */
+export async function updateReminder(input: {
+  reminderId: string;
+  body: string;
+  dueAt: string;
+}): Promise<{ error: string | null }> {
+  const parsed = reminderPatchSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('reminders')
+    .update({
+      body: parsed.data.body,
+      due_at: new Date(parsed.data.dueAt).toISOString(),
+    })
+    .eq('id', parsed.data.reminderId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/today');
+  revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
 }
 

@@ -80,6 +80,33 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
 
   usePopover({ open, onClose: close, panelRef, triggerRef });
 
+  /**
+   * Whether a focus landing on a swatch is the person's doing.
+   *
+   * Opening the panel moves focus into it, and the first thing in it is Paper
+   * -- so previewing on focus meant that merely tapping the palette repainted
+   * the whole app in a light theme, whatever theme you were in. On a pointer
+   * there is a hover afterwards to correct it, which is why this survived on a
+   * desktop and was reported from a phone.
+   *
+   * Declared after `usePopover` so its effect runs after the one that moves
+   * focus: by the time this flips, the opening focus has already been and
+   * gone. Every focus after it is a Tab or an arrow, and those should preview.
+   */
+  const settled = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      settled.current = false;
+      return;
+    }
+    settled.current = true;
+  }, [open]);
+
+  /** A focus is a preview only once the panel has finished opening. */
+  function previewOnFocus(next: ThemeChoice) {
+    if (settled.current) setPreview(next);
+  }
+
   function close() {
     setOpen(false);
     setPreview(undefined);
@@ -133,7 +160,7 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
               type="button"
               onClick={() => choose(theme.id as ThemeId)}
               onMouseEnter={() => setPreview(theme.id as ThemeId)}
-              onFocus={() => setPreview(theme.id as ThemeId)}
+              onFocus={() => previewOnFocus(theme.id as ThemeId)}
               aria-pressed={chosen === theme.id}
               className={cn(
                 'flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors',
@@ -162,7 +189,7 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
             type="button"
             onClick={() => choose(null)}
             onMouseEnter={() => setPreview(null)}
-            onFocus={() => setPreview(null)}
+            onFocus={() => previewOnFocus(null)}
             aria-pressed={chosen === null}
             className={cn(
               'mt-1 flex w-full items-center gap-2.5 rounded-lg border-t border-border px-2 pb-1.5 pt-2 text-left text-ui transition-colors',

@@ -22,13 +22,20 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
           title="Nothing captured yet"
           description="Use the message button in the header to log a bug or an idea the moment you hit it."
         />
-        <RunRoutineButton openCount={0} />
+        <RunRoutineButton openCount={0} divider="bottom" />
       </div>
     );
   }
 
   return (
     <>
+      {/* First, not last. It was under the whole list, which meant scrolling
+          past every note to reach the button that works them -- and the count
+          beside it already says what scrolling would have told you. */}
+      <div className="mb-6">
+        <RunRoutineButton openCount={outstanding.length} divider="bottom" />
+      </div>
+
       {blocked.length > 0 && (
         <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-ui text-ink">
           {blocked.length} note(s) blocked, waiting on an answer from you. They are listed
@@ -53,9 +60,6 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
             <FeedbackList rows={closed} />
           </section>
         )}
-
-        {/* Under the whole list: the queue is what the routine works. */}
-        <RunRoutineButton openCount={outstanding.length} />
       </div>
     </>
   );

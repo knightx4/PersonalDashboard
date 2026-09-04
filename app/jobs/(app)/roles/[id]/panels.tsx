@@ -54,6 +54,7 @@ import {
   ungroupInterview,
   unlinkMessage,
   unshareCasePage,
+  updateReminder,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 import {
@@ -466,11 +467,7 @@ function Todos({
         <ul className="mb-3 space-y-2">
           {todos.map((todo) => (
             <li key={todo.id} className="text-ui">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="tabular text-ink-muted">{formatDate(todo.dueAt, timezone)}</span>
-                <span className="text-ink">{todo.body}</span>
-                <ReminderActions id={todo.id} />
-              </div>
+              <TodoLine todo={todo} timezone={timezone} />
               <TodoMail todo={todo} messages={messages} timezone={timezone} />
             </li>
           ))}
@@ -516,6 +513,114 @@ function Todos({
         {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
     </section>
+  );
+}
+
+/**
+ * The date a `type="date"` input wants, from the timestamp we stored.
+ *
+ * Read back in UTC because that is how it was written -- `addReminder` turns
+ * the picked day into midnight UTC -- so a to-do that is not edited comes back
+ * out of the picker as the day that went in.
+ */
+function dueDateInput(iso: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/**
+ * One to-do, and the way to correct it.
+ *
+ * The wording of a to-do is a first guess typed while reading the mail that
+ * prompted it, and the date is usually a guess as well. Without this the only
+ * way to fix either was to finish it and write a new one, which throws away
+ * the mail it was linked to -- so "rename it" quietly cost more than it looks
+ * like it should.
+ */
+function TodoLine({
+  todo,
+  timezone,
+}: {
+  todo: PanelProps['todos'][number];
+  timezone: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(todo.body);
+  const [dueAt, setDueAt] = useState(() => dueDateInput(todo.dueAt));
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function open() {
+    // From the row as it stands, not from whatever was typed and abandoned
+    // the last time this was opened.
+    setBody(todo.body);
+    setDueAt(dueDateInput(todo.dueAt));
+    setError(null);
+    setEditing(true);
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="tabular text-ink-muted">{formatDate(todo.dueAt, timezone)}</span>
+        <span className="text-ink">{todo.body}</span>
+        <button
+          type="button"
+          onClick={open}
+          className="press text-small font-medium text-accent underline underline-offset-2"
+        >
+          Edit
+        </button>
+        <ReminderActions id={todo.id} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="min-w-48 flex-1">
+        <Input
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          aria-label="To-do"
+        />
+      </div>
+      <Input
+        type="date"
+        value={dueAt}
+        onChange={(event) => setDueAt(event.target.value)}
+        aria-label="Done by"
+        className="w-40"
+      />
+      <Button
+        type="button"
+        size="sm"
+        disabled={pending || !body.trim() || !dueAt}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await updateReminder({ reminderId: todo.id, body, dueAt });
+            setError(result.error);
+            if (!result.error) setEditing(false);
+          })
+        }
+      >
+        Save
+      </Button>
+      <button
+        type="button"
+        onClick={() => setEditing(false)}
+        className="press text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+      >
+        Cancel
+      </button>
+      {error && <span className="text-small text-status-rejected">{error}</span>}
+    </div>
   );
 }
 
