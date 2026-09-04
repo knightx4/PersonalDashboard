@@ -234,3 +234,26 @@ describe('EbayBrowseExpectedPriceSource evidence', () => {
     expect(empty.lastFailure?.stage).toBe('no_results');
   });
 });
+
+describe('the Browse query itself', () => {
+  it('does not ask eBay to sort by price', async () => {
+    // A price sort would return the cheapest twenty listings, making the
+    // percentile taken from them a percentile of the bottom of the market.
+    let requested = '';
+    const source = new EbayBrowseExpectedPriceSource({
+      clientId: 'App-App-PRD-1-2',
+      clientSecret: 'secret',
+      fetch: fakeFetch({
+        search: (url) => {
+          requested = url;
+          return jsonResponse(summaries('10.00'));
+        },
+      }),
+    });
+
+    await source.expectedSelfListCents('9780735211292');
+    expect(requested).not.toContain('sort');
+    expect(requested).toContain('limit=20');
+    expect(requested).toContain('q=9780735211292');
+  });
+});
