@@ -224,13 +224,20 @@ function CategoryTemplateForm({
         </h3>
         <p className="mt-1 text-ui text-ink-muted">
           Every item in this category shows these fields. Clearing a name removes the field;
-          values already recorded under it stay on their items.
+          values already recorded under it stay on their items. Tick “In eBay search” for a
+          detail that decides which listing is the right one — an edition, a pressing, a model
+          number — and it joins the search alongside the title.
         </p>
       </div>
 
       {rows.map((row, index) => (
         <div key={`${row.key}-${index}`} className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="field_key" value={row.key} />
+          {/* A hidden input carries the flag rather than the checkbox itself:
+              an unchecked box submits nothing, and these four lists are read
+              back positionally, so a missing entry would shift every field
+              below it onto the wrong row. */}
+          <input type="hidden" name="field_in_search" value={row.inSearch ? '1' : '0'} />
           <div className="min-w-[10rem] flex-1">
             <Label htmlFor={`field_label_${index}`}>Field</Label>
             <Input
@@ -250,6 +257,25 @@ function CategoryTemplateForm({
               ))}
             </Select>
           </div>
+          <label
+            className="flex h-9 items-center gap-2 text-ui text-ink-muted"
+            title="Add this field’s value to the eBay search for the item"
+          >
+            <input
+              type="checkbox"
+              checked={row.inSearch}
+              disabled={row.type === 'url'}
+              onChange={(event) =>
+                setRows((current) =>
+                  current.map((entry, at) =>
+                    at === index ? { ...entry, inSearch: event.target.checked } : entry,
+                  ),
+                )
+              }
+              className="size-4 accent-[var(--c-accent)]"
+            />
+            In eBay search
+          </label>
         </div>
       ))}
 
@@ -257,7 +283,9 @@ function CategoryTemplateForm({
         type="button"
         size="sm"
         variant="ghost"
-        onClick={() => setRows((current) => [...current, { key: '', label: '', type: 'text' }])}
+        onClick={() =>
+          setRows((current) => [...current, { key: '', label: '', type: 'text', inSearch: false }])
+        }
       >
         Add a field
       </Button>

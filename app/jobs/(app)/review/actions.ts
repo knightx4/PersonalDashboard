@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
+import { excludableDomains } from '@/lib/jobs/review/exclusions';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -265,6 +266,84 @@ export async function deleteInferredApplication(
   revalidatePath('/jobs/review');
   revalidatePath('/jobs/pipeline');
   return { error: null };
+}
+
+/**
+ * Not relevant, and nothing from this employer ever again.
+ *
+ * The one-off verdict was always available; what was missing was the standing
+ * one. An agency or a job board that spawned one inferred pursuit will spawn
+ * another next sync, and answering the same row every week is how a review
+ * queue stops being worked.
+ *
+ * Only the employer's own domains are written. greenhouse.io is on the record
+ * of every Greenhouse customer, and excluding it to be rid of one company
+ * would silently drop every other company's mail with it -- see
+ * lib/jobs/review/exclusions.ts, which is also what decides whether this
+ * button is offered at all.
+ */
+export async function excludeCompanyForApplication(
+  applicationId: string,
+): Promise<{ error: string | null; message?: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: application } = await supabase
+    .from('applications')
+    .select('id, created_by, roles!inner ( companies!inner ( name, domains ) )')
+    .eq('id', applicationId)
+    .eq('user_id', user.id)
+    .maybeSingle<{
+      id: string;
+      created_by: string;
+      roles: { companies: { name: string; domains: string[] | null } };
+    }>();
+
+  if (!application) return { error: 'That application no longer exists.' };
+
+  const company = application.roles.companies;
+  const domains = excludableDomains(company.domains);
+  if (domains.length === 0) {
+    return {
+      error: `No sending domain of ${company.name}'s own is on file, so there is nothing to exclude. Add one under Settings → Excluded senders.`,
+    };
+  }
+
+  // Already-excluded domains are not an error: the point of the button is the
+  // outcome, and a second click should read as "yes, still excluded". Filtered
+  // rather than upserted, because the uniqueness is an expression index on
+  // (user_id, lower(domain)) and ON CONFLICT cannot name it.
+  const { data: already } = await supabase
+    .from('excluded_senders')
+    .select('domain')
+    .eq('user_id', user.id);
+
+  const have = new Set(
+    ((already ?? []) as Array<{ domain: string }>).map((row) => row.domain.toLowerCase()),
+  );
+  const missing = domains.filter((domain) => !have.has(domain));
+
+  if (missing.length > 0) {
+    const { error } = await supabase
+      .from('excluded_senders')
+      .insert(missing.map((domain) => ({ user_id: user.id, domain })));
+    if (error) return { error: error.message };
+  }
+
+  // The pursuit in front of you goes too, where it is one the inbox invented.
+  // A hand-created application is a decision you made and is never removed by
+  // a button about senders.
+  if (application.created_by === 'email_inferred') {
+    const removed = await deleteInferredApplication(applicationId);
+    if (removed.error) return { error: removed.error };
+  }
+
+  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/settings');
+  return {
+    error: null,
+    message: `Removed, and mail from ${domains.join(', ')} will no longer open a pursuit.`,
+  };
 }
 
 /**

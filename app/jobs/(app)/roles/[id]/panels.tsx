@@ -42,13 +42,16 @@ import {
   addReminder,
   declineCandidateMessage,
   deleteInterview,
+  groupInterviews,
   linkCandidateMessage,
   linkReminderMessage,
   matchRoleRequirements,
   removeInterviewer,
   saveInterview,
+  saveInterviewGroup,
   searchUnlinkedMessages,
   shareCasePage,
+  ungroupInterview,
   unlinkMessage,
   unshareCasePage,
 } from './actions';
@@ -58,6 +61,7 @@ import {
   INTERVIEW_KINDS,
   interviewKindLabel,
 } from '@/lib/jobs/interview-kinds';
+import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
 import { Input, Label, Select } from '@/components/ui/field';
 
@@ -121,6 +125,10 @@ export interface PanelProps {
     status: string;
     prepNotes: string;
     notes: string;
+    /** Free-form notes written against this round, newest first. */
+    customNotes: Array<{ id: string; body: string; createdAt: string }>;
+    /** The occasion this round belongs to, when it is part of one. */
+    groupId: string | null;
     questionsAsked: string[];
     /** Who is in the room, as contacts rather than as names on a string. */
     participants: Array<{
@@ -146,6 +154,8 @@ export interface PanelProps {
     unsupportedClaims: string[];
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
+  /** Superdays and the like: several rounds read as one occasion. */
+  interviewGroups: Array<{ id: string; label: string | null; notes: string }>;
   /** Open to-dos you set for yourself, not events the inbox produced. */
   todos: Array<{
     id: string;
@@ -1539,6 +1549,7 @@ function AnswerCard({
 
 function Interviews({
   interviews,
+  interviewGroups,
   applicationId,
   timezone,
   focusInterviewId,
@@ -1579,15 +1590,41 @@ function Interviews({
           )}
         </div>
       ) : (
-        interviews.map((interview) => (
-          <InterviewCard
-            key={interview.id}
-            interview={interview}
-            timezone={timezone}
-            companyContacts={companyContacts}
-            focused={interview.id === focusInterviewId}
-          />
-        ))
+        <>
+          {/* Rounds that sit on one day and are not yet an occasion. Offered
+              rather than done for them: two screens on the same Tuesday for
+              two different reasons are not a superday, and only the reader
+              knows which this is. */}
+          {groupableDays(interviews, timezone).map(({ day, interviewIds }) => (
+            <GroupTheseRounds
+              key={day}
+              applicationId={applicationId}
+              day={day}
+              interviewIds={interviewIds}
+            />
+          ))}
+
+          {sectionInterviews(interviews, interviewGroups).map((section) =>
+            section.kind === 'group' ? (
+              <InterviewGroupCard
+                key={section.group.id}
+                group={section.group}
+                interviews={section.interviews}
+                timezone={timezone}
+                companyContacts={companyContacts}
+                focusInterviewId={focusInterviewId}
+              />
+            ) : (
+              <InterviewCard
+                key={section.interview.id}
+                interview={section.interview}
+                timezone={timezone}
+                companyContacts={companyContacts}
+                focused={section.interview.id === focusInterviewId}
+              />
+            ),
+          )}
+        </>
       )}
       <AddInterview
         applicationId={applicationId}
@@ -1821,13 +1858,150 @@ function InterviewHeading({
   );
 }
 
+/**
+ * The offer to read several rounds on one day as one occasion.
+ *
+ * A one-click action rather than a picker: the set is already known -- it is
+ * every ungrouped round on that date -- and anything else can be taken back
+ * out of the group afterwards.
+ */
+function GroupTheseRounds({
+  applicationId,
+  day,
+  interviewIds,
+}: {
+  applicationId: string;
+  day: string;
+  interviewIds: string[];
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  // `day` is already the date in the reader's zone, so it is formatted as
+  // written rather than converted again -- which past ±12 would move it.
+  const label = formatDate(`${day}T00:00:00.000Z`, 'UTC');
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-card border border-dashed border-border bg-surface px-4 py-2.5">
+      <p className="text-ui text-ink-muted">
+        {interviewIds.length} rounds on {label}.
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await groupInterviews({ applicationId, interviewIds, label });
+            setError(result.error);
+          })
+        }
+      >
+        Group them as one day
+      </Button>
+      {error && <span className="text-small text-status-rejected">{error}</span>}
+    </div>
+  );
+}
+
+/**
+ * A superday: the rounds unchanged, inside something that can hold an opinion
+ * about the whole occasion.
+ *
+ * The rounds are not flattened or merged. Each keeps its hour, its
+ * interviewers and its own notes, because that is what makes the group worth
+ * having rather than one long entry -- what is added is the line above them
+ * and the paragraph that belongs to none of them.
+ */
+function InterviewGroupCard({
+  group,
+  interviews,
+  timezone,
+  companyContacts,
+  focusInterviewId,
+}: {
+  group: { id: string; label: string | null; notes: string };
+  interviews: PanelProps['interviews'];
+  timezone: string;
+  companyContacts: PanelProps['companyContacts'];
+  focusInterviewId?: string | null;
+}) {
+  const [label, setLabel] = useState(group.label ?? '');
+  const [notes, setNotes] = useState(group.notes);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <section className="rounded-card border border-accent/40 bg-accent-tint/30 p-3">
+      <header className="flex flex-wrap items-center gap-2">
+        <CalendarClock className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+        <Input
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+          aria-label="What to call this group of rounds"
+          placeholder="Superday"
+          className="max-w-56"
+        />
+        <span className="text-small text-ink-muted">
+          {interviews.length} rounds, together
+        </span>
+      </header>
+
+      <div className="mt-3">
+        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+          Notes on the day
+        </h4>
+        <Textarea
+          rows={3}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="How the occasion went as a whole. Each round keeps its own notes below."
+          className="mt-1"
+        />
+        <div className="mt-1.5 flex items-center gap-3">
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await saveInterviewGroup(group.id, { label, notes });
+                setSaved(result.error ?? 'Saved.');
+              })
+            }
+          >
+            Save
+          </Button>
+          {saved && <span className="text-small text-ink-muted">{saved}</span>}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        {interviews.map((interview) => (
+          <InterviewCard
+            key={interview.id}
+            interview={interview}
+            timezone={timezone}
+            companyContacts={companyContacts}
+            focused={interview.id === focusInterviewId}
+            grouped
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function InterviewCard({
   interview,
   timezone,
   companyContacts,
   focused = false,
+  grouped = false,
 }: {
   focused?: boolean;
+  /** Rendered inside a group card, which supplies the surround. */
+  grouped?: boolean;
   interview: PanelProps['interviews'][number];
   timezone: string;
   companyContacts: PanelProps['companyContacts'];
@@ -1839,7 +2013,23 @@ function InterviewCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ref = useRef<HTMLElement>(null);
 
+  /**
+   * A round starts with no notes on it, because that is the truth.
+   *
+   * Two empty boxes headed Prep and Interview notes were shown on every round
+   * whether or not anything had been written in either, so a card with nothing
+   * to say still took the space of one with plenty and the section read as
+   * filled in. A note appears when it exists or when you ask for it.
+   */
+  const [showPrep, setShowPrep] = useState(interview.prepNotes.trim() !== '');
+  const [showDebrief, setShowDebrief] = useState(interview.notes.trim() !== '');
+  /** The custom note being written, or null when none is. */
+  const [draft, setDraft] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
   const needsDebrief = interview.debriefDue && !notes;
+  const empty =
+    !showPrep && !showDebrief && draft === null && interview.customNotes.length === 0;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
@@ -1867,17 +2057,105 @@ function InterviewCard({
 
       {needsDebrief && (
         <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
-          Write the debrief tonight. One written three days later is worth very little.
+          Write the debrief tonight. One written three days later is worth very little.{' '}
+          {!showDebrief && (
+            <button
+              type="button"
+              onClick={() => setShowDebrief(true)}
+              className="font-medium underline underline-offset-2"
+            >
+              Start it
+            </button>
+          )}
         </p>
       )}
 
-      <div className="mt-3 space-y-3">
-        <CollapsibleField label="Prep" defaultOpen>
-          <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
-        </CollapsibleField>
-        <CollapsibleField label="Interview notes" defaultOpen>
-          <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </CollapsibleField>
+      {/* One notes section per round, holding whatever has actually been
+          written: the prep, the debrief, and any number of loose notes. */}
+      <div className="mt-3">
+        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">Notes</h4>
+
+        {empty ? (
+          <p className="mt-1 text-small text-ink-muted">Nothing written for this round yet.</p>
+        ) : (
+          <div className="mt-1 space-y-3">
+            {showPrep && (
+              <CollapsibleField label="Prep" defaultOpen>
+                <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
+              </CollapsibleField>
+            )}
+            {showDebrief && (
+              <CollapsibleField label="Interview notes" defaultOpen>
+                <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </CollapsibleField>
+            )}
+            {interview.customNotes.map((note) => (
+              <article key={note.id} className="rounded-lg bg-sunken px-3 py-2">
+                <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+                <p className="tabular mt-1 text-micro text-ink-muted">
+                  {formatDate(note.createdAt, timezone)}
+                </p>
+              </article>
+            ))}
+            {draft !== null && (
+              <div>
+                <Textarea
+                  rows={3}
+                  value={draft}
+                  autoFocus
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Anything worth remembering about this round."
+                />
+                <div className="mt-1.5 flex items-center gap-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending || !draft.trim()}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const result = await addNote({
+                          interviewId: interview.id,
+                          body: draft,
+                        });
+                        setDraftError(result.error);
+                        if (!result.error) setDraft(null);
+                      })
+                    }
+                  >
+                    Add note
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraft(null);
+                      setDraftError(null);
+                    }}
+                    className="text-small text-ink-muted hover:text-ink"
+                  >
+                    Cancel
+                  </button>
+                  {draftError && (
+                    <span className="text-small text-status-rejected">{draftError}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Prep and the debrief are one each -- they are fields on the round,
+            not a list -- so each offers itself only while it is not already
+            there. A custom note has no such limit. */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-micro uppercase tracking-wider text-ink-muted">Create note</span>
+          {!showPrep && (
+            <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />
+          )}
+          {!showDebrief && (
+            <NoteKindButton label="Interview" onClick={() => setShowDebrief(true)} />
+          )}
+          {draft === null && <NoteKindButton label="Custom" onClick={() => setDraft('')} />}
+        </div>
       </div>
 
       {interview.questionsAsked.length > 0 && (
@@ -1894,20 +2172,33 @@ function InterviewCard({
       )}
 
       <div className="mt-3 flex items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await saveInterview(interview.id, { prepNotes: prep, notes });
-              setSaved(result.error ?? 'Saved.');
-            })
-          }
-        >
-          Save notes
-        </Button>
+        {/* Only where there is a field to save. A custom note saves itself. */}
+        {(showPrep || showDebrief) && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await saveInterview(interview.id, { prepNotes: prep, notes });
+                setSaved(result.error ?? 'Saved.');
+              })
+            }
+          >
+            Save notes
+          </Button>
+        )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
+        {grouped && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => startTransition(() => void ungroupInterview(interview.id))}
+            className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+          >
+            Not part of this day
+          </button>
+        )}
         <span className="ml-auto">
           {confirmingDelete ? (
             <span className="flex items-center gap-2">
@@ -1940,6 +2231,19 @@ function InterviewCard({
         </span>
       </div>
     </section>
+  );
+}
+
+/** One of the kinds of note a round can be given. */
+function NoteKindButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="press rounded-lg border border-border px-2 py-0.5 text-small font-medium text-ink-muted hover:border-accent hover:text-accent"
+    >
+      + {label}
+    </button>
   );
 }
 

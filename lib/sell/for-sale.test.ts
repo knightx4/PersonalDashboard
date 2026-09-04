@@ -30,6 +30,7 @@ function item(overrides: Partial<ForSaleItem> = {}): ForSaleItem {
     yearPublished: null,
     needsConfirmation: false,
     manualCents: null,
+    searchTerms: [],
     ...overrides,
   };
 }
@@ -60,6 +61,30 @@ describe('priceTargetOf', () => {
       query: 'Drill',
       hint: 'Used, in good condition, sold on eBay.',
     });
+  });
+
+  it('adds the attribute values the template marked for search', () => {
+    const target = priceTargetOf(
+      item({ shortName: 'Dune', searchTerms: ['Folio Society', '1st printing'] }),
+    );
+    expect(target.via).toBe('item');
+    if (target.via !== 'item') return;
+    expect(target.query).toBe('Dune Folio Society 1st printing');
+  });
+
+  it('leaves an ISBN and a BGG search alone, whatever the template marked', () => {
+    // Those two are cached under an identifier shared with every other copy of
+    // the same thing, so one owner's words would be written into everybody's
+    // answer. An ISBN also already pins the edition.
+    const isbn = priceTargetOf(
+      item({ kind: 'book', isbn13: '9780735211292', searchTerms: ['Folio Society'] }),
+    );
+    expect(isbn).toEqual({ via: 'isbn', isbn13: '9780735211292' });
+
+    const bgg = priceTargetOf(
+      item({ kind: 'game', bggId: 13, name: 'Catan', searchTerms: ['Folio Society'] }),
+    );
+    expect(bgg.via === 'bgg' && bgg.query).not.toContain('Folio Society');
   });
 
   it('falls back to a title search while an edition is unconfirmed', () => {

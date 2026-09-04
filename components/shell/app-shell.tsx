@@ -9,6 +9,7 @@ import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import {
   WorkspaceSwitcher,
   type SwitcherCounts,
@@ -19,6 +20,12 @@ import type { ThemeChoice } from '@/lib/theme';
 export type NavSection = {
   href: string;
   label: string;
+  /**
+   * Named, not passed: see components/shell/nav-icons.ts. A section without
+   * one still renders -- the label is what the row means, and the icon is
+   * what makes it findable at a glance.
+   */
+  icon?: NavIconName;
   /**
    * Prefix match by default. Exact for a section whose href is a parent of the
    * others -- /todo and /vault -- or every page in the workspace lights it up.
@@ -111,6 +118,7 @@ export function AppShell({
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
       {sections.map((section) => {
         const on = isActive(section);
+        const Icon = section.icon ? NAV_ICONS[section.icon] : null;
         return (
           <Link
             key={section.href}
@@ -136,6 +144,19 @@ export function AppShell({
               style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
               aria-hidden
             />
+            {/* Muted until the row is current, so the column reads as a list
+                of names with marks beside them rather than a wall of icons
+                competing with the one that says where you are. */}
+            {Icon && (
+              <Icon
+                className={cn(
+                  'size-4 shrink-0 transition-colors duration-150',
+                  on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
+                )}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            )}
             <span className="flex-1 truncate">{section.label}</span>
             {section.badge !== undefined && section.badge > 0 && (
               <span className="tabular rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold text-[#14100a]">

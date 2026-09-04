@@ -7,6 +7,7 @@ import {
   parseAttributeValues,
   parseTemplateFields,
   searchProviderFor,
+  searchTermsFor,
   templateFor,
 } from '@/lib/inventory/attributes';
 
@@ -52,9 +53,18 @@ describe('parseTemplateFields', () => {
         { key: 'brand', label: 'Brand again' },
       ]),
     ).toEqual([
-      { key: 'brand', label: 'Brand', type: 'text' },
-      { key: 'site', label: 'Site', type: 'url' },
+      { key: 'brand', label: 'Brand', type: 'text', inSearch: false },
+      { key: 'site', label: 'Site', type: 'url', inSearch: false },
     ]);
+  });
+
+  it('reads a field out of the search unless it says otherwise', () => {
+    // Every template written before the flag existed searched on the title
+    // alone, and must keep doing so.
+    expect(parseTemplateFields([{ key: 'x', label: 'X' }])[0]?.inSearch).toBe(false);
+    expect(
+      parseTemplateFields([{ key: 'x', label: 'X', inSearch: true }])[0]?.inSearch,
+    ).toBe(true);
   });
 
   it('defaults an unknown type to text', () => {
@@ -94,7 +104,7 @@ describe('parseAttributeValues', () => {
 describe('fieldsForItem', () => {
   it('appends values the template no longer defines', () => {
     const fields = fieldsForItem(
-      [{ key: 'brand', label: 'Brand', type: 'text' }],
+      [{ key: 'brand', label: 'Brand', type: 'text', inSearch: false }],
       { brand: 'Ravensburger', old_field: 'kept' },
     );
     expect(fields.map((f) => f.key)).toEqual(['brand', 'old_field']);
@@ -117,5 +127,30 @@ describe('searchProviderFor', () => {
   it('only board games have a search behind them so far', () => {
     expect(searchProviderFor('board-games')).toBe('bgg');
     expect(searchProviderFor('books')).toBeNull();
+  });
+});
+
+describe('searchTermsFor', () => {
+  const template = [
+    { key: 'edition', label: 'Edition', type: 'text' as const, inSearch: true },
+    { key: 'genre', label: 'Genre', type: 'text' as const, inSearch: false },
+    { key: 'link', label: 'Link', type: 'url' as const, inSearch: true },
+  ];
+
+  it('takes the marked fields, in template order', () => {
+    expect(
+      searchTermsFor(template, { genre: 'Sci-fi', edition: 'Folio Society' }),
+    ).toEqual(['Folio Society']);
+  });
+
+  it('skips a marked field this item left blank', () => {
+    // The marking says the detail identifies the listing. A detail nobody
+    // filled in identifies nothing, and a trailing space narrows no search.
+    expect(searchTermsFor(template, { edition: '   ' })).toEqual([]);
+    expect(searchTermsFor(template, {})).toEqual([]);
+  });
+
+  it('never puts a URL in a keyword search', () => {
+    expect(searchTermsFor(template, { link: 'https://example.com' })).toEqual([]);
   });
 });
