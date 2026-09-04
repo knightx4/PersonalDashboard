@@ -59,7 +59,7 @@ describe('summarizeEbayError', () => {
 });
 
 describe('EbayBrowseExpectedPriceSource', () => {
-  it('returns the 25th percentile of USD asks and records no failure', async () => {
+  it('returns the percentile of USD asks priceStats picks, and records no failure', async () => {
     const source = new EbayBrowseExpectedPriceSource({
       clientId: 'App-App-PRD-1-2',
       clientSecret: 'secret',

@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
   console.log('result       :', result.headline);
   if (result.priceCents != null) {
-    console.log('price        :', formatMoney(result.priceCents), '(25th pct of asks)');
+    console.log('price        :', formatMoney(result.priceCents), '(the price the assistant would use)');
   }
   if (result.stage !== 'ok') console.log('stage        :', result.stage);
   if (result.status) console.log('http status  :', result.status);

@@ -34,6 +34,9 @@ export function PriceEvidenceDetail({ evidence }: { evidence: PriceEvidence }) {
         {isEbay && evidence.medianCents != null && (
           <span className="tabular"> · median {formatMoney(evidence.medianCents)}</span>
         )}
+        {/* Which rule set the price, because "median of 3" is a warning and
+            "40th percentile of 20" is not. */}
+        {evidence.typicalBasis === 'median' && <span> · too few to rank, using the median</span>}
         {isEbay && evidence.totalMatches != null && evidence.totalMatches > (evidence.sampleSize ?? 0) && (
           <span> · {evidence.totalMatches} listed in total</span>
         )}

@@ -134,7 +134,8 @@ export function summarizeEbayError(body: string): string {
 
 /**
  * eBay Browse API — active listings only (asking prices, not sold).
- * Client-credentials OAuth. Conservative ceiling = 25th percentile of USD asks.
+ * Client-credentials OAuth. The price acted on is a percentile of USD asks —
+ * see priceStats, which also decides when a market is too thin for one.
  */
 export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
   private token: { value: string; expiresAt: number } | null = null;
@@ -271,9 +272,9 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
     // Deliberately unsorted, which means eBay's Best Match.
     //
     // Asking for sort=price looks helpful and is not: it returns the twenty
-    // CHEAPEST listings in the market, and taking the 25th percentile of those
-    // is the 25th percentile of the bottom of the market, not of the market.
-    // On a title with two hundred listings that is roughly its 3rd percentile,
+    // CHEAPEST listings in the market, so any percentile of that sample is a
+    // percentile of the bottom of the market rather than of the market. On a
+    // title with two hundred listings that is a low single-digit percentile,
     // so every price came out a fraction of what the item is worth. The sample
     // has to be representative for the percentile to mean anything; the
     // listings are sorted below, for display, once they are all in hand.
@@ -322,10 +323,11 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
       listings.sort((a, b) => (a.priceCents ?? 0) - (b.priceCents ?? 0));
       return {
         source: 'ebay_browse',
-        typicalCents: stats.p25Cents,
+        typicalCents: stats.typicalCents,
         lowCents: stats.minCents,
         highCents: stats.maxCents,
         medianCents: stats.medianCents,
+        typicalBasis: stats.typicalBasis,
         sampleSize: stats.count,
         totalMatches: typeof data.total === 'number' ? data.total : null,
         listings,

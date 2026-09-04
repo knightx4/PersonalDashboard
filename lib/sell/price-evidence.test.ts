@@ -4,31 +4,42 @@ import { formatRange, parsePriceEvidence, priceStats } from './price-evidence';
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
 
 describe('priceStats', () => {
-  it('reports the order statistics the panel shows', () => {
-    expect(priceStats([3000, 1000, 5000, 2000, 4000])).toEqual({
-      count: 5,
-      minCents: 1000,
-      p25Cents: 2000,
-      medianCents: 3000,
-      maxCents: 5000,
-    });
+  /** Twenty listings, $5 to $100 in $5 steps. A market with a shape. */
+  const healthy = Array.from({ length: 20 }, (_, i) => (i + 1) * 500);
+
+  it('takes the 40th percentile of a healthy market', () => {
+    const stats = priceStats(healthy)!;
+    expect(stats.count).toBe(20);
+    // floor(19 * 0.4) = 7, so the eighth cheapest of twenty.
+    expect(stats.typicalCents).toBe(4000);
+    expect(stats.typicalBasis).toBe('percentile');
+    // Below the middle, because asks run high -- but not near the bottom.
+    expect(stats.typicalCents).toBeLessThan(stats.medianCents);
+    expect(stats.typicalCents).toBeGreaterThan(stats.minCents);
   });
 
-  it('lands on the cheapest ask when the market is thin', () => {
-    // Four listings put p25 on index 0 -- the quirk the range exists to expose.
-    const stats = priceStats([1000, 2000, 3000, 4000])!;
-    expect(stats.p25Cents).toBe(1000);
-    expect(stats.minCents).toBe(1000);
-    expect(stats.maxCents).toBe(4000);
+  it('uses the median once the market is too thin to have a shape', () => {
+    // Three listings, one of them a lowball. The percentile would land on it.
+    const thin = priceStats([200, 3000, 3400])!;
+    expect(thin.typicalBasis).toBe('median');
+    expect(thin.typicalCents).toBe(3000);
+    expect(thin.typicalCents).not.toBe(thin.minCents);
   });
 
-  it('handles a single listing and an empty market', () => {
-    expect(priceStats([1500])).toEqual({
+  it('switches rules at five listings', () => {
+    expect(priceStats([100, 200, 300, 400])!.typicalBasis).toBe('median');
+    expect(priceStats([100, 200, 300, 400, 500])!.typicalBasis).toBe('percentile');
+  });
+
+  it('survives a single listing and an empty market', () => {
+    const one = priceStats([1500])!;
+    expect(one).toMatchObject({
       count: 1,
       minCents: 1500,
-      p25Cents: 1500,
+      typicalCents: 1500,
       medianCents: 1500,
       maxCents: 1500,
+      typicalBasis: 'median',
     });
     expect(priceStats([])).toBeNull();
   });

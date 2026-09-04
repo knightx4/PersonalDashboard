@@ -14,6 +14,7 @@ const ebay: PriceEvidence = {
   lowCents: 800,
   highCents: 9000,
   medianCents: 1200,
+  typicalBasis: 'percentile',
   sampleSize: 3,
   totalMatches: 340,
   listings: [
@@ -53,6 +54,7 @@ describe('PriceEvidenceDetail', () => {
           ...ebay,
           source: 'web_estimate',
           medianCents: null,
+          typicalBasis: null,
           sampleSize: null,
           totalMatches: null,
           note: 'Based on completed listings.',
@@ -81,5 +83,23 @@ describe('PriceEvidenceDetail', () => {
       />,
     );
     expect(html).toBe('');
+  });
+});
+
+describe('PriceEvidenceDetail thin markets', () => {
+  it('warns when too few listings to rank, and stays quiet when there are enough', () => {
+    const thin = renderToStaticMarkup(
+      <PriceEvidenceDetail
+        evidence={{ ...ebay, sampleSize: 3, typicalBasis: 'median' }}
+      />,
+    );
+    expect(thin).toContain('too few to rank');
+
+    const healthy = renderToStaticMarkup(
+      <PriceEvidenceDetail
+        evidence={{ ...ebay, sampleSize: 20, typicalBasis: 'percentile' }}
+      />,
+    );
+    expect(healthy).not.toContain('too few to rank');
   });
 });
