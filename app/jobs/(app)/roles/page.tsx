@@ -5,6 +5,7 @@ import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
@@ -210,9 +211,19 @@ export default async function RolesPage({
                   <td className="px-2 py-1.5">
                     <Link
                       href={`/jobs/companies/${row.companySlug}`}
-                      className="text-ink-muted hover:text-accent"
+                      className="flex items-center gap-2 text-ink-muted hover:text-accent"
                     >
-                      {row.companyName}
+                      <CompanyAvatar
+                        company={{
+                          name: row.companyName,
+                          logoUrl: row.companyLogoUrl,
+                          domains: row.companyDomains,
+                          website: row.companyWebsite,
+                        }}
+                        className="size-5 rounded"
+                        imageClassName="size-4"
+                      />
+                      <span className="truncate">{row.companyName}</span>
                     </Link>
                   </td>
                   <td className="px-2 py-1.5">
