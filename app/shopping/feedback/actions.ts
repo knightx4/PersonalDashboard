@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { fireFeatureRoutine } from '@/lib/feedback/routine';
+import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 
 /**
  * One queue rendered in two places, so a write has to refresh both. Missing
@@ -159,6 +160,26 @@ export async function runFeatureRoutine(
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };
+}
+
+/**
+ * How many notes are still outstanding — open, in progress, blocked or planned.
+ *
+ * Read when the capture panel opens rather than threaded down through the
+ * shell's props: the number moves every time a note is filed or worked, and one
+ * baked into a cached layout would be wrong at exactly the moment someone is
+ * deciding whether to press "Run Feature Routine".
+ */
+export async function openFeedbackCount(): Promise<number> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { count } = await supabase
+    .from('feedback_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .in('status', [...OUTSTANDING_STATUSES]);
+  return count ?? 0;
 }
 
 /** Reorder the queue by hand: 1 next, 2 normal, 3 someday. */

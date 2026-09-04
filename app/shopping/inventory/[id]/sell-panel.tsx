@@ -65,7 +65,9 @@ export function ItemSellPanel({
           <p className="mt-1 text-ui text-ink-muted">
             {quote.kind === 'game'
               ? 'Asking prices for the same game, less eBay fees, shipping and effort.'
-              : 'Asking prices for the same edition, less eBay fees, shipping and effort.'}
+              : quote.kind === 'book'
+                ? 'Asking prices for the same edition, less eBay fees, shipping and effort.'
+                : 'Asking prices for the same thing, less eBay fees, shipping and effort.'}
           </p>
         </div>
         {quote.priceSource !== 'none' && (
@@ -78,14 +80,12 @@ export function ItemSellPanel({
                 {searchPending ? 'Searching…' : searchLabel}
               </Button>
             </form>
-            {quote.priceable && (
-              <form action={priceAction}>
-                <input type="hidden" name="inventory_item_id" value={itemId} />
-                <Button type="submit" size="sm" disabled={pricePending}>
-                  {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
-                </Button>
-              </form>
-            )}
+            <form action={priceAction}>
+              <input type="hidden" name="inventory_item_id" value={itemId} />
+              <Button type="submit" size="sm" disabled={pricePending}>
+                {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
+              </Button>
+            </form>
           </div>
         )}
       </div>
@@ -117,23 +117,15 @@ export function ItemSellPanel({
       {searchState.evidence && <PriceEvidenceDetail evidence={searchState.evidence} />}
       <FieldError>{searchState.error}</FieldError>
 
-      {!quote.priceable ? (
-        <p className="text-ui text-ink-muted">
-          {quote.needsConfirmation ? (
-            <>
-              Confirm which {quote.kind === 'game' ? 'box' : 'edition'} this is in{' '}
-              {quote.kind === 'game' ? 'Game details' : 'Book details'} above to price and
-              cache it — or search on the title now.
-            </>
-          ) : quote.kind === 'game' ? (
-            'No BoardGameGeek match yet, so a search goes on the title alone.'
-          ) : (
-            'No ISBN yet, so a search goes on the title alone.'
-          )}
-        </p>
-      ) : quote.priceSource === 'none' ? (
+      {quote.priceSource === 'none' ? (
         <p className="text-ui text-ink-muted">
           No price source is configured, so prices can only be set by hand.
+        </p>
+      ) : quote.needsConfirmation ? (
+        <p className="text-ui text-ink-muted">
+          Priced on the title, because which{' '}
+          {quote.kind === 'game' ? 'box' : 'edition'} this is has not been confirmed in{' '}
+          {quote.kind === 'game' ? 'Game details' : 'Book details'} above.
         </p>
       ) : null}
 

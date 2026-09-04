@@ -115,6 +115,14 @@ function CandidateRow({
   );
 }
 
+/**
+ * A book's identity, its condition, and the confirmation gate pricing waits on.
+ *
+ * The top of the item's one Details box, not a box of its own — see the note on
+ * GameDetailsPanel. The ISBNs are rendered only when the catalog has them,
+ * because the books template carries an ISBN field of its own and the page
+ * hides whichever of the pair is the duplicate.
+ */
 export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
   const [confirmState, confirmAction, confirmPending] = useActionState(
     confirmBookEdition,
@@ -126,17 +134,14 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
   );
 
   return (
-    <section className="space-y-4 rounded-card border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-body font-semibold text-ink">Book details</h2>
-        {book.autoImported && (
-          <span className="text-small text-ink-muted">Imported from an order email</span>
-        )}
-      </div>
+    <div className="space-y-4">
+      {book.autoImported && (
+        <p className="text-small text-ink-muted">Imported from an order email</p>
+      )}
 
       <dl className="grid gap-2 text-body sm:grid-cols-2">
-        <Fact label="ISBN-13" value={book.isbn13} mono />
-        <Fact label="ISBN-10" value={book.isbn10} mono />
+        {book.isbn13 && <Fact label="ISBN-13" value={book.isbn13} mono />}
+        {book.isbn10 && <Fact label="ISBN-10" value={book.isbn10} mono />}
         <div className="sm:col-span-2">
           <Fact
             label="Authors"
@@ -256,6 +261,6 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
         </Button>
         <FieldError>{conditionState.error}</FieldError>
       </form>
-    </section>
+    </div>
   );
 }

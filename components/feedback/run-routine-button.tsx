@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, useTransition } from 'react';
+import { useActionState } from 'react';
 import { Play } from 'lucide-react';
 import {
   runFeatureRoutine,
@@ -12,26 +12,25 @@ import { FieldError } from '@/components/ui/field';
 /**
  * Start the routine that works this queue.
  *
- * Two placements, one action: under the whole list on the feedback page, and
- * in the capture panel next to "See all" — the two moments where wanting the
- * queue worked actually occurs.
+ * One shape, two placements: under the whole list on the feedback page, and in
+ * its own section at the bottom of the capture panel — the two moments where
+ * wanting the queue worked actually occurs. It used to be a bare link squeezed
+ * onto the panel's Send row, where it read as a footnote to the form rather
+ * than as the other thing you can do from there.
+ *
+ * The count beside it is what makes the button answerable: "run the routine" is
+ * a different decision when eleven notes are waiting than when none are.
  */
 export function RunRoutineButton({
-  variant = 'block',
+  openCount,
 }: {
-  /** `block` under the queue; `inline` beside a link in the capture panel. */
-  variant?: 'block' | 'inline';
+  /** Outstanding notes, shown beside the button. Omitted while unknown. */
+  openCount?: number | null;
 }) {
   const [state, action, pending] = useActionState(
     runFeatureRoutine,
     {} as FeedbackActionState,
   );
-
-  // The capture panel is itself a form, and a form inside a form is not
-  // markup — so inline calls the action directly instead of submitting one.
-  if (variant === 'inline') {
-    return <InlineRunButton />;
-  }
 
   return (
     <form action={action} className="space-y-2 border-t border-border pt-4">
@@ -40,41 +39,17 @@ export function RunRoutineButton({
           <Play className="size-3.5" aria-hidden />
           {pending ? 'Starting…' : 'Run Feature Routine'}
         </Button>
-        <p className="text-ui text-ink-muted">
-          Works the outstanding notes now instead of waiting for the schedule.
-        </p>
+        {openCount != null && (
+          <span className="text-ui text-ink-muted">
+            {openCount} open issue{openCount === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
+      <p className="text-ui text-ink-muted">
+        Works the outstanding notes now instead of waiting for the schedule.
+      </p>
       {state.message && <p className="text-ui text-positive">{state.message}</p>}
       <FieldError>{state.error}</FieldError>
     </form>
-  );
-}
-
-function InlineRunButton() {
-  const [pending, startTransition] = useTransition();
-  const [state, setState] = useState<FeedbackActionState>({});
-
-  return (
-    <span className="flex items-center gap-2">
-      <button
-        type="button"
-        disabled={pending}
-        title="Start the routine that works the queue"
-        onClick={() =>
-          startTransition(async () => {
-            setState(await runFeatureRoutine({}, new FormData()));
-          })
-        }
-        className="text-ui text-accent hover:underline disabled:opacity-60"
-      >
-        {pending ? 'Starting…' : 'Run routine'}
-      </button>
-      {state.message && <span className="text-small text-ink-muted">Started</span>}
-      {state.error && (
-        <span className="text-small text-danger" title={state.error}>
-          Failed
-        </span>
-      )}
-    </span>
   );
 }

@@ -1,10 +1,11 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
 import {
+  openFeedbackCount,
   submitFeedback,
   type FeedbackActionState,
 } from '@/app/shopping/feedback/actions';
@@ -41,6 +42,25 @@ export function FeedbackButton({
   );
 
   usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
+
+  // Counted when the panel opens, and again after a note is filed from it, so
+  // the number beside "Run Feature Routine" is the queue as it stands rather
+  // than as it was when the layout was rendered. A failure leaves it unknown,
+  // and the button simply shows no count.
+  const [openCount, setOpenCount] = useState<number | null>(null);
+  const submitted = state.message;
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void openFeedbackCount()
+      .then((count) => {
+        if (!cancelled) setOpenCount(count);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, submitted]);
 
   return (
     <div className="relative shrink-0">
@@ -137,16 +157,13 @@ export function FeedbackButton({
               <Button type="submit" size="sm" disabled={pending}>
                 {pending ? 'Saving…' : 'Send'}
               </Button>
-              <div className="flex items-center gap-3">
-                <RunRoutineButton variant="inline" />
-                <Link
-                  href={allHref}
-                  className="text-ui text-accent hover:underline"
-                  onClick={() => setOpen(false)}
-                >
-                  See all
-                </Link>
-              </div>
+              <Link
+                href={allHref}
+                className="text-ui text-accent hover:underline"
+                onClick={() => setOpen(false)}
+              >
+                See all
+              </Link>
             </div>
 
             <FieldError>{state.error}</FieldError>
@@ -154,6 +171,13 @@ export function FeedbackButton({
               <p className="text-ui text-accent">{state.message}</p>
             )}
           </form>
+
+          {/* Its own section below the form, not a link on the Send row: it is
+              the other thing you can do from here, and it acts on the whole
+              queue rather than on what you just typed. */}
+          <div className="mt-4">
+            <RunRoutineButton openCount={openCount} />
+          </div>
         </div>
       )}
     </div>
