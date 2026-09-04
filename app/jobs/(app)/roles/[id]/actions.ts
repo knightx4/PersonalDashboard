@@ -283,6 +283,8 @@ export async function addReminder(input: {
 
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/today');
+  // And on the company, which rolls up the to-dos of every role it has.
+  revalidatePath('/jobs/companies/[slug]', 'page');
   return { error: null };
 }
 
