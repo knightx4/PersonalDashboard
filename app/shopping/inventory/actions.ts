@@ -18,6 +18,7 @@ import {
   type AttributeValues,
 } from '@/lib/inventory/attributes';
 import { pickListGradient } from '@/lib/lists/gradients';
+import { stackSiblingIds } from '@/lib/inventory/stack-siblings';
 
 export interface ActionState {
   error?: string;
@@ -114,6 +115,13 @@ export async function updateInventoryItem(
     .maybeSingle();
   if (!current) return { error: 'That item could not be found.' };
 
+  // Everything on this form describes the item, not the box: a name, a
+  // category and a template field are as true of the second copy of Acquire as
+  // of the first. So the save reaches every copy in the stack. What genuinely
+  // differs between copies -- when it was bought, what it cost, whether this
+  // one is on the sell page -- is edited elsewhere and is never touched here.
+  const ids = await stackSiblingIds(supabase, user.id, parsed.data.id);
+
   const { error } = await supabase
     .from('inventory_items')
     .update({
@@ -125,14 +133,16 @@ export async function updateInventoryItem(
       search_tags: enriched.searchTags,
       attributes: mergeAttributeValues(parseAttributeValues(current.attributes), submitted),
     })
-    .eq('id', parsed.data.id)
+    .in('id', ids)
     .eq('user_id', user.id);
 
   if (error) return { error: error.message };
 
   revalidatePath('/shopping/inventory');
-  revalidatePath(`/shopping/inventory/${parsed.data.id}`);
-  return { message: 'Saved.' };
+  for (const id of ids) revalidatePath(`/shopping/inventory/${id}`);
+  return {
+    message: ids.length > 1 ? `Saved to all ${ids.length} copies.` : 'Saved.',
+  };
 }
 
 export async function disposeInventoryItem(

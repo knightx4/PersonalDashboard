@@ -25,6 +25,7 @@ import {
   type AttributeFilter,
 } from '@/lib/inventory/attribute-filters';
 import { parseAttributeValues, parseTemplateFields } from '@/lib/inventory/attributes';
+import { stackUnits, unitCostRange } from '@/lib/inventory/item-groups';
 import {
   GROUP_OPTIONS,
   groupInventoryItems,
@@ -158,6 +159,7 @@ export default async function InventoryPage({
     merchants,
     { data: profile },
     { data: attributeTemplates },
+    { data: groupRows },
   ] = await Promise.all([
     supabase
       .from('categories')
@@ -172,7 +174,16 @@ export default async function InventoryPage({
     loadUserMerchants(supabase, user.id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
     supabase.from('category_attribute_templates').select('fields').eq('user_id', user.id),
+    // The groupings someone made by hand. Almost always none: stacking is
+    // derived by default and a row exists only where that was overruled.
+    supabase.from('item_groups').select('id, name, group_key').eq('user_id', user.id),
   ]);
+
+  const itemGroups = (groupRows ?? []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    groupKey: (row.group_key as string | null) ?? null,
+  }));
 
   const timezone = profile?.timezone ?? 'UTC';
   const activeMerchant =
@@ -187,11 +198,16 @@ export default async function InventoryPage({
     ? `inventory_item_lists!inner ( list_id )`
     : `inventory_item_lists ( list_id )`;
 
+  // fingerprint_loose, group_id and the game's identity ride along because the
+  // list folds copies into one row per item, and that is what decides which
+  // copies are the same thing. See lib/inventory/item-groups.ts.
   const selectWithOptionalInner = activeMerchant
     ? `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
         image_url, return_planned, for_sale, search_tags, attributes,
+        fingerprint_loose, group_id,
         categories(name, color, slug),
+        game_details ( bgg_id, needs_confirmation ),
         ${membershipJoin},
         order_items!inner (
           image_url,
@@ -204,7 +220,9 @@ export default async function InventoryPage({
     : `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
         image_url, return_planned, for_sale, search_tags, attributes,
+        fingerprint_loose, group_id,
         categories(name, color, slug),
+        game_details ( bgg_id, needs_confirmation ),
         ${membershipJoin},
         order_items (
           image_url,
@@ -254,6 +272,12 @@ export default async function InventoryPage({
     for_sale: boolean;
     search_tags: string[] | null;
     attributes: unknown;
+    fingerprint_loose: string | null;
+    group_id: string | null;
+    game_details:
+      | { bgg_id: number | null; needs_confirmation: boolean }
+      | { bgg_id: number | null; needs_confirmation: boolean }[]
+      | null;
     inventory_item_lists:
       | { list_id: string }
       | { list_id: string }[]
@@ -307,10 +331,21 @@ export default async function InventoryPage({
     merchant_name: string | null;
     category_name: string | null;
     attributes: Record<string, string>;
+    // The shape lib/inventory/item-groups.ts stacks on.
+    inventoryItemId: string;
+    shortName: string | null;
+    bggId: number | null;
+    needsConfirmation: boolean;
+    isGame: boolean;
+    fingerprintLoose: string | null;
+    groupId: string | null;
+    costCents: number;
+    acquiredAt: string | null;
   })[] = rawItems.map((item) => {
     const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
     const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
     const merchantName = merchantNameFromItem(item);
+    const game = Array.isArray(item.game_details) ? item.game_details[0] : item.game_details;
     const memberships = Array.isArray(item.inventory_item_lists)
       ? item.inventory_item_lists
       : item.inventory_item_lists
@@ -318,6 +353,15 @@ export default async function InventoryPage({
         : [];
     return {
       id: item.id,
+      inventoryItemId: item.id,
+      shortName: item.short_name,
+      bggId: game?.bgg_id ?? null,
+      needsConfirmation: Boolean(game?.needs_confirmation),
+      isGame: Boolean(game),
+      fingerprintLoose: item.fingerprint_loose,
+      groupId: item.group_id,
+      costCents: item.cost_cents,
+      acquiredAt: item.acquired_at,
       name: item.name,
       short_name: item.short_name,
       variant: item.variant,
@@ -353,7 +397,35 @@ export default async function InventoryPage({
   const searched = q ? filterAndRankBySearch(byAttributes, q) : byAttributes;
   // Relevance wins while searching; otherwise honor the sort control.
   const finalItems = q ? searched : sortInventoryItems(searched, sort);
-  const groups = groupInventoryItems(finalItems, group);
+
+  // Fold copies into items, after sorting rather than before: the sort control
+  // orders what the user is looking at, and a stack takes the position of its
+  // first copy so the ordering they asked for still holds.
+  const stacks = stackUnits(finalItems, itemGroups);
+
+  // One row per item. `cost_cents` becomes the stack's total, which is what the
+  // row shows under the price and what the section subtotals add up.
+  const stackRows = stacks.map((stack) => {
+    const { low, high } = unitCostRange(stack.units);
+    return {
+      ...stack.primary,
+      id: stack.primary.inventoryItemId,
+      name: stack.name,
+      short_name: stack.quantity > 1 ? null : stack.primary.short_name,
+      cost_cents: stack.totalCents,
+      quantity: stack.quantity,
+      unit_cost_low: low,
+      unit_cost_high: high,
+      unit_ids: stack.units.map((unit) => unit.inventoryItemId),
+      // Any copy on the sell page or marked to return is worth saying on the
+      // row: the flag is about the item as far as the list is concerned.
+      for_sale: stack.units.some((unit) => unit.for_sale),
+      return_planned: stack.units.some((unit) => unit.return_planned),
+      list_ids: [...new Set(stack.units.flatMap((unit) => unit.list_ids ?? []))],
+    };
+  });
+
+  const groups = groupInventoryItems(stackRows, group);
 
   const filtered = Boolean(
     q || categoryId || activeMerchant || activeList || range !== 'all' || attrFilters.length,
