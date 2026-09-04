@@ -231,7 +231,7 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
 
           <p className="text-small text-ink-muted">
             Neither one? Scan the barcode on the back cover from{' '}
-            <Link href="/shopping/inventory/add" className="text-accent hover:underline">
+            <Link href="/shopping/inventory/add/books" className="text-accent hover:underline">
               Add books
             </Link>{' '}
             — the ISBN settles it in one shot.

@@ -1,84 +1,81 @@
 import Link from 'next/link';
+import { BookOpen, Dices } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
-import { requireUser } from '@/lib/auth/server';
-import { AddBookManualForm, AddBookPasteForm, AddBookSearchForm } from './add-book-forms';
-import { BarcodeScanPanel } from './barcode-scan';
-import { PhotoCapturePanel } from './photo-capture';
+import { Card } from '@/components/ui/card';
+import { createClient, requireUser } from '@/lib/auth/server';
+import { AddItemForm, type CategoryOption } from './add-item-form';
 
-export const metadata = { title: 'Add owned books' };
+export const metadata = { title: 'Add new item' };
 
-const MODES = [
-  { id: 'search', label: 'Search' },
-  { id: 'paste', label: 'Paste list' },
-  { id: 'scan', label: 'Scan barcode' },
-  { id: 'photo', label: 'Shelf / cover photo' },
-  { id: 'manual', label: 'By hand' },
+/** The flows that know more about a thing than a typed name can. */
+const CATALOGUED = [
+  {
+    href: '/shopping/inventory/add/books',
+    icon: BookOpen,
+    label: 'Add books',
+    hint: 'Scan a barcode, paste a list, or photograph a shelf. Sell-ready.',
+  },
+  {
+    href: '/shopping/inventory/add/games',
+    icon: Dices,
+    label: 'Add board games',
+    hint: 'Photograph the stack or scan a box. Editions are kept apart.',
+  },
 ] as const;
 
-type Mode = (typeof MODES)[number]['id'];
-
-function parseMode(raw: string | string[] | undefined): Mode {
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value === 'paste' || value === 'scan' || value === 'photo' || value === 'manual') {
-    return value;
-  }
-  return 'search';
-}
-
-export default async function AddOwnedBooksPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ mode?: string }>;
-}) {
+/**
+ * One way in for everything you own.
+ *
+ * The entry point used to be "Add owned books", which made the shelf-scanning
+ * flow look like the only way anything got into the inventory. Books and board
+ * games are the two things with a catalog behind them, so they keep their own
+ * screens -- but they are now a choice made from here rather than the door you
+ * have to walk through.
+ */
+export default async function AddItemPage() {
   await requireUser();
-  const params = await searchParams;
-  const mode = parseMode(params.mode);
+  const supabase = await createClient();
+
+  // Same shape the inventory list's category rail uses: top level only, and
+  // RLS is what decides whose categories come back.
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name')
+    .is('parent_id', null)
+    .order('name');
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Add owned books"
-        description="Capture books you already own. Barcodes are sell-ready; titles and shelf photos need a confirm tap."
+        title="Add new item"
+        description="Type in anything you own, or use one of the capture flows for the things that have a catalog behind them."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/shopping/inventory/add/games"
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              Add board games
-            </Link>
-            <Link
-              href="/shopping/inventory"
-              className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-            >
-              Back to inventory
-            </Link>
-          </div>
+          <Link
+            href="/shopping/inventory"
+            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+          >
+            Back to inventory
+          </Link>
         }
       />
 
-      <nav className="mb-6 flex flex-wrap gap-1" aria-label="Add mode">
-        {MODES.map((entry) => (
-          <Link
-            key={entry.id}
-            href={`/shopping/inventory/add?mode=${entry.id}`}
-            aria-current={mode === entry.id ? 'page' : undefined}
-            className={buttonVariants({
-              variant: mode === entry.id ? 'primary' : 'ghost',
-              size: 'sm',
-            })}
-          >
-            {entry.label}
+      <div className="mb-6 grid gap-3 sm:grid-cols-2">
+        {CATALOGUED.map((entry) => (
+          <Link key={entry.href} href={entry.href} className="block">
+            <Card padding="dense" interactive className="h-full">
+              <p className="flex items-center gap-2 text-ui font-semibold text-ink">
+                <entry.icon className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+                {entry.label}
+              </p>
+              <p className="mt-1 text-small text-ink-muted">{entry.hint}</p>
+            </Card>
           </Link>
         ))}
-      </nav>
+      </div>
 
-      {mode === 'search' && <AddBookSearchForm />}
-      {mode === 'paste' && <AddBookPasteForm />}
-      {mode === 'scan' && <BarcodeScanPanel />}
-      {mode === 'photo' && <PhotoCapturePanel />}
-      {mode === 'manual' && <AddBookManualForm />}
+      <h2 className="mb-3 text-ui font-semibold text-ink">Or add it by hand</h2>
+      <AddItemForm categories={(categories ?? []) as CategoryOption[]} />
     </div>
   );
 }
