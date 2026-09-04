@@ -41,10 +41,11 @@ export type AppModule = {
    * mark and the only shape that is not a square, which is what makes it read
    * as a key rather than as a fourth node.
    *
-   * A shape *and* a hue, deliberately -- either alone would run out. Position
+   * A picture *and* a hue, deliberately -- either alone would run out. Position
    * ran out at four modules, which is what this replaces; hue alone stops
-   * being distinguishable somewhere around six. Together they will go as far
-   * as anyone sensibly takes this.
+   * being distinguishable somewhere around six. Together they go as far as
+   * anyone sensibly takes this, and the picture means a new module is
+   * recognisable before anyone has learned its colour.
    *
    * The hexes are fixed rather than themed. A mark is an object, and an app
    * icon does not invert when the OS goes dark.
@@ -53,14 +54,18 @@ export type AppModule = {
 };
 
 /**
- * The shapes the changing square can take, in the order they were assigned.
+ * The shapes the changing square can take.
  *
- * Each has to survive about twelve pixels, which rules out anything with an
- * interior detail -- no glyphs, no letters, nothing hollow with a thin wall.
- * These five are told apart by silhouette alone at that size; the next module
- * takes the next unused one.
+ * Each is a picture of what the module is, and each is a *solid silhouette* --
+ * no strokes, no counters, no interior gap narrower than about a sixth of the
+ * shape. That constraint is the whole reason these read: a stroked glyph at
+ * this size is a smudge, and an outline of a briefcase is indistinguishable
+ * from an outline of a bag.
+ *
+ * 'orb' is the app itself and is the only abstract one, which is the point --
+ * it is the whole rather than one of the parts.
  */
-export type MarkShape = 'circle' | 'diamond' | 'triangle' | 'quarter' | 'pill';
+export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page';
 
 export interface MarkKey {
   shape: MarkShape;
@@ -77,7 +82,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
-    key: { shape: 'diamond', from: '#fb7185', to: '#be123c' },
+    key: { shape: 'bag', from: '#fb7185', to: '#be123c' },
   },
   {
     id: 'jobs',
@@ -86,7 +91,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
-    key: { shape: 'triangle', from: '#c4b5fd', to: '#7c3aed' },
+    key: { shape: 'briefcase', from: '#c4b5fd', to: '#7c3aed' },
   },
   {
     id: 'todo',
@@ -97,7 +102,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Todo',
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
-    key: { shape: 'quarter', from: '#7dd3fc', to: '#0369a1' },
+    key: { shape: 'check', from: '#7dd3fc', to: '#0369a1' },
   },
   {
     id: 'vault',
@@ -108,7 +113,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Vault',
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
-    key: { shape: 'pill', from: '#f0abfc', to: '#a21caf' },
+    key: { shape: 'page', from: '#f0abfc', to: '#a21caf' },
   },
 ] as const;
 
@@ -133,7 +138,7 @@ export const HOME_MARK = {
    * blue into pink is what this product has used for itself since before it
    * had modules, and the home mark is the only thing entitled to wear it.
    */
-  key: { shape: 'circle', from: '#6a82fb', to: '#ff6b9d' },
+  key: { shape: 'orb', from: '#6a82fb', to: '#ff6b9d' },
 } as const;
 
 export function moduleById(id: ModuleId | null): AppModule | null {

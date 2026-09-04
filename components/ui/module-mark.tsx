@@ -5,15 +5,16 @@ import { HOME_MARK, moduleById, type MarkKey, type MarkShape, type ModuleId } fr
 /**
  * One mark, any number of faces.
  *
- * Four nodes in a square. Three of them never change and carry no colour; the
- * fourth -- top right -- is the module, and is the only colour and the only
- * non-square shape in the whole thing.
+ * Four nodes filling a square. Three of them never change and carry no
+ * colour; the fourth -- top right -- is the module: a small picture of what it
+ * is, in its own hue, and the only colour anywhere in the mark.
  *
  * That split is the point. The constant three say "this is the same app"
  * without needing to be looked at, and the key says which room you are in
  * without needing to be read. The version before this encoded the module in
- * *which* node was promoted, which was legible but ran out at four modules;
- * a shape plus a hue does not.
+ * *which* node was promoted, which was legible but ran out at four modules; a
+ * picture plus a hue does not, and it is recognisable before anyone has
+ * learned the colour.
  *
  * The tile is a fixed near-black rather than the module's colour. A coloured
  * tile with a coloured key is two things competing to be the signal, and the
@@ -23,68 +24,85 @@ import { HOME_MARK, moduleById, type MarkKey, type MarkShape, type ModuleId } fr
  * Geometry is in a 24 unit box so the same paths serve 20px and 44px.
  */
 
-/** The three that never move, and the corner the key sits in. */
-const CONSTANT_CELLS = [
-  [7.8, 7.8],
-  [7.8, 16.2],
-  [16.2, 16.2],
-] as const;
-const KEY_CELL = [16.0, 8.0] as const;
-
-const NODE = 6.2;
 /**
- * Half again the size of a node, and it overruns its cell.
+ * The three that never move, and the corner the key sits in.
  *
- * At a node's size the key read as a fourth dot that happened to be coloured,
- * which is the opposite of the point. Breaking the grid is what turns it from
- * a member of the set into the thing the set is pointing at.
+ * Pushed out near the edges: the constellation is the mark, not a motif
+ * floating in a tile, and the earlier version left so much padding that the
+ * tile read as the logo and the squares as an afterthought.
  */
-const KEY = 8.8;
+const CONSTANT_CELLS = [
+  [7.1, 7.1],
+  [7.1, 16.9],
+  [16.9, 16.9],
+] as const;
+const KEY_CELL = [16.9, 7.1] as const;
+
+const NODE = 8.2;
 
 const SIZES = {
-  sm: { box: 'size-6 rounded-[7px]', svg: 15 },
-  md: { box: 'size-8 rounded-[9px]', svg: 20 },
-  lg: { box: 'size-11 rounded-[13px]', svg: 27 },
+  sm: { box: 'size-6 rounded-[7px]', svg: 17 },
+  md: { box: 'size-8 rounded-[9px]', svg: 22 },
+  lg: { box: 'size-11 rounded-[13px]', svg: 30 },
 } as const;
 
 /** Near-black, fixed. The mark is an object; it does not follow the theme. */
 const TILE = '#101216';
 
-function keyPath(shape: MarkShape): string {
+/**
+ * The key, drawn about its own centre.
+ *
+ * Every one of these is a single filled silhouette. No strokes, no counters,
+ * and no gap narrower than roughly a sixth of the shape -- at twenty-four
+ * pixels the key is about five, and anything finer than that closes up into a
+ * blob. It is also why the bag has two ears rather than a drawn handle: the
+ * gap between them survives being small, a 1px arc does not.
+ *
+ * Each runs a little larger than a constant node and overruns its cell, so it
+ * reads as the thing the other three are pointing at rather than as a fourth
+ * one of them.
+ */
+function KeyShape({ shape, fill }: { shape: MarkShape; fill: string }) {
   const [cx, cy] = KEY_CELL;
-  const half = KEY / 2;
 
   switch (shape) {
-    case 'diamond': {
-      const reach = half * 1.12;
-      return `M${cx} ${cy - reach}L${cx + reach} ${cy}L${cx} ${cy + reach}L${cx - reach} ${cy}Z`;
-    }
-    case 'triangle': {
-      // Sat slightly low in its cell: an upward triangle reads as higher than
-      // it is, and lining its centroid up with the nodes looks like a mistake.
-      const r = half * 1.14;
-      const top = cy - r + 0.5;
-      const bottom = cy + r * 0.82 + 0.5;
-      return `M${cx} ${top}L${cx + r * 1.02} ${bottom}L${cx - r * 1.02} ${bottom}Z`;
-    }
-    case 'quarter': {
-      // A square with one corner taken all the way round.
-      // A square with one corner taken all the way round -- half straight,
-      // half curve, which is a silhouette nothing else here has.
-      const x = cx - half;
-      const y = cy - half;
-      return `M${x} ${y}H${x + KEY}A${KEY} ${KEY} 0 0 1 ${x} ${y + KEY}Z`;
-    }
-    case 'pill': {
-      const w = KEY * 0.98;
-      const h = KEY * 0.52;
-      const x = cx - w / 2;
-      const y = cy - h / 2;
-      return `M${x + h / 2} ${y}H${x + w - h / 2}A${h / 2} ${h / 2} 0 0 1 ${x + w - h / 2} ${y + h}H${x + h / 2}A${h / 2} ${h / 2} 0 0 1 ${x + h / 2} ${y}Z`;
-    }
-    case 'circle':
+    case 'bag':
+      return (
+        <g fill={fill}>
+          {/* A real arch with a real hole. Below about 32px the hole closes and
+              this becomes a coloured blob -- which is the honest trade, because
+              at that size no bag is legible and the hue is doing the work. */}
+          <path
+            d={`M${cx - 3.2} ${cy - 1.3}A3.2 3.2 0 0 1 ${cx + 3.2} ${cy - 1.3}H${cx + 1.5}A1.5 1.5 0 0 0 ${cx - 1.5} ${cy - 1.3}Z`}
+          />
+          <rect x={cx - 4.9} y={cy - 1.6} width={9.8} height={6.7} rx={1.6} />
+        </g>
+      );
+    case 'briefcase':
+      return (
+        <g fill={fill}>
+          {/* One centred tab, against the bag's two -- convex top, not concave. */}
+          <rect x={cx - 2.1} y={cy - 4.9} width={4.2} height={2.8} rx={0.9} />
+          <rect x={cx - 4.9} y={cy - 2.6} width={9.8} height={7.4} rx={1.5} />
+        </g>
+      );
+    case 'check':
+      return (
+        <path
+          fill={fill}
+          d={`M${cx - 4.6} ${cy + 0.4}L${cx - 2.7} ${cy - 1.6}L${cx - 1.1} ${cy + 0.1}L${cx + 3.1} ${cy - 4.4}L${cx + 4.9} ${cy - 2.6}L${cx - 1.1} ${cy + 4.1}Z`}
+        />
+      );
+    case 'page':
+      return (
+        <path
+          fill={fill}
+          d={`M${cx - 3.9} ${cy - 4.9}H${cx + 0.3}L${cx + 4.1} ${cy - 1.1}V${cy + 4.9}H${cx - 3.9}Z`}
+        />
+      );
+    case 'orb':
     default:
-      return '';
+      return <circle cx={cx} cy={cy} r={5.1} fill={fill} />;
   }
 }
 
@@ -138,11 +156,7 @@ export function ModuleMark({
           />
         ))}
 
-        {key.shape === 'circle' ? (
-          <circle cx={KEY_CELL[0]} cy={KEY_CELL[1]} r={KEY / 2} fill={`url(#${gradientId})`} />
-        ) : (
-          <path d={keyPath(key.shape)} fill={`url(#${gradientId})`} />
-        )}
+        <KeyShape shape={key.shape} fill={`url(#${gradientId})`} />
       </svg>
     </span>
   );
