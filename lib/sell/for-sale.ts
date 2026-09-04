@@ -120,16 +120,23 @@ export async function loadForSaleItems(input: {
   userId: string;
   /** Narrow to specific items — the "price these ones" path. */
   ids?: string[];
+  /**
+   * Drop the for-sale flag from the query. Only meaningful alongside `ids`:
+   * an item's own page prices and shows a price for the item you are standing
+   * on whether or not it is on the sell list, and it has to reach the same row
+   * of the same cache the sell page would.
+   */
+  includeNotForSale?: boolean;
 }): Promise<ForSaleItem[]> {
-  const { supabase, userId, ids } = input;
+  const { supabase, userId, ids, includeNotForSale } = input;
   if (ids && ids.length === 0) return [];
 
   let query = supabase
     .from('inventory_items')
     .select(SELECT)
     .eq('user_id', userId)
-    .eq('status', 'owned')
-    .eq('for_sale', true);
+    .eq('status', 'owned');
+  if (!includeNotForSale) query = query.eq('for_sale', true);
   if (ids) query = query.in('id', ids);
 
   const { data } = await query.order('name');

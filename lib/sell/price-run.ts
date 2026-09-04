@@ -95,6 +95,96 @@ async function currentlyPriced(
   };
 }
 
+/**
+ * Look one target up and write the answer to the cache it belongs to.
+ *
+ * The batch below calls this once per item; the button on a single item's page
+ * calls it once. Same query, same table, same row — which is the whole point:
+ * a price found from either page has to be the price the other one reads.
+ */
+export async function priceOneTarget(input: {
+  supabase: SupabaseClient;
+  target: PriceTarget;
+  source: 'ebay_browse' | 'web_estimate';
+  provider: Awaited<ReturnType<typeof createExpectedPriceSource>>;
+  buybackProvider?: ReturnType<typeof createBuybackProvider> | null;
+}): Promise<number | null> {
+  const { supabase, target, source, provider, buybackProvider } = input;
+  const fetchedAt = new Date().toISOString();
+
+  try {
+    const { cents, evidence } =
+      target.via === 'isbn'
+        ? await lookupPriceByIsbn(provider, target.isbn13)
+        : await lookupPriceBySubject(provider, { query: target.query, hint: target.hint });
+
+    // A null is written too: it is what stops the next run asking again
+    // immediately, and quoteIsCurrent already refuses to treat it as a price.
+    if (target.via === 'isbn') {
+      await supabase.from('book_price_quotes').upsert(
+        {
+          isbn_13: target.isbn13,
+          source,
+          quoted_cents: cents,
+          shipping_cents: 0,
+          payload: evidence,
+          fetched_at: fetchedAt,
+        },
+        { onConflict: 'isbn_13,source' },
+      );
+    } else if (target.via === 'bgg') {
+      await supabase.from('game_price_quotes').upsert(
+        {
+          bgg_id: target.bggId,
+          source,
+          quoted_cents: cents,
+          shipping_cents: 0,
+          payload: evidence,
+          fetched_at: fetchedAt,
+        },
+        { onConflict: 'bgg_id,source' },
+      );
+    } else {
+      await supabase.from('item_price_quotes').upsert(
+        {
+          inventory_item_id: target.inventoryItemId,
+          source,
+          quoted_cents: cents,
+          shipping_cents: 0,
+          payload: evidence,
+          fetched_at: fetchedAt,
+        },
+        { onConflict: 'inventory_item_id,source' },
+      );
+    }
+    return cents;
+  } finally {
+    // Buyback rides along with the ISBN it belongs to: it is the only path that
+    // can beat self-listing, and it would otherwise never be refreshed at all.
+    // In `finally` because it is a different provider — an expected-price
+    // outage is no reason to leave the buyback quote stale too.
+    if (buybackProvider && target.via === 'isbn') {
+      try {
+        const quote = await buybackProvider.quote(target.isbn13);
+        await supabase.from('book_price_quotes').upsert(
+          {
+            isbn_13: target.isbn13,
+            source: 'buyback',
+            quoted_cents: quote?.cents ?? null,
+            shipping_cents: quote?.shippingCents ?? 0,
+            vendor_name: quote?.vendor ?? null,
+            vendor_url: quote?.url ?? null,
+            fetched_at: fetchedAt,
+          },
+          { onConflict: 'isbn_13,source' },
+        );
+      } catch (error) {
+        console.error('buyback lookup failed', target.isbn13, error);
+      }
+    }
+  }
+}
+
 export async function runPriceLookups(input: {
   supabase: SupabaseClient;
   userId: string;
@@ -143,77 +233,17 @@ export async function runPriceLookups(input: {
 
   let priced = 0;
   await mapPool(todo, 2, async ({ target }) => {
-    const fetchedAt = new Date().toISOString();
     try {
-      const { cents, evidence } =
-        target.via === 'isbn'
-          ? await lookupPriceByIsbn(provider, target.isbn13)
-          : await lookupPriceBySubject(provider, { query: target.query, hint: target.hint });
-
-      // A null is written too: it is what stops the next run asking again
-      // immediately, and quoteIsCurrent already refuses to treat it as a price.
-      if (target.via === 'isbn') {
-        await supabase.from('book_price_quotes').upsert(
-          {
-            isbn_13: target.isbn13,
-            source,
-            quoted_cents: cents,
-            shipping_cents: 0,
-            payload: evidence,
-            fetched_at: fetchedAt,
-          },
-          { onConflict: 'isbn_13,source' },
-        );
-      } else if (target.via === 'bgg') {
-        await supabase.from('game_price_quotes').upsert(
-          {
-            bgg_id: target.bggId,
-            source,
-            quoted_cents: cents,
-            shipping_cents: 0,
-            payload: evidence,
-            fetched_at: fetchedAt,
-          },
-          { onConflict: 'bgg_id,source' },
-        );
-      } else {
-        await supabase.from('item_price_quotes').upsert(
-          {
-            inventory_item_id: target.inventoryItemId,
-            source,
-            quoted_cents: cents,
-            shipping_cents: 0,
-            payload: evidence,
-            fetched_at: fetchedAt,
-          },
-          { onConflict: 'inventory_item_id,source' },
-        );
-      }
+      const cents = await priceOneTarget({
+        supabase,
+        target,
+        source,
+        provider,
+        buybackProvider,
+      });
       if (cents != null) priced += 1;
     } catch (error) {
       console.error('price lookup failed', target, error);
-    }
-
-    // Buyback rides along with the ISBN it belongs to: it is the only path that
-    // can beat self-listing, and it would otherwise never be refreshed at all.
-    if (buybackProvider && target.via === 'isbn') {
-      try {
-        const quote = await buybackProvider.quote(target.isbn13);
-        await supabase.from('book_price_quotes').upsert(
-          {
-            isbn_13: target.isbn13,
-            source: 'buyback',
-            quoted_cents: quote?.cents ?? null,
-            shipping_cents: quote?.shippingCents ?? 0,
-            vendor_name: quote?.vendor ?? null,
-            vendor_url: quote?.url ?? null,
-            fetched_at: fetchedAt,
-          },
-          { onConflict: 'isbn_13,source' },
-        );
-      } catch (error) {
-        console.error('buyback lookup failed', target.isbn13, error);
-      }
     }
   });
 
