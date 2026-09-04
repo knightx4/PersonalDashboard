@@ -11,6 +11,12 @@ import { checkEbayConnection, type EbayCheckResult } from '@/lib/sell/ebay-check
 import { sellIdentityOf } from '@/lib/sell/item-quote';
 import { runPriceLookups } from '@/lib/sell/price-run';
 import { gamePriceQuery } from '@/lib/sell/game-query';
+import {
+  lookupPriceByIsbn,
+  lookupPriceBySubject,
+  type PriceLookup,
+} from '@/lib/sell/price-lookup';
+import type { PriceEvidence } from '@/lib/sell/price-evidence';
 import { formatMoney, parseDollarsToCents } from '@/lib/money';
 
 export type SellActionState = {
@@ -220,32 +226,38 @@ export async function priceOneItem(
   try {
     if (identity.kind === 'book') {
       if (!identity.isbn13) return { error: 'This book has no ISBN to look up.' };
-      cents = await provider.expectedSelfListCents(identity.isbn13);
+      const found = await lookupPriceByIsbn(provider, identity.isbn13);
+      cents = found.cents;
       await supabase.from('book_price_quotes').upsert(
         {
           isbn_13: identity.isbn13,
           source,
           quoted_cents: cents,
           shipping_cents: 0,
+          // The listings behind the number, for the item page to show.
+          payload: found.evidence,
           fetched_at: new Date().toISOString(),
         },
         { onConflict: 'isbn_13,source' },
       );
     } else {
       if (identity.bggId == null) return { error: 'This game has no BGG match to look up.' };
-      cents = await provider.expectedSelfListCentsFor(
+      const found = await lookupPriceBySubject(
+        provider,
         gamePriceQuery({
           name: item.name as string,
           yearPublished: identity.yearPublished,
           publisher: identity.publisher,
         }),
       );
+      cents = found.cents;
       await supabase.from('game_price_quotes').upsert(
         {
           bgg_id: identity.bggId,
           source,
           quoted_cents: cents,
           shipping_cents: 0,
+          payload: found.evidence,
           fetched_at: new Date().toISOString(),
         },
         { onConflict: 'bgg_id,source' },
@@ -275,6 +287,8 @@ export type PriceSearchState = SellActionState & {
   foundCents?: number | null;
   /** What was searched for, so a wrong answer explains itself. */
   query?: string;
+  /** The listings behind that number. Not persisted — a search commits nothing. */
+  evidence?: PriceEvidence | null;
 };
 
 /**
@@ -327,20 +341,20 @@ export async function searchItemPrice(
           hint: 'Used copy in good condition, sold on eBay.',
         };
 
-  let cents: number | null = null;
+  let found: PriceLookup;
   try {
     // A confirmed ISBN is a far better query than the title, so use it when
     // there is one; everything else searches on what the item is called.
-    cents =
+    found =
       identity?.kind === 'book' && identity.isbn13 && !identity.needsConfirmation
-        ? await provider.expectedSelfListCents(identity.isbn13)
-        : await provider.expectedSelfListCentsFor(subject);
+        ? await lookupPriceByIsbn(provider, identity.isbn13)
+        : await lookupPriceBySubject(provider, subject);
   } catch (error) {
     console.error('price search failed', item.id, error);
     return { error: 'The price search failed. Try again in a moment.' };
   }
 
-  if (cents == null) {
+  if (found.cents == null) {
     return {
       query: subject.query,
       foundCents: null,
@@ -349,8 +363,11 @@ export async function searchItemPrice(
   }
   return {
     query: subject.query,
-    foundCents: cents,
-    message: `${formatMoney(cents)} for “${subject.query}”.`,
+    foundCents: found.cents,
+    // Nothing is written for a search, so the evidence rides back in the
+    // state: it is the only place this lookup's listings will ever exist.
+    evidence: found.evidence,
+    message: `${formatMoney(found.cents)} for “${subject.query}”.`,
   };
 }
 
