@@ -743,44 +743,48 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
     single hue. <strong>Never blend two hues</strong> — an orange-to-pink diagonal ramp is
     decoration pretending to be identity, it is the first thing that looks cheap when the theme
     changes, and it makes four workspace marks that are only distinguishable if you already know
-    which is which.
+    which is which. The single exception is the home mark's key, below, and it is an exception
+    because that ramp <em>is</em> the product's identity rather than a decoration of it.
   </p>
 </div>
 
 <p>
-  <strong>One mark, five faces.</strong> Every mark is the same constellation: four nodes in a
-  square, in the order the modules are declared — shopping, job search, todo, vault, reading left to
-  right and top to bottom. The home mark shows all four, evenly. A module's mark promotes its own
-  node and lets the other three recede, and the tile takes that module's hue.
+  <strong>Four squares. Three never change; the fourth is the module.</strong> The constant three
+  are monochrome and carry no colour at all. The top-right one is a different shape <em>and</em> a
+  different hue, and it is the only colour anywhere in the mark.
 </p>
 <p>
-  So the home mark <em>literally contains</em> the four modules, and each module mark is visibly a
-  view of the same object. A glyph per module — a bag, a briefcase — said nothing about the other
-  three and made five unrelated pictures; the flat tint that replaced it was correct and completely
-  lifeless.
-</p>
-<p>
-  The tile is a gradient of its hue running rich to deep at 145°, with a hairline highlight along
-  the top edge. The two hexes are fixed rather than themed: <strong>a mark is an object, and an app
-  icon does not invert when the OS goes dark</strong> — which also settles the white-on-hue contrast
-  once instead of five times.
-</p>
-<p style="font-size:13.5px;color:var(--ink-muted)">
-  The trade this makes: identity is carried by position and hue rather than by a picture of a thing.
-  It works because a mark in this app is always beside its own label — the switcher, the home tiles,
-  Account, the mobile top bar. It would not work on a browser tab.
+  That split is the whole system. The constant three say <em>this is the same app</em> without being
+  looked at; the key says <em>which room</em> without being read. And it does not run out — the
+  version before this encoded the module in which of four nodes was promoted, which was legible and
+  capped at exactly four modules. A shape plus a hue goes as far as anyone sensibly takes this.
 </p>
 
-<div class="demo">
-  <div class="marks">
-    <span class="m" style="--mk:var(--accent)"><svg class="ico"><use href="#i-home"/></svg></span>
-    <span class="m" style="--mk:var(--w-shopping)"><svg class="ico"><use href="#i-shopping"/></svg></span>
-    <span class="m" style="--mk:var(--w-jobs)"><svg class="ico"><use href="#i-jobs"/></svg></span>
-    <span class="m" style="--mk:var(--w-todo)"><svg class="ico"><use href="#i-todo"/></svg></span>
-    <span class="m" style="--mk:var(--w-vault)"><svg class="ico"><use href="#i-vault"/></svg></span>
-    <span style="font-size:12.5px;color:var(--ink-muted)">flat tint · 1px hairline · glyph in the hue</span>
-  </div>
+<table class="spec">
+  <thead><tr><th>Part</th><th>Rule</th></tr></thead>
+  <tbody>
+    <tr><td>Tile</td><td>A fixed near-black with a hairline ring, so it does not dissolve into a dark sidebar. <em>Not</em> the module's colour: a coloured tile behind a coloured key is two things competing to be the signal, and a gradient-filled rounded square is the most dated shape in software.</td></tr>
+    <tr><td>The constant three</td><td>White at 68%. Dimmed deliberately — at full strength they shout as loudly as the one element carrying meaning.</td></tr>
+    <tr><td>The key</td><td>Half again a node's size, overrunning its cell. At a node's size it read as a fourth dot that happened to be coloured, which is the opposite of the point; breaking the grid is what turns it from a member of the set into the thing the set points at.</td></tr>
+    <tr><td>Shapes</td><td>Silhouette only — circle, diamond, triangle, quarter-disc, pill. Each has to survive about twelve pixels, which rules out glyphs, letters, and anything hollow with a thin wall. A new module takes the next unused one.</td></tr>
+    <tr><td>Hexes</td><td>Fixed, not themed. A mark is an object, and an app icon does not invert when the OS goes dark.</td></tr>
+  </tbody>
+</table>
+
+<div class="rule">
+  <p>
+    <strong>The home key is the one place two hues may meet.</strong> Everywhere else a gradient
+    stays inside a single hue, because a two-hue ramp is decoration pretending to be identity. Here
+    it <em>is</em> the identity: blue into pink is what this product has used for itself since
+    before it had modules, and the home mark is the only thing entitled to wear it.
+  </p>
 </div>
+
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  The trade this makes: identity is carried by shape and hue rather than by a picture of a thing. It
+  works because a mark in this app always sits beside its own label — the switcher, the home tiles,
+  Account, the mobile top bar. It would not work on a browser tab.
+</p>
 
 <h3>Icons</h3>
 <ul>
