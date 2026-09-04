@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
 import {
   openFeedbackCount,
@@ -153,18 +152,9 @@ export function FeedbackButton({
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <Button type="submit" size="sm" disabled={pending}>
-                {pending ? 'Saving…' : 'Send'}
-              </Button>
-              <Link
-                href={allHref}
-                className="text-ui text-accent hover:underline"
-                onClick={() => setOpen(false)}
-              >
-                See all
-              </Link>
-            </div>
+            <Button type="submit" size="sm" disabled={pending} className="self-start">
+              {pending ? 'Saving…' : 'Send'}
+            </Button>
 
             <FieldError>{state.error}</FieldError>
             {state.message && (
@@ -174,9 +164,15 @@ export function FeedbackButton({
 
           {/* Its own section below the form, not a link on the Send row: it is
               the other thing you can do from here, and it acts on the whole
-              queue rather than on what you just typed. */}
+              queue rather than on what you just typed. "See all" sits here for
+              the same reason -- it belongs beside the count of what there is to
+              see, not next to a button that files one more. */}
           <div className="mt-4">
-            <RunRoutineButton openCount={openCount} />
+            <RunRoutineButton
+              openCount={openCount}
+              allHref={allHref}
+              onNavigate={() => setOpen(false)}
+            />
           </div>
         </div>
       )}

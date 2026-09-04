@@ -94,9 +94,11 @@ describe('the activity feed', () => {
     });
 
     expect(entries.map((e) => e.source)).toEqual(['sweep', 'sweep']);
-    expect(entries[0].headline).toBe('Nudge — Canonical · Engineering Manager');
+    expect(entries[0].label).toBe('Nudge');
+    expect(entries[0].subject).toBe('Canonical · Engineering Manager');
     expect(entries[0].detail).toBe('Nothing back for 21 days.');
-    expect(entries[1].headline).toBe('Nudge raised');
+    expect(entries[1].label).toBe('Nudge');
+    expect(entries[1].subject).toBeNull();
     expect(entries[1].roleId).toBeNull();
   });
 
@@ -113,10 +115,56 @@ describe('the activity feed', () => {
       ],
     });
 
-    expect(fromEvent.headline).toBe('interview scheduled — Canonical · Engineering Manager');
+    expect(fromEvent.label).toBe('interview scheduled');
+    expect(fromEvent.subject).toBe('Canonical · Engineering Manager');
     expect(fromEvent.detail).toBe('Round 2 booked');
-    expect(fromRole.headline).toBe('New role — Kalshi · Analyst');
+    expect(fromRole.label).toBe('New role');
+    expect(fromRole.subject).toBe('Kalshi · Analyst');
     expect(fromRole.roleId).toBe('role-a');
+  });
+
+  it('colours a rejection red, a step forward green, and the rest quietly', () => {
+    const entries = activityEntries({
+      newRoles: [newRole('a', '2026-09-02T05:00:00Z')],
+      events: [
+        event({ id: 'r', created_at: '2026-09-02T11:00:00Z', kind: 'rejection' }),
+        event({ id: 'i', created_at: '2026-09-02T10:00:00Z', kind: 'interview_scheduled' }),
+        event({ id: 'o', created_at: '2026-09-02T09:00:00Z', kind: 'offer' }),
+        event({ id: 's', created_at: '2026-09-02T08:00:00Z', kind: 'submitted' }),
+        event({ id: 'n', created_at: '2026-09-02T07:00:00Z', kind: 'note' }),
+        // Closing a cold lead is a decision, not a rejection.
+        event({ id: 'w', created_at: '2026-09-02T06:00:00Z', kind: 'withdrawal' }),
+      ],
+      reminders: [
+        {
+          id: 'n1',
+          body: 'Nothing back for 21 days.',
+          created_at: '2026-09-02T04:00:00Z',
+          applications: { roles: role('r9', 'Engineering Manager', 'Canonical') },
+        },
+      ],
+    });
+
+    expect(entries.map((e) => e.tone)).toEqual([
+      'bad',
+      'good',
+      'good',
+      'info',
+      'muted',
+      'muted',
+      'info',
+      'muted',
+    ]);
+  });
+
+  it('does not colour a kind it has never heard of', () => {
+    const [entry] = activityEntries({
+      newRoles: [],
+      events: [event({ id: 'x', created_at: '2026-09-02T11:00:00Z', kind: 'invented_later' })],
+    });
+
+    expect(entry.tone).toBe('muted');
+    expect(entry.label).toBe('invented later');
   });
 
   it('stops at the limit rather than becoming a second pipeline page', () => {

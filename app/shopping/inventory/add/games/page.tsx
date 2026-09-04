@@ -46,7 +46,7 @@ export default async function AddGamesPage({
         description="Photograph the whole stack, scan a box, or search by name. Editions are kept apart — a base box and its expansion are different products."
         actions={
           <Link
-            href="/shopping/inventory/add"
+            href="/shopping/inventory/add/books"
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
             Add books instead

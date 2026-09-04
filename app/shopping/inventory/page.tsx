@@ -637,7 +637,7 @@ export default async function InventoryPage({
                 href="/shopping/inventory/add"
                 className={buttonVariants({ variant: 'primary', size: 'sm' })}
               >
-                Add owned books
+                Add new item
               </Link>
             </>
           }
@@ -743,7 +743,7 @@ export default async function InventoryPage({
             action={
               filtered
                 ? { label: 'Clear filters', href: '/shopping/inventory' }
-                : { label: 'Add owned books', href: '/shopping/inventory/add' }
+                : { label: 'Add new item', href: '/shopping/inventory/add' }
             }
             secondaryAction={
               filtered

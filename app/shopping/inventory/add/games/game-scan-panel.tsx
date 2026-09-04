@@ -126,7 +126,7 @@ export function GameScanPanel() {
       {isbnHit && (
         <p className="text-body text-ink">
           That is a book barcode (ISBN {isbnHit}).{' '}
-          <Link href="/shopping/inventory/add?mode=scan" className="text-accent underline">
+          <Link href="/shopping/inventory/add/books?mode=scan" className="text-accent underline">
             Scan it in Add books
           </Link>
           .

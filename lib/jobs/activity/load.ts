@@ -1,5 +1,6 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import type { ApplicationEventKind } from '@/lib/jobs/pipeline';
 
 /**
  * What has changed lately, and what changed it.
@@ -27,12 +28,58 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
  */
 export type ActivitySource = 'email' | 'auto' | 'sweep' | 'you';
 
+/**
+ * How an entry reads at a glance, before you read it.
+ *
+ * A feed of forty identically grey lines makes the one line that matters --
+ * a rejection, an interview booked -- cost as much to find as the thirty-nine
+ * that do not. Four tones is the whole vocabulary: `bad` is a closed door,
+ * `good` is a step forward, `info` is the machinery working, and `muted` is a
+ * thing that merely happened.
+ */
+export type ActivityTone = 'good' | 'bad' | 'info' | 'muted';
+
+/**
+ * Which tone each kind of event earns.
+ *
+ * Exhaustive over APPLICATION_EVENT_KINDS on purpose: adding a kind should
+ * fail the typecheck here rather than quietly show up grey.
+ */
+const EVENT_TONE: Record<ApplicationEventKind, ActivityTone> = {
+  submitted: 'info',
+  confirmation: 'info',
+  recruiter_reply: 'good',
+  screen_scheduled: 'good',
+  assessment_sent: 'info',
+  assessment_submitted: 'info',
+  interview_scheduled: 'good',
+  interview_completed: 'good',
+  offer: 'good',
+  rejection: 'bad',
+  // Not red: withdrawing is a decision, usually the sweep closing something
+  // that went quiet, and colouring it like a rejection would double-count the
+  // bad news in a week where both happened.
+  withdrawal: 'muted',
+  follow_up_sent: 'info',
+  status_override: 'muted',
+  note: 'muted',
+};
+
+/** `kind` arrives as a plain string from the database. */
+function toneOfKind(kind: string): ActivityTone {
+  return EVENT_TONE[kind as ApplicationEventKind] ?? 'muted';
+}
+
 export type ActivityEntry = {
   id: string;
   /** When the app learned it. */
   at: string;
   source: ActivitySource;
-  headline: string;
+  /** What happened, in the fewest words that still say it. Carries the tone. */
+  label: string;
+  /** Who it happened to: "Canonical · Engineering Manager". */
+  subject: string | null;
+  tone: ActivityTone;
   detail: string | null;
   roleId: string | null;
 };
@@ -117,7 +164,9 @@ export function activityEntries(input: {
     id: `role-${row.id}`,
     at: row.created_at,
     source: 'email',
-    headline: `New role — ${nameOf(row.roles)}`,
+    label: 'New role',
+    subject: nameOf(row.roles),
+    tone: 'info',
     detail: null,
     roleId: row.roles.id,
   }));
@@ -126,7 +175,9 @@ export function activityEntries(input: {
     id: `event-${row.id}`,
     at: row.created_at,
     source: sourceOfEvent(row),
-    headline: `${row.kind.replace(/_/g, ' ')} — ${nameOf(row.applications.roles)}`,
+    label: row.kind.replace(/_/g, ' '),
+    subject: nameOf(row.applications.roles),
+    tone: toneOfKind(row.kind),
     detail: row.summary,
     roleId: row.applications.roles.id,
   }));
@@ -135,9 +186,9 @@ export function activityEntries(input: {
     id: `reminder-${row.id}`,
     at: row.created_at,
     source: 'sweep',
-    headline: row.applications
-      ? `Nudge — ${nameOf(row.applications.roles)}`
-      : 'Nudge raised',
+    label: 'Nudge',
+    subject: row.applications ? nameOf(row.applications.roles) : null,
+    tone: 'muted',
     detail: row.body,
     roleId: row.applications?.roles.id ?? null,
   }));

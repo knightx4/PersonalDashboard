@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { Play } from 'lucide-react';
 import {
   runFeatureRoutine,
@@ -20,12 +21,22 @@ import { FieldError } from '@/components/ui/field';
  *
  * The count beside it is what makes the button answerable: "run the routine" is
  * a different decision when eleven notes are waiting than when none are.
+ *
+ * A way through to the whole queue belongs on that same row, for the same
+ * reason: "12 open issues" is the sentence that makes someone want to look at
+ * them. It is passed in rather than assumed, because the feedback page renders
+ * this too and has no use for a link back to itself.
  */
 export function RunRoutineButton({
   openCount,
+  allHref,
+  onNavigate,
 }: {
   /** Outstanding notes, shown beside the button. Omitted while unknown. */
   openCount?: number | null;
+  /** Where the full queue lives. Omitted when this is already that page. */
+  allHref?: string;
+  onNavigate?: () => void;
 }) {
   const [state, action, pending] = useActionState(
     runFeatureRoutine,
@@ -43,6 +54,15 @@ export function RunRoutineButton({
           <span className="text-ui text-ink-muted">
             {openCount} open issue{openCount === 1 ? '' : 's'}
           </span>
+        )}
+        {allHref && (
+          <Link
+            href={allHref}
+            onClick={onNavigate}
+            className="ml-auto text-ui text-accent hover:underline"
+          >
+            See all
+          </Link>
         )}
       </div>
       <p className="text-ui text-ink-muted">
