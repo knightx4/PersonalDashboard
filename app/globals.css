@@ -219,7 +219,7 @@
 }
 
 /* ---------------------------------------------------------------------------
- * LIGHTBOX — a light table on a dark bench.
+ * LIGHTBOX — a lit sheet on a black bench.
  *
  * The one theme where the shell and the content disagree on purpose: the
  * sidebar and top bar are near-black, and the page they frame is lit. It reads
@@ -229,65 +229,82 @@
  *
  * This is why --c-shell-* exist at all. Every other theme could have got away
  * with tinting the surface.
+ *
+ * Every neutral here is on the blue-grey axis, and none of them carry red. The
+ * first version drifted warm -- a #e5e2db canvas over a #d9d5cc sunken, with
+ * beige borders and a warm-grey status-lead -- and a beige page under a
+ * near-black bench does not read as a lit sheet, it reads as old paper. Cool
+ * neutrals are also the only ones that sit honestly next to a shell this dark:
+ * the bench has no hue, so anything the page adds is the page's.
+ *
+ * The bench is deeper than it was and the sheet is whiter, which widens the
+ * one contrast this theme exists to make. Amber survives on caution and
+ * in-process because it is carrying a meaning rather than a mood -- it is the
+ * same amber in all five themes -- but its tint is pulled off beige.
+ *
+ * Note 7cab6802 also asks for the page ground itself to go dark, with only
+ * cards and tables lit. That is not a palette change: --c-canvas is the page
+ * ground in ~105 places and a recessed light well inside a card in the rest,
+ * and one token cannot be both once it flips. See the note for the split.
  * ------------------------------------------------------------------------- */
 [data-theme='lightbox'] {
   color-scheme: light;
 
-  --c-canvas: #e5e2db;
-  --c-surface: #fbfaf7;
+  --c-canvas: #dde3ea;
+  --c-surface: #fbfcfe;
   --c-raised: #ffffff;
-  --c-sunken: #d9d5cc;
-  --c-border: #cfcabf;
-  --c-border-strong: #b6b0a2;
+  --c-sunken: #cbd4de;
+  --c-border: #b7c1cd;
+  --c-border-strong: #94a0ae;
 
-  --c-shell: #101317;
-  --c-shell-ink: #e4e7ec;
-  --c-shell-muted: #9aa2ae;
-  --c-shell-border: #21262d;
-  --c-shell-hover: #1a1f26;
+  --c-shell: #090c10;
+  --c-shell-ink: #e7ebf1;
+  --c-shell-muted: #98a3b2;
+  --c-shell-border: #1a1f27;
+  --c-shell-hover: #151a21;
 
-  --c-ink: #1a1a18;
-  --c-ink-muted: #575752;
-  --c-ink-ghost: #70706a;
-  --c-border-control: #70706a;
+  --c-ink: #10141a;
+  --c-ink-muted: #464f59;
+  --c-ink-ghost: #626c78;
+  --c-border-control: #626c78;
 
-  --c-accent-base: #3f4fb5;
-  --c-accent-hover: #33418f;
-  --c-accent-tint-base: #e4e7fa;
+  --c-accent-base: #32459f;
+  --c-accent-hover: #28377f;
+  --c-accent-tint-base: #e0e5f6;
 
-  --c-w-shopping: #ab1046;
-  --c-w-shopping-tint: #f7dfe6;
-  --c-w-jobs: #6b21d6;
-  --c-w-jobs-tint: #eae0fa;
-  --c-w-todo: #03607f;
-  --c-w-todo-tint: #dcebf2;
-  --c-w-vault: #8f158f;
-  --c-w-vault-tint: #f4e0f4;
+  --c-w-shopping: #a30f46;
+  --c-w-shopping-tint: #f6dde6;
+  --c-w-jobs: #6420cf;
+  --c-w-jobs-tint: #e8dffa;
+  --c-w-todo: #035b79;
+  --c-w-todo-tint: #d9e9f1;
+  --c-w-vault: #891489;
+  --c-w-vault-tint: #f2def2;
 
-  --c-positive: #25664a;
-  --c-positive-tint: #dceee5;
-  --c-caution: #95440a;
+  --c-positive: #17624a;
+  --c-positive-tint: #d8ece4;
+  --c-caution: #8a480a;
   --c-caution-fill: #e8992f;
-  --c-caution-tint: #f6e6d6;
-  --c-danger: #a51b1b;
-  --c-danger-tint: #f6dede;
+  --c-caution-tint: #f2e6d6;
+  --c-danger: #9e1a1a;
+  --c-danger-tint: #f5dcdc;
 
-  --c-status-lead: #5d5751;
-  --c-status-lead-tint: #e6e3db;
-  --c-status-submitted: #1c4ed8;
-  --c-status-submitted-tint: #dfe6fb;
-  --c-status-process: #95440a;
-  --c-status-process-tint: #f6e6d6;
-  --c-status-final: #6b21d6;
-  --c-status-final-tint: #eae0fa;
-  --c-status-offer: #25664a;
-  --c-status-offer-tint: #dceee5;
-  --c-status-rejected: #a51b1b;
-  --c-status-rejected-tint: #f6dede;
-  --c-status-ghosted: #6a645c;
-  --c-status-ghosted-tint: #e2dfd7;
+  --c-status-lead: #4f5862;
+  --c-status-lead-tint: #e3e8ee;
+  --c-status-submitted: #1a48cc;
+  --c-status-submitted-tint: #dde4fa;
+  --c-status-process: #8a480a;
+  --c-status-process-tint: #f2e6d6;
+  --c-status-final: #6420cf;
+  --c-status-final-tint: #e8dffa;
+  --c-status-offer: #17624a;
+  --c-status-offer-tint: #d8ece4;
+  --c-status-rejected: #9e1a1a;
+  --c-status-rejected-tint: #f5dcdc;
+  --c-status-ghosted: #58616b;
+  --c-status-ghosted-tint: #dfe5eb;
 
-  --grain-opacity: 0.03;
+  --grain-opacity: 0.025;
   --grain-blend: multiply;
 }
 

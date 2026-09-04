@@ -42,10 +42,10 @@ export const THEMES = [
   {
     id: 'lightbox',
     label: 'Lightbox',
-    mood: 'Lit page, dark bench',
+    mood: 'Lit sheet, black bench',
     scheme: 'light',
-    swatch: '#101317',
-    ink: '#e4e7ec',
+    swatch: '#090c10',
+    ink: '#e7ebf1',
   },
   {
     id: 'dusk',
