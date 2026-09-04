@@ -268,8 +268,15 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
     url.searchParams.set('q', query);
     url.searchParams.set('limit', String(SEARCH_LIMIT));
     url.searchParams.set('filter', 'conditions:{USED|NEW}');
-    // Cheapest first, so the listings kept are the ones a buyer would see.
-    url.searchParams.set('sort', 'price');
+    // Deliberately unsorted, which means eBay's Best Match.
+    //
+    // Asking for sort=price looks helpful and is not: it returns the twenty
+    // CHEAPEST listings in the market, and taking the 25th percentile of those
+    // is the 25th percentile of the bottom of the market, not of the market.
+    // On a title with two hundred listings that is roughly its 3rd percentile,
+    // so every price came out a fraction of what the item is worth. The sample
+    // has to be representative for the percentile to mean anything; the
+    // listings are sorted below, for display, once they are all in hand.
 
     try {
       const res = await this.fetchFn(url.toString(), {

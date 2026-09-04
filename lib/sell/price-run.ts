@@ -18,7 +18,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/async/map-pool';
-import type { PriceEvidence } from '@/lib/sell/price-evidence';
+import { lookupPriceByIsbn, lookupPriceBySubject } from '@/lib/sell/price-lookup';
 import { createBuybackProvider } from '@/lib/sell/buyback';
 import {
   createExpectedPriceSource,
@@ -145,27 +145,10 @@ export async function runPriceLookups(input: {
   await mapPool(todo, 2, async ({ target }) => {
     const fetchedAt = new Date().toISOString();
     try {
-      // One call, never two: a web estimate is billed, so the evidence path
-      // replaces the number path rather than running alongside it. A source
-      // without the evidence methods still works, just without the listings.
-      let evidence: PriceEvidence | null = null;
-      let cents: number | null;
-      if (target.via === 'isbn') {
-        if (provider.priceEvidenceForIsbn) {
-          evidence = await provider.priceEvidenceForIsbn(target.isbn13);
-          cents = evidence?.typicalCents ?? null;
-        } else {
-          cents = await provider.expectedSelfListCents(target.isbn13);
-        }
-      } else {
-        const subject = { query: target.query, hint: target.hint };
-        if (provider.priceEvidence) {
-          evidence = await provider.priceEvidence(subject);
-          cents = evidence?.typicalCents ?? null;
-        } else {
-          cents = await provider.expectedSelfListCentsFor(subject);
-        }
-      }
+      const { cents, evidence } =
+        target.via === 'isbn'
+          ? await lookupPriceByIsbn(provider, target.isbn13)
+          : await lookupPriceBySubject(provider, { query: target.query, hint: target.hint });
 
       // A null is written too: it is what stops the next run asking again
       // immediately, and quoteIsCurrent already refuses to treat it as a price.

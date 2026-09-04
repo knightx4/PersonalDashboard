@@ -112,6 +112,9 @@ export function ItemSellPanel({
           )}
         </div>
       )}
+      {/* A search writes nothing, so this is the only place its listings
+          appear — worth showing before the number is accepted, not after. */}
+      {searchState.evidence && <PriceEvidenceDetail evidence={searchState.evidence} />}
       <FieldError>{searchState.error}</FieldError>
 
       {!quote.priceable ? (
