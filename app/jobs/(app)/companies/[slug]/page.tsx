@@ -6,6 +6,7 @@ import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
+import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
@@ -137,7 +138,9 @@ export default async function CompanyDetailPage({
             imageClassName="size-7"
           />
         }
-        title={company.name as string}
+        title={
+          <CompanyName companyId={company.id as string} name={company.name as string} />
+        }
         description={
           [company.industry, company.hq_location, company.stage]
             .filter(Boolean)
