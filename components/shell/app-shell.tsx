@@ -330,7 +330,14 @@ export function AppShell({
                 )}
               </p>
             )}
-            {!brief && <span className="min-w-0 flex-1" />}
+            {/* The gap that puts the account controls in the right corner.
+                From sm up the brief is the flexible middle of the bar and does
+                that job itself, so the spacer stands down. Below sm the brief
+                is `display: none` and takes no part in the layout at all --
+                which is how, on a phone, the theme, notification, feedback and
+                account icons ended up bunched against the page title instead
+                of in the corner. */}
+            <span className={cn('min-w-0 flex-1', brief && 'sm:hidden')} />
 
             {/* What is left here belongs to the person, not to the workspace:
                 their theme, their notifications, their feedback, their
