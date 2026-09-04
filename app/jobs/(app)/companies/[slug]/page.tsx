@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';
@@ -26,7 +27,7 @@ export default async function CompanyDetailPage({
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, domains, ats_type, ats_board_token, careers_url, website, linkedin_url, industry, stage, headcount_band, hq_location, priority, research, status',
+      'id, name, slug, domains, ats_type, ats_board_token, careers_url, website, linkedin_url, logo_url, industry, stage, headcount_band, hq_location, priority, research, status',
     )
     .eq('user_id', user.id)
     .eq('slug', slug)
@@ -86,6 +87,19 @@ export default async function CompanyDetailPage({
   return (
     <>
       <PageHeader
+        leading={
+          <CompanyAvatar
+            company={{
+              name: company.name as string,
+              logoUrl: company.logo_url as string | null,
+              domains: (company.domains as string[] | null) ?? [],
+              website: company.website as string | null,
+              careersUrl: company.careers_url as string | null,
+            }}
+            className="size-11 rounded-xl"
+            imageClassName="size-7"
+          />
+        }
         title={company.name as string}
         description={
           [company.industry, company.hq_location, company.stage]

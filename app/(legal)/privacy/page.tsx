@@ -198,8 +198,17 @@ export default function PrivacyPage() {
         headquarters, rough headcount, logo. That sends <strong>the company&rsquo;s name to
         Wikidata</strong> and may fetch the company&rsquo;s own public homepage to read its
         icon. Nothing about you is sent with either request, and neither happens unless you
-        press the button. We deliberately do not use a favicon or logo service, because that
-        would mean handing a third party the list of companies you are interested in.
+        press the button.
+      </p>
+      <p>
+        Separately, company logos on the board and in lists fall back to{' '}
+        <strong>Google&rsquo;s public favicon endpoint</strong> when no logo has been stored yet.
+        Your browser requests it directly, so what Google can see is the company&rsquo;s domain
+        alongside your IP address &mdash; in aggregate, the list of companies you are looking at.
+        No key, no account, and nothing about the role or the application is sent. If that trade
+        is not one you want, set <code>USE_FAVICON_SERVICE</code> to false in{' '}
+        <code>lib/jobs/companies/avatar.ts</code>: logos then come only from Wikidata and the
+        company&rsquo;s own site, and everything else shows initials.
       </p>
 
       <h2>Information about other people</h2>

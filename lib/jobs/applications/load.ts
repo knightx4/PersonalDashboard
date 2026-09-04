@@ -27,6 +27,9 @@ export interface PipelineRow {
   companyName: string;
   companySlug: string;
   companyLogoUrl: string | null;
+  /** Both feed the avatar: a stored logo first, the company's own domain next. */
+  companyDomains: string[];
+  companyWebsite: string | null;
   roleTitle: string;
   location: string | null;
   workMode: string | null;
@@ -67,7 +70,7 @@ const SELECT = `
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
     id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
-    companies!inner ( id, name, slug, logo_url )
+    companies!inner ( id, name, slug, logo_url, domains, website )
   )
 `;
 
@@ -97,7 +100,14 @@ type RawRow = {
     comp_min_cents: number | null;
     comp_max_cents: number | null;
     requirement_matches: CoverageEntry[] | null;
-    companies: { id: string; name: string; slug: string; logo_url: string | null };
+    companies: {
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      domains: string[] | null;
+      website: string | null;
+    };
   };
 };
 
@@ -135,6 +145,8 @@ export async function loadPipeline(
     companyName: row.roles.companies.name,
     companySlug: row.roles.companies.slug,
     companyLogoUrl: row.roles.companies.logo_url,
+    companyDomains: row.roles.companies.domains ?? [],
+    companyWebsite: row.roles.companies.website,
     roleTitle: row.roles.title,
     location: row.roles.location,
     workMode: row.roles.work_mode,

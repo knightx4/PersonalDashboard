@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
@@ -49,7 +50,7 @@ export default async function RoleDetailPage({
       `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, ats_job_id, seniority, location, work_mode,
        comp_min_cents, comp_max_cents, comp_source, posting_status, source, first_seen_at,
        requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
-       companies!inner ( id, name, slug, ats_type, priority )`,
+       companies!inner ( id, name, slug, ats_type, priority, logo_url, domains, website, careers_url )`,
     )
     .eq('id', id)
     .eq('user_id', user.id)
@@ -63,6 +64,10 @@ export default async function RoleDetailPage({
     slug: string;
     ats_type: string;
     priority: string;
+    logo_url: string | null;
+    domains: string[] | null;
+    website: string | null;
+    careers_url: string | null;
   };
 
   const { data: applications } = await supabase
@@ -199,6 +204,19 @@ export default async function RoleDetailPage({
   return (
     <>
       <PageHeader
+        leading={
+          <CompanyAvatar
+            company={{
+              name: company.name,
+              logoUrl: company.logo_url,
+              domains: company.domains ?? [],
+              website: company.website,
+              careersUrl: company.careers_url,
+            }}
+            className="size-11 rounded-xl"
+            imageClassName="size-7"
+          />
+        }
         title={<RoleTitle roleId={role.id as string} title={role.title as string} />}
         description={
           <>
