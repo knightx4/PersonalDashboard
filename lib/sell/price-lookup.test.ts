@@ -14,6 +14,7 @@ const evidence: PriceEvidence = {
   lowCents: 800,
   highCents: 9000,
   medianCents: 1500,
+  typicalBasis: 'percentile',
   sampleSize: 3,
   totalMatches: 42,
   listings: [

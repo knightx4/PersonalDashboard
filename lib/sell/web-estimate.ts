@@ -197,6 +197,9 @@ export class WebSearchExpectedPriceSource implements ExpectedPriceSource {
       lowCents: estimate.low_cents,
       highCents: estimate.high_cents,
       medianCents: null,
+      // Neither rule applies: the model judged a range, it did not read a
+      // distribution, so claiming a percentile or a median would be a fiction.
+      typicalBasis: null,
       // Not a count of listings: the model read pages, it did not enumerate a
       // market, and reporting its citation count as a sample size would imply
       // a rigour that is not there.

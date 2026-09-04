@@ -37,6 +37,8 @@ export const priceEvidenceSchema = z.object({
   /** What eBay says matched overall — a liquidity signal, when it says. */
   totalMatches: z.number().int().nonnegative().nullable().default(null),
   listings: z.array(evidenceListingSchema).default([]),
+  /** How typicalCents was derived, for the panel to explain itself. */
+  typicalBasis: z.enum(['percentile', 'median']).nullable().default(null),
   /** One line on what the number rests on. */
   note: z.string().nullable().default(null),
   /** The search that produced this, so a bad match is visible as a bad query. */
@@ -58,32 +60,61 @@ export function parsePriceEvidence(raw: unknown): PriceEvidence | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * The percentile of asks taken as the price to act on.
+ *
+ * Asks run high, so it sits below the middle of the market — but only a little.
+ * A quarter was too pessimistic: on a healthy listing page it named a price
+ * near the bottom of what anyone was asking.
+ */
+export const TYPICAL_PERCENTILE = 0.4;
+
+/**
+ * At or below this many listings, the percentile is abandoned for the median.
+ *
+ * A percentile needs a distribution to be a percentile of. With three listings
+ * the 40th lands on the cheapest, so one lowball sets the price for the item —
+ * the median is the more robust answer when there is barely a market to read.
+ * Five is the same threshold defaultNetFloorCents uses, for the same reason.
+ */
+export const THIN_MARKET_MAX = 4;
+
 export type PriceStats = {
   count: number;
   minCents: number;
-  /** The conservative ask the router uses. */
-  p25Cents: number;
+  /** The number to act on: a percentile normally, the median when thin. */
+  typicalCents: number;
   medianCents: number;
   maxCents: number;
+  /** Which rule produced typicalCents, so the panel can say. */
+  typicalBasis: 'percentile' | 'median';
 };
+
+/** Nearest-rank order statistic, clamped. Integers in, integers out. */
+function quantile(sorted: number[], q: number): number {
+  return sorted[Math.max(0, Math.floor((sorted.length - 1) * q))]!;
+}
 
 /**
  * Order statistics over asking prices.
  *
- * p25 rather than the median because these are asks, and asks run high — the
- * cheapest quartile is closer to what a copy actually moves at. With three or
- * four listings that lands on the cheapest one, which is exactly why the range
- * is worth showing next to it.
+ * These are what sellers want, not what buyers paid, so the number to act on
+ * sits below the middle — see TYPICAL_PERCENTILE — except on a market too thin
+ * to have a shape, where THIN_MARKET_MAX hands it to the median instead.
  */
 export function priceStats(centsUnsorted: number[]): PriceStats | null {
   const cents = [...centsUnsorted].sort((a, b) => a - b);
   if (cents.length === 0) return null;
+
+  const medianCents = quantile(cents, 0.5);
+  const thin = cents.length <= THIN_MARKET_MAX;
   return {
     count: cents.length,
     minCents: cents[0]!,
-    p25Cents: cents[Math.max(0, Math.floor((cents.length - 1) * 0.25))]!,
-    medianCents: cents[Math.floor((cents.length - 1) / 2)]!,
+    medianCents,
     maxCents: cents[cents.length - 1]!,
+    typicalCents: thin ? medianCents : quantile(cents, TYPICAL_PERCENTILE),
+    typicalBasis: thin ? 'median' : 'percentile',
   };
 }
 
