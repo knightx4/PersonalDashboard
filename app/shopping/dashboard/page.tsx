@@ -44,7 +44,7 @@ export default async function DashboardPage({
   const activePerson = personId ? people.find((entry) => entry.id === personId) : null;
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Time range">
           {DASHBOARD_RANGES.map((entry) => (

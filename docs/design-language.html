@@ -41,7 +41,7 @@
   --grain-opacity:0.035; --grain-blend:multiply;
   --texture:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
   --font-ui:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  --font-display:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --font-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
   --font-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
   --display-style:normal;
 }
@@ -109,34 +109,33 @@
 }
 
 /* ---------------------------------------------------------------------------
-   TERMINAL — cyan phosphor, monospace display. The joke, and it works.
+   LIGHTBOX — a lit page on a dark bench. Chrome and content disagree on purpose.
    --------------------------------------------------------------------------- */
-[data-theme="terminal"] {
-  color-scheme: dark;
-  --canvas:#020c11; --surface:#04141a; --raised:#082028; --sunken:#010609;
-  --border:#0e2c36; --border-strong:#16404e;
-  --ink:#ccf2ff; --ink-muted:#7fb8cc; --ink-faint:#4d7d8f;
+[data-theme="lightbox"] {
+  color-scheme: light;
+  --canvas:#e5e2db; --surface:#fbfaf7; --raised:#ffffff; --sunken:#d9d5cc;
+  --border:#cfcabf; --border-strong:#b6b0a2;
+  --ink:#1a1a18; --ink-muted:#575752; --ink-faint:#70706a;
 
-  --accent:#5fe3ff; --accent-hover:#8eecff; --accent-tint:#082b36;
-  --w-shopping:#ff9ec4;  --w-shopping-tint:#2e1522;
-  --w-jobs:#c0a5ff;      --w-jobs-tint:#1d1733;
-  --w-todo:#5fe3ff;      --w-todo-tint:#082b36;
-  --w-vault:#eb9ff5;     --w-vault-tint:#2a1430;
+  --accent:#3f4fb5; --accent-hover:#33418f; --accent-tint:#e4e7fa;
+  --w-shopping:#ab1046;  --w-shopping-tint:#f7dfe6;
+  --w-jobs:#6b21d6;      --w-jobs-tint:#eae0fa;
+  --w-todo:#03607f;      --w-todo-tint:#dcebf2;
+  --w-vault:#8f158f;     --w-vault-tint:#f4e0f4;
 
-  --positive:#54d6a0; --positive-tint:#062018;
-  --caution:#f0c052;  --caution-fill:#f0c052; --caution-tint:#241d08;
-  --danger:#ff9494;   --danger-tint:#2b1314;
+  --positive:#25664a; --positive-tint:#dceee5;
+  --caution:#95440a;  --caution-fill:#e8992f; --caution-tint:#f6e6d6;
+  --danger:#a51b1b;   --danger-tint:#f6dede;
 
-  --s-lead:#9aa8ad;      --s-lead-tint:#0d1a1e;
-  --s-submitted:#7fc4ff; --s-submitted-tint:#08202e;
-  --s-process:#f0c052;   --s-process-tint:#241d08;
-  --s-final:#c0a5ff;     --s-final-tint:#1d1733;
-  --s-offer:#54d6a0;     --s-offer-tint:#062018;
-  --s-rejected:#ff9494;  --s-rejected-tint:#2b1314;
-  --s-ghosted:#6f8f9b;
+  --s-lead:#5d5751;      --s-lead-tint:#e6e3db;
+  --s-submitted:#1c4ed8; --s-submitted-tint:#dfe6fb;
+  --s-process:#95440a;   --s-process-tint:#f6e6d6;
+  --s-final:#6b21d6;     --s-final-tint:#eae0fa;
+  --s-offer:#25664a;     --s-offer-tint:#dceee5;
+  --s-rejected:#a51b1b;  --s-rejected-tint:#f6dede;
+  --s-ghosted:#6a645c;
 
-  --grain-opacity:0.06; --grain-blend:overlay;
-  --font-display:var(--font-mono);
+  --grain-opacity:0.03; --grain-blend:multiply;
 }
 
 /* ---------------------------------------------------------------------------
@@ -422,14 +421,14 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
       <button data-set="paper"    aria-pressed="true"  title="Paper — default light"    style="background:#faf9f6"></button>
       <button data-set="ink"      aria-pressed="false" title="Ink — default dark"        style="background:#0f1011"></button>
       <button data-set="riso"     aria-pressed="false" title="Riso — printed light"     style="background:#f6f2e8"></button>
-      <button data-set="terminal" aria-pressed="false" title="Terminal — cyan phosphor"  style="background:#04141a"></button>
+      <button data-set="lightbox" aria-pressed="false" title="Lightbox — lit page, dark bench" style="background:#101317"></button>
       <button data-set="dusk"     aria-pressed="false" title="Dusk — plum dark"          style="background:#191426"></button>
     </div>
   </div>
   <nav class="toc">
     <a href="#laws">Laws</a><a href="#personality">Personality</a><a href="#colour">Colour</a>
     <a href="#themes">Themes</a><a href="#texture">Texture</a><a href="#type">Type</a>
-    <a href="#space">Space</a><a href="#shell">Shell</a><a href="#containers">Containers</a>
+    <a href="#space">Space</a><a href="#shell">Shell</a><a href="#sidebar">Sidebar</a><a href="#containers">Containers</a>
     <a href="#data">Data</a><a href="#states">States</a><a href="#forms">Forms</a>
     <a href="#motion">Motion</a><a href="#interaction">Interaction</a><a href="#alive">Alive</a><a href="#a11y">A11y</a>
     <a href="#voice">Voice</a><a href="#checklist">Checklist</a><a href="#never">Never</a>
@@ -749,10 +748,14 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 </div>
 
 <p>
-  A workspace mark is a <strong>flat tint of its own hue with the glyph stroked in it</strong>:
-  13% of the accent over the surface, a 30% accent border, the icon in the accent at full strength.
-  It reads at 16px, it survives every theme, and it is the same object as the icon used on the home
-  tiles and in Account.
+  A workspace mark is <strong>the module's glyph in white on a gradient of its own hue</strong>,
+  running rich to deep at 145°, with a hairline highlight along the top edge. Running the gradient
+  <em>darker</em> rather than lighter is what keeps the white glyph legible at every point along it.
+</p>
+<p>
+  The two hexes are fixed rather than themed. <strong>A mark is an object, and an app icon does not
+  invert when the OS goes dark</strong> — which also means the white-on-hue contrast is settled once
+  instead of five times. The flat-tint version this replaced was correct and completely lifeless.
 </p>
 
 <div class="demo">
@@ -818,8 +821,8 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   <tbody>
     <tr><td><strong>Paper</strong></td><td>Warm, quiet, printed</td><td>Light <code>#faf9f6</code></td><td>Fine grain, 3.5%</td><td>The default. Daylight, long sessions.</td></tr>
     <tr><td><strong>Ink</strong></td><td>Near-black, low chroma, blue-to-pink accent arc</td><td>Dark <code>#08090a</code></td><td>Grain, 4%, overlay</td><td>The default dark.</td></tr>
-    <tr><td><strong>Riso</strong></td><td>Duotone print, high chroma</td><td>Cream <code>#f6f2e8</code></td><td>Halftone dots, 11%</td><td>The loudest one. Deliberately imperfect.</td></tr>
-    <tr><td><strong>Terminal</strong></td><td>Cyan phosphor, monospace display</td><td>Near-black <code>#020c11</code></td><td>Grain, 6%</td><td>Focus. Also the joke, and it is allowed to be.</td></tr>
+    <tr><td><strong>Riso</strong></td><td>Duotone print, high chroma</td><td>Cream <code>#f6f2e8</code></td><td>Grain, 5.5%</td><td>The loudest one.</td></tr>
+    <tr><td><strong>Lightbox</strong></td><td>Near-black chrome, lit content</td><td>Shell <code>#101317</code> / page <code>#e5e2db</code></td><td>Grain, 3%</td><td>The one theme where the frame recedes completely.</td></tr>
     <tr><td><strong>Dusk</strong></td><td>Plum-cast dark, soft edges</td><td>Dark <code>#110d1a</code></td><td>Grain, 5%</td><td>Late. Lower contrast ceiling, still AA.</td></tr>
   </tbody>
 </table>
@@ -873,7 +876,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 
 <div class="demo">
   <p style="font-family:var(--font-display);font-style:var(--display-style);font-size:44px;line-height:1.06;margin:0;letter-spacing:-.02em;font-weight:400">You already own two of these.</p>
-  <p style="margin:.7rem 0 0;font-size:14px;color:var(--ink-muted);max-width:56ch">The display face is where the app stops sounding like software. Use it big or not at all — Instrument Serif at 13px is just a serif, and a serif at 13px in a data table is a mistake.</p>
+  <p style="margin:.7rem 0 0;font-size:14px;color:var(--ink-muted);max-width:56ch">The display face is where the app stops sounding like software. Use it big or not at all — at 13px a grotesque is just a slightly odd Inter, and the difference is noise rather than voice. No serifs anywhere: this is an instrument panel, not a document.</p>
   <p class="tabular" style="font-family:var(--font-display);font-style:var(--display-style);font-size:52px;margin:1.2rem 0 0;letter-spacing:-.025em;font-weight:400">$1,284.60</p>
   <p style="margin:.2rem 0 0;font-size:13px;color:var(--ink-muted)">One figure per page. Tabular. Display family. This is the thing the page is <em>for</em>.</p>
 </div>
@@ -895,7 +898,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
     <tr><td><code>text-ui</code></td><td>13px</td><td>UI</td><td><strong>The default for chrome.</strong> Nav, rail, table cells, list rows, small buttons, menu items.</td></tr>
     <tr><td><code>text-body</code></td><td>14px</td><td>UI</td><td><strong>The default for content.</strong> Page descriptions, prose, inputs, empty-state copy, banners.</td></tr>
     <tr><td><code>text-lead</code></td><td>15px</td><td>UI</td><td>Card titles, module names, the workspace label.</td></tr>
-    <tr><td><code>text-title</code></td><td>22px</td><td><strong>Display</strong></td><td>Page title (<code>h1</code>). <code>tracking-tight</code>.</td></tr>
+    <tr><td><code>text-title</code></td><td>20px</td><td><strong>Display</strong></td><td>Page title (<code>h1</code>). <code>tracking-tight</code>.</td></tr>
     <tr><td><code>text-figure</code></td><td>32 / 52px</td><td><strong>Display</strong></td><td>The single headline number. <code>tabular</code>. At most one per screen.</td></tr>
     <tr><td><code>text-machine</code></td><td>11.5px</td><td><strong>Mono</strong></td><td>Status line, keycaps, IDs, paths, raw values.</td></tr>
   </tbody>
@@ -1007,6 +1010,26 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   <li><strong>A badge only where an unattended count causes silent data damage.</strong> Review has earned one — an unworked queue is how the dashboard quietly becomes wrong. Nothing else has. Badges are <code>caution-fill</code> with dark ink, never white on orange (2.3:1).</li>
   <li><strong>Eight sections is the ceiling.</strong> Past that, group them or move something into module settings. Jobs has ten and it is the app's worst surface on a phone.</li>
   <li>On overflow: horizontal scroll, an edge fade, and <code>scrollIntoView({ block:'nearest', inline:'center' })</code> on the active item at mount. <strong>A user must never land on a page whose own tab is off-screen with no cue that it exists.</strong></li>
+</ul>
+
+<h3 id="sidebar">The sidebar</h3>
+
+<div class="rule">
+  <p>
+    <strong>Sections are a vertical list, not a horizontal strip.</strong> A strip stops working at
+    about six items and the job search has ten; a column holds ten without crowding, has room for a
+    count beside each, and frees the top bar to do the one thing a top bar is good at — naming the
+    page and holding what belongs to the account rather than to the page.
+  </p>
+</div>
+
+<ul>
+  <li><strong>Left to right, top to bottom, and this order is fixed:</strong> the switcher at the top of the sidebar, sections under it; then in the top bar, the page's name, and the account-level controls at the right.</li>
+  <li><strong>The active section is a ground, not a tint.</strong> A tint would have to be legible on five different shells; a 2px bar in the workspace mark's own fixed hue is vivid on all of them, so the active row gets <code>bg-shell-hover</code> plus that bar.</li>
+  <li><strong>The shell has its own inks.</strong> <code>--c-shell</code>, <code>--c-shell-ink</code>, <code>--c-shell-muted</code>, <code>--c-shell-border</code>, <code>--c-shell-hover</code>. In four themes the shell is a shade of the surface and these barely differ; in Lightbox the shell is near-black under a lit page, which is the whole reason they exist.</li>
+  <li><strong>Below <code>lg</code> the sidebar is a drawer</strong>, opened from a button in the top bar and closed by opening anything in it.</li>
+  <li><strong>The filter rail stays a second column</strong> from <code>xl</code> up, and a sheet below. Merging it into the sidebar is the obvious next move and is deliberately not done yet: the rail is server-rendered markup inside the page, and hoisting it into a layout means either a portal — which would make filters appear only after hydration, breaking law 6 — or threading it through every page's props.</li>
+  <li>The top bar names the page, and falls back to the workspace rather than to nothing. A bar that goes blank on an unlisted route reads as broken.</li>
 </ul>
 
 <h3 id="switcher">The workspace mark and switcher</h3>

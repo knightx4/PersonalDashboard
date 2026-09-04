@@ -63,10 +63,17 @@ export function WorkspaceSwitcher({
   current,
   enabled,
   counts = {},
+  onShell = false,
 }: {
   current: WorkspaceId | null;
   enabled?: readonly ModuleId[];
   counts?: SwitcherCounts;
+  /**
+   * Rendered on the shell rather than on a surface. In most themes those are
+   * near enough that it makes no difference; in Lightbox the shell is
+   * near-black under a lit page, so the trigger has to wear the shell's inks.
+   */
+  onShell?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -188,13 +195,30 @@ export function WorkspaceSwitcher({
         aria-expanded={open}
         title="Switch workspace  ⌘K"
         className={cn(
-          'press flex items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 transition-colors duration-150',
-          open ? 'bg-accent-tint' : 'hover:bg-sunken',
+          'press flex w-full items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-2 transition-colors duration-150',
+          onShell
+            ? open
+              ? 'bg-shell-hover'
+              : 'hover:bg-shell-hover'
+            : open
+              ? 'bg-accent-tint'
+              : 'hover:bg-sunken',
         )}
       >
         <ModuleMark module={current} size="md" />
-        <span className="font-display text-lead tracking-tight text-ink">{active.label}</span>
-        <ChevronsUpDown className="size-3.5 text-ink-muted" strokeWidth={2} aria-hidden />
+        <span
+          className={cn(
+            'font-display min-w-0 flex-1 truncate text-left text-lead font-semibold tracking-tight',
+            onShell ? 'text-shell-ink' : 'text-ink',
+          )}
+        >
+          {active.label}
+        </span>
+        <ChevronsUpDown
+          className={cn('size-3.5 shrink-0', onShell ? 'text-shell-muted' : 'text-ink-muted')}
+          strokeWidth={2}
+          aria-hidden
+        />
         <span className="sr-only">Switch workspace</span>
       </button>
 

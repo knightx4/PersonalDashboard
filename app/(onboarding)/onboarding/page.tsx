@@ -103,7 +103,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Welcome
             </p>
-            <h1 className="font-display mt-2 text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               Know what you own before you buy it again
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -137,7 +137,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Connect inbox
             </p>
-            <h1 className="font-display mt-2 text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               Before you grant Gmail access
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -218,7 +218,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Ready
             </p>
-            <h1 className="font-display mt-2 text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               {params.inbox === 'connected' ? 'Inbox connected' : 'You are set'}
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">

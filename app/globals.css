@@ -33,6 +33,12 @@
   --c-border: #e8e5df;
   --c-border-strong: #d5d1c8;
 
+  --c-shell: #f4f2ec;
+  --c-shell-ink: #1a1a18;
+  --c-shell-muted: #63635e;
+  --c-shell-border: #e2dfd7;
+  --c-shell-hover: #eae7df;
+
   --c-ink: #1a1a18;
   --c-ink-muted: #6b6b66;
   /* Decoration only -- placeholders, disabled controls, redundant glyphs.
@@ -97,6 +103,12 @@
   --c-border: #212225;
   --c-border-strong: #2e3033;
 
+  --c-shell: #0b0c0d;
+  --c-shell-ink: #f7f8f8;
+  --c-shell-muted: #9096a0;
+  --c-shell-border: #1c1d20;
+  --c-shell-hover: #17181a;
+
   --c-ink: #f7f8f8;
   --c-ink-muted: #9096a0;
   --c-ink-ghost: #6a707a;
@@ -143,7 +155,7 @@
 }
 
 /* ---------------------------------------------------------------------------
- * RISO — printed light. Cream ground, high chroma, halftone rather than grain.
+ * RISO — printed light. Cream ground, high chroma.
  * ------------------------------------------------------------------------- */
 [data-theme='riso'] {
   color-scheme: light;
@@ -154,6 +166,12 @@
   --c-sunken: #ece6d7;
   --c-border: #ded5c0;
   --c-border-strong: #c9bda0;
+
+  --c-shell: #efeadd;
+  --c-shell-ink: #191713;
+  --c-shell-muted: #655e4e;
+  --c-shell-border: #ddd3bd;
+  --c-shell-hover: #e6e0d0;
 
   --c-ink: #191713;
   --c-ink-muted: #6a6353;
@@ -196,68 +214,81 @@
   --c-status-ghosted: #6d6555;
   --c-status-ghosted-tint: #f2eee2;
 
-  --grain-opacity: 0.11;
+  --grain-opacity: 0.055;
   --grain-blend: multiply;
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='1.4' cy='1.4' r='1.1' fill='%23000'/%3E%3C/svg%3E");
 }
 
 /* ---------------------------------------------------------------------------
- * TERMINAL — cyan phosphor, monospace display. The joke, and it works.
+ * LIGHTBOX — a light table on a dark bench.
+ *
+ * The one theme where the shell and the content disagree on purpose: the
+ * sidebar and top bar are near-black, and the page they frame is lit. It reads
+ * the way a drafting table does, and it is the only arrangement here where the
+ * chrome genuinely recedes -- there is nothing to look at in it, so you look at
+ * the work.
+ *
+ * This is why --c-shell-* exist at all. Every other theme could have got away
+ * with tinting the surface.
  * ------------------------------------------------------------------------- */
-[data-theme='terminal'] {
-  color-scheme: dark;
+[data-theme='lightbox'] {
+  color-scheme: light;
 
-  --c-canvas: #020c11;
-  --c-surface: #04141a;
-  --c-raised: #082028;
-  --c-sunken: #010609;
-  --c-border: #0e2c36;
-  --c-border-strong: #16404e;
+  --c-canvas: #e5e2db;
+  --c-surface: #fbfaf7;
+  --c-raised: #ffffff;
+  --c-sunken: #d9d5cc;
+  --c-border: #cfcabf;
+  --c-border-strong: #b6b0a2;
 
-  --c-ink: #ccf2ff;
-  --c-ink-muted: #7fb8cc;
-  --c-ink-ghost: #4d7d8f;
-  --c-border-control: #4d7d8f;
+  --c-shell: #101317;
+  --c-shell-ink: #e4e7ec;
+  --c-shell-muted: #9aa2ae;
+  --c-shell-border: #21262d;
+  --c-shell-hover: #1a1f26;
 
-  --c-accent-base: #5fe3ff;
-  --c-accent-hover: #8eecff;
-  --c-accent-tint-base: #082b36;
+  --c-ink: #1a1a18;
+  --c-ink-muted: #575752;
+  --c-ink-ghost: #70706a;
+  --c-border-control: #70706a;
 
-  --c-w-shopping: #ff9ec4;
-  --c-w-shopping-tint: #2e1522;
-  --c-w-jobs: #c0a5ff;
-  --c-w-jobs-tint: #1d1733;
-  --c-w-todo: #5fe3ff;
-  --c-w-todo-tint: #082b36;
-  --c-w-vault: #eb9ff5;
-  --c-w-vault-tint: #2a1430;
+  --c-accent-base: #3f4fb5;
+  --c-accent-hover: #33418f;
+  --c-accent-tint-base: #e4e7fa;
 
-  --c-positive: #54d6a0;
-  --c-positive-tint: #062018;
-  --c-caution: #f0c052;
-  --c-caution-fill: #f0c052;
-  --c-caution-tint: #241d08;
-  --c-danger: #ff9494;
-  --c-danger-tint: #2b1314;
+  --c-w-shopping: #ab1046;
+  --c-w-shopping-tint: #f7dfe6;
+  --c-w-jobs: #6b21d6;
+  --c-w-jobs-tint: #eae0fa;
+  --c-w-todo: #03607f;
+  --c-w-todo-tint: #dcebf2;
+  --c-w-vault: #8f158f;
+  --c-w-vault-tint: #f4e0f4;
 
-  --c-status-lead: #9aa8ad;
-  --c-status-lead-tint: #0d1a1e;
-  --c-status-submitted: #7fc4ff;
-  --c-status-submitted-tint: #08202e;
-  --c-status-process: #f0c052;
-  --c-status-process-tint: #241d08;
-  --c-status-final: #c0a5ff;
-  --c-status-final-tint: #1d1733;
-  --c-status-offer: #54d6a0;
-  --c-status-offer-tint: #062018;
-  --c-status-rejected: #ff9494;
-  --c-status-rejected-tint: #2b1314;
-  --c-status-ghosted: #7f9ba6;
-  --c-status-ghosted-tint: #06171d;
+  --c-positive: #25664a;
+  --c-positive-tint: #dceee5;
+  --c-caution: #95440a;
+  --c-caution-fill: #e8992f;
+  --c-caution-tint: #f6e6d6;
+  --c-danger: #a51b1b;
+  --c-danger-tint: #f6dede;
 
-  --grain-opacity: 0.06;
-  --grain-blend: overlay;
-  --font-display: var(--font-mono-stack);
+  --c-status-lead: #5d5751;
+  --c-status-lead-tint: #e6e3db;
+  --c-status-submitted: #1c4ed8;
+  --c-status-submitted-tint: #dfe6fb;
+  --c-status-process: #95440a;
+  --c-status-process-tint: #f6e6d6;
+  --c-status-final: #6b21d6;
+  --c-status-final-tint: #eae0fa;
+  --c-status-offer: #25664a;
+  --c-status-offer-tint: #dceee5;
+  --c-status-rejected: #a51b1b;
+  --c-status-rejected-tint: #f6dede;
+  --c-status-ghosted: #6a645c;
+  --c-status-ghosted-tint: #e2dfd7;
+
+  --grain-opacity: 0.03;
+  --grain-blend: multiply;
 }
 
 /* ---------------------------------------------------------------------------
@@ -272,6 +303,12 @@
   --c-sunken: #0b0812;
   --c-border: #2c2440;
   --c-border-strong: #3b3153;
+
+  --c-shell: #0f0c17;
+  --c-shell-ink: #f2eefa;
+  --c-shell-muted: #a79fc0;
+  --c-shell-border: #241d35;
+  --c-shell-hover: #1c1729;
 
   --c-ink: #f2eefa;
   --c-ink-muted: #a79fc0;
@@ -330,6 +367,12 @@
     --c-sunken: #050506;
     --c-border: #212225;
     --c-border-strong: #2e3033;
+
+    --c-shell: #0b0c0d;
+    --c-shell-ink: #f7f8f8;
+    --c-shell-muted: #9096a0;
+    --c-shell-border: #1c1d20;
+    --c-shell-hover: #17181a;
 
     --c-ink: #f7f8f8;
     --c-ink-muted: #9096a0;
@@ -414,6 +457,11 @@
   --color-sunken: var(--c-sunken);
   --color-border: var(--c-border);
   --color-border-strong: var(--c-border-strong);
+  --color-shell: var(--c-shell);
+  --color-shell-ink: var(--c-shell-ink);
+  --color-shell-muted: var(--c-shell-muted);
+  --color-shell-border: var(--c-shell-border);
+  --color-shell-hover: var(--c-shell-hover);
 
   --color-ink: var(--c-ink);
   --color-ink-muted: var(--c-ink-muted);
@@ -483,7 +531,7 @@
   --text-figure-lg--line-height: 1;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-instrument), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono-stack);
 
   --radius-card: 0.75rem;

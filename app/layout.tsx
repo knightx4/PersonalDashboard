@@ -1,19 +1,19 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Instrument_Serif } from 'next/font/google';
+import { Bricolage_Grotesque, Inter } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 
-// Inter does all the work. Instrument Serif is the voice: page titles and the
-// one big figure, and nothing else -- it is the face that stops the app
-// sounding like software. It ships at 400 only, so nothing wearing
-// `font-display` may also ask for a bold; a synthesised serif bold looks
-// exactly as bad as it sounds.
+// Inter does all the work. Bricolage Grotesque is the voice: page titles, the
+// workspace name and the one big figure, and nothing else. A grotesque with
+// actual character rather than a serif -- the app should read as designed, not
+// as a document. Variable, so it can carry weight where a display face needs
+// to.
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
-const instrument = Instrument_Serif({
-  variable: '--font-instrument',
+const display = Bricolage_Grotesque({
+  variable: '--font-display-face',
   subsets: ['latin'],
-  weight: '400',
+  weight: ['500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -68,7 +68,7 @@ export default async function RootLayout({
     <html
       lang="en"
       data-theme={theme ?? undefined}
-      className={`${inter.variable} ${instrument.variable} h-full`}
+      className={`${inter.variable} ${display.variable} h-full`}
     >
       <body className="min-h-full">{children}</body>
     </html>

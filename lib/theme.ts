@@ -40,12 +40,12 @@ export const THEMES = [
     ink: '#191713',
   },
   {
-    id: 'terminal',
-    label: 'Terminal',
-    mood: 'Cyan phosphor, monospace',
-    scheme: 'dark',
-    swatch: '#04141a',
-    ink: '#ccf2ff',
+    id: 'lightbox',
+    label: 'Lightbox',
+    mood: 'Lit page, dark bench',
+    scheme: 'light',
+    swatch: '#101317',
+    ink: '#e4e7ec',
   },
   {
     id: 'dusk',

@@ -265,7 +265,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
   return (
     <div className="bg-surface px-4 py-3">
       <p className="text-micro uppercase tracking-wider text-ink-muted">{label}</p>
-      <p className="tabular font-display mt-1 text-2xl font-normal text-ink">{value}</p>
+      <p className="tabular font-display mt-1 text-2xl font-semibold text-ink">{value}</p>
       {hint && <p className="mt-1 text-micro leading-relaxed text-ink-muted">{hint}</p>}
     </div>
   );

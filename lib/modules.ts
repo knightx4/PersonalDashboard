@@ -33,6 +33,16 @@ export type AppModule = {
    * workspaces reading as one product rather than four sharing a login.
    */
   accent: `--color-w-${ModuleId}`;
+  /**
+   * The mark's gradient, as two fixed hexes.
+   *
+   * Deliberately not theme-aware. A workspace mark is an object -- the same
+   * idea as an app icon -- and an app icon does not invert when the OS goes
+   * dark. Fixing it also means the white glyph on it is legible once rather
+   * than in five places, and the gradient can run rich-to-deep within one hue
+   * instead of being the flat tint that made these read as dead.
+   */
+  mark: readonly [string, string];
   /** Lucide icon name, resolved by components/ui/module-icon.tsx. */
   icon: ModuleIconName;
 };
@@ -52,6 +62,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
+    mark: ['#be123c', '#8a0c2b'],
     icon: 'shopping',
   },
   {
@@ -61,6 +72,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
+    mark: ['#6d28d9', '#4f1ba0'],
     icon: 'jobs',
   },
   {
@@ -72,6 +84,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Todo',
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
+    mark: ['#0369a1', '#024a73'],
     icon: 'todo',
   },
   {
@@ -83,6 +96,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Vault',
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
+    mark: ['#9d1bab', '#6f1279'],
     icon: 'vault',
   },
 ] as const;
@@ -100,6 +114,7 @@ export const MODULES: readonly AppModule[] = [
 export const HOME_MARK = {
   label: 'Home',
   accent: '--color-accent',
+  mark: ['#4338ca', '#312a94'],
   icon: 'home',
 } as const;
 

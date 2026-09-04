@@ -1,6 +1,6 @@
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { WorkspaceNav } from '@/components/shell/workspace-nav';
+import { AppShell } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { AccountView } from './view';
@@ -32,7 +32,7 @@ export default async function AccountPage() {
 
   return (
     <div className="min-h-full">
-      <WorkspaceNav
+      <AppShell
         module={null}
         sections={[]}
         displayName={settings.displayName}
@@ -40,15 +40,13 @@ export default async function AccountPage() {
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
-      />
+      >
+        <div className="mx-auto max-w-3xl">
+          <p className="text-body text-ink-muted">
+            Settings that hold across every workspace.
+          </p>
 
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <h1 className="font-display text-3xl tracking-tight text-ink">Account</h1>
-        <p className="mt-1 text-ui text-ink-muted">
-          Settings that hold across every workspace.
-        </p>
-
-        <div className="mt-6">
+          <div className="mt-5">
           <AccountView
             email={user.email ?? ''}
             settings={{
@@ -57,9 +55,10 @@ export default async function AccountPage() {
               displayCurrency: settings.displayCurrency,
               enabledModules: settings.enabledModules,
             }}
-          />
+            />
+          </div>
         </div>
-      </main>
+      </AppShell>
     </div>
   );
 }

@@ -49,7 +49,7 @@ export function LeftRail({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="press mb-3 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-ui font-medium text-ink-muted lg:hidden"
+        className="press mb-3 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-ui font-medium text-ink-muted xl:hidden"
         aria-expanded={open}
       >
         <SlidersHorizontal className="size-4" strokeWidth={1.75} aria-hidden />
@@ -58,7 +58,7 @@ export function LeftRail({
 
       {/* Rendered only when open, so it costs nothing at rest. */}
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 xl:hidden">
           <button
             type="button"
             aria-label="Close filters"
@@ -87,8 +87,8 @@ export function LeftRail({
         </div>
       )}
 
-      <aside className={cn('hidden shrink-0 lg:block lg:w-56', className)} aria-label="Filters">
-        <div className="space-y-6 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
+      <aside className={cn('hidden shrink-0 xl:block xl:w-52', className)} aria-label="Filters">
+        <div className="space-y-6 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
           {children}
         </div>
       </aside>

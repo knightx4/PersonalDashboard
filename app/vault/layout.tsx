@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { WorkspaceNav, type NavSection } from '@/components/shell/workspace-nav';
+import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 
@@ -37,8 +37,8 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   ];
 
   return (
-    <div className="min-h-full" data-workspace="vault">
-      <WorkspaceNav
+    <div data-workspace="vault">
+      <AppShell
         module="vault"
         sections={sections}
         settingsHref="/vault/settings"
@@ -48,8 +48,9 @@ export default async function VaultLayout({ children }: { children: React.ReactN
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
-      />
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
+      >
+        {children}
+      </AppShell>
     </div>
   );
 }

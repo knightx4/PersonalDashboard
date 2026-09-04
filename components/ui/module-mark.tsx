@@ -25,19 +25,16 @@ const SIZES = {
 } as const;
 
 /**
- * A workspace mark: a flat tint of the module's own hue with its glyph
- * stroked in that hue.
+ * A workspace mark: the module's glyph in white on a gradient of its own hue.
  *
- * Not a gradient. A two-hue diagonal ramp is decoration pretending to be
- * identity -- three of the four old marks started on the same blue, so the
- * hue could not tell you which workspace you were in, and the ramps were the
- * first thing that looked wrong when the theme changed. The glyph is the
- * mnemonic and the hue confirms it, which is also why colour is never the
- * only signal here.
+ * The gradient runs rich to deep within one hue -- never across two, which is
+ * what made the original marks look cheap and made three of the four
+ * indistinguishable. Running it darker rather than lighter means the white
+ * glyph clears contrast at every point along it, and the inner highlight along
+ * the top edge is what stops the whole thing reading as a flat sticker.
  *
- * `color-mix` rather than a pre-mixed token: the tint has to be the module's
- * hue over whatever surface the current theme uses, and there are five of
- * those.
+ * Fixed hexes rather than theme tokens: a mark is an object, and an app icon
+ * does not invert when the OS goes dark.
  */
 export function ModuleMark({
   module,
@@ -52,18 +49,18 @@ export function ModuleMark({
   const entry = moduleById(module) ?? HOME_MARK;
   const Glyph = GLYPHS[entry.icon];
   const sizing = SIZES[size];
+  const [from, to] = entry.mark;
 
   return (
     <span
-      className={cn('flex shrink-0 items-center justify-center border', sizing.box, className)}
+      className={cn('relative flex shrink-0 items-center justify-center', sizing.box, className)}
       style={{
-        background: `color-mix(in srgb, var(${entry.accent}) 13%, var(--c-surface))`,
-        borderColor: `color-mix(in srgb, var(${entry.accent}) 30%, transparent)`,
-        color: `var(${entry.accent})`,
+        backgroundImage: `linear-gradient(145deg, ${from} 0%, ${to} 100%)`,
+        boxShadow: `inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 2px rgb(0 0 0 / 0.18)`,
       }}
       aria-hidden
     >
-      <Glyph className={sizing.glyph} strokeWidth={1.75} />
+      <Glyph className={cn('text-white', sizing.glyph)} strokeWidth={2} />
     </span>
   );
 }

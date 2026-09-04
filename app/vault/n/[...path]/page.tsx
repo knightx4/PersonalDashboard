@@ -58,7 +58,7 @@ export default async function NotePage({ params }: { params: Promise<{ path: str
       </Link>
 
       <header className="mb-5">
-        <h1 className="font-display text-2xl font-normal tracking-tight text-ink">
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
           {note.title}
         </h1>
         <p className="mt-1 text-ui text-ink-muted">

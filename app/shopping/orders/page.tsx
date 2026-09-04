@@ -282,7 +282,7 @@ export default async function OrdersPage({
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Time range">
           {RANGES.map((entry) => (
