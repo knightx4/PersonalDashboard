@@ -124,58 +124,84 @@ export function AppShell({
     };
   }, [drawer]);
 
+  /**
+   * One row of the column. The settings link uses it too, so the workspace's
+   * own settings look like a place you can go rather than a tool in a tray.
+   */
+  const navRow = ({
+    href,
+    label,
+    Icon,
+    on,
+    badge,
+  }: {
+    href: string;
+    label: string;
+    Icon: React.ComponentType<{
+      className?: string;
+      strokeWidth?: number;
+      'aria-hidden'?: boolean;
+    }> | null;
+    on: boolean;
+    badge?: number;
+  }) => (
+    <Link
+      key={href}
+      href={href}
+      // Opening a section is exactly when the drawer should close.
+      onClick={() => setDrawer(false)}
+      aria-current={on ? 'page' : undefined}
+      className={cn(
+        'group relative flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-2 text-ui font-medium transition-colors duration-150',
+        on
+          ? 'bg-shell-hover text-shell-ink'
+          : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
+      )}
+    >
+      {/* The workspace's own colour, as a bar rather than a tint. A tint
+          would have to be legible on five different shells; a 2px bar in
+          the mark key's fixed hue is vivid on all of them. */}
+      <span
+        className={cn(
+          'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-150',
+          on ? 'opacity-100' : 'opacity-0',
+        )}
+        style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+        aria-hidden
+      />
+      {/* Muted until the row is current, so the column reads as a list
+          of names with marks beside them rather than a wall of icons
+          competing with the one that says where you are. */}
+      {Icon && (
+        <Icon
+          className={cn(
+            'size-4 shrink-0 transition-colors duration-150',
+            on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
+          )}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+      )}
+      <span className="flex-1 truncate">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="tabular rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold text-[#14100a]">
+          {badge}
+        </span>
+      )}
+    </Link>
+  );
+
   const nav = (
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
-      {sections.map((section) => {
-        const on = isActive(section);
-        const Icon = section.icon ? NAV_ICONS[section.icon] : null;
-        return (
-          <Link
-            key={section.href}
-            href={section.href}
-            // Opening a section is exactly when the drawer should close.
-            onClick={() => setDrawer(false)}
-            aria-current={on ? 'page' : undefined}
-            className={cn(
-              'group relative flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-2 text-ui font-medium transition-colors duration-150',
-              on
-                ? 'bg-shell-hover text-shell-ink'
-                : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
-            )}
-          >
-            {/* The workspace's own colour, as a bar rather than a tint. A tint
-                would have to be legible on five different shells; a 2px bar in
-                the mark key's fixed hue is vivid on all of them. */}
-            <span
-              className={cn(
-                'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-150',
-                on ? 'opacity-100' : 'opacity-0',
-              )}
-              style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
-              aria-hidden
-            />
-            {/* Muted until the row is current, so the column reads as a list
-                of names with marks beside them rather than a wall of icons
-                competing with the one that says where you are. */}
-            {Icon && (
-              <Icon
-                className={cn(
-                  'size-4 shrink-0 transition-colors duration-150',
-                  on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
-                )}
-                strokeWidth={1.75}
-                aria-hidden
-              />
-            )}
-            <span className="flex-1 truncate">{section.label}</span>
-            {section.badge !== undefined && section.badge > 0 && (
-              <span className="tabular rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold text-[#14100a]">
-                {section.badge}
-              </span>
-            )}
-          </Link>
-        );
-      })}
+      {sections.map((section) =>
+        navRow({
+          href: section.href,
+          label: section.label,
+          Icon: section.icon ? NAV_ICONS[section.icon] : null,
+          on: isActive(section),
+          badge: section.badge,
+        }),
+      )}
     </nav>
   );
 
@@ -190,6 +216,23 @@ export function AppShell({
         />
       </div>
       <div className="mt-2 flex-1 overflow-y-auto px-2 pb-3">{nav}</div>
+
+      {/* The workspace's own settings, at the foot of its own column.
+          They were a gear in the top bar, next to the theme picker and the
+          account avatar -- controls that belong to the person rather than to
+          the workspace -- which is exactly the wrong company for them. Below
+          the section list rather than in it: settings are not a tenth place to
+          work, and a rule keeps them from reading as one. */}
+      {settingsHref && (
+        <div className="border-t border-shell-border px-2 py-2">
+          {navRow({
+            href: settingsHref,
+            label: settingsLabel ?? 'Settings',
+            Icon: Settings,
+            on: pathname.startsWith(settingsHref),
+          })}
+        </div>
+      )}
     </>
   );
 
@@ -270,22 +313,14 @@ export function AppShell({
             )}
             {!brief && <span className="min-w-0 flex-1" />}
 
+            {/* What is left here belongs to the person, not to the workspace:
+                their theme, their notifications, their feedback, their
+                account. The workspace's own settings moved into its column --
+                see sidebarInner. */}
             <div className="flex shrink-0 items-center gap-0.5">
               <ThemePicker value={theme} />
               <NotificationsButton />
               <FeedbackButton allHref={feedbackHref} />
-
-              {settingsHref && (
-                <Link
-                  href={settingsHref}
-                  aria-current={pathname.startsWith(settingsHref) ? 'page' : undefined}
-                  className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-                  title={settingsLabel ?? 'Settings'}
-                >
-                  <Settings className="size-4" strokeWidth={1.75} aria-hidden />
-                  <span className="sr-only">{settingsLabel ?? 'Settings'}</span>
-                </Link>
-              )}
 
               <Link
                 href="/account"
