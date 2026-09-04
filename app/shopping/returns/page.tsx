@@ -82,7 +82,7 @@ export default async function ReturnsPage({
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Group by">
           {RETURNS_GROUPS.map((entry) => (

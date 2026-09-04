@@ -86,7 +86,7 @@ export default async function AnswersPage({
         description={`${withCanonical} of ${rows.length} questions have a default answer. Each one you set makes the next application shorter.`}
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
           <RailGroup label="Kind">
             <RailItem label="All" href="/jobs/answers" active={!kind} count={rows.length} />

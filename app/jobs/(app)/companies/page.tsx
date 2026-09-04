@@ -107,7 +107,7 @@ export default async function CompaniesPage({
         }
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
           <RailGroup label="Priority">
             <RailItem

@@ -32,7 +32,7 @@ export function SpendHeadline({
         <CardTitle>Spent · {labelForPreset(range).toLowerCase()}</CardTitle>
       </CardHeader>
       <CardBody className="pt-0">
-        <p className="font-display text-4xl font-normal tracking-tight text-ink tabular sm:text-5xl">
+        <p className="font-display text-4xl font-semibold tracking-tight text-ink tabular sm:text-5xl">
           <CountUpMoney cents={current.netCents} currency={currency} />
         </p>
         <p className="mt-2 text-ui text-ink-muted">

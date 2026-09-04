@@ -55,7 +55,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Welcome
             </p>
-            <h1 className="font-display mt-2 text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               A pipeline that keeps itself current
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -90,7 +90,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Step 2
             </p>
-            <h1 className="font-display mt-2 text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               Who are you going after?
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -124,7 +124,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Step 3
             </p>
-            <h1 className="font-display mt-2 text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               Let it read your job-search mail
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -196,7 +196,7 @@ export default async function OnboardingPage({
       {step === 'done' && (
         <section className="space-y-6">
           <div>
-            <h1 className="font-display text-3xl font-normal tracking-tight text-ink">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
               You are set up
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">

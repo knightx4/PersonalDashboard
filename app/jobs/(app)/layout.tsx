@@ -3,7 +3,7 @@ import { createClient, getUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
-import { WorkspaceNav, type NavSection } from '@/components/shell/workspace-nav';
+import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
@@ -63,8 +63,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { accountIds, initialJob } = inbox;
 
   return (
-    <div className="min-h-full" data-workspace="jobs">
-      <WorkspaceNav
+    <div data-workspace="jobs">
+      <AppShell
         module="jobs"
         sections={sections}
         settingsHref="/jobs/settings"
@@ -75,9 +75,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
-      />
-      <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
+        banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
+      >
+        {children}
+      </AppShell>
     </div>
   );
 }

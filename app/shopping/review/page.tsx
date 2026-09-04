@@ -68,7 +68,7 @@ export default async function ReviewPage({
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Queue">
           {REVIEW_VIEWS.map((entry) => (

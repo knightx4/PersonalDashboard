@@ -29,7 +29,7 @@ export default function HomePage() {
 
       <main className="mx-auto max-w-[1100px] px-6">
         <section className="py-20 sm:py-28">
-          <h1 className="font-display max-w-2xl text-4xl font-normal leading-[1.1] tracking-tight text-ink sm:text-5xl">
+          <h1 className="font-display max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-ink sm:text-5xl">
             You already own two of these.
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted">

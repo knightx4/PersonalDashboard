@@ -75,7 +75,7 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
             setEditing(false);
           }
         }}
-        className="rounded-lg border border-border bg-surface px-2 py-1 font-display text-xl font-normal tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+        className="rounded-lg border border-border bg-surface px-2 py-1 font-display text-xl font-semibold tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
       />
       {error && <span className="text-small font-normal text-status-rejected">{error}</span>}
     </span>

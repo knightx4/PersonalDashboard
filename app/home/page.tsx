@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/server';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { WorkspaceNav } from '@/components/shell/workspace-nav';
+import { AppShell } from '@/components/shell/app-shell';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Card } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
@@ -56,7 +56,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-full">
-      <WorkspaceNav
+      <AppShell
         module={null}
         sections={[]}
         displayName={settings.displayName}
@@ -64,22 +64,19 @@ export default async function HomePage() {
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
-      />
-
-      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <h1 className="font-display text-3xl tracking-tight text-ink">Home</h1>
-
-        {agenda === null && (
-          <Banner tone="bad" className="mt-5">
+      >
+        <div className="mx-auto max-w-3xl">
+          {agenda === null && (
+            <Banner tone="bad">
             The agenda could not be read just now, so anything due today is missing from this page.
-          </Banner>
-        )}
+            </Banner>
+          )}
 
         {/* Nothing at all when there is nothing at all -- no "0 things due",
             no empty card. A quiet day should look quiet, and a front door that
             insists on saying something is one people stop reading. */}
-        {due.length > 0 && (
-          <Card padding="standard" className="mt-6">
+          {due.length > 0 && (
+            <Card padding="standard" className="mt-6">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="text-ui font-semibold text-ink">Today</h2>
               <Link
@@ -104,21 +101,22 @@ export default async function HomePage() {
                 </li>
               ))}
             </ul>
-          </Card>
-        )}
+            </Card>
+          )}
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {enabled.map((module) => (
-            <ModuleCard
-              key={module.id}
-              href={module.home}
-              module={module.id}
-              title={module.label}
-              stat={describeCount(counts[module.id]) || module.description}
-            />
-          ))}
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {enabled.map((module) => (
+              <ModuleCard
+                key={module.id}
+                href={module.home}
+                module={module.id}
+                title={module.label}
+                stat={describeCount(counts[module.id]) || module.description}
+              />
+            ))}
+          </div>
         </div>
-      </main>
+      </AppShell>
     </div>
   );
 }

@@ -57,7 +57,7 @@ const THEMES: Record<string, Vars> = {
   paper: PAPER,
   ink: theme("[data-theme='ink']"),
   riso: theme("[data-theme='riso']"),
-  terminal: theme("[data-theme='terminal']"),
+  lightbox: theme("[data-theme='lightbox']"),
   dusk: theme("[data-theme='dusk']"),
 };
 
@@ -104,6 +104,11 @@ const CHECKS: Check[] = [
   // identified by its fill and its contents -- which is why there are two
   // border tokens and only one of them is checked here.
   { ink: '--c-border-control', grounds: ['--c-surface', '--c-canvas', '--c-raised'], min: NON_TEXT, why: 'input borders and checkboxes' },
+  // The shell -- sidebar and top bar -- is its own ground. In most themes it
+  // is a shade of the surface; in Lightbox it is near-black under a lit page,
+  // which is the whole reason these tokens exist.
+  { ink: '--c-shell-ink', grounds: ['--c-shell'], min: TEXT, why: 'sidebar and top bar text' },
+  { ink: '--c-shell-muted', grounds: ['--c-shell'], min: TEXT, why: 'sidebar secondary text' },
 ];
 
 for (const stage of ['lead', 'submitted', 'process', 'final', 'offer', 'rejected'] as const) {
