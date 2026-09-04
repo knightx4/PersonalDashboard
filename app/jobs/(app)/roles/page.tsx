@@ -220,7 +220,7 @@ export default async function RolesPage({
                           domains: row.companyDomains,
                           website: row.companyWebsite,
                         }}
-                        className="size-6 rounded-md"
+                        className="size-5 rounded"
                         imageClassName="size-4"
                       />
                       <span className="truncate">{row.companyName}</span>

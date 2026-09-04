@@ -169,7 +169,7 @@ export default async function CompaniesPage({
                           website: company.website,
                           careersUrl: company.careers_url,
                         }}
-                        className="size-6 rounded-md"
+                        className="size-5 rounded"
                         imageClassName="size-4"
                       />
                       <span className="min-w-0">
