@@ -18,6 +18,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/async/map-pool';
+import { lookupPriceByIsbn, lookupPriceBySubject } from '@/lib/sell/price-lookup';
 import { createBuybackProvider } from '@/lib/sell/buyback';
 import {
   createExpectedPriceSource,
@@ -144,13 +145,10 @@ export async function runPriceLookups(input: {
   await mapPool(todo, 2, async ({ target }) => {
     const fetchedAt = new Date().toISOString();
     try {
-      const cents =
+      const { cents, evidence } =
         target.via === 'isbn'
-          ? await provider.expectedSelfListCents(target.isbn13)
-          : await provider.expectedSelfListCentsFor({
-              query: target.query,
-              hint: target.hint,
-            });
+          ? await lookupPriceByIsbn(provider, target.isbn13)
+          : await lookupPriceBySubject(provider, { query: target.query, hint: target.hint });
 
       // A null is written too: it is what stops the next run asking again
       // immediately, and quoteIsCurrent already refuses to treat it as a price.
@@ -161,6 +159,7 @@ export async function runPriceLookups(input: {
             source,
             quoted_cents: cents,
             shipping_cents: 0,
+            payload: evidence,
             fetched_at: fetchedAt,
           },
           { onConflict: 'isbn_13,source' },
@@ -172,6 +171,7 @@ export async function runPriceLookups(input: {
             source,
             quoted_cents: cents,
             shipping_cents: 0,
+            payload: evidence,
             fetched_at: fetchedAt,
           },
           { onConflict: 'bgg_id,source' },
@@ -183,6 +183,7 @@ export async function runPriceLookups(input: {
             source,
             quoted_cents: cents,
             shipping_cents: 0,
+            payload: evidence,
             fetched_at: fetchedAt,
           },
           { onConflict: 'inventory_item_id,source' },

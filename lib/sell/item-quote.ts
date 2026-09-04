@@ -25,6 +25,7 @@ import {
 } from '@/lib/sell/pricing';
 import { donateFmvHintCents, routeSellDecision, type SellPath } from '@/lib/sell/route';
 import { quoteIsCurrent, type CachedQuote } from '@/lib/sell/quote-cache';
+import { parsePriceEvidence, type PriceEvidence } from '@/lib/sell/price-evidence';
 import { serverEnv } from '@/lib/env';
 
 export type ItemSellQuote = {
@@ -38,6 +39,11 @@ export type ItemSellQuote = {
   priceIsManual: boolean;
   /** When the looked-up price was fetched, so a stale one can say so. */
   quotedAt: string | null;
+  /**
+   * What the lookup saw: the spread, and the listings behind the number.
+   * Null for a manual price, and for a quote cached before evidence was kept.
+   */
+  evidence: PriceEvidence | null;
   quoteIsStale: boolean;
   path: SellPath | null;
   reason: string | null;
@@ -158,6 +164,7 @@ export async function loadItemSellQuote(input: {
   const priceable = !identity.needsConfirmation && key != null;
 
   let cached: CachedQuote | null = null;
+  let cachedEvidence: PriceEvidence | null = null;
   let buyback: BuybackQuote | null = null;
 
   if (priceable && priceSource !== 'none') {
@@ -165,17 +172,20 @@ export async function loadItemSellQuote(input: {
       identity.kind === 'book'
         ? await supabase
             .from('book_price_quotes')
-            .select('quoted_cents, fetched_at')
+            .select('quoted_cents, fetched_at, payload')
             .eq('isbn_13', identity.isbn13 as string)
             .eq('source', priceSource)
             .maybeSingle()
         : await supabase
             .from('game_price_quotes')
-            .select('quoted_cents, fetched_at')
+            .select('quoted_cents, fetched_at, payload')
             .eq('bgg_id', identity.bggId as number)
             .eq('source', priceSource)
             .maybeSingle();
     cached = (data as CachedQuote | null) ?? null;
+    // A payload written by an older deploy parses to null rather than throwing,
+    // so the panel degrades to the bare number instead of failing to render.
+    cachedEvidence = parsePriceEvidence((data as { payload?: unknown } | null)?.payload);
   }
 
   // Buyback is read from cache only — same rule as the price: no lookup on load.
@@ -218,6 +228,9 @@ export async function loadItemSellQuote(input: {
     expectedSelfListCents,
     priceIsManual: identity.manualCents != null,
     quotedAt: identity.manualCents == null ? (cached?.fetched_at ?? null) : null,
+    // A price the user typed is the answer; showing comps beside it would
+    // invite arguing with a decision already made.
+    evidence: identity.manualCents == null ? cachedEvidence : null,
     quoteIsStale:
       identity.manualCents == null &&
       lookedUpCents != null &&

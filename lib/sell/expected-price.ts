@@ -2,6 +2,12 @@
  * Expected self-list price sources. v1: eBay Browse active listings (asking
  * prices). Later: paid sold-comps behind the same interface.
  */
+import {
+  priceStats,
+  type EvidenceListing,
+  type PriceEvidence,
+} from '@/lib/sell/price-evidence';
+
 /**
  * Something to price, when an ISBN is not what identifies it.
  *
@@ -19,6 +25,16 @@ export interface ExpectedPriceSource {
   expectedSelfListCents(isbn13: string): Promise<number | null>;
   /** Price anything not identified by an ISBN. */
   expectedSelfListCentsFor(subject: PriceSubject): Promise<number | null>;
+  /**
+   * The same lookup, keeping what it saw.
+   *
+   * Optional, and paired with the two above rather than replacing them, so each
+   * source keeps its own query shaping -- eBay wants a bare ISBN in `q`, the
+   * web search wants a sentence. A caller that has these must use them instead
+   * of the number methods, never as well: a web estimate is billed per call.
+   */
+  priceEvidenceForIsbn?(isbn13: string): Promise<PriceEvidence | null>;
+  priceEvidence?(subject: PriceSubject): Promise<PriceEvidence | null>;
 }
 
 export class NullExpectedPriceSource implements ExpectedPriceSource {
@@ -46,12 +62,27 @@ export class FixtureExpectedPriceSource implements ExpectedPriceSource {
 }
 
 type EbayItemSummary = {
+  itemId?: string;
+  title?: string;
+  itemWebUrl?: string;
+  condition?: string;
   price?: { value?: string; currency?: string };
+  shippingOptions?: { shippingCost?: { value?: string; currency?: string } }[];
 };
 
 type EbaySearchResponse = {
+  total?: number;
   itemSummaries?: EbayItemSummary[];
 };
+
+/** Money as Browse reports it: a decimal string, and only USD is usable here. */
+function usdCents(money?: { value?: string; currency?: string }): number | null {
+  if (!money) return null;
+  if (money.currency && money.currency !== 'USD') return null;
+  const value = Number(money.value);
+  if (!Number.isFinite(value) || value < 0) return null;
+  return Math.round(value * 100);
+}
 
 /**
  * Why a Browse lookup produced no number.
@@ -67,6 +98,9 @@ export type EbayFailure = {
   status?: number;
   detail: string;
 };
+
+/** How many listings one search reads. Browse allows more; 20 is plenty. */
+const SEARCH_LIMIT = 20;
 
 /** eBay keyset IDs carry their environment: `App-Name-PRD-…` or `…-SBX-…`. */
 export function ebayKeysetEnvironment(
@@ -207,14 +241,42 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
     return this.searchCents(subject.query);
   }
 
+  async priceEvidenceForIsbn(isbn13: string): Promise<PriceEvidence | null> {
+    return this.search(isbn13);
+  }
+
+  async priceEvidence(subject: PriceSubject): Promise<PriceEvidence | null> {
+    return this.search(subject.query);
+  }
+
   private async searchCents(query: string): Promise<number | null> {
+    return (await this.search(query))?.typicalCents ?? null;
+  }
+
+  /**
+   * One Browse search, kept whole.
+   *
+   * Everything but the price used to be dropped on the floor here, which made
+   * the resulting number impossible to check. The listings cost nothing extra
+   * -- they are in the response either way -- so they are carried out.
+   */
+  private async search(query: string): Promise<PriceEvidence | null> {
     const token = await this.accessToken();
     if (!token) return null;
     const marketplace = this.options.marketplaceId ?? 'EBAY_US';
     const url = new URL('https://api.ebay.com/buy/browse/v1/item_summary/search');
     url.searchParams.set('q', query);
-    url.searchParams.set('limit', '20');
+    url.searchParams.set('limit', String(SEARCH_LIMIT));
     url.searchParams.set('filter', 'conditions:{USED|NEW}');
+    // Deliberately unsorted, which means eBay's Best Match.
+    //
+    // Asking for sort=price looks helpful and is not: it returns the twenty
+    // CHEAPEST listings in the market, and taking the 25th percentile of those
+    // is the 25th percentile of the bottom of the market, not of the market.
+    // On a title with two hundred listings that is roughly its 3rd percentile,
+    // so every price came out a fraction of what the item is worth. The sample
+    // has to be representative for the percentile to mean anything; the
+    // listings are sorted below, for display, once they are all in hand.
 
     try {
       const res = await this.fetchFn(url.toString(), {
@@ -228,40 +290,55 @@ export class EbayBrowseExpectedPriceSource implements ExpectedPriceSource {
         const detail = summarizeEbayError(await res.text().catch(() => ''));
         // A keyset can authenticate fine and still not be cleared for Browse:
         // the Buy APIs are granted separately, and that arrives here as a 403.
-        return this.fail({
-          stage: 'search',
-          status: res.status,
-          detail: `${res.status} ${detail}`,
-        });
+        this.fail({ stage: 'search', status: res.status, detail: `${res.status} ${detail}` });
+        return null;
       }
       const data = (await res.json()) as EbaySearchResponse;
-      const prices = (data.itemSummaries ?? [])
-        .map((item) => {
-          if (item.price?.currency && item.price.currency !== 'USD') return null;
-          const value = Number(item.price?.value);
-          if (!Number.isFinite(value) || value <= 0) return null;
-          return Math.round(value * 100);
-        })
-        .filter((n): n is number => n != null)
-        .sort((a, b) => a - b);
 
-      if (prices.length === 0) {
-        // Genuinely empty, and now labelled as such — this is the one "null"
-        // that means the book, not the configuration.
-        return this.fail({
-          stage: 'no_results',
-          detail: `no USD listings for "${query}"`,
+      const listings: EvidenceListing[] = [];
+      for (const item of data.itemSummaries ?? []) {
+        const priceCents = usdCents(item.price);
+        // A listing with no usable USD price cannot join the statistics, and
+        // showing it without one would only raise the question of why.
+        if (priceCents == null || priceCents <= 0) continue;
+        listings.push({
+          title: item.title ?? null,
+          url: item.itemWebUrl ?? null,
+          priceCents,
+          shippingCents: usdCents(item.shippingOptions?.[0]?.shippingCost),
+          condition: item.condition ?? null,
         });
       }
-      // Conservative ceiling: 25th percentile of active asks (not optimistic).
-      const index = Math.max(0, Math.floor((prices.length - 1) * 0.25));
+
+      const stats = priceStats(listings.map((l) => l.priceCents!));
+      if (!stats) {
+        // Genuinely empty, and now labelled as such -- this is the one "null"
+        // that means the book, not the configuration.
+        this.fail({ stage: 'no_results', detail: `no USD listings for "${query}"` });
+        return null;
+      }
+
       this.lastFailure = null;
-      return prices[index] ?? null;
+      listings.sort((a, b) => (a.priceCents ?? 0) - (b.priceCents ?? 0));
+      return {
+        source: 'ebay_browse',
+        typicalCents: stats.p25Cents,
+        lowCents: stats.minCents,
+        highCents: stats.maxCents,
+        medianCents: stats.medianCents,
+        sampleSize: stats.count,
+        totalMatches: typeof data.total === 'number' ? data.total : null,
+        listings,
+        note: null,
+        query,
+        fetchedAt: new Date().toISOString(),
+      };
     } catch (error) {
-      return this.fail({
+      this.fail({
         stage: 'search',
         detail: error instanceof Error ? error.message : 'Browse request failed',
       });
+      return null;
     }
   }
 }

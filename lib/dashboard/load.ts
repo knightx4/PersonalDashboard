@@ -11,6 +11,8 @@ import {
   previousPeriodFor,
   spend,
   spendByCategory,
+  monthlySpendByMerchant,
+  recentMonthKeys,
   spendByMerchant,
   todayInTimezone,
   valueOwned,
@@ -66,6 +68,13 @@ export interface DashboardData {
   previous: SpendBreakdown;
   categories: CategorySpendSlice[];
   merchants: MerchantSpendSlice[];
+  /**
+   * Twelve months of gross spend per merchant, oldest first, keyed the same
+   * way the slices are. Its own small query rather than a wider window on the
+   * main one: that query drags order_items along with it, and pulling a year
+   * of those to draw eight sparklines would be a poor trade.
+   */
+  merchantTrend: Map<string, number[]>;
   valueOwnedCents: number;
   returnable: ReturnableRow[];
   /**
@@ -424,6 +433,16 @@ export async function loadDashboard(
     .is('deleted_at', null);
   if (personId) countQuery = countQuery.eq('person_id', personId);
 
+  // Trailing twelve months, three columns, no joins.
+  let trendQuery = supabase
+    .from('orders')
+    .select('order_date, total_cents, cancelled_at, merchant_id')
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .gte('order_date', recentMonthKeys(today, 12)[0] + '-01')
+    .lte('order_date', today);
+  if (personId) trendQuery = trendQuery.eq('person_id', personId);
+
   let ordersQuery = supabase
     .from('orders')
     .select(
@@ -464,6 +483,7 @@ export async function loadDashboard(
     { data: orderRows, error: ordersError },
     { data: returnRows, error: returnsError },
     { data: inventoryRows, error: inventoryError },
+    { data: trendRows, error: trendError },
   ] = await Promise.all([
     countQuery,
     supabase.from('categories').select('id, name, color, parent_id'),
@@ -472,12 +492,37 @@ export async function loadDashboard(
       .gte('refunded_at', earliest)
       .lte('refunded_at', latest),
     inventoryQuery,
+    trendQuery,
   ]);
 
   if (categoriesError) throw categoriesError;
   if (ordersError) throw ordersError;
   if (returnsError) throw returnsError;
   if (inventoryError) throw inventoryError;
+  // The trend is an ornament on a row, not a figure anyone reads off. A
+  // failure here costs the sparklines and nothing else, so it does not take
+  // the dashboard down with it.
+  const merchantTrend = trendError
+    ? new Map<string, number[]>()
+    : new Map(
+        [
+          ...monthlySpendByMerchant(
+            ((trendRows ?? []) as Array<{
+              order_date: string;
+              total_cents: number;
+              cancelled_at: string | null;
+              merchant_id: string | null;
+            }>).map((row) => ({
+              orderDate: row.order_date,
+              totalCents: row.total_cents,
+              cancelled: row.cancelled_at !== null,
+              merchantId: row.merchant_id,
+              merchantName: null,
+            })),
+            today,
+          ),
+        ].map(([merchant, points]) => [merchant, points.map((point) => point.cents)]),
+      );
 
   const ordersNative = (orderRows ?? []) as OrderRow[];
   const returnsNative = (returnRows ?? []) as ReturnRow[];
@@ -636,6 +681,7 @@ export async function loadDashboard(
     previous: previousBreakdown,
     categories: spendByCategory(toCategorizedUnits(orders, categories), period),
     merchants: spendByMerchant(toMerchantOrders(orders), period),
+    merchantTrend,
     byPerson,
     valueOwnedCents: valueOwned(
       inventory.map((item) => ({
