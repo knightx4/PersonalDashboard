@@ -1,8 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
-import { groupByDay, type Activity, type ActivityEntry } from '@/lib/jobs/activity/load';
+import {
+  groupByDay,
+  type Activity,
+  type ActivityEntry,
+  type ActivityTone,
+} from '@/lib/jobs/activity/load';
 
 /** Where an entry came from, said in one word rather than a colour alone. */
 const SOURCE_LABEL: Record<ActivityEntry['source'], string> = {
@@ -10,6 +16,22 @@ const SOURCE_LABEL: Record<ActivityEntry['source'], string> = {
   auto: 'derived',
   sweep: 'nightly',
   you: 'you',
+};
+
+/**
+ * The tone, as a tinted chip.
+ *
+ * These are the pipeline's own status colours rather than new ones: a
+ * rejection is the same red here as it is on the board, and every pair is
+ * already checked by scripts/check-contrast.ts in all five themes. The chip
+ * carries a word, never a colour alone -- the colour is what makes the one
+ * line you were looking for findable, not what tells you which line it is.
+ */
+const TONE_CHIP: Record<ActivityTone, string> = {
+  bad: 'bg-status-rejected-tint text-status-rejected',
+  good: 'bg-status-offer-tint text-status-offer',
+  info: 'bg-status-submitted-tint text-status-submitted',
+  muted: 'bg-status-lead-tint text-status-lead',
 };
 
 /**
@@ -83,18 +105,25 @@ export function ActivityFeed({
                     <span className="w-14 shrink-0 text-micro text-ink-muted">
                       {SOURCE_LABEL[entry.source]}
                     </span>
-                    {entry.roleId ? (
-                      <Link
-                        href={`/jobs/roles/${entry.roleId}`}
-                        className="text-ui text-ink first-letter:uppercase hover:text-accent"
-                      >
-                        {entry.headline}
-                      </Link>
-                    ) : (
-                      <span className="text-ui text-ink first-letter:uppercase">
-                        {entry.headline}
-                      </span>
-                    )}
+                    <span
+                      className={cn(
+                        'shrink-0 self-center rounded-full px-2 py-0.5 text-micro font-medium first-letter:uppercase',
+                        TONE_CHIP[entry.tone],
+                      )}
+                    >
+                      {entry.label}
+                    </span>
+                    {entry.subject &&
+                      (entry.roleId ? (
+                        <Link
+                          href={`/jobs/roles/${entry.roleId}`}
+                          className="text-ui text-ink hover:text-accent"
+                        >
+                          {entry.subject}
+                        </Link>
+                      ) : (
+                        <span className="text-ui text-ink">{entry.subject}</span>
+                      ))}
                     {entry.detail && (
                       <span className="w-full text-small text-ink-muted sm:w-auto sm:flex-1 sm:truncate">
                         {entry.detail}
