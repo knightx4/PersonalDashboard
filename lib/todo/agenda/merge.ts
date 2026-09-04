@@ -108,6 +108,15 @@ export function mergeAgenda(input: MergeInput): AgendaPile[] {
 
   const contextByBucket = new Map<Bucket, DayContext[]>();
   for (const entry of input.context ?? []) {
+    // An appointment in the past is not overdue -- it is over. Nothing is owed
+    // and there is nothing left to do about it, which is the whole meaning of
+    // the overdue pile. The window reaches a year back so that a genuinely
+    // late reminder cannot hide, and every interview in that year came back
+    // with it: months of attended interviews stacked under a red "Overdue"
+    // heading, telling a person they were late for things they had already
+    // been to.
+    if (entry.day < today) continue;
+
     const bucket = bucketOf(entry.day, today, horizon);
     contextByBucket.set(bucket, [...(contextByBucket.get(bucket) ?? []), entry]);
   }

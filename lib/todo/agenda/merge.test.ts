@@ -212,6 +212,44 @@ describe('mergeAgenda', () => {
     expect(piles[0].entries).toEqual([]);
   });
 
+  it('drops an appointment that has already happened rather than calling it overdue', () => {
+    // The source window reaches a year back so a late reminder cannot hide.
+    // Every interview already attended came back with it, under a red
+    // "Overdue" heading. You cannot be late for a meeting you have been to.
+    const piles = merge({
+      context: [
+        {
+          key: 'interview:old',
+          day: '2026-01-14',
+          at: '2026-01-14T14:00:00.000Z',
+          label: 'Acme · Staff Engineer',
+          detail: null,
+          link: null,
+        },
+      ],
+    });
+
+    expect(piles).toEqual([]);
+  });
+
+  it('still shows today’s appointment, which is not in the past', () => {
+    const piles = merge({
+      context: [
+        { key: 'i', day: '2026-03-10', at: null, label: 'Acme', detail: null, link: null },
+      ],
+    });
+
+    expect(piles).toHaveLength(1);
+    expect(piles[0].bucket).toBe('today');
+  });
+
+  it('keeps a genuinely late task in the overdue pile', () => {
+    // The rule is about appointments only: an overdue reminder from last month
+    // is still the most important thing on the page.
+    const piles = merge({ tasks: [task({ id: 'late', dueOn: '2026-02-01' })] });
+    expect(piles[0].bucket).toBe('overdue');
+  });
+
   it('files an item with no day under someday, not under overdue', () => {
     // Sources always give a day today, but a future one might not, and
     // "unknown" must never present as "late".
