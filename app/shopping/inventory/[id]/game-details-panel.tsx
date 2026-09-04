@@ -106,6 +106,14 @@ function CandidateRow({
  * could tell you a game needed confirming and then send you somewhere else to
  * do it. Books already answered that question on their own page; games now do
  * too, so an item is priced entirely from the page you are standing on.
+ *
+ * This is the top of the item's one Details box rather than a box of its own —
+ * it carries no heading and no chrome, because "Details" and "Game details"
+ * side by side asked the reader to work out which of two panels a fact was in.
+ *
+ * Players and playing time are rendered only when the catalog has them: the
+ * category template carries fields for the same two facts, and the page hides
+ * whichever of the pair is the duplicate.
  */
 export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
   const [confirmState, confirmAction, confirmPending] = useActionState(
@@ -116,23 +124,19 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
   const players = playerLine(game);
 
   return (
-    <section className="space-y-4 rounded-card border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-body font-semibold text-ink">Game details</h2>
-        {game.autoImported && (
-          <span className="text-small text-ink-muted">Imported from an order email</span>
-        )}
-      </div>
+    <div className="space-y-4">
+      {game.autoImported && (
+        <p className="text-small text-ink-muted">Imported from an order email</p>
+      )}
 
       <dl className="grid gap-2 text-body sm:grid-cols-2">
         <Fact label="BGG id" value={game.bggId} />
         <Fact label="Publisher" value={game.publisher} />
         <Fact label="Year" value={game.yearPublished} />
-        <Fact label="Players" value={players} />
-        <Fact
-          label="Playing time"
-          value={game.playingTimeMinutes != null ? `${game.playingTimeMinutes} min` : null}
-        />
+        {players != null && <Fact label="Players" value={players} />}
+        {game.playingTimeMinutes != null && (
+          <Fact label="Playing time" value={`${game.playingTimeMinutes} min`} />
+        )}
         <div>
           <dt className="text-ink-muted">Resolved via</dt>
           <dd className="text-ink">
@@ -204,6 +208,6 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }
