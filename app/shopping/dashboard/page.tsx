@@ -115,7 +115,11 @@ export default async function DashboardPage({
 
             <div className="grid gap-4 lg:grid-cols-2">
               <CategoryDonut slices={data.categories} currency={data.currency} />
-              <MerchantBreakdown slices={data.merchants} currency={data.currency} />
+              <MerchantBreakdown
+                slices={data.merchants}
+                currency={data.currency}
+                trend={data.merchantTrend}
+              />
             </div>
 
             <ReturnableList rows={data.returnable} />

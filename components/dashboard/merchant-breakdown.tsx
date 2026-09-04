@@ -1,13 +1,17 @@
 import Link from 'next/link';
 import { formatMoney, type CurrencyCode, type MerchantSpendSlice } from '@/lib/money';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sparkline } from '@/components/ui/sparkline';
 
 export function MerchantBreakdown({
   slices,
   currency,
+  trend,
 }: {
   slices: MerchantSpendSlice[];
   currency: CurrencyCode;
+  /** Twelve months of gross spend per merchant, oldest first. */
+  trend?: Map<string, number[]>;
 }) {
   const top = slices.slice(0, 8);
   const max = top[0]?.cents ?? 0;
@@ -24,10 +28,22 @@ export function MerchantBreakdown({
           <ul className="space-y-3">
             {top.map((slice) => {
               const width = max === 0 ? 0 : Math.round((slice.cents / max) * 100);
+              const series = trend?.get(slice.merchantId ?? '__unknown__');
               return (
                 <li key={slice.merchantId ?? slice.name}>
                   <div className="mb-1 flex items-baseline justify-between gap-3 text-ui">
                     <span className="truncate font-medium text-ink">{slice.name}</span>
+                    {/* The bar says how much of this period. The sparkline says
+                        whether this is new -- which the row had no room for and
+                        is the more useful of the two questions. */}
+                    {series && (
+                      <span className="ml-auto mr-1 shrink-0 self-center opacity-90">
+                        <Sparkline
+                          values={series}
+                          label={`${slice.name}: twelve-month spending trend`}
+                        />
+                      </span>
+                    )}
                     <span className="tabular shrink-0 text-ink">
                       {formatMoney(slice.cents, currency)}
                     </span>
