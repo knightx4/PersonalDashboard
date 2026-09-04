@@ -496,6 +496,145 @@ export async function removeInterviewer(input: {
   return { error: null };
 }
 
+const groupSchema = z.object({
+  applicationId: z.string().uuid(),
+  interviewIds: z.array(z.string().uuid()).min(2, 'A group needs at least two rounds.').max(20),
+  label: z.string().trim().max(120).optional(),
+});
+
+/**
+ * Make several rounds one occasion.
+ *
+ * The rounds themselves are untouched -- each keeps its hour, its panel and
+ * its own notes, which is the whole point of grouping rather than merging.
+ * What the group adds is somewhere to write how the day went, which belonged
+ * to none of them individually and so had nowhere to go at all.
+ */
+export async function groupInterviews(input: {
+  applicationId: string;
+  interviewIds: string[];
+  label?: string;
+}): Promise<{ error: string | null }> {
+  const parsed = groupSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: group, error: groupError } = await supabase
+    .from('interview_groups')
+    .insert({
+      user_id: user.id,
+      application_id: parsed.data.applicationId,
+      label: parsed.data.label || null,
+    })
+    .select('id')
+    .single();
+
+  if (groupError || !group) return { error: groupError?.message ?? 'Could not make the group.' };
+
+  const { error } = await supabase
+    .from('interviews')
+    .update({ group_id: group.id })
+    .in('id', parsed.data.interviewIds)
+    .eq('application_id', parsed.data.applicationId)
+    .eq('user_id', user.id);
+
+  if (error) {
+    // A group with nothing in it is litter, and the next visit would offer to
+    // make another one beside it.
+    await supabase.from('interview_groups').delete().eq('id', group.id).eq('user_id', user.id);
+    return { error: error.message };
+  }
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+const groupPatchSchema = z.object({
+  groupId: z.string().uuid(),
+  label: z.string().trim().max(120).optional(),
+  notes: z.string().max(20_000).optional(),
+});
+
+/** The label and the impression of the day as a whole. */
+export async function saveInterviewGroup(
+  groupId: string,
+  patch: { label?: string; notes?: string },
+): Promise<{ error: string | null }> {
+  const parsed = groupPatchSchema.safeParse({ groupId, ...patch });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const update: Record<string, unknown> = {};
+  if (parsed.data.label !== undefined) update.label = parsed.data.label || null;
+  if (parsed.data.notes !== undefined) update.notes = parsed.data.notes || null;
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('interview_groups')
+    .update(update)
+    .eq('id', parsed.data.groupId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+/**
+ * Take a round back out. The round survives; so does the group, unless this
+ * was the last thing in it -- a group of one is not a group, and leaving an
+ * empty one behind would keep its notes attached to nothing.
+ */
+export async function ungroupInterview(interviewId: string): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(interviewId);
+  if (!parsed.success) return { error: 'That is not an interview.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: interview } = await supabase
+    .from('interviews')
+    .select('id, group_id')
+    .eq('id', parsed.data)
+    .eq('user_id', user.id)
+    .maybeSingle<{ id: string; group_id: string | null }>();
+
+  if (!interview) return { error: 'That interview no longer exists.' };
+  if (!interview.group_id) return { error: null };
+
+  const { error } = await supabase
+    .from('interviews')
+    .update({ group_id: null })
+    .eq('id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  const { count } = await supabase
+    .from('interviews')
+    .select('id', { count: 'exact', head: true })
+    .eq('group_id', interview.group_id);
+
+  if ((count ?? 0) < 2) {
+    await supabase
+      .from('interviews')
+      .update({ group_id: null })
+      .eq('group_id', interview.group_id)
+      .eq('user_id', user.id);
+    await supabase
+      .from('interview_groups')
+      .delete()
+      .eq('id', interview.group_id)
+      .eq('user_id', user.id);
+  }
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
 /** The inbox read one scheduling thread as two rounds; this is how you say so. */
 export async function deleteInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);
