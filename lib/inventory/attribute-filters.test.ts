@@ -92,7 +92,7 @@ describe('attributeFacets', () => {
 describe('attributeLabelMap', () => {
   it('lets a saved template override the built-in label', () => {
     const labels = attributeLabelMap(
-      [[{ key: 'genre', label: 'Shelf genre', type: 'text' }]],
+      [[{ key: 'genre', label: 'Shelf genre', type: 'text', inSearch: false }]],
       ['books'],
     );
     expect(labels.get('genre')).toBe('Shelf genre');

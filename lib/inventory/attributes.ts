@@ -19,6 +19,17 @@ export type AttributeField = {
   key: string;
   label: string;
   type: AttributeFieldType;
+  /**
+   * Whether this field's value joins the eBay search for the item.
+   *
+   * Off by default, and it has to be: the search is a title, and every word
+   * added to it narrows the result set. "Brand" usually helps and "Warranty
+   * until" would find nothing at all -- which of the two a field is, is a
+   * judgement only the person who added it can make. What it is for is the
+   * detail that decides which listing is the right one: an edition, a
+   * pressing, a model number.
+   */
+  inSearch: boolean;
 };
 
 export type AttributeValues = Record<string, string>;
@@ -36,10 +47,15 @@ export function attributeKey(label: string): string {
     .slice(0, 40);
 }
 
-const field = (label: string, type: AttributeFieldType = 'text'): AttributeField => ({
+const field = (
+  label: string,
+  type: AttributeFieldType = 'text',
+  inSearch = false,
+): AttributeField => ({
   key: attributeKey(label),
   label,
   type,
+  inSearch,
 });
 
 /**
@@ -93,7 +109,14 @@ export function parseTemplateFields(raw: unknown): AttributeField[] {
         : attributeKey(label);
     if (!key || !label || seen.has(key)) continue;
     seen.add(key);
-    fields.push({ key, label, type: isFieldType(record.type) ? record.type : 'text' });
+    fields.push({
+      key,
+      label,
+      type: isFieldType(record.type) ? record.type : 'text',
+      // Absent means off: every template written before this existed keeps
+      // searching on the title alone, which is what it was doing.
+      inSearch: record.inSearch === true,
+    });
   }
   return fields;
 }
@@ -137,8 +160,31 @@ export function fieldsForItem(
   const extras = Object.keys(values)
     .filter((key) => !known.has(key))
     .sort()
-    .map((key) => ({ key, label: humanizeKey(key), type: 'text' as const }));
+    .map((key) => ({ key, label: humanizeKey(key), type: 'text' as const, inSearch: false }));
   return [...template, ...extras];
+}
+
+/**
+ * The values that should join this item's product search, in template order.
+ *
+ * A field marked for search but left blank on this item contributes nothing --
+ * the whole point of the marking is that the detail identifies the listing, and
+ * a detail nobody filled in identifies nothing.
+ */
+export function searchTermsFor(
+  template: readonly AttributeField[],
+  values: AttributeValues,
+): string[] {
+  const terms: string[] = [];
+  for (const field of template) {
+    if (!field.inSearch) continue;
+    // A URL is an address, not a description of the thing. Putting one in a
+    // keyword search returns nothing at all.
+    if (field.type === 'url') continue;
+    const value = (values[field.key] ?? '').trim();
+    if (value) terms.push(value);
+  }
+  return terms;
 }
 
 /** A readable label for a key that has no field definition left. */
