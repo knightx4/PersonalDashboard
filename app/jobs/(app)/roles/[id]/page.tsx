@@ -169,6 +169,36 @@ export default async function RoleDetailPage({
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+
+  /**
+   * Loose notes written against a round.
+   *
+   * A second round trip rather than part of the batch above, because the
+   * interview ids it filters on come out of that batch. Skipped entirely when
+   * there are no rounds, which is most pursuits.
+   */
+  const interviewIds = (interviews ?? []).map((interview) => interview.id as string);
+  const { data: interviewNotes } = interviewIds.length
+    ? await supabase
+        .from('notes')
+        .select('id, body, created_at, interview_id')
+        .in('interview_id', interviewIds)
+        .order('created_at', { ascending: false })
+    : { data: [] };
+
+  const notesByInterview = new Map<string, Array<{ id: string; body: string; createdAt: string }>>();
+  for (const note of (interviewNotes ?? []) as Array<Record<string, unknown>>) {
+    const key = note.interview_id as string;
+    notesByInterview.set(key, [
+      ...(notesByInterview.get(key) ?? []),
+      {
+        id: note.id as string,
+        body: note.body as string,
+        createdAt: note.created_at as string,
+      },
+    ]);
+  }
+
   const linkedTasks = await loadTasksFor(user.id, 'role', role.id as string);
   const requirements = (role.requirements as Requirement[] | null) ?? [];
 
@@ -363,6 +393,7 @@ export default async function RoleDetailPage({
           status: interview.status as string,
           prepNotes: (interview.prep_notes as string) ?? '',
           notes: (interview.notes as string) ?? '',
+          customNotes: notesByInterview.get(interview.id as string) ?? [],
           questionsAsked: (interview.questions_asked as string[]) ?? [],
           participants: (
             (interview.interview_participants ?? []) as unknown as Array<{

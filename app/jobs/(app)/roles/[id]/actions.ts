@@ -63,6 +63,20 @@ export async function addNote(input: {
   if (parsed.data.roleId) revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
   if (parsed.data.companyId) revalidatePath('/jobs/companies');
   if (parsed.data.contactId) revalidatePath('/jobs/contacts');
+
+  // A note on a round is read on the role page, which is two joins away from
+  // the id the note carries. Worth one lookup: without it the note is written
+  // and the page it was written on does not show it.
+  if (parsed.data.interviewId) {
+    const { data: interview } = await supabase
+      .from('interviews')
+      .select('applications!inner ( role_id )')
+      .eq('id', parsed.data.interviewId)
+      .eq('user_id', user.id)
+      .maybeSingle<{ applications: { role_id: string } }>();
+    if (interview) revalidatePath(`/jobs/roles/${interview.applications.role_id}`);
+  }
+
   return { error: null };
 }
 

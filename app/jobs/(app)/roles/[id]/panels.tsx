@@ -121,6 +121,8 @@ export interface PanelProps {
     status: string;
     prepNotes: string;
     notes: string;
+    /** Free-form notes written against this round, newest first. */
+    customNotes: Array<{ id: string; body: string; createdAt: string }>;
     questionsAsked: string[];
     /** Who is in the room, as contacts rather than as names on a string. */
     participants: Array<{
@@ -1839,7 +1841,23 @@ function InterviewCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ref = useRef<HTMLElement>(null);
 
+  /**
+   * A round starts with no notes on it, because that is the truth.
+   *
+   * Two empty boxes headed Prep and Interview notes were shown on every round
+   * whether or not anything had been written in either, so a card with nothing
+   * to say still took the space of one with plenty and the section read as
+   * filled in. A note appears when it exists or when you ask for it.
+   */
+  const [showPrep, setShowPrep] = useState(interview.prepNotes.trim() !== '');
+  const [showDebrief, setShowDebrief] = useState(interview.notes.trim() !== '');
+  /** The custom note being written, or null when none is. */
+  const [draft, setDraft] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
   const needsDebrief = interview.debriefDue && !notes;
+  const empty =
+    !showPrep && !showDebrief && draft === null && interview.customNotes.length === 0;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
@@ -1867,17 +1885,105 @@ function InterviewCard({
 
       {needsDebrief && (
         <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
-          Write the debrief tonight. One written three days later is worth very little.
+          Write the debrief tonight. One written three days later is worth very little.{' '}
+          {!showDebrief && (
+            <button
+              type="button"
+              onClick={() => setShowDebrief(true)}
+              className="font-medium underline underline-offset-2"
+            >
+              Start it
+            </button>
+          )}
         </p>
       )}
 
-      <div className="mt-3 space-y-3">
-        <CollapsibleField label="Prep" defaultOpen>
-          <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
-        </CollapsibleField>
-        <CollapsibleField label="Interview notes" defaultOpen>
-          <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </CollapsibleField>
+      {/* One notes section per round, holding whatever has actually been
+          written: the prep, the debrief, and any number of loose notes. */}
+      <div className="mt-3">
+        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">Notes</h4>
+
+        {empty ? (
+          <p className="mt-1 text-small text-ink-muted">Nothing written for this round yet.</p>
+        ) : (
+          <div className="mt-1 space-y-3">
+            {showPrep && (
+              <CollapsibleField label="Prep" defaultOpen>
+                <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
+              </CollapsibleField>
+            )}
+            {showDebrief && (
+              <CollapsibleField label="Interview notes" defaultOpen>
+                <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </CollapsibleField>
+            )}
+            {interview.customNotes.map((note) => (
+              <article key={note.id} className="rounded-lg bg-sunken px-3 py-2">
+                <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+                <p className="tabular mt-1 text-micro text-ink-muted">
+                  {formatDate(note.createdAt, timezone)}
+                </p>
+              </article>
+            ))}
+            {draft !== null && (
+              <div>
+                <Textarea
+                  rows={3}
+                  value={draft}
+                  autoFocus
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Anything worth remembering about this round."
+                />
+                <div className="mt-1.5 flex items-center gap-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending || !draft.trim()}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const result = await addNote({
+                          interviewId: interview.id,
+                          body: draft,
+                        });
+                        setDraftError(result.error);
+                        if (!result.error) setDraft(null);
+                      })
+                    }
+                  >
+                    Add note
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraft(null);
+                      setDraftError(null);
+                    }}
+                    className="text-small text-ink-muted hover:text-ink"
+                  >
+                    Cancel
+                  </button>
+                  {draftError && (
+                    <span className="text-small text-status-rejected">{draftError}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Prep and the debrief are one each -- they are fields on the round,
+            not a list -- so each offers itself only while it is not already
+            there. A custom note has no such limit. */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-micro uppercase tracking-wider text-ink-muted">Create note</span>
+          {!showPrep && (
+            <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />
+          )}
+          {!showDebrief && (
+            <NoteKindButton label="Interview" onClick={() => setShowDebrief(true)} />
+          )}
+          {draft === null && <NoteKindButton label="Custom" onClick={() => setDraft('')} />}
+        </div>
       </div>
 
       {interview.questionsAsked.length > 0 && (
@@ -1894,19 +2000,22 @@ function InterviewCard({
       )}
 
       <div className="mt-3 flex items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await saveInterview(interview.id, { prepNotes: prep, notes });
-              setSaved(result.error ?? 'Saved.');
-            })
-          }
-        >
-          Save notes
-        </Button>
+        {/* Only where there is a field to save. A custom note saves itself. */}
+        {(showPrep || showDebrief) && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await saveInterview(interview.id, { prepNotes: prep, notes });
+                setSaved(result.error ?? 'Saved.');
+              })
+            }
+          >
+            Save notes
+          </Button>
+        )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         <span className="ml-auto">
           {confirmingDelete ? (
@@ -1940,6 +2049,19 @@ function InterviewCard({
         </span>
       </div>
     </section>
+  );
+}
+
+/** One of the kinds of note a round can be given. */
+function NoteKindButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="press rounded-lg border border-border px-2 py-0.5 text-small font-medium text-ink-muted hover:border-accent hover:text-accent"
+    >
+      + {label}
+    </button>
   );
 }
 
