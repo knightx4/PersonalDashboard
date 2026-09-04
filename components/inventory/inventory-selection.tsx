@@ -9,7 +9,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { setItemsForSale, type ActionState } from '@/app/shopping/inventory/actions';
+import {
+  deleteInventoryItems,
+  setItemsForSale,
+  type ActionState,
+} from '@/app/shopping/inventory/actions';
 import { setItemsReturnPlanned } from '@/app/shopping/returns/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
@@ -92,10 +96,27 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
     setItemsReturnPlanned,
     {} as ActionState,
   );
+  const [deleteState, deleteAction, deletePending] = useActionState(
+    deleteInventoryItems,
+    {} as ActionState,
+  );
+  // Deleting a shelf-full cannot be undone, so it is asked twice — inline
+  // rather than through window.confirm, which browsers are free to suppress.
+  // Armed against the exact items it was pressed for, so a selection that
+  // changed between the two presses disarms rather than quietly widening what
+  // gets deleted — and so an armed confirm cannot survive into a later one.
+  const [armedFor, setArmedFor] = useState('');
 
   if (!selection) return null;
-  const ids = [...selection.selected];
-  const pending = salePending || returnPending;
+
+  // Only rows the server still lists. A deleted item leaves `allIds` on the
+  // next render, so the bar stops offering to act on things that are gone
+  // without needing to reach back into the selection to prune it.
+  const present = new Set(allIds);
+  const ids = [...selection.selected].filter((id) => present.has(id));
+  const pending = salePending || returnPending || deletePending;
+  const armKey = ids.join(',');
+  const confirmingDelete = ids.length > 0 && armedFor === armKey;
 
   if (ids.length === 0) {
     return (
@@ -107,7 +128,11 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
         >
           Select all {allIds.length}
         </button>
-        <span>or tick items to act on several at once.</span>
+        {deleteState.message ? (
+          <span className="text-positive">{deleteState.message}</span>
+        ) : (
+          <span>or tick items to act on several at once.</span>
+        )}
       </div>
     );
   }
@@ -153,17 +178,56 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
           </Button>
         </form>
 
+        {confirmingDelete ? (
+          <>
+            <form action={deleteAction} className="contents">
+              {hidden}
+              <Button type="submit" size="sm" variant="danger" disabled={pending}>
+                {deletePending
+                  ? 'Deleting…'
+                  : `Delete ${ids.length} permanently`}
+              </Button>
+            </form>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setArmedFor('')}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => setArmedFor(armKey)}
+          >
+            Delete
+          </Button>
+        )}
+
         <Button type="button" size="sm" variant="ghost" onClick={selection.clear}>
           Clear
         </Button>
       </div>
 
-      {(saleState.message || returnState.message) && (
-        <p className="text-ui text-positive">
-          {saleState.message ?? returnState.message}
+      {confirmingDelete && (
+        <p className="text-ui text-ink">
+          This cannot be undone. The order lines stay in spend history.
         </p>
       )}
-      <FieldError>{saleState.error ?? returnState.error}</FieldError>
+
+      {(saleState.message || returnState.message || deleteState.message) && (
+        <p className="text-ui text-positive">
+          {saleState.message ?? returnState.message ?? deleteState.message}
+        </p>
+      )}
+      <FieldError>
+        {saleState.error ?? returnState.error ?? deleteState.error}
+      </FieldError>
     </div>
   );
 }
