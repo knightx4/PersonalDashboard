@@ -13,7 +13,7 @@ import {
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
-import { moduleById, type ModuleId } from '@/lib/modules';
+import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
 import type { ThemeChoice } from '@/lib/theme';
 
 export type NavSection = {
@@ -127,13 +127,13 @@ export function AppShell({
           >
             {/* The workspace's own colour, as a bar rather than a tint. A tint
                 would have to be legible on five different shells; a 2px bar in
-                the mark's fixed hue is vivid on all of them. */}
+                the mark key's fixed hue is vivid on all of them. */}
             <span
               className={cn(
                 'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-150',
                 on ? 'opacity-100' : 'opacity-0',
               )}
-              style={{ background: (moduleById(module) ?? { mark: ['#4338ca'] }).mark[0] }}
+              style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
               aria-hidden
             />
             <span className="flex-1 truncate">{section.label}</span>
