@@ -156,3 +156,81 @@ describe('EbayBrowseExpectedPriceSource', () => {
     expect(source.lastFailure?.stage).toBe('no_results');
   });
 });
+
+describe('EbayBrowseExpectedPriceSource evidence', () => {
+  const browseResponse = {
+    total: 340,
+    itemSummaries: [
+      {
+        itemId: 'v1|1|0',
+        title: 'Atomic Habits paperback',
+        itemWebUrl: 'https://www.ebay.com/itm/1',
+        condition: 'Good',
+        price: { value: '8.00', currency: 'USD' },
+        shippingOptions: [{ shippingCost: { value: '0.00', currency: 'USD' } }],
+      },
+      {
+        itemId: 'v1|2|0',
+        title: 'Atomic Habits hardcover',
+        itemWebUrl: 'https://www.ebay.com/itm/2',
+        condition: 'Very Good',
+        price: { value: '12.00', currency: 'USD' },
+        shippingOptions: [{ shippingCost: { value: '3.99', currency: 'USD' } }],
+      },
+      // Not USD: excluded from both the statistics and the listing table.
+      { itemId: 'v1|3|0', title: 'UK copy', price: { value: '9.00', currency: 'GBP' } },
+      {
+        itemId: 'v1|4|0',
+        title: 'Signed first printing',
+        itemWebUrl: 'https://www.ebay.com/itm/4',
+        price: { value: '90.00', currency: 'USD' },
+      },
+    ],
+  };
+
+  function source() {
+    return new EbayBrowseExpectedPriceSource({
+      clientId: 'App-App-PRD-1-2',
+      clientSecret: 'secret',
+      fetch: fakeFetch({ search: () => jsonResponse(browseResponse) }),
+    });
+  }
+
+  it('keeps the listings, the spread and the market size', async () => {
+    const evidence = (await source().priceEvidenceForIsbn('9780735211292'))!;
+
+    expect(evidence.source).toBe('ebay_browse');
+    expect(evidence.sampleSize).toBe(3); // the GBP listing is not counted
+    expect(evidence.totalMatches).toBe(340);
+    expect(evidence.lowCents).toBe(800);
+    expect(evidence.highCents).toBe(9000);
+    expect(evidence.query).toBe('9780735211292');
+
+    expect(evidence.listings.map((l) => l.priceCents)).toEqual([800, 1200, 9000]);
+    expect(evidence.listings[0]).toMatchObject({
+      title: 'Atomic Habits paperback',
+      url: 'https://www.ebay.com/itm/1',
+      condition: 'Good',
+      shippingCents: 0,
+    });
+    // Absent shipping is unknown, not free.
+    expect(evidence.listings[2]?.shippingCents).toBeNull();
+    expect(evidence.listings.some((l) => l.title === 'UK copy')).toBe(false);
+  });
+
+  it('agrees with the number the router still routes on', async () => {
+    const evidence = await source().priceEvidenceForIsbn('9780735211292');
+    const cents = await source().expectedSelfListCents('9780735211292');
+    expect(cents).toBe(evidence?.typicalCents);
+  });
+
+  it('returns null with the reason recorded when nothing is listed', async () => {
+    const empty = new EbayBrowseExpectedPriceSource({
+      clientId: 'App-App-PRD-1-2',
+      clientSecret: 'secret',
+      fetch: fakeFetch({ search: () => jsonResponse({ itemSummaries: [] }) }),
+    });
+    expect(await empty.priceEvidenceForIsbn('9780735211292')).toBeNull();
+    expect(empty.lastFailure?.stage).toBe('no_results');
+  });
+});
