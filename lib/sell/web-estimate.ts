@@ -19,6 +19,7 @@ import {
   type EstimateResult,
 } from '@/lib/sell/price-estimate';
 import type { ExpectedPriceSource, PriceSubject } from '@/lib/sell/expected-price';
+import type { PriceEvidence } from '@/lib/sell/price-evidence';
 
 /**
  * Reading a few search results and reporting a number is not a reasoning
@@ -163,5 +164,54 @@ export class WebSearchExpectedPriceSource implements ExpectedPriceSource {
     hint?: string | null;
   }): Promise<EstimateResult> {
     return estimateResalePrice(this.options, subject);
+  }
+
+  async priceEvidenceForIsbn(isbn13: string): Promise<PriceEvidence | null> {
+    return this.evidence({
+      label: `Book, ISBN ${isbn13}`,
+      hint: 'Used copy in good condition, sold on eBay / Amazon marketplace / AbeBooks.',
+    });
+  }
+
+  async priceEvidence(subject: PriceSubject): Promise<PriceEvidence | null> {
+    return this.evidence({ label: subject.query, hint: subject.hint ?? null });
+  }
+
+  /**
+   * The estimate as evidence.
+   *
+   * `listings` carries the pages the search read, which is the closest thing
+   * this source has to a comp -- they are citations, so they have no price of
+   * their own, and the panel shows them as links rather than as offers.
+   */
+  private async evidence(subject: {
+    label: string;
+    hint?: string | null;
+  }): Promise<PriceEvidence | null> {
+    const result = await estimateResalePrice(this.options, subject);
+    if (!result.ok) return null;
+    const { estimate } = result;
+    return {
+      source: 'web_estimate',
+      typicalCents: estimate.typical_cents,
+      lowCents: estimate.low_cents,
+      highCents: estimate.high_cents,
+      medianCents: null,
+      // Not a count of listings: the model read pages, it did not enumerate a
+      // market, and reporting its citation count as a sample size would imply
+      // a rigour that is not there.
+      sampleSize: null,
+      totalMatches: null,
+      listings: (estimate.sources ?? []).map((source) => ({
+        title: source.title ?? null,
+        url: source.url,
+        priceCents: null,
+        shippingCents: null,
+        condition: null,
+      })),
+      note: estimate.basis ?? `Confidence: ${estimate.confidence}.`,
+      query: subject.label,
+      fetchedAt: new Date().toISOString(),
+    };
   }
 }

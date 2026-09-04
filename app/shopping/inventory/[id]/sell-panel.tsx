@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { FieldError, Input } from '@/components/ui/field';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { ItemSellQuote } from '@/lib/sell/item-quote';
+import { formatRange } from '@/lib/sell/price-evidence';
+import { PriceEvidenceDetail } from './price-evidence-detail';
 import type { SellPath } from '@/lib/sell/route';
 
 const PATH_LABEL: Record<SellPath, string> = {
@@ -29,6 +31,7 @@ const SEARCH_LABEL: Record<string, string> = {
   ebay_browse: 'Search eBay',
   web_estimate: 'Search the web',
 };
+
 
 /**
  * What this one item is worth, and the button that finds out.
@@ -146,6 +149,11 @@ export function ItemSellPanel({
                 {quote.quoteIsStale ? ' · out of date' : ''}
               </span>
             )}
+            {quote.evidence && (
+              <span className="ml-2 tabular text-small font-normal text-ink-muted">
+                {formatRange(quote.evidence.lowCents, quote.evidence.highCents, formatMoney)}
+              </span>
+            )}
           </dd>
         </div>
         <div>
@@ -189,6 +197,8 @@ export function ItemSellPanel({
           </div>
         )}
       </dl>
+
+      {quote.evidence && <PriceEvidenceDetail evidence={quote.evidence} />}
 
       <form action={manualAction} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
         <input type="hidden" name="inventory_item_id" value={itemId} />

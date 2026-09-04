@@ -18,6 +18,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mapPool } from '@/lib/async/map-pool';
+import type { PriceEvidence } from '@/lib/sell/price-evidence';
 import { createBuybackProvider } from '@/lib/sell/buyback';
 import {
   createExpectedPriceSource,
@@ -144,13 +145,27 @@ export async function runPriceLookups(input: {
   await mapPool(todo, 2, async ({ target }) => {
     const fetchedAt = new Date().toISOString();
     try {
-      const cents =
-        target.via === 'isbn'
-          ? await provider.expectedSelfListCents(target.isbn13)
-          : await provider.expectedSelfListCentsFor({
-              query: target.query,
-              hint: target.hint,
-            });
+      // One call, never two: a web estimate is billed, so the evidence path
+      // replaces the number path rather than running alongside it. A source
+      // without the evidence methods still works, just without the listings.
+      let evidence: PriceEvidence | null = null;
+      let cents: number | null;
+      if (target.via === 'isbn') {
+        if (provider.priceEvidenceForIsbn) {
+          evidence = await provider.priceEvidenceForIsbn(target.isbn13);
+          cents = evidence?.typicalCents ?? null;
+        } else {
+          cents = await provider.expectedSelfListCents(target.isbn13);
+        }
+      } else {
+        const subject = { query: target.query, hint: target.hint };
+        if (provider.priceEvidence) {
+          evidence = await provider.priceEvidence(subject);
+          cents = evidence?.typicalCents ?? null;
+        } else {
+          cents = await provider.expectedSelfListCentsFor(subject);
+        }
+      }
 
       // A null is written too: it is what stops the next run asking again
       // immediately, and quoteIsCurrent already refuses to treat it as a price.
@@ -161,6 +176,7 @@ export async function runPriceLookups(input: {
             source,
             quoted_cents: cents,
             shipping_cents: 0,
+            payload: evidence,
             fetched_at: fetchedAt,
           },
           { onConflict: 'isbn_13,source' },
@@ -172,6 +188,7 @@ export async function runPriceLookups(input: {
             source,
             quoted_cents: cents,
             shipping_cents: 0,
+            payload: evidence,
             fetched_at: fetchedAt,
           },
           { onConflict: 'bgg_id,source' },
@@ -183,6 +200,7 @@ export async function runPriceLookups(input: {
             source,
             quoted_cents: cents,
             shipping_cents: 0,
+            payload: evidence,
             fetched_at: fetchedAt,
           },
           { onConflict: 'inventory_item_id,source' },
