@@ -64,6 +64,7 @@ export function WorkspaceSwitcher({
   enabled,
   counts = {},
   onShell = false,
+  compact = false,
 }: {
   current: WorkspaceId | null;
   enabled?: readonly ModuleId[];
@@ -74,6 +75,12 @@ export function WorkspaceSwitcher({
    * near-black under a lit page, so the trigger has to wear the shell's inks.
    */
   onShell?: boolean;
+  /**
+   * The mark alone, for the collapsed column. The menu is unchanged and still
+   * the full width -- a narrow column is a reason to show less of the trigger,
+   * not a reason to make choosing harder.
+   */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -187,9 +194,10 @@ export function WorkspaceSwitcher({
         }}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Switch workspace  ⌘K"
+        title={compact ? `${active.label}  ⌘K` : 'Switch workspace  ⌘K'}
         className={cn(
-          'press flex w-full items-center gap-2 rounded-lg py-1.5 pl-1.5 pr-2 transition-colors duration-150',
+          'press flex w-full items-center gap-2 rounded-lg py-1.5 transition-colors duration-150',
+          compact ? 'justify-center px-1' : 'pl-1.5 pr-2',
           onShell
             ? open
               ? 'bg-shell-hover'
@@ -204,12 +212,17 @@ export function WorkspaceSwitcher({
           className={cn(
             'font-display min-w-0 flex-1 truncate text-left text-lead font-semibold tracking-tight',
             onShell ? 'text-shell-ink' : 'text-ink',
+            compact && 'sr-only',
           )}
         >
           {active.label}
         </span>
         <ChevronsUpDown
-          className={cn('size-3.5 shrink-0', onShell ? 'text-shell-muted' : 'text-ink-muted')}
+          className={cn(
+            'size-3.5 shrink-0',
+            onShell ? 'text-shell-muted' : 'text-ink-muted',
+            compact && 'hidden',
+          )}
           strokeWidth={2}
           aria-hidden
         />

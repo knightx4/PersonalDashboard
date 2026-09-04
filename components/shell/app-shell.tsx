@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Settings, X } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton } from '@/components/shell/notifications-button';
@@ -20,6 +20,8 @@ import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
 import type { ThemeChoice } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { Brief } from '@/lib/shell/brief';
+
+const NAV_COLLAPSED_KEY = 'pt_nav_collapsed';
 
 export type NavSection = {
   href: string;
@@ -98,7 +100,37 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [drawer, setDrawer] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
+
+  /**
+   * How wide you want the column, remembered.
+   *
+   * Per-viewer and disposable, so localStorage rather than the account -- the
+   * same call the workspace switcher makes for where you were, and guarded the
+   * same way, because it throws outright where site data is blocked. Read
+   * after mount rather than during render: the server has no way to know the
+   * answer, and rendering one width and hydrating another is a mismatch.
+   */
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(NAV_COLLAPSED_KEY) === '1');
+    } catch {
+      /* Blocked storage simply means the column starts open every time. */
+    }
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((was) => {
+      const next = !was;
+      try {
+        window.localStorage.setItem(NAV_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        /* Not remembering it is a smaller failure than not doing it. */
+      }
+      return next;
+    });
+  }
 
   const isActive = (section: NavSection) =>
     section.exact
@@ -134,6 +166,7 @@ export function AppShell({
     Icon,
     on,
     badge,
+    narrow = false,
   }: {
     href: string;
     label: string;
@@ -144,6 +177,8 @@ export function AppShell({
     }> | null;
     on: boolean;
     badge?: number;
+    /** In the collapsed column: the icon alone, with the name as its tooltip. */
+    narrow?: boolean;
   }) => (
     <Link
       key={href}
@@ -151,8 +186,10 @@ export function AppShell({
       // Opening a section is exactly when the drawer should close.
       onClick={() => setDrawer(false)}
       aria-current={on ? 'page' : undefined}
+      title={narrow ? label : undefined}
       className={cn(
-        'group relative flex items-center gap-2 rounded-lg py-1.5 pl-3 pr-2 text-ui font-medium transition-colors duration-150',
+        'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-150',
+        narrow ? 'justify-center px-2' : 'pl-3 pr-2',
         on
           ? 'bg-shell-hover text-shell-ink'
           : 'text-shell-muted hover:bg-shell-hover/60 hover:text-shell-ink',
@@ -182,16 +219,28 @@ export function AppShell({
           aria-hidden
         />
       )}
-      <span className="flex-1 truncate">{label}</span>
+      {/* The name is a tooltip in the narrow column, but it stays in the
+          accessibility tree either way: a rail of unlabelled icons is not a
+          navigation a screen reader can use. */}
+      <span className={cn('flex-1 truncate', narrow && 'sr-only')}>{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="tabular rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold text-[#14100a]">
-          {badge}
+        <span
+          className={cn(
+            'tabular bg-caution-fill font-bold text-[#14100a]',
+            narrow
+              ? // No room for a number beside a centred icon, so it becomes a
+                // dot in the corner -- still "something is waiting here".
+                'absolute right-1.5 top-1 size-1.5 rounded-full'
+              : 'rounded-full px-1.5 py-0.5 text-micro',
+          )}
+        >
+          <span className={cn(narrow && 'sr-only')}>{badge}</span>
         </span>
       )}
     </Link>
   );
 
-  const nav = (
+  const nav = (narrow: boolean) => (
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
       {sections.map((section) =>
         navRow({
@@ -200,22 +249,24 @@ export function AppShell({
           Icon: section.icon ? NAV_ICONS[section.icon] : null,
           on: isActive(section),
           badge: section.badge,
+          narrow,
         }),
       )}
     </nav>
   );
 
-  const sidebarInner = (
+  const sidebarInner = (narrow: boolean) => (
     <>
-      <div className="px-3 pt-3">
+      <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
           current={module}
           enabled={enabledModules}
           counts={counts}
           onShell
+          compact={narrow}
         />
       </div>
-      <div className="mt-2 flex-1 overflow-y-auto px-2 pb-3">{nav}</div>
+      <div className="mt-2 flex-1 overflow-y-auto px-2 pb-3">{nav(narrow)}</div>
 
       {/* The workspace's own settings, at the foot of its own column.
           They were a gear in the top bar, next to the theme picker and the
@@ -230,6 +281,7 @@ export function AppShell({
             label: settingsLabel ?? 'Settings',
             Icon: Settings,
             on: pathname.startsWith(settingsHref),
+            narrow,
           })}
         </div>
       )}
@@ -237,7 +289,12 @@ export function AppShell({
   );
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)]">
+    <div
+      className={cn(
+        'min-h-dvh lg:grid',
+        collapsed ? 'lg:grid-cols-[3.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]',
+      )}
+    >
       {/* The column, from lg up.
 
           z-40 rather than nothing: `sticky` makes this element a stacking
@@ -249,7 +306,34 @@ export function AppShell({
           switcher menu. Level with the top bar, below the palette and the
           sheets that are meant to cover the whole shell. */}
       <aside className="sticky top-0 z-40 hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
-        {sidebarInner}
+        {sidebarInner(collapsed)}
+
+        {/* Narrow it when the page needs the width, without losing the way
+            out: the workspace switcher stays at the top of the rail as its
+            mark, so switching module is still one click from here. Below the
+            settings rule, because it is a thing you do to the column rather
+            than a place you can go. */}
+        <div className="border-t border-shell-border px-2 py-2">
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
+            aria-pressed={collapsed}
+            className={cn(
+              'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-150 hover:bg-shell-hover/60 hover:text-shell-ink',
+              collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
+            )}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+            ) : (
+              <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+            )}
+            <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
+              {collapsed ? 'Expand' : 'Collapse'}
+            </span>
+          </button>
+        </div>
       </aside>
 
       {/* The drawer, below lg. */}
@@ -272,7 +356,9 @@ export function AppShell({
                 <span className="sr-only">Close navigation</span>
               </button>
             </div>
-            {sidebarInner}
+            {/* Never narrow: a drawer you opened on purpose has no width to
+                save, and it closes the moment you pick something. */}
+            {sidebarInner(false)}
           </aside>
         </div>
       )}
