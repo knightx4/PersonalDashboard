@@ -34,20 +34,40 @@ export type AppModule = {
    */
   accent: `--color-w-${ModuleId}`;
   /**
-   * The mark's gradient, as two fixed hexes.
+   * The one square in the mark that changes.
    *
-   * Deliberately not theme-aware. A workspace mark is an object -- the same
-   * idea as an app icon -- and an app icon does not invert when the OS goes
-   * dark. Fixing it also settles the white-on-hue contrast once rather than in
-   * five themes, and lets the gradient run rich-to-deep within a single hue.
+   * Every mark is the same four-node square: three constant nodes in
+   * monochrome, and this in the top-right corner. It is the only colour in the
+   * mark and the only shape that is not a square, which is what makes it read
+   * as a key rather than as a fourth node.
    *
-   * The order these modules are declared in is also the order of the nodes in
-   * the mark: shopping, job search, todo, vault, reading left to right and top
-   * to bottom. Reordering this list reorders the constellation, which is a
-   * change to the app's identity rather than to a list -- so don't, casually.
+   * A shape *and* a hue, deliberately -- either alone would run out. Position
+   * ran out at four modules, which is what this replaces; hue alone stops
+   * being distinguishable somewhere around six. Together they will go as far
+   * as anyone sensibly takes this.
+   *
+   * The hexes are fixed rather than themed. A mark is an object, and an app
+   * icon does not invert when the OS goes dark.
    */
-  mark: readonly [string, string];
+  key: MarkKey;
 };
+
+/**
+ * The shapes the changing square can take, in the order they were assigned.
+ *
+ * Each has to survive about twelve pixels, which rules out anything with an
+ * interior detail -- no glyphs, no letters, nothing hollow with a thin wall.
+ * These five are told apart by silhouette alone at that size; the next module
+ * takes the next unused one.
+ */
+export type MarkShape = 'circle' | 'diamond' | 'triangle' | 'quarter' | 'pill';
+
+export interface MarkKey {
+  shape: MarkShape;
+  /** Rich to deep within one hue. See HOME_MARK for the one exception. */
+  from: string;
+  to: string;
+}
 
 export const MODULES: readonly AppModule[] = [
   {
@@ -57,7 +77,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
-    mark: ['#be123c', '#8a0c2b'],
+    key: { shape: 'diamond', from: '#fb7185', to: '#be123c' },
   },
   {
     id: 'jobs',
@@ -66,7 +86,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Job search',
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
-    mark: ['#6d28d9', '#4f1ba0'],
+    key: { shape: 'triangle', from: '#c4b5fd', to: '#7c3aed' },
   },
   {
     id: 'todo',
@@ -77,7 +97,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Todo',
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
-    mark: ['#0369a1', '#024a73'],
+    key: { shape: 'quarter', from: '#7dd3fc', to: '#0369a1' },
   },
   {
     id: 'vault',
@@ -88,7 +108,7 @@ export const MODULES: readonly AppModule[] = [
     label: 'Vault',
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
-    mark: ['#9d1bab', '#6f1279'],
+    key: { shape: 'pill', from: '#f0abfc', to: '#a21caf' },
   },
 ] as const;
 
@@ -105,7 +125,15 @@ export const MODULES: readonly AppModule[] = [
 export const HOME_MARK = {
   label: 'Home',
   accent: '--color-accent',
-  mark: ['#4338ca', '#312a94'],
+  /**
+   * The app's own key, and the one place two hues are allowed to meet.
+   *
+   * Everywhere else a gradient stays inside a single hue, because a two-hue
+   * ramp is decoration pretending to be identity. Here it *is* the identity:
+   * blue into pink is what this product has used for itself since before it
+   * had modules, and the home mark is the only thing entitled to wear it.
+   */
+  key: { shape: 'circle', from: '#6a82fb', to: '#ff6b9d' },
 } as const;
 
 export function moduleById(id: ModuleId | null): AppModule | null {

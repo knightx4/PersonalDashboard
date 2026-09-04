@@ -113,7 +113,15 @@ export default async function PipelinePage({
   }
 
   return (
-    <>
+    /* The board scrolls, not the page. A pipeline is a thing you look through
+       while filtering it, and a layout where the search field, the filters and
+       the count all slide off the top is one where finding a pursuit means
+       scrolling back up to change the filter and back down to read the result.
+       From lg up -- where the shell is a sidebar and a content column and the
+       viewport is a fixed frame -- the chrome is pinned and only the columns
+       move. Below that the document scrolls as before: pinning a header on a
+       phone spends the screen the results need. */
+    <div className="lg:flex lg:h-[calc(100dvh-6.5rem)] lg:flex-col lg:overflow-hidden">
       <PageHeader
         title="Pipeline"
         description={
@@ -132,8 +140,8 @@ export default async function PipelinePage({
         }
       />
 
-      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
-        <LeftRail>
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 xl:flex-row xl:gap-6">
+        <LeftRail fill>
           <RailGroup label="Source">
             <RailItem
               label="All sources"
@@ -223,10 +231,10 @@ export default async function PipelinePage({
           </p>
         </LeftRail>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           <PipelineBoard rows={filtered} view={view} />
         </div>
       </div>
-    </>
+    </div>
   );
 }

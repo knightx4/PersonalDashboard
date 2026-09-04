@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -265,6 +266,15 @@ function Card({
             aria-hidden
           />
         )}
+        <CompanyAvatar
+          company={{
+            name: row.companyName,
+            logoUrl: row.companyLogoUrl,
+            domains: row.companyDomains,
+            website: row.companyWebsite,
+          }}
+          className="size-7"
+        />
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/roles/${row.roleId}`}

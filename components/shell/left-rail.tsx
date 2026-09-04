@@ -23,9 +23,17 @@ import { cn } from '@/lib/cn';
 export function LeftRail({
   children,
   className,
+  fill = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  /**
+   * The parent already bounds the height -- a page whose results scroll in
+   * their own region rather than with the document. The rail then fills that
+   * region instead of measuring the viewport itself, which it cannot do
+   * correctly from inside a container it does not know the height of.
+   */
+  fill?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -87,8 +95,18 @@ export function LeftRail({
         </div>
       )}
 
-      <aside className={cn('hidden shrink-0 xl:block xl:w-52', className)} aria-label="Filters">
-        <div className="space-y-6 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
+      <aside
+        className={cn('hidden shrink-0 xl:block xl:w-52', fill && 'xl:h-full', className)}
+        aria-label="Filters"
+      >
+        <div
+          className={cn(
+            'space-y-6 xl:overflow-y-auto xl:overscroll-contain xl:pr-1',
+            fill
+              ? 'xl:h-full'
+              : 'xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)]',
+          )}
+        >
           {children}
         </div>
       </aside>

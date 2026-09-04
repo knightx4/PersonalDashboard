@@ -31,8 +31,8 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
    * section has probably grown a feature it did not need.
    */
   const sections: NavSection[] = [
-    { href: '/todo', label: 'Agenda', exact: true },
-    { href: '/todo/all', label: 'All' },
+    { href: '/todo', label: 'Agenda', icon: 'agenda', exact: true },
+    { href: '/todo/all', label: 'All', icon: 'tasks' },
   ];
 
   return (

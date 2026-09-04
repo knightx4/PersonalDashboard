@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { SearchField } from '@/components/jobs/shell/search-field';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { IN_PROCESS_OR_LATER, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
@@ -32,7 +33,7 @@ export default async function CompaniesPage({
   const { data } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, priority, status, industry, hq_location, domains, roles ( id, applications ( status ) )',
+      'id, name, slug, priority, status, industry, hq_location, domains, website, careers_url, logo_url, roles ( id, applications ( status ) )',
     )
     .eq('user_id', user.id)
     .order('name');
@@ -46,6 +47,9 @@ export default async function CompaniesPage({
     industry: string | null;
     hq_location: string | null;
     domains: string[];
+    website: string | null;
+    careers_url: string | null;
+    logo_url: string | null;
     roles: Array<{ id: string; applications: Array<{ status: ApplicationStatus }> }>;
   }>;
 
@@ -156,15 +160,30 @@ export default async function CompaniesPage({
               {filtered.map((company) => (
                 <tr key={company.id} className="border-b border-border hover:bg-surface">
                   <td className="px-2 py-1.5">
-                    <Link
-                      href={`/jobs/companies/${company.slug}`}
-                      className="font-medium text-ink hover:text-accent"
-                    >
-                      {company.name}
-                    </Link>
-                    {company.hq_location && (
-                      <span className="ml-1.5 text-ink-muted">{company.hq_location}</span>
-                    )}
+                    <span className="flex items-center gap-2">
+                      <CompanyAvatar
+                        company={{
+                          name: company.name,
+                          logoUrl: company.logo_url,
+                          domains: company.domains,
+                          website: company.website,
+                          careersUrl: company.careers_url,
+                        }}
+                        className="size-5 rounded"
+                        imageClassName="size-4"
+                      />
+                      <span className="min-w-0">
+                        <Link
+                          href={`/jobs/companies/${company.slug}`}
+                          className="font-medium text-ink hover:text-accent"
+                        >
+                          {company.name}
+                        </Link>
+                        {company.hq_location && (
+                          <span className="ml-1.5 text-ink-muted">{company.hq_location}</span>
+                        )}
+                      </span>
+                    </span>
                   </td>
                   <td className="px-2 py-1.5 text-ink-muted">{company.priority}</td>
                   <td className="px-2 py-1.5 text-ink-muted">

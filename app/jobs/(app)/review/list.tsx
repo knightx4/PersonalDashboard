@@ -23,6 +23,7 @@ import {
   createRoleFromMessage,
   deleteInferredApplication,
   dismissMessage,
+  excludeCompanyForApplication,
   linkMessage,
   reopenApplication,
 } from './actions';
@@ -545,8 +546,29 @@ function ApplicationRow({
             })
           }
         >
-          I never applied
+          Not relevant
         </Button>
+        {/* Only where the employer has a sending domain of its own on file.
+            The one-off verdict never stops the next sync inferring the same
+            pursuit again, and answering the same agency every week is how a
+            queue stops being worked. */}
+        {row.companyDomains.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            title={`Stop hearing from ${row.companyDomains.join(', ')}`}
+            onClick={() =>
+              startTransition(async () => {
+                const result = await excludeCompanyForApplication(row.applicationId);
+                onDone(result.error ?? result.message ?? 'Excluded.');
+              })
+            }
+          >
+            Exclude {row.companyName}
+          </Button>
+        )}
       </footer>
     </>
   );

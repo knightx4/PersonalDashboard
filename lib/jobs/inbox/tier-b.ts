@@ -81,11 +81,33 @@ export async function extractWithModel(input: {
  * When Tier A was confident, its label wins over the model's. Tier A is
  * deterministic; the model is a guess with better recall on shape but no
  * knowledge of which domains are ATS infrastructure.
+ *
+ * One exception, and it is the pair the whole classifier is ordered around: a
+ * rejection read as an acknowledgement. Tier A sees only the first 2000
+ * characters and only the euphemisms someone thought to write down, while
+ * every rejection opens with the same sentence an acknowledgement does —
+ * "thank you for your interest in <company>". When the wording that would have
+ * settled it sits below the preview window, Tier A returns
+ * application_confirmation with full confidence and the model's correct
+ * reading is discarded. That is the most expensive mistake this pipeline can
+ * make: the pursuit is created in the funnel as live, no rejection event is
+ * ever written, and nothing later says otherwise.
+ *
+ * Narrow on purpose. Only this one substitution is allowed, and only in this
+ * direction — the model does not get to overrule a deterministic label in
+ * general, and a rejection it invents about mail Tier A read as an interview
+ * invite would close a live pursuit, which is the mirror-image error.
  */
 export function reconcileClassification(
   tierA: ClassifyResult,
   extracted: ExtractedMessage | null,
 ): ExtractedMessage['classification'] {
+  if (
+    extracted?.classification === 'rejection' &&
+    tierA.classification === 'application_confirmation'
+  ) {
+    return 'rejection';
+  }
   if (tierA.tier === 'A' && tierA.classification !== 'not_relevant') {
     return tierA.classification;
   }

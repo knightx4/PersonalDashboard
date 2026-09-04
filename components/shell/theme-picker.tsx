@@ -32,29 +32,47 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
 
   const chosen = override !== undefined ? override : value;
   const showing = preview !== undefined ? preview : chosen;
+  /** Has anything happened *on this page* -- a hover, or a click? */
+  const touched = preview !== undefined || override !== undefined;
 
   /**
    * One place writes to the document, and it is driven by state rather than by
    * a handler -- so hovering a swatch, choosing one, and closing without
    * choosing all go through the same path and cannot disagree.
+   *
+   * It writes only once something has actually happened here. On mount the
+   * document already carries whatever the server rendered from the cookie,
+   * and re-asserting it from `value` is how a chosen theme got lost: `value`
+   * is the account's answer, null means "follow the system", and null is also
+   * what the account returns when it simply does not know -- as it did for
+   * every request while the `theme` column was missing from
+   * core.account_settings. This component then removed `data-theme` on every
+   * mount, so the first paint of each workspace was right and hydration threw
+   * it away and fell back to prefers-color-scheme. Switching module looked
+   * like it reset the theme to dark, because on a dark machine that is exactly
+   * what it did.
    */
   useEffect(() => {
+    if (!touched) return;
     const root = document.documentElement;
     if (showing) root.setAttribute('data-theme', showing);
     else root.removeAttribute('data-theme');
-  }, [showing]);
+  }, [touched, showing]);
 
   /**
    * The account is the truth; the cookie is a device-local mirror.
    *
    * On a machine that has never seen this account the cookie is absent, so the
    * server rendered the system default and the first paint was the wrong
-   * theme. Repair the cookie once, quietly, so the next one is right. No state
-   * is touched -- `chosen` already reflects the account.
+   * theme. Apply it and repair the cookie, so this page is right and so is the
+   * next one. Only ever for a real stored choice: null is not evidence that
+   * the account wants the system default, only that it is not saying.
    */
   useEffect(() => {
     if (!value) return;
-    if (document.documentElement.getAttribute('data-theme') === value) return;
+    const root = document.documentElement;
+    if (root.getAttribute('data-theme') === value) return;
+    root.setAttribute('data-theme', value);
     startTransition(() => {
       void setTheme(value);
     });
