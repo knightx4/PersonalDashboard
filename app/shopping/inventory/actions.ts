@@ -546,6 +546,53 @@ export async function setItemsForSale(
   };
 }
 
+/**
+ * Delete the selected inventory units.
+ *
+ * The row menu deletes one at a time, which is the wrong shape for clearing out
+ * a shelf of duplicates. Same rule as the single delete: the order line and the
+ * spend history stay, the unit leaves inventory, and there is no undo — which
+ * is why the bar asks a second time before calling this.
+ */
+export async function deleteInventoryItems(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const ids = formData
+    .getAll('id')
+    .map((value) => String(value))
+    .filter((value) => z.string().uuid().safeParse(value).success);
+  if (ids.length === 0) return { error: 'Pick at least one item first.' };
+
+  // Read back what is actually the user's before deleting, so the count in the
+  // message is the number of rows that really went.
+  const { data: owned } = await supabase
+    .from('inventory_items')
+    .select('id')
+    .eq('user_id', user.id)
+    .in('id', ids);
+  const mine = (owned ?? []).map((row) => row.id as string);
+  if (mine.length === 0) return { error: 'Those items could not be found.' };
+
+  const { error } = await supabase
+    .from('inventory_items')
+    .delete()
+    .eq('user_id', user.id)
+    .in('id', mine);
+  if (error) return { error: error.message };
+
+  revalidateSellSurfaces(mine);
+  revalidatePath('/shopping/orders');
+  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/dashboard');
+  return {
+    message: `${mine.length} ${mine.length === 1 ? 'item' : 'items'} deleted.`,
+  };
+}
+
 /** Form-action friendly wrapper for list-row icon buttons. */
 export async function toggleItemForSaleForm(formData: FormData): Promise<void> {
   const result = await setItemsForSale({}, formData);

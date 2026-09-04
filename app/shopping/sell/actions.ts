@@ -8,8 +8,10 @@ import {
   expectedPriceSourceKind,
 } from '@/lib/sell/expected-price';
 import { checkEbayConnection, type EbayCheckResult } from '@/lib/sell/ebay-check';
+import { createBuybackProvider } from '@/lib/sell/buyback';
 import { sellIdentityOf } from '@/lib/sell/item-quote';
-import { runPriceLookups } from '@/lib/sell/price-run';
+import { loadForSaleItems, priceTargetOf } from '@/lib/sell/for-sale';
+import { priceOneTarget, runPriceLookups } from '@/lib/sell/price-run';
 import { gamePriceQuery } from '@/lib/sell/game-query';
 import {
   lookupPriceByIsbn,
@@ -186,6 +188,12 @@ export async function priceSellItems(
  * this is the button on a single item's page, so it always spends the lookup —
  * asking for a price and being told the cached one is still fresh is not an
  * answer to the question that was asked.
+ *
+ * It goes through the same target the batch uses, so the answer lands in the
+ * row the sell page and the item page both read. Doing its own identity
+ * arithmetic is what used to leave a price found on one page invisible on the
+ * other: an unconfirmed edition is cached against the item, and this used to
+ * refuse to price it at all.
  */
 export async function priceOneItem(
   _prev: SellActionState,
@@ -197,21 +205,13 @@ export async function priceOneItem(
   const id = z.string().uuid().safeParse(formData.get('inventory_item_id'));
   if (!id.success) return { error: 'Missing item.' };
 
-  const { data: item } = await supabase
-    .from('inventory_items')
-    .select('id, name')
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .maybeSingle();
+  const [item] = await loadForSaleItems({
+    supabase,
+    userId: user.id,
+    ids: [id.data],
+    includeNotForSale: true,
+  });
   if (!item) return { error: 'Item not found.' };
-
-  const identity = await sellIdentityOf(supabase, item.id);
-  if (!identity) {
-    return { error: 'Pricing needs a matched book or board game.' };
-  }
-  if (identity.needsConfirmation) {
-    return { error: 'Confirm which edition this is first, then price it.' };
-  }
 
   const keys = {
     ebayClientId: process.env.EBAY_CLIENT_ID ?? null,
@@ -224,57 +224,27 @@ export async function priceOneItem(
 
   let cents: number | null = null;
   try {
-    if (identity.kind === 'book') {
-      if (!identity.isbn13) return { error: 'This book has no ISBN to look up.' };
-      const found = await lookupPriceByIsbn(provider, identity.isbn13);
-      cents = found.cents;
-      await supabase.from('book_price_quotes').upsert(
-        {
-          isbn_13: identity.isbn13,
-          source,
-          quoted_cents: cents,
-          shipping_cents: 0,
-          // The listings behind the number, for the item page to show.
-          payload: found.evidence,
-          fetched_at: new Date().toISOString(),
-        },
-        { onConflict: 'isbn_13,source' },
-      );
-    } else {
-      if (identity.bggId == null) return { error: 'This game has no BGG match to look up.' };
-      const found = await lookupPriceBySubject(
-        provider,
-        gamePriceQuery({
-          name: item.name as string,
-          yearPublished: identity.yearPublished,
-          publisher: identity.publisher,
-        }),
-      );
-      cents = found.cents;
-      await supabase.from('game_price_quotes').upsert(
-        {
-          bgg_id: identity.bggId,
-          source,
-          quoted_cents: cents,
-          shipping_cents: 0,
-          payload: found.evidence,
-          fetched_at: new Date().toISOString(),
-        },
-        { onConflict: 'bgg_id,source' },
-      );
-    }
+    cents = await priceOneTarget({
+      supabase,
+      target: priceTargetOf(item),
+      source,
+      provider,
+      buybackProvider: process.env.BOOKSCOUTER_API_KEY
+        ? createBuybackProvider({ apiKey: process.env.BOOKSCOUTER_API_KEY })
+        : null,
+    });
   } catch (error) {
-    console.error('price lookup failed', item.id, error);
+    console.error('price lookup failed', item.inventoryItemId, error);
     return { error: 'The price lookup failed. Try again in a moment.' };
   }
 
   revalidatePath('/shopping/sell');
-  revalidatePath(`/shopping/inventory/${item.id}`);
+  revalidatePath(`/shopping/inventory/${item.inventoryItemId}`);
 
   if (cents == null) {
     return {
       message:
-        identity.manualCents != null
+        item.manualCents != null
           ? 'No price came back — your own price still stands.'
           : 'No price came back — nothing comparable was listed.',
     };

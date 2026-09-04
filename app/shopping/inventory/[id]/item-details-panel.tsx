@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, type ReactNode } from 'react';
 import { lookupItemAttributes, saveCategoryTemplate } from './attribute-actions';
 import type { AttributeActionState } from './attribute-actions';
 import { updateInventoryItem, type ActionState } from '@/app/shopping/inventory/actions';
@@ -22,12 +22,18 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 /**
- * Everything about the item that is editable, in one panel and under one Save.
+ * Everything the page knows about the item, in one box.
  *
  * What it is called and what category it is in used to live in a separate
  * "Edit" card further down the page, while the fields describing it lived up
  * here — two panels editing one row, each with its own Save button. They are
  * one form now; the category's own fields are just the second half of it.
+ *
+ * The catalog's own identity block — "Book details", "Game details" — used to
+ * be a third box above this one, which left the reader deciding which of two
+ * panels a given fact was in and reading "Players" twice. It is the top of this
+ * box now: catalog identity, then what the item is, then the fields its
+ * category says it carries.
  *
  * The search and the category-template editor stay separate forms, because
  * they act on something other than this item: a catalog, and every item in the
@@ -43,6 +49,8 @@ export function ItemDetailsPanel({
   fields,
   values,
   searchAvailable,
+  catalog,
+  catalogAnsweredLabels = [],
 }: {
   itemId: string;
   item: {
@@ -59,6 +67,14 @@ export function ItemDetailsPanel({
   fields: AttributeField[];
   values: AttributeValues;
   searchAvailable: boolean;
+  /** The book or game identity block, rendered as the top of this box. */
+  catalog?: ReactNode;
+  /**
+   * Labels of the template fields left out because the identity block above
+   * already answers them. Named rather than silently dropped, so a field that
+   * is in the category template but not on screen explains itself.
+   */
+  catalogAnsweredLabels?: string[];
 }) {
   const [saveState, saveAction, savePending] = useActionState(updateInventoryItem, initialSave);
   const [lookupState, lookupAction, lookupPending] = useActionState(
@@ -95,7 +111,9 @@ export function ItemDetailsPanel({
       {lookupState.message && <p className="text-body text-positive">{lookupState.message}</p>}
       <FieldError>{lookupState.error}</FieldError>
 
-      <form action={saveAction} className="space-y-4">
+      {catalog && <div className="border-t border-border pt-4">{catalog}</div>}
+
+      <form action={saveAction} className="space-y-4 border-t border-border pt-4">
         <input type="hidden" name="id" value={itemId} />
 
         <div>
@@ -158,6 +176,14 @@ export function ItemDetailsPanel({
         ) : (
           <p className="border-t border-border pt-4 text-ui text-ink-muted">
             No category fields yet. Add one below, or set up the template for this category.
+          </p>
+        )}
+
+        {catalogAnsweredLabels.length > 0 && (
+          <p className="text-ui text-ink-muted">
+            {catalogAnsweredLabels.join(' and ')}{' '}
+            {catalogAnsweredLabels.length === 1 ? 'comes' : 'come'} from the catalog above, so{' '}
+            {catalogAnsweredLabels.length === 1 ? 'it is' : 'they are'} not repeated here.
           </p>
         )}
 

@@ -22,7 +22,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
           title="Nothing captured yet"
           description="Use the message button in the header to log a bug or an idea the moment you hit it."
         />
-        <RunRoutineButton />
+        <RunRoutineButton openCount={0} />
       </div>
     );
   }
@@ -55,7 +55,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
         )}
 
         {/* Under the whole list: the queue is what the routine works. */}
-        <RunRoutineButton />
+        <RunRoutineButton openCount={outstanding.length} />
       </div>
     </>
   );

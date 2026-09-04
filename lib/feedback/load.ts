@@ -31,10 +31,15 @@ export type FeedbackRow = {
 };
 
 /** Anything not finished — including blocked, the state most easily forgotten. */
-const OUTSTANDING = ['open', 'in_progress', 'blocked', 'planned'] as const;
+export const OUTSTANDING_STATUSES = [
+  'open',
+  'in_progress',
+  'blocked',
+  'planned',
+] as const;
 
 export function isOutstanding(row: FeedbackRow): boolean {
-  return (OUTSTANDING as readonly string[]).includes(row.status);
+  return (OUTSTANDING_STATUSES as readonly string[]).includes(row.status);
 }
 
 /**

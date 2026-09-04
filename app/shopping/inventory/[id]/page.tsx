@@ -159,6 +159,30 @@ export default async function InventoryItemPage({
     hasSavedTemplate: Boolean(templateRow),
   });
 
+  // One fact, one place. The board-games template carries Players and Playing
+  // time, the books template carries ISBN, and the catalog rows below answer
+  // the same three — so the item read "Players 2–6" from the catalog and then
+  // offered a second, empty Players box a few lines down. Where the catalog has
+  // the answer it keeps it and the field stands down; where it does not, the
+  // field is the only place the answer can live, so it is drawn. Stored values
+  // are untouched either way: saving merges, so a field that is not rendered
+  // keeps whatever it already holds.
+  const catalogAnswered = new Map<string, string>();
+  if (gameRow) {
+    if (gameRow.min_players != null || gameRow.max_players != null) {
+      catalogAnswered.set('players', 'Players');
+    }
+    if (gameRow.playing_time_minutes != null) {
+      catalogAnswered.set('playing_time_min', 'Playing time');
+    }
+  }
+  if (bookRow && (bookRow.isbn_13 || bookRow.isbn_10)) {
+    catalogAnswered.set('isbn', 'ISBN');
+  }
+  const attributeFields = fieldsForItem(attributeTemplate, attributeValues).filter(
+    (field) => !catalogAnswered.has(field.key),
+  );
+
   // Only worth asking for something still owned, and it never spends a lookup:
   // the price on screen is whatever is already cached.
   const sellQuote =
@@ -301,53 +325,6 @@ export default async function InventoryItemPage({
         )}
       </dl>
 
-      {bookRow && (
-        <BookDetailsPanel
-          book={{
-            inventoryItemId: bookRow.inventory_item_id,
-            title: item.name,
-            imageUrl,
-            isbn13: bookRow.isbn_13,
-            isbn10: bookRow.isbn_10,
-            authors: bookRow.authors ?? [],
-            edition: bookRow.edition,
-            publisher: bookRow.publisher,
-            publishedYear: bookRow.published_year,
-            condition: bookRow.condition,
-            needsConfirmation: bookRow.needs_confirmation,
-            confirmationReason: bookRow.confirmation_reason ?? null,
-            candidates: Array.isArray(bookRow.candidates) ? bookRow.candidates : [],
-            autoImported: Boolean(bookRow.auto_imported),
-            matchConfidence:
-              bookRow.match_confidence != null ? Number(bookRow.match_confidence) : null,
-            resolutionSource: bookRow.resolution_source,
-          }}
-        />
-      )}
-
-      {gameRow && (
-        <GameDetailsPanel
-          game={{
-            inventoryItemId: gameRow.inventory_item_id,
-            title: item.name,
-            imageUrl,
-            bggId: gameRow.bgg_id,
-            yearPublished: gameRow.year_published,
-            publisher: gameRow.publisher,
-            minPlayers: gameRow.min_players,
-            maxPlayers: gameRow.max_players,
-            playingTimeMinutes: gameRow.playing_time_minutes,
-            needsConfirmation: gameRow.needs_confirmation,
-            confirmationReason: gameRow.confirmation_reason ?? null,
-            candidates: Array.isArray(gameRow.candidates) ? gameRow.candidates : [],
-            autoImported: Boolean(gameRow.auto_imported),
-            matchConfidence:
-              gameRow.match_confidence != null ? Number(gameRow.match_confidence) : null,
-            resolutionSource: gameRow.resolution_source,
-          }}
-        />
-      )}
-
       <ItemDetailsPanel
         itemId={item.id}
         item={{ name: item.name, variant: item.variant, notes: item.notes }}
@@ -355,9 +332,65 @@ export default async function InventoryItemPage({
         categoryId={item.category_id}
         categoryName={category?.name ?? null}
         template={attributeTemplate}
-        fields={fieldsForItem(attributeTemplate, attributeValues)}
+        fields={attributeFields}
         values={attributeValues}
         searchAvailable={searchProviderFor(category?.slug ?? null) !== null}
+        catalogAnsweredLabels={[...catalogAnswered.values()]}
+        catalog={
+          bookRow || gameRow ? (
+            <>
+              {bookRow && (
+                <BookDetailsPanel
+                  book={{
+                    inventoryItemId: bookRow.inventory_item_id,
+                    title: item.name,
+                    imageUrl,
+                    isbn13: bookRow.isbn_13,
+                    isbn10: bookRow.isbn_10,
+                    authors: bookRow.authors ?? [],
+                    edition: bookRow.edition,
+                    publisher: bookRow.publisher,
+                    publishedYear: bookRow.published_year,
+                    condition: bookRow.condition,
+                    needsConfirmation: bookRow.needs_confirmation,
+                    confirmationReason: bookRow.confirmation_reason ?? null,
+                    candidates: Array.isArray(bookRow.candidates) ? bookRow.candidates : [],
+                    autoImported: Boolean(bookRow.auto_imported),
+                    matchConfidence:
+                      bookRow.match_confidence != null
+                        ? Number(bookRow.match_confidence)
+                        : null,
+                    resolutionSource: bookRow.resolution_source,
+                  }}
+                />
+              )}
+              {gameRow && (
+                <GameDetailsPanel
+                  game={{
+                    inventoryItemId: gameRow.inventory_item_id,
+                    title: item.name,
+                    imageUrl,
+                    bggId: gameRow.bgg_id,
+                    yearPublished: gameRow.year_published,
+                    publisher: gameRow.publisher,
+                    minPlayers: gameRow.min_players,
+                    maxPlayers: gameRow.max_players,
+                    playingTimeMinutes: gameRow.playing_time_minutes,
+                    needsConfirmation: gameRow.needs_confirmation,
+                    confirmationReason: gameRow.confirmation_reason ?? null,
+                    candidates: Array.isArray(gameRow.candidates) ? gameRow.candidates : [],
+                    autoImported: Boolean(gameRow.auto_imported),
+                    matchConfidence:
+                      gameRow.match_confidence != null
+                        ? Number(gameRow.match_confidence)
+                        : null,
+                    resolutionSource: gameRow.resolution_source,
+                  }}
+                />
+              )}
+            </>
+          ) : null
+        }
       />
 
       {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
