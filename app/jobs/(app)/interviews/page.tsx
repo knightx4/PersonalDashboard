@@ -8,6 +8,19 @@ import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Interviews' };
 
+/**
+ * The interview itself, not just the pursuit it belongs to.
+ *
+ * An interview has no page of its own -- it lives on the role's interviews
+ * tab, which scrolls to it and highlights it when named in the query. That
+ * link already existed and was used from This week and from the agenda; this
+ * page, the one actually called Interviews, sent every click to the top of the
+ * role instead, so finding the round you had clicked on meant hunting for it.
+ */
+function interviewHref(roleId: string, interviewId: string): string {
+  return `/jobs/roles/${roleId}?tab=interviews&interview=${interviewId}`;
+}
+
 export default async function InterviewsPage() {
   const user = await requireUser();
   const supabase = await createClient();
@@ -71,8 +84,10 @@ export default async function InterviewsPage() {
           <ul className="mt-2 space-y-1">
             {needDebrief.map((row) => (
               <li key={row.id} className="text-ui">
+                {/* Straight to the round that needs writing up, which is the
+                    only reason this list exists. */}
                 <Link
-                  href={`/jobs/roles/${row.applications.roles.id}`}
+                  href={interviewHref(row.applications.roles.id, row.id)}
                   className="font-medium text-ink hover:text-accent"
                 >
                   {row.applications.roles.companies.name} · {row.applications.roles.title}
@@ -160,8 +175,16 @@ function Section({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-b border-border hover:bg-surface">
-                <td className="tabular px-2 py-1.5 text-ink-muted">
-                  {formatDateTime(row.scheduled_at, timezone)}
+                {/* The interview, and the role, as two separate destinations.
+                    Both are things you might want from this table and only one
+                    of them was reachable. */}
+                <td className="tabular px-2 py-1.5">
+                  <Link
+                    href={interviewHref(row.applications.roles.id, row.id)}
+                    className="font-medium text-ink hover:text-accent"
+                  >
+                    {formatDateTime(row.scheduled_at, timezone)}
+                  </Link>
                 </td>
                 <td className="px-2 py-1.5 text-ink-muted">
                   {row.applications.roles.companies.name}
@@ -169,7 +192,7 @@ function Section({
                 <td className="px-2 py-1.5">
                   <Link
                     href={`/jobs/roles/${row.applications.roles.id}`}
-                    className="font-medium text-ink hover:text-accent"
+                    className="text-ink-muted hover:text-accent"
                   >
                     {row.applications.roles.title}
                   </Link>
