@@ -56,7 +56,9 @@ export function NotificationsButton({
         title={`${count} notification${count === 1 ? '' : 's'}`}
         className={cn(
           'press relative flex size-8 items-center justify-center rounded-full transition-colors',
-          open ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
+          open
+            ? 'bg-accent-tint text-accent'
+            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
         )}
       >
         <Bell className="size-4" aria-hidden />

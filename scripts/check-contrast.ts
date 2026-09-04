@@ -46,11 +46,41 @@ function blockFor(selector: string): Vars {
   return vars;
 }
 
-const PAPER = blockFor(":root,\n[data-theme='paper']");
+/**
+ * Follow `var(--x)` chains until a literal comes out.
+ *
+ * The scope tokens are written as references -- `--c-page-ink: var(--c-ink)`
+ * in every theme that does not need a page palette of its own -- so a theme's
+ * table has to be flattened before anything in it can be measured. Resolving
+ * per theme is the point: the same declaration lands on a different literal in
+ * each one, which is exactly what makes those defaults free.
+ */
+function resolve(vars: Vars): Vars {
+  const out: Vars = {};
+  for (const name of Object.keys(vars)) {
+    let value = vars[name];
+    // Deep enough for any chain this file has a reason to contain, and a hard
+    // stop rather than a hang if someone writes a loop.
+    for (let hop = 0; hop < 10 && value.startsWith('var('); hop += 1) {
+      const referenced = value.slice(4, -1).trim();
+      const next = vars[referenced];
+      if (next === undefined) throw new Error(`${name} points at undefined ${referenced}`);
+      value = next;
+    }
+    if (value.startsWith('var(')) throw new Error(`${name} does not settle on a value`);
+    out[name] = value;
+  }
+  return out;
+}
+
+const PAPER = resolve(blockFor(":root,\n[data-theme='paper']"));
 
 /** A theme inherits every value it does not itself declare from Paper. */
 function theme(selector: string): Vars {
-  return { ...PAPER, ...blockFor(selector) };
+  // Merged before resolving, so a theme that overrides --c-ink also moves
+  // every default that was written as var(--c-ink) -- which is the whole
+  // mechanism the scopes rely on.
+  return resolve({ ...blockFor(":root,\n[data-theme='paper']"), ...blockFor(selector) });
 }
 
 const THEMES: Record<string, Vars> = {
@@ -78,7 +108,15 @@ function ratio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** Every ground a given ink can legitimately land on. */
+/**
+ * Every ground a sheet's ink can land on.
+ *
+ * --c-page is deliberately not in here. A theme may draw its page ground in
+ * the opposite polarity from its cards -- Lightbox does -- and the ink that
+ * lands there is the --c-page-* set, checked separately below. Leaving the
+ * page in this list would have forced one ink to clear both, which is exactly
+ * the constraint the two scopes exist to lift.
+ */
 const GROUNDS = ['--c-canvas', '--c-surface', '--c-raised', '--c-sunken'] as const;
 
 type Check = { ink: string; grounds: readonly string[]; min: number; why: string };
@@ -126,6 +164,62 @@ CHECKS.push({
   grounds: ['--c-surface', '--c-canvas'],
   min: TEXT,
   why: 'pipeline status: ghosted (outline, no fill)',
+});
+
+/**
+ * The page ground, and everything that can be drawn straight onto it.
+ *
+ * This is the other half of the two-scope arrangement in globals.css. A page
+ * header, a bare link, a divider between two rows that are not in a card --
+ * none of those sit on a sheet, so none of them use the inks above. In four
+ * themes these tokens resolve to the same values as their sheet twins and this
+ * block re-proves what the block above already proved, which is cheap. In
+ * Lightbox it is the only thing standing between a black bench and unreadable
+ * text on it.
+ *
+ * The accents are checked per workspace: the page ground is where a workspace
+ * link actually lands, and four hues have to clear it, not one.
+ */
+const PAGE = ['--c-page'] as const;
+
+CHECKS.push(
+  { ink: '--c-page-ink', grounds: PAGE, min: TEXT, why: 'page-ground text' },
+  { ink: '--c-page-ink-muted', grounds: PAGE, min: TEXT, why: 'secondary text on the page ground' },
+  { ink: '--c-page-ink-ghost', grounds: PAGE, min: NON_TEXT, why: 'decoration on the page ground' },
+  { ink: '--c-page-border-control', grounds: PAGE, min: NON_TEXT, why: 'input borders on the page ground' },
+  { ink: '--c-page-positive', grounds: PAGE, min: TEXT, why: 'refunds and savings on the page ground' },
+  { ink: '--c-page-caution', grounds: PAGE, min: TEXT, why: 'needs attention on the page ground' },
+  { ink: '--c-page-danger', grounds: PAGE, min: TEXT, why: 'destructive on the page ground' },
+  { ink: '--c-accent-base-lit', grounds: PAGE, min: TEXT, why: 'app accent on the page ground' },
+  { ink: '--c-accent-hover-lit', grounds: PAGE, min: TEXT, why: 'app accent hover on the page ground' },
+  { ink: '--c-w-shopping-lit', grounds: PAGE, min: TEXT, why: 'shopping accent on the page ground' },
+  { ink: '--c-w-jobs-lit', grounds: PAGE, min: TEXT, why: 'jobs accent on the page ground' },
+  { ink: '--c-w-todo-lit', grounds: PAGE, min: TEXT, why: 'todo accent on the page ground' },
+  { ink: '--c-w-vault-lit', grounds: PAGE, min: TEXT, why: 'vault accent on the page ground' },
+);
+
+/**
+ * The sheet accents, on the sheets they land on.
+ *
+ * `bg-accent` is a solid fill wearing --c-surface as its label, and a tint
+ * chip is that accent on its own tint. Both were previously covered only for
+ * the app's own accent; now that a workspace accent has a second, lit value
+ * it is worth pinning the sheet value too, or a hue could be fixed for the
+ * bench and quietly broken on a card.
+ */
+for (const hue of ['--c-w-shopping', '--c-w-jobs', '--c-w-todo', '--c-w-vault'] as const) {
+  CHECKS.push({
+    ink: '--c-surface',
+    grounds: [hue],
+    min: TEXT,
+    why: `${hue.replace('--c-w-', '')} button label on its solid fill`,
+  });
+}
+CHECKS.push({
+  ink: '--c-surface',
+  grounds: ['--c-accent-base'],
+  min: TEXT,
+  why: 'primary button label on the app accent',
 });
 
 /** Dark ink on the count badge, which is a light amber in every theme. */
