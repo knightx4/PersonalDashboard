@@ -269,12 +269,18 @@ export function AppShell({
       )}
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-40 border-b border-border bg-surface/85 backdrop-blur">
+        {/* The top bar is chrome, not page: it takes the shell's ground and
+            the shell's ink, the same as the column beside it. In four themes
+            the shell is a near-neighbour of the surface it used to use, so
+            this reads as the bar picking up its own sidebar's tone. In
+            Lightbox it is the difference between a white strip across the top
+            of a black bench and one continuous bench. */}
+        <header className="sticky top-0 z-40 border-b border-shell-border bg-shell/85 backdrop-blur">
           <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
             <button
               type="button"
               onClick={() => setDrawer(true)}
-              className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink lg:hidden"
+              className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
               aria-label="Open navigation"
             >
               <Menu className="size-4" strokeWidth={2} aria-hidden />
@@ -284,7 +290,7 @@ export function AppShell({
               <ModuleMark module={module} size="sm" />
             </span>
 
-            <h2 className="font-display shrink-0 truncate text-lead font-semibold tracking-tight text-ink">
+            <h2 className="font-display shrink-0 truncate text-lead font-semibold tracking-tight text-shell-ink">
               {title}
             </h2>
 
@@ -299,15 +305,19 @@ export function AppShell({
                     href={brief.href}
                     className={cn(
                       'truncate rounded-full px-2.5 py-1 transition-colors',
+                      // Dimming on hover rather than thinning the tint: the
+                      // pill is a lit chip in dark chrome under Lightbox, and
+                      // a translucent tint there stops being a lit chip while
+                      // its text carries on assuming it is one.
                       brief.tone === 'caution'
-                        ? 'bg-caution-tint text-caution hover:bg-caution-tint/70'
-                        : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                        ? 'bg-caution-tint text-caution hover:opacity-90'
+                        : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
                     )}
                   >
                     {brief.text}
                   </Link>
                 ) : (
-                  <span className="truncate px-2.5 py-1 text-ink-muted">{brief.text}</span>
+                  <span className="truncate px-2.5 py-1 text-shell-muted">{brief.text}</span>
                 )}
               </p>
             )}

@@ -105,7 +105,9 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
         title="Theme"
         className={cn(
           'press flex size-8 items-center justify-center rounded-full transition-colors',
-          open ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
+          open
+            ? 'bg-accent-tint text-accent'
+            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
         )}
       >
         <Palette className="size-4" strokeWidth={1.75} aria-hidden />

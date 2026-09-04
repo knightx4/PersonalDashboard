@@ -32,11 +32,11 @@ export function StatusLine({ lines }: { lines: ActivityLine[] }) {
   if (lines.length === 0) return null;
 
   return (
-    <div className="pointer-events-none sticky bottom-0 z-30 border-t border-border bg-surface/85 backdrop-blur">
+    <div className="pointer-events-none sticky bottom-0 z-30 border-t border-shell-border bg-shell/85 backdrop-blur">
       <div
         className={cn(
           'flex items-center gap-2 px-4 py-1.5 font-mono text-micro transition-opacity duration-1000 sm:px-6',
-          settled ? 'text-ink-ghost' : 'text-ink-muted',
+          settled ? 'text-shell-muted/70' : 'text-shell-muted',
         )}
       >
         <Activity className="size-3 shrink-0" strokeWidth={2} aria-hidden />

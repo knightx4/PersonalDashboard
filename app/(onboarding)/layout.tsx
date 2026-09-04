@@ -17,7 +17,7 @@ export default async function OnboardingLayout({
   if (!user) redirect('/login?next=/onboarding');
 
   return (
-    <div className="min-h-dvh bg-canvas">
+    <div className="min-h-dvh bg-page">
       <header className="mx-auto flex h-14 max-w-lg items-center justify-between px-4 sm:px-0 sm:pt-6">
         <Link href="/onboarding" className="flex items-center gap-2">
           <ModuleMark module={null} size="md" />

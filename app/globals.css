@@ -24,7 +24,11 @@
  * ------------------------------------------------------------------------- */
 :root,
 [data-theme='paper'] {
+  /* The page's own scheme: what the browser paints for itself -- scrollbars,
+   * and any form widget it draws rather than the app. A sheet declares its
+   * own below, because in Lightbox the two disagree. */
   color-scheme: light;
+  --c-sheet-scheme: light;
 
   --c-canvas: #faf9f6;
   --c-surface: #ffffff;
@@ -85,6 +89,52 @@
   --grain-opacity: 0.035;
   --grain-blend: multiply;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* ---- The page ground, as a scope of its own -------------------------
+   * Everything above describes a sheet: a card, a table, a panel. Four of
+   * the five themes draw the page behind those sheets in the same polarity,
+   * so for them the page needs no palette of its own and these simply point
+   * back at the values above -- zero difference, zero maintenance.
+   *
+   * Lightbox is the theme that disagrees, and it is why this exists: a black
+   * bench with lit sheets on it needs two inks on screen at once. It sets the
+   * --c-page-* half and the SCOPES block near the bottom of this file does
+   * the rest. Nothing else in the app has to know.
+   *
+   * The rule for a new theme: if your page and your cards share a polarity,
+   * ignore all of this. */
+  --c-page: var(--c-canvas);
+  --c-page-ink: var(--c-ink);
+  --c-page-ink-muted: var(--c-ink-muted);
+  --c-page-ink-ghost: var(--c-ink-ghost);
+  --c-page-border: var(--c-border);
+  --c-page-border-strong: var(--c-border-strong);
+  --c-page-border-control: var(--c-border-control);
+  --c-page-positive: var(--c-positive);
+  --c-page-caution: var(--c-caution);
+  --c-page-danger: var(--c-danger);
+
+  /* The lit twin of each accent: the same hue, legible on the page ground
+   * rather than on a sheet. Only a two-polarity theme sets these apart. */
+  --c-accent-base-lit: var(--c-accent-base);
+  --c-accent-hover-lit: var(--c-accent-hover);
+  --c-w-shopping-lit: var(--c-w-shopping);
+  --c-w-jobs-lit: var(--c-w-jobs);
+  --c-w-todo-lit: var(--c-w-todo);
+  --c-w-vault-lit: var(--c-w-vault);
+
+  /* The sheet palette, captured here on :root -- where --c-ink and friends
+   * still hold their raw per-theme values -- so the SCOPES block can hand it
+   * back to a card after the page scope has taken over below <body>. */
+  --c-sheet-ink: var(--c-ink);
+  --c-sheet-ink-muted: var(--c-ink-muted);
+  --c-sheet-ink-ghost: var(--c-ink-ghost);
+  --c-sheet-border: var(--c-border);
+  --c-sheet-border-strong: var(--c-border-strong);
+  --c-sheet-border-control: var(--c-border-control);
+  --c-sheet-positive: var(--c-positive);
+  --c-sheet-caution: var(--c-caution);
+  --c-sheet-danger: var(--c-danger);
 }
 
 /* ---------------------------------------------------------------------------
@@ -95,6 +145,7 @@
  * ------------------------------------------------------------------------- */
 [data-theme='ink'] {
   color-scheme: dark;
+  --c-sheet-scheme: dark;
 
   --c-canvas: #08090a;
   --c-surface: #0f1011;
@@ -159,6 +210,7 @@
  * ------------------------------------------------------------------------- */
 [data-theme='riso'] {
   color-scheme: light;
+  --c-sheet-scheme: light;
 
   --c-canvas: #f6f2e8;
   --c-surface: #fffdf7;
@@ -219,48 +271,80 @@
 }
 
 /* ---------------------------------------------------------------------------
- * LIGHTBOX — a lit sheet on a black bench.
+ * LIGHTBOX — lit sheets on a black bench.
  *
- * The one theme where the shell and the content disagree on purpose: the
- * sidebar and top bar are near-black, and the page they frame is lit. It reads
- * the way a drafting table does, and it is the only arrangement here where the
- * chrome genuinely recedes -- there is nothing to look at in it, so you look at
- * the work.
+ * The theme where the page and the things on it disagree on purpose. The
+ * bench -- the sidebar, the top bar, the status line, and the page ground
+ * itself -- is near-black and carries no hue. The sheets laid on it -- cards,
+ * tables, panels, tinted chips -- are lit, and they are the only lit things on
+ * screen. It reads the way a drafting table does: there is nothing to look at
+ * in the bench, so you look at the work.
  *
- * This is why --c-shell-* exist at all. Every other theme could have got away
- * with tinting the surface.
+ * This is the theme the two-scope machinery exists for. Everywhere else in
+ * this file --c-ink is simply "the ink"; here there are two, and which one an
+ * element gets is decided by whether it paints a sheet under itself. The page
+ * half is --c-page-*, the sheet half is the ordinary tokens, and the SCOPES
+ * block at the bottom hands each element the right one.
  *
- * Every neutral here is on the blue-grey axis, and none of them carry red. The
- * first version drifted warm -- a #e5e2db canvas over a #d9d5cc sunken, with
- * beige borders and a warm-grey status-lead -- and a beige page under a
- * near-black bench does not read as a lit sheet, it reads as old paper. Cool
- * neutrals are also the only ones that sit honestly next to a shell this dark:
- * the bench has no hue, so anything the page adds is the page's.
+ * Two consequences worth knowing before editing this:
  *
- * The bench is deeper than it was and the sheet is whiter, which widens the
- * one contrast this theme exists to make. Amber survives on caution and
- * in-process because it is carrying a meaning rather than a mood -- it is the
- * same amber in all five themes -- but its tint is pulled off beige.
+ *   --c-canvas stays LIGHT. It is not the page background here; it is the
+ *   recessed well inside a card, which is what all hundred-odd uses of
+ *   `bg-canvas` in the app actually mean. The page background is --c-page.
  *
- * Note 7cab6802 also asks for the page ground itself to go dark, with only
- * cards and tables lit. That is not a palette change: --c-canvas is the page
- * ground in ~105 places and a recessed light well inside a card in the rest,
- * and one token cannot be both once it flips. See the note for the split.
+ *   The page half borrows the shell's own values rather than inventing a
+ *   second near-black. One bench, one colour: the sidebar and the page ground
+ *   are the same surface, so a card looks laid on the bench rather than
+ *   floating in a second, slightly different dark.
+ *
+ * Every neutral is on the blue-grey axis and none of them carry red. The
+ * earlier version drifted warm -- a beige canvas over a beige sunken -- and
+ * beige under a near-black bench reads as old paper rather than as a lit
+ * sheet. Amber survives on caution and in-process because there it carries a
+ * meaning rather than a mood, and it is the same amber in all five themes.
  * ------------------------------------------------------------------------- */
 [data-theme='lightbox'] {
-  color-scheme: light;
+  /* The bench is black, so the scrollbar the browser draws down the side of
+   * it has to be too. The sheets say `light` for themselves, which is where
+   * the checkboxes and date pickers actually live. */
+  color-scheme: dark;
+  --c-sheet-scheme: light;
 
-  --c-canvas: #dde3ea;
+  /* ---- The bench ---- */
+  --c-page: #08090c;
+  --c-page-ink: #e7ebf1;
+  --c-page-ink-muted: #9aa5b4;
+  --c-page-ink-ghost: #6d7887;
+  --c-page-border: #232a33;
+  --c-page-border-strong: #333c48;
+  --c-page-border-control: #6d7887;
+  --c-page-positive: #54d6a0;
+  --c-page-caution: #f0a63f;
+  --c-page-danger: #ff8b8b;
+
+  /* The lit twins: the same hues as below, turned up to clear the bench. */
+  --c-accent-base-lit: #8b9dff;
+  --c-accent-hover-lit: #a3b2ff;
+  --c-w-shopping-lit: #ff8fa8;
+  --c-w-jobs-lit: #b39bff;
+  --c-w-todo-lit: #4cc2f1;
+  --c-w-vault-lit: #e690f2;
+
+  /* ---- The sheets ----
+   * --c-canvas is the well inside a card, not the page. See the note above. */
+  --c-canvas: #e7ecf2;
   --c-surface: #fbfcfe;
   --c-raised: #ffffff;
-  --c-sunken: #cbd4de;
-  --c-border: #b7c1cd;
-  --c-border-strong: #94a0ae;
+  --c-sunken: #dde4ec;
+  --c-border: #d0d9e3;
+  --c-border-strong: #a6b1bf;
 
-  --c-shell: #090c10;
+  /* The sidebar is the same surface as the page ground, to the byte: one
+   * bench, not two nearly-identical darks meeting at an edge. */
+  --c-shell: #08090c;
   --c-shell-ink: #e7ebf1;
-  --c-shell-muted: #98a3b2;
-  --c-shell-border: #1a1f27;
+  --c-shell-muted: #9aa5b4;
+  --c-shell-border: #232a33;
   --c-shell-hover: #151a21;
 
   --c-ink: #10141a;
@@ -304,8 +388,10 @@
   --c-status-ghosted: #58616b;
   --c-status-ghosted-tint: #dfe5eb;
 
-  --grain-opacity: 0.025;
-  --grain-blend: multiply;
+  /* Overlay rather than multiply: the grain has to sit on a black bench and
+   * on white sheets in the same pass, and multiply is invisible on the first. */
+  --grain-opacity: 0.03;
+  --grain-blend: overlay;
 }
 
 /* ---------------------------------------------------------------------------
@@ -313,6 +399,7 @@
  * ------------------------------------------------------------------------- */
 [data-theme='dusk'] {
   color-scheme: dark;
+  --c-sheet-scheme: dark;
 
   --c-canvas: #110d1a;
   --c-surface: #191426;
@@ -377,6 +464,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
+    --c-sheet-scheme: dark;
 
     --c-canvas: #08090a;
     --c-surface: #0f1011;
@@ -448,16 +536,140 @@
  * still submitted-blue inside the violet workspace, because that colour is a
  * claim about the pursuit rather than about where you are standing.
  * ═══════════════════════════════════════════════════════════════════════════ */
-[data-workspace='shopping'] { --c-accent: var(--c-w-shopping); --c-accent-tint: var(--c-w-shopping-tint); }
-[data-workspace='jobs']     { --c-accent: var(--c-w-jobs);     --c-accent-tint: var(--c-w-jobs-tint); }
-[data-workspace='todo']     { --c-accent: var(--c-w-todo);     --c-accent-tint: var(--c-w-todo-tint); }
-[data-workspace='vault']    { --c-accent: var(--c-w-vault);    --c-accent-tint: var(--c-w-vault-tint); }
+/* Each workspace names its hue twice: once for a sheet and once for the page
+ * ground. In four of the five themes the two are the same value. */
+[data-workspace='shopping'] {
+  --c-sheet-accent: var(--c-w-shopping);
+  --c-page-accent: var(--c-w-shopping-lit);
+  --c-accent-tint: var(--c-w-shopping-tint);
+}
+[data-workspace='jobs'] {
+  --c-sheet-accent: var(--c-w-jobs);
+  --c-page-accent: var(--c-w-jobs-lit);
+  --c-accent-tint: var(--c-w-jobs-tint);
+}
+[data-workspace='todo'] {
+  --c-sheet-accent: var(--c-w-todo);
+  --c-page-accent: var(--c-w-todo-lit);
+  --c-accent-tint: var(--c-w-todo-tint);
+}
+[data-workspace='vault'] {
+  --c-sheet-accent: var(--c-w-vault);
+  --c-page-accent: var(--c-w-vault-lit);
+  --c-accent-tint: var(--c-w-vault-tint);
+}
 
 :root {
   /* No workspace -- home, account, auth, legal. The app's own accent. */
-  --c-accent: var(--c-accent-base);
+  --c-sheet-accent: var(--c-accent-base);
+  --c-page-accent: var(--c-accent-base-lit);
   --c-accent-tint: var(--c-accent-tint-base);
+  /* Hover is the app's accent in every workspace, as it always has been. */
+  --c-sheet-accent-hover: var(--c-accent-hover);
+  --c-page-accent-hover: var(--c-accent-hover-lit);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SCOPES — which ink an element gets
+ *
+ * A theme whose page and cards share a polarity needs none of this, and gets
+ * none: every --c-page-* above points back at its sheet twin, so both rules
+ * below assign a value to itself and nothing changes. It exists for Lightbox,
+ * where a black bench carries lit sheets and two inks are on screen at once.
+ *
+ * The rule is the one a person would state out loud: an element that paints a
+ * sheet under itself gets the sheet's ink; everything else is standing on the
+ * page and gets the page's. So the default is the page -- taken at <body>,
+ * and again at the workspace element because that is where the accent is
+ * chosen -- and any element that lays down an opaque sheet takes it back.
+ *
+ * Defaulting this way round is deliberate. The set of things that paint a
+ * sheet is a list of class names, which can be written down and is written
+ * down below. The set of things that put text on the page ground is every
+ * heading, description and bare link in forty pages, which cannot.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+body,
+[data-workspace] {
+  --c-ink: var(--c-page-ink);
+  --c-ink-muted: var(--c-page-ink-muted);
+  --c-ink-ghost: var(--c-page-ink-ghost);
+  --c-border: var(--c-page-border);
+  --c-border-strong: var(--c-page-border-strong);
+  --c-border-control: var(--c-page-border-control);
+  --c-positive: var(--c-page-positive);
+  --c-caution: var(--c-page-caution);
+  --c-danger: var(--c-page-danger);
+  --c-accent: var(--c-page-accent);
+  --c-accent-hover: var(--c-page-accent-hover);
+}
+
+/*
+ * The sheets. Every opaque light ground the app paints, including the hover
+ * variants -- a row that is transparent at rest and a sheet under the cursor
+ * would otherwise keep the page's ink the moment it stops being the page.
+ *
+ * A tint counts: an accent chip or a caution banner is a sheet the size of a
+ * sentence, and the text on it belongs to the chip, not to the ground behind.
+ *
+ * `bg-accent` is here for the same reason and one more: the fill itself is
+ * --c-accent, so an element that takes back the sheet accent also paints
+ * itself the sheet accent, which is the one that carries white text.
+ *
+ * Opaque grounds only. A fractional one -- `bg-canvas/60`, `bg-accent-tint/30`
+ * -- is not a sheet, it is a wash: on a black bench it comes out dark, so it
+ * wants the ink of whatever it is washing over, which is what inheriting gives
+ * it for free. Putting one here would hand it a dark ink on a dark result.
+ */
+:is(
+  .bg-surface, .bg-raised, .bg-sunken, .bg-canvas, .bg-accent, .bg-accent-tint,
+  .bg-positive-tint, .bg-caution-tint, .bg-danger-tint, .bg-caution-fill,
+  .bg-w-shopping-tint, .bg-w-jobs-tint, .bg-w-todo-tint, .bg-w-vault-tint,
+  .bg-status-lead-tint, .bg-status-submitted-tint, .bg-status-process-tint,
+  .bg-status-final-tint, .bg-status-offer-tint, .bg-status-rejected-tint,
+  .bg-status-ghosted-tint
+),
+.hover\:bg-surface:hover,
+.hover\:bg-sunken:hover,
+.hover\:bg-canvas:hover,
+.hover\:bg-accent:hover,
+.hover\:bg-accent-tint:hover,
+.hover\:bg-danger-tint:hover,
+.hover\:bg-status-rejected-tint:hover {
+  --c-ink: var(--c-sheet-ink);
+  --c-ink-muted: var(--c-sheet-ink-muted);
+  --c-ink-ghost: var(--c-sheet-ink-ghost);
+  --c-border: var(--c-sheet-border);
+  --c-border-strong: var(--c-sheet-border-strong);
+  --c-border-control: var(--c-sheet-border-control);
+  --c-positive: var(--c-sheet-positive);
+  --c-caution: var(--c-sheet-caution);
+  --c-danger: var(--c-sheet-danger);
+  --c-accent: var(--c-sheet-accent);
+  --c-accent-hover: var(--c-sheet-accent-hover);
+  /* Identical to the page's scheme in four themes, so this is inert there. */
+  color-scheme: var(--c-sheet-scheme);
+}
+
+/* `bg-page` paints the page ground itself -- a layout that draws its own
+ * background instead of letting <body> show through -- so wherever it appears
+ * it goes back to the page scope, even if some sheet happens to be above it. */
+.bg-page {
+  --c-ink: var(--c-page-ink);
+  --c-ink-muted: var(--c-page-ink-muted);
+  --c-ink-ghost: var(--c-page-ink-ghost);
+  --c-border: var(--c-page-border);
+  --c-border-strong: var(--c-page-border-strong);
+  --c-border-control: var(--c-page-border-control);
+  --c-positive: var(--c-page-positive);
+  --c-caution: var(--c-page-caution);
+  --c-danger: var(--c-page-danger);
+  --c-accent: var(--c-page-accent);
+  --c-accent-hover: var(--c-page-accent-hover);
+}
+
+/* The shell -- sidebar, top bar, status line -- appears in neither list. It
+ * has painted its own ground and named its own ink since it was written, so it
+ * is already outside both scopes and needs nothing from them. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * TOKENS
@@ -468,6 +680,10 @@
  * easing -- is a plain value.
  * ═══════════════════════════════════════════════════════════════════════════ */
 @theme inline {
+  /* The page ground. `bg-page` is for the handful of layouts that paint it
+   * themselves instead of letting <body> show through; `bg-canvas` is the
+   * recessed well inside a sheet, which is a different thing in Lightbox. */
+  --color-page: var(--c-page);
   --color-canvas: var(--c-canvas);
   --color-surface: var(--c-surface);
   --color-raised: var(--c-raised);
@@ -562,7 +778,7 @@
 }
 
 body {
-  background: var(--c-canvas);
+  background: var(--c-page);
   color: var(--c-ink);
   font-family: var(--font-sans);
   font-size: 14px;
