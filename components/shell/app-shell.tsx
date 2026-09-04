@@ -238,8 +238,17 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[13.5rem_minmax(0,1fr)]">
-      {/* The column, from lg up. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
+      {/* The column, from lg up.
+
+          z-40 rather than nothing: `sticky` makes this element a stacking
+          context, so the workspace switcher's menu cannot escape it however
+          high its own z-index goes. Without a z-index here the column lands in
+          the auto layer, which every positioned element in the page column --
+          and the page column comes later in the DOM -- paints over. That is
+          how a company logo and a filter chip ended up in front of an open
+          switcher menu. Level with the top bar, below the palette and the
+          sheets that are meant to cover the whole shell. */}
+      <aside className="sticky top-0 z-40 hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
         {sidebarInner}
       </aside>
 
