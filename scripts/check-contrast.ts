@@ -91,19 +91,65 @@ const THEMES: Record<string, Vars> = {
   dusk: theme("[data-theme='dusk']"),
 };
 
-function luminance(hex: string): number {
-  const parts = hex.replace('#', '').match(/../g);
-  if (!parts || parts.length < 3) throw new Error(`Not a hex colour: ${hex}`);
-  const [r, g, b] = parts.map((part) => {
-    const channel = parseInt(part, 16) / 255;
+type Rgb = [number, number, number];
+type Rgba = { rgb: Rgb; alpha: number };
+
+/**
+ * `#rrggbb` or `rgb(r g b / a)`.
+ *
+ * The second form exists because Lightbox's sheets are translucent: they are
+ * meant to pick up the bench they sit on rather than glare white over it. A
+ * contrast figure for one of those is only true once it has been composited,
+ * which is what `over` below is for.
+ */
+function parseColour(value: string): Rgba {
+  const hex = value.trim().match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const parts = hex[1].match(/../g)!;
+    return { rgb: parts.map((part) => parseInt(part, 16)) as Rgb, alpha: 1 };
+  }
+  const rgb = value
+    .trim()
+    .match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)\s*(?:[/,]\s*([\d.]+)\s*)?\)$/i);
+  if (rgb) {
+    return {
+      rgb: [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])],
+      alpha: rgb[4] === undefined ? 1 : Number(rgb[4]),
+    };
+  }
+  throw new Error(`Not a colour this script can measure: ${value}`);
+}
+
+/** Source-over: what the eye actually receives, which is what WCAG measures. */
+function over(colour: Rgba, backdrop: Rgb): Rgb {
+  if (colour.alpha >= 1) return colour.rgb;
+  return colour.rgb.map((channel, index) =>
+    channel * colour.alpha + backdrop[index] * (1 - colour.alpha),
+  ) as Rgb;
+}
+
+function luminance(rgb: Rgb): number {
+  const [r, g, b] = rgb.map((value) => {
+    const channel = value / 255;
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-function ratio(a: string, b: string): number {
-  const x = luminance(a);
-  const y = luminance(b);
+/**
+ * The ratio between `ink` and `ground`, with `bench` behind both.
+ *
+ * A translucent ground is composited over the bench and a translucent ink over
+ * the composited ground. The bench is the page ground, which is the darkest
+ * thing a sheet can sit on, so this is the worst case: a sheet stacked on
+ * another sheet only ever comes out lighter than what is measured here.
+ */
+function ratio(ink: string, ground: string, bench: string): number {
+  const behind = parseColour(bench);
+  if (behind.alpha < 1) throw new Error(`The page ground must be opaque: ${bench}`);
+  const groundRgb = over(parseColour(ground), behind.rgb);
+  const x = luminance(over(parseColour(ink), groundRgb));
+  const y = luminance(groundRgb);
   const [hi, lo] = x > y ? [x, y] : [y, x];
   return (hi + 0.05) / (lo + 0.05);
 }
@@ -229,6 +275,8 @@ let failures = 0;
 let checked = 0;
 
 for (const [name, vars] of Object.entries(THEMES)) {
+  const bench = vars['--c-page'];
+  if (!bench) throw new Error(`${name}: --c-page is not defined`);
   for (const check of CHECKS) {
     const ink = vars[check.ink];
     if (!ink) {
@@ -240,7 +288,7 @@ for (const [name, vars] of Object.entries(THEMES)) {
       const ground = vars[groundName];
       if (!ground) continue;
       checked += 1;
-      const value = ratio(ink, ground);
+      const value = ratio(ink, ground, bench);
       if (value < check.min) {
         failures += 1;
         console.error(
@@ -253,7 +301,7 @@ for (const [name, vars] of Object.entries(THEMES)) {
   const badgeFill = vars['--c-caution-fill'];
   if (badgeFill) {
     checked += 1;
-    const value = ratio(BADGE_INK, badgeFill);
+    const value = ratio(BADGE_INK, badgeFill, bench);
     if (value < TEXT) {
       failures += 1;
       console.error(

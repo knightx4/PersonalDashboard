@@ -88,6 +88,10 @@
 
   --grain-opacity: 0.035;
   --grain-blend: multiply;
+  /* A wash laid over the page ground: soft, off-centre pools of colour that
+   * give a flat ground somewhere to travel. Only a theme whose bench is large
+   * and dark enough to look like a void needs one, so the default is none. */
+  --page-wash: none;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* ---- The page ground, as a scope of its own -------------------------
@@ -310,14 +314,26 @@
   color-scheme: dark;
   --c-sheet-scheme: light;
 
-  /* ---- The bench ---- */
-  --c-page: #08090c;
+  /* ---- The bench ----
+   * Blue-grey rather than neutral, and a shade off full black: a bench at
+   * #08090c reads as a hole punched in the screen, and the sheets on it look
+   * like they are floating in nothing. Lifting it to a blue-cast near-black
+   * and laying a wash over it gives the light somewhere to come from. */
+  --c-page: #0d1219;
   --c-page-ink: #e7ebf1;
   --c-page-ink-muted: #9aa5b4;
   --c-page-ink-ghost: #6d7887;
-  --c-page-border: #232a33;
-  --c-page-border-strong: #333c48;
+  --c-page-border: #242c38;
+  --c-page-border-strong: #343e4c;
   --c-page-border-control: #6d7887;
+
+  /* Three pools, held under 0.3 alpha so the bench never lightens enough to
+   * put the inks above out of range. Fixed to the viewport at <body>, so it
+   * reads as depth the page slides over rather than a pattern that scrolls. */
+  --page-wash:
+    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.22), transparent 60%),
+    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.16), transparent 55%),
+    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.28), transparent 68%);
   --c-page-positive: #54d6a0;
   --c-page-caution: #f0a63f;
   --c-page-danger: #ff8b8b;
@@ -331,21 +347,30 @@
   --c-w-vault-lit: #e690f2;
 
   /* ---- The sheets ----
-   * --c-canvas is the well inside a card, not the page. See the note above. */
-  --c-canvas: #e7ecf2;
-  --c-surface: #fbfcfe;
-  --c-raised: #ffffff;
-  --c-sunken: #dde4ec;
+   * --c-canvas is the well inside a card, not the page. See the note above.
+   *
+   * Alpha rather than a duller white. A sheet that is 90% opaque picks up the
+   * bench beneath it, so it lands near #e3e5e7 on the ground and stays light
+   * over another sheet -- one token that is lit paper on the bench and plain
+   * paper on a card, which no flat hex can be. Anything measured against
+   * these is composited over --c-page first; scripts/check-contrast.ts does
+   * that, so an alpha that would darken a sheet out of range fails there.
+   * --c-sunken is written a shade lighter than the flat value it replaces to
+   * pay for the alpha: it is the darkest sheet and the one with least room. */
+  --c-canvas: rgb(231 236 242 / 0.9);
+  --c-surface: rgb(251 252 254 / 0.9);
+  --c-raised: rgb(255 255 255 / 0.9);
+  --c-sunken: rgb(228 234 241 / 0.9);
   --c-border: #d0d9e3;
   --c-border-strong: #a6b1bf;
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
-  --c-shell: #08090c;
+  --c-shell: #0d1219;
   --c-shell-ink: #e7ebf1;
   --c-shell-muted: #9aa5b4;
-  --c-shell-border: #232a33;
-  --c-shell-hover: #151a21;
+  --c-shell-border: #242c38;
+  --c-shell-hover: #171e28;
 
   --c-ink: #10141a;
   --c-ink-muted: #464f59;
@@ -385,12 +410,16 @@
   --c-status-offer-tint: #d8ece4;
   --c-status-rejected: #9e1a1a;
   --c-status-rejected-tint: #f5dcdc;
-  --c-status-ghosted: #58616b;
+  /* A step darker than the other themes' grey: it is an outline with no fill,
+   * so it lands on the canvas well, which the sheet alpha above dims. */
+  --c-status-ghosted: #515a64;
   --c-status-ghosted-tint: #dfe5eb;
 
   /* Overlay rather than multiply: the grain has to sit on a black bench and
-   * on white sheets in the same pass, and multiply is invisible on the first. */
-  --grain-opacity: 0.03;
+   * on white sheets in the same pass, and multiply is invisible on the first.
+   * Turned up from 0.03: the bench is the largest flat area in any theme and
+   * it is the texture, along with the wash, that keeps it from looking dead. */
+  --grain-opacity: 0.05;
   --grain-blend: overlay;
 }
 
@@ -654,6 +683,8 @@ body,
  * background instead of letting <body> show through -- so wherever it appears
  * it goes back to the page scope, even if some sheet happens to be above it. */
 .bg-page {
+  /* It is standing in for <body>, so it carries the same wash. */
+  background-image: var(--page-wash);
   --c-ink: var(--c-page-ink);
   --c-ink-muted: var(--c-page-ink-muted);
   --c-ink-ghost: var(--c-page-ink-ghost);
@@ -778,7 +809,11 @@ body,
 }
 
 body {
-  background: var(--c-page);
+  background-color: var(--c-page);
+  /* Fixed, so the wash is a light source the page moves under rather than a
+   * pattern that scrolls away. `none` in every theme that does not set one. */
+  background-image: var(--page-wash);
+  background-attachment: fixed;
   color: var(--c-ink);
   font-family: var(--font-sans);
   font-size: 14px;

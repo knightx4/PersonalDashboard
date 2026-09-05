@@ -42,11 +42,11 @@ export const THEMES = [
   {
     id: 'lightbox',
     label: 'Lightbox',
-    mood: 'Lit sheets, black bench',
+    mood: 'Lit sheets, blue-black bench',
     // The one theme whose page and cards disagree: the bench is dark, so the
     // picker's swatch and the scheme it reports both describe the bench.
     scheme: 'dark',
-    swatch: '#08090c',
+    swatch: '#0d1219',
     ink: '#e7ebf1',
   },
   {
