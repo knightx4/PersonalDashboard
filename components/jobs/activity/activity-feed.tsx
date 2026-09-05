@@ -7,6 +7,7 @@ import {
   groupByDay,
   type Activity,
   type ActivityEntry,
+  type ActivityHighlights,
   type ActivityTone,
 } from '@/lib/jobs/activity/load';
 
@@ -34,6 +35,58 @@ const TONE_CHIP: Record<ActivityTone, string> = {
   muted: 'bg-status-lead-tint text-status-lead',
 };
 
+/** The same four tones as a figure on a plain surface, with no tint behind. */
+const TONE_FIGURE: Record<ActivityTone, string> = {
+  bad: 'text-status-rejected',
+  good: 'text-status-offer',
+  info: 'text-status-submitted',
+  muted: 'text-ink',
+};
+
+/**
+ * The week in four numbers.
+ *
+ * The feed answers "what happened" a row at a time, which is the right shape
+ * for reading it and the wrong shape for the question you actually arrive
+ * with: was this a week where anything moved. Four counts, in the order they
+ * happen -- roles open, they move, they get rejected, they close -- each one
+ * tinted with the same tone the matching rows below carry.
+ *
+ * They are counted in the database over the window, not tallied from the
+ * forty rows the feed shows, so a busy week reads correctly.
+ */
+function Highlights({ highlights }: { highlights: ActivityHighlights }) {
+  const tiles: Array<{ label: string; value: number; tone: ActivityTone }> = [
+    { label: 'New roles', value: highlights.newRoles, tone: 'info' },
+    { label: 'Moved forward', value: highlights.movedForward, tone: 'good' },
+    { label: 'Rejections', value: highlights.rejections, tone: 'bad' },
+    { label: 'Closed out', value: highlights.closedOut, tone: 'muted' },
+  ];
+
+  return (
+    <section aria-label={`The last ${highlights.days} days`}>
+      <div className="grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-4">
+        {tiles.map((tile) => (
+          <div key={tile.label} className="bg-surface px-4 py-3">
+            <p className="text-micro uppercase tracking-wider text-ink-muted">{tile.label}</p>
+            {/* Zero is grey whatever the tone: nothing happened is not news,
+             * and four coloured noughts would say it was. */}
+            <p
+              className={cn(
+                'tabular mt-1 text-2xl font-semibold',
+                tile.value === 0 ? 'text-ink-muted' : TONE_FIGURE[tile.tone],
+              )}
+            >
+              {tile.value}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1.5 text-micro text-ink-muted">Last {highlights.days} days.</p>
+    </section>
+  );
+}
+
 /**
  * What has changed lately.
  *
@@ -59,6 +112,8 @@ export function ActivityFeed({
 
   return (
     <div className="space-y-4">
+      <Highlights highlights={activity.highlights} />
+
       <section className="rounded-card border border-border bg-surface p-5">
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui">
           <dt className="text-ink-muted">Last inbox sync</dt>

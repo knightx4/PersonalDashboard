@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { activityEntries, groupByDay } from '@/lib/jobs/activity/load';
+import { FORWARD_KINDS, activityEntries, groupByDay } from '@/lib/jobs/activity/load';
+import { APPLICATION_EVENT_KINDS } from '@/lib/jobs/pipeline';
 
 const role = (id: string, title: string, company: string) => ({
   id,
@@ -194,5 +195,24 @@ describe('grouping the feed by day', () => {
 
   it('has nothing to group when nothing happened', () => {
     expect(groupByDay([])).toEqual([]);
+  });
+});
+
+describe('the "moved forward" headline', () => {
+  it('counts exactly the kinds the feed shows as a step forward', () => {
+    const green = APPLICATION_EVENT_KINDS.filter(
+      (kind) =>
+        activityEntries({
+          newRoles: [],
+          events: [event({ id: kind, created_at: '2026-09-02T09:00:00Z', kind })],
+        })[0].tone === 'good',
+    );
+
+    expect([...FORWARD_KINDS].sort()).toEqual([...green].sort());
+  });
+
+  it('leaves out the two that only look like progress', () => {
+    expect(FORWARD_KINDS).not.toContain('submitted');
+    expect(FORWARD_KINDS).not.toContain('confirmation');
   });
 });

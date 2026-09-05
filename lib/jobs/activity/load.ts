@@ -1,6 +1,6 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
-import type { ApplicationEventKind } from '@/lib/jobs/pipeline';
+import { APPLICATION_EVENT_KINDS, type ApplicationEventKind } from '@/lib/jobs/pipeline';
 
 /**
  * What has changed lately, and what changed it.
@@ -70,6 +70,35 @@ function toneOfKind(kind: string): ActivityTone {
   return EVENT_TONE[kind as ApplicationEventKind] ?? 'muted';
 }
 
+/**
+ * What "moved forward" counts.
+ *
+ * Read off the tone table rather than listed again: the feed already decides
+ * which kinds are a step forward, and a headline number that disagreed with
+ * the green chips underneath it would be worse than no number at all.
+ */
+export const FORWARD_KINDS: ApplicationEventKind[] = APPLICATION_EVENT_KINDS.filter(
+  (kind) => EVENT_TONE[kind] === 'good',
+);
+
+/** The window the headline numbers cover. */
+export const HIGHLIGHT_DAYS = 7;
+
+/**
+ * The four numbers above the feed.
+ *
+ * Counted in the database over the window rather than tallied from `entries`.
+ * The feed is capped at forty rows, so a busy week would have quietly counted
+ * only part of itself -- a headline that is wrong exactly when it matters.
+ */
+export type ActivityHighlights = {
+  days: number;
+  newRoles: number;
+  movedForward: number;
+  rejections: number;
+  closedOut: number;
+};
+
 export type ActivityEntry = {
   id: string;
   /** When the app learned it. */
@@ -98,6 +127,7 @@ export type ActivityRun = {
 export type Activity = {
   runs: ActivityRun[];
   entries: ActivityEntry[];
+  highlights: ActivityHighlights;
   /** When the nightly sweep last actually changed something. */
   lastSweepAt: string | null;
 };
@@ -219,7 +249,27 @@ export async function loadActivity(
   core: CoreSupabaseClient,
   userId: string,
 ): Promise<Activity> {
-  const [roleRows, eventRows, reminderRows, runRows, lastWithdrawal] = await Promise.all([
+  // Head requests: four counts, no rows returned.
+  const since = new Date(Date.now() - HIGHLIGHT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const countEvents = (kinds: readonly ApplicationEventKind[]) =>
+    supabase
+      .from('application_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', since)
+      .in('kind', kinds as string[]);
+
+  const [
+    roleRows,
+    eventRows,
+    reminderRows,
+    runRows,
+    lastWithdrawal,
+    newRoleCount,
+    forwardCount,
+    rejectionCount,
+    closedCount,
+  ] = await Promise.all([
     supabase
       .from('applications')
       .select('id, created_at, roles!inner ( id, title, companies!inner ( name ) )')
@@ -270,6 +320,18 @@ export async function loadActivity(
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+
+    supabase
+      .from('applications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', since),
+
+    countEvents(FORWARD_KINDS),
+    countEvents(['rejection']),
+    // Withdrawal covers both: the sweep closing a cold lead and you turning
+    // something down. Either way the door is shut, which is what the tile says.
+    countEvents(['withdrawal']),
   ]);
 
   const reminders = (reminderRows.data ?? []) as unknown as ReminderRow[];
@@ -312,5 +374,13 @@ export async function loadActivity(
     [lastWithdrawalAt, lastReminderAt].filter((at): at is string => Boolean(at)).sort().pop() ??
     null;
 
-  return { runs, entries, lastSweepAt };
+  const highlights: ActivityHighlights = {
+    days: HIGHLIGHT_DAYS,
+    newRoles: newRoleCount.count ?? 0,
+    movedForward: forwardCount.count ?? 0,
+    rejections: rejectionCount.count ?? 0,
+    closedOut: closedCount.count ?? 0,
+  };
+
+  return { runs, entries, highlights, lastSweepAt };
 }
