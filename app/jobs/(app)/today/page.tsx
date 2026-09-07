@@ -1,7 +1,9 @@
 import Link from 'next/link';
-import { CalendarClock, CheckCircle2, Clock, MailQuestion, PenLine, Video } from 'lucide-react';
+import { CalendarClock, Clock, MailQuestion, PenLine, Video } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Card } from '@/components/ui/card';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
 import { ReminderActions } from './reminder-actions';
@@ -45,25 +47,16 @@ export default async function TodayPage() {
         }
       />
 
+      {/* Finished, not empty: the week has nothing with a clock on it. That
+          earns the day's sigil rather than a placeholder box. */}
       {board.clear && (
-        <div className="rounded-card border border-border bg-surface p-8 text-center">
-          <CheckCircle2
-            className="mx-auto size-8 text-status-offer"
-            strokeWidth={1.5}
-            aria-hidden
-          />
-          <p className="mt-3 text-body font-medium text-ink">Nothing needs you today.</p>
-          <p className="mt-1 text-ui text-ink-muted">
-            No interviews in the next {INTERVIEW_HORIZON_DAYS} days, and nothing waiting on a
-            reply.
-          </p>
-          <Link
-            href="/jobs/pipeline"
-            className="mt-4 inline-block text-ui font-medium text-accent underline underline-offset-2"
-          >
-            Look at the pipeline anyway
-          </Link>
-        </div>
+        <EmptyState
+          tone="finished"
+          seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:jobs`}
+          title="Nothing needs you today."
+          description={`No interviews in the next ${INTERVIEW_HORIZON_DAYS} days, and nothing waiting on a reply.`}
+          action={{ label: 'Look at the pipeline anyway', href: '/jobs/pipeline' }}
+        />
       )}
 
       <div className="space-y-6">
@@ -216,7 +209,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
+    <Card padding="dense">
       <header className="mb-1 flex items-baseline gap-2">
         <Icon
           className={tone === 'brand' ? 'size-4 text-accent' : 'size-4 text-ink-muted'}
@@ -226,6 +219,6 @@ function Section({
         <span className="text-small text-ink-muted">{hint}</span>
       </header>
       {children}
-    </section>
+    </Card>
   );
 }

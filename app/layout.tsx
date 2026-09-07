@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Inter } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
+import { DENSITY_COOKIE, parseDensity } from '@/lib/density';
 
 // Inter does all the work. Bricolage Grotesque is the voice: page titles, the
 // workspace name and the one big figure, and nothing else. A grotesque with
@@ -63,11 +64,15 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const jar = await cookies();
   const theme = parseTheme(jar.get(THEME_COOKIE)?.value);
+  // Same arrangement as the theme, for the same reason: the attribute has to
+  // be in the first byte, or the page renders one density and snaps to another.
+  const density = parseDensity(jar.get(DENSITY_COOKIE)?.value);
 
   return (
     <html
       lang="en"
       data-theme={theme ?? undefined}
+      data-density={density === 'comfortable' ? undefined : density}
       className={`${inter.variable} ${display.variable} h-full`}
     >
       <body className="min-h-full">{children}</body>

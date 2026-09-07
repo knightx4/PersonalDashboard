@@ -88,8 +88,27 @@
   --c-status-ghosted: #78716c;
   --c-status-ghosted-tint: #fafaf9;
 
-  --grain-opacity: 0.035;
+  /* Turned up from 0.035: at that level the grain did not survive a 1x
+   * screenshot, which means it was not doing its job on most monitors. It is
+   * decoration under text, never text, so it owes no contrast. */
+  --grain-opacity: 0.06;
   --grain-blend: multiply;
+
+  /* ---- The sheet's edge -----------------------------------------------
+   * Four themes draw a card as a hairline on a surface over a canvas, and no
+   * shadow at rest: page and card share a polarity, so depth is a border.
+   * Lightbox is the exception and sets both of these; see its block. */
+  --c-sheet-outline: var(--c-border);
+  --sheet-edge: none;
+  /* What `lift` shows under the cursor. Lightbox lifts a lit sheet, so it
+   * keeps the edge and deepens the drop instead of replacing it. */
+  --lift-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.18);
+
+  /* The one ink that does not follow the theme: the count badge is a light
+   * amber fill in all five, so its label is near-black in all five. A token
+   * rather than a hex in a className, so the checker can measure it. */
+  --c-caution-fill-ink: #14100a;
+
   /* A wash laid over the page ground: soft, off-centre pools of colour that
    * give a flat ground somewhere to travel. Only a theme whose bench is large
    * and dark enough to look like a void needs one, so the default is none. */
@@ -210,7 +229,7 @@
   --c-status-ghosted: #8b9099;
   --c-status-ghosted-tint: #141516;
 
-  --grain-opacity: 0.04;
+  --grain-opacity: 0.055;
   --grain-blend: overlay;
 }
 
@@ -277,7 +296,13 @@
   --c-status-ghosted: #6d6555;
   --c-status-ghosted-tint: #f2eee2;
 
-  --grain-opacity: 0.055;
+  /* Printed means printed: a halftone dot rather than the fractal noise the
+   * other four share. The dot is 6px on a 6px tile -- coarse enough to read
+   * as a screen, fine enough not to fight 12px text. Multiply, so it only
+   * ever darkens, and turned up from the noise's level because a dot pattern
+   * at 5% is a smudge and at 9% is a print. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='1.4' cy='1.4' r='1.1' fill='%23000'/%3E%3C/svg%3E");
+  --grain-opacity: 0.09;
   --grain-blend: multiply;
 }
 
@@ -338,9 +363,9 @@
    * put the inks above out of range. Fixed to the viewport at <body>, so it
    * reads as depth the page slides over rather than a pattern that scrolls. */
   --page-wash:
-    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.22), transparent 60%),
-    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.16), transparent 55%),
-    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.28), transparent 68%);
+    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.28), transparent 60%),
+    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.2), transparent 55%),
+    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.3), transparent 68%);
   --c-page-positive: #54d6a0;
   --c-page-caution: #f0a63f;
   --c-page-danger: #ff8b8b;
@@ -365,12 +390,35 @@
    * that, so an alpha that would darken a sheet out of range fails there.
    * --c-sunken is written a shade lighter than the flat value it replaces to
    * pay for the alpha: it is the darkest sheet and the one with least room. */
-  --c-canvas: rgb(231 236 242 / 0.9);
-  --c-surface: rgb(251 252 254 / 0.9);
-  --c-raised: rgb(255 255 255 / 0.9);
-  --c-sunken: rgb(228 234 241 / 0.9);
+  --c-canvas: rgb(231 236 242 / 0.92);
+  /* Up from 0.9. At 0.9 over the bench the surface landed near #e3e5e7,
+   * which is a grey card, not a lit one; at 0.96 it lands near #f1f3f5 and
+   * is brighter than anything else on screen, which is what lit means. */
+  --c-surface: rgb(251 252 254 / 0.96);
+  --c-raised: rgb(255 255 255 / 0.97);
+  --c-sunken: rgb(228 234 241 / 0.92);
   --c-border: #d0d9e3;
   --c-border-strong: #a6b1bf;
+
+  /* ---- The edge ----
+   * This is what makes a sheet a sheet rather than a rectangle. Three parts:
+   * a 1px white line inside the top edge, which is the light catching the
+   * paper's edge; a hard bench-coloured outline in place of the grey hairline,
+   * so the sheet ends where the bench begins instead of fading into it; and
+   * a deep, soft drop so the sheet sits a few millimetres above the bench
+   * rather than being printed on it. The faint blue bloom is the sheet
+   * lighting the bench around it -- a lightbox, not a spotlight. */
+  --c-sheet-outline: rgb(4 7 12 / 0.75);
+  --sheet-edge:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 1px 2px rgb(0 0 0 / 0.45),
+    0 14px 32px -14px rgb(0 0 0 / 0.75),
+    0 0 48px -10px rgb(150 180 230 / 0.14);
+  --lift-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 2px 4px rgb(0 0 0 / 0.45),
+    0 24px 44px -16px rgb(0 0 0 / 0.85),
+    0 0 56px -8px rgb(150 180 230 / 0.2);
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
@@ -429,7 +477,7 @@
    * on white sheets in the same pass, and multiply is invisible on the first.
    * Turned up from 0.03: the bench is the largest flat area in any theme and
    * it is the texture, along with the wash, that keeps it from looking dead. */
-  --grain-opacity: 0.05;
+  --grain-opacity: 0.07;
   --grain-blend: overlay;
 }
 
@@ -496,7 +544,7 @@
   --c-status-ghosted: #9a91af;
   --c-status-ghosted-tint: #1c1728;
 
-  --grain-opacity: 0.05;
+  --grain-opacity: 0.06;
   --grain-blend: overlay;
 }
 
@@ -563,7 +611,7 @@
     --c-status-ghosted: #8b9099;
     --c-status-ghosted-tint: #141516;
 
-    --grain-opacity: 0.04;
+    --grain-opacity: 0.055;
     --grain-blend: overlay;
   }
 }
@@ -770,6 +818,7 @@ body,
   --color-positive-tint: var(--c-positive-tint);
   --color-caution: var(--c-caution);
   --color-caution-fill: var(--c-caution-fill);
+  --color-caution-fill-ink: var(--c-caution-fill-ink);
   --color-caution-tint: var(--c-caution-tint);
   --color-danger: var(--c-danger);
   --color-danger-tint: var(--c-danger-tint);
@@ -814,6 +863,9 @@ body,
   --text-figure--line-height: 1.05;
   --text-figure-lg: 48px;
   --text-figure-lg--line-height: 1;
+  /* The one figure a page is about. Nothing else is ever set this large. */
+  --text-figure-xl: 72px;
+  --text-figure-xl--line-height: 0.95;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
@@ -863,6 +915,62 @@ body::before {
   pointer-events: none;
 }
 
+/* ---------------------------------------------------------------------------
+ * Density.
+ *
+ * One attribute on <html>, three values, two variables. Every card's padding
+ * and every list row's vertical padding derive from these, so "how much do I
+ * want to see at once" is one click in the top bar rather than a rebuild.
+ * Comfortable is the default and is exactly what the app measured before the
+ * dial existed; the other two only take away.
+ * ------------------------------------------------------------------------- */
+:root,
+[data-density='comfortable'] {
+  --card-p: 1.25rem;
+  --card-p-dense: 1rem;
+  --row-y: 0.625rem;
+}
+[data-density='snug'] {
+  --card-p: 1rem;
+  --card-p-dense: 0.75rem;
+  --row-y: 0.5rem;
+}
+[data-density='dense'] {
+  --card-p: 0.75rem;
+  --card-p-dense: 0.625rem;
+  --row-y: 0.375rem;
+}
+
+@utility card-pad {
+  padding: var(--card-p);
+}
+@utility card-pad-dense {
+  padding: var(--card-p-dense);
+}
+@utility card-pad-x {
+  padding-inline: var(--card-p);
+}
+@utility row-pad {
+  padding-block: var(--row-y);
+}
+
+/* A sheet: the one class every opaque card carries. Inert in four themes,
+ * where the outline is the ordinary hairline and there is no edge; in
+ * Lightbox it is the lit paper's edge. See the token comments in that block. */
+@utility sheet {
+  border-color: var(--c-sheet-outline);
+  box-shadow: var(--sheet-edge);
+}
+
+/* Shortcut hints: invisible until a modifier is held. See components/shell/key-hints.tsx. */
+.keyhint {
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out-soft);
+}
+body[data-keyhints] .keyhint {
+  opacity: 1;
+}
+
 /* Anything in a column of numbers lines up. */
 .tabular {
   font-variant-numeric: tabular-nums;
@@ -885,7 +993,7 @@ body::before {
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.18);
+    box-shadow: var(--lift-shadow);
   }
 }
 
@@ -903,6 +1011,22 @@ body::before {
   &:active {
     transform: scale(0.98);
   }
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* One entrance for the toast, and nothing on the way out. */
+@utility toast-in {
+  animation: toast-in 180ms var(--ease-out-soft) both;
 }
 
 @keyframes shimmer {
@@ -962,6 +1086,10 @@ body::before {
   }
 
   .skeleton::after {
+    animation: none;
+  }
+
+  .toast-in {
     animation: none;
   }
 }

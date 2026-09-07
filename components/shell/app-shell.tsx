@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
 import { NotificationsButton } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
+import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
+import { ToastProvider } from '@/components/ui/toast';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import {
@@ -99,6 +101,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
@@ -138,6 +141,29 @@ export function AppShell({
         (section.alsoMatches ?? []).some((prefix) => pathname.startsWith(prefix))
       : pathname.startsWith(section.href);
 
+  /**
+   * ⌥1–9 jumps to a section, in the order the column lists them.
+   *
+   * Alt rather than Cmd: ⌘1–4 already switch workspaces and ⌘K opens the
+   * palette, and a second meaning on the same modifier is a coin toss. Read
+   * by `event.code` because on a Mac ⌥ plus a digit types a symbol, not the
+   * digit. The hints beside each row appear while the key is held; see
+   * key-hints.tsx.
+   */
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const match = /^Digit([1-9])$/.exec(event.code);
+      if (!match) return;
+      const target = sections[Number(match[1]) - 1];
+      if (!target) return;
+      event.preventDefault();
+      router.push(target.href);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [sections, router]);
+
   const active = sections.find(isActive);
   // The top bar names the page. Falling back to the workspace rather than to
   // nothing: a bar that goes blank on an unlisted route reads as broken.
@@ -167,6 +193,7 @@ export function AppShell({
     on,
     badge,
     narrow = false,
+    hint,
   }: {
     href: string;
     label: string;
@@ -179,6 +206,8 @@ export function AppShell({
     badge?: number;
     /** In the collapsed column: the icon alone, with the name as its tooltip. */
     narrow?: boolean;
+    /** The shortcut that opens it, shown while a modifier is held. */
+    hint?: string;
   }) => (
     <Link
       key={href}
@@ -223,10 +252,11 @@ export function AppShell({
           accessibility tree either way: a rail of unlabelled icons is not a
           navigation a screen reader can use. */}
       <span className={cn('flex-1 truncate', narrow && 'sr-only')}>{label}</span>
+      {hint && !narrow && <Kbd>{hint}</Kbd>}
       {badge !== undefined && badge > 0 && (
         <span
           className={cn(
-            'tabular bg-caution-fill font-bold text-[#14100a]',
+            'tabular bg-caution-fill font-bold text-caution-fill-ink',
             narrow
               ? // No room for a number beside a centred icon, so it becomes a
                 // dot in the corner -- still "something is waiting here".
@@ -242,7 +272,7 @@ export function AppShell({
 
   const nav = (narrow: boolean) => (
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
-      {sections.map((section) =>
+      {sections.map((section, index) =>
         navRow({
           href: section.href,
           label: section.label,
@@ -250,6 +280,7 @@ export function AppShell({
           on: isActive(section),
           badge: section.badge,
           narrow,
+          hint: index < 9 ? `⌥${index + 1}` : undefined,
         }),
       )}
     </nav>
@@ -288,7 +319,19 @@ export function AppShell({
     </>
   );
 
+  /**
+   * The phone's navigation: the first four sections as a bar of tabs along
+   * the bottom, and everything else behind More. A hamburger was the only way
+   * in before, which made every section two taps away and the current one
+   * invisible. Four, because that is what fits with a label under each icon
+   * at 390px; the rest are one tap further, which is where they were anyway.
+   */
+  const tabs = sections.slice(0, 4);
+  const overflow = sections.length > 4 || Boolean(settingsHref);
+
   return (
+    <ToastProvider>
+    <KeyHintsProvider />
     <div
       className={cn(
         'min-h-dvh lg:grid',
@@ -446,12 +489,96 @@ export function AppShell({
           </div>
         </header>
 
+        {/* Below sm the brief has no middle of the bar to live in, so it gets
+            its own line under the bar. Read on arrival, same as on a desktop. */}
+        {brief && (
+          <p className="border-b border-shell-border bg-shell px-4 py-1.5 text-center text-small sm:hidden">
+            {brief.href ? (
+              <Link
+                href={brief.href}
+                className={cn(
+                  'truncate',
+                  brief.tone === 'caution' ? 'font-medium text-caution' : 'text-shell-muted',
+                )}
+              >
+                {brief.text}
+              </Link>
+            ) : (
+              <span className="text-shell-muted">{brief.text}</span>
+            )}
+          </p>
+        )}
+
         {banner}
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
+        <main
+          className={cn(
+            'mx-auto max-w-[1400px] px-4 py-6 sm:px-6',
+            // Room for the tab bar, which is fixed over the foot of the page.
+            tabs.length > 0 && 'pb-24 lg:pb-6',
+          )}
+        >
+          {children}
+        </main>
         <StatusLine lines={activity} />
+
+        {tabs.length > 0 && (
+          <nav
+            aria-label="Sections"
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+          >
+            <ul className="grid auto-cols-fr grid-flow-col">
+              {tabs.map((section) => {
+                const Icon = section.icon ? NAV_ICONS[section.icon] : null;
+                const on = isActive(section);
+                return (
+                  <li key={section.href}>
+                    <Link
+                      href={section.href}
+                      aria-current={on ? 'page' : undefined}
+                      className={cn(
+                        'press relative flex flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium',
+                        on ? 'text-shell-ink' : 'text-shell-muted',
+                      )}
+                    >
+                      {Icon && <Icon className="size-5" strokeWidth={on ? 2 : 1.75} aria-hidden />}
+                      <span className="truncate">{section.label}</span>
+                      {section.badge !== undefined && section.badge > 0 && (
+                        <span
+                          className="absolute right-1/2 top-1.5 -mr-4 size-1.5 rounded-full bg-caution-fill"
+                          aria-hidden
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-150',
+                          on ? 'opacity-100' : 'opacity-0',
+                        )}
+                        style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
+                        aria-hidden
+                      />
+                    </Link>
+                  </li>
+                );
+              })}
+              {overflow && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setDrawer(true)}
+                    className="press flex w-full flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium text-shell-muted"
+                  >
+                    <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />
+                    More
+                  </button>
+                </li>
+              )}
+            </ul>
+          </nav>
+        )}
       </div>
 
       <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
     </div>
+    </ToastProvider>
   );
 }

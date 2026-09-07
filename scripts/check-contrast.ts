@@ -270,8 +270,9 @@ CHECKS.push({
   why: 'primary button label on the app accent',
 });
 
-/** Dark ink on the count badge, which is a light amber in every theme. */
-const BADGE_INK = '#14100a';
+/** Dark ink on the count badge, which is a light amber in every theme. Read
+ * from the token rather than repeated here, so the two cannot drift. */
+const BADGE_INK = PAPER['--c-caution-fill-ink'];
 
 let failures = 0;
 let checked = 0;

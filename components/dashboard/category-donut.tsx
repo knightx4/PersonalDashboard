@@ -46,11 +46,19 @@ export function CategoryDonut({
                     formatter={(value) =>
                       formatMoney(typeof value === 'number' ? value : Number(value), currency)
                     }
+                    // Recharts ships a white panel with black text. Both come
+                    // from the tokens here, or the tooltip is a white square
+                    // in three dark themes.
                     contentStyle={{
-                      borderRadius: '0.75rem',
-                      borderColor: 'var(--color-border)',
+                      borderRadius: '0.5rem',
+                      borderColor: 'var(--color-border-strong)',
+                      backgroundColor: 'var(--color-raised)',
+                      color: 'var(--color-ink)',
                       fontSize: 12,
+                      boxShadow: 'var(--sheet-edge, 0 6px 20px -6px rgb(0 0 0 / 0.18))',
                     }}
+                    itemStyle={{ color: 'var(--color-ink)' }}
+                    labelStyle={{ color: 'var(--color-ink-muted)' }}
                   />
                 </PieChart>
               </ResponsiveContainer>

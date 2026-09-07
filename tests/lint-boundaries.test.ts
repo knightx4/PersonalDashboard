@@ -94,6 +94,57 @@ const RATE_SYNTAX = `export function rate(rows: unknown[], hits: number) {
 }
 `;
 
+const OFF_SCALE_TYPE = `export const heading = 'font-display text-2xl font-semibold';
+`;
+
+const ON_SCALE_TYPE = `export const heading = 'font-display text-title font-semibold sm:text-figure-lg text-lead text-small';
+`;
+
+const ARBITRARY_WIDTH = `export const page = 'mx-auto max-w-[1100px] px-6';
+`;
+
+const NAMED_WIDTH = `export const page = 'mx-auto max-w-3xl px-6 max-w-[1400px] max-w-sm';
+`;
+
+const RAW_HEX =
+  "export const badge = `tabular bg-caution-fill text-[#14100a] ${'x'}`;\n";
+
+const RAW_PALETTE = `export const chip = 'rounded bg-emerald-50 text-emerald-700';
+`;
+
+/**
+ * The design language's hard rules, held by the linter rather than by review.
+ *
+ * Each probe is a string that was actually in the tree before the rule
+ * existed. The passing cases matter as much as the failing ones: a rule that
+ * also bites `text-lead` or `max-w-[1400px]` is a rule people disable.
+ */
+describe('the design-language rules', () => {
+  it('blocks an off-scale type size', () => {
+    expect(lint('components/__design_probe.ts', OFF_SCALE_TYPE)).toMatch(/no-restricted-syntax/);
+  });
+
+  it('allows every named step of the scale', () => {
+    expect(lint('components/__design_probe.ts', ON_SCALE_TYPE)).toBe('');
+  });
+
+  it('blocks an arbitrary page width', () => {
+    expect(lint('app/__design_probe.ts', ARBITRARY_WIDTH)).toMatch(/no-restricted-syntax/);
+  });
+
+  it('allows the three page widths and the named inner sizes', () => {
+    expect(lint('app/__design_probe.ts', NAMED_WIDTH)).toBe('');
+  });
+
+  it('blocks a hex colour in a class string, even a template one', () => {
+    expect(lint('components/__design_probe.ts', RAW_HEX)).toMatch(/no-restricted-syntax/);
+  });
+
+  it('blocks a raw Tailwind palette colour', () => {
+    expect(lint('components/__design_probe.ts', RAW_PALETTE)).toMatch(/no-restricted-syntax/);
+  });
+});
+
 describe('the service-role boundary', () => {
   it('blocks the admin client from a component', () => {
     expect(lint('components/__boundary_probe.ts', SERVICE_ROLE_IMPORT)).toMatch(

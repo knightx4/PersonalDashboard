@@ -2,6 +2,7 @@ import { BarChart3 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Figure } from '@/components/ui/figure';
 import { loadPipeline, toFunnelApplications } from '@/lib/jobs/applications/load';
 import {
   RESPONSE_WINDOW_DAYS,
@@ -80,23 +81,24 @@ export default async function AnalyticsPage() {
         description="Where in the funnel you are losing, and whether that differs by channel."
       />
 
-      <section className="mb-6 grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Applications sent" value={String(overall.applicationsSent)} />
-        <Metric
-          label="Confirmation rate"
-          value={formatRate(overall.confirmationRate)}
-          hint="Not progress. It only proves the application landed somewhere real."
-        />
-        <Metric
-          label="Human response rate"
-          value={formatRate(overall.responseRate)}
-          hint="Automated confirmations and bulk rejections are excluded. This is the number the search turns on."
-        />
-        <Metric
-          label="Median days to reply"
-          value={formatDays(overall.medianDaysToResponse)}
-        />
-      </section>
+      {/* The response rate is the number the search turns on, so it is the
+          figure; the three that used to share a grid with it are its
+          supporting row. */}
+      <Figure
+        className="mb-8"
+        label="Human response rate"
+        meta={`${overall.applicationsSent} sent`}
+        value={formatRate(overall.responseRate)}
+        caption="Automated confirmations and bulk rejections are excluded."
+        secondary={[
+          { value: String(overall.applicationsSent), label: 'applications sent' },
+          {
+            value: formatRate(overall.confirmationRate),
+            label: 'confirmed as received — not progress, only proof it landed',
+          },
+          { value: formatDays(overall.medianDaysToResponse), label: 'median days to a reply' },
+        ]}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-card border border-border bg-surface p-4">
@@ -261,12 +263,3 @@ export default async function AnalyticsPage() {
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="bg-surface px-4 py-3">
-      <p className="text-micro uppercase tracking-wider text-ink-muted">{label}</p>
-      <p className="tabular font-display mt-1 text-2xl font-semibold text-ink">{value}</p>
-      {hint && <p className="mt-1 text-micro leading-relaxed text-ink-muted">{hint}</p>}
-    </div>
-  );
-}

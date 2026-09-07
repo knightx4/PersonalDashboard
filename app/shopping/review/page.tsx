@@ -91,6 +91,10 @@ export default async function ReviewPage({
         {rows.length === 0 ? (
           <EmptyState
             icon={ClipboardCheck}
+            // A worked queue is finished, not empty; the filtered views are
+            // just narrower windows on it and stay plain.
+            tone={view === 'all' ? 'finished' : 'empty'}
+            seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:review`}
             title={emptyCopy[view].title}
             description={emptyCopy[view].description}
           />

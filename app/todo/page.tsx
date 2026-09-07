@@ -1,9 +1,10 @@
-import { CalendarClock, ListChecks, TriangleAlert } from 'lucide-react';
+import { CalendarClock, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
@@ -50,13 +51,13 @@ export default async function TodoPage() {
       )}
 
       {empty ? (
-        <div className="mt-6 rounded-card border border-border bg-surface p-8 text-center">
-          <ListChecks className="mx-auto size-8 text-status-offer" strokeWidth={1.5} aria-hidden />
-          <p className="mt-3 text-body font-medium text-ink">Nothing on the list.</p>
-          <p className="mt-1 text-ui text-ink-muted">
-            Write the next thing down and it will be here.
-          </p>
-        </div>
+        <EmptyState
+          tone="finished"
+          seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:todo`}
+          title="Nothing on the list."
+          description="Write the next thing down and it will be here."
+          className="mt-6"
+        />
       ) : (
         <div className="mt-6 space-y-6">
           {agenda.piles.map(({ bucket, entries, context }) => (

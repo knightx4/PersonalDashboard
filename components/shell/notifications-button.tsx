@@ -62,7 +62,7 @@ export function NotificationsButton({
         )}
       >
         <Bell className="size-4" aria-hidden />
-        <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-[#14100a]">
+        <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-caution-fill-ink">
           {count > 9 ? '9+' : count}
         </span>
         <span className="sr-only">Notifications, {count} unread</span>

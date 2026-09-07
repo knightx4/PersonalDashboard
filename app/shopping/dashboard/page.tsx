@@ -7,7 +7,6 @@ import { SpendHeadline } from '@/components/dashboard/spend-headline';
 import { CategoryDonut } from '@/components/dashboard/category-donut';
 import { MerchantBreakdown } from '@/components/dashboard/merchant-breakdown';
 import { ReturnableList } from '@/components/dashboard/returnable-list';
-import { ValueOwnedCard } from '@/components/dashboard/value-owned-card';
 import { PersonBreakdown } from '@/components/dashboard/person-breakdown';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPeople, parsePersonFilter } from '@/lib/people/load';
@@ -92,18 +91,17 @@ export default async function DashboardPage({
           />
         ) : (
           <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <SpendHeadline
-                current={data.current}
-                previous={data.previous}
-                range={data.range}
-                currency={data.currency}
-              />
-              <ValueOwnedCard
-                cents={data.valueOwnedCents}
-                currency={data.currency}
-              />
-            </div>
+            <SpendHeadline
+              current={data.current}
+              previous={data.previous}
+              range={data.range}
+              period={data.period}
+              currency={data.currency}
+              valueOwnedCents={data.valueOwnedCents}
+              orderCount={data.orderCount}
+              returnableCount={data.returnable.length}
+            />
+            <div className="h-2" aria-hidden />
 
             {showPeople && !personId && (
               <PersonBreakdown

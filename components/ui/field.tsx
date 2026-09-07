@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement } from 'react';
 import { cn } from '@/lib/cn';
 
 /**
@@ -9,7 +10,7 @@ import { cn } from '@/lib/cn';
  * container's border does not -- the container is also identified by its fill
  * and its contents -- which is why there are two border tokens.
  *
- * `text-base sm:text-body` on every field is load-bearing: 16px is what stops
+ * `text-base sm:text-ui` on every field is load-bearing: 16px is what stops
  * iOS zooming the page on focus, and anything smaller silently destroys the
  * layout on a phone.
  */
@@ -22,9 +23,16 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
   );
 }
 
+/**
+ * `aria-invalid:` is the whole inline-validation story at the control level:
+ * a field the Field below has marked wrong turns its border to the danger
+ * colour without a second class on the call site.
+ */
 const control =
+  // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
   'w-full rounded-lg border border-control bg-surface text-base text-ink sm:text-ui ' +
   'placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 ' +
+  'aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:ring-danger/25 ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
 
 export const Input = function Input({
@@ -54,14 +62,26 @@ export function Textarea({
   return <textarea className={cn(control, 'min-h-24 px-3 py-2', className)} {...props} />;
 }
 
-export function FieldError({ children }: { children?: React.ReactNode }) {
+/**
+ * `role="alert"`: an error that appears after a submit is exactly the thing a
+ * screen reader should interrupt to say, and without this it is silent.
+ */
+export function FieldError({ children, id }: { children?: React.ReactNode; id?: string }) {
   if (!children) return null;
-  return <p className="mt-1.5 text-ui text-danger">{children}</p>;
+  return (
+    <p id={id} role="alert" className="mt-1.5 text-ui text-danger">
+      {children}
+    </p>
+  );
 }
 
-export function FieldHint({ children }: { children?: React.ReactNode }) {
+export function FieldHint({ children, id }: { children?: React.ReactNode; id?: string }) {
   if (!children) return null;
-  return <p className="mt-1 text-small text-ink-muted">{children}</p>;
+  return (
+    <p id={id} className="mt-1 text-small text-ink-muted">
+      {children}
+    </p>
+  );
 }
 
 /**
@@ -70,6 +90,12 @@ export function FieldHint({ children }: { children?: React.ReactNode }) {
  * Hints were being hand-rolled as `text-micro text-ink-muted` in dozens of
  * files -- both off the type scale and under the contrast floor -- so this
  * lands two fixes at once and stops the third from being written.
+ *
+ * When the child is a single control it is also wired up: `aria-invalid` when
+ * there is an error, and `aria-describedby` pointing at the hint and the
+ * error, so what a sighted person reads under the field is what a screen
+ * reader hears after it. Cloning rather than a context, because this renders
+ * on the server and so do most of the forms that use it.
  */
 export function Field({
   id,
@@ -86,12 +112,25 @@ export function Field({
   children: React.ReactNode;
   className?: string;
 }) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+
+  const control = isValidElement<Record<string, unknown>>(children)
+    ? cloneElement(children, {
+        'aria-invalid': error ? true : children.props['aria-invalid'],
+        'aria-describedby':
+          [children.props['aria-describedby'], describedBy].filter(Boolean).join(' ') ||
+          undefined,
+      })
+    : children;
+
   return (
     <div className={className}>
       <Label htmlFor={id}>{label}</Label>
-      {children}
-      <FieldHint>{hint}</FieldHint>
-      <FieldError>{error}</FieldError>
+      {control}
+      <FieldHint id={hintId}>{hint}</FieldHint>
+      <FieldError id={errorId}>{error}</FieldError>
     </div>
   );
 }

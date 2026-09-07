@@ -32,7 +32,7 @@ export function StatusLine({ lines }: { lines: ActivityLine[] }) {
   if (lines.length === 0) return null;
 
   return (
-    <div className="pointer-events-none sticky bottom-0 z-30 border-t border-shell-border bg-shell/85 backdrop-blur">
+    <div className="pointer-events-none sticky bottom-0 z-30 hidden border-t border-shell-border bg-shell/85 backdrop-blur lg:block">
       <div
         className={cn(
           'flex items-center gap-2 px-4 py-1.5 font-mono text-micro transition-opacity duration-1000 sm:px-6',
