@@ -468,6 +468,7 @@ const addInterviewSchema = z.object({
   applicationId: z.string().uuid(),
   round: z.number().int().min(1),
   kind: z.enum(INTERVIEW_KINDS),
+  groupId: z.string().uuid().nullable(),
   schedule: scheduleSchema,
 });
 
@@ -484,6 +485,8 @@ export async function addInterview(input: {
   applicationId: string;
   round: number;
   kind: string;
+  /** The round it belongs to, when it is being added inside one. */
+  groupId?: string | null;
   scheduledAt: string | null;
   timeKnown: boolean;
 }): Promise<{ error: string | null }> {
@@ -491,6 +494,7 @@ export async function addInterview(input: {
     applicationId: input.applicationId,
     round: input.round,
     kind: input.kind,
+    groupId: input.groupId ?? null,
     schedule: { scheduledAt: input.scheduledAt, timeKnown: input.timeKnown },
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -503,6 +507,7 @@ export async function addInterview(input: {
     application_id: parsed.data.applicationId,
     round: parsed.data.round,
     kind: parsed.data.kind,
+    group_id: parsed.data.groupId,
     scheduled_at: parsed.data.schedule.scheduledAt,
     time_known: parsed.data.schedule.timeKnown,
   });
@@ -641,6 +646,70 @@ export async function groupInterviews(input: {
   return { error: null };
 }
 
+const newRoundSchema = z.object({
+  applicationId: z.string().uuid(),
+  label: z.string().trim().max(120).optional(),
+});
+
+/**
+ * A round with nothing in it yet.
+ *
+ * `groupInterviews` makes a round out of interviews that already exist, which
+ * only works when the mail arrived first. A round is usually agreed before any
+ * of it is booked — "there will be a technical round, we will send times" —
+ * and the conversations inside it turn up one at a time afterwards, some from
+ * the inbox and some by hand. So the container comes first and fills up, which
+ * is the way round the user actually works.
+ */
+export async function createInterviewRound(input: {
+  applicationId: string;
+  label?: string;
+}): Promise<{ id: string | null; error: string | null }> {
+  const parsed = newRoundSchema.safeParse(input);
+  if (!parsed.success) return { id: null, error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('interview_groups')
+    .insert({
+      user_id: user.id,
+      application_id: parsed.data.applicationId,
+      label: parsed.data.label || null,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) return { id: null, error: error?.message ?? 'Could not add the round.' };
+
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { id: data.id as string, error: null };
+}
+
+/**
+ * Drop the round itself. Anything inside it survives as an interview of its
+ * own -- the foreign key nulls the membership rather than cascading -- so this
+ * removes the heading and its notes, never the conversations.
+ */
+export async function deleteInterviewRound(groupId: string): Promise<{ error: string | null }> {
+  const parsed = z.string().uuid().safeParse(groupId);
+  if (!parsed.success) return { error: 'That is not a round.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('interview_groups')
+    .delete()
+    .eq('id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
 const groupPatchSchema = z.object({
   groupId: z.string().uuid(),
   label: z.string().trim().max(120).optional(),
@@ -674,9 +743,10 @@ export async function saveInterviewGroup(
 }
 
 /**
- * Take a round back out. The round survives; so does the group, unless this
- * was the last thing in it -- a group of one is not a group, and leaving an
- * empty one behind would keep its notes attached to nothing.
+ * Take an interview back out of its round. The interview survives, and so does
+ * the round -- including when it is left empty. An empty round is a real state
+ * now that rounds are made before anything is booked into them, so it is kept
+ * rather than swept up; `deleteInterviewRound` is how one goes.
  */
 export async function ungroupInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);
@@ -702,24 +772,6 @@ export async function ungroupInterview(interviewId: string): Promise<{ error: st
     .eq('user_id', user.id);
 
   if (error) return { error: error.message };
-
-  const { count } = await supabase
-    .from('interviews')
-    .select('id', { count: 'exact', head: true })
-    .eq('group_id', interview.group_id);
-
-  if ((count ?? 0) < 2) {
-    await supabase
-      .from('interviews')
-      .update({ group_id: null })
-      .eq('group_id', interview.group_id)
-      .eq('user_id', user.id);
-    await supabase
-      .from('interview_groups')
-      .delete()
-      .eq('id', interview.group_id)
-      .eq('user_id', user.id);
-  }
 
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
