@@ -114,7 +114,8 @@ describe('coexistence with the commerce app in public', () => {
     //
     // `todo` appears for the same reason as obsidian: tasks have an updated_at
     // and nothing in the module is created on sign-up -- a list exists because
-    // you wrote something on it.
+    // you wrote something on it. `learn` likewise: a reading queue exists
+    // because you pasted something into it.
     //
     // `core` appears for touch_updated_at because account_settings has an
     // updated_at, and its sign-up function is deliberately NOT called
@@ -124,7 +125,7 @@ describe('coexistence with the commerce app in public', () => {
     const owners: Record<string, string[]> = {
       handle_new_user: [APP_SCHEMA, 'public'],
       handle_new_user_settings: ['core'],
-      touch_updated_at: ['core', APP_SCHEMA, 'obsidian', 'public', 'todo'],
+      touch_updated_at: ['core', APP_SCHEMA, 'learn', 'obsidian', 'public', 'todo'],
     };
 
     for (const [fn, expected] of Object.entries(owners)) {
