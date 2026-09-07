@@ -6,7 +6,7 @@ import { Play } from 'lucide-react';
 import {
   runFeatureRoutine,
   type FeedbackActionState,
-} from '@/app/shopping/feedback/actions';
+} from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { cn } from '@/lib/cn';

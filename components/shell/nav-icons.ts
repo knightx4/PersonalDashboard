@@ -4,6 +4,7 @@ import {
   Bookmark,
   Boxes,
   Briefcase,
+  Bug,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -11,6 +12,7 @@ import {
   ClipboardCheck,
   KanbanSquare,
   LayoutDashboard,
+  Lightbulb,
   ListChecks,
   ListTodo,
   MessageSquareText,
@@ -55,6 +57,9 @@ export const NAV_ICONS = {
   answers: MessageSquareText,
   analytics: BarChart3,
   activity: Activity,
+  // Dev
+  bugs: Bug,
+  ideas: Lightbulb,
   // Todo and vault
   agenda: ListChecks,
   calendar: CalendarDays,

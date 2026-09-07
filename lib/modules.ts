@@ -12,7 +12,7 @@
  * module is never invisible while waiting for someone to write the query.
  */
 
-export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo';
+export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'dev';
 
 export type AppModule = {
   id: ModuleId;
@@ -65,7 +65,7 @@ export type AppModule = {
  * 'orb' is the app itself and is the only abstract one, which is the point --
  * it is the whole rather than one of the parts.
  */
-export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page';
+export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page' | 'bolt';
 
 export interface MarkKey {
   shape: MarkShape;
@@ -103,6 +103,17 @@ export const MODULES: readonly AppModule[] = [
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
     key: { shape: 'check', from: '#7dd3fc', to: '#0369a1' },
+  },
+  {
+    id: 'dev',
+    prefix: '/dev',
+    // Bugs and requests, not the ideas list: the queue is the thing with work
+    // in it, and the ideas are what you read when there is none.
+    home: '/dev/bugs',
+    label: 'Dev',
+    description: 'Bugs, requests and long-term ideas for this app',
+    accent: '--color-w-dev',
+    key: { shape: 'bolt', from: '#5eead4', to: '#0f766e' },
   },
   {
     id: 'vault',

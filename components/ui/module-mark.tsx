@@ -100,6 +100,16 @@ function KeyShape({ shape, fill }: { shape: MarkShape; fill: string }) {
           d={`M${cx - 3.9} ${cy - 4.9}H${cx + 0.3}L${cx + 4.1} ${cy - 1.1}V${cy + 4.9}H${cx - 3.9}Z`}
         />
       );
+    case 'bolt':
+      // The workshop: a solid bolt, no notch narrow enough to close up. It
+      // reads as "the thing that makes the rest of it work" rather than as a
+      // place you keep something, which is what the other four are.
+      return (
+        <path
+          fill={fill}
+          d={`M${cx + 1.5} ${cy - 5}L${cx - 4.5} ${cy + 0.9}H${cx - 0.6}L${cx - 1.5} ${cy + 5}L${cx + 4.5} ${cy - 0.9}H${cx + 0.6}Z`}
+        />
+      );
     case 'orb':
     default:
       return <circle cx={cx} cy={cy} r={5.1} fill={fill} />;

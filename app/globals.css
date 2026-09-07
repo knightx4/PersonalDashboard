@@ -62,6 +62,8 @@
   --c-w-todo-tint: #e6f4fb;
   --c-w-vault: #a21caf;
   --c-w-vault-tint: #fcecfd;
+  --c-w-dev: #0f6f66;
+  --c-w-dev-tint: #e3f5f2;
 
   --c-positive: #286f50;
   --c-positive-tint: #ecf7f1;
@@ -126,6 +128,7 @@
   --c-w-jobs-lit: var(--c-w-jobs);
   --c-w-todo-lit: var(--c-w-todo);
   --c-w-vault-lit: var(--c-w-vault);
+  --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
    * still hold their raw per-theme values -- so the SCOPES block can hand it
@@ -181,6 +184,8 @@
   --c-w-todo-tint: #0b2130;
   --c-w-vault: #e690f2;
   --c-w-vault-tint: #2a1430;
+  --c-w-dev: #5fdcc9;
+  --c-w-dev-tint: #0b2422;
 
   --c-positive: #54d6a0;
   --c-positive-tint: #0c2119;
@@ -246,6 +251,8 @@
   --c-w-todo-tint: #e0f0f7;
   --c-w-vault: #96128f;
   --c-w-vault-tint: #fae5f7;
+  --c-w-dev: #0c6a61;
+  --c-w-dev-tint: #dcf0ed;
 
   --c-positive: #1d6b48;
   --c-positive-tint: #e0f0e6;
@@ -345,6 +352,7 @@
   --c-w-jobs-lit: #b39bff;
   --c-w-todo-lit: #4cc2f1;
   --c-w-vault-lit: #e690f2;
+  --c-w-dev-lit: #5fdcc9;
 
   /* ---- The sheets ----
    * --c-canvas is the well inside a card, not the page. See the note above.
@@ -389,6 +397,8 @@
   --c-w-todo-tint: #d9e9f1;
   --c-w-vault: #891489;
   --c-w-vault-tint: #f2def2;
+  --c-w-dev: #0a635b;
+  --c-w-dev-tint: #d7ece9;
 
   --c-positive: #17624a;
   --c-positive-tint: #d8ece4;
@@ -460,6 +470,8 @@
   --c-w-todo-tint: #132833;
   --c-w-vault: #ec9df3;
   --c-w-vault-tint: #301a3a;
+  --c-w-dev: #79dbcb;
+  --c-w-dev-tint: #12292a;
 
   --c-positive: #68d9aa;
   --c-positive-tint: #13291f;
@@ -525,6 +537,8 @@
     --c-w-todo-tint: #0b2130;
     --c-w-vault: #e690f2;
     --c-w-vault-tint: #2a1430;
+    --c-w-dev: #5fdcc9;
+    --c-w-dev-tint: #0b2422;
 
     --c-positive: #54d6a0;
     --c-positive-tint: #0c2119;
@@ -586,6 +600,11 @@
   --c-sheet-accent: var(--c-w-vault);
   --c-page-accent: var(--c-w-vault-lit);
   --c-accent-tint: var(--c-w-vault-tint);
+}
+[data-workspace='dev'] {
+  --c-sheet-accent: var(--c-w-dev);
+  --c-page-accent: var(--c-w-dev-lit);
+  --c-accent-tint: var(--c-w-dev-tint);
 }
 
 :root {
@@ -744,6 +763,8 @@ body,
   --color-w-todo-tint: var(--c-w-todo-tint);
   --color-w-vault: var(--c-w-vault);
   --color-w-vault-tint: var(--c-w-vault-tint);
+  --color-w-dev: var(--c-w-dev);
+  --color-w-dev-tint: var(--c-w-dev-tint);
 
   --color-positive: var(--c-positive);
   --color-positive-tint: var(--c-positive-tint);

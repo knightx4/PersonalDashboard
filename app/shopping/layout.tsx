@@ -65,7 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         sections={sections}
         settingsHref="/shopping/settings"
         settingsLabel="Shopping settings"
-        feedbackHref="/shopping/feedback"
+        feedbackHref="/dev/bugs"
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
