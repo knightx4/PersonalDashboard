@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { RotateCcw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 /**
  * What a route group shows when it throws.
@@ -34,7 +35,7 @@ export function RouteError({
   }, [error]);
 
   return (
-    <div className="mx-auto max-w-lg rounded-card border border-border bg-surface p-8 text-center">
+    <Card padding="standard" className="mx-auto max-w-lg text-center">
       <h1 className="font-display text-title tracking-tight text-ink">
         We could not load {what}.
       </h1>
@@ -44,19 +45,16 @@ export function RouteError({
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
         <Button onClick={reset}>
-          <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+          <RotateCcw className="size-4" strokeWidth={1.75} aria-hidden />
           Try again
         </Button>
-        <Link
-          href={backHref}
-          className="press inline-flex h-10 items-center rounded-lg border border-border bg-surface px-4 text-body font-medium text-ink hover:bg-sunken"
-        >
+        <Link href={backHref} className={buttonVariants({ variant: 'secondary' })}>
           {backLabel}
         </Link>
       </div>
       {error.digest && (
         <p className="mt-5 font-mono text-micro text-ink-ghost">Reference {error.digest}</p>
       )}
-    </div>
+    </Card>
   );
 }

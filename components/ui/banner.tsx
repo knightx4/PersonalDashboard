@@ -57,7 +57,7 @@ export function Banner({ className, tone, icon = true, children, ...props }: Ban
       className={cn(banner({ tone }), className)}
       {...props}
     >
-      {icon && <Glyph className={cn('mt-0.5 size-4 shrink-0', iconClass)} strokeWidth={2} aria-hidden />}
+      {icon && <Glyph className={cn('mt-0.5 size-4 shrink-0', iconClass)} strokeWidth={1.75} aria-hidden />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );

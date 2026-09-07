@@ -7,6 +7,8 @@ import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { markOnboardingComplete, onboardingNeeded } from '@/lib/onboarding';
 import { buttonVariants } from '@/components/ui/button';
 import { FinishOnboardingForm, SkipGmailForm, WelcomeForm } from './forms';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Welcome' };
 
@@ -103,7 +105,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Welcome
             </p>
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
               Know what you own before you buy it again
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -137,7 +139,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Connect inbox
             </p>
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
               Before you grant Gmail access
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -160,7 +162,7 @@ export default async function OnboardingPage({
             </p>
           )}
 
-          <div className="space-y-4 rounded-card border border-border bg-surface px-4 py-4 text-body">
+          <div className={cn(cardVariants(), 'space-y-4 px-4 py-4 text-body')}>
             <div>
               <h2 className="font-medium text-ink">What we read</h2>
               <p className="mt-1 text-ink-muted">
@@ -218,7 +220,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Ready
             </p>
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
               {params.inbox === 'connected' ? 'Inbox connected' : 'You are set'}
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">

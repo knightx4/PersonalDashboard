@@ -3,14 +3,14 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Textarea } from '@/components/ui/field';
+import { Field, FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { finishOnboarding, saveCompanies, saveWelcome, type OnboardingState } from './actions';
 import { TimezoneField } from '@/components/ui/timezone-field';
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'One moment…' : label}
     </Button>
   );
@@ -22,10 +22,9 @@ export function WelcomeForm() {
   return (
     <form action={action} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="displayName">Your name</Label>
+        <Field id="displayName" label="Your name">
           <Input id="displayName" name="displayName" />
-        </div>
+        </Field>
         <div>
           <Label htmlFor="timezone">Timezone</Label>
           {/* No default passed: the field reads this computer's zone itself,
@@ -33,26 +32,20 @@ export function WelcomeForm() {
               guess. */}
           <TimezoneField id="timezone" name="timezone" />
         </div>
-        <div>
-          <Label htmlFor="searchStartedOn">When did the search start</Label>
+        <Field id="searchStartedOn" label="When did the search start">
           <Input id="searchStartedOn" name="searchStartedOn" type="date" />
-        </div>
+        </Field>
       </div>
 
-      <div>
-        <Label htmlFor="targetTitles">Roles you are going for</Label>
+      <Field id="targetTitles" label="Roles you are going for">
         <Input
           id="targetTitles"
           name="targetTitles"
           placeholder="Strategic Finance Analyst, FP&A Manager"
         />
-      </div>
+      </Field>
 
-      {state.error && (
-        <p role="alert" className="text-ui text-status-rejected">
-          {state.error}
-        </p>
-      )}
+      <FieldError>{state.error}</FieldError>
 
       <Submit label="Continue" />
     </form>
@@ -64,26 +57,19 @@ export function CompaniesForm() {
 
   return (
     <form action={action} className="space-y-4">
-      <div>
-        <Label htmlFor="companies">Companies you are pursuing</Label>
+      <Field
+        id="companies"
+        label="Companies you are pursuing"
+        hint="One per line, name first, email domain after a comma if you know it. The domain is what lets a recruiter’s personal work address find its company, and it is the list the direct-outreach inbox query searches."
+        error={state.error}
+      >
         <Textarea
           id="companies"
           name="companies"
           rows={6}
           placeholder={'Ramp, ramp.com\nLinear, linear.app\nFigma'}
         />
-        <p className="mt-1 text-micro leading-relaxed text-ink-muted">
-          One per line, name first, email domain after a comma if you know it. The domain is what
-          lets a recruiter&rsquo;s personal work address find its company, and it is the list the
-          direct-outreach inbox query searches.
-        </p>
-      </div>
-
-      {state.error && (
-        <p role="alert" className="text-ui text-status-rejected">
-          {state.error}
-        </p>
-      )}
+      </Field>
 
       <div className="flex gap-2">
         <Submit label="Continue" />

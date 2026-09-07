@@ -10,6 +10,7 @@ import { TimezoneField } from '@/components/ui/timezone-field';
 import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
+import { cardVariants } from '@/components/ui/card';
 
 export function AccountView({
   email,
@@ -50,7 +51,7 @@ function YouSection({
   const [state, action] = useActionState<AccountState, FormData>(updateAccountSettings, {});
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">You</h2>
       <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
 
@@ -63,7 +64,7 @@ function YouSection({
           <div>
             <Label htmlFor="timezone">Timezone</Label>
             <TimezoneField id="timezone" name="timezone" defaultValue={settings.timezone} />
-            <p className="mt-1 text-micro text-ink-muted">
+            <p className="mt-1 text-small text-ink-muted">
               Every workspace reads dates in this zone — what counts as today, when a return
               window closes, what time an interview is.
             </p>
@@ -81,7 +82,7 @@ function YouSection({
                 </option>
               ))}
             </Select>
-            <p className="mt-1 text-micro text-ink-muted">
+            <p className="mt-1 text-small text-ink-muted">
               Spend totals are converted into this. Orders keep the currency they were paid in.
             </p>
           </div>
@@ -98,7 +99,7 @@ function ModulesSection({ enabled }: { enabled: ModuleId[] }) {
   const [state, action] = useActionState<AccountState, FormData>(updateEnabledModules, {});
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Workspaces</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
         Which of these appear in the switcher. Turning one off hides it — nothing is deleted, and
@@ -172,7 +173,7 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
   ] as const).filter((link) => enabled.includes(link.module));
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Module settings</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
         Settings that only mean something inside one workspace live in that workspace.
@@ -203,7 +204,7 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
  */
 function SessionSection() {
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Session</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
         Signing out ends this session on this device. Nothing is deleted.

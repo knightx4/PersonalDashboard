@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Package } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { formatMoneyOrBlank } from '@/lib/money';
 import { publicEnv } from '@/lib/env';
 import { ShareControls, ShareLinkRow } from '../share-ui';
@@ -82,9 +83,9 @@ export default async function ShareDetailPage({
     <>
       <Link
         href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted hover:text-ink"
+        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
       >
-        <ArrowLeft className="size-3.5" aria-hidden /> Shared forms
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
       </Link>
 
       <PageHeader
@@ -100,13 +101,12 @@ export default async function ShareDetailPage({
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div>
           {groups.length === 0 ? (
-            <Card className="p-6 text-body text-ink-muted">
-              Nothing on this form yet. Add things from{' '}
-              <Link href="/shopping/inventory" className="text-accent hover:underline">
-                your inventory
-              </Link>
-              .
-            </Card>
+            <EmptyState
+              icon={Package}
+              title="Nothing on this form yet"
+              description="Add things from your inventory and they show up here, ready to send."
+              action={{ label: 'Open inventory', href: '/shopping/inventory' }}
+            />
           ) : (
             <ul className="space-y-2">
               {groups.map((group) => {
@@ -114,14 +114,14 @@ export default async function ShareDetailPage({
                 const price = formatMoneyOrBlank(group.unitPriceCents);
                 return (
                   <li key={group.groupKey}>
-                    <Card className="flex flex-wrap items-center gap-3 p-3">
+                    <Card padding="dense" className="flex flex-wrap items-center gap-3">
                       <div className="size-12 shrink-0 overflow-hidden rounded-lg border border-border bg-canvas">
                         {group.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={group.imageUrl} alt="" className="size-full object-cover" />
                         ) : (
                           <div className="flex size-full items-center justify-center text-ink-muted">
-                            <Package className="size-4" aria-hidden />
+                            <Package className="size-4" strokeWidth={1.75} aria-hidden />
                           </div>
                         )}
                       </div>
@@ -172,8 +172,7 @@ export default async function ShareDetailPage({
         </div>
 
         <div className="space-y-4">
-          <Card className="p-4">
-            <h2 className="mb-2 text-body font-semibold text-ink">Links</h2>
+          <CardSection title="Links">
             <div className="space-y-2">
               {(tokens ?? []).map((token) => (
                 <ShareLinkRow
@@ -190,10 +189,9 @@ export default async function ShareDetailPage({
               Anyone holding a live link can read and change these answers. Revoke
               one and it stops working immediately; the answers it left stay.
             </p>
-          </Card>
+          </CardSection>
 
-          <Card className="p-4">
-            <h2 className="mb-2 text-body font-semibold text-ink">Recent activity</h2>
+          <CardSection title="Recent activity">
             {(events ?? []).length === 0 ? (
               <p className="text-ui text-ink-muted">Nothing yet.</p>
             ) : (
@@ -211,7 +209,7 @@ export default async function ShareDetailPage({
                 ))}
               </ul>
             )}
-          </Card>
+          </CardSection>
         </div>
       </div>
     </>

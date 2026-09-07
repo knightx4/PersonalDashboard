@@ -6,6 +6,8 @@ import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 import {
   filterReviewRows,
@@ -99,19 +101,19 @@ export default async function ReviewPage({
             description={emptyCopy[view].description}
           />
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
             {rows.map((row) => {
               if (row.kind === 'order') {
                 return (
                   <li
                     key={row.id}
-                    className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                    className="row-pad flex flex-col gap-3 px-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
                   >
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <Link
                           href={`/shopping/orders/${row.orderId}`}
-                          className="font-medium text-ink hover:text-accent"
+                          className="font-medium text-ink transition-colors duration-150 hover:text-accent"
                         >
                           {row.merchantName}
                         </Link>
@@ -128,7 +130,7 @@ export default async function ReviewPage({
                       <p className="text-ui text-ink-muted">{row.reason}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
-                      <p className="text-right text-body font-medium tabular-nums text-ink">
+                      <p className="tabular text-right text-body font-medium text-ink">
                         {formatMoney(row.totalCents, row.currency)}
                       </p>
                       <div className="flex flex-wrap justify-end gap-2">
@@ -159,7 +161,7 @@ export default async function ReviewPage({
               return (
                 <li
                   key={row.id}
-                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                  className="row-pad flex flex-col gap-3 px-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

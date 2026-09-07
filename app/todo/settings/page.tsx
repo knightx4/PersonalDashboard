@@ -58,7 +58,7 @@ export default async function TodoSettingsPage() {
 
       <p className="mt-6 text-ui text-ink-muted">
         Your timezone decides what counts as today here, and it holds across every workspace.{' '}
-        <Link href="/account" className="font-medium text-accent underline underline-offset-2">
+        <Link href="/account" className="font-medium text-accent hover:underline">
           Account settings
         </Link>
       </p>

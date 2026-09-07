@@ -18,7 +18,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/field';
+import { Card, CardSection, cardVariants } from '@/components/ui/card';
+import { ConfirmStep } from '@/components/ui/confirm-step';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import { Field, FieldError, FieldHint, Textarea } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -225,7 +229,7 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
 
   return (
     <div>
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border max-lg:scroll-fade-x">
         {TABS.map((entry) => {
           const active = tab === entry.id;
           const count =
@@ -251,7 +255,7 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
                   : 'border-transparent text-ink-muted hover:text-ink',
               )}
             >
-              <entry.icon className="size-3.5" strokeWidth={1.75} />
+              <entry.icon className="size-4" strokeWidth={1.75} aria-hidden />
               {entry.label}
               {count !== undefined && count > 0 && (
                 <span className="tabular text-ink-muted">{count}</span>
@@ -288,51 +292,24 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
  * company with research on it, a contact, or a note survives its pursuit.
  */
 function NotRealPursuit({ applicationId }: { applicationId: string }) {
-  const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
   const router = useRouter();
 
   return (
     <div className="mt-8 border-t border-border pt-4">
-      {confirming ? (
-        <div className="space-y-2">
-          <p className="text-ui text-ink">
-            Remove this pursuit? The role goes with it, and the company too if nothing else is
-            attached to it. Any mail that created it is marked not relevant, so the next sync
-            will not bring it back.
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="danger"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await dismissPursuit(applicationId);
-                  if (result.error) setError(result.error);
-                  else router.push('/jobs/pipeline');
-                })
-              }
-            >
-              {pending ? 'Removing…' : 'Yes, remove it'}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-          </div>
-          {error && <p className="text-ui text-status-rejected">{error}</p>}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="text-small text-ink-muted hover:text-status-rejected hover:underline"
-        >
-          This was not a real pursuit — remove it
-        </button>
-      )}
+      <ConfirmStep
+        align="start"
+        prompt="Remove this pursuit? The role goes with it, and the company too if nothing else is attached to it. Any mail that created it is marked not relevant, so the next sync will not bring it back."
+        confirmLabel="Yes, remove it"
+        pendingLabel="Removing…"
+        onConfirm={async () => {
+          const result = await dismissPursuit(applicationId);
+          // Thrown rather than stored: ConfirmStep renders the error in place.
+          if (result.error) throw new Error(result.error);
+          router.push('/jobs/pipeline');
+        }}
+      >
+        This was not a real pursuit — remove it
+      </ConfirmStep>
     </div>
   );
 }
@@ -350,10 +327,10 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 hover:text-accent hover:decoration-accent"
+      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent hover:decoration-accent"
     >
       <span>{children}</span>
-      <ExternalLink className="size-3 shrink-0 self-center text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <ExternalLink className="size-3.5 shrink-0 self-center text-ink-muted" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Open in Gmail</span>
     </a>
   );
@@ -370,13 +347,11 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
       />
 
       {otherAttempts.length > 0 && (
-        <section className="rounded-card border border-border bg-surface p-4">
-          <h3 className="text-ui font-semibold text-ink">Earlier attempts</h3>
-          <p className="mt-0.5 text-small text-ink-muted">
-            Kept as history rather than overwritten — which is the whole reason a pursuit is a
-            separate row from the posting.
-          </p>
-          <ul className="mt-2 space-y-1.5">
+        <CardSection
+          title="Earlier attempts"
+          hint="Kept as history rather than overwritten — which is the whole reason a pursuit is a separate row from the posting."
+        >
+          <ul className="space-y-1.5">
             {otherAttempts.map((attempt) => (
               <li key={attempt.id} className="flex items-center gap-2 text-ui">
                 <span className="tabular text-ink-muted">#{attempt.attempt}</span>
@@ -388,21 +363,26 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
               </li>
             ))}
           </ul>
-        </section>
+        </CardSection>
       )}
 
       {events.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
-          Nothing has happened yet. Events appear here as mail arrives, or when you move the card.
-        </p>
+        <EmptyState
+          icon={ListChecks}
+          title="Nothing has happened yet"
+          description="Events appear here as mail arrives, or when you move the card."
+          action={{ label: 'Open the board', href: '/jobs/pipeline' }}
+        />
       ) : (
-        <ol className="space-y-2">
+        // One card of rows rather than a card per event: the tint on a row
+        // that needs review is enough to single it out without its own border.
+        <ol className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {events.map((event) => (
             <li
               key={event.id}
               className={cn(
-                'flex gap-3 rounded-card border border-border bg-surface px-4 py-2.5',
-                event.needsReview && 'border-caution bg-caution-tint',
+                'card-pad-x row-pad flex gap-3',
+                event.needsReview && 'bg-caution-tint',
               )}
             >
               <span className="tabular w-28 shrink-0 text-small text-ink-muted">
@@ -418,12 +398,16 @@ function Timeline({ events, timezone, otherAttempts, todos, applicationId, messa
                     (event.summary ?? event.kind.replace(/_/g, ' '))
                   )}
                 </p>
-                <p className="text-micro text-ink-muted">
+                <p className="text-small text-ink-muted">
                   {event.kind.replace(/_/g, ' ')} · {event.source}
                 </p>
                 {event.needsReview && (
                   <p className="mt-1 flex items-start gap-1.5 text-small text-ink">
-                    <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-caution" strokeWidth={2} />
+                    <CircleAlert
+                      className="mt-0.5 size-3.5 shrink-0 text-caution"
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
                     Recorded, but it did not change the status — that would have moved this
                     backwards.
                   </p>
@@ -461,8 +445,7 @@ function Todos({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h3 className="mb-2 text-ui font-semibold text-ink">To-dos</h3>
+    <CardSection title="To-dos">
       {todos.length > 0 && (
         <ul className="mb-3 space-y-2">
           {todos.map((todo) => (
@@ -474,25 +457,21 @@ function Todos({
         </ul>
       )}
       <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-48 flex-1">
-          <Label htmlFor="todo-body">Add a to-do</Label>
+        <Field id="todo-body" label="Add a to-do" className="min-w-48 flex-1">
           <Input
-            id="todo-body"
             value={body}
             onChange={(event) => setBody(event.target.value)}
             placeholder="Record a video interview"
           />
-        </div>
-        <div>
-          <Label htmlFor="todo-due">Done by</Label>
+        </Field>
+        <Field id="todo-due" label="Done by">
           <Input
-            id="todo-due"
             type="date"
             value={dueAt}
             onChange={(event) => setDueAt(event.target.value)}
             className="w-40"
           />
-        </div>
+        </Field>
         <Button
           type="button"
           size="sm"
@@ -510,9 +489,9 @@ function Todos({
         >
           Add
         </Button>
-        {error && <span className="text-small text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-danger">{error}</span>}
       </div>
-    </section>
+    </CardSection>
   );
 }
 
@@ -570,13 +549,9 @@ function TodoLine({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="tabular text-ink-muted">{formatDate(todo.dueAt, timezone)}</span>
         <span className="text-ink">{todo.body}</span>
-        <button
-          type="button"
-          onClick={open}
-          className="press text-small font-medium text-accent underline underline-offset-2"
-        >
+        <Button type="button" size="sm" variant="ghost" onClick={open}>
           Edit
-        </button>
+        </Button>
         <ReminderActions id={todo.id} />
       </div>
     );
@@ -612,14 +587,10 @@ function TodoLine({
       >
         Save
       </Button>
-      <button
-        type="button"
-        onClick={() => setEditing(false)}
-        className="press text-small text-ink-muted underline underline-offset-2 hover:text-ink"
-      >
+      <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
         Cancel
-      </button>
-      {error && <span className="text-small text-status-rejected">{error}</span>}
+      </Button>
+      {error && <span className="text-small text-danger">{error}</span>}
     </div>
   );
 }
@@ -659,7 +630,7 @@ function TodoMail({
   if (todo.message) {
     return (
       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-0.5 text-small text-ink-muted">
-        <Mail className="size-3 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <Mail className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         {todo.message.gmailHref ? (
           <GmailLink href={todo.message.gmailHref}>
             {todo.message.subject ?? '(no subject)'}
@@ -667,15 +638,17 @@ function TodoMail({
         ) : (
           <span>{todo.message.subject ?? 'An email no longer linked to this role'}</span>
         )}
-        <button
+        {/* No confirm: re-linking is one pick away, so this is reversible. */}
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           disabled={pending}
           onClick={() => save(null)}
-          className="text-ink-muted underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
         >
           Unlink
-        </button>
-        {error && <span className="text-status-rejected">{error}</span>}
+        </Button>
+        {error && <span className="text-danger">{error}</span>}
       </p>
     );
   }
@@ -684,13 +657,15 @@ function TodoMail({
 
   if (!picking) {
     return (
-      <button
+      <Button
         type="button"
+        size="sm"
+        variant="ghost"
+        className="mt-0.5"
         onClick={() => setPicking(true)}
-        className="mt-0.5 pl-0.5 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
       >
         Link an email
-      </button>
+      </Button>
     );
   }
 
@@ -700,7 +675,7 @@ function TodoMail({
         aria-label="Email this to-do is about"
         defaultValue=""
         disabled={pending}
-        className="max-w-full sm:max-w-[28rem]"
+        className="max-w-full sm:max-w-md"
         onChange={(event) => {
           if (event.target.value) save(event.target.value);
         }}
@@ -712,14 +687,10 @@ function TodoMail({
           </option>
         ))}
       </Select>
-      <button
-        type="button"
-        onClick={() => setPicking(false)}
-        className="text-ink-muted underline underline-offset-2 hover:text-ink"
-      >
+      <Button type="button" size="sm" variant="ghost" onClick={() => setPicking(false)}>
         Cancel
-      </button>
-      {error && <span className="text-status-rejected">{error}</span>}
+      </Button>
+      {error && <span className="text-danger">{error}</span>}
     </p>
   );
 }
@@ -775,15 +746,20 @@ function Posting({
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <section className="rounded-card border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-ui font-semibold text-ink">Requirement map</h3>
-          {requirements.length > 0 && (
+      <CardSection
+        title="Requirement map"
+        hint={
+          matches
+            ? 'Your best evidence beside each line. A gap is the useful answer — it is the hour you do not spend.'
+            : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'
+        }
+        action={
+          requirements.length > 0 && (
             <Button
               type="button"
               size="sm"
               variant="secondary"
-              disabled={matching}
+              pending={matching}
               onClick={() => {
                 setMatching(true);
                 setMatchError(null);
@@ -801,14 +777,9 @@ function Posting({
             >
               {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
             </Button>
-          )}
-        </div>
-        <p className="mt-0.5 text-small text-ink-muted">
-          {matches
-            ? 'Your best evidence beside each line. A gap is the useful answer — it is the hour you do not spend.'
-            : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'}
-        </p>
-
+          )
+        }
+      >
         {matches && requirementMatchesAt && !stale && (
           <p className="mt-1 text-small text-ink-muted">
             Matched {formatDateTime(requirementMatchesAt, timezone)}.
@@ -822,12 +793,15 @@ function Posting({
         {bankSize === 0 && (
           <p className="mt-1 text-small text-ink-muted">
             Your evidence bank is empty, so there is nothing to match against.{' '}
-            <Link href="/jobs/settings" className="underline underline-offset-2 hover:text-ink">
+            <Link
+              href="/jobs/settings"
+              className="underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+            >
               Fill it in Settings.
             </Link>
           </p>
         )}
-        {matchError && <p className="mt-1 text-small text-status-rejected">{matchError}</p>}
+        <FieldError>{matchError}</FieldError>
 
         {requirements.length === 0 ? (
           <p className="mt-3 text-ui text-ink-muted">
@@ -875,7 +849,7 @@ function Posting({
             })}
           </div>
         )}
-      </section>
+      </CardSection>
 
       <div className="space-y-4">
         <ShareCaseCard
@@ -942,40 +916,36 @@ function ShareCaseCard({
   const url = liveSlug ? `${appOrigin}/jobs/p/${liveSlug}` : null;
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h3 className="text-ui font-semibold text-ink">Share the map</h3>
-      <p className="mt-0.5 text-small leading-relaxed text-ink-muted">
-        A private link showing this role&rsquo;s requirements with your evidence beside each one. It
-        is a work sample and a cover letter in one. Gaps are never on it, and the link expires.
-      </p>
-
-      <Label htmlFor={`case-body-${applicationId}`} className="mt-3 block">
-        Why you want it
-      </Label>
-      <Textarea
-        id={`case-body-${applicationId}`}
-        rows={4}
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
-        placeholder="A short paragraph, in your words. Nothing writes this for you."
-      />
+    <CardSection
+      title="Share the map"
+      hint="A private link showing this role’s requirements with your evidence beside each one. It is a work sample and a cover letter in one. Gaps are never on it, and the link expires."
+    >
+      <Field id={`case-body-${applicationId}`} label="Why you want it" className="mt-3">
+        <Textarea
+          rows={4}
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="A short paragraph, in your words. Nothing writes this for you."
+        />
+      </Field>
 
       {url && (
         <div className="mt-3 rounded-lg bg-canvas p-2">
-          <p className="break-all font-mono text-micro text-ink">{url}</p>
+          <p className="break-all font-mono text-small text-ink">{url}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
-              className="text-small text-accent hover:underline"
+              size="sm"
+              variant="ghost"
               onClick={() => {
                 navigator.clipboard.writeText(url);
                 setCopied(true);
               }}
             >
               {copied ? 'Copied' : 'Copy link'}
-            </button>
+            </Button>
             {liveExpiry && (
-              <span className="text-micro text-ink-muted">
+              <span className="text-small text-ink-muted">
                 Expires {formatDate(liveExpiry, timezone)}
               </span>
             )}
@@ -1008,9 +978,11 @@ function ShareCaseCard({
         </Button>
 
         {liveSlug && (
-          <button
+          <Button
             type="button"
-            className="text-small text-ink-muted hover:text-status-rejected"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
             onClick={() => {
               setError(null);
               startTransition(async () => {
@@ -1026,19 +998,19 @@ function ShareCaseCard({
             }}
           >
             Stop sharing
-          </button>
+          </Button>
         )}
 
-        {error && <span className="text-small text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-danger">{error}</span>}
       </div>
 
       {liveSlug && (
-        <p className="mt-1.5 text-micro text-ink-muted">
+        <FieldHint>
           Re-issuing gives a new link and breaks the old one, which is how you take a shared page
           back.
-        </p>
+        </FieldHint>
       )}
-    </section>
+    </CardSection>
   );
 }
 
@@ -1106,19 +1078,21 @@ function RoleDetailsCard({
 
   if (!editing) {
     return (
-      <section className="rounded-card border border-border bg-surface p-4">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-ui font-semibold text-ink">Details</h3>
+      <CardSection
+        title="Details"
+        action={
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-ink-muted hover:text-ink"
             title="Edit posting details"
+            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
           >
-            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Edit posting details</span>
           </button>
-        </div>
-        <dl className="mt-2 space-y-1.5 text-ui">
+        }
+      >
+        <dl className="space-y-1.5 text-ui">
           <div className="flex items-baseline gap-2">
             <dt className="w-24 shrink-0 text-ink-muted">Posting link</dt>
             <dd className="min-w-0 flex-1 truncate">
@@ -1127,7 +1101,7 @@ function RoleDetailsCard({
                   href={jdUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="text-accent underline underline-offset-2 transition-colors duration-150 hover:text-accent-hover"
                 >
                   {jdUrl}
                 </a>
@@ -1150,56 +1124,47 @@ function RoleDetailsCard({
             </dd>
           </div>
         </dl>
-      </section>
+      </CardSection>
     );
   }
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h3 className="text-ui font-semibold text-ink">Details</h3>
-      <div className="mt-2 space-y-2">
-        <div>
-          <Label htmlFor={`jdurl-${roleId}`}>Posting link</Label>
+    <CardSection title="Details">
+      <div className="space-y-2">
+        <Field id={`jdurl-${roleId}`} label="Posting link">
           <Input
-            id={`jdurl-${roleId}`}
             type="url"
             value={jdUrlDraft}
             onChange={(event) => setJdUrlDraft(event.target.value)}
             placeholder="https://…"
           />
-        </div>
-        <div>
-          <Label htmlFor={`ats-${roleId}`}>ATS job id</Label>
+        </Field>
+        <Field id={`ats-${roleId}`} label="ATS job id">
           <Input
-            id={`ats-${roleId}`}
             value={atsJobIdDraft}
             onChange={(event) => setAtsJobIdDraft(event.target.value)}
           />
-        </div>
+        </Field>
         <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor={`compmin-${roleId}`}>Comp min ($)</Label>
+          <Field id={`compmin-${roleId}`} label="Comp min ($)">
             <Input
-              id={`compmin-${roleId}`}
               type="number"
               value={compMinDraft}
               onChange={(event) => setCompMinDraft(event.target.value)}
             />
-          </div>
-          <div>
-            <Label htmlFor={`compmax-${roleId}`}>Comp max ($)</Label>
+          </Field>
+          <Field id={`compmax-${roleId}`} label="Comp max ($)">
             <Input
-              id={`compmax-${roleId}`}
               type="number"
               value={compMaxDraft}
               onChange={(event) => setCompMaxDraft(event.target.value)}
             />
-          </div>
+          </Field>
         </div>
       </div>
-      {error && <p className="mt-2 text-ui text-status-rejected">{error}</p>}
+      <FieldError>{error}</FieldError>
       <div className="mt-3 flex gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={save}>
+        <Button type="button" size="sm" pending={pending} onClick={save}>
           {pending ? 'Saving…' : 'Save'}
         </Button>
         <Button
@@ -1212,7 +1177,7 @@ function RoleDetailsCard({
           Cancel
         </Button>
       </div>
-    </section>
+    </CardSection>
   );
 }
 
@@ -1263,13 +1228,13 @@ function JobDescriptionCard({
   };
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-ui font-semibold text-ink">Job description</h3>
-        {!editing && (
+    <CardSection
+      title="Job description"
+      action={
+        !editing && (
           <div className="flex items-center gap-1">
             {!jdText && (
-              <Button type="button" size="sm" variant="ghost" disabled={looking} onClick={lookItUp}>
+              <Button type="button" size="sm" variant="ghost" pending={looking} onClick={lookItUp}>
                 {looking ? 'Looking…' : 'Look it up'}
               </Button>
             )}
@@ -1285,21 +1250,22 @@ function JobDescriptionCard({
               {jdText ? 'Edit' : 'Add description'}
             </Button>
           </div>
-        )}
-      </div>
-
+        )
+      }
+    >
       {editing ? (
-        <div className="mt-2">
+        <div>
           <Textarea
             autoFocus
             rows={16}
             value={draft}
+            aria-label="Job description"
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Paste the full posting here."
           />
-          {error && <p className="mt-2 text-ui text-status-rejected">{error}</p>}
+          <FieldError>{error}</FieldError>
           <div className="mt-2 flex gap-2">
-            <Button type="button" size="sm" disabled={pending} onClick={save}>
+            <Button type="button" size="sm" pending={pending} onClick={save}>
               {pending ? 'Saving…' : 'Save'}
             </Button>
             <Button
@@ -1314,11 +1280,11 @@ function JobDescriptionCard({
           </div>
         </div>
       ) : jdText ? (
-        <pre className="mt-2 max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-ui leading-relaxed text-ink-muted">
+        <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-ui leading-relaxed text-ink-muted">
           {jdText}
         </pre>
       ) : (
-        <p className="mt-3 text-ui text-ink-muted">
+        <p className="text-ui text-ink-muted">
           Nothing saved. Add the description to build the requirement map and fill in the comp
           band automatically.
         </p>
@@ -1344,7 +1310,7 @@ function JobDescriptionCard({
                       href={candidate.url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-ink-muted underline underline-offset-2 hover:text-ink"
+                      className="text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
                     >
                       {candidate.title}
                     </a>
@@ -1367,7 +1333,7 @@ function JobDescriptionCard({
           {jdLookupNote}
         </p>
       )}
-    </section>
+    </CardSection>
   );
 }
 
@@ -1378,17 +1344,15 @@ function Answers({ answers, applicationId, bankSize }: PanelProps) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h3 className="text-ui font-semibold text-ink">Add the application questions</h3>
-        <p className="mt-0.5 text-small text-ink-muted">
-          Use the bookmarklet on the application page, or paste them here — one per line, or
-          numbered. Both work; the paste box always works.
-        </p>
+      <CardSection
+        title="Add the application questions"
+        hint="Use the bookmarklet on the application page, or paste them here — one per line, or numbered. Both work; the paste box always works."
+      >
         <Textarea
           rows={4}
           value={paste}
+          aria-label="Application questions"
           onChange={(event) => setPaste(event.target.value)}
-          className="mt-2"
           placeholder={'1. Why do you want to work here?\n2. Tell us about a time you...'}
         />
         <div className="mt-2 flex items-center gap-3">
@@ -1408,12 +1372,17 @@ function Answers({ answers, applicationId, bankSize }: PanelProps) {
           </Button>
           {message && <span className="text-small text-ink-muted">{message}</span>}
         </div>
-      </section>
+      </CardSection>
 
       {answers.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
-          No questions captured for this application yet.
-        </p>
+        // The paste box above is the action that fills this; the link goes to
+        // the bookmarklet, which is the other way in.
+        <EmptyState
+          icon={MessageSquareText}
+          title="No questions captured yet"
+          description="No questions captured for this application yet. Paste them above, or grab them from the application page with the bookmarklet."
+          action={{ label: 'Get the bookmarklet', href: '/jobs/settings' }}
+        />
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
@@ -1448,17 +1417,23 @@ function AnswerCard({
   const usingCanonical = !answer.answer && Boolean(answer.canonicalAnswer);
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
+    <Card padding="dense">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-ui font-medium text-ink">{answer.questionText}</p>
-          <p className="mt-0.5 text-micro text-ink-muted">
+          <p className="mt-0.5 text-small text-ink-muted">
             {answer.questionKind}
             {answer.timesSeen > 1 && ` · asked ${answer.timesSeen} times`}
           </p>
         </div>
+        {/* Positive rather than the offer hue: an approved answer is a thing
+            done, not a pipeline stage. */}
         {status === 'approved' && (
-          <CheckCircle2 className="size-4 shrink-0 text-status-offer" strokeWidth={2} />
+          <CheckCircle2
+            className="size-4 shrink-0 text-positive"
+            strokeWidth={1.75}
+            aria-label="Approved"
+          />
         )}
       </div>
 
@@ -1489,6 +1464,7 @@ function AnswerCard({
       <Textarea
         rows={5}
         value={text}
+        aria-label="Your answer"
         onChange={(event) => setText(event.target.value)}
         className="mt-2"
       />
@@ -1543,7 +1519,8 @@ function AnswerCard({
           type="button"
           size="sm"
           variant="ghost"
-          disabled={drafting || bankSize === 0}
+          pending={drafting}
+          disabled={bankSize === 0}
           title={
             bankSize === 0
               ? 'Your evidence bank is empty, so there is nothing to draft from.'
@@ -1566,14 +1543,14 @@ function AnswerCard({
           {drafting ? 'Drafting…' : 'Draft from my evidence'}
         </Button>
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
-        {draftError && <span className="text-small text-status-rejected">{draftError}</span>}
+        {draftError && <span className="text-small text-danger">{draftError}</span>}
       </div>
 
       {draft && (
         <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
-            <span className="text-micro text-ink-muted">
+            <span className="text-small text-ink-muted">
               Nothing is saved until you insert it and save.
             </span>
           </div>
@@ -1582,7 +1559,7 @@ function AnswerCard({
             {draft.text}
           </p>
 
-          <p className="mt-2 text-micro text-ink-muted">
+          <p className="mt-2 text-small text-ink-muted">
             Draws on{' '}
             {draft.evidenceItemIds.length === 1
               ? 'one item'
@@ -1600,7 +1577,7 @@ function AnswerCard({
                   <li key={claim}>{claim}</li>
                 ))}
               </ul>
-              <p className="mt-1 text-micro text-ink-muted">
+              <p className="mt-1 text-small text-ink-muted">
                 Check each of these before it goes out, or cut it.
               </p>
             </div>
@@ -1638,17 +1615,13 @@ function AnswerCard({
             >
               Insert
             </Button>
-            <button
-              type="button"
-              className="text-small text-ink-muted hover:text-ink"
-              onClick={() => setDraft(null)}
-            >
+            <Button type="button" size="sm" variant="ghost" onClick={() => setDraft(null)}>
               Discard
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -1674,7 +1647,7 @@ function Interviews({
   return (
     <div className="space-y-3">
       {interviews.length === 0 ? (
-        <div className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
+        <div className={cn(cardVariants(), 'border-dashed px-4 py-10 text-center text-ui text-ink-muted')}>
           {interviewMail.length > 0 ? (
             <>
               <p className="text-ink">
@@ -1986,7 +1959,7 @@ function GroupTheseRounds({
   const label = formatDate(`${day}T00:00:00.000Z`, 'UTC');
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-card border border-dashed border-border bg-surface px-4 py-2.5">
+    <div className={cn(cardVariants(), 'flex flex-wrap items-center gap-3 border-dashed px-4 py-2.5')}>
       <p className="text-ui text-ink-muted">
         {interviewIds.length} rounds on {label}.
       </p>
@@ -2147,7 +2120,7 @@ function InterviewCard({
     <section
       ref={ref}
       className={cn(
-        'rounded-card border border-border bg-surface p-4',
+        cardVariants({ padding: 'dense' }),
         focused && 'ring-2 ring-accent ring-offset-2 ring-offset-canvas',
       )}
     >
@@ -2197,7 +2170,7 @@ function InterviewCard({
             {interview.customNotes.map((note) => (
               <article key={note.id} className="rounded-lg bg-sunken px-3 py-2">
                 <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
-                <p className="tabular mt-1 text-micro text-ink-muted">
+                <p className="tabular mt-1 text-small text-ink-muted">
                   {formatDate(note.createdAt, timezone)}
                 </p>
               </article>
@@ -2431,7 +2404,7 @@ function AddInterview({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
+        className={cn(cardVariants(), 'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent')}
       >
         Add a round
       </button>
@@ -2439,7 +2412,7 @@ function AddInterview({
   }
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
+    <section className={cardVariants({ padding: 'dense' })}>
       {usedSeed && (
         <p className="mb-3 text-small text-ink-muted">
           From{' '}
@@ -2511,7 +2484,7 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
 
   return (
     <div className="space-y-3">
-      <section className="rounded-card border border-border bg-surface p-4">
+      <section className={cardVariants({ padding: 'dense' })}>
         <Textarea
           rows={3}
           value={body}
@@ -2538,9 +2511,9 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
       </section>
 
       {notes.map((note) => (
-        <article key={note.id} className="rounded-card border border-border bg-surface p-4">
+        <article key={note.id} className={cardVariants({ padding: 'dense' })}>
           <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
-          <p className="tabular mt-1.5 text-micro text-ink-muted">
+          <p className="tabular mt-1.5 text-small text-ink-muted">
             {formatDate(note.createdAt, timezone)}
           </p>
         </article>
@@ -2562,28 +2535,30 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
       />
 
       {messages.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
+        <p className={cn(cardVariants(), 'border-dashed px-4 py-10 text-center text-ui text-ink-muted')}>
           No mail has been linked to this pursuit yet.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-ui">
-            <thead>
-              <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
-                <th className="px-2 py-2 font-semibold">Received</th>
-                <th className="px-2 py-2 font-semibold">Subject</th>
-                <th className="px-2 py-2 font-semibold">Kind</th>
-                <th className="px-2 py-2 font-semibold">Linked by</th>
-                <th className="px-2 py-2 font-semibold" />
-              </tr>
-            </thead>
-            <tbody>
+        <div>
+          <Table>
+            <THead>
+              <TR>
+                <TH>Received</TH>
+                <TH>Subject</TH>
+                <TH>Kind</TH>
+                <TH>Linked by</TH>
+                <TH>
+                  <span className="sr-only">Actions</span>
+                </TH>
+              </TR>
+            </THead>
+            <TBody>
               {messages.map((message) => (
-                <tr key={message.id} className="border-b border-border">
-                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                <TR key={message.id}>
+                  <TD muted label="Received" className="tabular whitespace-nowrap">
                     {formatDate(message.receivedAt, timezone)}
-                  </td>
-                  <td className="px-2 py-1.5 text-ink">
+                  </TD>
+                  <TD primary label="Subject">
                     {message.gmailHref ? (
                       <GmailLink href={message.gmailHref}>
                         {message.subject ?? '(no subject)'}
@@ -2591,16 +2566,14 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                     ) : (
                       (message.subject ?? '—')
                     )}
-                  </td>
-                  <td className="px-2 py-1.5 text-ink-muted">
-                    {message.classification.replace(/_/g, ' ')}
-                  </td>
-                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                  </TD>
+                  <TD muted label="Kind">{message.classification.replace(/_/g, ' ')}</TD>
+                  <TD muted label="Linked by" className="tabular">
                     {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
                     {message.linkConfidence !== null &&
                       ` (${Math.round(message.linkConfidence * 100)}%)`}
-                  </td>
-                  <td className="px-2 py-1.5 text-right">
+                  </TD>
+                  <TD className="text-right">
                     <span className="inline-flex items-center gap-3">
                       {INTERVIEW_MAIL.has(message.classification) && (
                         <button
@@ -2611,19 +2584,19 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                               fromSubject: message.subject,
                             })
                           }
-                          className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+                          className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-accent"
                         >
                           Add interview
                         </button>
                       )}
                       <UnlinkMessage messageId={message.id} applicationId={applicationId} />
                     </span>
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
-          <p className="mt-2 text-micro text-ink-muted">
+            </TBody>
+          </Table>
+          <p className="mt-2 text-small text-ink-muted">
             Subjects and senders only. Message bodies are never stored.
           </p>
         </div>
@@ -2650,27 +2623,23 @@ function UnlinkMessage({
 
   return (
     <span className="inline-flex items-center gap-2">
-      {error && <span className="text-micro text-status-rejected">{error}</span>}
-      <button
-        type="button"
+      {error && <span className="text-small text-danger">{error}</span>}
+      <ConfirmStep
+        variant="ghost"
+        size="sm"
+        prompt="It goes back to the review queue, and anything it added to this timeline is removed."
+        confirmLabel="Unlink"
+        pendingLabel="Unlinking…"
         disabled={pending}
-        onClick={() => {
-          if (
-            !window.confirm(
-              'Unlink this email? It goes back to the review queue, and anything it added to this timeline is removed.',
-            )
-          ) {
-            return;
-          }
+        onConfirm={async () => {
           startTransition(async () => {
             const result = await unlinkMessage(messageId, applicationId);
             setError(result.error);
           });
         }}
-        className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected disabled:opacity-50"
       >
-        {pending ? 'Unlinking…' : 'Unlink'}
-      </button>
+        Unlink
+      </ConfirmStep>
     </span>
   );
 }
@@ -2713,12 +2682,12 @@ function MatchCandidates({
   return (
     <div className="space-y-2">
       {visible.length > 0 && (
-        <details className="rounded-card border border-border bg-surface">
+        <details className={cardVariants()}>
           <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink">
             Possible matches — {visible.length}
           </summary>
           <div className="space-y-2 border-t border-border p-3">
-            <p className="text-micro text-ink-muted">
+            <p className="text-small text-ink-muted">
               Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not a
               match and it will not be suggested again for this pursuit.
             </p>
@@ -2771,7 +2740,7 @@ function MatchRow({
 }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-canvas px-2.5 py-2 text-ui">
-      <span className="tabular w-full text-micro text-ink-muted sm:w-32">
+      <span className="tabular w-full text-small text-ink-muted sm:w-32">
         {formatDate(message.receivedAt, timezone)}
       </span>
       <span className="min-w-0 flex-1 truncate text-ink">
@@ -2781,7 +2750,7 @@ function MatchRow({
           (message.subject ?? '—')
         )}
       </span>
-      <span className="truncate text-micro text-ink-muted">{message.fromAddress ?? ''}</span>
+      <span className="truncate text-small text-ink-muted">{message.fromAddress ?? ''}</span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {onDecline && (
           <button
@@ -2840,7 +2809,7 @@ function AddOtherSearch({
   }
 
   return (
-    <div className="rounded-card border border-dashed border-border bg-surface p-3">
+    <div className={cn(cardVariants(), 'border-dashed p-3')}>
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
           <Label htmlFor="mail-search">Search unlinked mail</Label>

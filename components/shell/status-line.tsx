@@ -39,7 +39,7 @@ export function StatusLine({ lines }: { lines: ActivityLine[] }) {
           settled ? 'text-shell-muted/70' : 'text-shell-muted',
         )}
       >
-        <Activity className="size-3 shrink-0" strokeWidth={2} aria-hidden />
+        <Activity className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1 truncate">
           {lines.map((line) => line.text).join('  ·  ')}
         </span>

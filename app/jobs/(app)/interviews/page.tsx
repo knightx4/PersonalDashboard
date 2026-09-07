@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { CalendarClock } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
@@ -79,7 +81,7 @@ export default async function InterviewsPage() {
       />
 
       {needDebrief.length > 0 && (
-        <section className="mb-6 rounded-card border border-caution bg-caution-tint p-4">
+        <Banner tone="warn" className="mb-6" icon={false}>
           <h2 className="text-ui font-semibold text-ink">Write these up tonight</h2>
           <ul className="mt-2 space-y-1">
             {needDebrief.map((row) => (
@@ -88,7 +90,7 @@ export default async function InterviewsPage() {
                     only reason this list exists. */}
                 <Link
                   href={interviewHref(row.applications.roles.id, row.id)}
-                  className="font-medium text-ink hover:text-accent"
+                  className="font-medium text-ink transition-colors duration-150 hover:text-accent"
                 >
                   {row.applications.roles.companies.name} · {row.applications.roles.title}
                 </Link>
@@ -98,7 +100,7 @@ export default async function InterviewsPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </Banner>
       )}
 
       <Section title="Upcoming" rows={upcoming} timezone={timezone} />
@@ -160,53 +162,51 @@ function Section({
   return (
     <section className="mb-6">
       <h2 className="mb-2 text-ui font-semibold text-ink">{title}</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-ui">
-          <thead>
-            <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
-              <th className="px-2 py-2 font-semibold">When</th>
-              <th className="px-2 py-2 font-semibold">Company</th>
-              <th className="px-2 py-2 font-semibold">Role</th>
-              <th className="px-2 py-2 font-semibold">Round</th>
-              <th className="px-2 py-2 font-semibold">Kind</th>
-              <th className="px-2 py-2 font-semibold">Debrief</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-border hover:bg-surface">
-                {/* The interview, and the role, as two separate destinations.
-                    Both are things you might want from this table and only one
-                    of them was reachable. */}
-                <td className="tabular px-2 py-1.5">
-                  <Link
-                    href={interviewHref(row.applications.roles.id, row.id)}
-                    className="font-medium text-ink hover:text-accent"
-                  >
-                    {formatDateTime(row.scheduled_at, timezone)}
-                  </Link>
-                </td>
-                <td className="px-2 py-1.5 text-ink-muted">
-                  {row.applications.roles.companies.name}
-                </td>
-                <td className="px-2 py-1.5">
-                  <Link
-                    href={`/jobs/roles/${row.applications.roles.id}`}
-                    className="text-ink-muted hover:text-accent"
-                  >
-                    {row.applications.roles.title}
-                  </Link>
-                </td>
-                <td className="tabular px-2 py-1.5 text-ink-muted">{row.round}</td>
-                <td className="px-2 py-1.5 text-ink-muted">{row.kind.replace(/_/g, ' ')}</td>
-                <td className="px-2 py-1.5 text-ink-muted">
-                  {row.notes ? 'written' : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <THead>
+          <TR>
+            <TH>When</TH>
+            <TH>Company</TH>
+            <TH>Role</TH>
+            <TH num>Round</TH>
+            <TH>Kind</TH>
+            <TH>Debrief</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {rows.map((row) => (
+            /* The interview, and the role, as two separate destinations.
+               Both are things you might want from this table and only one
+               of them was reachable. The row goes to the interview; the role
+               cell keeps its own link, lifted above the row link with `relative`. */
+            <TR key={row.id} href={interviewHref(row.applications.roles.id, row.id)}>
+              <TD primary className="tabular">
+                {formatDateTime(row.scheduled_at, timezone)}
+              </TD>
+              <TD label="Company" muted>
+                {row.applications.roles.companies.name}
+              </TD>
+              <TD label="Role" muted>
+                <Link
+                  href={`/jobs/roles/${row.applications.roles.id}`}
+                  className="relative transition-colors duration-150 hover:text-accent"
+                >
+                  {row.applications.roles.title}
+                </Link>
+              </TD>
+              <TD label="Round" num muted>
+                {row.round}
+              </TD>
+              <TD label="Kind" muted>
+                {row.kind.replace(/_/g, ' ')}
+              </TD>
+              <TD label="Debrief" muted>
+                {row.notes ? 'written' : '—'}
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
     </section>
   );
 }

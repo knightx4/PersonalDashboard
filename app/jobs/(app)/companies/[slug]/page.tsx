@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { CardSection } from '@/components/ui/card';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -156,7 +157,7 @@ export default async function CompanyDetailPage({
                 href={company.careers_url as string}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-ink-muted underline underline-offset-2 hover:text-ink"
+                className="text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
               >
                 Careers
               </a>
@@ -165,8 +166,7 @@ export default async function CompanyDetailPage({
         }
       />
 
-      <section className="mb-6 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-ui font-semibold text-ink">Roles here, across cycles</h2>
+      <CardSection title="Roles here, across cycles" className="mb-6">
         <RolesList
           companyId={company.id as string}
           timezone={timezone}
@@ -184,14 +184,18 @@ export default async function CompanyDetailPage({
             })),
           }))}
         />
-      </section>
+      </CardSection>
 
       {todos.length > 0 && (
-        <section className="mb-6 rounded-card border border-border bg-surface p-4">
-          <h2 className="mb-2 text-ui font-semibold text-ink">
-            To-dos{' '}
-            <span className="tabular text-small font-normal text-ink-muted">{todos.length}</span>
-          </h2>
+        <CardSection
+          className="mb-6"
+          title={
+            <>
+              To-dos{' '}
+              <span className="tabular text-small font-normal text-ink-muted">{todos.length}</span>
+            </>
+          }
+        >
           <ul className="space-y-2">
             {todos.map((todo) => (
               <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui">
@@ -205,7 +209,7 @@ export default async function CompanyDetailPage({
                 {todo.role && (
                   <Link
                     href={`/jobs/roles/${todo.role.id}`}
-                    className="truncate text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                    className="truncate text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
                   >
                     {todo.role.title}
                   </Link>
@@ -214,7 +218,7 @@ export default async function CompanyDetailPage({
               </li>
             ))}
           </ul>
-        </section>
+        </CardSection>
       )}
 
       <div className="mb-6">

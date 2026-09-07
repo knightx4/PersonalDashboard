@@ -1,7 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { Activity as ActivityIcon } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { formatDate, formatDateTime } from '@/lib/jobs/applications/load';
 import {
   groupByDay,
@@ -73,7 +76,7 @@ function Highlights({ highlights }: { highlights: ActivityHighlights }) {
              * and four coloured noughts would say it was. */}
             <p
               className={cn(
-                'tabular mt-1 text-2xl font-semibold',
+                'font-display tabular mt-1 text-figure font-semibold tracking-tight',
                 tile.value === 0 ? 'text-ink-muted' : TONE_FIGURE[tile.tone],
               )}
             >
@@ -82,7 +85,7 @@ function Highlights({ highlights }: { highlights: ActivityHighlights }) {
           </div>
         ))}
       </div>
-      <p className="mt-1.5 text-micro text-ink-muted">Last {highlights.days} days.</p>
+      <p className="mt-1.5 text-small text-ink-muted">Last {highlights.days} days.</p>
     </section>
   );
 }
@@ -114,7 +117,7 @@ export function ActivityFeed({
     <div className="space-y-4">
       <Highlights highlights={activity.highlights} />
 
-      <section className="rounded-card border border-border bg-surface p-5">
+      <Card padding="standard">
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui">
           <dt className="text-ink-muted">Last inbox sync</dt>
           <dd className="text-ink">
@@ -138,14 +141,17 @@ export function ActivityFeed({
             Last run reported: {latestRun.error}
           </p>
         )}
-      </section>
+      </Card>
 
       {activity.entries.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface px-4 py-3 text-ui text-ink-muted">
-          Nothing has changed yet. Once a scan has run, everything it writes shows up here.
-        </p>
+        <EmptyState
+          icon={ActivityIcon}
+          title="Nothing has changed yet"
+          description="Once a scan has run, everything it writes shows up here."
+          action={{ label: 'Inbox settings', href: '/jobs/settings#inboxes' }}
+        />
       ) : (
-        <div className="space-y-4 rounded-card border border-border bg-surface p-5">
+        <Card padding="standard" className="space-y-4">
           {days.map((group) => (
             <div key={group.day}>
               <h2 className="text-small font-medium text-ink-muted">
@@ -155,9 +161,9 @@ export function ActivityFeed({
                 {group.entries.map((entry) => (
                   <li
                     key={entry.id}
-                    className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1.5"
+                    className="row-pad flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
                   >
-                    <span className="w-14 shrink-0 text-micro text-ink-muted">
+                    <span className="w-14 shrink-0 text-small text-ink-muted">
                       {SOURCE_LABEL[entry.source]}
                     </span>
                     <span
@@ -172,7 +178,7 @@ export function ActivityFeed({
                       (entry.roleId ? (
                         <Link
                           href={`/jobs/roles/${entry.roleId}`}
-                          className="text-ui text-ink hover:text-accent"
+                          className="text-ui text-ink transition-colors duration-150 hover:text-accent"
                         >
                           {entry.subject}
                         </Link>
@@ -189,7 +195,7 @@ export function ActivityFeed({
               </ul>
             </div>
           ))}
-        </div>
+        </Card>
       )}
     </div>
   );

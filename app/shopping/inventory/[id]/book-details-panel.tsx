@@ -9,7 +9,7 @@ import {
   type BookActionState,
 } from '@/app/shopping/inventory/add/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Label, Select } from '@/components/ui/field';
+import { Field, FieldError, Select } from '@/components/ui/field';
 import type { BookEditionCandidate } from '@/lib/books/types';
 
 export type BookDetailsView = {
@@ -105,7 +105,7 @@ function CandidateRow({
         <form action={action} className="mt-2">
           <input type="hidden" name="inventory_item_id" value={inventoryItemId} />
           <input type="hidden" name="candidate_json" value={JSON.stringify(candidate)} />
-          <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+          <Button type="submit" size="sm" variant="secondary" pending={pending}>
             {pending ? 'Switching…' : 'This is my copy'}
           </Button>
         </form>
@@ -165,7 +165,7 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
       {book.needsConfirmation && (
         <div className="space-y-3 rounded-lg border border-caution/30 bg-caution-fill/5 p-3">
           <div>
-            <h3 className="text-body font-semibold text-ink">Which edition is on your shelf?</h3>
+            <h3 className="text-ui font-semibold text-ink">Which edition is on your shelf?</h3>
             <p className="mt-1 text-ui text-ink-muted">
               {book.confirmationReason ??
                 'We could not pin this to a single printing, and buyback quotes are per ISBN.'}
@@ -201,7 +201,7 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
                   name="inventory_item_id"
                   value={book.inventoryItemId}
                 />
-                <Button type="submit" size="sm" disabled={confirmPending}>
+                <Button type="submit" size="sm" pending={confirmPending}>
                   {confirmPending ? 'Saving…' : 'This is the right edition'}
                 </Button>
               </form>
@@ -241,8 +241,7 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
 
       <form action={conditionAction} className="flex flex-wrap items-end gap-3">
         <input type="hidden" name="inventory_item_id" value={book.inventoryItemId} />
-        <div className="min-w-[12rem] flex-1">
-          <Label htmlFor="condition">Condition</Label>
+        <Field id="condition" label="Condition" className="min-w-48 flex-1">
           <Select
             id="condition"
             name="condition"
@@ -255,8 +254,8 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
             <option value="good">Good</option>
             <option value="acceptable">Acceptable</option>
           </Select>
-        </div>
-        <Button type="submit" size="sm" variant="secondary" disabled={conditionPending}>
+        </Field>
+        <Button type="submit" size="sm" variant="secondary" pending={conditionPending}>
           {conditionPending ? 'Saving…' : 'Save condition'}
         </Button>
         <FieldError>{conditionState.error}</FieldError>

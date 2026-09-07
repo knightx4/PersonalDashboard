@@ -314,10 +314,10 @@ export function TimezoneField({
               <span className="truncate">
                 {match.zone.replace(/_/g, ' ')}
                 {match.zone === detected && (
-                  <span className="ml-2 text-micro text-ink-muted">this computer</span>
+                  <span className="ml-2 text-small text-ink-muted">this computer</span>
                 )}
               </span>
-              <span className="shrink-0 text-micro text-ink-muted">{match.offset}</span>
+              <span className="shrink-0 text-small text-ink-muted">{match.offset}</span>
             </li>
           ))}
         </ul>

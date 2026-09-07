@@ -17,6 +17,9 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
   if (rows.length === 0) {
     return (
       <div className="space-y-6">
+        {/* No `action`: the thing that fills this is the message button in the
+            header, which is a popover rather than a place, and a link that
+            only says "look up" would be worse than none. */}
         <EmptyState
           icon={MessageSquarePlus}
           title="Nothing captured yet"

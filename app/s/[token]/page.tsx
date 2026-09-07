@@ -59,7 +59,7 @@ export default async function SharePage({
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 sm:px-5 sm:py-12">
       <header>
-        <h1 className="font-display text-2xl text-ink">{page.title}</h1>
+        <h1 className="font-display text-title tracking-tight text-ink">{page.title}</h1>
         {page.intro && (
           <p className="mt-2 text-lead leading-relaxed text-ink-muted">{page.intro}</p>
         )}

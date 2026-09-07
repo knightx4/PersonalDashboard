@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { reparseInboxOrders, resetInboxImport } from './actions';
 
 export type InboxSyncProgress = {
@@ -80,12 +81,9 @@ export function InboxSyncButton({
     }
   }
 
+  // Not destructive -- orders and inventory stay in place, only merchant,
+  // items and totals are refreshed -- so it needs no confirm at all.
   async function reparseWithLatest() {
-    const confirmed = window.confirm(
-      'Re-parse already-imported order emails from this inbox with the latest parser? Orders and inventory stay in place — only merchant, items, and totals are refreshed from Gmail.',
-    );
-    if (!confirmed) return;
-
     setError(null);
     setMessage(null);
     setReparsing(true);
@@ -107,11 +105,6 @@ export function InboxSyncButton({
   }
 
   async function resetAndRescan() {
-    const confirmed = window.confirm(
-      'Delete email-imported orders from this inbox and re-scan Gmail from scratch? Manual orders are kept. This cannot be undone.',
-    );
-    if (!confirmed) return;
-
     setError(null);
     setMessage(null);
     setResetting(true);
@@ -166,9 +159,17 @@ export function InboxSyncButton({
             {reparsing ? 'Reparsing…' : 'Re-parse with latest parser'}
           </Button>
         )}
-        <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={resetAndRescan}>
+        <ConfirmStep
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          prompt="Deletes the orders this inbox imported and re-scans Gmail from scratch. Manual orders are kept."
+          confirmLabel="Reset & re-scan"
+          pendingLabel="Resetting…"
+          onConfirm={resetAndRescan}
+        >
           {resetting ? 'Resetting…' : 'Reset & re-scan'}
-        </Button>
+        </ConfirmStep>
       </div>
       {progress && (
         <p className="text-small text-ink-muted" aria-live="polite">

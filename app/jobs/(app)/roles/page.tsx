@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Table2 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { cn } from '@/lib/cn';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
@@ -8,6 +9,7 @@ import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import {
   formatCompBand,
@@ -177,12 +179,12 @@ export default async function RolesPage({
           </RailGroup>
         </LeftRail>
 
-        <div className="min-w-0 flex-1 overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-ui">
-            <thead>
-              <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
+        <div className="min-w-0 flex-1">
+          <Table>
+            <THead>
+              <TR>
                 {SORTS.map((entry) => (
-                  <th key={entry.id} className="px-2 py-2 font-semibold">
+                  <TH key={entry.id}>
                     <Link
                       href={hrefFor({
                         sort: entry.id,
@@ -190,28 +192,33 @@ export default async function RolesPage({
                         source: params.source,
                         q: params.q,
                       })}
-                      className={sort === entry.id ? 'text-accent' : 'hover:text-ink'}
+                      className={cn(
+                        'transition-colors duration-150',
+                        sort === entry.id ? 'text-accent' : 'hover:text-ink',
+                      )}
                     >
                       {entry.label}
                     </Link>
-                  </th>
+                  </TH>
                 ))}
-                <th className="px-2 py-2 font-semibold">Comp</th>
-              </tr>
-            </thead>
-            <tbody>
+                <TH num>Comp</TH>
+              </TR>
+            </THead>
+            <TBody>
               {filtered.map((row) => (
-                <tr
-                  key={row.applicationId}
-                  className="border-b border-border transition-colors duration-150 hover:bg-surface"
-                >
-                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                // The row goes to the role; the company is a second destination
+                // and stays a link of its own in its cell.
+                <TR key={row.applicationId} href={`/jobs/roles/${row.roleId}`}>
+                  <TD label="Last activity" muted className="tabular">
                     {shortAge(row.lastActivityAt)}
-                  </td>
-                  <td className="px-2 py-1.5">
+                  </TD>
+                  <TD label="Company">
+                    {/* `relative z-10`: the primary cell's link stretches over the
+                        whole row, and this cell comes before it in the DOM, so
+                        without a stacking position the row link would sit on top. */}
                     <Link
                       href={`/jobs/companies/${row.companySlug}`}
-                      className="flex items-center gap-2 text-ink-muted hover:text-accent"
+                      className="relative z-10 flex items-center gap-2 text-ink-muted transition-colors duration-150 hover:text-accent max-md:justify-end"
                     >
                       <CompanyAvatar
                         company={{
@@ -225,33 +232,31 @@ export default async function RolesPage({
                       />
                       <span className="truncate">{row.companyName}</span>
                     </Link>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <Link href={`/jobs/roles/${row.roleId}`} className="font-medium text-ink hover:text-accent">
-                      {row.roleTitle}
-                    </Link>
+                  </TD>
+                  <TD primary>
+                    {row.roleTitle}
                     {row.attempt > 1 && (
-                      <span className="tabular ml-1.5 text-micro text-ink-muted">
+                      <span className="tabular ml-1.5 text-small font-normal text-ink-muted">
                         attempt {row.attempt}
                       </span>
                     )}
-                  </td>
-                  <td className="px-2 py-1.5">
+                  </TD>
+                  <TD label="Status">
                     <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
-                  </td>
-                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                  </TD>
+                  <TD label="Date applied" muted className="tabular">
                     {formatDate(row.submittedAt)}
-                  </td>
-                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                  </TD>
+                  <TD label="Excitement" muted className="tabular">
                     {row.excitement ? '★'.repeat(row.excitement) : '—'}
-                  </td>
-                  <td className="tabular px-2 py-1.5 text-ink-muted">
+                  </TD>
+                  <TD label="Comp" num muted>
                     {formatCompBand(row.compMinCents, row.compMaxCents) ?? '—'}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       </div>
     </>

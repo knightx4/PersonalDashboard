@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Check, ListChecks, Plus, Unlink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/field';
+import { cardVariants } from '@/components/ui/card';
+import { FieldError, Input } from '@/components/ui/field';
 import { completeTask, reopenTask } from '@/app/todo/actions';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import type { LinkTarget } from '@/lib/todo/links/model';
@@ -56,7 +57,7 @@ export function LinkedTasks({
   );
 
   return (
-    <section className={cn(!compact && 'rounded-card border border-border bg-surface p-4')}>
+    <section className={cn(!compact && cardVariants({ padding: 'dense' }))}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-ui font-semibold text-ink">
           <ListChecks className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
@@ -65,14 +66,15 @@ export function LinkedTasks({
             <span className="tabular text-small font-normal text-ink-muted">{tasks.length}</span>
           )}
         </h3>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => setAdding((open) => !open)}
-          className="press flex items-center gap-1 text-small font-medium text-accent"
         >
           <Plus className="size-3.5" strokeWidth={2} aria-hidden />
           {adding ? 'Cancel' : 'Add'}
-        </button>
+        </Button>
       </div>
 
       {adding && (
@@ -87,13 +89,13 @@ export function LinkedTasks({
               Add
             </Button>
           </div>
-          {state.error && <p className="text-small text-status-rejected">{state.error}</p>}
+          <FieldError>{state.error}</FieldError>
         </form>
       )}
 
       {tasks.length === 0 ? (
         !adding && (
-          <p className="mt-2 text-small text-ink-muted">Nothing outstanding.</p>
+          <p className="mt-2 text-ui text-ink-muted">Nothing outstanding.</p>
         )
       ) : (
         <ul className="mt-2 divide-y divide-border">
@@ -136,13 +138,13 @@ function LinkedRow({
         aria-label={done ? 'Reopen' : 'Mark done'}
         onClick={() => start(() => (done ? reopenTask(task.id) : completeTask(task.id)))}
         className={cn(
-          'press flex size-4 shrink-0 items-center justify-center rounded border',
+          'press flex size-4 shrink-0 items-center justify-center rounded border transition-colors duration-150',
           done
             ? 'border-status-offer bg-status-offer text-surface'
             : 'border-control hover:border-accent',
         )}
       >
-        {done && <Check className="size-2.5" strokeWidth={3} aria-hidden />}
+        {done && <Check className="size-2.5" strokeWidth={2} aria-hidden />}
       </button>
 
       <span className={cn('min-w-0 flex-1 truncate text-ui text-ink', done && 'text-ink-muted line-through')}>
@@ -161,9 +163,9 @@ function LinkedRow({
         type="button"
         title="Detach from this"
         onClick={() => start(() => detachTask(task.id, target, targetId, returnTo))}
-        className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted opacity-100 hover:bg-canvas hover:text-ink sm:opacity-0 sm:group-hover:opacity-100"
+        className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-150 hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
       >
-        <Unlink className="size-3" strokeWidth={1.75} aria-hidden />
+        <Unlink className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Detach from this</span>
       </button>
     </li>
@@ -190,7 +192,7 @@ function formatDue(task: Task, timezone: string): string {
 /** A link to the agenda, for a section that has more than it can show. */
 export function AllTasksLink() {
   return (
-    <Link href="/todo" className="text-small font-medium text-accent underline underline-offset-2">
+    <Link href="/todo" className="text-ui font-medium text-accent hover:underline">
       All tasks
     </Link>
   );

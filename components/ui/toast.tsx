@@ -163,7 +163,7 @@ function ToastItem({
           disabled={pending}
           className="press inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-sans text-ui font-semibold text-accent hover:bg-accent-tint disabled:opacity-50"
         >
-          <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
+          <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
           {pending ? 'Undoing…' : 'Undo'}
         </button>
       )}

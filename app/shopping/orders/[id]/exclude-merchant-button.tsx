@@ -35,7 +35,7 @@ export function ExcludeMerchantButton({
 
   return (
     <div className="inline-flex flex-col items-end gap-1">
-      <p className="max-w-[18rem] text-right text-small text-ink-muted">
+      <p className="max-w-xs text-right text-small text-ink-muted">
         Stop importing from {label}? Removes their orders and skips them on future imports.
       </p>
       <div className="flex items-center gap-2">
@@ -52,7 +52,7 @@ export function ExcludeMerchantButton({
           type="button"
           variant="danger"
           size="sm"
-          disabled={pending}
+          pending={pending}
           onClick={() => {
             setError(null);
             setPending(true);

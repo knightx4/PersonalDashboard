@@ -4,7 +4,8 @@ import { useActionState, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { createManualOrder, type ActionState } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Select } from '@/components/ui/field';
+import { Card } from '@/components/ui/card';
+import { Field, FieldError, Input, Select } from '@/components/ui/field';
 import type { Person } from '@/lib/people/load';
 import {
   computeOrderTotalCents,
@@ -95,8 +96,12 @@ export function OrderForm({
   return (
     <form action={action} className="space-y-8">
       <section className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Label htmlFor="merchant_id">Merchant</Label>
+        {/* One field whose control swaps: the label follows whichever is showing. */}
+        <Field
+          id={merchantMode === 'pick' ? 'merchant_id' : 'custom_merchant_name'}
+          label="Merchant"
+          className="sm:col-span-2"
+        >
           {merchantMode === 'pick' ? (
             <Select
               id="merchant_id"
@@ -120,6 +125,7 @@ export function OrderForm({
           ) : (
             <div className="flex gap-2">
               <Input
+                id="custom_merchant_name"
                 name="custom_merchant_name"
                 placeholder="Merchant name"
                 autoFocus
@@ -134,19 +140,17 @@ export function OrderForm({
               </Button>
             </div>
           )}
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="external_order_number">Order number</Label>
+        <Field id="external_order_number" label="Order number">
           <Input
             id="external_order_number"
             name="external_order_number"
             placeholder="Optional"
           />
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="order_date">Order date</Label>
+        <Field id="order_date" label="Order date">
           <Input
             id="order_date"
             name="order_date"
@@ -154,7 +158,7 @@ export function OrderForm({
             required
             defaultValue={defaultDate}
           />
-        </div>
+        </Field>
 
         {/*
           Only shown once there is somebody to choose between. On a
@@ -162,8 +166,7 @@ export function OrderForm({
           every time would be noise.
         */}
         {people.length > 1 && (
-          <div>
-            <Label htmlFor="person_id">Whose is it</Label>
+          <Field id="person_id" label="Whose is it">
             <Select id="person_id" name="person_id" defaultValue={defaultPersonId ?? ''}>
               <option value="">Nobody in particular</option>
               {people.map((person) => (
@@ -172,32 +175,28 @@ export function OrderForm({
                 </option>
               ))}
             </Select>
-          </div>
+          </Field>
         )}
       </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-body font-semibold text-ink">Line items</h2>
+          <h2 className="text-ui font-semibold text-ink">Line items</h2>
           <Button
             type="button"
             variant="secondary"
             size="sm"
             onClick={() => setLines((current) => [...current, newLine()])}
           >
-            <Plus className="size-4" strokeWidth={1.75} />
+            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
             Add line
           </Button>
         </div>
 
         <div className="space-y-3">
           {lines.map((line, index) => (
-            <div
-              key={line.key}
-              className="grid gap-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-12"
-            >
-              <div className="sm:col-span-4">
-                <Label htmlFor={`line_name_${line.key}`}>Item</Label>
+            <Card key={line.key} padding="dense" className="grid gap-3 sm:grid-cols-12">
+              <Field id={`line_name_${line.key}`} label="Item" className="sm:col-span-4">
                 <Input
                   id={`line_name_${line.key}`}
                   name="line_name"
@@ -212,9 +211,8 @@ export function OrderForm({
                   }
                   placeholder="What did you buy?"
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor={`line_variant_${line.key}`}>Variant</Label>
+              </Field>
+              <Field id={`line_variant_${line.key}`} label="Variant" className="sm:col-span-2">
                 <Input
                   id={`line_variant_${line.key}`}
                   name="line_variant"
@@ -228,9 +226,8 @@ export function OrderForm({
                   }
                   placeholder="Size, color…"
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor={`line_category_${line.key}`}>Category</Label>
+              </Field>
+              <Field id={`line_category_${line.key}`} label="Category" className="sm:col-span-2">
                 <Select
                   id={`line_category_${line.key}`}
                   name="line_category_id"
@@ -250,9 +247,8 @@ export function OrderForm({
                     </option>
                   ))}
                 </Select>
-              </div>
-              <div className="sm:col-span-1">
-                <Label htmlFor={`line_qty_${line.key}`}>Qty</Label>
+              </Field>
+              <Field id={`line_qty_${line.key}`} label="Qty" className="sm:col-span-1">
                 <Input
                   id={`line_qty_${line.key}`}
                   name="line_quantity"
@@ -267,9 +263,8 @@ export function OrderForm({
                     )
                   }
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor={`line_price_${line.key}`}>Unit price</Label>
+              </Field>
+              <Field id={`line_price_${line.key}`} label="Unit price" className="sm:col-span-2">
                 <Input
                   id={`line_price_${line.key}`}
                   name="line_unit_price"
@@ -285,7 +280,7 @@ export function OrderForm({
                     )
                   }
                 />
-              </div>
+              </Field>
               <div className="flex items-end sm:col-span-1">
                 <Button
                   type="button"
@@ -298,17 +293,16 @@ export function OrderForm({
                   }
                   aria-label="Remove line"
                 >
-                  <Trash2 className="size-4" strokeWidth={1.75} />
+                  <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
                 </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <div>
-          <Label htmlFor="tax">Tax</Label>
+        <Field id="tax" label="Tax">
           <Input
             id="tax"
             name="tax"
@@ -317,9 +311,8 @@ export function OrderForm({
             value={tax}
             onChange={(event) => setTax(event.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor="shipping">Shipping</Label>
+        </Field>
+        <Field id="shipping" label="Shipping">
           <Input
             id="shipping"
             name="shipping"
@@ -328,9 +321,8 @@ export function OrderForm({
             value={shipping}
             onChange={(event) => setShipping(event.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor="discount">Discount</Label>
+        </Field>
+        <Field id="discount" label="Discount">
           <Input
             id="discount"
             name="discount"
@@ -339,10 +331,10 @@ export function OrderForm({
             value={discount}
             onChange={(event) => setDiscount(event.target.value)}
           />
-        </div>
+        </Field>
       </section>
 
-      <div className="flex flex-wrap items-end justify-between gap-4 rounded-card border border-border bg-surface px-4 py-3">
+      <Card padding="dense" className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1 text-body text-ink-muted">
           <p>
             Subtotal{' '}
@@ -359,10 +351,10 @@ export function OrderForm({
             shipping and discount.
           </p>
         </div>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" pending={pending}>
           {pending ? 'Saving…' : 'Save order'}
         </Button>
-      </div>
+      </Card>
 
       <FieldError>{state.error}</FieldError>
     </form>

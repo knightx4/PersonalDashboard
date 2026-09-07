@@ -1,13 +1,28 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import {
   excludeMerchantFromOrder,
+  restoreDeletedOrder,
   softDeleteOrder,
 } from '@/app/shopping/orders/actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { useToast } from '@/components/ui/toast';
 
+function isRedirect(err: unknown): boolean {
+  const digest =
+    typeof err === 'object' && err && 'digest' in err
+      ? String((err as { digest: unknown }).digest)
+      : '';
+  return digest.startsWith('NEXT_REDIRECT');
+}
+
+/**
+ * The row's two actions. Both arm in place through the menu's own `confirm`
+ * -- a first click shows the consequence, a second does it -- so the menu no
+ * longer needs its own phase machine, and nothing here reaches for a browser
+ * dialog. A delete is soft, so once done it offers the way back in a toast.
+ */
 export function OrderRowMenu({
   orderId,
   merchantName,
@@ -16,111 +31,67 @@ export function OrderRowMenu({
   merchantName: string;
 }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<'menu' | 'delete' | 'exclude'>('menu');
-  const [pending, setPending] = useState(false);
+  const toast = useToast();
   const label = merchantName.trim() || 'this sender';
 
-  const items: ActionMenuItem[] =
-    phase === 'delete'
-      ? [
-          {
-            id: 'delete-confirm',
-            label: pending ? 'Deleting…' : 'Confirm delete',
-            destructive: true,
-            disabled: pending,
-            closeOnSelect: false,
-            onSelect: () => {
-              setPending(true);
-              void (async () => {
-                const formData = new FormData();
-                formData.set('orderId', orderId);
-                try {
-                  const result = await softDeleteOrder(formData);
-                  if (!result.ok) {
-                    window.alert(result.error);
-                    setPending(false);
-                    setPhase('menu');
-                    return;
-                  }
-                  router.push('/shopping/orders');
-                  router.refresh();
-                } catch (err) {
-                  window.alert(err instanceof Error ? err.message : 'Delete failed.');
-                  setPending(false);
-                  setPhase('menu');
-                }
-              })();
-            },
-          },
-          {
-            id: 'delete-cancel',
-            label: 'Cancel',
-            disabled: pending,
-            closeOnSelect: false,
-            onSelect: () => setPhase('menu'),
-          },
-        ]
-      : phase === 'exclude'
-        ? [
-            {
-              id: 'exclude-confirm',
-              label: pending ? 'Working…' : `Confirm mute ${label}`,
-              destructive: true,
-              disabled: pending,
-              closeOnSelect: false,
-              onSelect: () => {
-                setPending(true);
-                void (async () => {
-                  const formData = new FormData();
-                  formData.set('orderId', orderId);
-                  try {
-                    await excludeMerchantFromOrder(formData);
-                  } catch (err) {
-                    const digest =
-                      typeof err === 'object' && err && 'digest' in err
-                        ? String((err as { digest: unknown }).digest)
-                        : '';
-                    if (digest.startsWith('NEXT_REDIRECT')) throw err;
-                    window.alert(
-                      err instanceof Error ? err.message : 'Could not mute that merchant.',
-                    );
-                    setPending(false);
-                    setPhase('menu');
-                  }
-                })();
-              },
-            },
-            {
-              id: 'exclude-cancel',
-              label: 'Cancel',
-              disabled: pending,
-              closeOnSelect: false,
-              onSelect: () => setPhase('menu'),
-            },
-          ]
-        : [
-            {
-              id: 'exclude',
-              label: `Don’t import from ${label}`,
-              closeOnSelect: false,
-              onSelect: () => setPhase('exclude'),
-            },
-            {
-              id: 'delete',
-              label: 'Delete order',
-              destructive: true,
-              closeOnSelect: false,
-              onSelect: () => setPhase('delete'),
-            },
-          ];
+  function orderForm(): FormData {
+    const formData = new FormData();
+    formData.set('orderId', orderId);
+    return formData;
+  }
 
-  return (
-    <ActionMenu
-      label="Order actions"
-      items={items}
-      onOpenChange={(open) => {
-        if (!open && !pending) setPhase('menu');
-      }}
-    />
-  );
+  const items: ActionMenuItem[] = [
+    {
+      id: 'exclude',
+      label: `Don’t import from ${label}`,
+      confirm: `Stop importing from ${label}? Removes their orders and skips them on future imports.`,
+      onSelect: () => {
+        void (async () => {
+          try {
+            await excludeMerchantFromOrder(orderForm());
+          } catch (err) {
+            if (isRedirect(err)) throw err;
+            toast({
+              text: err instanceof Error ? err.message : 'could not mute that merchant',
+            });
+          }
+        })();
+      },
+    },
+    {
+      id: 'delete',
+      label: 'Delete order',
+      destructive: true,
+      confirm: 'Delete this order? You can restore it later from Settings.',
+      onSelect: () => {
+        void (async () => {
+          const formData = orderForm();
+          try {
+            const result = await softDeleteOrder(formData);
+            if (!result.ok) {
+              toast({ text: result.error });
+              return;
+            }
+            toast({
+              text: 'order deleted',
+              undone: 'order restored',
+              undo: async () => {
+                try {
+                  await restoreDeletedOrder(formData);
+                } catch (err) {
+                  if (!isRedirect(err)) throw err;
+                }
+                router.refresh();
+              },
+            });
+            router.refresh();
+          } catch (err) {
+            toast({ text: err instanceof Error ? err.message : 'delete failed' });
+          }
+        })();
+      },
+    },
+  ];
+
+  return <ActionMenu label="Order actions" items={items} />;
 }

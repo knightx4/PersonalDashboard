@@ -14,15 +14,23 @@ checker, the named type scale, one `WorkspaceNav` in place of four top bars, the
 rebuilt switcher, per-workspace accents, the grain, popover focus management, sign-out
 on `/account`, and a `loading.tsx` and `error.tsx` for every route group.
 
+**The second pass (September 2026)** shipped the rest of Phase 1 and most of Phases 5 and 6:
+the `Card` migration across the tree (with `cardVariants` for links and `CardSection` for
+the heading-plus-content shape), one `Table`, `Field` everywhere with `aria-invalid` and
+`aria-describedby`, a `Figure` for the one number a page is about, `EmptyState tone="finished"`
+with the quiet-day sigil, a toast with undo and an inline `ConfirmStep` in place of every
+`window.confirm`, hold-⌘ shortcut hints with ⌥1–9 for sections, a bottom tab bar on phones,
+the density dial, Lightbox's lit sheet edge, the grain turned up and Riso's halftone, and
+lint rules that fail an off-scale type size, an arbitrary width, or a hex or palette colour
+in a class string. `/home` became a masthead: the date, then every workspace's brief.
+
 **What is left**, in the order it is worth doing:
 
 | | Why it is still open |
 |---|---|
-| **1.1 The `Card` migration** | `Card` now has the padding variants and the headerless mode it needed, so nothing is blocking it — but the utility string is hand-written in over a hundred places and swapping a `<div>` for a `<Card>` is not a safe `sed`. It wants a JSX-aware codemod or an afternoon, and it changes no pixels. |
-| **1.6 `Field`** | The component exists and is used by new code; the several dozen hand-rolled label/hint/error trios have not been migrated onto it. |
 | **3.3 Wiring the bell** | It renders nothing until it has something to say, which is the correct half. The other half — deriving notifications from the return windows, interview prep, vault token and review queue that already exist — is a feature, not a refactor. |
-| **5.1–5.5, 5.7–5.9** | Undo, bulk actions, the keyboard model, search unification, tabs into the URL, the attention ladder, a keyboard path for the pipeline board. The whole interaction half. |
-| **Phase 6** | The status line, the sigil, key hints, density, marginalia, seams, sound. |
+| **5.2, 5.4, 5.5, 5.7–5.9** | Bulk actions, search unification, tabs into the URL, the attention ladder, a keyboard path for the pipeline board. Undo (5.1) and the keyboard model's discoverability half (5.3) shipped. |
+| **Phase 6** | Marginalia, seams, sound. The status line, the sigil, key hints and density shipped. |
 
 Two things changed from the plan as written, and the reasons are worth keeping:
 

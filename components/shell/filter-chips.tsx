@@ -44,7 +44,7 @@ export function FilterChips({
         >
           <span className="text-accent/70 group-hover:text-surface/70">{chip.label}</span>
           <span className="max-w-40 truncate">{chip.value}</span>
-          <X className="size-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+          <X className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
           <span className="sr-only">Remove the {chip.label} filter</span>
         </Link>
       ))}

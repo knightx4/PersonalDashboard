@@ -8,6 +8,8 @@ import { todayInTimezone } from '@/lib/money';
 export type ActionState = {
   error?: string;
   message?: string;
+  /** Set by markItemReturned, so the toast's Undo can hand it straight back to undoItemReturned. */
+  returnId?: string;
 };
 
 async function userTimezone(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -164,20 +166,24 @@ export async function markItemReturned(
   const timezone = await userTimezone(supabase, user.id);
   const today = todayInTimezone(timezone);
 
-  const { error } = await supabase.from('returns').insert({
-    user_id: user.id,
-    order_id: orderItem.order_id,
-    inventory_item_id: item.id,
-    initiated_at: today,
-    refund_amount_cents: item.cost_cents,
-    status: 'refunded',
-    refunded_at: today,
-  });
+  const { data: inserted, error } = await supabase
+    .from('returns')
+    .insert({
+      user_id: user.id,
+      order_id: orderItem.order_id,
+      inventory_item_id: item.id,
+      initiated_at: today,
+      refund_amount_cents: item.cost_cents,
+      status: 'refunded',
+      refunded_at: today,
+    })
+    .select('id')
+    .single();
 
   if (error) return { error: error.message };
 
   revalidateReturnSurfaces(item.id, orderItem.order_id);
-  return { message: 'Marked as returned.' };
+  return { message: 'Marked as returned.', returnId: inserted?.id as string | undefined };
 }
 
 /**

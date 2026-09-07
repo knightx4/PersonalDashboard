@@ -5,6 +5,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTracks, type TrackProgress } from '@/lib/learn/tracks/load';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,7 +65,7 @@ export default async function LearnPage() {
           action={{ label: 'Paste a reading list', href: '/learn/new' }}
         />
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {tracks.map((track) => (
             <li key={track.id}>
               <Link

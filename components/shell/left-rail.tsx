@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { cn } from '@/lib/cn';
+import { buttonVariants } from '@/components/ui/button';
 
 /**
  * Contextual filters. Contents change per section, so each page passes its own
@@ -57,7 +58,7 @@ export function LeftRail({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="press mb-3 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-ui font-medium text-ink-muted xl:hidden"
+        className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'mb-3 xl:hidden')}
         aria-expanded={open}
       >
         <SlidersHorizontal className="size-4" strokeWidth={1.75} aria-hidden />

@@ -3,7 +3,8 @@
 import { Pencil } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { Card } from '@/components/ui/card';
+import { Field, FieldError, Input, Textarea, Select } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { logTouch, markTouchAnswered, updateContact } from '../actions';
 import type { ContactRow } from '../view';
@@ -27,24 +28,25 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
   const pendingReply = outbound.filter((t) => t.respondedAt === null);
 
   return (
-    <div className="rounded-card border border-border bg-surface p-4">
-      <header className="flex flex-wrap items-baseline gap-2">
+    <Card padding="dense">
+      <header className="flex flex-wrap items-center gap-2">
         <h1 className="text-lead font-semibold text-ink">{contact.fullName}</h1>
         {contact.title && <span className="text-ui text-ink-muted">{contact.title}</span>}
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted">
+        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
           {contact.relationship.replace(/_/g, ' ')}
         </span>
-        <span className="ml-auto text-micro text-ink-muted">
+        <span className="ml-auto text-small text-ink-muted">
           {contact.status.replace(/_/g, ' ')}
         </span>
         {!editing && (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-ink-muted hover:text-ink"
+            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
             title="Edit their details"
           >
-            <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Edit their details</span>
           </button>
         )}
       </header>
@@ -81,8 +83,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
       )}
 
       <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-3">
-        <div className="w-40">
-          <Label htmlFor={`channel-${contact.id}`}>Log a send</Label>
+        <Field id={`channel-${contact.id}`} label="Log a send" className="w-40">
           <Select
             id={`channel-${contact.id}`}
             value={channel}
@@ -94,7 +95,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
               </option>
             ))}
           </Select>
-        </div>
+        </Field>
         <Input
           value={message}
           onChange={(event) => setMessage(event.target.value)}
@@ -127,7 +128,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
       {contact.touches.length > 0 ? (
         <ul className="mt-3 divide-y divide-border border-t border-border">
           {contact.touches.map((touch) => (
-            <li key={touch.id} className="flex flex-wrap items-center gap-2 py-1.5 text-ui">
+            <li key={touch.id} className="row-pad flex flex-wrap items-center gap-2 text-ui">
               <span className="tabular w-24 text-ink-muted">
                 {formatDate(touch.sentAt, timezone)}
               </span>
@@ -137,7 +138,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
                 <span className="min-w-0 flex-1 truncate text-ink-muted">{touch.message}</span>
               )}
               {touch.respondedAt ? (
-                <span className="text-status-offer">replied</span>
+                <span className="text-ink">replied</span>
               ) : touch.direction === 'outbound' ? (
                 <Button
                   type="button"
@@ -164,11 +165,11 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
       )}
 
       {pendingReply.length > 0 && (
-        <p className="mt-2 text-micro text-ink-muted">
+        <p className="mt-2 text-small text-ink-muted">
           {pendingReply.length} send{pendingReply.length === 1 ? '' : 's'} still unanswered.
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -225,63 +226,53 @@ function ContactEditForm({
   return (
     <div className="mt-2 space-y-2 border-t border-border pt-2">
       <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={`name-${contact.id}`}>Name</Label>
+        <Field id={`name-${contact.id}`} label="Name">
           <Input
             id={`name-${contact.id}`}
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor={`title-${contact.id}`}>Title</Label>
+        </Field>
+        <Field id={`title-${contact.id}`} label="Title">
           <Input
             id={`title-${contact.id}`}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor={`linkedin-${contact.id}`}>LinkedIn</Label>
+        </Field>
+        <Field id={`linkedin-${contact.id}`} label="LinkedIn">
           <Input
             id={`linkedin-${contact.id}`}
             type="url"
             value={linkedinUrl}
             onChange={(event) => setLinkedinUrl(event.target.value)}
           />
-        </div>
-        <div>
-          <Label htmlFor={`email-${contact.id}`}>Work email</Label>
+        </Field>
+        <Field id={`email-${contact.id}`} label="Work email">
           <Input
             id={`email-${contact.id}`}
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
-        </div>
+        </Field>
       </div>
-      <div>
-        <Label htmlFor={`connect-${contact.id}`}>How you connect</Label>
+      <Field id={`connect-${contact.id}`} label="How you connect">
         <Input
           id={`connect-${contact.id}`}
           value={howWeConnect}
           onChange={(event) => setHowWeConnect(event.target.value)}
         />
-      </div>
-      <div>
-        <Label htmlFor={`notes-${contact.id}`}>Notes</Label>
+      </Field>
+      <Field id={`notes-${contact.id}`} label="Notes">
         <Textarea
           id={`notes-${contact.id}`}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           rows={2}
         />
-      </div>
-      {error && (
-        <p role="alert" className="text-ui text-status-rejected">
-          {error}
-        </p>
-      )}
+      </Field>
+      <FieldError>{error}</FieldError>
       <div className="flex gap-2">
         <Button type="button" size="sm" disabled={pending} onClick={save}>
           Save

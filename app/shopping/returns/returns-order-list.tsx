@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { deadlineLabel } from '@/lib/returns/deadline';
 import type { ReturnsOrderGroup } from '@/lib/returns/grouping';
 import type { ReturnsTrackerRow } from '@/lib/returns/types';
@@ -59,10 +61,10 @@ export function ReturnsOrderList({
         return (
           <li
             key={group.orderId}
-            className="overflow-hidden rounded-card border border-border bg-surface"
+            className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}
           >
             <details className="group/order open:[&_summary_.chevron]:rotate-90">
-              <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 outline-none marker:content-none [&::-webkit-details-marker]:hidden">
+              <summary className="row-pad flex cursor-pointer list-none items-start gap-3 px-4 outline-none transition-colors duration-150 marker:content-none hover:bg-sunken [&::-webkit-details-marker]:hidden">
                 <ChevronRight
                   className="chevron mt-0.5 size-4 shrink-0 text-ink-muted transition-transform duration-150"
                   strokeWidth={1.75}
@@ -78,10 +80,10 @@ export function ReturnsOrderList({
                   )}
                 </div>
               </summary>
-              <div className="flex items-center justify-end border-t border-border px-4 py-2">
+              <div className="row-pad flex items-center justify-end border-t border-border px-4">
                 <Link
                   href={`/shopping/orders/${group.orderId}`}
-                  className="text-small text-ink-muted hover:text-accent hover:underline"
+                  className="text-small text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
                 >
                   View full order
                 </Link>

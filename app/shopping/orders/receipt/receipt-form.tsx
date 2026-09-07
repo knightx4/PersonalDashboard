@@ -7,7 +7,9 @@ import {
   type ReceiptActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Label } from '@/components/ui/field';
+import { cardVariants } from '@/components/ui/card';
+import { Field, FieldError } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import {
   PHOTO_ACCEPT,
   preparePhoto,
@@ -56,16 +58,16 @@ export function ReceiptPhotoForm() {
         Photograph a paper receipt. We extract an order the same way as email
         import, then attach book details when lines look like books.
       </p>
-      <div>
-        <Label htmlFor="receipt">Receipt photo</Label>
+      {/* A file input keeps its native control; only the label is ours. */}
+      <Field id="receipt" label="Receipt photo">
         <input
           id="receipt"
           type="file"
           accept={PHOTO_ACCEPT}
-          className="block w-full text-body"
+          className="block w-full text-body text-ink-muted"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
-      </div>
+      </Field>
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -76,7 +78,8 @@ export function ReceiptPhotoForm() {
       )}
       <Button
         type="button"
-        disabled={!preview || previewPending}
+        disabled={!preview}
+        pending={previewPending}
         onClick={runPreview}
         className="self-start"
       >
@@ -85,7 +88,7 @@ export function ReceiptPhotoForm() {
       <FieldError>{imageError ?? previewState.error ?? saveState.error}</FieldError>
 
       {previewState.preview && previewState.rawOrder && (
-        <form action={saveAction} className="space-y-3 rounded-xl border border-border bg-surface p-4">
+        <form action={saveAction} className={cn(cardVariants({ padding: 'dense' }), 'space-y-3')}>
           <input type="hidden" name="raw_order" value={previewState.rawOrder} />
           <p className="text-body font-medium text-ink">
             {previewState.preview.merchantName ?? 'Unknown merchant'} ·{' '}
@@ -94,7 +97,7 @@ export function ReceiptPhotoForm() {
           </p>
           <ul className="divide-y divide-border text-body">
             {previewState.preview.lines.map((line, i) => (
-              <li key={i} className="flex justify-between gap-3 py-2">
+              <li key={i} className="row-pad flex justify-between gap-3">
                 <span>
                   {line.name}
                   {line.quantity > 1 ? ` ×${line.quantity}` : ''}
@@ -108,7 +111,7 @@ export function ReceiptPhotoForm() {
               </li>
             ))}
           </ul>
-          <Button type="submit" disabled={savePending}>
+          <Button type="submit" pending={savePending}>
             {savePending ? 'Saving…' : 'Save as receipt order'}
           </Button>
         </form>

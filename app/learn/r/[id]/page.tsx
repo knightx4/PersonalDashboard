@@ -9,6 +9,8 @@ import { formatMoney } from '@/lib/money';
 import { openReading } from './actions';
 import { NoteForm } from './note-form';
 import { StatusButtons } from './status-buttons';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,7 +65,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
 
       {reading.why && <p className="mb-5 text-body text-ink">{reading.why}</p>}
 
-      <section className="mb-5 rounded-card border border-border bg-surface p-4">
+      <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where to read</h2>
 
         <p className="flex items-start gap-2 text-body text-ink">

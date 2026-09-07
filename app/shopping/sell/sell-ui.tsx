@@ -21,6 +21,8 @@ import { FieldError, Input, Label } from '@/components/ui/field';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { SellQueueRow } from '@/lib/sell/load-for-sale';
 import type { SellPath } from '@/lib/sell/route';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 const PATH_LABEL: Record<SellPath, string> = {
   list_individually: 'List individually',
@@ -56,7 +58,7 @@ export function SellSettingsForm({
   return (
     <form
       action={action}
-      className="flex flex-wrap items-end gap-3 rounded-card border border-border bg-surface p-4"
+      className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-end gap-3')}
     >
       <div>
         <Label htmlFor="net_floor">Net floor ($)</Label>
@@ -411,7 +413,7 @@ export function SellQueue({
   return (
     <div className="space-y-6">
       {hasPriceSource && (
-        <div className="space-y-2 rounded-card border border-border bg-surface p-4">
+        <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
           <div className="flex flex-wrap items-center gap-2">
             {unpricedCount > 0 && (
               <form action={priceAction}>
@@ -483,7 +485,7 @@ export function SellQueue({
               </h2>
               {group.note && <p className="text-ui text-ink-muted">{group.note}</p>}
             </div>
-            <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+            <ul className={cn(cardVariants(), 'divide-y divide-border')}>
               {groupRows.map((row) => (
                 <SellRow
                   key={row.inventoryItemId}
@@ -512,7 +514,7 @@ export function SellQueue({
               listing. The FMV hint is a rough number, not tax advice.
             </p>
           </div>
-          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {donate.map((row) => (
               <SellRow
                 key={row.inventoryItemId}

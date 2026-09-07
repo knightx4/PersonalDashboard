@@ -222,7 +222,7 @@ export function ActionMenu({
           setMenuOpen(!open);
         }}
       >
-        {trigger ?? <MoreHorizontal className="size-4" strokeWidth={2} aria-hidden />}
+        {trigger ?? <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />}
       </IconActionButton>
 
       {open &&

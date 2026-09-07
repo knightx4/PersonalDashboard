@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil } from 'lucide-react';
+import { FieldError } from '@/components/ui/field';
 import { renameCompany } from '../actions';
 
 /**
@@ -82,9 +83,10 @@ export function CompanyName({ companyId, name }: { companyId: string; name: stri
             setEditing(false);
           }
         }}
-        className="rounded-lg border border-border bg-surface px-2 py-1 font-display text-xl font-semibold tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+        // A control, so its border is the 3:1 token; the size matches the page title it stands in for.
+        className="rounded-lg border border-control bg-surface px-2 py-1 font-display text-title font-semibold tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
       />
-      {error && <span className="text-small font-normal text-status-rejected">{error}</span>}
+      <FieldError>{error}</FieldError>
     </span>
   );
 }

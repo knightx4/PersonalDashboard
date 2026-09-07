@@ -225,7 +225,7 @@ export function WorkspaceSwitcher({
             onShell ? 'text-shell-muted' : 'text-ink-muted',
             compact && 'hidden',
           )}
-          strokeWidth={2}
+          strokeWidth={1.75}
           aria-hidden
         />
         <span className="sr-only">Switch workspace</span>

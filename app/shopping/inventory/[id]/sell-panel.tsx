@@ -9,6 +9,7 @@ import {
   type SellActionState,
 } from '@/app/shopping/sell/actions';
 import { Button } from '@/components/ui/button';
+import { CardSection } from '@/components/ui/card';
 import { FieldError, Input } from '@/components/ui/field';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { ItemSellQuote } from '@/lib/sell/item-quote';
@@ -58,37 +59,37 @@ export function ItemSellPanel({
   const searchLabel = SEARCH_LABEL[quote.priceSource] ?? 'Search for a price';
 
   return (
-    <section className="space-y-3 rounded-card border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-body font-semibold text-ink">Sell</h2>
-          <p className="mt-1 text-ui text-ink-muted">
-            {quote.kind === 'game'
-              ? 'Asking prices for the same game, less eBay fees, shipping and effort.'
-              : quote.kind === 'book'
-                ? 'Asking prices for the same edition, less eBay fees, shipping and effort.'
-                : 'Asking prices for the same thing, less eBay fees, shipping and effort.'}
-          </p>
-        </div>
-        {quote.priceSource !== 'none' && (
+    <CardSection
+      title="Sell"
+      action={
+        quote.priceSource !== 'none' ? (
           <div className="flex flex-wrap gap-2">
             {/* Always offered: a title search needs no confirmed edition, so
                 this is the one button that works on an unpriceable item. */}
             <form action={searchAction}>
               <input type="hidden" name="inventory_item_id" value={itemId} />
-              <Button type="submit" size="sm" variant="secondary" disabled={searchPending}>
+              <Button type="submit" size="sm" variant="secondary" pending={searchPending}>
                 {searchPending ? 'Searching…' : searchLabel}
               </Button>
             </form>
             <form action={priceAction}>
               <input type="hidden" name="inventory_item_id" value={itemId} />
-              <Button type="submit" size="sm" disabled={pricePending}>
+              <Button type="submit" size="sm" pending={pricePending}>
                 {pricePending ? 'Pricing…' : price == null ? 'Price it' : 'Price it again'}
               </Button>
             </form>
           </div>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
+      <div className="space-y-3">
+      <p className="text-ui text-ink-muted">
+        {quote.kind === 'game'
+          ? 'Asking prices for the same game, less eBay fees, shipping and effort.'
+          : quote.kind === 'book'
+            ? 'Asking prices for the same edition, less eBay fees, shipping and effort.'
+            : 'Asking prices for the same thing, less eBay fees, shipping and effort.'}
+      </p>
 
       {searchState.query && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas px-3 py-2 text-ui">
@@ -206,7 +207,7 @@ export function ItemSellPanel({
           className="w-28"
           aria-label="Price you found yourself"
         />
-        <Button type="submit" size="sm" variant="secondary" disabled={manualPending}>
+        <Button type="submit" size="sm" variant="secondary" pending={manualPending}>
           {manualPending ? 'Saving…' : 'Set price'}
         </Button>
         <span className="text-small text-ink-muted">Beats any lookup; clear it to go back.</span>
@@ -216,6 +217,7 @@ export function ItemSellPanel({
         <p className="text-body text-positive">{priceState.message ?? manualState.message}</p>
       )}
       <FieldError>{priceState.error ?? manualState.error}</FieldError>
-    </section>
+      </div>
+    </CardSection>
   );
 }

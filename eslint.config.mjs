@@ -124,7 +124,7 @@ const renderBoundaries = {
  * codebase writes.
  */
 const OFF_SCALE_TYPE = String.raw`\btext-(xs|sm|base|lg|xl|[2-9]xl)\b`;
-const ARBITRARY_WIDTH = String.raw`\bmax-w-(\[(?!1400px\])|[4-9]xl\b)`;
+const ARBITRARY_WIDTH = String.raw`\bmax-w-\[(?!1400px\])`;
 const RAW_HEX = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline|shadow|from|to|via)-\[#`;
 const RAW_PALETTE = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline|decoration|from|to|via)-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d`;
 

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
 import { confirmImport, previewImport, type NewTrackState, type PreviewRow } from './actions';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 /**
  * Paste, then confirm.
@@ -127,7 +129,7 @@ export function ImportForm() {
           {found} of {previewState.preview.rows.length} placed. Untick anything you do not want.
         </p>
 
-        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {previewState.preview.rows.map((row, index) => (
             <ResolvedRow key={`${row.raw}-${index}`} row={row} index={index} />
           ))}

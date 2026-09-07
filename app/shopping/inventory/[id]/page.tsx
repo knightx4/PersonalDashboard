@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { SendToShare } from '@/components/share/send-to-share';
 import { loadShareOptions } from '@/lib/share/load-options';
 import { buttonVariants } from '@/components/ui/button';
+import { Card, CardSection, cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/shopping/returns/plan-return-button';
@@ -298,7 +300,9 @@ export default async function InventoryItemPage({
     item.status === 'owned' ? await loadShareOptions(supabase, user.id) : [];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    // A detail page reads top to bottom, so it gets the reading column rather
+    // than the single-form width the panels below might suggest.
+    <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
         title={title}
         description={[displayVariant(item.variant), category?.name, item.status]
@@ -327,7 +331,7 @@ export default async function InventoryItemPage({
         }
       />
 
-      <div className="overflow-hidden rounded-card border border-border bg-surface">
+      <Card padding="none" className="overflow-hidden">
         <div className="aspect-[16/9] bg-canvas sm:aspect-[2/1]">
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
@@ -344,9 +348,9 @@ export default async function InventoryItemPage({
             Full title: <span className="text-ink">{item.name}</span>
           </p>
         )}
-      </div>
+      </Card>
 
-      <dl className="grid gap-3 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
+      <dl className={cn(cardVariants({ padding: 'dense' }), 'grid gap-3 text-body sm:grid-cols-2')}>
         <div>
           <dt className="text-ink-muted">Landed cost</dt>
           <dd className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</dd>
@@ -495,35 +499,33 @@ export default async function InventoryItemPage({
       {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
 
       {item.status === 'owned' && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
-          <div>
-            <h2 className="text-body font-semibold text-ink">Sell this</h2>
-            <p className="mt-1 text-ui text-ink-muted">
-              Puts it on the{' '}
-              <Link href="/shopping/sell" className="text-accent hover:underline">
-                sell page
-              </Link>
-              , whether or not it is something the assistant can price.
-            </p>
-          </div>
-          <MarkForSaleButton itemId={item.id} forSale={Boolean(item.for_sale)} />
-        </section>
+        <CardSection
+          title="Sell this"
+          action={<MarkForSaleButton itemId={item.id} forSale={Boolean(item.for_sale)} />}
+        >
+          <p className="text-ui text-ink-muted">
+            Puts it on the{' '}
+            <Link href="/shopping/sell" className="text-accent hover:underline">
+              sell page
+            </Link>
+            , whether or not it is something the assistant can price.
+          </p>
+        </CardSection>
       )}
 
       {item.status === 'owned' && order && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
-          <div>
-            <h2 className="text-body font-semibold text-ink">Plan a return</h2>
-            <p className="mt-1 text-ui text-ink-muted">
-              Marks this unit on the{' '}
-              <Link href="/shopping/returns?view=marked" className="text-accent hover:underline">
-                returns tracker
-              </Link>{' '}
-              without recording a refund yet.
-            </p>
-          </div>
-          <PlanReturnButton itemId={item.id} planned={Boolean(item.return_planned)} />
-        </section>
+        <CardSection
+          title="Plan a return"
+          action={<PlanReturnButton itemId={item.id} planned={Boolean(item.return_planned)} />}
+        >
+          <p className="text-ui text-ink-muted">
+            Marks this unit on the{' '}
+            <Link href="/shopping/returns?view=marked" className="text-accent hover:underline">
+              returns tracker
+            </Link>{' '}
+            without recording a refund yet.
+          </p>
+        </CardSection>
       )}
 
       <ItemListsForm
@@ -537,9 +539,9 @@ export default async function InventoryItemPage({
           {item.order_item_id ? (
             <ReturnForm itemId={item.id} defaultRefundCents={item.cost_cents} />
           ) : (
-            <div className="rounded-card border border-dashed border-border bg-surface p-4 text-body text-ink-muted">
+            <Card padding="dense" className="border-dashed text-body text-ink-muted">
               This owned item is not linked to an order, so it cannot be marked returned.
-            </div>
+            </Card>
           )}
           <DisposeForm itemId={item.id} />
         </div>

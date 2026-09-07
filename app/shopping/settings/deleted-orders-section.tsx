@@ -7,6 +7,7 @@ import {
   restoreDeletedOrder,
 } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { formatMoney } from '@/lib/money';
 
 export type DeletedOrderRow = {
@@ -60,20 +61,19 @@ export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) 
                       Restore
                     </Button>
                   </form>
-                  <form
+                  {/* The one action here with no way back, so it confirms in
+                      place: a second click on the same spot, never a dialog. */}
+                  <ConfirmStep
+                    variant="ghost"
+                    size="sm"
+                    prompt="This removes the order for good. There is no undo."
+                    confirmLabel="Delete forever"
+                    pendingLabel="Deleting…"
                     action={permanentlyDeleteOrder}
-                    onSubmit={(event) => {
-                      const ok = window.confirm(
-                        'Delete this order forever? This cannot be undone.',
-                      );
-                      if (!ok) event.preventDefault();
-                    }}
+                    fields={{ orderId: order.id }}
                   >
-                    <input type="hidden" name="orderId" value={order.id} />
-                    <Button type="submit" variant="ghost" size="sm">
-                      Delete forever
-                    </Button>
-                  </form>
+                    Delete forever
+                  </ConfirmStep>
                 </div>
               </li>
             );

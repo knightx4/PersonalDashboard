@@ -4,7 +4,10 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { fingerprintLoose } from '@/lib/fingerprint';
 import { formatMoney } from '@/lib/money';
 import { PageHeader } from '@/components/shell/page-header';
+import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
+import { cardVariants, CardSection } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { EditSavedForm, SavedStatusActions } from './item-forms';
 
 export const metadata = { title: 'Saved item' };
@@ -56,7 +59,9 @@ export default async function SavedItemPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    // A detail page read top to bottom, so the reading column rather than the
+    // single-form width, even though most of it is an edit form.
+    <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
         title={item.title ?? 'Untitled'}
         description={[merchant?.name, item.status, item.created_at?.slice(0, 10)]
@@ -97,7 +102,12 @@ export default async function SavedItemPage({
             </div>
           )}
         </div>
-        <dl className="grid flex-1 gap-3 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
+        <dl
+          className={cn(
+            cardVariants({ padding: 'dense' }),
+            'grid flex-1 gap-3 text-body sm:grid-cols-2',
+          )}
+        >
           <div>
             <dt className="text-ink-muted">Price</dt>
             <dd className="tabular font-medium text-ink">
@@ -122,11 +132,8 @@ export default async function SavedItemPage({
       </div>
 
       {ownedMatches.length > 0 && (
-        <div
-          className="rounded-card border border-caution/40 bg-caution-tint px-4 py-3"
-          role="status"
-        >
-          <p className="text-body font-medium text-ink">You may already own this</p>
+        <Banner tone="warn">
+          <p className="font-medium">You may already own this</p>
           <ul className="mt-2 space-y-1 text-ui text-ink-muted">
             {ownedMatches.map((match) => (
               <li key={match.id}>
@@ -139,11 +146,10 @@ export default async function SavedItemPage({
               </li>
             ))}
           </ul>
-        </div>
+        </Banner>
       )}
 
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="mb-4 text-body font-semibold text-ink">Edit</h2>
+      <CardSection title="Edit">
         <EditSavedForm
           item={{
             id: item.id,
@@ -156,10 +162,10 @@ export default async function SavedItemPage({
             merchantId: item.merchant_id,
           }}
         />
-      </section>
+      </CardSection>
 
       <section className="space-y-3">
-        <h2 className="text-body font-semibold text-ink">Queue actions</h2>
+        <h2 className="text-ui font-semibold text-ink">Queue actions</h2>
         <SavedStatusActions itemId={item.id} status={item.status} />
       </section>
     </div>

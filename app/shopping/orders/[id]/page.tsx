@@ -2,7 +2,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
+import { Card, cardVariants } from '@/components/ui/card';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import { cn } from '@/lib/cn';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
@@ -210,42 +214,44 @@ export default async function OrderDetailPage({
       />
 
       {isDeleted && (
-        <p className="rounded-lg border border-border bg-caution-tint px-3 py-2 text-body text-caution">
+        <Banner tone="warn">
           This order is in Deleted orders. Its inventory is hidden from your owned list until you
           restore it. Manage it in{' '}
           <Link href="/shopping/settings#deleted-orders" className="underline underline-offset-2">
             Settings
           </Link>
           .
-        </p>
+        </Banner>
       )}
 
       {!isDeleted && order.needs_review && (
-        <div className="flex flex-col gap-3 rounded-card border border-border bg-caution-tint px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-body font-medium text-caution">Needs review</p>
-            <p className="text-ui text-caution/80">
-              Imported with the fallback parser. Confirm the totals and items, or discard if this
-              should not count toward spend.
-            </p>
+        <Banner tone="warn">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-medium">Needs review</p>
+              <p className="text-ui text-ink-muted">
+                Imported with the fallback parser. Confirm the totals and items, or discard if this
+                should not count toward spend.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ConfirmOrderButton orderId={order.id} />
+              <DiscardOrderButton orderId={order.id} />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <ConfirmOrderButton orderId={order.id} />
-            <DiscardOrderButton orderId={order.id} />
-          </div>
-        </div>
+        </Banner>
       )}
 
       {(shipments?.length ?? 0) > 0 && (
         <section className="space-y-3">
-          <h2 className="text-body font-semibold uppercase tracking-wider text-ink-muted">
+          <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
             Shipments
           </h2>
-          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
             {(shipments ?? []).map((shipment) => {
               const links = shipmentEmailLinks.get(shipment.id) ?? {};
               return (
-                <li key={shipment.id} className="px-4 py-3 text-body">
+                <li key={shipment.id} className="row-pad px-4 text-body">
                   <p className="font-medium text-ink">
                     {shipment.status.replaceAll('_', ' ')}
                     {shipment.carrier ? ` · ${shipment.carrier}` : ''}
@@ -269,7 +275,7 @@ export default async function OrderDetailPage({
                         href={shipment.tracking_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ui text-accent hover:underline"
+                        className="text-ui font-medium text-accent hover:underline"
                       >
                         Track package
                       </a>
@@ -279,7 +285,7 @@ export default async function OrderDetailPage({
                         href={links.shippingHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ui text-ink-muted hover:text-accent hover:underline"
+                        className="text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
                       >
                         Open shipping email
                       </a>
@@ -289,7 +295,7 @@ export default async function OrderDetailPage({
                         href={links.deliveryHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ui text-ink-muted hover:text-accent hover:underline"
+                        className="text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
                       >
                         Open delivery email
                       </a>
@@ -304,12 +310,12 @@ export default async function OrderDetailPage({
 
       {(returnRows?.length ?? 0) > 0 && (
         <section className="space-y-3">
-          <h2 className="text-body font-semibold uppercase tracking-wider text-ink-muted">
+          <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
             Returns
           </h2>
-          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
             {(displayReturns ?? []).map((row) => (
-              <li key={row.id} className="flex justify-between gap-4 px-4 py-3 text-body">
+              <li key={row.id} className="row-pad flex justify-between gap-4 px-4 text-body">
                 <span className="text-ink">
                   {row.status.replaceAll('_', ' ')}
                   {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
@@ -323,52 +329,56 @@ export default async function OrderDetailPage({
         </section>
       )}
 
-      <section className="overflow-hidden rounded-card border border-border bg-surface">
-        <table className="w-full text-body">
-          <thead className="border-b border-border text-left text-small uppercase tracking-wider text-ink-muted">
-            <tr>
-              <th className="px-4 py-2 font-semibold">Item</th>
-              <th className="px-4 py-2 font-semibold">Qty</th>
-              <th className="px-4 py-2 text-right font-semibold">Unit</th>
-              <th className="px-4 py-2 text-right font-semibold">Line</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
+      <Card padding="none" className="overflow-hidden">
+        <Table>
+          <THead>
+            <TR>
+              <TH>Item</TH>
+              <TH num>Qty</TH>
+              <TH num>Unit</TH>
+              <TH num>Line</TH>
+            </TR>
+          </THead>
+          <TBody>
             {displayItems.map((item) => {
               const category = Array.isArray(item.categories)
                 ? item.categories[0]
                 : item.categories;
               const units = item.display_units;
               return (
-                <tr key={item.id}>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{item.name}</p>
-                    <p className="text-ui text-ink-muted">
+                <TR key={item.id}>
+                  {/* The primary cell is set medium; everything under the
+                      name steps back to the normal weight. */}
+                  <TD primary className="text-body">
+                    <p className="text-ink">{item.name}</p>
+                    <p className="text-ui font-normal text-ink-muted">
                       {[item.variant, category?.name].filter(Boolean).join(' · ') || '—'}
                     </p>
-                    <OrderItemTags
-                      orderId={order.id}
-                      orderItemId={item.id}
-                      tags={orderItemTags(item).map((tag) => ({
-                        id: tag.id ?? '',
-                        name: tag.name,
-                      })).filter((tag) => tag.id)}
-                      readOnly={isDeleted}
-                    />
+                    <div className="font-normal">
+                      <OrderItemTags
+                        orderId={order.id}
+                        orderItemId={item.id}
+                        tags={orderItemTags(item).map((tag) => ({
+                          id: tag.id ?? '',
+                          name: tag.name,
+                        })).filter((tag) => tag.id)}
+                        readOnly={isDeleted}
+                      />
+                    </div>
                     {item.product_url && (
                       <p className="mt-1.5">
                         <a
                           href={item.product_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-ui text-accent hover:underline"
+                          className="text-ui font-medium text-accent hover:underline"
                         >
                           View product
                         </a>
                       </p>
                     )}
                     {units.length > 0 && (
-                      <ul className="mt-2 space-y-1.5">
+                      <ul className="mt-2 space-y-1.5 font-normal">
                         {units.map((unit, index) => (
                           <li
                             key={unit.id}
@@ -391,25 +401,27 @@ export default async function OrderDetailPage({
                         ))}
                       </ul>
                     )}
-                  </td>
-                  <td className="tabular px-4 py-3 align-top text-ink-muted">{item.quantity}</td>
-                  <td className="tabular px-4 py-3 align-top text-right text-ink">
+                  </TD>
+                  <TD num muted label="Qty" className="text-body">
+                    {item.quantity}
+                  </TD>
+                  <TD num label="Unit" className="text-body">
                     {moneyLabel(item.display_unit_cents, item.unit_price_cents)}
-                  </td>
-                  <td className="tabular px-4 py-3 align-top text-right text-ink">
+                  </TD>
+                  <TD num label="Line" className="text-body">
                     {moneyLabel(
                       item.display_line_cents,
                       lineSubtotalCents(item.quantity, item.unit_price_cents),
                     )}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               );
             })}
-          </tbody>
-        </table>
-      </section>
+          </TBody>
+        </Table>
+      </Card>
 
-      <dl className="grid gap-2 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
+      <dl className={cn(cardVariants({ padding: 'dense' }), 'grid gap-2 text-body sm:grid-cols-2')}>
         <div className="flex justify-between gap-4 sm:col-span-2">
           <dt className="text-ink-muted">Subtotal</dt>
           <dd className="tabular text-ink">

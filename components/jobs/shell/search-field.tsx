@@ -14,6 +14,16 @@ import { useEffect, useRef, useState } from 'react';
  * Typing is debounced and pushed with `replace`, so a search does not leave one
  * history entry per keystroke between you and the page you came from.
  */
+/**
+ * The field's own classes, kept raw for the icon layout. `text-base sm:text-ui`
+ * is the same deliberate exception the Field primitive makes: 16px stops iOS
+ * zooming the page on focus.
+ */
+const control =
+  // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+  'h-9 w-full rounded-lg border border-control bg-surface pl-8 pr-8 text-base text-ink sm:text-ui ' +
+  'placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25';
+
 export function SearchField({
   placeholder = 'Search company or role',
   paramName = 'q',
@@ -65,7 +75,7 @@ export function SearchField({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-8 text-base text-ink placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 sm:text-ui"
+        className={control}
       />
       {value && (
         <button
@@ -74,7 +84,8 @@ export function SearchField({
             typing.current = true;
             setValue('');
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-muted hover:text-ink"
+          // Sized to sit inside a 36px field, so smaller than the standard size-8 icon button.
+          className="press absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={2} aria-hidden />
           <span className="sr-only">Clear search</span>

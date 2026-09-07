@@ -18,7 +18,7 @@ export function MarkForSaleButton({ itemId, forSale }: { itemId: string; forSale
     <form action={action} className="inline-flex flex-col items-end gap-1">
       <input type="hidden" name="id" value={itemId} />
       <input type="hidden" name="for_sale" value={forSale ? 'false' : 'true'} />
-      <Button type="submit" variant={forSale ? 'secondary' : 'primary'} size="sm" disabled={pending}>
+      <Button type="submit" variant={forSale ? 'secondary' : 'primary'} size="sm" pending={pending}>
         {pending ? 'Saving…' : forSale ? 'Take off the sell page' : 'Mark for sale'}
       </Button>
       <FieldError>{state.error}</FieldError>

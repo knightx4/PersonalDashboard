@@ -70,7 +70,7 @@ export default async function VaultSettingsPage() {
                 </span>
               ) : (
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-caution-tint px-2 py-0.5 text-small font-medium text-caution">
-                  <AlertTriangle className="size-3" strokeWidth={2.5} aria-hidden />
+                  <AlertTriangle className="size-3" strokeWidth={2} aria-hidden />
                   {STATUS_LABEL[connection.status] ?? connection.status}
                 </span>
               )}

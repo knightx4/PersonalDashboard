@@ -4,7 +4,8 @@ import { useActionState, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Textarea } from '@/components/ui/field';
+import { cardVariants } from '@/components/ui/card';
+import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
 import type { Task } from '@/lib/todo/tasks/model';
 
@@ -40,7 +41,7 @@ export function AddTask() {
   );
 
   return (
-    <form ref={formRef} action={action} className="rounded-card border border-border bg-surface p-3">
+    <form ref={formRef} action={action} className={cardVariants({ padding: 'dense' })}>
       <div className="flex items-center gap-2">
         <Input
           ref={titleRef}
@@ -51,15 +52,17 @@ export function AddTask() {
           required
         />
         <Button type="submit" disabled={pending}>
-          <Plus className="size-4" strokeWidth={2} aria-hidden />
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           Add
         </Button>
       </div>
 
+      {/* Deliberately quiet rather than accent-coloured: the whole point of the
+          form is that you do not need what is behind this. */}
       <button
         type="button"
         onClick={() => setExpanded((open) => !open)}
-        className="mt-2 text-small font-medium text-ink-muted hover:text-ink"
+        className="mt-2 text-ui font-medium text-ink-muted transition-colors duration-150 hover:text-ink"
       >
         {expanded ? 'Less' : 'Details'}
       </button>
@@ -69,16 +72,13 @@ export function AddTask() {
           the section is collapsed again. */}
       <div className={cn('mt-3 space-y-3', !expanded && 'hidden')}>
         <DueFields />
-        <div>
-          <Label htmlFor="add-body">Notes</Label>
+        <Field id="add-body" label="Notes">
           <Textarea id="add-body" name="body" rows={3} />
-        </div>
+        </Field>
         <PinnedField id="add-pinned" />
       </div>
 
-      {state.error && (
-        <p className="mt-2 text-ui text-status-rejected">{state.error}</p>
-      )}
+      <FieldError>{state.error}</FieldError>
     </form>
   );
 }
@@ -94,26 +94,26 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
   );
 
   return (
+    // Not a card: an editor that opens in place of a row sits on the canvas
+    // tone so it reads as the row unfolded, not as a second sheet.
     <form action={action} className="space-y-3 rounded-lg border border-border bg-canvas p-3">
       <input type="hidden" name="id" value={task.id} />
-      <div>
-        <Label htmlFor={`title-${task.id}`}>Title</Label>
+      <Field id={`title-${task.id}`} label="Title">
         <Input id={`title-${task.id}`} name="title" defaultValue={task.title} required />
-      </div>
+      </Field>
 
       <DueFields
         defaultDay={task.dueOn ?? (task.dueAt ? task.dueAt.slice(0, 10) : '')}
         defaultTime={task.dueAt ? clockOf(task.dueAt) : ''}
       />
 
-      <div>
-        <Label htmlFor={`body-${task.id}`}>Notes</Label>
+      <Field id={`body-${task.id}`} label="Notes">
         <Textarea id={`body-${task.id}`} name="body" rows={3} defaultValue={task.body ?? ''} />
-      </div>
+      </Field>
 
       <PinnedField id={`pinned-${task.id}`} defaultChecked={task.pinned} />
 
-      {state.error && <p className="text-ui text-status-rejected">{state.error}</p>}
+      <FieldError>{state.error}</FieldError>
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
@@ -138,17 +138,12 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
 function DueFields({ defaultDay = '', defaultTime = '' }: { defaultDay?: string; defaultTime?: string }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <div>
-        <Label htmlFor="dueOn">Due</Label>
+      <Field id="dueOn" label="Due">
         <Input id="dueOn" name="dueOn" type="date" defaultValue={defaultDay} />
-      </div>
-      <div>
-        <Label htmlFor="dueTime">At (optional)</Label>
+      </Field>
+      <Field id="dueTime" label="At (optional)" hint="Leave empty for a day with no particular hour.">
         <Input id="dueTime" name="dueTime" type="time" defaultValue={defaultTime} />
-        <p className="mt-1 text-micro text-ink-muted">
-          Leave empty for a day with no particular hour.
-        </p>
-      </div>
+      </Field>
     </div>
   );
 }

@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 import { SaveForm } from './save-form';
 
@@ -97,9 +99,11 @@ export default async function SavedPage({
             icon={Bookmark}
             title={emptyCopy[status].title}
             description={emptyCopy[status].description}
+            // The composer that fills the saved queue sits just above, so its
+            // action points at the URL box rather than at another page.
             action={
               status === 'saved'
-                ? undefined
+                ? { label: 'Save your first link', href: '#url' }
                 : { label: 'Back to saved', href: '/shopping/saved' }
             }
           />
@@ -113,7 +117,10 @@ export default async function SavedPage({
                 <li key={item.id}>
                   <Link
                     href={`/shopping/saved/${item.id}`}
-                    className="lift block overflow-hidden rounded-card border border-border bg-surface"
+                    className={cn(
+                      cardVariants({ padding: 'none', interactive: true }),
+                      'block overflow-hidden',
+                    )}
                   >
                     <div className="aspect-[4/3] bg-canvas">
                       {item.image_url ? (

@@ -25,7 +25,7 @@ export function ReturnItemRow({
   const returned = row.status === 'returned';
 
   return (
-    <li className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+    <li className="row-pad flex flex-col gap-3 px-4 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export function ReturnItemRow({
         {!nested && (
           <Link
             href={`/shopping/orders/${row.orderId}`}
-            className="text-small text-ink-muted hover:text-accent hover:underline"
+            className="text-small text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
           >
             View order
           </Link>

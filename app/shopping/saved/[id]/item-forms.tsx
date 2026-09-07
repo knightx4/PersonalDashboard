@@ -10,7 +10,7 @@ import {
   type ActionState,
 } from '@/app/shopping/saved/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
+import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { formatCentsAsDollarsInput } from '@/lib/money';
 
 const initial: ActionState = {};
@@ -36,17 +36,14 @@ export function EditSavedForm({
       <input type="hidden" name="id" value={item.id} />
       <input type="hidden" name="merchant_id" value={item.merchantId ?? ''} />
       <input type="hidden" name="currency" value={item.currency} />
-      <div>
-        <Label htmlFor="title">Title</Label>
+      <Field id="title" label="Title">
         <Input id="title" name="title" required defaultValue={item.title ?? ''} />
-      </div>
-      <div>
-        <Label htmlFor="url">URL</Label>
+      </Field>
+      <Field id="url" label="URL">
         <Input id="url" name="url" type="url" required defaultValue={item.url} />
-      </div>
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="price">Price</Label>
+        <Field id="price" label="Price">
           <Input
             id="price"
             name="price"
@@ -56,23 +53,21 @@ export function EditSavedForm({
               item.priceCents != null ? formatCentsAsDollarsInput(item.priceCents) : ''
             }
           />
-        </div>
-        <div>
-          <Label htmlFor="image_url">Image URL</Label>
+        </Field>
+        <Field id="image_url" label="Image URL">
           <Input
             id="image_url"
             name="image_url"
             type="url"
             defaultValue={item.imageUrl ?? ''}
           />
-        </div>
+        </Field>
       </div>
-      <div>
-        <Label htmlFor="notes">Notes</Label>
+      <Field id="notes" label="Notes">
         <Textarea id="notes" name="notes" defaultValue={item.notes ?? ''} />
-      </div>
+      </Field>
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" pending={pending}>
           {pending ? 'Saving…' : 'Save changes'}
         </Button>
         {state.message && <p className="text-body text-positive">{state.message}</p>}
@@ -99,7 +94,7 @@ function StatusForm({
   return (
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="id" value={itemId} />
-      <Button type="submit" variant={variant} disabled={pending} className="w-full sm:w-auto">
+      <Button type="submit" variant={variant} pending={pending} className="w-full sm:w-auto">
         {pending ? pendingLabel : label}
       </Button>
       <FieldError>{state.error}</FieldError>

@@ -53,10 +53,10 @@ export function SendToShare({
       <Button
         size={size}
         variant="secondary"
-        disabled={pending}
+        pending={pending}
         onClick={() => send(shares[0]!.id)}
       >
-        <Share2 className="size-3.5" aria-hidden />
+        <Share2 className="size-4" strokeWidth={1.75} aria-hidden />
         {pending ? 'Adding…' : text}
       </Button>
     );
@@ -64,8 +64,8 @@ export function SendToShare({
 
   return (
     <div className="relative">
-      <Button size={size} variant="secondary" disabled={pending} onClick={() => setOpen(!open)}>
-        <Share2 className="size-3.5" aria-hidden />
+      <Button size={size} variant="secondary" pending={pending} onClick={() => setOpen(!open)}>
+        <Share2 className="size-4" strokeWidth={1.75} aria-hidden />
         {pending ? 'Adding…' : text}
       </Button>
       {open && (
@@ -75,7 +75,7 @@ export function SendToShare({
               <button
                 type="button"
                 onClick={() => send(share.id)}
-                className="w-full px-3 py-1.5 text-left text-ui text-ink hover:bg-canvas"
+                className="w-full px-3 py-1.5 text-left text-ui text-ink transition-colors duration-150 hover:bg-canvas"
               >
                 {share.title}
               </button>

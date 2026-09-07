@@ -421,7 +421,7 @@ export function AppShell({
               className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
               aria-label="Open navigation"
             >
-              <Menu className="size-4" strokeWidth={2} aria-hidden />
+              <Menu className="size-4" strokeWidth={1.75} aria-hidden />
             </button>
 
             <span className="lg:hidden">
