@@ -31,12 +31,14 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
   const brief = await loadTodoBrief(user.id, settings.timezone);
 
   /**
-   * Two sections and nothing else. "Agenda" is what needs you; "All" is
-   * everything, including what is finished. A todo module that grows a third
-   * section has probably grown a feature it did not need.
+   * Three questions, three sections. "Agenda" is what needs you next;
+   * "Calendar" is how the month is shaped; "All" is everything, including what
+   * is finished. Anything a fourth section would answer is probably a filter on
+   * one of these.
    */
   const sections: NavSection[] = [
     { href: '/todo', label: 'Agenda', icon: 'agenda', exact: true },
+    { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ];
 
