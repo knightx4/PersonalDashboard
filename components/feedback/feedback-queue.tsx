@@ -1,15 +1,16 @@
 import { MessageSquarePlus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FeedbackList } from '@/app/shopping/feedback/feedback-list';
+import { FeedbackList } from '@/components/feedback/feedback-list';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import type { FeedbackQueue } from '@/lib/feedback/load';
 
 /**
  * The queue itself, without a page header.
  *
- * Both workspaces show the same list — there is one queue — and they differ
- * only in which shell's header sits above it, so that is the only thing each
- * page supplies.
+ * It lives apart from the page for the reason it always did: there is one
+ * queue, and it used to be rendered under two workspaces that differed only in
+ * which shell sat above it. Both of those are redirects to /dev/bugs now, and
+ * this stays split because a queue view and a page are still different things.
  */
 export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
   const { rows, outstanding, closed, blocked } = queue;

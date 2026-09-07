@@ -38,13 +38,21 @@ export function dayIn(iso: string, timezone: string): string {
 }
 
 /**
- * The tab's reading order: every round exactly once, grouped ones gathered at
- * the position of the first of them.
+ * The tab's reading order: every interview exactly once, the ones in a round
+ * gathered at the position of the first of them, and rounds with nothing in
+ * them yet after all of it.
+ *
+ * Empty rounds are listed because a round is now made before anything is
+ * booked into it -- "there will be a technical round, times to follow" -- and
+ * one that did not render would be a round the user made and cannot see, let
+ * alone add to. They go last for want of a position: they have no interview to
+ * sort by, and putting them among the booked ones would move as things are
+ * added.
  *
  * A group_id pointing at a group that is not on the page cannot silently
- * swallow a round -- it renders on its own instead. That is a state the
- * database allows only briefly, and a round that vanishes is much worse than
- * one shown outside its group.
+ * swallow an interview -- it renders on its own instead. That is a state the
+ * database allows only briefly, and an interview that vanishes is much worse
+ * than one shown outside its round.
  */
 export function sectionInterviews<T extends GroupableInterview>(
   interviews: readonly T[],
@@ -70,6 +78,11 @@ export function sectionInterviews<T extends GroupableInterview>(
     (sections[at] as { kind: 'group'; group: InterviewGroup; interviews: T[] }).interviews.push(
       interview,
     );
+  }
+
+  for (const group of groups) {
+    if (indexOfGroup.has(group.id)) continue;
+    sections.push({ kind: 'group', group, interviews: [] });
   }
 
   return sections;

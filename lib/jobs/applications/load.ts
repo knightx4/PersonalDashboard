@@ -239,6 +239,24 @@ export function formatDate(iso: string | null, timezone = 'UTC'): string {
   }).format(date);
 }
 
+/**
+ * When a round is, saying only as much as is actually known.
+ *
+ * A round can be on the calendar with an hour, agreed for a day whose hour is
+ * still being worked out, or agreed in principle with no date at all. Putting
+ * all three through formatDateTime printed the middle one as midnight — a time
+ * nobody said — and the last as an em dash that reads like missing data rather
+ * than like the answer.
+ */
+export function formatInterviewWhen(
+  iso: string | null,
+  timeKnown: boolean,
+  timezone = 'UTC',
+): string {
+  if (!iso) return 'Date to be set';
+  return timeKnown ? formatDateTime(iso, timezone) : formatDate(iso, timezone);
+}
+
 export function formatDateTime(iso: string | null, timezone = 'UTC'): string {
   if (!iso) return '—';
   const date = new Date(iso);

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
   CalendarClock,
   CheckCircle2,
@@ -20,7 +20,12 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
-import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
+import {
+  formatCompBand,
+  formatDate,
+  formatDateTime,
+  formatInterviewWhen,
+} from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -40,8 +45,10 @@ import {
   addInterviewer,
   addNote,
   addReminder,
+  createInterviewRound,
   declineCandidateMessage,
   deleteInterview,
+  deleteInterviewRound,
   groupInterviews,
   linkCandidateMessage,
   linkReminderMessage,
@@ -120,6 +127,8 @@ export interface PanelProps {
     round: number;
     kind: string;
     scheduledAt: string | null;
+    /** False when only the day is settled: the hour is not to be shown. */
+    timeKnown: boolean;
     /** Computed on the server: reading the clock during render is unstable. */
     debriefDue: boolean;
     format: string | null;
@@ -1671,9 +1680,15 @@ function Interviews({
     ? messages.filter((message) => INTERVIEW_MAIL.has(message.classification))
     : [];
 
+  // Scheduling mail on this pursuit, offered inside a round as the other way
+  // to fill it: "add from email" rather than retyping what the invite says.
+  const schedulingMail = messages.filter((message) =>
+    INTERVIEW_MAIL.has(message.classification),
+  );
+
   return (
     <div className="space-y-3">
-      {interviews.length === 0 ? (
+      {interviews.length === 0 && interviewGroups.length === 0 ? (
         <div className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
           {interviewMail.length > 0 ? (
             <>
@@ -1713,8 +1728,11 @@ function Interviews({
             section.kind === 'group' ? (
               <InterviewGroupCard
                 key={section.group.id}
+                applicationId={applicationId}
                 group={section.group}
                 interviews={section.interviews}
+                nextRound={section.interviews[0]?.round ?? interviews.length + 1}
+                schedulingMail={schedulingMail}
                 timezone={timezone}
                 companyContacts={companyContacts}
                 focusInterviewId={focusInterviewId}
@@ -1731,12 +1749,54 @@ function Interviews({
           )}
         </>
       )}
+      {/* Two ways in, because both happen. A round is usually agreed before
+          anything in it is booked, so it is made empty and filled as the
+          invitations arrive; a single conversation nobody framed as a round
+          still goes straight on the tab. */}
+      <AddRound applicationId={applicationId} nextRound={interviewGroups.length + 1} />
       <AddInterview
         applicationId={applicationId}
         nextRound={interviews.length + 1}
+        triggerLabel="Add an interview on its own"
         seed={seed}
         onSeedUsed={onSeedUsed}
       />
+    </div>
+  );
+}
+
+/**
+ * The round itself, before anything is in it.
+ *
+ * "There will be a technical round, we will send times" is the state a
+ * pursuit is in most often, and it had nowhere to be recorded: rounds could
+ * only be made out of interviews that already existed, which meant waiting for
+ * the mail before the thing everyone had already agreed to could be written
+ * down.
+ */
+function AddRound({ applicationId, nextRound }: { applicationId: string; nextRound: number }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await createInterviewRound({
+              applicationId,
+              label: `Round ${nextRound}`,
+            });
+            setError(result.error);
+          })
+        }
+        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
+      >
+        {pending ? 'Adding…' : 'Add a round'}
+      </button>
+      {error && <p className="mt-1 text-small text-status-rejected">{error}</p>}
     </div>
   );
 }
@@ -1862,20 +1922,58 @@ function Interviewers({
  * another round. Close enough to be useful, wrong often enough that a card
  * with no way to fix its own name is a dead end.
  */
+/**
+ * The two form fields as the pair the server takes.
+ *
+ * A day with no hour is stored at local midnight with `timeKnown` false: the
+ * timestamp still sorts and groups on the day it was typed for, and the flag
+ * is what stops the card from claiming the interview starts at midnight.
+ */
+function scheduleFromFields(
+  date: string,
+  time: string,
+): { scheduledAt: string | null; timeKnown: boolean } {
+  if (!date) return { scheduledAt: null, timeKnown: false };
+  const parsed = new Date(`${date}T${time || '00:00'}`);
+  if (!Number.isFinite(parsed.getTime())) return { scheduledAt: null, timeKnown: false };
+  return { scheduledAt: parsed.toISOString(), timeKnown: time !== '' };
+}
+
+/** The stored instant back as the two fields, in the browser's own zone. */
+function fieldsFromSchedule(
+  iso: string | null,
+  timeKnown: boolean,
+): { date: string; time: string } {
+  if (!iso) return { date: '', time: '' };
+  const value = new Date(iso);
+  if (!Number.isFinite(value.getTime())) return { date: '', time: '' };
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return {
+    date: `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`,
+    time: timeKnown ? `${pad(value.getHours())}:${pad(value.getMinutes())}` : '',
+  };
+}
+
 function InterviewHeading({
   interviewId,
   round,
   kind,
   when,
+  scheduledAt,
+  timeKnown,
 }: {
   interviewId: string;
   round: number;
   kind: string;
   when: string;
+  scheduledAt: string | null;
+  timeKnown: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draftRound, setDraftRound] = useState(String(round));
   const [draftKind, setDraftKind] = useState(kind);
+  const [draftDate, setDraftDate] = useState(fieldsFromSchedule(scheduledAt, timeKnown).date);
+  const [draftTime, setDraftTime] = useState(fieldsFromSchedule(scheduledAt, timeKnown).time);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -1889,15 +1987,20 @@ function InterviewHeading({
             onClick={() => {
               setDraftRound(String(round));
               setDraftKind(kind);
+              const fields = fieldsFromSchedule(scheduledAt, timeKnown);
+              setDraftDate(fields.date);
+              setDraftTime(fields.time);
               setError(null);
               setEditing(true);
             }}
             className="ml-2 align-middle text-small font-normal text-ink-muted underline underline-offset-2 hover:text-accent"
           >
-            Rename
+            Edit
           </button>
         </h3>
-        <span className="tabular text-small text-ink-muted">{when}</span>
+        <span className={cn('tabular text-small', scheduledAt ? 'text-ink-muted' : 'text-caution')}>
+          {when}
+        </span>
       </header>
     );
   }
@@ -1932,6 +2035,28 @@ function InterviewHeading({
             ))}
           </Select>
         </div>
+        {/* A round can be added before anyone has said when it is, so this is
+            where the date arrives once it exists — and where a day agreed
+            without an hour gets its hour. */}
+        <div>
+          <Label htmlFor={`date-${interviewId}`}>Date</Label>
+          <Input
+            id={`date-${interviewId}`}
+            type="date"
+            value={draftDate}
+            onChange={(event) => setDraftDate(event.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor={`time-${interviewId}`}>Time</Label>
+          <Input
+            id={`time-${interviewId}`}
+            type="time"
+            value={draftTime}
+            disabled={!draftDate}
+            onChange={(event) => setDraftTime(event.target.value)}
+          />
+        </div>
         <Button
           type="button"
           size="sm"
@@ -1946,6 +2071,7 @@ function InterviewHeading({
               const result = await saveInterview(interviewId, {
                 round: parsedRound,
                 kind: draftKind,
+                ...scheduleFromFields(draftDate, draftTime),
               });
               if (result.error) setError(result.error);
               else setEditing(false);
@@ -2010,23 +2136,35 @@ function GroupTheseRounds({
 }
 
 /**
- * A superday: the rounds unchanged, inside something that can hold an opinion
- * about the whole occasion.
+ * A round: the interviews in it unchanged, inside something that can hold an
+ * opinion about the round as a whole.
  *
- * The rounds are not flattened or merged. Each keeps its hour, its
- * interviewers and its own notes, because that is what makes the group worth
+ * The interviews are not flattened or merged. Each keeps its hour, its
+ * interviewers and its own notes, because that is what makes the round worth
  * having rather than one long entry -- what is added is the line above them
  * and the paragraph that belongs to none of them.
+ *
+ * A round holds anything from nothing to a superday. It can be made empty and
+ * filled as invitations arrive, from the inbox or by hand, which is how a
+ * round that was agreed before it was booked gets recorded at all.
  */
 function InterviewGroupCard({
+  applicationId,
   group,
   interviews,
+  nextRound,
+  schedulingMail,
   timezone,
   companyContacts,
   focusInterviewId,
 }: {
+  applicationId: string;
   group: { id: string; label: string | null; notes: string };
   interviews: PanelProps['interviews'];
+  /** The round number given to an interview added here. */
+  nextRound: number;
+  /** Scheduling mail on this pursuit, as a starting point for a new one. */
+  schedulingMail: PanelProps['messages'];
   timezone: string;
   companyContacts: PanelProps['companyContacts'];
   focusInterviewId?: string | null;
@@ -2034,6 +2172,7 @@ function InterviewGroupCard({
   const [label, setLabel] = useState(group.label ?? '');
   const [notes, setNotes] = useState(group.notes);
   const [saved, setSaved] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
   const [pending, startTransition] = useTransition();
 
   return (
@@ -2043,24 +2182,53 @@ function InterviewGroupCard({
         <Input
           value={label}
           onChange={(event) => setLabel(event.target.value)}
-          aria-label="What to call this group of rounds"
-          placeholder="Superday"
+          aria-label="What to call this round"
+          placeholder="Technical round"
           className="max-w-56"
         />
         <span className="text-small text-ink-muted">
-          {interviews.length} rounds, together
+          {interviews.length === 0
+            ? 'Nothing booked in yet'
+            : interviews.length === 1
+              ? '1 interview'
+              : `${interviews.length} interviews, together`}
         </span>
+        {/* Only while it is empty: a round with conversations in it is
+            removed by taking those out first, so nothing is swept away by a
+            click on the wrong card. */}
+        {interviews.length === 0 && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (!removing) {
+                setRemoving(true);
+                return;
+              }
+              startTransition(async () => {
+                const result = await deleteInterviewRound(group.id);
+                if (result.error) {
+                  setSaved(result.error);
+                  setRemoving(false);
+                }
+              });
+            }}
+            className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected"
+          >
+            {removing ? 'Really remove it?' : 'Remove this round'}
+          </button>
+        )}
       </header>
 
       <div className="mt-3">
         <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-          Notes on the day
+          Notes on this round
         </h4>
         <Textarea
           rows={3}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
-          placeholder="How the occasion went as a whole. Each round keeps its own notes below."
+          placeholder="How the round went as a whole. Each interview keeps its own notes below."
           className="mt-1"
         />
         <div className="mt-1.5 flex items-center gap-3">
@@ -2092,6 +2260,19 @@ function InterviewGroupCard({
             grouped
           />
         ))}
+
+        {/* The round fills up from here: another conversation in the same
+            round is one click, and an invitation that is already in the inbox
+            starts from the message rather than from a blank form. */}
+        <AddInterview
+          applicationId={applicationId}
+          groupId={group.id}
+          nextRound={nextRound}
+          mailOptions={schedulingMail}
+          triggerLabel={
+            interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
+          }
+        />
       </div>
     </section>
   );
@@ -2155,7 +2336,9 @@ function InterviewCard({
         interviewId={interview.id}
         round={interview.round}
         kind={interview.kind}
-        when={formatDateTime(interview.scheduledAt, timezone)}
+        when={formatInterviewWhen(interview.scheduledAt, interview.timeKnown, timezone)}
+        scheduledAt={interview.scheduledAt}
+        timeKnown={interview.timeKnown}
       />
 
       <Interviewers interview={interview} companyContacts={companyContacts} />
@@ -2394,21 +2577,34 @@ function CollapsibleField({
 function AddInterview({
   applicationId,
   nextRound,
+  groupId = null,
+  mailOptions = [],
+  triggerLabel = 'Add an interview',
   seed,
   onSeedUsed,
 }: {
   applicationId: string;
   nextRound: number;
+  /** The round this is being added inside, when it is being added inside one. */
+  groupId?: string | null;
+  /** Scheduling mail on this pursuit, offered as a starting point. */
+  mailOptions?: PanelProps['messages'];
+  triggerLabel?: string;
   /** Set when the round is being added from a specific email. */
   seed?: InterviewSeed | null;
   onSeedUsed?: () => void;
 }) {
+  const fieldId = useId();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('recruiter_screen');
-  const [scheduledAt, setScheduledAt] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [usedSeed, setUsedSeed] = useState<InterviewSeed | null>(null);
+  /** A message picked from the list below, as opposed to one passed in. */
+  const [fromMail, setFromMail] = useState<InterviewSeed | null>(null);
+  const startedFrom = usedSeed ?? fromMail;
 
   // Arriving from a message in Linked mail: open already filled in. The time
   // is deliberately not guessed from the mail -- the mail's arrival is not the
@@ -2423,6 +2619,7 @@ function AddInterview({
   const close = () => {
     setOpen(false);
     setUsedSeed(null);
+    setFromMail(null);
     onSeedUsed?.();
   };
 
@@ -2433,25 +2630,48 @@ function AddInterview({
         onClick={() => setOpen(true)}
         className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
       >
-        Add a round
+        {triggerLabel}
       </button>
     );
   }
 
   return (
     <section className="rounded-card border border-border bg-surface p-4">
-      {usedSeed && (
+      {startedFrom ? (
         <p className="mb-3 text-small text-ink-muted">
           From{' '}
-          <span className="text-ink">{usedSeed.fromSubject ?? 'the linked message'}</span> — that
+          <span className="text-ink">{startedFrom.fromSubject ?? 'the linked message'}</span> — that
           mail says when it is; put the time in below.
         </p>
+      ) : (
+        // Add from email, in the round rather than off in the mail tab: the
+        // subject is the whole reason you remember which conversation this is.
+        mailOptions.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-micro uppercase tracking-wider text-ink-muted">
+              Add from email
+            </span>
+            {mailOptions.map((message) => (
+              <button
+                key={message.id}
+                type="button"
+                onClick={() => {
+                  setFromMail({ kind: 'recruiter_screen', fromSubject: message.subject });
+                  setError(null);
+                }}
+                className="max-w-full truncate text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+              >
+                {message.subject ?? '(no subject)'}
+              </button>
+            ))}
+          </div>
+        )
       )}
       <div className="flex flex-wrap items-end gap-2">
         <div>
-          <Label htmlFor="interview-kind">Kind</Label>
+          <Label htmlFor={`${fieldId}-kind`}>Kind</Label>
           <Select
-            id="interview-kind"
+            id={`${fieldId}-kind`}
             value={kind}
             onChange={(event) => setKind(event.target.value)}
             className="w-48"
@@ -2463,37 +2683,55 @@ function AddInterview({
             ))}
           </Select>
         </div>
+        {/* Date and time as two fields rather than one datetime-local,
+            because the second is often not settled when the first is: an
+            onsite is agreed for the 15th days before anyone says at what
+            hour, and both empty is its own real answer — "they said yes,
+            dates to follow". The hour can be filled in from the heading
+            later. */}
         <div>
-          <Label htmlFor="interview-when">When</Label>
+          <Label htmlFor={`${fieldId}-date`}>Date</Label>
           <Input
-            id="interview-when"
-            type="datetime-local"
-            value={scheduledAt}
-            onChange={(event) => setScheduledAt(event.target.value)}
+            id={`${fieldId}-date`}
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${fieldId}-time`}>Time</Label>
+          <Input
+            id={`${fieldId}-time`}
+            type="time"
+            value={time}
+            disabled={!date}
+            onChange={(event) => setTime(event.target.value)}
           />
         </div>
         <Button
           type="button"
           size="sm"
-          disabled={pending || !scheduledAt}
+          disabled={pending}
           onClick={() =>
             startTransition(async () => {
               const result = await addInterview({
                 applicationId,
                 round: nextRound,
                 kind,
-                scheduledAt: new Date(scheduledAt).toISOString(),
+                groupId,
+                ...scheduleFromFields(date, time),
               });
               if (result.error) {
                 setError(result.error);
               } else {
-                setScheduledAt('');
+                setDate('');
+                setTime('');
                 close();
               }
             })
           }
         >
-          Add round {nextRound}
+          {groupId ? 'Add it to this round' : `Add round ${nextRound}`}
         </Button>
         <button type="button" onClick={close} className="text-small text-ink-muted hover:text-ink">
           Cancel
