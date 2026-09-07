@@ -108,7 +108,9 @@ export async function openReading(formData: FormData): Promise<void> {
   const reading = await loadReading(supabase, readingId.data);
   if (!reading) redirect('/learn');
 
-  const url = reading.openUrl ?? reading.source.canonicalUrl;
+  // A reading you wrote down yourself has nowhere to go yet. Back to its own
+  // page, which says so.
+  const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
   if (!url) redirect(`/learn/r/${readingId.data}`);
 
   // Already narrowed and checked: nothing to do but go.
@@ -120,7 +122,7 @@ export async function openReading(formData: FormData): Promise<void> {
   }
 
   const outcome = await locatePassage({
-    url: reading.source.canonicalUrl ?? url,
+    url: reading.source?.canonicalUrl ?? url,
     question: reading.trackQuestion,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
   });

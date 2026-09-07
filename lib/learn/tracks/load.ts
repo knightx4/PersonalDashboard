@@ -40,6 +40,16 @@ export type ReadingRow = {
   id: string;
   position: number;
   status: ReadingStatus;
+  /**
+   * What this reading is about, however it knows.
+   *
+   * The source's title when there is a source, your own words when there is
+   * not. Every reading has one -- a check constraint says so -- so nothing
+   * downstream has to render a blank line.
+   */
+  subject: string;
+  /** Your own words, when you typed them. Null for a reading from a paste. */
+  title: string | null;
   why: string | null;
   note: string | null;
   locatorKind: string;
@@ -51,6 +61,10 @@ export type ReadingRow = {
   pageFrom: number | null;
   pageTo: number | null;
   finishedAt: string | null;
+  /**
+   * Null when you wrote down a subject and no source has been found for it
+   * yet. That is a normal state, not a broken row.
+   */
   source: {
     id: string;
     title: string;
@@ -61,7 +75,7 @@ export type ReadingRow = {
     access: SourceAccess;
     priceCents: number | null;
     pageCount: number | null;
-  };
+  } | null;
 };
 
 export type TrackDetail = TrackSummary & { readings: ReadingRow[] };
@@ -92,6 +106,7 @@ type ReadingRecord = {
   id: string;
   position: number;
   status: ReadingStatus;
+  title: string | null;
   why: string | null;
   note: string | null;
   locator_kind: string;
@@ -116,16 +131,19 @@ type ReadingRecord = {
   } | null;
 };
 
-function toReading(row: ReadingRecord): ReadingRow | null {
-  // The join is on a non-null foreign key, so a null here means the select
-  // shape changed rather than that the row is odd. Dropping it beats rendering
-  // a reading with no source.
-  if (!row.sources) return null;
+function toReading(row: ReadingRecord): ReadingRow {
+  // A reading with no source is a subject you wrote down and have not found
+  // anything to read for yet. The check constraint guarantees one of the two
+  // is present, so the fallback at the end never fires -- it is there so this
+  // function has no way to return an empty string.
+  const subject = row.sources?.title ?? row.title ?? 'Untitled';
 
   return {
     id: row.id,
     position: row.position,
     status: row.status,
+    subject,
+    title: row.title,
     why: row.why,
     note: row.note,
     locatorKind: row.locator_kind,
@@ -137,22 +155,24 @@ function toReading(row: ReadingRecord): ReadingRow | null {
     pageFrom: row.page_from,
     pageTo: row.page_to,
     finishedAt: row.finished_at,
-    source: {
-      id: row.sources.id,
-      title: row.sources.title,
-      author: row.sources.author,
-      kind: row.sources.kind,
-      year: row.sources.year,
-      canonicalUrl: row.sources.canonical_url,
-      access: row.sources.access,
-      priceCents: row.sources.price_cents,
-      pageCount: row.sources.page_count,
-    },
+    source: row.sources
+      ? {
+          id: row.sources.id,
+          title: row.sources.title,
+          author: row.sources.author,
+          kind: row.sources.kind,
+          year: row.sources.year,
+          canonicalUrl: row.sources.canonical_url,
+          access: row.sources.access,
+          priceCents: row.sources.price_cents,
+          pageCount: row.sources.page_count,
+        }
+      : null,
   };
 }
 
 const READING_COLUMNS =
-  'id, position, status, why, note, locator_kind, locator_label, locator_basis, ' +
+  'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
   'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
@@ -236,9 +256,7 @@ export async function loadTrack(
   assertSchemaExposed(readingError, LEARN_SCHEMA);
   if (readingError) throw new Error(`Reading this track failed: ${readingError.message}`);
 
-  const readings = ((readingRows ?? []) as unknown as ReadingRecord[])
-    .map(toReading)
-    .filter((r): r is ReadingRow => r !== null);
+  const readings = ((readingRows ?? []) as unknown as ReadingRecord[]).map(toReading);
 
   return {
     id: track.id,
@@ -274,8 +292,8 @@ export async function loadReading(
     tracks: { id: string; title: string; question: string | null } | null;
   };
 
+  if (!row.tracks) return null;
   const reading = toReading(row);
-  if (!reading || !row.tracks) return null;
 
   return {
     ...reading,

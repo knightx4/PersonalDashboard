@@ -27,7 +27,10 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
   const reading = await loadReading(supabase, id);
   if (!reading) notFound();
 
-  const elsewhere = await loadOtherReadingsOfSource(supabase, reading.source.id, reading.id);
+  // Only meaningful when there is a source to have read somewhere else.
+  const elsewhere = reading.source
+    ? await loadOtherReadingsOfSource(supabase, reading.source.id, reading.id)
+    : [];
   const alreadyRead = elsewhere.find((row) => row.status === 'read');
 
   const verified = reading.locatorConfidence === 'verified';
@@ -38,7 +41,8 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         ? `p. ${reading.pageFrom}`
         : null;
   const where = [reading.locatorLabel, pages].filter(Boolean).join(', ');
-  const url = reading.openUrl ?? reading.source.canonicalUrl;
+  const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
+  const hasSource = reading.source !== null;
 
   return (
     <>
@@ -53,9 +57,9 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
       </p>
 
       <PageHeader
-        title={reading.source.title}
+        title={reading.subject}
         description={
-          [reading.source.author, reading.source.year ? String(reading.source.year) : null]
+          [reading.source?.author, reading.source?.year ? String(reading.source.year) : null]
             .filter(Boolean)
             .join(' · ') || undefined
         }
@@ -63,6 +67,18 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
 
       {reading.why && <p className="mb-5 text-body text-ink">{reading.why}</p>}
 
+      {!hasSource ? (
+        // Something you wrote down. There is nothing to open, and saying so is
+        // the honest thing -- an empty "Where to read" box would read as a
+        // failure rather than as a step you have not taken.
+        <section className="mb-5 rounded-card border border-dashed border-border bg-surface p-4">
+          <h2 className="mb-2 text-ui font-semibold text-ink-muted">No source yet</h2>
+          <p className="text-body text-ink-muted">
+            You wrote this down yourself. Nothing has been found to read for it — paste something
+            into a new track, or add a link when you come across one.
+          </p>
+        </section>
+      ) : (
       <section className="mb-5 rounded-card border border-border bg-surface p-4">
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where to read</h2>
 
@@ -88,9 +104,9 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         <p className="mt-1.5 pl-6 text-ui text-ink-muted">{reading.locatorBasis}</p>
 
         <p className="mt-3 pl-6 text-ui text-ink-muted">
-          {ACCESS_TEXT[reading.source.access] ?? ACCESS_TEXT.unknown}
-          {reading.source.priceCents !== null && ` — ${formatMoney(reading.source.priceCents)}`}
-          {reading.source.pageCount ? ` · ${reading.source.pageCount} pages` : ''}
+          {ACCESS_TEXT[reading.source!.access] ?? ACCESS_TEXT.unknown}
+          {reading.source!.priceCents !== null && ` — ${formatMoney(reading.source!.priceCents)}`}
+          {reading.source!.pageCount ? ` · ${reading.source!.pageCount} pages` : ''}
         </p>
 
         {alreadyRead && (
@@ -124,6 +140,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
           )}
         </div>
       </section>
+      )}
 
       <section className="mb-5">
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where you are</h2>
@@ -135,7 +152,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         <NoteForm readingId={reading.id} note={reading.note} />
       </section>
 
-      {reading.source.canonicalUrl && (
+      {reading.source?.canonicalUrl && (
         <p className="mt-6 text-caption text-ink-muted">
           <a
             href={reading.source.canonicalUrl}
