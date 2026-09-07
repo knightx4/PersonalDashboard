@@ -3,6 +3,7 @@ import 'server-only';
 import { createClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
 import type { ModuleId } from '@/lib/modules';
@@ -30,13 +31,14 @@ async function safe<T>(query: PromiseLike<T>, fallback: T): Promise<T> {
 }
 
 export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
-  const [supabase, jobs, vault] = await Promise.all([
+  const [supabase, jobs, vault, learn] = await Promise.all([
     createClient(),
     createJobsClient(),
     createVaultClient(),
+    createLearnClient(),
   ]);
 
-  const [items, pursuits, notes, tasks] = await Promise.all([
+  const [items, pursuits, notes, tasks, toRead] = await Promise.all([
     safe(
       supabase
         .from('inventory_items')
@@ -65,6 +67,16 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
       null,
     ),
     safe(countOpenTasks(userId), null),
+    // What is still ahead of you, which is the only number here worth
+    // glancing at. Finished and abandoned readings are both done with.
+    safe(
+      learn
+        .from('readings')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['queued', 'reading'])
+        .then((r) => r.count),
+      null,
+    ),
   ]);
 
   return {
@@ -72,6 +84,7 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
     jobs: { value: pursuits, noun: 'open pursuit' },
     todo: { value: tasks, noun: 'thing to do' },
     vault: { value: notes, noun: 'note' },
+    learn: { value: toRead, noun: 'thing to read' },
   };
 }
 

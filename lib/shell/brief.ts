@@ -4,6 +4,7 @@ import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
 import { todayInTimezone } from '@/lib/money';
 import type { ModuleId } from '@/lib/modules';
 
@@ -208,6 +209,30 @@ export async function loadVaultBrief(): Promise<Brief | null> {
     };
   }
   return null;
+}
+
+/**
+ * The learn brief: what is in front of you, not what you have done.
+ *
+ * Quiet by construction. There is no failure state to warn about here -- no
+ * token to expire, no sync to go stale -- so this either says how much is left
+ * or says nothing, and an empty queue says nothing rather than congratulating
+ * anybody.
+ */
+export async function loadLearnBrief(): Promise<Brief | null> {
+  const supabase = await createLearnClient();
+
+  const count = await safe(
+    supabase
+      .from('readings')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['queued', 'reading'])
+      .then((result) => result.count),
+    null,
+  );
+
+  if (!count) return null;
+  return { text: `${plural(count, 'thing')} to read`, href: '/learn' };
 }
 
 export type BriefFor = ModuleId | null;

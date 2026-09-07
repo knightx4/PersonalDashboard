@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  BookOpen,
   Bookmark,
   Boxes,
   Briefcase,
@@ -58,6 +59,9 @@ export const NAV_ICONS = {
   agenda: ListChecks,
   tasks: ListTodo,
   notes: StickyNote,
+
+  // Learn
+  tracks: BookOpen,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

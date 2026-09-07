@@ -242,12 +242,16 @@ create table learn.readings (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  foreign key (track_id, user_id)
+  -- Named, because PostgREST embeds a parent by naming its foreign key, and
+  -- `user_id` sits in both of these. A generated name would work until the day
+  -- one of them changed; `readings!readings_track_fk(...)` in a select says
+  -- exactly which relationship is meant and keeps saying it.
+  constraint readings_track_fk foreign key (track_id, user_id)
     references learn.tracks (id, user_id) on delete cascade,
   -- Cascade rather than restrict: a reading without a source is meaningless,
   -- and it keeps account deletion a matter of foreign keys rather than of a
   -- route remembering four more tables. Nothing in the app deletes a source.
-  foreign key (source_id, user_id)
+  constraint readings_source_fk foreign key (source_id, user_id)
     references learn.sources (id, user_id) on delete cascade,
 
   constraint readings_pages_ck check (
@@ -294,7 +298,7 @@ create table learn.imports (
 
   created_at timestamptz not null default now(),
 
-  foreign key (track_id, user_id)
+  constraint imports_track_fk foreign key (track_id, user_id)
     references learn.tracks (id, user_id) on delete cascade,
 
   constraint imports_raw_text_ck check (btrim(raw_text) <> ''),

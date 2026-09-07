@@ -154,7 +154,7 @@ function toReading(row: ReadingRecord): ReadingRow | null {
 const READING_COLUMNS =
   'id, position, status, why, note, locator_kind, locator_label, locator_basis, ' +
   'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, ' +
-  'sources ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
+  'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
 /**
  * Every track, with its progress.
@@ -263,7 +263,7 @@ export async function loadReading(
 ): Promise<ReadingDetail | null> {
   const { data, error } = await supabase
     .from('readings')
-    .select(`${READING_COLUMNS}, tracks ( id, title, question )`)
+    .select(`${READING_COLUMNS}, tracks!readings_track_fk ( id, title, question )`)
     .eq('id', readingId)
     .maybeSingle();
 
@@ -299,7 +299,7 @@ export async function loadOtherReadingsOfSource(
 ): Promise<Array<{ id: string; status: ReadingStatus; trackTitle: string }>> {
   const { data, error } = await supabase
     .from('readings')
-    .select('id, status, tracks ( title )')
+    .select('id, status, tracks!readings_track_fk ( title )')
     .eq('source_id', sourceId)
     .neq('id', excludeReadingId);
 

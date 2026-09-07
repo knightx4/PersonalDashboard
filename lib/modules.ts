@@ -12,7 +12,7 @@
  * module is never invisible while waiting for someone to write the query.
  */
 
-export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo';
+export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn';
 
 export type AppModule = {
   id: ModuleId;
@@ -65,7 +65,7 @@ export type AppModule = {
  * 'orb' is the app itself and is the only abstract one, which is the point --
  * it is the whole rather than one of the parts.
  */
-export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page';
+export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page' | 'stack';
 
 export interface MarkKey {
   shape: MarkShape;
@@ -114,6 +114,20 @@ export const MODULES: readonly AppModule[] = [
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
     key: { shape: 'page', from: '#f0abfc', to: '#a21caf' },
+  },
+  {
+    id: 'learn',
+    prefix: '/learn',
+    // The tracks, not a reading. "What am I part way through" is the question
+    // this module answers, and it is the only page that answers one.
+    home: '/learn',
+    label: 'Learn',
+    description: 'Things worth reading, resolved and queued',
+    accent: '--color-w-learn',
+    // Teal, at the cold end of the sweep the other four sit on -- sky, violet,
+    // fuchsia, rose -- rather than somewhere else on the wheel, which is what
+    // keeps five differently-coloured workspaces reading as one product.
+    key: { shape: 'stack', from: '#5eead4', to: '#0f766e' },
   },
 ] as const;
 

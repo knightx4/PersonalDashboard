@@ -100,6 +100,17 @@ function KeyShape({ shape, fill }: { shape: MarkShape; fill: string }) {
           d={`M${cx - 3.9} ${cy - 4.9}H${cx + 0.3}L${cx + 4.1} ${cy - 1.1}V${cy + 4.9}H${cx - 3.9}Z`}
         />
       );
+    case 'stack':
+      return (
+        // Three bars, wide gaps: a pile of things to get through. Thick enough
+        // that the two gaps survive at 24px, which an outlined book would not,
+        // and unmistakable against the page's single leaf.
+        <g fill={fill}>
+          <rect x={cx - 4.9} y={cy - 4.9} width={9.8} height={2.5} rx={1.1} />
+          <rect x={cx - 4.9} y={cy - 1.2} width={9.8} height={2.5} rx={1.1} />
+          <rect x={cx - 4.9} y={cy + 2.5} width={9.8} height={2.5} rx={1.1} />
+        </g>
+      );
     case 'orb':
     default:
       return <circle cx={cx} cy={cy} r={5.1} fill={fill} />;
