@@ -1,6 +1,6 @@
 # Personal Tracker
 
-Four workspaces behind one login, one deployment and one database.
+Five workspaces behind one login, one deployment and one database.
 
 **Shopping** (`/shopping`) tracks what you have already bought, prevents double
 buying, and holds things you want to buy in a queue instead of a cart. The
@@ -22,10 +22,17 @@ it readable and searchable here. Markdown only — attachments are never even
 requested. It is a viewer today; what it is *for* is in
 [docs/VAULT-SPEC.md](docs/VAULT-SPEC.md).
 
+**Learn** (`/learn`) takes a list of things somebody told you to read and turns
+it into a queue you can start: each item resolved to a link that opens, priced
+if it is not free, and pointed at the chapter or paragraph worth reading rather
+than at a 350-page book. Specified in
+[docs/LEARN-SPEC.md](docs/LEARN-SPEC.md).
+
 They share an account and a design system, and the first two share one mailbox.
 Otherwise nothing. Each owns its own Postgres schema in one Supabase project —
 `public` for shopping, `job_search` for the job side, `obsidian` for the notes,
-`todo` for the list — and ingestion and account settings sit in `core`, because
+`todo` for the list, `learn` for the reading — and ingestion and account
+settings sit in `core`, because
 an order confirmation and a rejection letter arrive on the same sync, your
 timezone belongs to none of them, and no workspace owns any of those facts. See
 [docs/SETUP.md](docs/SETUP.md).
@@ -43,6 +50,12 @@ The fourth workspace — **Todo** — is built: build order steps 24–31, speci
 in [docs/TODO-SPEC.md](docs/TODO-SPEC.md). Reading `- [ ]` checkboxes out of
 vault notes is deliberately not part of it and waits for the vault to hold
 notes as something more structured than text.
+
+The fifth workspace — **Learn** — has its sourcing and tracking slice built:
+build order steps 32–36, specified in [docs/LEARN-SPEC.md](docs/LEARN-SPEC.md).
+Curriculum generation from a bare topic is deliberately not part of it: it was
+tested before the spec was written and is the weak half — expensive, gap-prone,
+and quietly incomplete. Resolution is the reliable half and ships first.
 
 | | |
 |---|---|

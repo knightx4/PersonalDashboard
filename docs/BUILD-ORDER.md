@@ -178,6 +178,49 @@ the vault to hold notes as something more structured than text, and is then one
 file against the step 28 interface. The spec records the three options and why
 none of them is chosen yet.
 
+## The learn module
+
+Specified in [LEARN-SPEC.md](LEARN-SPEC.md). The ordering is the argument:
+resolution before generation, because generation was tested first and is the
+weak half -- twenty-plus searches per curriculum, quality that tracks whether a
+topic has a free canonical corpus rather than anything about the prompt, and
+gaps it does not admit to. Resolving a list somebody already handed you is the
+half that works.
+
+32. ✅ **Schema, RLS and the isolation test.** Four tables in `learn`, policies
+    in the first migration, `rls-learn.test.ts` written before any feature
+    code. Build step 2's rule for the fifth time and the same reason.
+33. ✅ **The guarded fetcher.** The first integration that reaches an address
+    nobody here chose, so the address guard, the redirect re-check and the
+    containment boundary come before anything that would use them.
+34. ✅ **Parse and resolve.** A paste becomes citations; each citation becomes a
+    source with a link, an access, and a proposed location. Separate steps so
+    one bad row does not cost the whole import.
+35. ✅ **The locate pass.** Fetch on open, find the passage, verify the phrase
+    is really in the page. This is where "never send someone to a page that is
+    not there" stops being a sentence in a spec.
+36. ✅ **The workspace.** Tracks, a track, a reading, and the paste-and-confirm
+    intake. Fifth entry in `MODULES`, and a migration turning the module on for
+    accounts that already exist.
+
+Deliberately not a step: PDF passages, the MCP connector, curriculum
+generation, and the vault link. Each is sketched at the end of the spec, and
+each assumes the one before it worked. The vault link is the interesting one --
+materialising wikilinks would turn every unresolved `[[link]]` into a track
+worth building, which is a reading queue you have been writing for years
+without knowing it -- and it waits because nothing yet proves a resolved queue
+gets read.
+
+### Ordering notes worth respecting
+
+- Step 32 before 33, and both before 34, for the reason every block here
+  repeats: a missing policy has to fail immediately.
+- Step 33 before 34 specifically, not just conventionally. Resolution produces
+  URLs, and the moment anything fetches one without the guard in place the
+  guard is decoration.
+- Step 35 after 34 because it needs somewhere to write back to, and it is the
+  step that makes the module worth more than a bookmark list.
+
 ### Ordering notes worth respecting
 
 - Step 2 before step 4, so a missing policy surfaces immediately.
