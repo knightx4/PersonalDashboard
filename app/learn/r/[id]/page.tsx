@@ -7,6 +7,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
 import { openReading } from './actions';
+import { FindSources } from './find-sources';
 import { NoteForm } from './note-form';
 import { StatusButtons } from './status-buttons';
 
@@ -73,10 +74,10 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         // failure rather than as a step you have not taken.
         <section className="mb-5 rounded-card border border-dashed border-border bg-surface p-4">
           <h2 className="mb-2 text-ui font-semibold text-ink-muted">No source yet</h2>
-          <p className="text-body text-ink-muted">
-            You wrote this down yourself. Nothing has been found to read for it — paste something
-            into a new track, or add a link when you come across one.
+          <p className="mb-4 text-body text-ink-muted">
+            You wrote this down yourself. Nothing has been found to read for it yet.
           </p>
+          <FindSources readingId={reading.id} />
         </section>
       ) : (
       <section className="mb-5 rounded-card border border-border bg-surface p-4">

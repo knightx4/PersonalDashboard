@@ -7,7 +7,10 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadReading } from '@/lib/learn/tracks/load';
 import { locatePassage } from '@/lib/learn/locate/locate';
+import { suggestSources } from '@/lib/learn/import/suggest';
+import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
+  attachSourceToReading,
   setReadingLocation,
   setReadingNote,
   setReadingStatus,
@@ -23,6 +26,83 @@ import {
  */
 
 export type ReadingActionState = { error?: string };
+
+export type FindState = {
+  error?: string;
+  /** Proposed, not saved. Nothing reaches the row until you pick one. */
+  candidates?: ResolvedSource[];
+};
+
+/**
+ * Find something to read about a subject you wrote down.
+ *
+ * Proposes and writes nothing, which is the same rule the import path follows
+ * and matters more here: a search given only a subject has far more room to be
+ * wrong than one given a citation, and a bad source in a queue costs twenty
+ * minutes at the moment you were finally going to read something.
+ */
+export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
+  await requireUser();
+
+  const readingId = z.string().uuid().safeParse(formData.get('readingId'));
+  if (!readingId.success) return { error: 'Could not work out which one to search for.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Searching needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+  const reading = await loadReading(supabase, readingId.data);
+  if (!reading) return { error: 'That is not there any more.' };
+
+  const result = await suggestSources({
+    subject: reading.subject,
+    question: reading.trackQuestion,
+    anthropicApiKey: apiKey,
+  });
+
+  if (!result.ok) return { error: result.detail };
+  return { candidates: result.sources };
+}
+
+/**
+ * Attach the one you picked.
+ *
+ * The payload rides back through a hidden field, so it is re-validated here
+ * rather than trusted -- a form field is user input whoever wrote the form.
+ */
+export async function attachSource(
+  _prev: ReadingActionState,
+  formData: FormData,
+): Promise<ReadingActionState> {
+  const user = await requireUser();
+
+  const readingId = z.string().uuid().safeParse(formData.get('readingId'));
+  if (!readingId.success) return { error: 'Could not work out which one to attach to.' };
+
+  const raw = formData.get('chosen');
+  if (typeof raw !== 'string') return { error: 'Pick one first.' };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: 'That choice did not survive the trip. Search again.' };
+  }
+
+  const safe = resolvedSourceSchema.safeParse(parsed);
+  if (!safe.success) return { error: 'That choice did not survive the trip. Search again.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await attachSourceToReading(supabase, user.id, readingId.data, safe.data);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not attach that.' };
+  }
+
+  revalidatePath(`/learn/r/${readingId.data}`);
+  revalidatePath('/learn');
+  return {};
+}
 
 const StatusInput = z.object({
   readingId: z.string().uuid(),

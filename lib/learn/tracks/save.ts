@@ -232,6 +232,45 @@ export async function addManualReading(
   return (data as { id: string }).id;
 }
 
+/**
+ * Give a subject you wrote down something to read.
+ *
+ * Your own words stay as `readings.title` -- "how central banks set rates"
+ * remains what the row is about -- and the source arrives beside it. That
+ * combination is why the title column is allowed alongside a source rather
+ * than only instead of one: the subject is yours, the source is an answer to
+ * it, and losing the subject would lose why the row is in the track.
+ *
+ * The locator is written unverified, whatever the search believed. Nothing has
+ * fetched the document yet; the locate pass does that when you open it, and it
+ * is the only thing allowed to promote a locator.
+ */
+export async function attachSourceToReading(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  readingId: string,
+  resolved: ResolvedSource,
+): Promise<void> {
+  const sourceId = await upsertSource(supabase, userId, resolved);
+
+  const { error } = await supabase
+    .from('readings')
+    .update({
+      source_id: sourceId,
+      locator_kind: resolved.locator_kind,
+      locator_label: resolved.locator_label ?? null,
+      page_from: resolved.page_from ?? null,
+      page_to: resolved.page_to ?? null,
+      open_url: resolved.canonical_url ?? null,
+      locator_confidence: 'unverified',
+      locator_basis: resolved.locator_basis,
+    })
+    .eq('id', readingId);
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Attaching the source', error);
+}
+
 /** Take a reading off a track. Only ever the one you asked for; RLS does the rest. */
 export async function deleteReading(
   supabase: LearnSupabaseClient,
