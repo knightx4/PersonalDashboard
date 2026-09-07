@@ -162,6 +162,86 @@ export async function saveImport(
   return { trackId, readings: readings.length };
 }
 
+/**
+ * A track with nothing in it yet.
+ *
+ * The broad thing you want to learn about, written down before you have found
+ * anything to read for it. Separate from saveImport because there is no paste,
+ * no resolution and nothing to confirm -- you typed a name and meant it.
+ */
+export async function createTrack(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { title: string; question: string | null },
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('tracks')
+    .insert({ user_id: userId, title: input.title, question: input.question })
+    .select('id')
+    .single();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw messageFor('Creating the track', error ?? { message: 'no row' });
+  return (data as { id: string }).id;
+}
+
+/**
+ * Something specific you want to learn, inside a track.
+ *
+ * No source, because you have not found one -- that is what `readings.title`
+ * is for, and the check constraint accepts a reading that has a subject
+ * either way. The basis says plainly where this came from, which keeps the
+ * module's rule intact: a location is never claimed without saying how it is
+ * known, and "you typed it" is a perfectly good how.
+ */
+export async function addManualReading(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { trackId: string; title: string; why: string | null },
+): Promise<string> {
+  // Append. One query for the current end of the list beats a sequence, and a
+  // personal track is tens of rows.
+  const { data: last } = await supabase
+    .from('readings')
+    .select('position')
+    .eq('track_id', input.trackId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const position = ((last as { position: number } | null)?.position ?? 0) + 10;
+
+  const { data, error } = await supabase
+    .from('readings')
+    .insert({
+      user_id: userId,
+      track_id: input.trackId,
+      source_id: null,
+      title: input.title,
+      why: input.why,
+      position,
+      locator_kind: 'whole',
+      locator_basis: 'You wrote this down yourself. Nothing has been looked up for it.',
+      locator_confidence: 'unverified',
+    })
+    .select('id')
+    .single();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw messageFor('Adding that', error ?? { message: 'no row' });
+  return (data as { id: string }).id;
+}
+
+/** Take a reading off a track. Only ever the one you asked for; RLS does the rest. */
+export async function deleteReading(
+  supabase: LearnSupabaseClient,
+  readingId: string,
+): Promise<void> {
+  const { error } = await supabase.from('readings').delete().eq('id', readingId);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Removing that', error);
+}
+
 /** Move a reading between statuses. The timestamps follow, in a trigger. */
 export async function setReadingStatus(
   supabase: LearnSupabaseClient,

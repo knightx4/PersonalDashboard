@@ -233,6 +233,56 @@ describe('cross-user writes', () => {
   });
 });
 
+describe('a reading you wrote down yourself', () => {
+  it('is allowed to have no source', async () => {
+    // The point of the whole change: the first thing you write down is a
+    // subject, not a book.
+    const [row] = await admin<{ id: string; title: string }[]>`
+      insert into readings (user_id, track_id, source_id, title, locator_basis)
+      values (${userA}, ${trackA}, null, 'How central banks set rates',
+              'You wrote this down yourself.')
+      returning id, title`;
+    expect(row.title).toBe('How central banks set rates');
+
+    await admin`delete from readings where id = ${row.id}`;
+  });
+
+  it('refuses a reading that is about nothing at all', async () => {
+    // Neither a source nor a title renders as a blank line you cannot click,
+    // delete or explain.
+    await expect(
+      admin`insert into readings (user_id, track_id, source_id, title, locator_basis)
+            values (${userA}, ${trackA}, null, null, 'nothing')`,
+    ).rejects.toThrow();
+
+    await expect(
+      admin`insert into readings (user_id, track_id, source_id, title, locator_basis)
+            values (${userA}, ${trackA}, null, '   ', 'nothing')`,
+    ).rejects.toThrow();
+  });
+
+  it('lets a source-backed reading carry your own title as well', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into readings (user_id, track_id, source_id, title, locator_basis)
+      values (${userA}, ${trackA}, ${sourceA}, 'the coordination argument', 'fetched')
+      returning id`;
+    expect(row.id).toBeTruthy();
+    await admin`delete from readings where id = ${row.id}`;
+  });
+
+  it('stays hidden from another user like any other reading', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into readings (user_id, track_id, source_id, title, locator_basis)
+      values (${userA}, ${trackA}, null, 'A private curiosity', 'typed')
+      returning id`;
+
+    const seen = await asUser(userB, (tx) => tx`select id from readings where id = ${row.id}`);
+    expect(seen).toHaveLength(0);
+
+    await admin`delete from readings where id = ${row.id}`;
+  });
+});
+
 describe('the rules the schema itself enforces', () => {
   it('refuses a locator with no stated basis', async () => {
     // "Never send someone to a page that is not there" is a check constraint,

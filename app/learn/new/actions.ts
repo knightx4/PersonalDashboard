@@ -8,7 +8,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { parseReferences } from '@/lib/learn/import/parse';
 import { resolveReferences } from '@/lib/learn/import/resolve';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
-import { saveImport, type SaveRow } from '@/lib/learn/tracks/save';
+import { createTrack, saveImport, type SaveRow } from '@/lib/learn/tracks/save';
 
 /**
  * Bringing a reading list in.
@@ -138,6 +138,52 @@ export async function previewImport(
       })),
     },
   };
+}
+
+/**
+ * A track with nothing in it.
+ *
+ * The broad thing, written down on its own. No paste, so nothing to parse,
+ * nothing to search for and nothing to confirm -- this writes immediately,
+ * unlike the import path, because there is no proposal to check. You typed a
+ * name and you meant it.
+ */
+const NewTrackInput = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Give the topic a name.')
+    .max(300, 'That name is too long — the detail belongs in the question.'),
+  question: z.string().trim().max(2000),
+});
+
+export async function startTrack(
+  _prev: NewTrackState,
+  formData: FormData,
+): Promise<NewTrackState> {
+  const user = await requireUser();
+
+  const parsed = NewTrackInput.safeParse({
+    title: formData.get('title') ?? '',
+    question: formData.get('question') ?? '',
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Could not start that topic.' };
+  }
+
+  const supabase = await createLearnClient();
+  let trackId: string;
+  try {
+    trackId = await createTrack(supabase, user.id, {
+      title: parsed.data.title,
+      question: parsed.data.question || null,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not start that topic.' };
+  }
+
+  revalidatePath('/learn');
+  redirect(`/learn/t/${trackId}`);
 }
 
 const ConfirmInput = z.object({
