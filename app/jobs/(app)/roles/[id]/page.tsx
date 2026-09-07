@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
-import { publicEnv } from '@/lib/env';
+import { requestOrigin } from '@/lib/auth/origin';
 import { PageHeader } from '@/components/shell/page-header';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
@@ -395,7 +395,10 @@ export default async function RoleDetailPage({
             : null
         }
         caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
-        appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
+        // The live host rather than NEXT_PUBLIC_APP_URL: a case-page link is
+        // sent to a hiring manager, and an env var that still holds its
+        // localhost default would hand them a link only the sender can open.
+        appOrigin={await requestOrigin()}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
         focusInterviewId={focusInterviewId ?? null}
