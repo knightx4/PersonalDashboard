@@ -60,6 +60,20 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
 
           {item.detail && <span className="text-small text-ink-muted">{item.detail}</span>}
 
+          {/* Where this thing lives, named and underlined. The title is a link
+              too, but a bold heading that happens to be clickable is not an
+              affordance anyone sees -- least of all on a phone, where there is
+              no hover to reveal it. This matches a linked task's anchor, so
+              "click through to the job" reads the same on both kinds of row. */}
+          {item.link && (
+            <a
+              href={item.link.href}
+              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 hover:text-accent"
+            >
+              {item.link.label}
+            </a>
+          )}
+
           {item.action && (
             <a
               href={item.action.href}
