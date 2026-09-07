@@ -5,7 +5,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { formatMoneyOrBlank } from '@/lib/money';
-import { publicEnv } from '@/lib/env';
+import { requestOrigin } from '@/lib/auth/origin';
 import { ShareControls, ShareLinkRow } from '../share-ui';
 import { ApplyDecision } from './apply-decision';
 
@@ -76,7 +76,11 @@ export default async function ShareDetailPage({
 
   const groups = page?.groups ?? [];
   const answered = groups.filter((g) => g.keepQty + g.sellQty + g.giveawayQty > 0);
-  const origin = publicEnv().NEXT_PUBLIC_APP_URL;
+  // The live host, not NEXT_PUBLIC_APP_URL: this link is copied out of the
+  // app and sent to someone else, and the env var defaults to localhost, so a
+  // deployment that never set it handed out links nobody but the sender could
+  // open. The header says where the reader actually is.
+  const origin = await requestOrigin();
 
   return (
     <>
