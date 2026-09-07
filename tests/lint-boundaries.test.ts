@@ -60,6 +60,10 @@ const VAULT_PROVIDER_IMPORT = `import { GithubVaultSource } from '@/lib/vault/pr
 export const source = GithubVaultSource;
 `;
 
+const LEARN_FETCH_IMPORT = `import { fetchDocument } from '@/lib/learn/providers/fetch';
+export const fetcher = fetchDocument;
+`;
+
 const SELL_IMPORT = `import { runPriceLookups } from '@/lib/sell/price-run';
 export const load = runPriceLookups;
 `;
@@ -137,6 +141,36 @@ describe('the vault provider boundary', () => {
     // The cron may hold the service-role client; it still must not know the
     // vault is in git. Those are separate privileges and only one is granted.
     expect(lint('app/api/cron/__boundary_probe.ts', VAULT_PROVIDER_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+});
+
+/**
+ * The learn module reaches addresses nobody here chose.
+ *
+ * Every other integration talks to a host we picked -- GitHub, Gmail, eBay.
+ * This one fetches URLs a model produced from text a stranger wrote, from a
+ * server with an outbound position no browser has. lib/learn/providers/fetch
+ * refuses private and link-local addresses on every redirect hop; that guard
+ * is worth nothing if a page can call fetch itself, so the import is closed
+ * off and this is what proves the rule fires.
+ */
+describe('the learn fetch boundary', () => {
+  it('blocks the fetcher from a page', () => {
+    expect(lint('app/__boundary_probe.ts', LEARN_FETCH_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+
+  it('blocks it from a component', () => {
+    expect(lint('components/__boundary_probe.ts', LEARN_FETCH_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+
+  it('still applies inside the exempted cron routes', () => {
+    expect(lint('app/api/cron/__boundary_probe.ts', LEARN_FETCH_IMPORT)).toMatch(
       /no-restricted-imports/,
     );
   });

@@ -42,6 +42,18 @@ const VAULT_PROVIDER_PATTERN = {
 };
 
 /**
+ * The learn module is the only thing here that fetches a URL somebody else
+ * chose, so the guard against reaching an internal address has to be
+ * unavoidable. It is worth nothing if a second call site can be written beside
+ * it without one.
+ */
+const LEARN_FETCH_PATTERN = {
+  group: ["**/learn/providers/fetch", "@/lib/learn/providers/fetch"],
+  message:
+    "Nothing outside lib/learn/providers/ fetches an external URL. Go through lib/learn/providers/index.ts, which is where the address guard lives.",
+};
+
+/**
  * The shared link is a window, never an engine.
  *
  * A page an anonymous stranger can open must not be able to spend money, hit a
@@ -88,7 +100,14 @@ const renderBoundaries = {
   rules: {
     "no-restricted-imports": [
       "error",
-      { patterns: [SERVICE_ROLE_PATTERN, ATS_PATTERN, VAULT_PROVIDER_PATTERN] },
+      {
+        patterns: [
+          SERVICE_ROLE_PATTERN,
+          ATS_PATTERN,
+          VAULT_PROVIDER_PATTERN,
+          LEARN_FETCH_PATTERN,
+        ],
+      },
     ],
   },
 };
@@ -140,7 +159,10 @@ const jdBoundary = {
 const serviceRoleExceptions = {
   files: ["app/api/cron/**/*.ts", "app/api/jobs/account/delete/route.ts"],
   rules: {
-    "no-restricted-imports": ["error", { patterns: [ATS_PATTERN, VAULT_PROVIDER_PATTERN] }],
+    "no-restricted-imports": [
+      "error",
+      { patterns: [ATS_PATTERN, VAULT_PROVIDER_PATTERN, LEARN_FETCH_PATTERN] },
+    ],
   },
 };
 
