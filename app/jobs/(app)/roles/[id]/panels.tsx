@@ -20,7 +20,12 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
-import { formatCompBand, formatDate, formatDateTime } from '@/lib/jobs/applications/load';
+import {
+  formatCompBand,
+  formatDate,
+  formatDateTime,
+  formatInterviewWhen,
+} from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -120,6 +125,8 @@ export interface PanelProps {
     round: number;
     kind: string;
     scheduledAt: string | null;
+    /** False when only the day is settled: the hour is not to be shown. */
+    timeKnown: boolean;
     /** Computed on the server: reading the clock during render is unstable. */
     debriefDue: boolean;
     format: string | null;
@@ -1862,20 +1869,58 @@ function Interviewers({
  * another round. Close enough to be useful, wrong often enough that a card
  * with no way to fix its own name is a dead end.
  */
+/**
+ * The two form fields as the pair the server takes.
+ *
+ * A day with no hour is stored at local midnight with `timeKnown` false: the
+ * timestamp still sorts and groups on the day it was typed for, and the flag
+ * is what stops the card from claiming the interview starts at midnight.
+ */
+function scheduleFromFields(
+  date: string,
+  time: string,
+): { scheduledAt: string | null; timeKnown: boolean } {
+  if (!date) return { scheduledAt: null, timeKnown: false };
+  const parsed = new Date(`${date}T${time || '00:00'}`);
+  if (!Number.isFinite(parsed.getTime())) return { scheduledAt: null, timeKnown: false };
+  return { scheduledAt: parsed.toISOString(), timeKnown: time !== '' };
+}
+
+/** The stored instant back as the two fields, in the browser's own zone. */
+function fieldsFromSchedule(
+  iso: string | null,
+  timeKnown: boolean,
+): { date: string; time: string } {
+  if (!iso) return { date: '', time: '' };
+  const value = new Date(iso);
+  if (!Number.isFinite(value.getTime())) return { date: '', time: '' };
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return {
+    date: `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`,
+    time: timeKnown ? `${pad(value.getHours())}:${pad(value.getMinutes())}` : '',
+  };
+}
+
 function InterviewHeading({
   interviewId,
   round,
   kind,
   when,
+  scheduledAt,
+  timeKnown,
 }: {
   interviewId: string;
   round: number;
   kind: string;
   when: string;
+  scheduledAt: string | null;
+  timeKnown: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draftRound, setDraftRound] = useState(String(round));
   const [draftKind, setDraftKind] = useState(kind);
+  const [draftDate, setDraftDate] = useState(fieldsFromSchedule(scheduledAt, timeKnown).date);
+  const [draftTime, setDraftTime] = useState(fieldsFromSchedule(scheduledAt, timeKnown).time);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -1889,15 +1934,20 @@ function InterviewHeading({
             onClick={() => {
               setDraftRound(String(round));
               setDraftKind(kind);
+              const fields = fieldsFromSchedule(scheduledAt, timeKnown);
+              setDraftDate(fields.date);
+              setDraftTime(fields.time);
               setError(null);
               setEditing(true);
             }}
             className="ml-2 align-middle text-small font-normal text-ink-muted underline underline-offset-2 hover:text-accent"
           >
-            Rename
+            Edit
           </button>
         </h3>
-        <span className="tabular text-small text-ink-muted">{when}</span>
+        <span className={cn('tabular text-small', scheduledAt ? 'text-ink-muted' : 'text-caution')}>
+          {when}
+        </span>
       </header>
     );
   }
@@ -1932,6 +1982,28 @@ function InterviewHeading({
             ))}
           </Select>
         </div>
+        {/* A round can be added before anyone has said when it is, so this is
+            where the date arrives once it exists — and where a day agreed
+            without an hour gets its hour. */}
+        <div>
+          <Label htmlFor={`date-${interviewId}`}>Date</Label>
+          <Input
+            id={`date-${interviewId}`}
+            type="date"
+            value={draftDate}
+            onChange={(event) => setDraftDate(event.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor={`time-${interviewId}`}>Time</Label>
+          <Input
+            id={`time-${interviewId}`}
+            type="time"
+            value={draftTime}
+            disabled={!draftDate}
+            onChange={(event) => setDraftTime(event.target.value)}
+          />
+        </div>
         <Button
           type="button"
           size="sm"
@@ -1946,6 +2018,7 @@ function InterviewHeading({
               const result = await saveInterview(interviewId, {
                 round: parsedRound,
                 kind: draftKind,
+                ...scheduleFromFields(draftDate, draftTime),
               });
               if (result.error) setError(result.error);
               else setEditing(false);
@@ -2155,7 +2228,9 @@ function InterviewCard({
         interviewId={interview.id}
         round={interview.round}
         kind={interview.kind}
-        when={formatDateTime(interview.scheduledAt, timezone)}
+        when={formatInterviewWhen(interview.scheduledAt, interview.timeKnown, timezone)}
+        scheduledAt={interview.scheduledAt}
+        timeKnown={interview.timeKnown}
       />
 
       <Interviewers interview={interview} companyContacts={companyContacts} />
@@ -2405,7 +2480,8 @@ function AddInterview({
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('recruiter_screen');
-  const [scheduledAt, setScheduledAt] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [usedSeed, setUsedSeed] = useState<InterviewSeed | null>(null);
@@ -2463,31 +2539,48 @@ function AddInterview({
             ))}
           </Select>
         </div>
+        {/* Date and time as two fields rather than one datetime-local,
+            because the second is often not settled when the first is: an
+            onsite is agreed for the 15th days before anyone says at what
+            hour, and both empty is its own real answer — "they said yes,
+            dates to follow". The hour can be filled in from the heading
+            later. */}
         <div>
-          <Label htmlFor="interview-when">When</Label>
+          <Label htmlFor="interview-date">Date</Label>
           <Input
-            id="interview-when"
-            type="datetime-local"
-            value={scheduledAt}
-            onChange={(event) => setScheduledAt(event.target.value)}
+            id="interview-date"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="interview-time">Time</Label>
+          <Input
+            id="interview-time"
+            type="time"
+            value={time}
+            disabled={!date}
+            onChange={(event) => setTime(event.target.value)}
           />
         </div>
         <Button
           type="button"
           size="sm"
-          disabled={pending || !scheduledAt}
+          disabled={pending}
           onClick={() =>
             startTransition(async () => {
               const result = await addInterview({
                 applicationId,
                 round: nextRound,
                 kind,
-                scheduledAt: new Date(scheduledAt).toISOString(),
+                ...scheduleFromFields(date, time),
               });
               if (result.error) {
                 setError(result.error);
               } else {
-                setScheduledAt('');
+                setDate('');
+                setTime('');
                 close();
               }
             })

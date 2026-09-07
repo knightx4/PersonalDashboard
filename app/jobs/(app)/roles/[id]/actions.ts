@@ -383,6 +383,21 @@ export async function linkReminderMessage(input: {
   return { error: null };
 }
 
+/**
+ * When a round is, in the three states it can actually be in: an hour, a day
+ * whose hour is not settled, or nothing agreed yet. `timeKnown` is only
+ * meaningful alongside a date, and a null date forces it false.
+ */
+const scheduleSchema = z
+  .object({
+    scheduledAt: z.string().datetime({ offset: true }).nullable(),
+    timeKnown: z.boolean(),
+  })
+  .transform((value) => ({
+    scheduledAt: value.scheduledAt,
+    timeKnown: value.scheduledAt === null ? false : value.timeKnown,
+  }));
+
 const interviewPatchSchema = z.object({
   round: z.number().int().min(1, 'Rounds start at 1.').max(99).optional(),
   kind: z.enum(INTERVIEW_KINDS).optional(),
@@ -396,6 +411,10 @@ const interviewPatchSchema = z.object({
  * second thread about the same conversation becomes round 3. The guess is
  * usually close and occasionally wrong, and a wrong name on a card the user
  * cannot correct is worse than no name — so they are editable like the notes.
+ *
+ * When is here for the same reason and one more: a round can now be added
+ * before its date exists, so filling that in later is the only way such a
+ * round ever gets one.
  */
 export async function saveInterview(
   interviewId: string,
@@ -405,6 +424,8 @@ export async function saveInterview(
     status?: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
     round?: number;
     kind?: string;
+    scheduledAt?: string | null;
+    timeKnown?: boolean;
   },
 ): Promise<{ error: string | null }> {
   const user = await requireUser();
@@ -420,6 +441,16 @@ export async function saveInterview(
   if (parsed.data.round !== undefined) update.round = parsed.data.round;
   if (parsed.data.kind !== undefined) update.kind = parsed.data.kind;
 
+  if (patch.scheduledAt !== undefined) {
+    const schedule = scheduleSchema.safeParse({
+      scheduledAt: patch.scheduledAt,
+      timeKnown: patch.timeKnown ?? true,
+    });
+    if (!schedule.success) return { error: 'That is not a date.' };
+    update.scheduled_at = schedule.data.scheduledAt;
+    update.time_known = schedule.data.timeKnown;
+  }
+
   const { error } = await supabase
     .from('interviews')
     .update(update)
@@ -429,6 +460,7 @@ export async function saveInterview(
   if (error) return { error: error.message };
   revalidatePath('/jobs/interviews');
   revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/today');
   return { error: null };
 }
 
@@ -436,21 +468,31 @@ const addInterviewSchema = z.object({
   applicationId: z.string().uuid(),
   round: z.number().int().min(1),
   kind: z.enum(INTERVIEW_KINDS),
-  scheduledAt: z.string().min(1, 'Pick a date.'),
+  schedule: scheduleSchema,
 });
 
 /**
  * A round the inbox never saw mail about -- a phone screen nobody emailed
  * you the invite for, or the same case with `deleteInterview`: a round the
  * inbox saw twice.
+ *
+ * The date is optional both ways round: "they want to do an onsite, dates to
+ * follow" is a real round worth putting on the board, and so is a day agreed
+ * without an hour. Either can be filled in later through `saveInterview`.
  */
 export async function addInterview(input: {
   applicationId: string;
   round: number;
   kind: string;
-  scheduledAt: string;
+  scheduledAt: string | null;
+  timeKnown: boolean;
 }): Promise<{ error: string | null }> {
-  const parsed = addInterviewSchema.safeParse(input);
+  const parsed = addInterviewSchema.safeParse({
+    applicationId: input.applicationId,
+    round: input.round,
+    kind: input.kind,
+    schedule: { scheduledAt: input.scheduledAt, timeKnown: input.timeKnown },
+  });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const user = await requireUser();
@@ -461,7 +503,8 @@ export async function addInterview(input: {
     application_id: parsed.data.applicationId,
     round: parsed.data.round,
     kind: parsed.data.kind,
-    scheduled_at: parsed.data.scheduledAt,
+    scheduled_at: parsed.data.schedule.scheduledAt,
+    time_known: parsed.data.schedule.timeKnown,
   });
 
   if (error) return { error: error.message };

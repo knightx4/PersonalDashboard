@@ -112,7 +112,7 @@ export default async function RoleDetailPage({
         // reading a round, and the contact carries the LinkedIn and the title
         // that make the name worth clicking.
         .select(
-          `id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes,
+          `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
            questions_asked, group_id,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
         )
@@ -414,6 +414,7 @@ export default async function RoleDetailPage({
           round: interview.round as number,
           kind: interview.kind as string,
           scheduledAt: interview.scheduled_at as string | null,
+          timeKnown: (interview.time_known as boolean | null) ?? true,
           debriefDue: debriefDue(interview.scheduled_at as string | null),
           format: interview.format as string | null,
           status: interview.status as string,
