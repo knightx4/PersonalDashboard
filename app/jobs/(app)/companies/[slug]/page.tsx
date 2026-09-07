@@ -1,9 +1,16 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
+import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
+import { CompanyName } from './company-name';
 import { CompanyPanels } from './panels';
 import { RolesList } from './roles-list';
+import { LinkedTasks } from '@/components/todo/linked-tasks';
+import { loadTasksFor } from '@/lib/todo/links/load';
 
 export const metadata = { title: 'Company' };
 
@@ -24,7 +31,7 @@ export default async function CompanyDetailPage({
   const { data: company } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, domains, ats_type, ats_board_token, careers_url, website, linkedin_url, industry, stage, headcount_band, hq_location, priority, research, status',
+      'id, name, slug, domains, ats_type, ats_board_token, careers_url, website, linkedin_url, logo_url, industry, stage, headcount_band, hq_location, priority, research, status',
     )
     .eq('user_id', user.id)
     .eq('slug', slug)
@@ -62,6 +69,7 @@ export default async function CompanyDetailPage({
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+  const linkedTasks = await loadTasksFor(user.id, 'company', company.id as string);
 
   type RoleRow = {
     id: string;
@@ -80,17 +88,66 @@ export default async function CompanyDetailPage({
 
   const roleRows = (roles ?? []) as unknown as RoleRow[];
 
+  /**
+   * The to-dos sitting on this company's roles.
+   *
+   * A to-do is written on a role page and stored against that pursuit, so the
+   * company page -- which is where you go to ask "what is outstanding here" --
+   * had no way to see any of them, and said nothing while four were due. It is
+   * a read: they stay owned by the role, and adding one is still done there,
+   * where the mail to hang it on is.
+   */
+  const applicationIds = roleRows.flatMap((role) =>
+    role.applications.map((application) => application.id),
+  );
+  const roleByApplication = new Map(
+    roleRows.flatMap((role) =>
+      role.applications.map((application) => [application.id, role] as const),
+    ),
+  );
+
+  const { data: reminders } = applicationIds.length
+    ? await supabase
+        .from('reminders')
+        .select('id, body, due_at, application_id')
+        .in('application_id', applicationIds)
+        .is('completed_at', null)
+        .order('due_at', { ascending: true })
+    : { data: [] };
+
+  const todos = (reminders ?? []).map((reminder) => ({
+    id: reminder.id as string,
+    body: reminder.body as string,
+    dueAt: reminder.due_at as string,
+    role: roleByApplication.get(reminder.application_id as string) ?? null,
+  }));
+
   return (
     <>
       <PageHeader
-        title={company.name as string}
+        leading={
+          <CompanyAvatar
+            company={{
+              name: company.name as string,
+              logoUrl: company.logo_url as string | null,
+              domains: (company.domains as string[] | null) ?? [],
+              website: company.website as string | null,
+              careersUrl: company.careers_url as string | null,
+            }}
+            className="size-11 rounded-xl"
+            imageClassName="size-7"
+          />
+        }
+        title={
+          <CompanyName companyId={company.id as string} name={company.name as string} />
+        }
         description={
           [company.industry, company.hq_location, company.stage]
             .filter(Boolean)
             .join(' · ') || 'No detail recorded yet.'
         }
         actions={
-          <div className="flex items-center gap-2 text-[13px]">
+          <div className="flex items-center gap-2 text-ui">
             <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-muted">
               {company.priority as string}
             </span>
@@ -109,7 +166,7 @@ export default async function CompanyDetailPage({
       />
 
       <section className="mb-6 rounded-card border border-border bg-surface p-4">
-        <h2 className="text-[13px] font-semibold text-ink">Roles here, across cycles</h2>
+        <h2 className="text-ui font-semibold text-ink">Roles here, across cycles</h2>
         <RolesList
           companyId={company.id as string}
           timezone={timezone}
@@ -128,6 +185,47 @@ export default async function CompanyDetailPage({
           }))}
         />
       </section>
+
+      {todos.length > 0 && (
+        <section className="mb-6 rounded-card border border-border bg-surface p-4">
+          <h2 className="mb-2 text-ui font-semibold text-ink">
+            To-dos{' '}
+            <span className="tabular text-small font-normal text-ink-muted">{todos.length}</span>
+          </h2>
+          <ul className="space-y-2">
+            {todos.map((todo) => (
+              <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui">
+                <span className="tabular shrink-0 text-ink-muted">
+                  {formatDate(todo.dueAt, timezone)}
+                </span>
+                <span className="text-ink">{todo.body}</span>
+                {/* Which pursuit it belongs to, and the way to it: the to-do is
+                    the role's, and everything you would do with it beyond
+                    finishing it is done there. */}
+                {todo.role && (
+                  <Link
+                    href={`/jobs/roles/${todo.role.id}`}
+                    className="truncate text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                  >
+                    {todo.role.title}
+                  </Link>
+                )}
+                <ReminderActions id={todo.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <div className="mb-6">
+        <LinkedTasks
+          target="company"
+          targetId={company.id as string}
+          returnTo={`/jobs/companies/${company.slug as string}`}
+          tasks={linkedTasks}
+          timezone={timezone}
+        />
+      </div>
 
       <CompanyPanels
         companyId={company.id as string}

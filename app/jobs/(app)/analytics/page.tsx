@@ -1,6 +1,6 @@
 import { BarChart3 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadPipeline, toFunnelApplications } from '@/lib/jobs/applications/load';
 import {
@@ -100,8 +100,8 @@ export default async function AnalyticsPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-[13px] font-semibold text-ink">The funnel</h2>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
+          <h2 className="text-ui font-semibold text-ink">The funnel</h2>
+          <p className="mt-0.5 text-small text-ink-muted">
             Each bar is everything that ever reached that rung — a rejection after an onsite still
             counts as having reached the onsite.
           </p>
@@ -112,21 +112,21 @@ export default async function AnalyticsPage() {
               const advance = index === 0 ? null : advanceRate(applications, LADDER[index - 1].stage);
               return (
                 <li key={rung.stage}>
-                  <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                  <div className="flex items-baseline justify-between gap-2 text-ui">
                     <span className="text-ink">{rung.label}</span>
                     <span className="tabular text-ink-muted">
                       {count}
-                      <span className="ml-2 text-ink-faint">{formatRate(share)}</span>
+                      <span className="ml-2 text-ink-muted">{formatRate(share)}</span>
                     </span>
                   </div>
                   <div className="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
                     <div
-                      className="h-full rounded-full bg-brand"
+                      className="h-full rounded-full bg-accent"
                       style={{ width: `${Math.max(share * 100, count > 0 ? 2 : 0)}%` }}
                     />
                   </div>
                   {advance !== null && (
-                    <p className="tabular mt-0.5 text-[11px] text-ink-faint">
+                    <p className="tabular mt-0.5 text-micro text-ink-muted">
                       {formatRate(advance)} advanced from {LADDER[index - 1].label.toLowerCase()}
                     </p>
                   )}
@@ -137,15 +137,15 @@ export default async function AnalyticsPage() {
         </section>
 
         <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-[13px] font-semibold text-ink">By channel</h2>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
+          <h2 className="text-ui font-semibold text-ink">By channel</h2>
+          <p className="mt-0.5 text-small text-ink-muted">
             The comparison a single blended number hides. This is usually the most actionable
             table in the app.
           </p>
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-[13px]">
+            <table className="w-full min-w-[420px] border-collapse text-ui">
               <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+                <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
                   <th className="px-2 py-1.5 font-semibold">Source</th>
                   <th className="px-2 py-1.5 text-right font-semibold">Sent</th>
                   <th className="px-2 py-1.5 text-right font-semibold">Replied</th>
@@ -177,15 +177,15 @@ export default async function AnalyticsPage() {
         </section>
 
         <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-[13px] font-semibold text-ink">By month applied</h2>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
+          <h2 className="text-ui font-semibold text-ink">By month applied</h2>
+          <p className="mt-0.5 text-small text-ink-muted">
             Cohorted by submission date, always. Applications sent in June stay the June cohort
             forever and their response rate fills in as replies arrive.
           </p>
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-[13px]">
+            <table className="w-full min-w-[420px] border-collapse text-ui">
               <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+                <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
                   <th className="px-2 py-1.5 font-semibold">Month</th>
                   <th className="px-2 py-1.5 text-right font-semibold">Sent</th>
                   <th className="px-2 py-1.5 text-right font-semibold">Replied</th>
@@ -201,14 +201,14 @@ export default async function AnalyticsPage() {
                     </td>
                     <td className="tabular px-2 py-1.5 text-right">
                       {metrics.tooEarly ? (
-                        <span className="text-ink-faint">too early</span>
+                        <span className="text-ink-muted">too early</span>
                       ) : (
                         <span className="text-ink">{formatRate(metrics.responseRate)}</span>
                       )}
                     </td>
                     <td className="tabular px-2 py-1.5 text-right">
                       {metrics.tooEarly ? (
-                        <span className="text-ink-faint">—</span>
+                        <span className="text-ink-muted">—</span>
                       ) : (
                         <span className="text-ink-muted">{formatRate(metrics.screenRate)}</span>
                       )}
@@ -218,7 +218,7 @@ export default async function AnalyticsPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+          <p className="mt-2 text-micro leading-relaxed text-ink-muted">
             A month is marked &ldquo;too early&rdquo; until its newest applications are{' '}
             {RESPONSE_WINDOW_DAYS} days old. Including them would drag every rate toward zero and
             make recent effort look like failure.
@@ -226,13 +226,13 @@ export default async function AnalyticsPage() {
         </section>
 
         <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-[13px] font-semibold text-ink">Where rejections happen</h2>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
+          <h2 className="text-ui font-semibold text-ink">Where rejections happen</h2>
+          <p className="mt-0.5 text-small text-ink-muted">
             Rejection at resume review and rejection after a final round are opposite diagnoses
             leading to opposite responses. Without this split, every rejection looks the same.
           </p>
           {rejections.length === 0 ? (
-            <p className="mt-3 text-[13px] text-ink-faint">No rejections recorded yet.</p>
+            <p className="mt-3 text-ui text-ink-muted">No rejections recorded yet.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {rejections.map((entry) => {
@@ -240,7 +240,7 @@ export default async function AnalyticsPage() {
                 const share = entry.count / total;
                 return (
                   <li key={entry.stage}>
-                    <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                    <div className="flex items-baseline justify-between gap-2 text-ui">
                       <span className="text-ink">{STAGE_LABELS[entry.stage] ?? entry.stage}</span>
                       <span className="tabular text-ink-muted">{entry.count}</span>
                     </div>
@@ -264,9 +264,9 @@ export default async function AnalyticsPage() {
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="bg-surface px-4 py-3">
-      <p className="text-[11px] uppercase tracking-wider text-ink-faint">{label}</p>
+      <p className="text-micro uppercase tracking-wider text-ink-muted">{label}</p>
       <p className="tabular font-display mt-1 text-2xl font-semibold text-ink">{value}</p>
-      {hint && <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">{hint}</p>}
+      {hint && <p className="mt-1 text-micro leading-relaxed text-ink-muted">{hint}</p>}
     </div>
   );
 }

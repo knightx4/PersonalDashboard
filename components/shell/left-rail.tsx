@@ -1,53 +1,114 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { cn } from '@/lib/cn';
 
 /**
- * Contextual filters. Contents change per section -- time frames on Dashboard
- * and Orders, category / merchant / price on Inventory -- so each page passes
- * its own children.
+ * Contextual filters. Contents change per section, so each page passes its own
+ * children.
  *
- * Collapsible, and collapsed by default under 1024px.
+ * There were two of these, differing in width and -- more consequentially --
+ * in opposite mobile defaults, so the same control opened on one workspace and
+ * stayed shut on the other.
+ *
+ * From lg up it is a column that is always there, scrolling on its own: once
+ * the filters are taller than the viewport, sticking them without their own
+ * overflow means the bottom of the list is only reachable by scrolling the
+ * page past the results. Below lg it is a sheet, not a stack of filters shoved
+ * above the thing you opened the page to read.
  */
 export function LeftRail({
   children,
   className,
+  fill = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  /**
+   * The parent already bounds the height -- a page whose results scroll in
+   * their own region rather than with the document. The rail then fills that
+   * region instead of measuring the viewport itself, which it cannot do
+   * correctly from inside a container it does not know the height of.
+   */
+  fill?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+
+  // A sheet that survives a route change is a sheet in the way. Every rail
+  // item is a link, so opening one is exactly when it should close.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [open]);
 
   return (
     <>
-      {/* Under lg the rail is hidden behind a toggle; above it, it is always shown. */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="press mb-3 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-muted lg:hidden"
+        onClick={() => setOpen(true)}
+        className="press mb-3 inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-ui font-medium text-ink-muted xl:hidden"
         aria-expanded={open}
       >
-        {open ? (
-          <PanelLeftClose className="size-4" strokeWidth={1.75} />
-        ) : (
-          <PanelLeftOpen className="size-4" strokeWidth={1.75} />
-        )}
+        <SlidersHorizontal className="size-4" strokeWidth={1.75} aria-hidden />
         Filters
       </button>
 
+      {/* Rendered only when open, so it costs nothing at rest. */}
+      {open && (
+        <div className="fixed inset-0 z-50 xl:hidden">
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={() => setOpen(false)}
+            className="absolute inset-0 bg-ink/25"
+          />
+          <aside
+            className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-border bg-surface"
+            aria-label="Filters"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-ui font-semibold text-ink">Filters</h2>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+              >
+                <X className="size-4" strokeWidth={2} aria-hidden />
+                <span className="sr-only">Close filters</span>
+              </button>
+            </div>
+            <div className="flex-1 space-y-6 overflow-y-auto p-4" onClick={() => setOpen(false)}>
+              {children}
+            </div>
+          </aside>
+        </div>
+      )}
+
       <aside
-        className={cn(
-          'shrink-0 lg:block lg:w-56',
-          open ? 'block' : 'hidden',
-          className,
-        )}
+        className={cn('hidden shrink-0 xl:block xl:w-52', fill && 'xl:h-full', className)}
         aria-label="Filters"
       >
-        <div className="space-y-6 lg:sticky lg:top-20">{children}</div>
+        <div
+          className={cn(
+            'space-y-6 xl:overflow-y-auto xl:overscroll-contain xl:pr-1',
+            fill
+              ? 'xl:h-full'
+              : 'xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)]',
+          )}
+        >
+          {children}
+        </div>
       </aside>
     </>
   );
@@ -62,10 +123,111 @@ export function RailGroup({
 }) {
   return (
     <div>
-      <h2 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+      <h2 className="mb-2 px-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
         {label}
       </h2>
       <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+export type RailOption = {
+  id: string;
+  label: string;
+  href: string;
+  swatch?: string;
+};
+
+/**
+ * A one-line stand-in for a RailGroup whose list has grown long enough to push
+ * everything below it off the rail — merchants, most obviously.
+ *
+ * Collapsed it shows only what is selected; opened it is a type-to-filter list.
+ * Options stay plain links, so the filter still works the way the rest of the
+ * rail does and a middle-click still opens it in a tab.
+ */
+export function RailPicker({
+  label,
+  options,
+  activeId,
+  anyLabel = 'Any',
+  anyHref,
+  placeholder = 'Type to filter…',
+}: {
+  label: string;
+  options: RailOption[];
+  activeId?: string;
+  /** Where "no filter" points. */
+  anyLabel?: string;
+  anyHref: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const active = options.find((option) => option.id === activeId);
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  return (
+    <div>
+      <h2 className="mb-2 px-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+        {label}
+      </h2>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className={cn(
+          'press flex w-full items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-left text-ui',
+          active ? 'bg-accent-tint font-medium text-accent' : 'bg-surface text-ink-muted',
+        )}
+      >
+        <span className="flex-1 truncate">{active?.label ?? anyLabel}</span>
+        <ChevronDown
+          className={cn('size-3.5 shrink-0 transition-transform', open && 'rotate-180')}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <div className="mt-1 rounded-lg border border-border bg-surface p-1">
+          <div className="relative mb-1">
+            <Search
+              className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-muted"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={placeholder}
+              aria-label={`Filter ${label.toLowerCase()} options`}
+              className="h-8 w-full rounded-md border border-control bg-sunken pl-7 pr-2 text-ui text-ink placeholder:text-ink-ghost focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="max-h-64 space-y-0.5 overflow-y-auto overscroll-contain">
+            <RailItem label={anyLabel} active={!activeId} href={anyHref} />
+            {matches.map((option) => (
+              <RailItem
+                key={option.id}
+                label={option.label}
+                swatch={option.swatch}
+                active={option.id === activeId}
+                href={option.href}
+              />
+            ))}
+            {matches.length === 0 && (
+              <p className="px-2.5 py-1.5 text-ui text-ink-muted">No matches</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -89,10 +251,10 @@ export function RailItem({
   href?: string;
 }) {
   const className = cn(
-    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors duration-150',
+    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui transition-colors duration-150',
     active
-      ? 'bg-brand-tint font-medium text-brand'
-      : 'text-ink-muted hover:bg-surface hover:text-ink',
+      ? 'bg-accent-tint font-medium text-accent'
+      : 'text-ink-muted hover:bg-sunken hover:text-ink',
   );
 
   const body = (
@@ -121,7 +283,7 @@ export function RailItem({
         />
       ) : null}
       <span className="flex-1 truncate">{label}</span>
-      {count !== undefined && <span className="tabular text-ink-faint">{count}</span>}
+      {count !== undefined && <span className="tabular text-ink-muted">{count}</span>}
     </>
   );
 

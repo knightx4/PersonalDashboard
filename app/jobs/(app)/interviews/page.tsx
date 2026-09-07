@@ -1,12 +1,25 @@
 import Link from 'next/link';
 import { CalendarClock } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Interviews' };
+
+/**
+ * The interview itself, not just the pursuit it belongs to.
+ *
+ * An interview has no page of its own -- it lives on the role's interviews
+ * tab, which scrolls to it and highlights it when named in the query. That
+ * link already existed and was used from This week and from the agenda; this
+ * page, the one actually called Interviews, sent every click to the top of the
+ * role instead, so finding the round you had clicked on meant hunting for it.
+ */
+function interviewHref(roleId: string, interviewId: string): string {
+  return `/jobs/roles/${roleId}?tab=interviews&interview=${interviewId}`;
+}
 
 export default async function InterviewsPage() {
   const user = await requireUser();
@@ -66,14 +79,16 @@ export default async function InterviewsPage() {
       />
 
       {needDebrief.length > 0 && (
-        <section className="mb-6 rounded-card border border-accent-orange bg-accent-orange-tint p-4">
-          <h2 className="text-[13px] font-semibold text-ink">Write these up tonight</h2>
+        <section className="mb-6 rounded-card border border-caution bg-caution-tint p-4">
+          <h2 className="text-ui font-semibold text-ink">Write these up tonight</h2>
           <ul className="mt-2 space-y-1">
             {needDebrief.map((row) => (
-              <li key={row.id} className="text-[13px]">
+              <li key={row.id} className="text-ui">
+                {/* Straight to the round that needs writing up, which is the
+                    only reason this list exists. */}
                 <Link
-                  href={`/jobs/roles/${row.applications.roles.id}`}
-                  className="font-medium text-ink hover:text-brand"
+                  href={interviewHref(row.applications.roles.id, row.id)}
+                  className="font-medium text-ink hover:text-accent"
                 >
                   {row.applications.roles.companies.name} · {row.applications.roles.title}
                 </Link>
@@ -144,11 +159,11 @@ function Section({
 
   return (
     <section className="mb-6">
-      <h2 className="mb-2 text-[13px] font-semibold text-ink">{title}</h2>
+      <h2 className="mb-2 text-ui font-semibold text-ink">{title}</h2>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+        <table className="w-full min-w-[720px] border-collapse text-ui">
           <thead>
-            <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+            <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
               <th className="px-2 py-2 font-semibold">When</th>
               <th className="px-2 py-2 font-semibold">Company</th>
               <th className="px-2 py-2 font-semibold">Role</th>
@@ -160,8 +175,16 @@ function Section({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id} className="border-b border-border hover:bg-surface">
-                <td className="tabular px-2 py-1.5 text-ink-muted">
-                  {formatDateTime(row.scheduled_at, timezone)}
+                {/* The interview, and the role, as two separate destinations.
+                    Both are things you might want from this table and only one
+                    of them was reachable. */}
+                <td className="tabular px-2 py-1.5">
+                  <Link
+                    href={interviewHref(row.applications.roles.id, row.id)}
+                    className="font-medium text-ink hover:text-accent"
+                  >
+                    {formatDateTime(row.scheduled_at, timezone)}
+                  </Link>
                 </td>
                 <td className="px-2 py-1.5 text-ink-muted">
                   {row.applications.roles.companies.name}
@@ -169,14 +192,14 @@ function Section({
                 <td className="px-2 py-1.5">
                   <Link
                     href={`/jobs/roles/${row.applications.roles.id}`}
-                    className="font-medium text-ink hover:text-brand"
+                    className="text-ink-muted hover:text-accent"
                   >
                     {row.applications.roles.title}
                   </Link>
                 </td>
                 <td className="tabular px-2 py-1.5 text-ink-muted">{row.round}</td>
                 <td className="px-2 py-1.5 text-ink-muted">{row.kind.replace(/_/g, ' ')}</td>
-                <td className="px-2 py-1.5 text-ink-faint">
+                <td className="px-2 py-1.5 text-ink-muted">
                   {row.notes ? 'written' : '—'}
                 </td>
               </tr>

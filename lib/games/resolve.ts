@@ -189,6 +189,7 @@ async function resolveByTitle(
     maxPlayers: null,
     playingTimeMinutes: null,
     imageUrl: null,
+    averageRating: null,
   };
 
   return thingToGame(resolved, {

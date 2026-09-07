@@ -1,12 +1,15 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import {
   highWaterFromRejectionStage,
+  requirementCoverage,
   type ApplicationSource,
   type ApplicationStatus,
+  type CoverageEntry,
   type FunnelApplication,
   type RejectionStage,
+  type RequirementCoverage,
 } from '@/lib/jobs/pipeline';
-import { safeTimeZone } from '@/lib/jobs/timezone';
+import { safeTimeZone } from '@/lib/core/timezone';
 
 /**
  * Reading the pipeline.
@@ -24,6 +27,9 @@ export interface PipelineRow {
   companyName: string;
   companySlug: string;
   companyLogoUrl: string | null;
+  /** Both feed the avatar: a stored logo first, the company's own domain next. */
+  companyDomains: string[];
+  companyWebsite: string | null;
   roleTitle: string;
   location: string | null;
   workMode: string | null;
@@ -50,6 +56,12 @@ export interface PipelineRow {
   daysSinceActivity: number | null;
   compMinCents: number | null;
   compMaxCents: number | null;
+  /**
+   * Must-have coverage from the stored requirement match, or a null rate when
+   * the role has never been matched. Derived once here rather than per card,
+   * for the same reason `daysSinceActivity` is.
+   */
+  coverage: RequirementCoverage;
 }
 
 const SELECT = `
@@ -57,8 +69,8 @@ const SELECT = `
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
-    id, title, location, work_mode, comp_min_cents, comp_max_cents,
-    companies!inner ( id, name, slug, logo_url )
+    id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
+    companies!inner ( id, name, slug, logo_url, domains, website )
   )
 `;
 
@@ -87,7 +99,15 @@ type RawRow = {
     work_mode: string | null;
     comp_min_cents: number | null;
     comp_max_cents: number | null;
-    companies: { id: string; name: string; slug: string; logo_url: string | null };
+    requirement_matches: CoverageEntry[] | null;
+    companies: {
+      id: string;
+      name: string;
+      slug: string;
+      logo_url: string | null;
+      domains: string[] | null;
+      website: string | null;
+    };
   };
 };
 
@@ -125,6 +145,8 @@ export async function loadPipeline(
     companyName: row.roles.companies.name,
     companySlug: row.roles.companies.slug,
     companyLogoUrl: row.roles.companies.logo_url,
+    companyDomains: row.roles.companies.domains ?? [],
+    companyWebsite: row.roles.companies.website,
     roleTitle: row.roles.title,
     location: row.roles.location,
     workMode: row.roles.work_mode,
@@ -146,6 +168,7 @@ export async function loadPipeline(
     daysSinceActivity: daysSince(lastActivity.get(row.id) ?? row.created_at),
     compMinCents: row.roles.comp_min_cents,
     compMaxCents: row.roles.comp_max_cents,
+    coverage: requirementCoverage(row.roles.requirement_matches),
   }));
 }
 
@@ -211,7 +234,7 @@ export function formatDate(iso: string | null, timezone = 'UTC'): string {
     year: 'numeric',
     // Through safeTimeZone, because the value comes from a free-text profile
     // field: Intl throws on a zone it does not know, and an uncaught throw in
-    // a server component is a 500, not a wrong date. See lib/jobs/timezone.ts.
+    // a server component is a 500, not a wrong date. See lib/core/timezone.ts.
     timeZone: safeTimeZone(timezone),
   }).format(date);
 }

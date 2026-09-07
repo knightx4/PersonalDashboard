@@ -379,14 +379,35 @@ export const inventoryItems = pgTable(
     disposalMethod: disposalMethod('disposal_method'),
     disposalProceedsCents: integer('disposal_proceeds_cents'),
     notes: text('notes'),
+    /**
+     * Free-form structured details, keyed by the template field's key.
+     * See lib/inventory/attributes.ts; identity still lives in the detail
+     * tables (book_details, game_details), which is what pricing reads.
+     */
+    attributes: jsonb('attributes').notNull().default({}),
     /** User intent: show on the returns tracker “to return” filter. */
     returnPlanned: boolean('return_planned').notNull().default(false),
+    /** User intent: show on the sell page, whatever a catalog does or does not know. */
+    forSale: boolean('for_sale').notNull().default(false),
+    /**
+     * A sell price you typed yourself, for an item with no detail row to hold
+     * one. Read only when book_details and game_details are both absent, so an
+     * item never has two manual prices to choose between.
+     */
+    manualExpectedPriceCents: integer('manual_expected_price_cents'),
     /**
      * Provenance for this physical unit. For order-backed rows this mirrors
      * orders.source; for standalone owned items (scanned books, etc.) it is
      * set directly (manual / photo / receipt_photo).
      */
     source: orderSource('source').notNull().default('manual'),
+    /**
+     * The stack this unit was put in by hand. Null is the norm and means
+     * "stack me by my derived key" (lib/share/grouping.ts); a value means a
+     * person decided, and the derivation no longer gets a vote. See
+     * lib/inventory/item-groups.ts and migration 0047.
+     */
+    groupId: uuid('group_id').references(() => itemGroups.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -394,6 +415,61 @@ export const inventoryItems = pgTable(
     index('inventory_order_item_idx').on(t.orderItemId),
     index('inventory_category_idx').on(t.categoryId),
     index('inventory_fp_loose_idx').on(t.fingerprintLoose),
+    index('inventory_items_group_idx').on(t.groupId),
+  ],
+);
+
+/**
+ * "These copies are one item" — written down, because it is a decision.
+ *
+ * Most stacking needs no row here: units with no `group_id` fold together on
+ * the key derived in lib/share/grouping.ts, which is why a copy bought next
+ * month joins its siblings with nobody doing anything. A row appears only when
+ * someone merges units the derivation kept apart, or splits one it stacked.
+ */
+export const itemGroups = pgTable(
+  'item_groups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /**
+     * The derived key this group stands in for, so later arrivals join it
+     * rather than forming a second stack beside it. Null on a group that
+     * exists only to hold units held out of one.
+     */
+    groupKey: text('group_key'),
+    ...timestamps,
+  },
+  (t) => [
+    index('item_groups_user_idx').on(t.userId),
+    uniqueIndex('item_groups_user_key_key').on(t.userId, t.groupKey),
+  ],
+);
+
+/**
+ * Which structured details items in a category should carry, per user.
+ * A row exists only once the user has edited the template; before that the
+ * built-in defaults in lib/inventory/attributes.ts apply.
+ */
+export const categoryAttributeTemplates = pgTable(
+  'category_attribute_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+    /** [{ key, label, type }] — see AttributeField. */
+    fields: jsonb('fields').notNull().default([]),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('category_attribute_templates_user_category_idx').on(t.userId, t.categoryId),
   ],
 );
 
@@ -559,6 +635,36 @@ export const gamePriceQuotes = pgTable(
   (t) => [
     uniqueIndex('game_price_quotes_bgg_source_key').on(t.bggId, t.source),
     index('game_price_quotes_fetched_at_idx').on(t.fetchedAt),
+  ],
+);
+
+/**
+ * Quotes for an item that is neither a book nor a board game — keyed by the
+ * item, because a title search is all the identity it has.
+ *
+ * Not shared the way the two caches above are: "what a grey desk lamp goes for"
+ * is only an answer to the person who named it that, so this is user-scoped
+ * through inventory_items. See 0045.
+ */
+export const itemPriceQuotes = pgTable(
+  'item_price_quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    source: bookPriceQuoteSource('source').notNull(),
+    quotedCents: integer('quoted_cents'),
+    shippingCents: integer('shipping_cents').notNull().default(0),
+    vendorName: text('vendor_name'),
+    vendorUrl: text('vendor_url'),
+    payload: jsonb('payload'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('item_price_quotes_item_source_key').on(t.inventoryItemId, t.source),
+    index('item_price_quotes_fetched_at_idx').on(t.fetchedAt),
   ],
 );
 
@@ -776,9 +882,13 @@ export const syncJobs = pgTable(
       .references(() => emailAccounts.id, { onDelete: 'cascade' }),
     type: syncJobType('type').notNull(),
     status: syncJobStatus('status').notNull().default('queued'),
+    /** listing | reading | linking | done — see lib/core/inbox/progress.ts. */
+    phase: text('phase'),
     messagesSeen: integer('messages_seen').notNull().default(0),
     messagesClassified: integer('messages_classified').notNull().default(0),
     messagesParsed: integer('messages_parsed').notNull().default(0),
+    /** What the list step found, where that is a whole run's worth. */
+    messagesTotal: integer('messages_total'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     error: text('error'),
@@ -839,5 +949,222 @@ export const fxRates = pgTable(
   (t) => [
     uniqueIndex('fx_rates_pair_date_key').on(t.rateDate, t.baseCurrency, t.quoteCurrency),
     index('fx_rates_lookup_idx').on(t.baseCurrency, t.quoteCurrency, t.rateDate),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Item families -- see supabase/migrations/0041_item_families.sql
+// ---------------------------------------------------------------------------
+
+export const itemFamilyRole = pgEnum('item_family_role', [
+  'base',
+  'expansion',
+  'edition',
+  'accessory',
+  'member',
+]);
+
+export const itemFamilySource = pgEnum('item_family_source', [
+  'manual',
+  'bgg_link',
+  'title_cluster',
+]);
+
+/** A named group of things that belong together: Monopoly, Catan, Ticket to Ride. */
+export const itemFamilies = pgTable(
+  'item_families',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('item_families_user_slug_key').on(t.userId, t.slug),
+    index('item_families_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * One family per item, and three states: suggested, confirmed, rejected.
+ * The partial unique indexes that enforce that are in the migration -- Drizzle
+ * cannot express a `where` on a unique index, so this mirrors the columns only.
+ */
+export const inventoryItemFamilies = pgTable(
+  'inventory_item_families',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => itemFamilies.id, { onDelete: 'cascade' }),
+    role: itemFamilyRole('role').notNull().default('member'),
+    source: itemFamilySource('source').notNull().default('manual'),
+    position: integer('position').notNull().default(0),
+    confidence: numeric('confidence', { precision: 4, scale: 3 }),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index('inventory_item_families_family_idx').on(t.familyId)],
+);
+
+/** The join 0018 gave order lines, now on inventory where scanned items live. */
+export const inventoryItemTags = pgTable(
+  'inventory_item_tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    inventoryItemId: uuid('inventory_item_id')
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => itemTags.id, { onDelete: 'cascade' }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('inventory_item_tags_unique').on(t.inventoryItemId, t.tagId),
+    index('inventory_item_tags_item_idx').on(t.inventoryItemId),
+    index('inventory_item_tags_tag_idx').on(t.tagId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Share links -- see supabase/migrations/0040_share_links.sql
+// ---------------------------------------------------------------------------
+
+export const shareLinkKind = pgEnum('share_link_kind', ['disposition']);
+
+export const shareLinkStatus = pgEnum('share_link_status', ['active', 'archived']);
+
+export const shareSubjectType = pgEnum('share_subject_type', ['inventory_item']);
+
+export const shareLinkEventKind = pgEnum('share_link_event_kind', [
+  'viewed',
+  'responded',
+  'item_added',
+  'item_removed',
+  'regrouped',
+  'token_issued',
+  'token_revoked',
+]);
+
+export const shareLinks = pgTable(
+  'share_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    kind: shareLinkKind('kind').notNull().default('disposition'),
+    title: text('title').notNull(),
+    intro: text('intro'),
+    status: shareLinkStatus('status').notNull().default('active'),
+    ...timestamps,
+  },
+  (t) => [index('share_links_user_idx').on(t.userId)],
+);
+
+/**
+ * The credential is a row, not a column: a second reader is a second row, and
+ * revoking one leaves the answers and the other links alone.
+ */
+export const shareLinkTokens = pgTable(
+  'share_link_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shareLinkId: uuid('share_link_id')
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: 'cascade' }),
+    token: text('token').notNull(),
+    label: text('label').notNull().default('Anyone with the link'),
+    canRespond: boolean('can_respond').notNull().default(true),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('share_link_tokens_token_key').on(t.token),
+    index('share_link_tokens_share_idx').on(t.shareLinkId),
+  ],
+);
+
+/**
+ * One row per real unit. `groupKey` and `familyKey` are denormalized from the
+ * grouping layer so share_respond() can count a quantity instead of trusting
+ * one from the caller.
+ */
+export const shareLinkItems = pgTable(
+  'share_link_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shareLinkId: uuid('share_link_id')
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: 'cascade' }),
+    subjectType: shareSubjectType('subject_type').notNull().default('inventory_item'),
+    // Polymorphic, so no foreign key. A prune trigger on inventory_items keeps
+    // it honest -- see the migration.
+    subjectId: uuid('subject_id').notNull(),
+    groupKey: text('group_key').notNull(),
+    familyKey: text('family_key'),
+    position: integer('position').notNull().default(0),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('share_link_items_subject_key').on(t.shareLinkId, t.subjectType, t.subjectId),
+    index('share_link_items_share_group_idx').on(t.shareLinkId, t.groupKey),
+    index('share_link_items_subject_idx').on(t.subjectType, t.subjectId),
+  ],
+);
+
+/** Keyed by group, not by item: which two of three identical boxes is not a question. */
+export const shareLinkResponses = pgTable(
+  'share_link_responses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shareLinkId: uuid('share_link_id')
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: 'cascade' }),
+    groupKey: text('group_key').notNull(),
+    keepQty: integer('keep_qty').notNull().default(0),
+    sellQty: integer('sell_qty').notNull().default(0),
+    giveawayQty: integer('giveaway_qty').notNull().default(0),
+    note: text('note'),
+    answeredByToken: uuid('answered_by_token').references(() => shareLinkTokens.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('share_link_responses_group_key').on(t.shareLinkId, t.groupKey),
+    index('share_link_responses_share_idx').on(t.shareLinkId),
+    index('share_link_responses_token_idx').on(t.answeredByToken),
+  ],
+);
+
+/** Append-only. No updatedAt and no update grant: an editable audit trail is not one. */
+export const shareLinkEvents = pgTable(
+  'share_link_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shareLinkId: uuid('share_link_id')
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: 'cascade' }),
+    tokenId: uuid('token_id').references(() => shareLinkTokens.id, { onDelete: 'set null' }),
+    kind: shareLinkEventKind('kind').notNull(),
+    groupKey: text('group_key'),
+    payload: jsonb('payload').notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('share_link_events_share_created_idx').on(t.shareLinkId, t.createdAt),
+    index('share_link_events_token_created_idx').on(t.tokenId, t.createdAt),
   ],
 );

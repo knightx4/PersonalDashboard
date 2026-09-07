@@ -1,74 +1,802 @@
 @import "tailwindcss";
 
-/**
- * Design tokens.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THEMES
  *
- * Light palette, neutral base, with pops of blue, orange and pink. The blue
- * anchor is #6A82FB. Green is reserved exclusively for savings and refunds and
- * must never be used for spend -- money leaving is not a positive event.
+ * A theme is a ground, an ink, a border and a mood. Everything else is
+ * derived. That constraint is deliberate: a theme small enough to read in one
+ * screen is a theme a person could plausibly write themselves, which is the
+ * whole point of having more than two.
  *
- * Every category carries a colour so the dashboard donut and the inventory
- * filters share one visual language; those live in the `categories` table and
- * are seeded in supabase/migrations/0005.
+ * The raw values live here, per theme, as `--c-*` variables. The `@theme
+ * inline` block at the bottom maps them onto Tailwind's utility names, so
+ * `bg-surface` compiles to `background-color: var(--c-surface)` and follows
+ * whatever theme is active rather than baking one theme's hex into the CSS.
+ *
+ * See docs/design-language.html for the rules these values exist to serve.
+ * Every text/ground pair below is checked by scripts/check-contrast.ts, which
+ * fails CI on anything under threshold. Do not hand-tune a value without
+ * re-running it.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ---------------------------------------------------------------------------
+ * PAPER — the default light. Warm, printed, quiet.
+ * ------------------------------------------------------------------------- */
+:root,
+[data-theme='paper'] {
+  /* The page's own scheme: what the browser paints for itself -- scrollbars,
+   * and any form widget it draws rather than the app. A sheet declares its
+   * own below, because in Lightbox the two disagree. */
+  color-scheme: light;
+  --c-sheet-scheme: light;
+
+  --c-canvas: #faf9f6;
+  --c-surface: #ffffff;
+  --c-raised: #ffffff;
+  --c-sunken: #f2f0ea;
+  --c-border: #e8e5df;
+  --c-border-strong: #d5d1c8;
+
+  --c-shell: #f4f2ec;
+  --c-shell-ink: #1a1a18;
+  --c-shell-muted: #63635e;
+  --c-shell-border: #e2dfd7;
+  --c-shell-hover: #eae7df;
+
+  --c-ink: #1a1a18;
+  --c-ink-muted: #6b6b66;
+  /* Decoration only -- placeholders, disabled controls, redundant glyphs.
+   * Never anything the reader would miss. See the three-ink rule. */
+  --c-ink-ghost: #85857e;
+  --c-border-control: #85857e;
+
+  --c-accent-base: #4a5fd0;
+  --c-accent-hover: #3f52bd;
+  --c-accent-tint-base: #eef1fe;
+
+  --c-w-shopping: #be1250;
+  --c-w-shopping-tint: #fdecf2;
+  --c-w-jobs: #7c3aed;
+  --c-w-jobs-tint: #f4f0fe;
+  --c-w-todo: #036695;
+  --c-w-todo-tint: #e6f4fb;
+  --c-w-vault: #a21caf;
+  --c-w-vault-tint: #fcecfd;
+
+  --c-positive: #286f50;
+  --c-positive-tint: #ecf7f1;
+  --c-caution: #a34a07;
+  --c-caution-fill: #f0a63f;
+  --c-caution-tint: #fdf3e3;
+  --c-danger: #b91c1c;
+  --c-danger-tint: #fef2f2;
+
+  --c-status-lead: #6f6864;
+  --c-status-lead-tint: #f5f5f4;
+  --c-status-submitted: #2563eb;
+  --c-status-submitted-tint: #eff6ff;
+  --c-status-process: #b45309;
+  --c-status-process-tint: #fffbeb;
+  --c-status-final: #7c3aed;
+  --c-status-final-tint: #f5f3ff;
+  --c-status-offer: #047857;
+  --c-status-offer-tint: #ecfdf5;
+  --c-status-rejected: #b91c1c;
+  --c-status-rejected-tint: #fef2f2;
+  --c-status-ghosted: #78716c;
+  --c-status-ghosted-tint: #fafaf9;
+
+  --grain-opacity: 0.035;
+  --grain-blend: multiply;
+  /* A wash laid over the page ground: soft, off-centre pools of colour that
+   * give a flat ground somewhere to travel. Only a theme whose bench is large
+   * and dark enough to look like a void needs one, so the default is none. */
+  --page-wash: none;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* ---- The page ground, as a scope of its own -------------------------
+   * Everything above describes a sheet: a card, a table, a panel. Four of
+   * the five themes draw the page behind those sheets in the same polarity,
+   * so for them the page needs no palette of its own and these simply point
+   * back at the values above -- zero difference, zero maintenance.
+   *
+   * Lightbox is the theme that disagrees, and it is why this exists: a black
+   * bench with lit sheets on it needs two inks on screen at once. It sets the
+   * --c-page-* half and the SCOPES block near the bottom of this file does
+   * the rest. Nothing else in the app has to know.
+   *
+   * The rule for a new theme: if your page and your cards share a polarity,
+   * ignore all of this. */
+  --c-page: var(--c-canvas);
+  --c-page-ink: var(--c-ink);
+  --c-page-ink-muted: var(--c-ink-muted);
+  --c-page-ink-ghost: var(--c-ink-ghost);
+  --c-page-border: var(--c-border);
+  --c-page-border-strong: var(--c-border-strong);
+  --c-page-border-control: var(--c-border-control);
+  --c-page-positive: var(--c-positive);
+  --c-page-caution: var(--c-caution);
+  --c-page-danger: var(--c-danger);
+
+  /* The lit twin of each accent: the same hue, legible on the page ground
+   * rather than on a sheet. Only a two-polarity theme sets these apart. */
+  --c-accent-base-lit: var(--c-accent-base);
+  --c-accent-hover-lit: var(--c-accent-hover);
+  --c-w-shopping-lit: var(--c-w-shopping);
+  --c-w-jobs-lit: var(--c-w-jobs);
+  --c-w-todo-lit: var(--c-w-todo);
+  --c-w-vault-lit: var(--c-w-vault);
+
+  /* The sheet palette, captured here on :root -- where --c-ink and friends
+   * still hold their raw per-theme values -- so the SCOPES block can hand it
+   * back to a card after the page scope has taken over below <body>. */
+  --c-sheet-ink: var(--c-ink);
+  --c-sheet-ink-muted: var(--c-ink-muted);
+  --c-sheet-ink-ghost: var(--c-ink-ghost);
+  --c-sheet-border: var(--c-border);
+  --c-sheet-border-strong: var(--c-border-strong);
+  --c-sheet-border-control: var(--c-border-control);
+  --c-sheet-positive: var(--c-positive);
+  --c-sheet-caution: var(--c-caution);
+  --c-sheet-danger: var(--c-danger);
+}
+
+/* ---------------------------------------------------------------------------
+ * INK — the default dark. Near-black, low chroma in the neutrals, elevation
+ * by lightening rather than by shadow. The accent set is one arc through
+ * blue, violet and pink, so four differently-coloured workspaces still read
+ * as one product.
+ * ------------------------------------------------------------------------- */
+[data-theme='ink'] {
+  color-scheme: dark;
+  --c-sheet-scheme: dark;
+
+  --c-canvas: #08090a;
+  --c-surface: #0f1011;
+  --c-raised: #191a1c;
+  --c-sunken: #050506;
+  --c-border: #212225;
+  --c-border-strong: #2e3033;
+
+  --c-shell: #0b0c0d;
+  --c-shell-ink: #f7f8f8;
+  --c-shell-muted: #9096a0;
+  --c-shell-border: #1c1d20;
+  --c-shell-hover: #17181a;
+
+  --c-ink: #f7f8f8;
+  --c-ink-muted: #9096a0;
+  --c-ink-ghost: #6a707a;
+  --c-border-control: #6a707a;
+
+  --c-accent-base: #8b9dff;
+  --c-accent-hover: #a3b2ff;
+  --c-accent-tint-base: #161a33;
+
+  --c-w-shopping: #ff8fa8;
+  --c-w-shopping-tint: #301620;
+  --c-w-jobs: #b39bff;
+  --c-w-jobs-tint: #1e1733;
+  --c-w-todo: #4cc2f1;
+  --c-w-todo-tint: #0b2130;
+  --c-w-vault: #e690f2;
+  --c-w-vault-tint: #2a1430;
+
+  --c-positive: #54d6a0;
+  --c-positive-tint: #0c2119;
+  --c-caution: #f0a63f;
+  --c-caution-fill: #f0a63f;
+  --c-caution-tint: #2a1c09;
+  --c-danger: #ff8b8b;
+  --c-danger-tint: #2b1315;
+
+  --c-status-lead: #a8a49b;
+  --c-status-lead-tint: #1c1c1e;
+  --c-status-submitted: #7ea9ff;
+  --c-status-submitted-tint: #111a2e;
+  --c-status-process: #e8a84e;
+  --c-status-process-tint: #2a1c09;
+  --c-status-final: #c0a5ff;
+  --c-status-final-tint: #1d1730;
+  --c-status-offer: #54d6a0;
+  --c-status-offer-tint: #0c2119;
+  --c-status-rejected: #ff8b8b;
+  --c-status-rejected-tint: #2b1315;
+  --c-status-ghosted: #8b9099;
+  --c-status-ghosted-tint: #141516;
+
+  --grain-opacity: 0.04;
+  --grain-blend: overlay;
+}
+
+/* ---------------------------------------------------------------------------
+ * RISO — printed light. Cream ground, high chroma.
+ * ------------------------------------------------------------------------- */
+[data-theme='riso'] {
+  color-scheme: light;
+  --c-sheet-scheme: light;
+
+  --c-canvas: #f6f2e8;
+  --c-surface: #fffdf7;
+  --c-raised: #fffdf7;
+  --c-sunken: #ece6d7;
+  --c-border: #ded5c0;
+  --c-border-strong: #c9bda0;
+
+  --c-shell: #efeadd;
+  --c-shell-ink: #191713;
+  --c-shell-muted: #655e4e;
+  --c-shell-border: #ddd3bd;
+  --c-shell-hover: #e6e0d0;
+
+  --c-ink: #191713;
+  --c-ink-muted: #6a6353;
+  --c-ink-ghost: #817967;
+  --c-border-control: #817967;
+
+  --c-accent-base: #2438b8;
+  --c-accent-hover: #1c2d98;
+  --c-accent-tint-base: #e6e9fb;
+
+  --c-w-shopping: #b3104a;
+  --c-w-shopping-tint: #fbe3ec;
+  --c-w-jobs: #6b21d6;
+  --c-w-jobs-tint: #efe7fc;
+  --c-w-todo: #03607f;
+  --c-w-todo-tint: #e0f0f7;
+  --c-w-vault: #96128f;
+  --c-w-vault-tint: #fae5f7;
+
+  --c-positive: #1d6b48;
+  --c-positive-tint: #e0f0e6;
+  --c-caution: #9a4409;
+  --c-caution-fill: #ef8f33;
+  --c-caution-tint: #fbebdc;
+  --c-danger: #a3160f;
+  --c-danger-tint: #fbe3e0;
+
+  --c-status-lead: #5f584f;
+  --c-status-lead-tint: #efeade;
+  --c-status-submitted: #1642b5;
+  --c-status-submitted-tint: #e4e9f8;
+  --c-status-process: #9a4409;
+  --c-status-process-tint: #fbebdc;
+  --c-status-final: #6b21d6;
+  --c-status-final-tint: #efe7fc;
+  --c-status-offer: #1d6b48;
+  --c-status-offer-tint: #e0f0e6;
+  --c-status-rejected: #a3160f;
+  --c-status-rejected-tint: #fbe3e0;
+  --c-status-ghosted: #6d6555;
+  --c-status-ghosted-tint: #f2eee2;
+
+  --grain-opacity: 0.055;
+  --grain-blend: multiply;
+}
+
+/* ---------------------------------------------------------------------------
+ * LIGHTBOX — lit sheets on a black bench.
+ *
+ * The theme where the page and the things on it disagree on purpose. The
+ * bench -- the sidebar, the top bar, the status line, and the page ground
+ * itself -- is near-black and carries no hue. The sheets laid on it -- cards,
+ * tables, panels, tinted chips -- are lit, and they are the only lit things on
+ * screen. It reads the way a drafting table does: there is nothing to look at
+ * in the bench, so you look at the work.
+ *
+ * This is the theme the two-scope machinery exists for. Everywhere else in
+ * this file --c-ink is simply "the ink"; here there are two, and which one an
+ * element gets is decided by whether it paints a sheet under itself. The page
+ * half is --c-page-*, the sheet half is the ordinary tokens, and the SCOPES
+ * block at the bottom hands each element the right one.
+ *
+ * Two consequences worth knowing before editing this:
+ *
+ *   --c-canvas stays LIGHT. It is not the page background here; it is the
+ *   recessed well inside a card, which is what all hundred-odd uses of
+ *   `bg-canvas` in the app actually mean. The page background is --c-page.
+ *
+ *   The page half borrows the shell's own values rather than inventing a
+ *   second near-black. One bench, one colour: the sidebar and the page ground
+ *   are the same surface, so a card looks laid on the bench rather than
+ *   floating in a second, slightly different dark.
+ *
+ * Every neutral is on the blue-grey axis and none of them carry red. The
+ * earlier version drifted warm -- a beige canvas over a beige sunken -- and
+ * beige under a near-black bench reads as old paper rather than as a lit
+ * sheet. Amber survives on caution and in-process because there it carries a
+ * meaning rather than a mood, and it is the same amber in all five themes.
+ * ------------------------------------------------------------------------- */
+[data-theme='lightbox'] {
+  /* The bench is black, so the scrollbar the browser draws down the side of
+   * it has to be too. The sheets say `light` for themselves, which is where
+   * the checkboxes and date pickers actually live. */
+  color-scheme: dark;
+  --c-sheet-scheme: light;
+
+  /* ---- The bench ----
+   * Blue-grey rather than neutral, and a shade off full black: a bench at
+   * #08090c reads as a hole punched in the screen, and the sheets on it look
+   * like they are floating in nothing. Lifting it to a blue-cast near-black
+   * and laying a wash over it gives the light somewhere to come from. */
+  --c-page: #0d1219;
+  --c-page-ink: #e7ebf1;
+  --c-page-ink-muted: #9aa5b4;
+  --c-page-ink-ghost: #6d7887;
+  --c-page-border: #242c38;
+  --c-page-border-strong: #343e4c;
+  --c-page-border-control: #6d7887;
+
+  /* Three pools, held under 0.3 alpha so the bench never lightens enough to
+   * put the inks above out of range. Fixed to the viewport at <body>, so it
+   * reads as depth the page slides over rather than a pattern that scrolls. */
+  --page-wash:
+    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.22), transparent 60%),
+    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.16), transparent 55%),
+    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.28), transparent 68%);
+  --c-page-positive: #54d6a0;
+  --c-page-caution: #f0a63f;
+  --c-page-danger: #ff8b8b;
+
+  /* The lit twins: the same hues as below, turned up to clear the bench. */
+  --c-accent-base-lit: #8b9dff;
+  --c-accent-hover-lit: #a3b2ff;
+  --c-w-shopping-lit: #ff8fa8;
+  --c-w-jobs-lit: #b39bff;
+  --c-w-todo-lit: #4cc2f1;
+  --c-w-vault-lit: #e690f2;
+
+  /* ---- The sheets ----
+   * --c-canvas is the well inside a card, not the page. See the note above.
+   *
+   * Alpha rather than a duller white. A sheet that is 90% opaque picks up the
+   * bench beneath it, so it lands near #e3e5e7 on the ground and stays light
+   * over another sheet -- one token that is lit paper on the bench and plain
+   * paper on a card, which no flat hex can be. Anything measured against
+   * these is composited over --c-page first; scripts/check-contrast.ts does
+   * that, so an alpha that would darken a sheet out of range fails there.
+   * --c-sunken is written a shade lighter than the flat value it replaces to
+   * pay for the alpha: it is the darkest sheet and the one with least room. */
+  --c-canvas: rgb(231 236 242 / 0.9);
+  --c-surface: rgb(251 252 254 / 0.9);
+  --c-raised: rgb(255 255 255 / 0.9);
+  --c-sunken: rgb(228 234 241 / 0.9);
+  --c-border: #d0d9e3;
+  --c-border-strong: #a6b1bf;
+
+  /* The sidebar is the same surface as the page ground, to the byte: one
+   * bench, not two nearly-identical darks meeting at an edge. */
+  --c-shell: #0d1219;
+  --c-shell-ink: #e7ebf1;
+  --c-shell-muted: #9aa5b4;
+  --c-shell-border: #242c38;
+  --c-shell-hover: #171e28;
+
+  --c-ink: #10141a;
+  --c-ink-muted: #464f59;
+  --c-ink-ghost: #626c78;
+  --c-border-control: #626c78;
+
+  --c-accent-base: #32459f;
+  --c-accent-hover: #28377f;
+  --c-accent-tint-base: #e0e5f6;
+
+  --c-w-shopping: #a30f46;
+  --c-w-shopping-tint: #f6dde6;
+  --c-w-jobs: #6420cf;
+  --c-w-jobs-tint: #e8dffa;
+  --c-w-todo: #035b79;
+  --c-w-todo-tint: #d9e9f1;
+  --c-w-vault: #891489;
+  --c-w-vault-tint: #f2def2;
+
+  --c-positive: #17624a;
+  --c-positive-tint: #d8ece4;
+  --c-caution: #8a480a;
+  --c-caution-fill: #e8992f;
+  --c-caution-tint: #f2e6d6;
+  --c-danger: #9e1a1a;
+  --c-danger-tint: #f5dcdc;
+
+  --c-status-lead: #4f5862;
+  --c-status-lead-tint: #e3e8ee;
+  --c-status-submitted: #1a48cc;
+  --c-status-submitted-tint: #dde4fa;
+  --c-status-process: #8a480a;
+  --c-status-process-tint: #f2e6d6;
+  --c-status-final: #6420cf;
+  --c-status-final-tint: #e8dffa;
+  --c-status-offer: #17624a;
+  --c-status-offer-tint: #d8ece4;
+  --c-status-rejected: #9e1a1a;
+  --c-status-rejected-tint: #f5dcdc;
+  /* A step darker than the other themes' grey: it is an outline with no fill,
+   * so it lands on the canvas well, which the sheet alpha above dims. */
+  --c-status-ghosted: #515a64;
+  --c-status-ghosted-tint: #dfe5eb;
+
+  /* Overlay rather than multiply: the grain has to sit on a black bench and
+   * on white sheets in the same pass, and multiply is invisible on the first.
+   * Turned up from 0.03: the bench is the largest flat area in any theme and
+   * it is the texture, along with the wash, that keeps it from looking dead. */
+  --grain-opacity: 0.05;
+  --grain-blend: overlay;
+}
+
+/* ---------------------------------------------------------------------------
+ * DUSK — plum-cast dark, softer edges, the same accent arc shifted warm.
+ * ------------------------------------------------------------------------- */
+[data-theme='dusk'] {
+  color-scheme: dark;
+  --c-sheet-scheme: dark;
+
+  --c-canvas: #110d1a;
+  --c-surface: #191426;
+  --c-raised: #241d35;
+  --c-sunken: #0b0812;
+  --c-border: #2c2440;
+  --c-border-strong: #3b3153;
+
+  --c-shell: #0f0c17;
+  --c-shell-ink: #f2eefa;
+  --c-shell-muted: #a79fc0;
+  --c-shell-border: #241d35;
+  --c-shell-hover: #1c1729;
+
+  --c-ink: #f2eefa;
+  --c-ink-muted: #a79fc0;
+  --c-ink-ghost: #7a7394;
+  --c-border-control: #7a7394;
+
+  --c-accent-base: #b9a5ff;
+  --c-accent-hover: #cbbcff;
+  --c-accent-tint-base: #241c3d;
+
+  --c-w-shopping: #ff9ab5;
+  --c-w-shopping-tint: #331a29;
+  --c-w-jobs: #c0a5ff;
+  --c-w-jobs-tint: #271e42;
+  --c-w-todo: #6fcdf0;
+  --c-w-todo-tint: #132833;
+  --c-w-vault: #ec9df3;
+  --c-w-vault-tint: #301a3a;
+
+  --c-positive: #68d9aa;
+  --c-positive-tint: #13291f;
+  --c-caution: #f2b25a;
+  --c-caution-fill: #f2b25a;
+  --c-caution-tint: #2e2210;
+  --c-danger: #ff96a4;
+  --c-danger-tint: #331a22;
+
+  --c-status-lead: #a89fb8;
+  --c-status-lead-tint: #211b2e;
+  --c-status-submitted: #8fb4ff;
+  --c-status-submitted-tint: #1a2038;
+  --c-status-process: #f2b25a;
+  --c-status-process-tint: #2e2210;
+  --c-status-final: #c0a5ff;
+  --c-status-final-tint: #271e42;
+  --c-status-offer: #68d9aa;
+  --c-status-offer-tint: #13291f;
+  --c-status-rejected: #ff96a4;
+  --c-status-rejected-tint: #331a22;
+  --c-status-ghosted: #9a91af;
+  --c-status-ghosted-tint: #1c1728;
+
+  --grain-opacity: 0.05;
+  --grain-blend: overlay;
+}
+
+/* An unset choice follows the system, and the system dark is Ink. Kept in sync
+ * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --c-sheet-scheme: dark;
+
+    --c-canvas: #08090a;
+    --c-surface: #0f1011;
+    --c-raised: #191a1c;
+    --c-sunken: #050506;
+    --c-border: #212225;
+    --c-border-strong: #2e3033;
+
+    --c-shell: #0b0c0d;
+    --c-shell-ink: #f7f8f8;
+    --c-shell-muted: #9096a0;
+    --c-shell-border: #1c1d20;
+    --c-shell-hover: #17181a;
+
+    --c-ink: #f7f8f8;
+    --c-ink-muted: #9096a0;
+    --c-ink-ghost: #6a707a;
+    --c-border-control: #6a707a;
+
+    --c-accent-base: #8b9dff;
+    --c-accent-hover: #a3b2ff;
+    --c-accent-tint-base: #161a33;
+
+    --c-w-shopping: #ff8fa8;
+    --c-w-shopping-tint: #301620;
+    --c-w-jobs: #b39bff;
+    --c-w-jobs-tint: #1e1733;
+    --c-w-todo: #4cc2f1;
+    --c-w-todo-tint: #0b2130;
+    --c-w-vault: #e690f2;
+    --c-w-vault-tint: #2a1430;
+
+    --c-positive: #54d6a0;
+    --c-positive-tint: #0c2119;
+    --c-caution: #f0a63f;
+    --c-caution-fill: #f0a63f;
+    --c-caution-tint: #2a1c09;
+    --c-danger: #ff8b8b;
+    --c-danger-tint: #2b1315;
+
+    --c-status-lead: #a8a49b;
+    --c-status-lead-tint: #1c1c1e;
+    --c-status-submitted: #7ea9ff;
+    --c-status-submitted-tint: #111a2e;
+    --c-status-process: #e8a84e;
+    --c-status-process-tint: #2a1c09;
+    --c-status-final: #c0a5ff;
+    --c-status-final-tint: #1d1730;
+    --c-status-offer: #54d6a0;
+    --c-status-offer-tint: #0c2119;
+    --c-status-rejected: #ff8b8b;
+    --c-status-rejected-tint: #2b1315;
+    --c-status-ghosted: #8b9099;
+    --c-status-ghosted-tint: #141516;
+
+    --grain-opacity: 0.04;
+    --grain-blend: overlay;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WORKSPACE ACCENT
+ *
+ * The shell sets data-workspace once. Everything below it references
+ * `--color-accent` and never a workspace token directly, so a component works
+ * unchanged in every workspace and picks up the right hue for free.
+ *
+ * Chrome takes the accent; content keeps its own meaning. A pipeline card is
+ * still submitted-blue inside the violet workspace, because that colour is a
+ * claim about the pursuit rather than about where you are standing.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+/* Each workspace names its hue twice: once for a sheet and once for the page
+ * ground. In four of the five themes the two are the same value. */
+[data-workspace='shopping'] {
+  --c-sheet-accent: var(--c-w-shopping);
+  --c-page-accent: var(--c-w-shopping-lit);
+  --c-accent-tint: var(--c-w-shopping-tint);
+}
+[data-workspace='jobs'] {
+  --c-sheet-accent: var(--c-w-jobs);
+  --c-page-accent: var(--c-w-jobs-lit);
+  --c-accent-tint: var(--c-w-jobs-tint);
+}
+[data-workspace='todo'] {
+  --c-sheet-accent: var(--c-w-todo);
+  --c-page-accent: var(--c-w-todo-lit);
+  --c-accent-tint: var(--c-w-todo-tint);
+}
+[data-workspace='vault'] {
+  --c-sheet-accent: var(--c-w-vault);
+  --c-page-accent: var(--c-w-vault-lit);
+  --c-accent-tint: var(--c-w-vault-tint);
+}
+
+:root {
+  /* No workspace -- home, account, auth, legal. The app's own accent. */
+  --c-sheet-accent: var(--c-accent-base);
+  --c-page-accent: var(--c-accent-base-lit);
+  --c-accent-tint: var(--c-accent-tint-base);
+  /* Hover is the app's accent in every workspace, as it always has been. */
+  --c-sheet-accent-hover: var(--c-accent-hover);
+  --c-page-accent-hover: var(--c-accent-hover-lit);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SCOPES — which ink an element gets
+ *
+ * A theme whose page and cards share a polarity needs none of this, and gets
+ * none: every --c-page-* above points back at its sheet twin, so both rules
+ * below assign a value to itself and nothing changes. It exists for Lightbox,
+ * where a black bench carries lit sheets and two inks are on screen at once.
+ *
+ * The rule is the one a person would state out loud: an element that paints a
+ * sheet under itself gets the sheet's ink; everything else is standing on the
+ * page and gets the page's. So the default is the page -- taken at <body>,
+ * and again at the workspace element because that is where the accent is
+ * chosen -- and any element that lays down an opaque sheet takes it back.
+ *
+ * Defaulting this way round is deliberate. The set of things that paint a
+ * sheet is a list of class names, which can be written down and is written
+ * down below. The set of things that put text on the page ground is every
+ * heading, description and bare link in forty pages, which cannot.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+body,
+[data-workspace] {
+  --c-ink: var(--c-page-ink);
+  --c-ink-muted: var(--c-page-ink-muted);
+  --c-ink-ghost: var(--c-page-ink-ghost);
+  --c-border: var(--c-page-border);
+  --c-border-strong: var(--c-page-border-strong);
+  --c-border-control: var(--c-page-border-control);
+  --c-positive: var(--c-page-positive);
+  --c-caution: var(--c-page-caution);
+  --c-danger: var(--c-page-danger);
+  --c-accent: var(--c-page-accent);
+  --c-accent-hover: var(--c-page-accent-hover);
+}
+
+/*
+ * The sheets. Every opaque light ground the app paints, including the hover
+ * variants -- a row that is transparent at rest and a sheet under the cursor
+ * would otherwise keep the page's ink the moment it stops being the page.
+ *
+ * A tint counts: an accent chip or a caution banner is a sheet the size of a
+ * sentence, and the text on it belongs to the chip, not to the ground behind.
+ *
+ * `bg-accent` is here for the same reason and one more: the fill itself is
+ * --c-accent, so an element that takes back the sheet accent also paints
+ * itself the sheet accent, which is the one that carries white text.
+ *
+ * Opaque grounds only. A fractional one -- `bg-canvas/60`, `bg-accent-tint/30`
+ * -- is not a sheet, it is a wash: on a black bench it comes out dark, so it
+ * wants the ink of whatever it is washing over, which is what inheriting gives
+ * it for free. Putting one here would hand it a dark ink on a dark result.
  */
+:is(
+  .bg-surface, .bg-raised, .bg-sunken, .bg-canvas, .bg-accent, .bg-accent-tint,
+  .bg-positive-tint, .bg-caution-tint, .bg-danger-tint, .bg-caution-fill,
+  .bg-w-shopping-tint, .bg-w-jobs-tint, .bg-w-todo-tint, .bg-w-vault-tint,
+  .bg-status-lead-tint, .bg-status-submitted-tint, .bg-status-process-tint,
+  .bg-status-final-tint, .bg-status-offer-tint, .bg-status-rejected-tint,
+  .bg-status-ghosted-tint
+),
+.hover\:bg-surface:hover,
+.hover\:bg-sunken:hover,
+.hover\:bg-canvas:hover,
+.hover\:bg-accent:hover,
+.hover\:bg-accent-tint:hover,
+.hover\:bg-danger-tint:hover,
+.hover\:bg-status-rejected-tint:hover {
+  --c-ink: var(--c-sheet-ink);
+  --c-ink-muted: var(--c-sheet-ink-muted);
+  --c-ink-ghost: var(--c-sheet-ink-ghost);
+  --c-border: var(--c-sheet-border);
+  --c-border-strong: var(--c-sheet-border-strong);
+  --c-border-control: var(--c-sheet-border-control);
+  --c-positive: var(--c-sheet-positive);
+  --c-caution: var(--c-sheet-caution);
+  --c-danger: var(--c-sheet-danger);
+  --c-accent: var(--c-sheet-accent);
+  --c-accent-hover: var(--c-sheet-accent-hover);
+  /* Identical to the page's scheme in four themes, so this is inert there. */
+  color-scheme: var(--c-sheet-scheme);
+}
+
+/* `bg-page` paints the page ground itself -- a layout that draws its own
+ * background instead of letting <body> show through -- so wherever it appears
+ * it goes back to the page scope, even if some sheet happens to be above it. */
+.bg-page {
+  /* It is standing in for <body>, so it carries the same wash. */
+  background-image: var(--page-wash);
+  --c-ink: var(--c-page-ink);
+  --c-ink-muted: var(--c-page-ink-muted);
+  --c-ink-ghost: var(--c-page-ink-ghost);
+  --c-border: var(--c-page-border);
+  --c-border-strong: var(--c-page-border-strong);
+  --c-border-control: var(--c-page-border-control);
+  --c-positive: var(--c-page-positive);
+  --c-caution: var(--c-page-caution);
+  --c-danger: var(--c-page-danger);
+  --c-accent: var(--c-page-accent);
+  --c-accent-hover: var(--c-page-accent-hover);
+}
+
+/* The shell -- sidebar, top bar, status line -- appears in neither list. It
+ * has painted its own ground and named its own ink since it was written, so it
+ * is already outside both scopes and needs nothing from them. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TOKENS
+ *
+ * `@theme inline` maps the variables above onto Tailwind's utility names
+ * without inlining their values, which is what lets one class follow five
+ * themes. Anything that is not themeable -- the type scale, the radii, the
+ * easing -- is a plain value.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  /* The page ground. `bg-page` is for the handful of layouts that paint it
+   * themselves instead of letting <body> show through; `bg-canvas` is the
+   * recessed well inside a sheet, which is a different thing in Lightbox. */
+  --color-page: var(--c-page);
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-sunken: var(--c-sunken);
+  --color-border: var(--c-border);
+  --color-border-strong: var(--c-border-strong);
+  --color-shell: var(--c-shell);
+  --color-shell-ink: var(--c-shell-ink);
+  --color-shell-muted: var(--c-shell-muted);
+  --color-shell-border: var(--c-shell-border);
+  --color-shell-hover: var(--c-shell-hover);
+
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-ghost: var(--c-ink-ghost);
+  --color-control: var(--c-border-control);
+
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-tint: var(--c-accent-tint);
+
+  --color-w-shopping: var(--c-w-shopping);
+  --color-w-shopping-tint: var(--c-w-shopping-tint);
+  --color-w-jobs: var(--c-w-jobs);
+  --color-w-jobs-tint: var(--c-w-jobs-tint);
+  --color-w-todo: var(--c-w-todo);
+  --color-w-todo-tint: var(--c-w-todo-tint);
+  --color-w-vault: var(--c-w-vault);
+  --color-w-vault-tint: var(--c-w-vault-tint);
+
+  --color-positive: var(--c-positive);
+  --color-positive-tint: var(--c-positive-tint);
+  --color-caution: var(--c-caution);
+  --color-caution-fill: var(--c-caution-fill);
+  --color-caution-tint: var(--c-caution-tint);
+  --color-danger: var(--c-danger);
+  --color-danger-tint: var(--c-danger-tint);
+
+  --color-status-lead: var(--c-status-lead);
+  --color-status-lead-tint: var(--c-status-lead-tint);
+  --color-status-submitted: var(--c-status-submitted);
+  --color-status-submitted-tint: var(--c-status-submitted-tint);
+  --color-status-process: var(--c-status-process);
+  --color-status-process-tint: var(--c-status-process-tint);
+  --color-status-final: var(--c-status-final);
+  --color-status-final-tint: var(--c-status-final-tint);
+  --color-status-offer: var(--c-status-offer);
+  --color-status-offer-tint: var(--c-status-offer-tint);
+  --color-status-rejected: var(--c-status-rejected);
+  --color-status-rejected-tint: var(--c-status-rejected-tint);
+  --color-status-ghosted: var(--c-status-ghosted);
+  --color-status-ghosted-tint: var(--c-status-ghosted-tint);
+}
 
 @theme {
-  /* Surfaces */
-  --color-canvas: #fafaf8;
-  --color-surface: #ffffff;
-  --color-border: #e8e6e1;
-  --color-border-strong: #d6d3cc;
-
-  /* Text */
-  --color-ink: #1a1a18;
-  --color-ink-muted: #6b6b66;
-  --color-ink-faint: #9a9a94;
-
-  /* Primary */
-  --color-brand: #6a82fb;
-  --color-brand-hover: #5a72eb;
-  --color-brand-tint: #eef1fe;
-
-  /* Accents */
-  --color-accent-orange: #ff8a4c;
-  --color-accent-orange-tint: #fff1e8;
-  --color-accent-pink: #ff6b9d;
-  --color-accent-pink-tint: #ffeef4;
-
-  /* -------------------------------------------------------------------------
-   * Pipeline status, for the job search workspace. One colour per stage, used
-   * only for that stage. On that board a colour is a claim about where a
-   * pursuit stands, so they are fixed once, here, and used nowhere else for
-   * anything else.
-   *   gray    lead, drafting          -- yours to move, not theirs
-   *   blue    submitted, acknowledged -- sent, nothing has happened yet
-   *   amber   in process              -- a human is involved
-   *   purple  final round             -- nearly there
-   *   green   offer
-   *   red     rejected                -- muted, because it is information not alarm
-   *   faded   ghosted                 -- visibly drained, because it is a non-answer
-   * ---------------------------------------------------------------------- */
-  --color-status-lead: #78716c;
-  --color-status-lead-tint: #f5f5f4;
-  --color-status-submitted: #2563eb;
-  --color-status-submitted-tint: #eff6ff;
-  --color-status-process: #d97706;
-  --color-status-process-tint: #fffbeb;
-  --color-status-final: #7c3aed;
-  --color-status-final-tint: #f5f3ff;
-  --color-status-offer: #059669;
-  --color-status-offer-tint: #ecfdf5;
-  --color-status-rejected: #b91c1c;
-  --color-status-rejected-tint: #fef2f2;
-  --color-status-ghosted: #a8a29e;
-  --color-status-ghosted-tint: #fafaf9;
-
-  /* Savings and refunds only. Never spend. */
-  --color-positive: #3fa37a;
-  --color-positive-tint: #ecf7f2;
+  /* ---------------------------------------------------------------------------
+   * Type scale.
+   *
+   * Named steps only -- never `text-[Npx]`. The ambiguity this removes: 13px
+   * and 14px were being used interchangeably for the same role in different
+   * files. `text-ui` is interface chrome; `text-body` is content.
+   * ------------------------------------------------------------------------- */
+  --text-micro: 11px;
+  --text-micro--line-height: 1.45;
+  --text-small: 12px;
+  --text-small--line-height: 1.5;
+  --text-ui: 13px;
+  --text-ui--line-height: 1.5;
+  --text-body: 14px;
+  --text-body--line-height: 1.55;
+  --text-lead: 15px;
+  --text-lead--line-height: 1.5;
+  --text-title: 20px;
+  --text-title--line-height: 1.25;
+  --text-figure: 32px;
+  --text-figure--line-height: 1.05;
+  --text-figure-lg: 48px;
+  --text-figure-lg--line-height: 1;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-instrument), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-mono-stack);
 
   --radius-card: 0.75rem;
 
@@ -77,18 +805,44 @@
 }
 
 :root {
-  color-scheme: light;
+  --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
 body {
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background-color: var(--c-page);
+  /* Fixed, so the wash is a light source the page moves under rather than a
+   * pattern that scrolls away. `none` in every theme that does not set one. */
+  background-image: var(--page-wash);
+  background-attachment: fixed;
+  color: var(--c-ink);
   font-family: var(--font-sans);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Anything in a column of money lines up. */
+/* ---------------------------------------------------------------------------
+ * The grain.
+ *
+ * One fixed layer over the whole viewport. It is the difference between a
+ * surface and a void, and it costs a single pseudo-element with an inline SVG
+ * -- no image request, no layout, no repaint.
+ *
+ * pointer-events: none is not optional. A full-viewport overlay that swallows
+ * clicks is a catastrophic and very hard-to-diagnose bug.
+ * ------------------------------------------------------------------------- */
+body::before {
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  background-image: var(--grain);
+  background-repeat: repeat;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+  content: "";
+  pointer-events: none;
+}
+
+/* Anything in a column of numbers lines up. */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
@@ -97,9 +851,9 @@ body {
 /* ---------------------------------------------------------------------------
  * Motion
  *
- * Subtle lift on card hover, 0.98 scale on press. All of it drops when the
- * user has asked for reduced motion -- no exceptions, including the dashboard
- * count-up.
+ * One duration, one easing, three utilities. All of it drops under
+ * prefers-reduced-motion -- no exceptions, including the dashboard count-up.
+ * Any new animation is added to that block in the same commit.
  * ------------------------------------------------------------------------- */
 
 @utility lift {
@@ -110,7 +864,7 @@ body {
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px -6px rgb(26 26 24 / 0.13);
+    box-shadow: 0 6px 20px -6px rgb(0 0 0 / 0.18);
   }
 }
 
@@ -140,7 +894,7 @@ body {
 @utility skeleton {
   position: relative;
   overflow: hidden;
-  background-color: var(--color-border);
+  background-color: var(--c-border);
   border-radius: 0.375rem;
 
   &::after {
@@ -149,13 +903,19 @@ body {
     transform: translateX(-100%);
     background-image: linear-gradient(
       90deg,
-      rgb(255 255 255 / 0),
-      rgb(255 255 255 / 0.6),
-      rgb(255 255 255 / 0)
+      transparent,
+      color-mix(in srgb, var(--c-surface) 65%, transparent),
+      transparent
     );
     animation: shimmer 1.6s infinite;
     content: "";
   }
+}
+
+/* The right edge of a horizontally scrollable region, so the scroll is
+ * discoverable. A silently scrollable table is a table with hidden columns. */
+@utility scroll-fade-x {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -185,9 +945,133 @@ body {
   }
 }
 
+/* A filter form whose selects submit themselves has no use for its Apply
+ * button -- but the button is what makes the form work with JavaScript off, so
+ * it is hidden rather than removed. See components/shell/submit-on-change.tsx. */
+form[data-auto-submit] [data-fallback-submit] {
+  display: none;
+}
+
 /* Visible focus for keyboard users, invisible for mouse users. */
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--c-accent);
   outline-offset: 2px;
   border-radius: 0.25rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Vault notes.
+ *
+ * A note is the only place in this app that renders long-form prose written
+ * by a person rather than laid out by a component, so it needs typography the
+ * design system does not otherwise have: a comfortable measure, vertical
+ * rhythm between blocks, and quiet defaults for everything markdown can emit.
+ *
+ * Scoped to .vault-prose rather than set globally -- these are rules for a
+ * document, and applying them to the app's own interface would be wrong.
+ * ------------------------------------------------------------------------ */
+.vault-prose {
+  color: var(--c-ink);
+  font-size: 15px;
+  line-height: 1.7;
+  /* Around 70 characters, which is where long lines stop being readable. */
+  max-width: 68ch;
+}
+
+.vault-prose > * + * {
+  margin-top: 1em;
+}
+
+.vault-prose h1,
+.vault-prose h2,
+.vault-prose h3,
+.vault-prose h4 {
+  font-family: var(--font-display, var(--font-sans));
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.3;
+  margin-top: 1.8em;
+}
+
+.vault-prose h1 { font-size: 1.5rem; }
+.vault-prose h2 { font-size: 1.25rem; }
+.vault-prose h3 { font-size: 1.05rem; }
+.vault-prose h4 { font-size: 0.95rem; }
+
+.vault-prose > :first-child { margin-top: 0; }
+
+.vault-prose a {
+  color: var(--c-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.vault-prose ul,
+.vault-prose ol {
+  padding-left: 1.4em;
+}
+
+.vault-prose ul { list-style: disc; }
+.vault-prose ol { list-style: decimal; }
+.vault-prose li + li { margin-top: 0.25em; }
+
+/* Obsidian checklists. The box is disabled: this is a mirror, not an editor. */
+.vault-prose li input[type='checkbox'] {
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+
+.vault-prose blockquote {
+  border-left: 3px solid var(--c-border-strong);
+  color: var(--c-ink-muted);
+  padding-left: 1em;
+}
+
+.vault-prose code {
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+}
+
+.vault-prose pre {
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  padding: 0.9em 1em;
+}
+
+.vault-prose pre code {
+  background: none;
+  border: 0;
+  font-size: 0.85em;
+  padding: 0;
+}
+
+/* Wide tables scroll inside the note rather than widening the page. */
+.vault-prose table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.vault-prose th,
+.vault-prose td {
+  border: 1px solid var(--c-border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+
+.vault-prose th {
+  background: var(--c-sunken);
+  font-weight: 600;
+}
+
+.vault-prose hr {
+  border: 0;
+  border-top: 1px solid var(--c-border);
+  margin: 2em 0;
 }

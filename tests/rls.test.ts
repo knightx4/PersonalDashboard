@@ -91,6 +91,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.game_details = gameDetails.id;
 
+  const [attributeTemplate] = await admin<{ id: string }[]>`
+    insert into category_attribute_templates (user_id, category_id, fields)
+    values (
+      ${userId}, ${category.id},
+      ${admin.json([{ key: 'brand', label: 'Brand', type: 'text' }])}::jsonb
+    )
+    returning id`;
+  ids.category_attribute_templates = attributeTemplate.id;
+
   const [feedback] = await admin<{ id: string }[]>`
     insert into feedback_items (user_id, kind, body, page_path)
     values (${userId}, 'bug', ${`${tag} found a bug`}, '/shopping/dashboard')
@@ -107,6 +116,25 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     )
     returning id`;
   ids.book_price_quotes = bookQuote.id;
+
+  const [gameQuote] = await admin<{ id: string }[]>`
+    insert into game_price_quotes (bgg_id, source, quoted_cents, vendor_name)
+    values (
+      ${tag === 'alice' ? 13 : 822},
+      'buyback',
+      ${tag === 'alice' ? 1500 : 900},
+      ${`${tag} games`}
+    )
+    returning id`;
+  ids.game_price_quotes = gameQuote.id;
+
+  // Unlike the two above this one is NOT shared reference data: it is keyed by
+  // the item, so the row is as private as the item it prices.
+  const [itemQuote] = await admin<{ id: string }[]>`
+    insert into item_price_quotes (inventory_item_id, source, quoted_cents)
+    values (${inventoryItem.id}, 'web_estimate', ${tag === 'alice' ? 2500 : 1100})
+    returning id`;
+  ids.item_price_quotes = itemQuote.id;
 
   const [use] = await admin<{ id: string }[]>`
     insert into item_uses (inventory_item_id, used_on)
@@ -173,6 +201,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.inventory_item_lists = membership.id;
 
+  const [itemGroup] = await admin<{ id: string }[]>`
+    insert into item_groups (user_id, name, group_key)
+    values (${userId}, ${`${tag} group`}, ${`item:title:${tag}-group`})
+    returning id`;
+  ids.item_groups = itemGroup.id;
+
   const [policy] = await admin<{ id: string }[]>`
     insert into merchant_return_policies (user_id, merchant_id, return_window_days)
     values (${userId}, ${merchant.id}, 30)
@@ -190,6 +224,56 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${orderItem.id}, ${itemTag.id})
     returning id`;
   ids.order_item_tags = orderItemTag.id;
+
+  const [family] = await admin<{ id: string }[]>`
+    insert into item_families (user_id, name, slug)
+    values (${userId}, ${`${tag} monopoly`}, ${`${tag}-monopoly`})
+    returning id`;
+  ids.item_families = family.id;
+
+  const [familyMember] = await admin<{ id: string }[]>`
+    insert into inventory_item_families (inventory_item_id, family_id, role, confirmed_at)
+    values (${inventoryItem.id}, ${family.id}, 'base', now())
+    returning id`;
+  ids.inventory_item_families = familyMember.id;
+
+  const [inventoryTag] = await admin<{ id: string }[]>`
+    insert into inventory_item_tags (inventory_item_id, tag_id)
+    values (${inventoryItem.id}, ${itemTag.id})
+    returning id`;
+  ids.inventory_item_tags = inventoryTag.id;
+
+  const [share] = await admin<{ id: string }[]>`
+    insert into share_links (user_id, title, intro)
+    values (${userId}, ${`${tag} keep or sell`}, 'Pick what stays.')
+    returning id`;
+  ids.share_links = share.id;
+
+  const [shareToken] = await admin<{ id: string }[]>`
+    insert into share_link_tokens (share_link_id, token)
+    values (${share.id}, ${`${tag}-token-with-plenty-of-entropy-0001`})
+    returning id`;
+  ids.share_link_tokens = shareToken.id;
+
+  const [shareItem] = await admin<{ id: string }[]>`
+    insert into share_link_items (share_link_id, subject_id, group_key, family_key)
+    values (${share.id}, ${inventoryItem.id}, ${`game:bgg:${tag === 'alice' ? 13 : 822}`},
+            ${`${tag}-monopoly`})
+    returning id`;
+  ids.share_link_items = shareItem.id;
+
+  const [shareResponse] = await admin<{ id: string }[]>`
+    insert into share_link_responses (share_link_id, group_key, keep_qty, answered_by_token)
+    values (${share.id}, ${`game:bgg:${tag === 'alice' ? 13 : 822}`}, 1, ${shareToken.id})
+    returning id`;
+  ids.share_link_responses = shareResponse.id;
+
+  const [shareEvent] = await admin<{ id: string }[]>`
+    insert into share_link_events (share_link_id, token_id, kind, group_key)
+    values (${share.id}, ${shareToken.id}, 'responded',
+            ${`game:bgg:${tag === 'alice' ? 13 : 822}`})
+    returning id`;
+  ids.share_link_events = shareEvent.id;
 
   const [fxRate] = await admin<{ id: string }[]>`
     insert into fx_rates (rate_date, base_currency, quote_currency, rate, source)
@@ -258,7 +342,11 @@ describe('RLS coverage', () => {
 
 describe('cross-user reads', () => {
   /** Shared market-data tables: every authenticated user may read every row. */
-  const SHARED_REFERENCE_TABLES = new Set(['fx_rates', 'book_price_quotes']);
+  const SHARED_REFERENCE_TABLES = new Set([
+    'fx_rates',
+    'book_price_quotes',
+    'game_price_quotes',
+  ]);
 
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
@@ -298,6 +386,13 @@ describe('cross-user reads', () => {
   it('lets every authenticated user read cached book price quotes', async () => {
     const rows = await asUser(userB, (tx) =>
       tx<{ id: string }[]>`select id from book_price_quotes where id = ${seedA.book_price_quotes}`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets every authenticated user read cached game price quotes', async () => {
+    const rows = await asUser(userB, (tx) =>
+      tx<{ id: string }[]>`select id from game_price_quotes where id = ${seedA.game_price_quotes}`,
     );
     expect(rows).toHaveLength(1);
   });

@@ -66,7 +66,7 @@ export default async function SavedPage({
   const showComposer = status === 'saved';
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Status">
           {STATUSES.map((entry) => (
@@ -124,7 +124,7 @@ export default async function SavedPage({
                           className="size-full object-cover"
                         />
                       ) : (
-                        <div className="flex size-full items-center justify-center text-[12px] text-ink-faint">
+                        <div className="flex size-full items-center justify-center text-small text-ink-muted">
                           No image
                         </div>
                       )}
@@ -133,10 +133,10 @@ export default async function SavedPage({
                       <p className="line-clamp-2 font-medium text-ink">
                         {item.title ?? 'Untitled'}
                       </p>
-                      <p className="truncate text-[13px] text-ink-muted">
+                      <p className="truncate text-ui text-ink-muted">
                         {[merchant?.name, item.created_at?.slice(0, 10)].filter(Boolean).join(' · ')}
                       </p>
-                      <p className="tabular text-sm font-medium text-ink">
+                      <p className="tabular text-body font-medium text-ink">
                         {item.price_cents != null
                           ? formatMoney(item.price_cents, item.currency ?? 'USD')
                           : 'Price unknown'}

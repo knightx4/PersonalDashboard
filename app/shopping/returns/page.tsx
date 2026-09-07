@@ -82,7 +82,7 @@ export default async function ReturnsPage({
   };
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Group by">
           {RETURNS_GROUPS.map((entry) => (
@@ -128,7 +128,7 @@ export default async function ReturnsPage({
           actions={
             <Link
               href="/shopping/settings#return-policies"
-              className="text-sm font-medium text-brand hover:underline"
+              className="text-body font-medium text-accent hover:underline"
             >
               Edit return policies
             </Link>

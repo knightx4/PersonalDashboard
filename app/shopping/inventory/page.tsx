@@ -2,13 +2,30 @@ import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import {
+  InventoryBulkBar,
+  InventorySelectionProvider,
+} from '@/components/inventory/inventory-selection';
+import { LeftRail, RailGroup, RailItem, RailPicker } from '@/components/shell/left-rail';
+import { AttributeFilterPicker } from './attribute-filter-picker';
 import { PageHeader } from '@/components/shell/page-header';
+import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
+import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
+import {
+  attributeFacets,
+  attributeLabelMap,
+  matchesAttributeFilters,
+  parseAttributeFilters,
+  serializeAttributeFilter,
+  type AttributeFilter,
+} from '@/lib/inventory/attribute-filters';
+import { parseAttributeValues, parseTemplateFields } from '@/lib/inventory/attributes';
+import { stackUnits, unitCostRange } from '@/lib/inventory/item-groups';
 import {
   GROUP_OPTIONS,
   groupInventoryItems,
@@ -21,6 +38,8 @@ import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchan
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
+import { loadShareOptions } from '@/lib/share/load-options';
+import { SendToShare } from '@/components/share/send-to-share';
 
 export const metadata = { title: 'Inventory' };
 
@@ -51,6 +70,7 @@ function inventoryHref(opts: {
   sort?: string;
   group?: string;
   person?: string;
+  attrs?: AttributeFilter[];
 }): string {
   const params = new URLSearchParams();
   if (opts.range && opts.range !== 'all') params.set('range', opts.range);
@@ -61,6 +81,7 @@ function inventoryHref(opts: {
   if (opts.sort && opts.sort !== 'newest') params.set('sort', opts.sort);
   if (opts.group && opts.group !== 'none') params.set('group', opts.group);
   if (opts.person) params.set('person', opts.person);
+  for (const attr of opts.attrs ?? []) params.append('attr', serializeAttributeFilter(attr));
   const qs = params.toString();
   return qs ? `/shopping/inventory?${qs}` : '/shopping/inventory';
 }
@@ -108,6 +129,7 @@ export default async function InventoryPage({
     sort?: string;
     group?: string;
     person?: string;
+    attr?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -121,6 +143,7 @@ export default async function InventoryPage({
     RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
   const sort = parseSortId(params.sort);
   const group = parseGroupId(params.group);
+  const attrFilters = parseAttributeFilters(params.attr);
 
   await backfillUserInventoryDisplay(supabase, user.id);
 
@@ -130,7 +153,14 @@ export default async function InventoryPage({
   const byPerson = peopleById(people);
   const showPeople = people.length > 1;
 
-  const [{ data: categories }, { data: lists }, merchants, { data: profile }] = await Promise.all([
+  const [
+    { data: categories },
+    { data: lists },
+    merchants,
+    { data: profile },
+    { data: attributeTemplates },
+    { data: groupRows },
+  ] = await Promise.all([
     supabase
       .from('categories')
       .select('id, name, color, slug')
@@ -143,7 +173,17 @@ export default async function InventoryPage({
       .order('name'),
     loadUserMerchants(supabase, user.id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    supabase.from('category_attribute_templates').select('fields').eq('user_id', user.id),
+    // The groupings someone made by hand. Almost always none: stacking is
+    // derived by default and a row exists only where that was overruled.
+    supabase.from('item_groups').select('id, name, group_key').eq('user_id', user.id),
   ]);
+
+  const itemGroups = (groupRows ?? []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    groupKey: (row.group_key as string | null) ?? null,
+  }));
 
   const timezone = profile?.timezone ?? 'UTC';
   const activeMerchant =
@@ -158,11 +198,16 @@ export default async function InventoryPage({
     ? `inventory_item_lists!inner ( list_id )`
     : `inventory_item_lists ( list_id )`;
 
+  // fingerprint_loose, group_id and the game's identity ride along because the
+  // list folds copies into one row per item, and that is what decides which
+  // copies are the same thing. See lib/inventory/item-groups.ts.
   const selectWithOptionalInner = activeMerchant
     ? `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
-        image_url, return_planned, search_tags,
+        image_url, return_planned, for_sale, search_tags, attributes,
+        fingerprint_loose, group_id,
         categories(name, color, slug),
+        game_details ( bgg_id, needs_confirmation ),
         ${membershipJoin},
         order_items!inner (
           image_url,
@@ -174,8 +219,10 @@ export default async function InventoryPage({
       `
     : `
         id, name, short_name, variant, cost_cents, acquired_at, status, category_id, person_id,
-        image_url, return_planned, search_tags,
+        image_url, return_planned, for_sale, search_tags, attributes,
+        fingerprint_loose, group_id,
         categories(name, color, slug),
+        game_details ( bgg_id, needs_confirmation ),
         ${membershipJoin},
         order_items (
           image_url,
@@ -222,7 +269,15 @@ export default async function InventoryPage({
     category_id: string | null;
     image_url: string | null;
     return_planned: boolean;
+    for_sale: boolean;
     search_tags: string[] | null;
+    attributes: unknown;
+    fingerprint_loose: string | null;
+    group_id: string | null;
+    game_details:
+      | { bgg_id: number | null; needs_confirmation: boolean }
+      | { bgg_id: number | null; needs_confirmation: boolean }[]
+      | null;
     inventory_item_lists:
       | { list_id: string }
       | { list_id: string }[]
@@ -275,10 +330,22 @@ export default async function InventoryPage({
     search_tags: string[] | null;
     merchant_name: string | null;
     category_name: string | null;
+    attributes: Record<string, string>;
+    // The shape lib/inventory/item-groups.ts stacks on.
+    inventoryItemId: string;
+    shortName: string | null;
+    bggId: number | null;
+    needsConfirmation: boolean;
+    isGame: boolean;
+    fingerprintLoose: string | null;
+    groupId: string | null;
+    costCents: number;
+    acquiredAt: string | null;
   })[] = rawItems.map((item) => {
     const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
     const orderItem = Array.isArray(item.order_items) ? item.order_items[0] : item.order_items;
     const merchantName = merchantNameFromItem(item);
+    const game = Array.isArray(item.game_details) ? item.game_details[0] : item.game_details;
     const memberships = Array.isArray(item.inventory_item_lists)
       ? item.inventory_item_lists
       : item.inventory_item_lists
@@ -286,6 +353,15 @@ export default async function InventoryPage({
         : [];
     return {
       id: item.id,
+      inventoryItemId: item.id,
+      shortName: item.short_name,
+      bggId: game?.bgg_id ?? null,
+      needsConfirmation: Boolean(game?.needs_confirmation),
+      isGame: Boolean(game),
+      fingerprintLoose: item.fingerprint_loose,
+      groupId: item.group_id,
+      costCents: item.cost_cents,
+      acquiredAt: item.acquired_at,
       name: item.name,
       short_name: item.short_name,
       variant: item.variant,
@@ -293,7 +369,9 @@ export default async function InventoryPage({
       acquired_at: item.acquired_at,
       image_url: item.image_url ?? orderItem?.image_url ?? null,
       return_planned: item.return_planned,
+      for_sale: item.for_sale,
       search_tags: item.search_tags,
+      attributes: parseAttributeValues(item.attributes),
       person: showPeople ? (byPerson.get(item.person_id ?? '') ?? null) : null,
       category_name: category?.name ?? null,
       category_color: category?.color ?? null,
@@ -303,14 +381,60 @@ export default async function InventoryPage({
     };
   });
 
-  const searched = q ? filterAndRankBySearch(mapped, q) : mapped;
+  // Facets come from everything the other filters left, so the properties on
+  // offer do not vanish the moment one of them is picked.
+  const facets = attributeFacets(
+    mapped,
+    attributeLabelMap(
+      (attributeTemplates ?? []).map((row) => parseTemplateFields(row.fields)),
+      (categories ?? []).map((category) => category.slug),
+    ),
+  );
+  const byAttributes = attrFilters.length
+    ? mapped.filter((item) => matchesAttributeFilters(item.attributes, attrFilters))
+    : mapped;
+
+  const searched = q ? filterAndRankBySearch(byAttributes, q) : byAttributes;
   // Relevance wins while searching; otherwise honor the sort control.
   const finalItems = q ? searched : sortInventoryItems(searched, sort);
-  const groups = groupInventoryItems(finalItems, group);
+
+  // Fold copies into items, after sorting rather than before: the sort control
+  // orders what the user is looking at, and a stack takes the position of its
+  // first copy so the ordering they asked for still holds.
+  const stacks = stackUnits(finalItems, itemGroups);
+
+  // One row per item. `cost_cents` becomes the stack's total, which is what the
+  // row shows under the price and what the section subtotals add up.
+  const stackRows = stacks.map((stack) => {
+    const { low, high } = unitCostRange(stack.units);
+    return {
+      ...stack.primary,
+      id: stack.primary.inventoryItemId,
+      name: stack.name,
+      short_name: stack.quantity > 1 ? null : stack.primary.short_name,
+      cost_cents: stack.totalCents,
+      quantity: stack.quantity,
+      unit_cost_low: low,
+      unit_cost_high: high,
+      unit_ids: stack.units.map((unit) => unit.inventoryItemId),
+      // Any copy on the sell page or marked to return is worth saying on the
+      // row: the flag is about the item as far as the list is concerned.
+      for_sale: stack.units.some((unit) => unit.for_sale),
+      return_planned: stack.units.some((unit) => unit.return_planned),
+      list_ids: [...new Set(stack.units.flatMap((unit) => unit.list_ids ?? []))],
+    };
+  });
+
+  const groups = groupInventoryItems(stackRows, group);
 
   const filtered = Boolean(
-    q || categoryId || activeMerchant || activeList || range !== 'all',
+    q || categoryId || activeMerchant || activeList || range !== 'all' || attrFilters.length,
   );
+
+  // The shares that exist, so a filtered shelf can be sent to one in a click.
+  // This is the "put all the board games on the form" path done by hand: filter
+  // to the category, then add what is on screen.
+  const shareOptions = await loadShareOptions(supabase, user.id);
 
   // person rides in the base, so every other filter link keeps it rather than
   // silently dropping back to everyone.
@@ -323,10 +447,99 @@ export default async function InventoryPage({
     sort,
     group,
     person: personId ?? undefined,
+    attrs: attrFilters,
   };
 
+  // Every value a property can be filtered to, as a ready-made link, so the
+  // picker stays a client component that only chooses between hrefs.
+  const attrHrefs: Record<string, Record<string, string>> = {};
+  for (const facet of facets) {
+    attrHrefs[facet.key] = Object.fromEntries(
+      facet.values
+        .filter(
+          (value) =>
+            !attrFilters.some(
+              (filter) =>
+                filter.key === facet.key &&
+                filter.value.toLowerCase() === value.toLowerCase(),
+            ),
+        )
+        .map((value) => [
+          value,
+          inventoryHref({
+            ...hrefBase,
+            // One value per property: picking another replaces it.
+            attrs: [
+              ...attrFilters.filter((filter) => filter.key !== facet.key),
+              { key: facet.key, value },
+            ],
+          }),
+        ]),
+    );
+  }
+
+  const facetLabels = new Map(facets.map((facet) => [facet.key, facet.label]));
+
+  /**
+   * What is narrowing this page, said out loud above the results.
+   *
+   * Eight filters can be in force at once here -- search, category, merchant,
+   * list, range, whose, and any number of item-detail facets -- and the rail
+   * alone made you hunt for a tinted row to find out which. One row rather
+   * than two: the facets used to carry their own chips inside the rail, which
+   * meant the answer to "what is filtering this" lived in two places
+   * depending on which filter you had used.
+   *
+   * Each chip clears exactly itself and keeps the rest. "Clear all" is the
+   * blunt instrument and is offered separately.
+   */
+  const chips: FilterChip[] = [];
+  if (q) chips.push({ label: 'Search', value: q, clearHref: inventoryHref({ ...hrefBase, q: undefined }) });
+  if (categoryId) {
+    const category = (categories ?? []).find((entry) => entry.id === categoryId);
+    if (category) {
+      chips.push({ label: 'Category', value: category.name, clearHref: inventoryHref({ ...hrefBase, category: undefined }) });
+    }
+  }
+  if (activeMerchant) {
+    const merchant = merchants.find((entry) => entry.id === activeMerchant);
+    if (merchant) {
+      chips.push({ label: 'Merchant', value: merchant.name, clearHref: inventoryHref({ ...hrefBase, merchant: undefined }) });
+    }
+  }
+  if (activeList) {
+    const list = (lists ?? []).find((entry) => entry.id === activeList);
+    if (list) {
+      chips.push({ label: 'List', value: list.name, clearHref: inventoryHref({ ...hrefBase, list: undefined }) });
+    }
+  }
+  if (range !== 'all') {
+    const entry = RANGES.find((option) => option.id === range);
+    if (entry) {
+      chips.push({ label: 'Acquired', value: entry.label, clearHref: inventoryHref({ ...hrefBase, range: 'all' }) });
+    }
+  }
+  if (personId) {
+    const person = byPerson.get(personId);
+    if (person) {
+      chips.push({ label: 'Whose', value: person.name, clearHref: inventoryHref({ ...hrefBase, person: undefined }) });
+    }
+  }
+  for (const filter of attrFilters) {
+    chips.push({
+      label: facetLabels.get(filter.key) ?? filter.key,
+      value: filter.value,
+      clearHref: inventoryHref({
+        ...hrefBase,
+        attrs: attrFilters.filter(
+          (entry) => !(entry.key === filter.key && entry.value === filter.value),
+        ),
+      }),
+    });
+  }
+
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Acquired">
           {RANGES.map((entry) => (
@@ -372,20 +585,24 @@ export default async function InventoryPage({
             />
           ))}
         </RailGroup>
-        <RailGroup label="Merchant">
-          <RailItem
-            label="Any"
-            active={!activeMerchant}
-            href={inventoryHref({ ...hrefBase, merchant: undefined })}
-          />
-          {merchants.map((merchant) => (
-            <RailItem
-              key={merchant.id}
-              label={merchant.name}
-              active={merchant.id === activeMerchant}
-              href={inventoryHref({ ...hrefBase, merchant: merchant.id })}
-            />
-          ))}
+        <RailPicker
+          label="Merchant"
+          activeId={activeMerchant}
+          anyHref={inventoryHref({ ...hrefBase, merchant: undefined })}
+          placeholder="Type a merchant…"
+          options={merchants.map((merchant) => ({
+            id: merchant.id,
+            label: merchant.name,
+            href: inventoryHref({ ...hrefBase, merchant: merchant.id }),
+          }))}
+        />
+        <RailGroup label="Property">
+          <AttributeFilterPicker facets={facets} hrefFor={attrHrefs} />
+          {facets.length === 0 && (
+            <p className="px-2.5 py-1.5 text-ui text-ink-muted">
+              None of these items have details recorded yet.
+            </p>
+          )}
         </RailGroup>
         <RailGroup label="Category">
           <RailItem
@@ -411,14 +628,22 @@ export default async function InventoryPage({
           title="Inventory"
           description="Everything you currently own, so you can check before buying it again."
           actions={
-            <Link
-              href="/shopping/inventory/add"
-              className={buttonVariants({ variant: 'primary', size: 'sm' })}
-            >
-              Add owned books
-            </Link>
+            <>
+              <SendToShare
+                shares={shareOptions}
+                inventoryItemIds={finalItems.map((item) => item.id)}
+              />
+              <Link
+                href="/shopping/inventory/add"
+                className={buttonVariants({ variant: 'primary', size: 'sm' })}
+              >
+                Add new item
+              </Link>
+            </>
           }
         />
+
+        <FilterChips chips={chips} clearAllHref="/shopping/inventory" />
 
         <form className="mb-4 space-y-3" action="/shopping/inventory" method="get">
           {range !== 'all' && <input type="hidden" name="range" value={range} />}
@@ -427,10 +652,19 @@ export default async function InventoryPage({
             <input type="hidden" name="merchant" value={activeMerchant} />
           )}
           {activeList && <input type="hidden" name="list" value={activeList} />}
+          {personId && <input type="hidden" name="person" value={personId} />}
+          {attrFilters.map((filter) => (
+            <input
+              key={`${filter.key}:${filter.value}`}
+              type="hidden"
+              name="attr"
+              value={serializeAttributeFilter(filter)}
+            />
+          ))}
 
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -444,7 +678,7 @@ export default async function InventoryPage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
+            <label className="inline-flex items-center gap-1.5 text-small text-ink-muted">
               <ArrowUpDown className="size-3.5" strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Sort</span>
               <Select
@@ -461,7 +695,7 @@ export default async function InventoryPage({
                 ))}
               </Select>
             </label>
-            <label className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted">
+            <label className="inline-flex items-center gap-1.5 text-small text-ink-muted">
               <Layers className="size-3.5" strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Group</span>
               <Select
@@ -477,14 +711,18 @@ export default async function InventoryPage({
                 ))}
               </Select>
             </label>
+            <SubmitOnChange />
+            {/* Hidden once the selects submit themselves; still there, and
+                still the only way through, with JavaScript off. */}
             <button
               type="submit"
-              className="press h-9 rounded-lg border border-border bg-surface px-3 text-[13px] font-medium text-ink-muted hover:text-ink"
+              data-fallback-submit
+              className="press h-9 rounded-lg border border-control bg-surface px-3 text-ui font-medium text-ink-muted hover:text-ink"
             >
               Apply
             </button>
             {q && (
-              <p className="text-[12px] text-ink-faint">
+              <p className="text-small text-ink-muted">
                 Sorted by relevance while searching
               </p>
             )}
@@ -505,7 +743,7 @@ export default async function InventoryPage({
             action={
               filtered
                 ? { label: 'Clear filters', href: '/shopping/inventory' }
-                : { label: 'Add owned books', href: '/shopping/inventory/add' }
+                : { label: 'Add new item', href: '/shopping/inventory/add' }
             }
             secondaryAction={
               filtered
@@ -514,40 +752,43 @@ export default async function InventoryPage({
             }
           />
         ) : (
-          <div className="space-y-5">
-            {groups.map((section) => {
-              const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
-              return (
-                <section key={section.key} className="space-y-2">
-                  {group !== 'none' && (
-                    <div className="flex items-baseline justify-between gap-3 px-1">
-                      <h2 className="text-[13px] font-semibold text-ink">
-                        {section.label}
-                        <span className="ml-2 font-normal text-ink-faint">
-                          {section.items.length}
-                        </span>
-                      </h2>
-                      <p className="tabular text-[12px] text-ink-muted">
-                        {formatMoney(subtotal)}
-                      </p>
-                    </div>
-                  )}
-                  <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
-                    {section.items.map((item) => (
-                      <InventoryRow
-                        key={item.id}
-                        item={item}
-                        lists={(lists ?? []).map((list) => ({
-                          id: list.id,
-                          name: list.name,
-                        }))}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
+          <InventorySelectionProvider>
+            <InventoryBulkBar allIds={finalItems.map((item) => item.id)} />
+            <div className="space-y-5">
+              {groups.map((section) => {
+                const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
+                return (
+                  <section key={section.key} className="space-y-2">
+                    {group !== 'none' && (
+                      <div className="flex items-baseline justify-between gap-3 px-1">
+                        <h2 className="text-ui font-semibold text-ink">
+                          {section.label}
+                          <span className="ml-2 font-normal text-ink-muted">
+                            {section.items.length}
+                          </span>
+                        </h2>
+                        <p className="tabular text-small text-ink-muted">
+                          {formatMoney(subtotal)}
+                        </p>
+                      </div>
+                    )}
+                    <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                      {section.items.map((item) => (
+                        <InventoryRow
+                          key={item.id}
+                          item={item}
+                          lists={(lists ?? []).map((list) => ({
+                            id: list.id,
+                            name: list.name,
+                          }))}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          </InventorySelectionProvider>
         )}
       </div>
     </div>

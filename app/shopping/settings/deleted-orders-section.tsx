@@ -22,12 +22,12 @@ export type DeletedOrderRow = {
 export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Orders you removed from the main list. Restore brings the order and its inventory back;
         delete forever removes them for good.
       </p>
       {orders.length === 0 ? (
-        <p className="text-sm text-ink-faint">No deleted orders.</p>
+        <p className="text-body text-ink-muted">No deleted orders.</p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {orders.map((order) => {
@@ -36,7 +36,7 @@ export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) 
             return (
               <li
                 key={order.id}
-                className="flex flex-col gap-2 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2 px-3 py-2.5 text-body sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">
@@ -49,7 +49,7 @@ export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) 
                       {order.external_order_number ? ` · #${order.external_order_number}` : ''}
                     </span>
                   </p>
-                  <p className="text-[12px] text-ink-faint">
+                  <p className="text-small text-ink-muted">
                     Deleted {deletedOn} · {formatMoney(order.total_cents, order.currency)}
                   </p>
                 </div>

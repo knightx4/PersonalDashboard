@@ -4,11 +4,17 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
 import { fetchPostingFromUrl, fetchQuestionsFromUrl, detectPosting } from '@/lib/jobs/ats';
 import { extractCompBand, extractRequirements, guessSeniority, guessWorkMode, jdHash } from '@/lib/jobs/jd/requirements';
-import { domainFromUrl, slugify } from '@/lib/jobs/slug';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { guessQuestionKind, questionFingerprint, splitQuestionBlock } from '@/lib/jobs/fingerprint';
 import { APPLICATION_SOURCES } from '@/lib/jobs/pipeline';
+import { draftAnswer } from '@/lib/jobs/evidence/draft';
+import { DEFAULT_BANNED_CONSTRUCTIONS, type AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
 
 /**
  * Creating a role.
@@ -30,58 +36,6 @@ export interface RoleFormState {
     vendor: string;
     questionCount: number;
   };
-}
-
-/** Find or create the company, filling in domains from the URL we have. */
-async function ensureCompany(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  name: string,
-  hints: { careersUrl?: string | null; website?: string | null; boardToken?: string | null; ats?: string | null },
-): Promise<{ id: string; error: string | null }> {
-  const slug = slugify(name);
-
-  const { data: existing } = await supabase
-    .from('companies')
-    .select('id, domains, ats_board_token')
-    .eq('user_id', userId)
-    .eq('slug', slug)
-    .maybeSingle();
-
-  const domain = domainFromUrl(hints.website) ?? domainFromUrl(hints.careersUrl);
-
-  if (existing) {
-    // Top up what we learned without clobbering anything the user edited.
-    const patch: Record<string, unknown> = {};
-    if (domain && !(existing.domains as string[]).includes(domain)) {
-      patch.domains = [...(existing.domains as string[]), domain];
-    }
-    if (hints.boardToken && !existing.ats_board_token) patch.ats_board_token = hints.boardToken;
-    if (Object.keys(patch).length > 0) {
-      await supabase.from('companies').update(patch).eq('id', existing.id);
-    }
-    return { id: existing.id as string, error: null };
-  }
-
-  const { data, error } = await supabase
-    .from('companies')
-    .insert({
-      user_id: userId,
-      name: name.trim(),
-      slug,
-      // domains is what lets a recruiter's personal work address find this
-      // company later, so it is seeded from whatever URL we have on day one.
-      domains: domain ? [domain] : [],
-      careers_url: hints.careersUrl ?? null,
-      website: hints.website ?? null,
-      ats_board_token: hints.boardToken ?? null,
-      ats_type: (hints.ats as never) ?? 'unknown',
-    })
-    .select('id')
-    .single();
-
-  if (error || !data) return { id: '', error: error?.message ?? 'Could not create the company.' };
-  return { id: data.id as string, error: null };
 }
 
 const createSchema = z.object({
@@ -141,6 +95,7 @@ export async function createRole(
       jd_text: jdText,
       jd_fetched_at: null,
       jd_hash: jdText ? jdHash(jdText) : null,
+      jd_source: jdText ? 'manual' : null,
       ats_job_id: detected?.jobId ?? null,
       seniority: jdText ? guessSeniority(input.title, jdText) : null,
       location: input.location || null,
@@ -264,6 +219,11 @@ export async function updateRole(
     const text = patch.jdText?.trim() || null;
     update.jd_text = text;
     update.jd_hash = text ? jdHash(text) : null;
+    update.jd_source = text ? 'manual' : null;
+    // The nightly board lookup's note explains an empty panel or a title-based
+    // match. Once you have pasted the description yourself it explains nothing,
+    // so it goes with the thing it was about.
+    update.jd_lookup_note = null;
     // Requirements are extracted once per JD; changing the JD re-extracts.
     update.requirements = text ? extractRequirements(text) : null;
     update.requirements_extracted_at = text ? new Date().toISOString() : null;
@@ -387,6 +347,275 @@ export async function promoteToCanonical(
     .eq('id', questionId)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
+  revalidatePath('/jobs/answers');
+  return { error: null };
+}
+
+/** What the role page shows after a lookup. */
+export interface JdLookupResult {
+  ok: boolean;
+  message: string;
+  /** Set only when the board offered more than one plausible posting. */
+  candidates?: Array<{ title: string; url: string | null }>;
+}
+
+/**
+ * Read this role's description off the employer's board, now.
+ *
+ * The same work the nightly backfill does, on one role, on your session rather
+ * than the service key -- so RLS decides what is yours, not this function. The
+ * point of it existing at all is the queue: the nightly pass walks six
+ * companies a night, and a role you care about today should not wait its turn
+ * behind two hundred you do not.
+ *
+ * Refuses a role that already has a description. The button is only offered on
+ * an empty one, but the rule that automated work never overwrites what a person
+ * wrote belongs here, where it cannot be got round by a stale page.
+ */
+export async function lookUpJobDescription(roleId: string): Promise<JdLookupResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: role, error } = await supabase
+    .from('roles')
+    .select(
+      `id, user_id, company_id, title, jd_text, ats_job_id, location, work_mode, seniority,
+       comp_min_cents, comp_max_cents, jd_url, posting_status,
+       companies!inner ( id, name, ats_type, ats_board_token, ats_board_hint, careers_url, website )`,
+    )
+    .eq('id', roleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) return { ok: false, message: error.message };
+  if (!role) return { ok: false, message: 'That role could not be found.' };
+  if ((role.jd_text as string | null)?.trim()) {
+    return { ok: false, message: 'This role already has a description. Edit it instead.' };
+  }
+
+  const company = role.companies as unknown as CompanyForLookup | null;
+  if (!company) return { ok: false, message: 'That role has no company to look up a board for.' };
+
+  // Every title at this company, not just this one: a guessed board is only
+  // believed when a posting on it matches a role recorded here, and one title
+  // is a thinner test than four.
+  const { data: siblings } = await supabase
+    .from('roles')
+    .select('title')
+    .eq('user_id', user.id)
+    .eq('company_id', role.company_id as string)
+    .limit(50);
+
+  const now = new Date();
+  const resolved = await resolveBoard(
+    supabase,
+    await createCoreClient(),
+    company,
+    user.id,
+    (siblings ?? []).map((row) => row.title as string),
+    now,
+  );
+
+  revalidatePath(`/jobs/roles/${roleId}`);
+
+  if (!resolved.ok) return { ok: false, message: resolved.reason };
+
+  const outcome = await applyBoardToRole(
+    supabase,
+    role as unknown as RoleForLookup,
+    resolved.board,
+    now,
+  );
+
+  revalidatePath(`/jobs/roles/${roleId}`);
+
+  switch (outcome.kind) {
+    case 'filled':
+      return { ok: true, message: `Read from the ${outcome.vendor} board: “${outcome.title}”.` };
+    case 'ambiguous':
+      return {
+        ok: false,
+        message: `More than one posting on the ${outcome.vendor} board could be this role. Open the one that is yours and paste it, rather than have the wrong description saved here.`,
+        candidates: outcome.candidates,
+      };
+    case 'closed':
+      return {
+        ok: false,
+        message: `Not on the ${outcome.vendor} board any more, so the posting has closed and its description is no longer published.`,
+      };
+    case 'no_match':
+      return { ok: false, message: `No posting on the ${outcome.vendor} board matched this role.` };
+    case 'untitled':
+      return {
+        ok: false,
+        message: 'This role still has no title, so there is nothing to match against the board.',
+      };
+    case 'no_description':
+      return {
+        ok: false,
+        message: `Found the posting on the ${outcome.vendor} board, but it publishes no description.`,
+      };
+    case 'save_failed':
+      return { ok: false, message: outcome.note };
+  }
+}
+
+/**
+ * Drafting one answer from the bank.
+ *
+ * The draft comes back to the caller and is not written anywhere. It lands
+ * beside the textarea, not in it, and only an Insert followed by a Save puts
+ * it on the record — the compose.ts principle carried forward: the model may
+ * prepare text, but nothing goes out over your name that you did not put
+ * there.
+ */
+const draftSchema = z.object({ answerId: z.string().uuid() });
+
+export async function draftAnswerFromEvidence(
+  input: z.input<typeof draftSchema>,
+): Promise<{ draft: AnswerDraft | null; error: string | null }> {
+  const parsed = draftSchema.safeParse(input);
+  if (!parsed.success) return { draft: null, error: parsed.error.issues[0].message };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: row, error: rowError } = await supabase
+    .from('application_answers')
+    .select(
+      `id, word_limit,
+       questions!inner ( text, canonical_answer ),
+       applications!inner ( roles!inner ( title, requirement_matches, companies!inner ( name ) ) )`,
+    )
+    .eq('id', parsed.data.answerId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (rowError) return { draft: null, error: rowError.message };
+  if (!row) return { draft: null, error: 'That question is not yours.' };
+
+  const question = row.questions as unknown as { text: string; canonical_answer: string | null };
+  const role = (row.applications as unknown as {
+    roles: {
+      title: string;
+      requirement_matches: RequirementMatch[] | null;
+      companies: { name: string } | null;
+    };
+  }).roles;
+
+  const [{ data: bank, error: bankError }, { data: profile }] = await Promise.all([
+    supabase
+      .from('evidence_items')
+      .select('id, title, body, context, metrics, skills, strength')
+      .eq('user_id', user.id),
+    supabase
+      .from('profiles')
+      .select('writing_style_notes, banned_constructions')
+      .eq('id', user.id)
+      .maybeSingle(),
+  ]);
+
+  if (bankError) return { draft: null, error: bankError.message };
+
+  const items = (bank ?? []).map((item) => ({
+    id: item.id as string,
+    title: item.title as string,
+    body: item.body as string,
+    context: (item.context as string) ?? null,
+    metrics: (item.metrics as string) ?? null,
+    skills: (item.skills as string[]) ?? [],
+    strength: item.strength as number,
+  }));
+
+  if (items.length === 0) {
+    return {
+      draft: null,
+      error: 'Your evidence bank is empty. Fill it in Settings — a draft from nothing is a blank page with extra steps.',
+    };
+  }
+
+  // The shortlist is against the question rather than the description: this
+  // one answer is about one thing, and sending the whole bank invites the
+  // model to reach for a stronger story that answers a different question.
+  const shortlist = shortlistEvidence([{ text: question.text, kind: 'must_have' }], items);
+
+  // What the match already established this role wants, so the draft is
+  // written toward the role rather than in the abstract. Absent until the
+  // requirements have been matched, which is fine.
+  const matches = (role.requirement_matches as RequirementMatch[] | null) ?? [];
+  const wants = matches
+    .filter((match) => match.kind === 'must_have')
+    .slice(0, 8)
+    .map((match) => match.requirement)
+    .join('; ');
+
+  const banned = (profile?.banned_constructions as string[] | null) ?? [];
+
+  const result = await draftAnswer(
+    { apiKey },
+    {
+      question: question.text,
+      roleLabel: [role.companies?.name, role.title].filter(Boolean).join(', '),
+      bank: shortlist,
+      wordLimit: (row.word_limit as number) ?? null,
+      styleNotes: (profile?.writing_style_notes as string) ?? null,
+      banned: banned.length > 0 ? banned : DEFAULT_BANNED_CONSTRUCTIONS,
+      canonicalAnswer: question.canonical_answer,
+      requirementSummary: wants || null,
+    },
+  );
+
+  if (!result.ok) return { draft: null, error: result.error };
+  return { draft: result.draft, error: null };
+}
+
+const acceptDraftSchema = z.object({
+  answerId: z.string().uuid(),
+  answer: z.string().trim().min(1),
+  evidenceItemIds: z.array(z.string().uuid()).max(40),
+  unsupportedClaims: z.array(z.string().trim().min(1)).max(20),
+});
+
+/**
+ * Save an answer that came from a draft, recording what it cited.
+ *
+ * Separate from `saveAnswer` because the citation is the point: an answer with
+ * `evidence_item_ids` can be traced back to the stories it rests on months
+ * later, and `unsupported_claims` is what you re-read before you submit. The
+ * used counters go up here rather than at draft time, so a draft you discarded
+ * does not make a story look worn out.
+ */
+export async function saveDraftedAnswer(
+  input: z.input<typeof acceptDraftSchema>,
+): Promise<{ error: string | null }> {
+  const parsed = acceptDraftSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('application_answers')
+    .update({
+      answer: parsed.data.answer,
+      status: 'draft',
+      evidence_item_ids: parsed.data.evidenceItemIds,
+      unsupported_claims: parsed.data.unsupportedClaims,
+    })
+    .eq('id', parsed.data.answerId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+
+  // Best effort: a use counter that failed to tick is not a reason to lose the
+  // answer that was just saved.
+  if (parsed.data.evidenceItemIds.length > 0) {
+    await supabase.rpc('bump_evidence_use', { item_ids: parsed.data.evidenceItemIds });
+  }
+
   revalidatePath('/jobs/answers');
   return { error: null };
 }

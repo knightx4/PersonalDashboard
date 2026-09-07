@@ -16,12 +16,12 @@ import type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 export type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 
 const STATUS_STYLE: Record<FeedbackStatus, string> = {
-  open: 'bg-accent-orange/10 text-accent-orange',
-  in_progress: 'bg-brand-tint text-brand',
-  blocked: 'bg-red-500/10 text-red-600',
+  open: 'bg-caution-fill/10 text-caution',
+  in_progress: 'bg-accent-tint text-accent',
+  blocked: 'bg-danger/10 text-danger',
   planned: 'bg-canvas text-ink-muted',
-  done: 'bg-emerald-500/10 text-emerald-600',
-  declined: 'bg-canvas text-ink-faint',
+  done: 'bg-positive/10 text-positive',
+  declined: 'bg-canvas text-ink-muted',
 };
 
 const PRIORITY_LABEL: Record<number, string> = {
@@ -45,33 +45,33 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+            'rounded-full px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
             row.kind === 'bug'
-              ? 'bg-red-500/10 text-red-600'
-              : 'bg-brand-tint text-brand',
+              ? 'bg-danger/10 text-danger'
+              : 'bg-accent-tint text-accent',
           )}
         >
           {row.kind}
         </span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[11px] font-medium',
+            'rounded-full px-2 py-0.5 text-micro font-medium',
             STATUS_STYLE[row.status],
           )}
         >
           {row.status}
         </span>
-        <span className="text-[12px] text-ink-faint">
+        <span className="text-small text-ink-muted">
           {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
           {row.pagePath ? ` · ${row.pagePath}` : ''}
         </span>
-        <code className="text-[11px] text-ink-faint">{row.id.slice(0, 8)}</code>
+        <code className="text-micro text-ink-muted">{row.id.slice(0, 8)}</code>
       </div>
 
-      <p className="whitespace-pre-wrap text-sm text-ink">{row.body}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">{row.body}</p>
 
       {row.resolutionNote && (
-        <p className="rounded-lg bg-canvas px-3 py-2 text-[13px] text-ink-muted">
+        <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
           {row.status === 'blocked' ? 'Waiting on: ' : ''}
           {row.resolutionNote}
           {row.commitSha ? ` · ${row.commitSha}` : ''}

@@ -5,8 +5,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import Link from 'next/link';
 import { PipelineBoard, type PipelineView } from '@/components/jobs/pipeline/board';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -43,6 +43,7 @@ export default async function PipelinePage({
   searchParams: Promise<{
     source?: string;
     excitement?: string;
+    coverage?: string;
     company?: string;
     q?: string;
   }>;
@@ -62,14 +63,23 @@ export default async function PipelinePage({
 
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
   const excitement = params.excitement ? Number(params.excitement) : null;
+  const coverage = params.coverage === 'gaps' || params.coverage === 'covered' ? params.coverage : null;
 
   const terms = searchTerms(params.q);
 
   let filtered = rows;
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (excitement) filtered = filtered.filter((row) => (row.excitement ?? 0) >= excitement);
+  // Unmatched roles are in neither bucket. A role you have not matched is not a
+  // role without gaps, and putting it in "no gaps" would be the flattery this
+  // whole layer exists to remove.
+  if (coverage === 'gaps') filtered = filtered.filter((row) => row.coverage.gaps > 0);
+  if (coverage === 'covered')
+    filtered = filtered.filter((row) => row.coverage.total > 0 && row.coverage.gaps === 0);
   if (terms.length)
     filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
+
+  const matchedCount = rows.filter((row) => row.coverage.total > 0).length;
 
   const countsBySource = new Map<ApplicationSource, number>();
   for (const row of rows) {
@@ -103,7 +113,15 @@ export default async function PipelinePage({
   }
 
   return (
-    <>
+    /* The board scrolls, not the page. A pipeline is a thing you look through
+       while filtering it, and a layout where the search field, the filters and
+       the count all slide off the top is one where finding a pursuit means
+       scrolling back up to change the filter and back down to read the result.
+       From lg up -- where the shell is a sidebar and a content column and the
+       viewport is a fixed frame -- the chrome is pinned and only the columns
+       move. Below that the document scrolls as before: pinning a header on a
+       phone spends the screen the results need. */
+    <div className="lg:flex lg:h-[calc(100dvh-6.5rem)] lg:flex-col lg:overflow-hidden">
       <PageHeader
         title="Pipeline"
         description={
@@ -122,12 +140,12 @@ export default async function PipelinePage({
         }
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-        <LeftRail>
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 xl:flex-row xl:gap-6">
+        <LeftRail fill>
           <RailGroup label="Source">
             <RailItem
               label="All sources"
-              href={hrefFor({ excitement: params.excitement, q: params.q })}
+              href={hrefFor({ excitement: params.excitement, coverage: params.coverage, q: params.q })}
               active={!source}
               count={rows.length}
             />
@@ -138,6 +156,7 @@ export default async function PipelinePage({
                 href={hrefFor({
                   source: entry,
                   excitement: params.excitement,
+                  coverage: params.coverage,
                   q: params.q,
                 })}
                 active={source === entry}
@@ -149,7 +168,7 @@ export default async function PipelinePage({
           <RailGroup label="Excitement">
             <RailItem
               label="Any"
-              href={hrefFor({ source: params.source, q: params.q })}
+              href={hrefFor({ source: params.source, coverage: params.coverage, q: params.q })}
               active={!excitement}
             />
             {[5, 4, 3].map((level) => (
@@ -159,6 +178,7 @@ export default async function PipelinePage({
                 href={hrefFor({
                   source: params.source,
                   excitement: String(level),
+                  coverage: params.coverage,
                   q: params.q,
                 })}
                 active={excitement === level}
@@ -166,7 +186,43 @@ export default async function PipelinePage({
             ))}
           </RailGroup>
 
-          <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
+          {matchedCount > 0 && (
+            <RailGroup label="Evidence">
+              <RailItem
+                label="Any"
+                href={hrefFor({
+                  source: params.source,
+                  excitement: params.excitement,
+                  q: params.q,
+                })}
+                active={!coverage}
+              />
+              <RailItem
+                label="Has gaps"
+                href={hrefFor({
+                  source: params.source,
+                  excitement: params.excitement,
+                  coverage: 'gaps',
+                  q: params.q,
+                })}
+                active={coverage === 'gaps'}
+                count={rows.filter((row) => row.coverage.gaps > 0).length}
+              />
+              <RailItem
+                label="Fully covered"
+                href={hrefFor({
+                  source: params.source,
+                  excitement: params.excitement,
+                  coverage: 'covered',
+                  q: params.q,
+                })}
+                active={coverage === 'covered'}
+                count={rows.filter((row) => row.coverage.total > 0 && row.coverage.gaps === 0).length}
+              />
+            </RailGroup>
+          )}
+
+          <p className="px-1 text-micro leading-relaxed text-ink-muted">
             Priority lives on the company, not the pursuit —{' '}
             <Link href="/jobs/companies" className="underline underline-offset-2">
               set it there
@@ -175,10 +231,10 @@ export default async function PipelinePage({
           </p>
         </LeftRail>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           <PipelineBoard rows={filtered} view={view} />
         </div>
       </div>
-    </>
+    </div>
   );
 }

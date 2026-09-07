@@ -3,16 +3,49 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryImageFallback } from '@/components/inventory/inventory-row';
 import { PageHeader } from '@/components/shell/page-header';
+import { SendToShare } from '@/components/share/send-to-share';
+import { loadShareOptions } from '@/lib/share/load-options';
 import { buttonVariants } from '@/components/ui/button';
 import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/shopping/returns/plan-return-button';
 import { displayVariant } from '@/lib/inventory/display';
 import { displayNameOf } from '@/lib/inventory/sort-group';
-import { DisposeForm, EditInventoryForm, ItemListsForm, ReturnForm } from './item-forms';
+import { loadItemSellQuote } from '@/lib/sell/item-quote';
+import {
+  fieldsForItem,
+  parseAttributeValues,
+  searchProviderFor,
+  templateFor,
+} from '@/lib/inventory/attributes';
+import { DisposeForm, ItemListsForm, ReturnForm } from './item-forms';
 import { BookDetailsPanel } from './book-details-panel';
+import { GameDetailsPanel } from './game-details-panel';
+import { ItemDetailsPanel } from './item-details-panel';
+import { ItemSellPanel } from './sell-panel';
+import { CopiesPanel } from './copies-panel';
+import { MarkForSaleButton } from './mark-for-sale-button';
+import { stackContaining, stackUnits } from '@/lib/inventory/item-groups';
 
 export const metadata = { title: 'Inventory item' };
+
+/** Shape of the copies query above — one row per owned unit. */
+type CopyUnitRow = {
+  id: string;
+  name: string;
+  short_name: string | null;
+  cost_cents: number;
+  acquired_at: string | null;
+  fingerprint_loose: string | null;
+  group_id: string | null;
+  for_sale: boolean;
+  return_planned: boolean;
+  game_details:
+    | { bgg_id: number | null; needs_confirmation: boolean }
+    | { bgg_id: number | null; needs_confirmation: boolean }[]
+    | null;
+  order_items: unknown;
+};
 
 export default async function InventoryItemPage({
   params,
@@ -30,6 +63,7 @@ export default async function InventoryItemPage({
     { data: memberships },
     { data: profile },
     { data: bookRow },
+    { data: gameRow },
   ] = await Promise.all([
     supabase
       .from('inventory_items')
@@ -37,7 +71,7 @@ export default async function InventoryItemPage({
         `
         id, name, short_name, variant, notes, status, cost_cents, acquired_at, disposed_at,
         disposal_method, disposal_proceeds_cents, category_id, order_item_id, image_url,
-        return_planned, source,
+        return_planned, for_sale, source, attributes,
         categories ( id, name, color, slug ),
         order_items (
           order_id, product_url, image_url,
@@ -72,6 +106,17 @@ export default async function InventoryItemPage({
         `
         inventory_item_id, isbn_13, isbn_10, authors, edition, publisher,
         published_year, condition, needs_confirmation, match_confidence, resolution_source,
+        candidates, confirmation_reason, auto_imported
+      `,
+      )
+      .eq('inventory_item_id', id)
+      .maybeSingle(),
+    supabase
+      .from('game_details')
+      .select(
+        `
+        inventory_item_id, bgg_id, year_published, publisher, min_players, max_players,
+        playing_time_minutes, needs_confirmation, match_confidence, resolution_source,
         candidates, confirmation_reason, auto_imported
       `,
       )
@@ -116,6 +161,125 @@ export default async function InventoryItemPage({
     }
   }
 
+  // A template row exists only once the user has edited it; until then the
+  // category's built-in fields apply.
+  const { data: templateRow } = item.category_id
+    ? await supabase
+        .from('category_attribute_templates')
+        .select('fields')
+        .eq('user_id', user.id)
+        .eq('category_id', item.category_id)
+        .maybeSingle()
+    : { data: null };
+
+  // The other copies of this same item. Everything above is about the item;
+  // this is where the boxes differ. See lib/inventory/item-groups.ts.
+  const [{ data: unitRows }, { data: groupRows }] = await Promise.all([
+    supabase
+      .from('inventory_items')
+      .select(
+        `
+        id, name, short_name, cost_cents, acquired_at, fingerprint_loose, group_id,
+        for_sale, return_planned,
+        game_details ( bgg_id, needs_confirmation ),
+        order_items ( orders ( id, deleted_at, merchants ( name ) ) )
+      `,
+      )
+      .eq('user_id', user.id)
+      .eq('status', 'owned'),
+    supabase.from('item_groups').select('id, name, group_key').eq('user_id', user.id),
+  ]);
+
+  const units = ((unitRows ?? []) as unknown as CopyUnitRow[]).map((row) => {
+    const game = Array.isArray(row.game_details) ? row.game_details[0] : row.game_details;
+    const orderItem = Array.isArray(row.order_items) ? row.order_items[0] : row.order_items;
+    const order = orderItem
+      ? Array.isArray(orderItem.orders)
+        ? orderItem.orders[0]
+        : orderItem.orders
+      : null;
+    const rowMerchant = order
+      ? Array.isArray(order.merchants)
+        ? order.merchants[0]
+        : order.merchants
+      : null;
+    return {
+      inventoryItemId: row.id,
+      name: row.name,
+      shortName: row.short_name,
+      bggId: game?.bgg_id ?? null,
+      needsConfirmation: Boolean(game?.needs_confirmation),
+      isGame: Boolean(game),
+      fingerprintLoose: row.fingerprint_loose,
+      groupId: row.group_id,
+      costCents: row.cost_cents,
+      acquiredAt: row.acquired_at,
+      forSale: Boolean(row.for_sale),
+      returnPlanned: Boolean(row.return_planned),
+      merchantName: rowMerchant?.name ?? null,
+      orderId: order?.id ?? null,
+    };
+  });
+
+  const stack = stackContaining(
+    stackUnits(
+      units,
+      (groupRows ?? []).map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        groupKey: (row.group_key as string | null) ?? null,
+      })),
+    ),
+    item.id,
+  );
+  const copies = (stack?.units ?? []).map((unit) => ({
+    id: unit.inventoryItemId,
+    acquiredAt: unit.acquiredAt,
+    costCents: unit.costCents,
+    merchantName: unit.merchantName,
+    orderId: unit.orderId,
+    forSale: unit.forSale,
+    returnPlanned: unit.returnPlanned,
+  }));
+
+  const attributeValues = parseAttributeValues(item.attributes);
+  const attributeTemplate = templateFor({
+    categorySlug: category?.slug ?? null,
+    savedFields: templateRow?.fields ?? null,
+    hasSavedTemplate: Boolean(templateRow),
+  });
+
+  // One fact, one place. The board-games template carries Players and Playing
+  // time, the books template carries ISBN, and the catalog rows below answer
+  // the same three — so the item read "Players 2–6" from the catalog and then
+  // offered a second, empty Players box a few lines down. Where the catalog has
+  // the answer it keeps it and the field stands down; where it does not, the
+  // field is the only place the answer can live, so it is drawn. Stored values
+  // are untouched either way: saving merges, so a field that is not rendered
+  // keeps whatever it already holds.
+  const catalogAnswered = new Map<string, string>();
+  if (gameRow) {
+    if (gameRow.min_players != null || gameRow.max_players != null) {
+      catalogAnswered.set('players', 'Players');
+    }
+    if (gameRow.playing_time_minutes != null) {
+      catalogAnswered.set('playing_time_min', 'Playing time');
+    }
+  }
+  if (bookRow && (bookRow.isbn_13 || bookRow.isbn_10)) {
+    catalogAnswered.set('isbn', 'ISBN');
+  }
+  const attributeFields = fieldsForItem(attributeTemplate, attributeValues).filter(
+    (field) => !catalogAnswered.has(field.key),
+  );
+
+  // Only worth asking for something still owned, and it never spends a lookup:
+  // the price on screen is whatever is already cached.
+  const sellQuote =
+    item.status === 'owned'
+      ? await loadItemSellQuote({ supabase, userId: user.id, inventoryItemId: item.id })
+      : null;
+
   let returnDueCopy: string | null = null;
   if (item.status === 'owned' && order) {
     if (returnDeadline && daysLeft != null) {
@@ -127,6 +291,12 @@ export default async function InventoryItemPage({
     }
   }
 
+  // Offered only while the item is still owned: a form asking whether to keep
+  // something already sold wastes the reader's time, and share_page() filters
+  // those out anyway.
+  const shareOptions =
+    item.status === 'owned' ? await loadShareOptions(supabase, user.id) : [];
+
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <PageHeader
@@ -136,6 +306,7 @@ export default async function InventoryItemPage({
           .join(' · ')}
         actions={
           <div className="flex flex-wrap gap-2">
+            <SendToShare shares={shareOptions} inventoryItemIds={[item.id]} />
             {productUrl && (
               <a
                 href={productUrl}
@@ -169,13 +340,13 @@ export default async function InventoryItemPage({
           )}
         </div>
         {item.short_name && item.short_name !== item.name && (
-          <p className="border-t border-border px-4 py-2 text-[13px] text-ink-muted">
+          <p className="border-t border-border px-4 py-2 text-ui text-ink-muted">
             Full title: <span className="text-ink">{item.name}</span>
           </p>
         )}
       </div>
 
-      <dl className="grid gap-3 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
+      <dl className="grid gap-3 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
         <div>
           <dt className="text-ink-muted">Landed cost</dt>
           <dd className="tabular font-medium text-ink">{formatMoney(item.cost_cents)}</dd>
@@ -196,7 +367,7 @@ export default async function InventoryItemPage({
             <dd
               className={
                 daysLeft != null && daysLeft <= 7
-                  ? 'font-medium text-accent-orange'
+                  ? 'font-medium text-caution'
                   : 'text-ink'
               }
             >
@@ -205,7 +376,7 @@ export default async function InventoryItemPage({
                 <span className="ml-2 text-ink-muted">({returnDeadline})</span>
               ) : null}
               {item.return_planned ? (
-                <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-brand">
+                <span className="ml-2 text-micro font-semibold uppercase tracking-wide text-accent">
                   To return
                 </span>
               ) : null}
@@ -216,7 +387,7 @@ export default async function InventoryItemPage({
           <div className="sm:col-span-2">
             <dt className="text-ink-muted">From order</dt>
             <dd>
-              <Link href={`/shopping/orders/${order.id}`} className="text-brand hover:underline">
+              <Link href={`/shopping/orders/${order.id}`} className="text-accent hover:underline">
                 {merchant?.name ?? 'Order'}
                 {order.external_order_number ? ` · #${order.external_order_number}` : ''}
               </Link>
@@ -244,37 +415,108 @@ export default async function InventoryItemPage({
         )}
       </dl>
 
-      {bookRow && (
-        <BookDetailsPanel
-          book={{
-            inventoryItemId: bookRow.inventory_item_id,
-            title: item.name,
-            imageUrl,
-            isbn13: bookRow.isbn_13,
-            isbn10: bookRow.isbn_10,
-            authors: bookRow.authors ?? [],
-            edition: bookRow.edition,
-            publisher: bookRow.publisher,
-            publishedYear: bookRow.published_year,
-            condition: bookRow.condition,
-            needsConfirmation: bookRow.needs_confirmation,
-            confirmationReason: bookRow.confirmation_reason ?? null,
-            candidates: Array.isArray(bookRow.candidates) ? bookRow.candidates : [],
-            autoImported: Boolean(bookRow.auto_imported),
-            matchConfidence:
-              bookRow.match_confidence != null ? Number(bookRow.match_confidence) : null,
-            resolutionSource: bookRow.resolution_source,
-          }}
+      <ItemDetailsPanel
+        itemId={item.id}
+        item={{ name: item.name, variant: item.variant, notes: item.notes }}
+        categories={categories ?? []}
+        categoryId={item.category_id}
+        categoryName={category?.name ?? null}
+        template={attributeTemplate}
+        fields={attributeFields}
+        values={attributeValues}
+        searchAvailable={searchProviderFor(category?.slug ?? null) !== null}
+        catalogAnsweredLabels={[...catalogAnswered.values()]}
+        catalog={
+          bookRow || gameRow ? (
+            <>
+              {bookRow && (
+                <BookDetailsPanel
+                  book={{
+                    inventoryItemId: bookRow.inventory_item_id,
+                    title: item.name,
+                    imageUrl,
+                    isbn13: bookRow.isbn_13,
+                    isbn10: bookRow.isbn_10,
+                    authors: bookRow.authors ?? [],
+                    edition: bookRow.edition,
+                    publisher: bookRow.publisher,
+                    publishedYear: bookRow.published_year,
+                    condition: bookRow.condition,
+                    needsConfirmation: bookRow.needs_confirmation,
+                    confirmationReason: bookRow.confirmation_reason ?? null,
+                    candidates: Array.isArray(bookRow.candidates) ? bookRow.candidates : [],
+                    autoImported: Boolean(bookRow.auto_imported),
+                    matchConfidence:
+                      bookRow.match_confidence != null
+                        ? Number(bookRow.match_confidence)
+                        : null,
+                    resolutionSource: bookRow.resolution_source,
+                  }}
+                />
+              )}
+              {gameRow && (
+                <GameDetailsPanel
+                  game={{
+                    inventoryItemId: gameRow.inventory_item_id,
+                    title: item.name,
+                    imageUrl,
+                    bggId: gameRow.bgg_id,
+                    yearPublished: gameRow.year_published,
+                    publisher: gameRow.publisher,
+                    minPlayers: gameRow.min_players,
+                    maxPlayers: gameRow.max_players,
+                    playingTimeMinutes: gameRow.playing_time_minutes,
+                    needsConfirmation: gameRow.needs_confirmation,
+                    confirmationReason: gameRow.confirmation_reason ?? null,
+                    candidates: Array.isArray(gameRow.candidates) ? gameRow.candidates : [],
+                    autoImported: Boolean(gameRow.auto_imported),
+                    matchConfidence:
+                      gameRow.match_confidence != null
+                        ? Number(gameRow.match_confidence)
+                        : null,
+                    resolutionSource: gameRow.resolution_source,
+                  }}
+                />
+              )}
+            </>
+          ) : null
+        }
+      />
+
+      {copies.length > 0 && (
+        <CopiesPanel
+          copies={copies}
+          currentId={item.id}
+          groupId={stack?.groupId ?? null}
+          derived={!stack?.groupId}
         />
+      )}
+
+      {sellQuote && <ItemSellPanel itemId={item.id} quote={sellQuote} />}
+
+      {item.status === 'owned' && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
+          <div>
+            <h2 className="text-body font-semibold text-ink">Sell this</h2>
+            <p className="mt-1 text-ui text-ink-muted">
+              Puts it on the{' '}
+              <Link href="/shopping/sell" className="text-accent hover:underline">
+                sell page
+              </Link>
+              , whether or not it is something the assistant can price.
+            </p>
+          </div>
+          <MarkForSaleButton itemId={item.id} forSale={Boolean(item.for_sale)} />
+        </section>
       )}
 
       {item.status === 'owned' && order && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-4">
           <div>
-            <h2 className="text-sm font-semibold text-ink">Plan a return</h2>
-            <p className="mt-1 text-[13px] text-ink-muted">
+            <h2 className="text-body font-semibold text-ink">Plan a return</h2>
+            <p className="mt-1 text-ui text-ink-muted">
               Marks this unit on the{' '}
-              <Link href="/shopping/returns?view=marked" className="text-brand hover:underline">
+              <Link href="/shopping/returns?view=marked" className="text-accent hover:underline">
                 returns tracker
               </Link>{' '}
               without recording a refund yet.
@@ -283,20 +525,6 @@ export default async function InventoryItemPage({
           <PlanReturnButton itemId={item.id} planned={Boolean(item.return_planned)} />
         </section>
       )}
-
-      <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Edit</h2>
-        <EditInventoryForm
-          item={{
-            id: item.id,
-            name: item.name,
-            variant: item.variant,
-            categoryId: item.category_id,
-            notes: item.notes,
-          }}
-          categories={categories ?? []}
-        />
-      </section>
 
       <ItemListsForm
         itemId={item.id}
@@ -309,7 +537,7 @@ export default async function InventoryItemPage({
           {item.order_item_id ? (
             <ReturnForm itemId={item.id} defaultRefundCents={item.cost_cents} />
           ) : (
-            <div className="rounded-card border border-dashed border-border bg-surface p-4 text-sm text-ink-muted">
+            <div className="rounded-card border border-dashed border-border bg-surface p-4 text-body text-ink-muted">
               This owned item is not linked to an order, so it cannot be marked returned.
             </div>
           )}

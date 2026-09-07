@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   contactFromSender,
   contactsFromInvite,
+  contactsFromNames,
   isPersonalAddress,
   isRelayAddress,
   looksLikeAPerson,
+  namesInLabel,
   stripVia,
 } from '@/lib/jobs/contacts/from-mail';
 
@@ -33,6 +35,15 @@ describe('telling a person from a mailbox', () => {
     expect(isPersonalAddress('noreen@ramp.com')).toBe(true);
     expect(isPersonalAddress('jobst@ramp.com')).toBe(true);
     expect(isPersonalAddress('hrafn.olafsson@ramp.com')).toBe(true);
+  });
+
+  it('rejects a mailbox that runs the words together', () => {
+    // The two attendees on every slot of a Greenhouse superday. Both were
+    // recorded as members of the panel: neither is separated by a dot, and
+    // `schedule` was a spelling the set did not have.
+    expect(isPersonalAddress('galaxyinterviews@galaxydigital.io')).toBe(false);
+    expect(isPersonalAddress('schedule@lily.greenhouse.io')).toBe(false);
+    expect(isPersonalAddress('talentacquisition@ramp.com')).toBe(false);
   });
 });
 
@@ -220,5 +231,39 @@ describe('the people on an invite', () => {
         interviewerEmails: ['dana@ramp.com', 'DANA@ramp.com'],
       }),
     ).toHaveLength(1);
+  });
+
+  it('records nobody from the scheduling robot the superday invited', () => {
+    expect(
+      contactsFromInvite({
+        interviewerNames: ['Galaxy Interviews', ''],
+        interviewerEmails: ['galaxyinterviews@galaxydigital.io', 'schedule@lily.greenhouse.io'],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('the people a body named', () => {
+  it('records a panel that has no addresses at all', () => {
+    expect(contactsFromNames(['Ryan Kleiner', 'Bill Burt'])).toEqual([
+      { fullName: 'Ryan Kleiner', email: null, relationship: 'interviewer' },
+      { fullName: 'Bill Burt', email: null, relationship: 'interviewer' },
+    ]);
+  });
+
+  it('drops departments, blanks and repeats', () => {
+    expect(
+      contactsFromNames(['Ryan Kleiner', 'Hiring Team', null, ' ryan  kleiner ']),
+    ).toHaveLength(1);
+  });
+
+  it('reads who takes one slot out of its label', () => {
+    const panel = ['Ryan Kleiner', 'Bill Burt', 'Jiaying Wang', 'Joe Koyfman'];
+    expect(namesInLabel(panel, 'Interview with Jiaying Wang, Joe Koyfman')).toEqual([
+      'Jiaying Wang',
+      'Joe Koyfman',
+    ]);
+    expect(namesInLabel(panel, 'Onsite loop')).toEqual([]);
+    expect(namesInLabel(panel, null)).toEqual([]);
   });
 });

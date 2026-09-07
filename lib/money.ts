@@ -57,6 +57,29 @@ export function formatMoney(
 }
 
 /**
+ * Format a price that might not be known.
+ *
+ * `formatMoney` takes a number, so a caller holding `number | null` has to
+ * decide what null looks like -- and the decision it reaches for is `?? 0`,
+ * which renders "$0.00". Zero is a claim, and on a page asking someone whether
+ * to sell a board game the claim is both false and expensive: a game shown as
+ * worth nothing is a game she gives away.
+ *
+ * So an unknown price is nothing at all. This lives here, next to
+ * `formatMoney`, because the lint rule keeping `Intl.NumberFormat` out of
+ * components is what makes "money has one home" true rather than aspirational.
+ */
+export function formatMoneyOrBlank(
+  cents: number | null | undefined,
+  currency: CurrencyCode = 'USD',
+  options: { showCents?: boolean; locale?: string; blank?: string } = {},
+): string {
+  const { blank = '', ...rest } = options;
+  if (cents == null || !Number.isFinite(cents)) return blank;
+  return formatMoney(cents, currency, rest);
+}
+
+/**
  * Parse a dollars string from a form into integer cents.
  *
  * Accepts "12", "12.3", "12.99", "$12.99", "1,299.00". Rejects more than two
@@ -472,6 +495,77 @@ export function spendByMerchant(
   return [...totals.values()].sort(
     (a, b) => b.cents - a.cents || a.name.localeCompare(b.name),
   );
+}
+
+
+// ---------------------------------------------------------------------------
+// Trends
+// ---------------------------------------------------------------------------
+
+/** One month of a merchant's gross spend, oldest first. */
+export interface MonthlyPoint {
+  /** YYYY-MM, in the user's timezone. */
+  month: string;
+  cents: number;
+}
+
+/** The last `months` calendar months ending with the one `today` falls in. */
+export function recentMonthKeys(today: string, months: number): string[] {
+  const [year, month] = today.split('-').map(Number);
+  const keys: string[] = [];
+  for (let back = months - 1; back >= 0; back -= 1) {
+    // Month arithmetic on numbers rather than Date: a Date constructed from a
+    // YYYY-MM-DD string is UTC midnight, and in a negative-offset timezone
+    // that is the previous day -- which silently shifts a month boundary.
+    const total = year * 12 + (month - 1) - back;
+    const y = Math.floor(total / 12);
+    const m = (total % 12) + 1;
+    keys.push(`${y}-${String(m).padStart(2, '0')}`);
+  }
+  return keys;
+}
+
+/**
+ * A merchant's gross spend per month, over the trailing window.
+ *
+ * Every month in the window is present, including the ones with nothing in
+ * them: a sparkline that silently omits its empty months draws a smooth line
+ * through a gap and claims a steadiness that is not there.
+ *
+ * Cancelled orders are excluded, on the same rule as spend() gross.
+ */
+export function monthlySpendByMerchant(
+  orders: readonly MerchantSpendOrder[],
+  today: string,
+  months = 12,
+): Map<string, MonthlyPoint[]> {
+  const keys = recentMonthKeys(today, months);
+  const index = new Map(keys.map((key, position) => [key, position]));
+  const byMerchant = new Map<string, number[]>();
+
+  for (const order of orders) {
+    if (order.cancelled) continue;
+    const position = index.get(order.orderDate.slice(0, 7));
+    if (position === undefined) continue;
+    assertIntegerCents(order.totalCents);
+
+    const key = order.merchantId ?? '__unknown__';
+    let series = byMerchant.get(key);
+    if (!series) {
+      series = new Array<number>(keys.length).fill(0);
+      byMerchant.set(key, series);
+    }
+    series[position] += order.totalCents;
+  }
+
+  const out = new Map<string, MonthlyPoint[]>();
+  for (const [merchant, series] of byMerchant) {
+    out.set(
+      merchant,
+      series.map((cents, position) => ({ month: keys[position], cents })),
+    );
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

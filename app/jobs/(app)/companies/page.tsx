@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { SearchField } from '@/components/jobs/shell/search-field';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { IN_PROCESS_OR_LATER, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
@@ -32,7 +33,7 @@ export default async function CompaniesPage({
   const { data } = await supabase
     .from('companies')
     .select(
-      'id, name, slug, priority, status, industry, hq_location, domains, roles ( id, applications ( status ) )',
+      'id, name, slug, priority, status, industry, hq_location, domains, website, careers_url, logo_url, roles ( id, applications ( status ) )',
     )
     .eq('user_id', user.id)
     .order('name');
@@ -46,6 +47,9 @@ export default async function CompaniesPage({
     industry: string | null;
     hq_location: string | null;
     domains: string[];
+    website: string | null;
+    careers_url: string | null;
+    logo_url: string | null;
     roles: Array<{ id: string; applications: Array<{ status: ApplicationStatus }> }>;
   }>;
 
@@ -107,7 +111,7 @@ export default async function CompaniesPage({
         }
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
           <RailGroup label="Priority">
             <RailItem
@@ -142,9 +146,9 @@ export default async function CompaniesPage({
         </LeftRail>
 
         <div className="min-w-0 flex-1 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-[13px]">
+          <table className="w-full min-w-[720px] border-collapse text-ui">
             <thead>
-              <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+              <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
                 <th className="px-2 py-2 font-semibold">Company</th>
                 <th className="px-2 py-2 font-semibold">Priority</th>
                 <th className="px-2 py-2 font-semibold">Activity</th>
@@ -156,29 +160,44 @@ export default async function CompaniesPage({
               {filtered.map((company) => (
                 <tr key={company.id} className="border-b border-border hover:bg-surface">
                   <td className="px-2 py-1.5">
-                    <Link
-                      href={`/jobs/companies/${company.slug}`}
-                      className="font-medium text-ink hover:text-brand"
-                    >
-                      {company.name}
-                    </Link>
-                    {company.hq_location && (
-                      <span className="ml-1.5 text-ink-faint">{company.hq_location}</span>
-                    )}
+                    <span className="flex items-center gap-2">
+                      <CompanyAvatar
+                        company={{
+                          name: company.name,
+                          logoUrl: company.logo_url,
+                          domains: company.domains,
+                          website: company.website,
+                          careersUrl: company.careers_url,
+                        }}
+                        className="size-5 rounded"
+                        imageClassName="size-4"
+                      />
+                      <span className="min-w-0">
+                        <Link
+                          href={`/jobs/companies/${company.slug}`}
+                          className="font-medium text-ink hover:text-accent"
+                        >
+                          {company.name}
+                        </Link>
+                        {company.hq_location && (
+                          <span className="ml-1.5 text-ink-muted">{company.hq_location}</span>
+                        )}
+                      </span>
+                    </span>
                   </td>
                   <td className="px-2 py-1.5 text-ink-muted">{company.priority}</td>
                   <td className="px-2 py-1.5 text-ink-muted">
                     {company.status.replace(/_/g, ' ')}
                   </td>
                   <td className="tabular px-2 py-1.5 text-ink-muted">{company.roles.length}</td>
-                  <td className="px-2 py-1.5 text-ink-faint">
+                  <td className="px-2 py-1.5 text-ink-muted">
                     {company.domains.length > 0 ? company.domains.join(', ') : '—'}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-[11px] text-ink-faint">
+          <p className="mt-2 text-micro text-ink-muted">
             Domains are what let a recruiter&rsquo;s personal work address find its company. Add
             them on the company page when mail is not linking.
           </p>

@@ -134,12 +134,41 @@ export function looksLikeAPerson(name: string | null | undefined): boolean {
   return /\p{L}{2,}/u.test(trimmed);
 }
 
+/**
+ * Role words distinctive enough to catch anywhere inside a local part.
+ *
+ * The segment set above deliberately refuses to match on substrings, because
+ * `hr` and `jobs` live inside `hrafn` and `jobst`. That leaves a mailbox that
+ * runs the words together: a Greenhouse superday invites `galaxyinterviews@`
+ * and `schedule@lily.greenhouse.io`, and both were recorded as people on the
+ * panel. Every word here is six characters or more and does not occur inside a
+ * name, so a substring match is safe for these and only these.
+ */
+const MACHINE_WORDS = [
+  'noreply',
+  'donotreply',
+  'notification',
+  'interview',
+  // scheduling, scheduler, schedule.
+  'schedul',
+  // recruiting, recruitment, recruiter.
+  'recruit',
+  'careers',
+  'talent',
+  'hiring',
+  'candidate',
+  'applications',
+  'automated',
+  'postmaster',
+];
+
 /** Whether an address belongs to a person rather than a function. */
 export function isPersonalAddress(address: string | null | undefined): boolean {
   const bare = addressOnly(address);
   if (!bare) return false;
   const local = bare.split('@')[0].toLowerCase();
   if (ROLE_MAILBOXES.has(local)) return false;
+  if (MACHINE_WORDS.some((word) => local.includes(word))) return false;
   // `talent.acquisition@`, `no-reply+123@`, `careers-uk@`.
   return !local
     .split(/[.\-+_]/)
@@ -266,4 +295,56 @@ export function contactsFromInvite(invite: {
   }
 
   return out;
+}
+
+/**
+ * The panel a body named, for when the invite's attendees are the robot.
+ *
+ * A Greenhouse superday sends one invite per slot whose only attendees are
+ * `galaxyinterviews@` and `schedule@`, and names the people you will actually
+ * sit with in the covering mail instead. Those names had nowhere to go: the
+ * extraction recorded them on the timeline event and the rounds went on
+ * reading back as the scheduling mailbox.
+ *
+ * A name with no address is enough. The contact row is what makes the round
+ * say who is in the room, and the address fills itself in from the first mail
+ * one of them sends, the same way any other blank does.
+ */
+export function contactsFromNames(
+  names: readonly (string | null | undefined)[],
+): CandidateContact[] {
+  const out: CandidateContact[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of names) {
+    if (!looksLikeAPerson(raw)) continue;
+    const fullName = raw!.replace(/\s+/g, ' ').trim();
+    const key = fullName.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ fullName, email: null, relationship: 'interviewer' });
+  }
+
+  return out;
+}
+
+/**
+ * Which of the named panel a single slot's label mentions.
+ *
+ * A superday lists everyone once and then labels each slot with the one or two
+ * who take it -- "Interview with Jiaying Wang, Joe Koyfman". Where a label
+ * names somebody it decides that room; where no label names anybody, the
+ * caller falls back to the whole panel, which is what a single-slot invite
+ * with three interviewers on it actually means.
+ */
+export function namesInLabel(
+  names: readonly string[],
+  label: string | null | undefined,
+): string[] {
+  if (!label) return [];
+  const haystack = label.toLowerCase();
+  return names.filter((name) => {
+    const needle = name.replace(/\s+/g, ' ').trim().toLowerCase();
+    return needle.length > 1 && haystack.includes(needle);
+  });
 }

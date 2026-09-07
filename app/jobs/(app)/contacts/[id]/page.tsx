@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { ContactDetail } from './contact-detail';
+import { LinkedTasks } from '@/components/todo/linked-tasks';
+import { loadTasksFor } from '@/lib/todo/links/load';
 
 export const metadata = { title: 'Contact' };
 
@@ -33,6 +35,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   if (!contact) notFound();
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+  const linkedTasks = await loadTasksFor(user.id, 'contact', id);
   const row = contact as unknown as {
     id: string;
     full_name: string;
@@ -51,7 +54,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     <>
       <Link
         href="/jobs/contacts"
-        className="mb-2 inline-flex items-center gap-1 text-[13px] text-ink-muted hover:text-ink"
+        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
       >
         <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
         Contacts
@@ -60,6 +63,16 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
         title={row.full_name}
         description={row.companies ? `at ${row.companies.name}` : 'Not attached to a company'}
       />
+
+      <div className="mb-6">
+        <LinkedTasks
+          target="contact"
+          targetId={row.id}
+          returnTo={`/jobs/contacts/${row.id}`}
+          tasks={linkedTasks}
+          timezone={timezone}
+        />
+      </div>
 
       <ContactDetail
         timezone={timezone}

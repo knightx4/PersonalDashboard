@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { Table2 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
+import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
@@ -129,7 +130,7 @@ export default async function RolesPage({
         }
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
           <RailGroup label="Status">
             <RailItem
@@ -177,9 +178,9 @@ export default async function RolesPage({
         </LeftRail>
 
         <div className="min-w-0 flex-1 overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-[13px]">
+          <table className="w-full min-w-[900px] border-collapse text-ui">
             <thead>
-              <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+              <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
                 {SORTS.map((entry) => (
                   <th key={entry.id} className="px-2 py-2 font-semibold">
                     <Link
@@ -189,7 +190,7 @@ export default async function RolesPage({
                         source: params.source,
                         q: params.q,
                       })}
-                      className={sort === entry.id ? 'text-brand' : 'hover:text-ink'}
+                      className={sort === entry.id ? 'text-accent' : 'hover:text-ink'}
                     >
                       {entry.label}
                     </Link>
@@ -210,17 +211,27 @@ export default async function RolesPage({
                   <td className="px-2 py-1.5">
                     <Link
                       href={`/jobs/companies/${row.companySlug}`}
-                      className="text-ink-muted hover:text-brand"
+                      className="flex items-center gap-2 text-ink-muted hover:text-accent"
                     >
-                      {row.companyName}
+                      <CompanyAvatar
+                        company={{
+                          name: row.companyName,
+                          logoUrl: row.companyLogoUrl,
+                          domains: row.companyDomains,
+                          website: row.companyWebsite,
+                        }}
+                        className="size-5 rounded"
+                        imageClassName="size-4"
+                      />
+                      <span className="truncate">{row.companyName}</span>
                     </Link>
                   </td>
                   <td className="px-2 py-1.5">
-                    <Link href={`/jobs/roles/${row.roleId}`} className="font-medium text-ink hover:text-brand">
+                    <Link href={`/jobs/roles/${row.roleId}`} className="font-medium text-ink hover:text-accent">
                       {row.roleTitle}
                     </Link>
                     {row.attempt > 1 && (
-                      <span className="tabular ml-1.5 text-[11px] text-ink-faint">
+                      <span className="tabular ml-1.5 text-micro text-ink-muted">
                         attempt {row.attempt}
                       </span>
                     )}
@@ -231,7 +242,7 @@ export default async function RolesPage({
                   <td className="tabular px-2 py-1.5 text-ink-muted">
                     {formatDate(row.submittedAt)}
                   </td>
-                  <td className="tabular px-2 py-1.5 text-ink-faint">
+                  <td className="tabular px-2 py-1.5 text-ink-muted">
                     {row.excitement ? '★'.repeat(row.excitement) : '—'}
                   </td>
                   <td className="tabular px-2 py-1.5 text-ink-muted">

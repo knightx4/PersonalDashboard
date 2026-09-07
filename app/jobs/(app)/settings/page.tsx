@@ -1,6 +1,6 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { publicEnv } from '@/lib/env';
 import { SettingsView } from './view';
@@ -45,12 +45,17 @@ export default async function SettingsPage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [{ data: profile }, { data: accounts }, { data: resumes }, { data: evidence }, { data: excludedSenders }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: accounts },
+    { data: resumes },
+    { data: evidence },
+    { data: excludedSenders },
+  ] = await Promise.all([
       supabase
         .from('profiles')
         .select(
-          'display_name, timezone, target_titles, search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions',
+          'target_titles, search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions',
         )
         .eq('id', user.id)
         .single(),
@@ -63,7 +68,7 @@ export default async function SettingsPage({
         .order('created_at'),
       supabase
         .from('resume_versions')
-        .select('id, label, is_default, notes, created_at')
+        .select('id, label, is_default, notes, created_at, text_content')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
       supabase
@@ -108,15 +113,16 @@ export default async function SettingsPage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Settings" description="Your profile, your inboxes, and your data." />
+      <PageHeader
+        title="Settings"
+        description="What the job search needs. Your name and timezone are under Account."
+      />
       <SettingsView
         email={user.email ?? ''}
         banner={inboxBanner(params.inbox)}
         gmailConfigured={isGmailOAuthConfigured()}
         appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
         profile={{
-          displayName: (profile?.display_name as string) ?? '',
-          timezone: (profile?.timezone as string) ?? 'UTC',
           targetTitles: ((profile?.target_titles as string[]) ?? []).join(', '),
           searchStartedOn: (profile?.search_started_on as string) ?? '',
           ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,
@@ -151,6 +157,9 @@ export default async function SettingsPage({
           label: resume.label as string,
           isDefault: resume.is_default as boolean,
           notes: (resume.notes as string) ?? null,
+          // Whether it can be read, not the text: a resume is several kilobytes
+          // and the client only needs to know the option is offerable.
+          hasText: Boolean((resume.text_content as string | null)?.trim()),
         }))}
         evidence={(evidence ?? []).map((item) => ({
           id: item.id as string,

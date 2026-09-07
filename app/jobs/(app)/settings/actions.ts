@@ -6,27 +6,17 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
-import { normalizeTimeZone } from '@/lib/jobs/timezone';
 
 export interface SettingsState {
   error?: string;
   message?: string;
 }
 
+// Name and timezone are not here: they hold across every workspace, so they
+// are account settings and are written once, in app/account/actions.ts. The
+// two profiles.timezone columns are mirrors kept by a trigger now -- writing
+// one from here would be a second writer of a value this page does not own.
 const profileSchema = z.object({
-  displayName: z.string().trim().max(120).optional(),
-  timezone: z
-    .string()
-    .trim()
-    .max(64)
-    .optional()
-    // Validated here rather than trusted, because this is a free-text field
-    // whose value is handed straight to Intl on every page that shows a date.
-    // "ET" got stored once and took the review queue down with a 500.
-    .refine((value) => !value || normalizeTimeZone(value) !== null, {
-      message:
-        'That is not a timezone name. Use something like Europe/London or America/New_York.',
-    }),
   targetTitles: z.string().trim().optional(),
   searchStartedOn: z.string().optional(),
   ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
@@ -39,8 +29,6 @@ export async function updateProfile(
   formData: FormData,
 ): Promise<SettingsState> {
   const parsed = profileSchema.safeParse({
-    displayName: formData.get('displayName') ?? '',
-    timezone: formData.get('timezone') ?? '',
     targetTitles: formData.get('targetTitles') ?? '',
     searchStartedOn: formData.get('searchStartedOn') ?? '',
     ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
@@ -54,8 +42,6 @@ export async function updateProfile(
   const supabase = await createClient();
 
   const patch: Record<string, unknown> = {};
-  if (parsed.data.displayName !== undefined) patch.display_name = parsed.data.displayName || null;
-  if (parsed.data.timezone) patch.timezone = normalizeTimeZone(parsed.data.timezone);
   if (parsed.data.searchStartedOn) patch.search_started_on = parsed.data.searchStartedOn;
   if (parsed.data.ghostThresholdDays) patch.ghost_threshold_days = parsed.data.ghostThresholdDays;
   if (parsed.data.writingStyleNotes !== undefined) {

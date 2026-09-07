@@ -32,6 +32,19 @@ const PUBLIC_PATHS = [
   '/api/jobs/inbox/sync/continue',
   // Vercel Cron — authenticated via CRON_SECRET Bearer token.
   '/api/cron',
+  // eBay marketplace account deletion. eBay carries no session; the GET proves
+  // ownership with a hash of EBAY_VERIFICATION_TOKEN, and the POST only ever
+  // acknowledges. Required for the production keyset to stay enabled.
+  '/api/ebay/account-deletion',
+  // The shared case page. Authorized by an unguessable, expiring slug and read
+  // through one security definer function that checks both; see
+  // supabase/migrations-job-search/0017_public_case_page.sql.
+  '/jobs/p',
+  // The shared disposition form. Authorized by an unguessable token and read
+  // and written through two security definer functions that check it; see
+  // supabase/migrations/0042_share_rpcs.sql. Its writes are a server action,
+  // which POSTs back to this same path, so nothing else needs opening.
+  '/s',
 ];
 
 function isPublic(pathname: string): boolean {

@@ -1,15 +1,16 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
+import { loadPipeline } from '@/lib/jobs/applications/load';
 import {
   addressOnly,
   composeFollowUp,
   displayName,
   gmailComposeUrl,
 } from '@/lib/jobs/followup/compose';
-import { DEFAULT_GHOST_THRESHOLD_DAYS, TERMINAL_STATUSES, isTerminal } from '@/lib/jobs/pipeline';
+import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
+import { lastCorrespondents } from '@/lib/jobs/followup/recipients';
 
 /**
- * The week, as four questions.
+ * The week, as three questions.
  *
  * Everything else in this workspace is an archive you consult. After six
  * months there were 341 pursuits on the board, 203 of them dead, and exactly
@@ -17,7 +18,7 @@ import { DEFAULT_GHOST_THRESHOLD_DAYS, TERMINAL_STATUSES, isTerminal } from '@/l
  * where you land. A list sorted by recency cannot answer "what do I have to do
  * today", because the answer is four rows and they are scattered through it.
  *
- * So this asks the four questions directly, and each section is empty when
+ * So this asks the three questions directly, and each section is empty when
  * there is nothing to say. An empty page here is the correct answer on a quiet
  * day, and it should not be padded out to look busy.
  */
@@ -26,9 +27,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** How far ahead an interview is worth surfacing. */
 export const INTERVIEW_HORIZON_DAYS = 14;
-
-/** How close to being written off a pursuit has to be to be worth a nudge. */
-export const GOING_QUIET_WINDOW_DAYS = 7;
 
 /**
  * How far ahead a reminder is worth surfacing.
@@ -88,22 +86,10 @@ export interface WaitingOnYou {
   occurredAt: string;
 }
 
-export interface GoingQuiet {
-  applicationId: string;
-  roleId: string;
-  companyName: string;
-  roleTitle: string;
-  lastActivityAt: string | null;
-  daysSinceActivity: number;
-  daysUntilGhosted: number;
-  followUpHref: string | null;
-}
-
 export interface TodayBoard {
   interviews: UpcomingInterview[];
   reminders: DueReminder[];
   waiting: WaitingOnYou[];
-  quiet: GoingQuiet[];
   /** True when every section is empty, so the page can say so once. */
   clear: boolean;
 }
@@ -113,18 +99,16 @@ type RoleJoin = { id: string; title: string; companies: { name: string } };
 export async function loadToday(
   supabase: AppSupabaseClient,
   userId: string,
-  opts: { now?: Date; ghostThresholdDays?: number; senderName?: string | null } = {},
+  opts: { now?: Date; senderName?: string | null } = {},
 ): Promise<TodayBoard> {
   const now = opts.now ?? new Date();
-  const ghostDays = opts.ghostThresholdDays ?? DEFAULT_GHOST_THRESHOLD_DAYS;
 
   const [
     interviewRows,
     reminderRows,
     eventRows,
-    quietRows,
+    pipelineRows,
     waitingDismissedRows,
-    quietDismissedRows,
   ] = await Promise.all([
     supabase
       .from('interviews')
@@ -162,24 +146,17 @@ export async function loadToday(
       .order('occurred_at', { ascending: false })
       .limit(30),
 
-    // Through the pipeline loader rather than a query of its own: "last
-    // activity" is derived from the event log, not stored on the application,
-    // and a second derivation of it here is how two screens start disagreeing
-    // about which pursuits are stale.
+    // Through the pipeline loader rather than a query of its own: it is where
+    // the date a pursuit was submitted comes from, which is what a follow-up
+    // draft opens with.
     loadPipeline(supabase, userId),
 
-    // Dismissed "waiting" and "quiet" items. A row with no dismissed_until is
-    // dismissed for good; one with a future dismissed_until is snoozed and
-    // filtered the same way until it passes.
+    // Dismissed "waiting" items. A row with no dismissed_until is dismissed
+    // for good; one with a future dismissed_until is snoozed and filtered the
+    // same way until it passes.
     supabase
       .from('waiting_dismissals')
       .select('application_event_id, dismissed_until')
-      .eq('user_id', userId)
-      .or(`dismissed_until.is.null,dismissed_until.gt.${now.toISOString()}`),
-
-    supabase
-      .from('quiet_dismissals')
-      .select('application_id, dismissed_until')
       .eq('user_id', userId)
       .or(`dismissed_until.is.null,dismissed_until.gt.${now.toISOString()}`),
   ]);
@@ -249,10 +226,6 @@ export async function loadToday(
   const dismissedWaiting = new Set(
     (waitingDismissedRows.data ?? []).map((row) => row.application_event_id as string),
   );
-  const dismissedQuiet = new Set(
-    (quietDismissedRows.data ?? []).map((row) => row.application_id as string),
-  );
-
   const waiting: WaitingOnYou[] = ((eventRows.data ?? []) as unknown as EventRaw[])
     // A request on a pursuit that has since closed is not waiting on anybody.
     .filter((row) => !TERMINAL_STATUSES.includes(row.applications.status as never))
@@ -268,29 +241,16 @@ export async function loadToday(
       occurredAt: row.occurred_at,
     }));
 
-  const quiet = selectGoingQuiet(quietRows, {
-    ghostDays,
-    withInterview: new Set(interviews.map((i) => i.applicationId)),
-    alreadyNudged: new Set(
-      reminders.map((r) => r.applicationId).filter((id): id is string => Boolean(id)),
-    ),
-    dismissed: dismissedQuiet,
-  });
-
   // Who to write to, for everything on the page that could be followed up.
   // One query for all of them rather than one each: this page is opened every
   // morning and a round trip per row would be felt.
-  const needsDraft = [
-    ...reminders.filter((r) => r.kind === 'follow_up' && r.applicationId),
-    ...quiet,
-  ];
   const correspondents = await lastCorrespondents(
     supabase,
     userId,
-    needsDraft.map((r) => ('applicationId' in r ? r.applicationId : null)),
+    reminders.filter((r) => r.kind === 'follow_up').map((r) => r.applicationId),
   );
 
-  const submittedAt = new Map(quietRows.map((row) => [row.applicationId, row.submittedAt]));
+  const submittedAt = new Map(pipelineRows.map((row) => [row.applicationId, row.submittedAt]));
 
   const draftFor = (
     applicationId: string | null,
@@ -321,100 +281,13 @@ export async function loadToday(
         ? draftFor(reminder.applicationId, reminder.companyName, reminder.roleTitle)
         : null;
   }
-  for (const row of quiet) {
-    row.followUpHref = draftFor(row.applicationId, row.companyName, row.roleTitle);
-  }
 
   return {
     interviews,
     reminders,
     waiting,
-    quiet,
-    clear:
-      interviews.length === 0 &&
-      reminders.length === 0 &&
-      waiting.length === 0 &&
-      quiet.length === 0,
+    clear: interviews.length === 0 && reminders.length === 0 && waiting.length === 0,
   };
 }
 
-/**
- * Which live pursuits are close enough to being written off to say so.
- *
- * Pulled out of the loader because the exclusions are the whole point and they
- * are what a query cannot express: a pursuit with an interview booked is not
- * going quiet however long ago the last email was, and one that already has a
- * nudge in the section above does not need saying twice on the same screen.
- * Saying it twice is not saying it louder -- it is the thing that makes a page
- * like this feel like noise.
- */
-export function selectGoingQuiet(
-  rows: readonly PipelineRow[],
-  opts: {
-    ghostDays: number;
-    withInterview: ReadonlySet<string>;
-    alreadyNudged: ReadonlySet<string>;
-    dismissed?: ReadonlySet<string>;
-  },
-): GoingQuiet[] {
-  const floor = opts.ghostDays - GOING_QUIET_WINDOW_DAYS;
-  const dismissed = opts.dismissed ?? new Set<string>();
 
-  return rows
-    .filter((row) => !isTerminal(row.status))
-    .filter((row) => !opts.withInterview.has(row.applicationId))
-    .filter((row) => !opts.alreadyNudged.has(row.applicationId))
-    .filter((row) => !dismissed.has(row.applicationId))
-    .filter((row) => (row.daysSinceActivity ?? 0) >= floor)
-    .map((row) => ({
-      applicationId: row.applicationId,
-      roleId: row.roleId,
-      companyName: row.companyName,
-      roleTitle: row.roleTitle,
-      lastActivityAt: row.lastActivityAt,
-      daysSinceActivity: row.daysSinceActivity ?? 0,
-      daysUntilGhosted: Math.max(0, opts.ghostDays - (row.daysSinceActivity ?? 0)),
-      // Filled in by loadToday once it knows who to write to; the selection
-      // itself is pure and has no database to ask.
-      followUpHref: null,
-    }))
-    .sort((a, b) => b.daysSinceActivity - a.daysSinceActivity);
-}
-
-/**
- * The most recent inbound sender on each pursuit.
- *
- * The address a follow-up should go to is whoever last wrote to you about it,
- * which is often a person even when the first confirmation came from a
- * no-reply. Where it is still a no-reply the draft is written anyway, without
- * a recipient -- an unaddressed draft is a smaller problem than no draft.
- */
-async function lastCorrespondents(
-  supabase: AppSupabaseClient,
-  userId: string,
-  applicationIds: readonly (string | null)[],
-): Promise<Map<string, { fromAddress: string | null; inbox: string | null }>> {
-  const ids = [...new Set(applicationIds.filter((id): id is string => Boolean(id)))];
-  const found = new Map<string, { fromAddress: string | null; inbox: string | null }>();
-  if (ids.length === 0) return found;
-
-  const { data } = await supabase
-    .from('inbox_messages')
-    .select('resulting_application_id, from_address, reply_to_address, email_address, received_at')
-    .eq('user_id', userId)
-    .in('resulting_application_id', ids)
-    .order('received_at', { ascending: false });
-
-  for (const row of data ?? []) {
-    const id = row.resulting_application_id as string;
-    if (found.has(id)) continue;
-    found.set(id, {
-      // Reply-to first: an ATS sends from a no-reply and points replies at the
-      // recruiter, and the recruiter is the one who answers.
-      fromAddress: (row.reply_to_address as string) ?? (row.from_address as string) ?? null,
-      inbox: (row.email_address as string) ?? null,
-    });
-  }
-
-  return found;
-}

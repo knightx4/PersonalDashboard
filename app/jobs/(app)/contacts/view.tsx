@@ -66,7 +66,7 @@ export function ContactsView({
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <section className="rounded-card border border-border bg-surface p-4 lg:order-2">
-        <h2 className="text-[13px] font-semibold text-ink">Add someone</h2>
+        <h2 className="text-ui font-semibold text-ink">Add someone</h2>
         <form action={action} className="mt-3 space-y-3">
           <div>
             <Label htmlFor="fullName">Name</Label>
@@ -111,16 +111,16 @@ export function ContactsView({
           </div>
 
           {state.error && (
-            <p role="alert" className="text-[13px] text-status-rejected">
+            <p role="alert" className="text-ui text-status-rejected">
               {state.error}
             </p>
           )}
-          {state.message && <p className="text-[13px] text-status-offer">{state.message}</p>}
+          {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
 
           <Button type="submit" size="sm">
             Add contact
           </Button>
-          <p className="text-[11px] leading-relaxed text-ink-faint">
+          <p className="text-micro leading-relaxed text-ink-muted">
             Name, title, public professional URL, work email. Nothing else, and nothing scraped —
             this is the part of the app most worth being careful with.
           </p>
@@ -129,14 +129,14 @@ export function ContactsView({
 
       <div className="lg:col-span-2">
         {contacts.length === 0 ? (
-          <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-[13px] text-ink-muted">
+          <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
             Nobody yet.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-card border border-border bg-surface">
-            <table className="w-full min-w-[640px] border-collapse text-[13px]">
+            <table className="w-full min-w-[640px] border-collapse text-ui">
               <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-ink-faint">
+                <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
                   <th className="px-3 py-2 font-semibold">Name</th>
                   <th className="px-3 py-2 font-semibold">Company</th>
                   <th className="px-3 py-2 font-semibold">Relationship</th>
@@ -150,7 +150,7 @@ export function ContactsView({
                     <td className="px-3 py-2">
                       <Link
                         href={`/jobs/contacts/${contact.id}`}
-                        className="font-medium text-ink hover:text-brand"
+                        className="font-medium text-ink hover:text-accent"
                       >
                         {contact.fullName}
                       </Link>
@@ -162,7 +162,7 @@ export function ContactsView({
                       {contact.companySlug ? (
                         <Link
                           href={`/jobs/companies/${contact.companySlug}`}
-                          className="hover:text-brand hover:underline"
+                          className="hover:text-accent hover:underline"
                         >
                           {contact.companyName}
                         </Link>
@@ -176,12 +176,12 @@ export function ContactsView({
                     <td className="px-3 py-2 text-ink-muted">
                       {contact.status.replace(/_/g, ' ')}
                       {contact.pendingReplies > 0 && (
-                        <span className="ml-1.5 text-[11px] text-ink-faint">
+                        <span className="ml-1.5 text-micro text-ink-muted">
                           ({contact.pendingReplies} unanswered)
                         </span>
                       )}
                     </td>
-                    <td className="tabular px-3 py-2 text-ink-faint">
+                    <td className="tabular px-3 py-2 text-ink-muted">
                       {contact.lastTouchAt ? formatDate(contact.lastTouchAt, timezone) : '—'}
                     </td>
                   </tr>

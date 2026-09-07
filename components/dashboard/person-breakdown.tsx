@@ -35,7 +35,7 @@ export function PersonBreakdown({
       </CardHeader>
       <CardBody className="pt-0">
         {rows.length === 0 ? (
-          <p className="text-[13px] text-ink-muted">No orders in this period.</p>
+          <p className="text-ui text-ink-muted">No orders in this period.</p>
         ) : (
           <ul className="space-y-3">
             {rows.map((row) => {
@@ -43,7 +43,7 @@ export function PersonBreakdown({
               const width = max === 0 ? 0 : Math.round((row.netCents / max) * 100);
               return (
                 <li key={row.personId ?? 'unattributed'}>
-                  <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
+                  <div className="mb-1 flex items-baseline justify-between gap-3 text-ui">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <span
                         className={cn(

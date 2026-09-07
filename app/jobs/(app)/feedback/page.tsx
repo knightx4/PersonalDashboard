@@ -1,6 +1,6 @@
 import { requireUser } from '@/lib/jobs/auth/server';
 import { createClient } from '@/lib/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 

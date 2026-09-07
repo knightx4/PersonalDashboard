@@ -97,10 +97,10 @@ export const IconActionButton = forwardRef<
       className={cn(
         'press inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted',
         'transition-colors duration-150',
-        'hover:bg-brand-tint hover:text-brand',
+        'hover:bg-accent-tint hover:text-accent',
         'focus-visible:outline-2 focus-visible:outline-offset-2',
         'disabled:pointer-events-none disabled:opacity-40',
-        active && 'bg-brand-tint text-brand',
+        active && 'bg-accent-tint text-accent',
         className,
       )}
       {...props}
@@ -229,9 +229,9 @@ export function ActionMenu({
           >
             {items.map((item) => {
               const itemClass = cn(
-                'flex w-full items-center px-3 py-2 text-left text-[13px] transition-colors',
+                'flex w-full items-center px-3 py-2 text-left text-ui transition-colors',
                 item.destructive
-                  ? 'text-red-600 hover:bg-red-50'
+                  ? 'text-danger hover:bg-danger-tint'
                   : 'text-ink hover:bg-canvas',
                 (item.disabled || pending) && 'pointer-events-none opacity-40',
               );

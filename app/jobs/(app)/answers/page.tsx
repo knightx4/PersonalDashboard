@@ -1,8 +1,8 @@
 import { MessageSquareText } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { AnswerBank } from './bank';
 
 export const metadata = { title: 'Answers' };
@@ -22,7 +22,7 @@ const KINDS = [
  *
  * The reuse loop is the whole point: after twenty applications the common
  * questions are answered and the work per application drops to tailoring.
- * Generation is Phase 2, but capture and manual answering are MVP precisely so
+ * Generation is later work, but capture and manual answering are MVP precisely so
  * the bank has real content by the time generation exists.
  */
 export default async function AnswersPage({
@@ -86,7 +86,7 @@ export default async function AnswersPage({
         description={`${withCanonical} of ${rows.length} questions have a default answer. Each one you set makes the next application shorter.`}
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
           <RailGroup label="Kind">
             <RailItem label="All" href="/jobs/answers" active={!kind} count={rows.length} />
@@ -100,7 +100,7 @@ export default async function AnswersPage({
               />
             ))}
           </RailGroup>
-          <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="px-1 text-micro leading-relaxed text-ink-muted">
             Questions are deduped by fingerprint, so the same question asked in different words
             lands on one row.
           </p>

@@ -13,7 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts', 'lib/**/*.test.ts'],
+    // .tsx too, so a component can be rendered rather than described.
+    include: ['tests/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}'],
     // The database tests share one schema, so they must not run concurrently.
     fileParallelism: false,
     testTimeout: 20_000,

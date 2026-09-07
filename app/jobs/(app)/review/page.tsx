@@ -1,10 +1,15 @@
 import { CheckCheck } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { PageHeader } from '@/components/jobs/shell/page-header';
+import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/jobs/shell/left-rail';
-import { loadReviewQueue, parseReviewView, REVIEW_VIEWS } from '@/lib/jobs/review/load';
+import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import {
+  loadReviewQueue,
+  parseReviewView,
+  REVIEW_VIEWS,
+  type SearchableRole,
+} from '@/lib/jobs/review/load';
 import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
 import { scoreCandidate, type LinkInput } from '@/lib/jobs/email/link';
 import { ReviewList } from './list';
@@ -86,6 +91,22 @@ export default async function ReviewPage({
     };
   });
 
+  // Every pursuit on file, for the "some other role" search. The same rows the
+  // scorer above ranks against the message, so a role the top three missed is
+  // still one keystroke away rather than a page away.
+  const allRoles: SearchableRole[] = candidates
+    .map((candidate) => ({
+      applicationId: candidate.applicationId,
+      companyName: candidate.companyName,
+      roleTitle: candidate.roleTitle,
+      status: candidate.status,
+      everSubmitted: candidate.submittedAt !== null,
+    }))
+    .sort(
+      (a, b) =>
+        a.companyName.localeCompare(b.companyName) || a.roleTitle.localeCompare(b.roleTitle),
+    );
+
   const filtered =
     view === 'all'
       ? withCandidates
@@ -121,7 +142,7 @@ export default async function ReviewPage({
         description={`${counts.all} waiting. Holding rather than guessing is what keeps the funnel worth reading.`}
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
           <RailGroup label="Kind">
             {REVIEW_VIEWS.map((entry) => (
@@ -134,7 +155,7 @@ export default async function ReviewPage({
               />
             ))}
           </RailGroup>
-          <p className="px-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="px-1 text-micro leading-relaxed text-ink-muted">
             Bodies are never stored, so each row links out to Gmail for the full message.
           </p>
         </LeftRail>
@@ -143,7 +164,8 @@ export default async function ReviewPage({
           <ReviewList
             rows={filtered}
             timezone={(profile?.timezone as string) ?? 'UTC'}
-            companyCount={companies.length}
+            companyNames={companies.map((company) => company.name).sort()}
+            allRoles={allRoles}
           />
         </div>
       </div>

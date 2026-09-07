@@ -11,8 +11,8 @@ import { createHash } from 'crypto';
  *
  * Heuristic rather than model-driven on purpose. Job descriptions are already
  * structured as bullet lists under predictable headings, so a parser gets most
- * of the value at zero cost and zero latency, and Phase 2's generation layer
- * can refine what it finds.
+ * of the value at zero cost and zero latency, and the evidence layer's match
+ * refines what it finds -- see lib/jobs/evidence/match.ts.
  */
 
 export type RequirementKind = 'must_have' | 'nice_to_have' | 'responsibility';

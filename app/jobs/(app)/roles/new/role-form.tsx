@@ -43,8 +43,8 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
   return (
     <div className="space-y-6">
       <section className="rounded-card border border-border bg-surface p-5">
-        <h2 className="text-sm font-semibold text-ink">Start from a link</h2>
-        <p className="mt-1 text-[13px] text-ink-muted">
+        <h2 className="text-body font-semibold text-ink">Start from a link</h2>
+        <p className="mt-1 text-ui text-ink-muted">
           Greenhouse, Lever and Ashby come back complete. Most other career pages work too.
           LinkedIn and Workday do not, and will say so.
         </p>
@@ -64,18 +64,18 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
         </form>
 
         {fetchState.notice && (
-          <p className="mt-3 flex gap-2 rounded-lg bg-accent-orange-tint px-3 py-2 text-[13px] text-ink">
-            <Info className="mt-0.5 size-4 shrink-0 text-accent-orange" strokeWidth={1.75} />
+          <p className="mt-3 flex gap-2 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
+            <Info className="mt-0.5 size-4 shrink-0 text-caution" strokeWidth={1.75} />
             {fetchState.notice}
           </p>
         )}
         {fetchState.error && (
-          <p role="alert" className="mt-3 text-[13px] text-status-rejected">
+          <p role="alert" className="mt-3 text-ui text-status-rejected">
             {fetchState.error}
           </p>
         )}
         {fetched && (
-          <p className="mt-3 rounded-lg bg-status-offer-tint px-3 py-2 text-[13px] text-status-offer">
+          <p className="mt-3 rounded-lg bg-status-offer-tint px-3 py-2 text-ui text-status-offer">
             Read the posting from {fetched.vendor}
             {fetched.questionCount > 0 &&
               ` — and ${fetched.questionCount} application questions`}
@@ -138,7 +138,7 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
                 </option>
               ))}
             </Select>
-            <p className="mt-1 text-[11px] text-ink-faint">
+            <p className="mt-1 text-micro text-ink-muted">
               This drives the by-channel funnel, which is where the diagnosis lives.
             </p>
           </div>
@@ -170,20 +170,20 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
             defaultValue={fetched?.text ?? ''}
             placeholder="Paste the description here if the link could not be read. This is always available and always works."
           />
-          <p className="mt-1 text-[11px] text-ink-faint">
+          <p className="mt-1 text-micro text-ink-muted">
             Kept in full, unlike email. It is public text you fetched from a public page, it is
             what the requirement map reads, and refetching it later usually fails because the
             posting is gone.
           </p>
         </div>
 
-        <label className="flex items-center gap-2 text-[13px] text-ink">
+        <label className="flex items-center gap-2 text-ui text-ink">
           <input type="checkbox" name="saveAsLead" className="size-4 rounded border-border" />
           Save as a lead — I have not applied yet
         </label>
 
         {createState.error && (
-          <p role="alert" className="text-[13px] text-status-rejected">
+          <p role="alert" className="text-ui text-status-rejected">
             {createState.error}
           </p>
         )}

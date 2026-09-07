@@ -10,12 +10,18 @@ most of the way through the project. Do not front-load it.
 
 ---
 
-## Two apps, one Supabase project
+## Four apps, one Supabase project
 
-This deployment carries two workspaces behind one login: the commerce side at
-`/shopping` and the job search side at `/jobs`. They share a Supabase project
-and take a schema each — `public` and `job_search` — plus a third, `core`,
-that belongs to neither.
+This deployment carries four workspaces behind one login: the commerce side at
+`/shopping`, the job search side at `/jobs`, the vault at `/vault` and the todo
+module at `/todo`. They share a Supabase project and take a schema each —
+`public`, `job_search`, `obsidian` and `todo` — plus `core`, which belongs to
+none of them and holds both ingestion and the account settings (your timezone
+is not a fact about any one workspace).
+
+The notes workspace is called Vault everywhere a person sees it, but its schema
+is `obsidian`: `vault` is taken by Supabase Vault on every hosted project, and
+its `secrets` table has no RLS.
 
 Supabase bills per **project**, not per app, so this costs nothing extra. It is
 also the only arrangement under which the two can share a database at all:
@@ -69,28 +75,54 @@ schemas, so the join has to be in the database.
 ### The one step that is not in this repository
 
 In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search` and `core`** alongside `public`.
+must include **`job_search`, `core`, `obsidian` and `todo`** alongside `public`.
 
-Without it PostgREST refuses every job-side request with *"The schema must be
-one of the following"*, and because it is a dashboard setting rather than a
-migration it is the step that gets forgotten after a project restore or when
-setting up a second environment. Three things have to agree — the migrations,
-the `db: { schema }` option on every job-side client, and this setting — and
-only the first two are in version control.
+Without it PostgREST refuses every request against the missing schema with
+*"The schema must be one of the following"*, and because it is a dashboard
+setting rather than a migration it is the step that gets forgotten after a
+project restore or when setting up a second environment. Three things have to
+agree — the migrations, the `db: { schema }` option on every client, and this
+setting — and only the first two are in version control.
+
+`todo` is the newest and therefore the one most likely to be missing: the
+symptom is a Todo workspace that reports an empty list on an account that has
+one, and — because the account settings live in `core` — a timezone that
+silently reverts to UTC everywhere if that one is missing too.
+
+**Never add `vault` to that list.** That schema is Supabase's own — Supabase
+Vault, the encrypted secrets store — and `vault.secrets` carries no RLS
+because nothing is meant to reach it through PostgREST. The notes workspace is
+called Vault and lives in `obsidian` for exactly this reason.
 
 ### Migrations
 
-Two directories, applied in order:
+Four directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
-| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0029` |
-| `supabase/migrations-job-search` | `job_search` | `0001`–`0010` |
+| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0037` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
+| `supabase/migrations-vault` | `obsidian` | `0001` |
+| `supabase/migrations-todo` | `todo` | `0001`–`0002` |
 
-They are separate because both sets were numbered independently from `0001`,
-and the `job_search` versions are already recorded remotely under exactly those
+`migrations-todo` goes **last**, after all three of the others. Its
+`task_links` table carries foreign keys into `job_search` and `obsidian`, so
+applying it earlier fails on a table that does not exist yet.
+`scripts/db-reset.sh` already sequences the directories this way; a fresh
+project must be migrated in the same order.
+
+They are separate because the sets were numbered independently from `0001`, and
+the `job_search` versions are already recorded remotely under exactly those
 numbers. Renaming them would make the local files disagree with the deployed
-history. **Do not renumber either set.**
+history. **Do not renumber any set.**
+
+The two older sets depend on each other in both directions:
+`job_search/0006` hands ingestion to `core`, which `public/0029` creates, while
+`public/0031` onward repair `job_search` rows. So the working order is public
+through `0030`, then all of `job_search`, then the rest of public, then
+`obsidian` — which is what `scripts/db-reset.sh` now does. Running the directories
+straight through fails on `public/0031` with *"relation
+job_search.application_events does not exist"*.
 
 `job_search` `0001`–`0006` are applied remotely; do not re-run them.
 **`0007`–`0010` are not**, and the code that depends on them is deployed, so
@@ -191,9 +223,9 @@ Or set them in the dashboard under **Authentication → URL Configuration**:
 
 | Field | Value |
 |---|---|
-| Site URL | `https://shopping.selveyknight.com` |
-| Redirect URLs | `https://shopping.selveyknight.com/auth/callback` |
-| | `https://shopping.selveyknight.com/**` |
+| Site URL | `https://dash.selveyknight.com` |
+| Redirect URLs | `https://dash.selveyknight.com/auth/callback` |
+| | `https://dash.selveyknight.com/**` |
 | | `https://shopping-manager-amber.vercel.app/auth/callback` |
 | | `http://localhost:3000/auth/callback` |
 
@@ -331,6 +363,68 @@ local-only and is never applied to Supabase.
 It then applies both migration sets into one database — `public` first, then
 `job_search` — which is what lets `tests/coexistence.test.ts` assert against a
 real neighbour rather than a stand-in for one.
+
+### eBay marketplace account deletion (required)
+
+eBay marks an application **Non Compliant** unless it either receives
+marketplace account deletion notifications or claims an exemption, and
+restricts the production keyset until it is resolved — which looks from the
+outside like credentials that stopped working, not like a policy flag.
+
+This app never sees an eBay user: it authenticates with client credentials and
+stores one price per ISBN, no usernames or item ids. So either route is honest.
+The endpoint is already built, so it is the one that needs no review:
+
+1. Generate a token — `openssl rand -hex 24` — and set `EBAY_VERIFICATION_TOKEN`
+   in Vercel. It must be 32–80 characters of `A-Za-z0-9_-`.
+2. Redeploy, so the running deployment can answer.
+3. In the developer portal, under **Alerts & Notifications → Marketplace Account
+   Deletion**, enter the same token and the endpoint
+   `https://<NEXT_PUBLIC_APP_URL>/api/ebay/account-deletion`, then save.
+
+eBay immediately GETs the endpoint with a `challenge_code` and expects the
+SHA-256 of `challengeCode + verificationToken + endpointURL`, in that order. The
+endpoint in that hash must be byte-identical to the one registered, which is
+what nearly every failed validation turns out to be — set
+`EBAY_DELETION_ENDPOINT_URL` if the registered URL is not the app's own.
+
+The notification itself is answered with 204 and nothing is erased, because
+nothing about an eBay user is held. The alternative, if you would rather hold no
+endpoint at all, is the exemption: same screen, slide **Not persisting eBay
+data** to On and submit a reason.
+
+### Checking the eBay keyset
+
+The sell assistant prices books from eBay Browse when `EBAY_CLIENT_ID` and
+`EBAY_CLIENT_SECRET` are both set, and falls back to a billed web-search
+estimate when they are not. To find out which one is actually running, read the
+note under the heading on `/shopping/sell` — it names the source.
+
+To test the credentials themselves:
+
+```bash
+npx vercel env pull .env.local   # same values the deployment uses
+npm run check:ebay -- 9780735211292
+```
+
+It loads `.env.local` itself, fetches an application token, runs one Browse
+search, and prints either the price the assistant would use or the reason eBay
+refused — the stage, the HTTP status and eBay's own error text. It exits
+non-zero for a configuration fault and zero for a book that genuinely has no
+listings, so the two cannot be confused.
+
+Three faults account for most failures. The keyset must be the **production**
+one (`-PRD-` in the client id); a sandbox keyset returns invented listings and
+is refused outright. The application must have the **Buy APIs granted** — a
+keyset is issued immediately, Browse access is a separate approval that takes
+days, and until it lands OAuth succeeds while every search returns 403. And on
+Vercel, variables only reach a deployment **built after** they were set, in the
+environment you are actually visiting.
+
+> **This cannot be run from a Claude Code web session** unless `api.ebay.com` is
+> allowed in the environment's network policy; the proxy otherwise returns its
+> own 403, which the script reports verbatim
+> ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)).
 
 ---
 

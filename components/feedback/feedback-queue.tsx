@@ -1,6 +1,7 @@
 import { MessageSquarePlus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FeedbackList } from '@/app/shopping/feedback/feedback-list';
+import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import type { FeedbackQueue } from '@/lib/feedback/load';
 
 /**
@@ -15,18 +16,28 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
 
   if (rows.length === 0) {
     return (
-      <EmptyState
-        icon={MessageSquarePlus}
-        title="Nothing captured yet"
-        description="Use the message button in the header to log a bug or an idea the moment you hit it."
-      />
+      <div className="space-y-6">
+        <EmptyState
+          icon={MessageSquarePlus}
+          title="Nothing captured yet"
+          description="Use the message button in the header to log a bug or an idea the moment you hit it."
+        />
+        <RunRoutineButton openCount={0} divider="bottom" />
+      </div>
     );
   }
 
   return (
     <>
+      {/* First, not last. It was under the whole list, which meant scrolling
+          past every note to reach the button that works them -- and the count
+          beside it already says what scrolling would have told you. */}
+      <div className="mb-6">
+        <RunRoutineButton openCount={outstanding.length} divider="bottom" />
+      </div>
+
       {blocked.length > 0 && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-[13px] text-ink">
+        <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-ui text-ink">
           {blocked.length} note(s) blocked, waiting on an answer from you. They are listed
           first below with the question.
         </p>
@@ -35,7 +46,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
       <div className="space-y-6">
         {outstanding.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-ink">
+            <h2 className="text-body font-semibold text-ink">
               Outstanding <span className="font-normal text-ink-muted">({outstanding.length})</span>
             </h2>
             <FeedbackList rows={outstanding} />
@@ -43,7 +54,7 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
         )}
         {closed.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-ink">
+            <h2 className="text-body font-semibold text-ink">
               Closed <span className="font-normal text-ink-muted">({closed.length})</span>
             </h2>
             <FeedbackList rows={closed} />

@@ -1,11 +1,20 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Instrument_Sans } from 'next/font/google';
+import { Bricolage_Grotesque, Inter } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
+import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 
-// Inter for UI at 14px base; Instrument Sans is the slightly warmer face used
-// for the large dashboard numbers.
+// Inter does all the work. Bricolage Grotesque is the voice: page titles, the
+// workspace name and the one big figure, and nothing else. A grotesque with
+// actual character rather than a serif -- the app should read as designed, not
+// as a document. Variable, so it can carry weight where a display face needs
+// to.
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
-const instrument = Instrument_Sans({ variable: '--font-instrument', subsets: ['latin'] });
+const display = Bricolage_Grotesque({
+  variable: '--font-display-face',
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+});
 
 export const metadata: Metadata = {
   title: {
@@ -36,11 +45,31 @@ export const viewport: Viewport = {
   minimumScale: 1,
 };
 
-export default function RootLayout({
+/**
+ * The theme is read from a cookie, here, on the server.
+ *
+ * That cookie is a mirror of core.account_settings.theme rather than the
+ * source of truth. It exists for one reason: so `data-theme` is in the first
+ * byte of HTML we send. A theme that flashes white before going dark is worse
+ * than having no dark mode at all, and that flash is precisely what you get
+ * when the choice is only readable after hydration.
+ *
+ * No cookie means no choice has been made, which is not the same as choosing
+ * light: the attribute is left off entirely and globals.css falls through to
+ * `prefers-color-scheme`.
+ */
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const jar = await cookies();
+  const theme = parseTheme(jar.get(THEME_COOKIE)?.value);
+
   return (
-    <html lang="en" className={`${inter.variable} ${instrument.variable} h-full`}>
+    <html
+      lang="en"
+      data-theme={theme ?? undefined}
+      className={`${inter.variable} ${display.variable} h-full`}
+    >
       <body className="min-h-full">{children}</body>
     </html>
   );

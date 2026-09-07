@@ -59,6 +59,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Five themes is five times the surface area for a contrast bug to hide
+      # in, and "it looked fine on my screen" is how all of them get shipped.
+      - name: Contrast
+        run: npm run check:contrast
+
       # Includes both cross-user isolation tests, each of which fails
       # automatically if a table is added to its schema without an RLS policy,
       # and the coexistence test that proves neither app's migrations reach

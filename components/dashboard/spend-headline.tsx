@@ -35,10 +35,10 @@ export function SpendHeadline({
         <p className="font-display text-4xl font-semibold tracking-tight text-ink tabular sm:text-5xl">
           <CountUpMoney cents={current.netCents} currency={currency} />
         </p>
-        <p className="mt-2 text-[13px] text-ink-muted">
+        <p className="mt-2 text-ui text-ink-muted">
           {formatReconciliation(current, currency)}
         </p>
-        <p className="mt-3 text-[13px] text-ink-muted">
+        <p className="mt-3 text-ui text-ink-muted">
           {changeLabel === null ? (
             <>No prior period to compare</>
           ) : (

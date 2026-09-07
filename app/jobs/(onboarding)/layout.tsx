@@ -9,11 +9,11 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
             className="size-6 rounded-md"
             style={{
               backgroundImage:
-                'linear-gradient(135deg, var(--color-brand) 0%, var(--color-status-final) 100%)',
+                'linear-gradient(135deg, var(--color-accent) 0%, var(--color-status-final) 100%)',
             }}
             aria-hidden
           />
-          <span className="font-display text-[15px] font-semibold tracking-tight text-ink">
+          <span className="text-lead font-semibold tracking-tight text-ink">
             Job search
           </span>
         </Link>

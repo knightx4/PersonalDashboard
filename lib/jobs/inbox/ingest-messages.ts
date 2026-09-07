@@ -12,6 +12,8 @@ import {
   type MessageClassification,
 } from '@/lib/jobs/email/classify';
 import { PARSER_VERSION, verifyExtraction, type ExtractedMessage } from '@/lib/jobs/email/extract';
+import type { AtsVendor } from '@/lib/jobs/email/ats-senders';
+import { isBoardVendor } from '@/lib/jobs/ats/detect';
 import {
   decideLink,
   type LinkCandidate,
@@ -27,9 +29,16 @@ import {
   inferredApplicationNeedsReview,
   unappliedEventNeedsReview,
 } from '@/lib/jobs/review/flagging';
-import { contactFromSender, contactsFromInvite, type CandidateContact } from '@/lib/jobs/contacts/from-mail';
+import {
+  contactFromSender,
+  contactsFromInvite,
+  contactsFromNames,
+  namesInLabel,
+  type CandidateContact,
+} from '@/lib/jobs/contacts/from-mail';
 import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
 import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
+import { pairSlots } from '@/lib/jobs/calendar/slots';
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
@@ -323,6 +332,18 @@ async function writeEvent(
     });
   }
 
+  // Who is in the room, where the body said so. Naming a person on a round
+  // that is already booked moves no status, so it happens on this side of the
+  // transition gate: the mail that lists a superday's panel is usually read as
+  // a confirmation, and a confirmation arriving mid-process is not a legal
+  // move. That gate is about the funnel, not about the people.
+  await attachNamedInterviewers(supabase, {
+    userId: opts.userId,
+    applicationId: opts.applicationId,
+    names: opts.extracted?.interviewerNames ?? [],
+    dates: opts.extracted?.dates ?? [],
+  });
+
   if (!legal) return;
 
   if (invite) {
@@ -334,6 +355,7 @@ async function writeEvent(
       applicationId: opts.applicationId,
       invite,
       fallbackKind: interviewKind,
+      namedInterviewers: contactsFromNames(opts.extracted?.interviewerNames ?? []),
     });
     return;
   }
@@ -345,16 +367,93 @@ async function writeEvent(
       .from('interviews')
       .select('id', { count: 'exact', head: true })
       .eq('application_id', opts.applicationId);
-    await supabase.from('interviews').insert({
-      user_id: opts.userId,
-      application_id: opts.applicationId,
-      round: (count ?? 0) + 1,
-      kind: interviewKind ?? 'recruiter_screen',
-      scheduled_at: interviewDate.at,
-      format: 'video',
-      status: 'scheduled',
+    const { data: created } = await supabase
+      .from('interviews')
+      .insert({
+        user_id: opts.userId,
+        application_id: opts.applicationId,
+        round: (count ?? 0) + 1,
+        kind: interviewKind ?? 'recruiter_screen',
+        scheduled_at: interviewDate.at,
+        format: 'video',
+        status: 'scheduled',
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (created) {
+      await recordParticipants(supabase, {
+        userId: opts.userId,
+        companyId: await companyForApplication(supabase, opts.applicationId),
+        interviewId: created.id as string,
+        people: contactsFromNames(namesForSlot(opts.extracted, interviewDate)),
+      });
+    }
+  }
+}
+
+/**
+ * Attach the panel a message named to the rounds it named them for.
+ *
+ * The four slots of a superday arrive as four invites whose only attendees are
+ * the scheduling robot, and the covering mail that says who is actually in
+ * each room books nothing itself. Nothing joined the two, so every round read
+ * back as `galaxyinterviews@`. This joins them on the one thing both carry --
+ * the schedule -- and creates the people it names, who by definition have
+ * never sent you anything and so are in no contact list yet.
+ */
+async function attachNamedInterviewers(
+  supabase: AppSupabaseClient,
+  opts: {
+    userId: string;
+    applicationId: string;
+    names: readonly string[];
+    dates: NonNullable<ExtractedMessage['dates']>;
+  },
+): Promise<void> {
+  const slots = opts.dates.filter((date) => date.kind === 'interview');
+  if (!opts.names.length || !slots.length) return;
+
+  const { data: booked } = await supabase
+    .from('interviews')
+    .select('id, scheduled_at')
+    .eq('application_id', opts.applicationId);
+  if (!booked?.length) return;
+
+  const pairs = pairSlots(
+    slots,
+    booked.map((row) => ({ id: row.id as string, scheduledAt: row.scheduled_at as string })),
+  );
+  if (!pairs.length) return;
+
+  // Where any label names somebody, the labels decide every slot: a mail that
+  // says who takes which room is not also to be read as everyone in all of
+  // them. Where none does, the panel is the panel.
+  const labelled = slots.some((slot) => namesInLabel(opts.names, slot.label).length > 0);
+  const companyId = await companyForApplication(supabase, opts.applicationId);
+
+  for (const pair of pairs) {
+    const slot = slots[pair.slotIndex];
+    const names = labelled ? namesInLabel(opts.names, slot.label) : opts.names;
+    if (!names.length) continue;
+
+    await recordParticipants(supabase, {
+      userId: opts.userId,
+      companyId,
+      interviewId: pair.interviewId,
+      people: contactsFromNames(names),
     });
   }
+}
+
+/** The panel for one slot: whoever its label names, else everyone named. */
+function namesForSlot(
+  extracted: ExtractedMessage | null | undefined,
+  slot: { label?: string | null },
+): readonly string[] {
+  const names = extracted?.interviewerNames ?? [];
+  const forSlot = namesInLabel(names, slot.label);
+  return forSlot.length ? forSlot : names;
 }
 
 /**
@@ -373,6 +472,8 @@ async function applyInvite(
     applicationId: string;
     invite: InviteInterview;
     fallbackKind: string | null;
+    /** People the covering note named, where the attendees are the robot. */
+    namedInterviewers: readonly CandidateContact[];
   },
 ): Promise<void> {
   const { invite } = opts;
@@ -409,7 +510,7 @@ async function applyInvite(
       userId: opts.userId,
       companyId,
       interviewId: existing.data.id as string,
-      invite,
+      people: [...contactsFromInvite(invite), ...opts.namedInterviewers],
     });
     return;
   }
@@ -440,7 +541,7 @@ async function applyInvite(
       userId: opts.userId,
       companyId,
       interviewId: created.id as string,
-      invite,
+      people: [...contactsFromInvite(invite), ...opts.namedInterviewers],
     });
   }
 }
@@ -543,17 +644,18 @@ async function upsertContact(
   return null;
 }
 
-/** Everyone on the invite, attached to the interview it books. */
+/** Attach people to a round, creating the contacts the round needs. */
 async function recordParticipants(
   supabase: AppSupabaseClient,
   opts: {
     userId: string;
     companyId: string | null;
     interviewId: string;
-    invite: InviteInterview;
+    /** The invite's attendees, the body's named panel, or both. */
+    people: readonly CandidateContact[];
   },
 ): Promise<void> {
-  for (const person of contactsFromInvite(opts.invite)) {
+  for (const person of opts.people) {
     const contactId = await upsertContact(supabase, {
       userId: opts.userId,
       companyId: opts.companyId,
@@ -684,6 +786,52 @@ async function resolveCompanyId(
   }
 
   return data.id as string;
+}
+
+/**
+ * Remember which ATS subdomain a company's mail arrives from.
+ *
+ * `ramp.greenhouse.io` says two things at once: this employer uses Greenhouse,
+ * and their board is probably called `ramp`. Both were already worked out
+ * during classification and then thrown away with the rest of the tier-A
+ * result, because linking had no use for them.
+ *
+ * The JD backfill does. Almost no confirmation email links to the posting, so
+ * the sending subdomain is frequently the only thing in the entire mailbox that
+ * points at the board — and a board is all the fetchers need.
+ *
+ * Written as a HINT, never as `ats_board_token`: that column means a board has
+ * answered to it. This one means it is worth asking. Discovery promotes the one
+ * to the other, and only after the board proves to be this company's.
+ */
+async function learnBoardHint(
+  supabase: AppSupabaseClient,
+  companyId: string,
+  hint: string | null,
+  vendor: AtsVendor,
+): Promise<void> {
+  const knownVendor = isBoardVendor(vendor);
+  if (!hint && !knownVendor) return;
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('ats_type, ats_board_token, ats_board_hint')
+    .eq('id', companyId)
+    .maybeSingle();
+  if (!company) return;
+
+  const patch: Record<string, unknown> = {};
+  // A proven token outranks a hint, and a hint already recorded is not
+  // improved by a second message saying the same thing.
+  if (hint && !company.ats_board_token && !company.ats_board_hint) {
+    patch.ats_board_hint = hint;
+  }
+  if (knownVendor && (!company.ats_type || company.ats_type === 'unknown')) {
+    patch.ats_type = vendor;
+  }
+  if (Object.keys(patch).length === 0) return;
+
+  await supabase.from('companies').update(patch).eq('id', companyId);
 }
 
 /**
@@ -1140,6 +1288,8 @@ async function applyDecision(
         return;
       }
 
+      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats);
+
       const created = await createInferredApplication(supabase, {
         userId: ctx.userId,
         companyId,
@@ -1194,6 +1344,8 @@ async function applyDecision(
         ctx.counters.heldForReview += 1;
         return;
       }
+
+      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats);
 
       const lead = await createInferredApplication(supabase, {
         userId: ctx.userId,

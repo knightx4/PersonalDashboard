@@ -1,18 +1,12 @@
 import Link from 'next/link';
+import { ModuleMark } from '@/components/ui/module-mark';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
       <Link href="/" className="mb-8 flex items-center gap-2">
-        <span
-          className="size-7 rounded-md"
-          style={{
-            backgroundImage:
-              'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
-          }}
-          aria-hidden
-        />
-        <span className="font-display text-base font-semibold tracking-tight text-ink">
+        <ModuleMark module={null} size="md" />
+        <span className="text-lead font-semibold tracking-tight text-ink">
           Personal Dashboard
         </span>
       </Link>
@@ -21,7 +15,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {children}
       </div>
 
-      <p className="mt-6 text-xs text-ink-faint">
+      <p className="mt-6 text-small text-ink-muted">
         <Link href="/privacy" className="hover:text-ink-muted">
           Privacy
         </Link>

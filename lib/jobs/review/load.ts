@@ -2,6 +2,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { connectedAccountIds, connectedInboxes } from '@/lib/core/inbox/accounts';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
+import { excludableDomains } from '@/lib/jobs/review/exclusions';
 
 /**
  * The review queue.
@@ -56,6 +57,12 @@ export interface ReviewApplicationRow {
   applicationId: string;
   roleId: string;
   companyName: string;
+  /**
+   * The employer's own sending domains, so the queue can offer to stop hearing
+   * from them. ATS and scheduling domains are filtered out where the exclusion
+   * is written -- excluding greenhouse.io would silence every employer at once.
+   */
+  companyDomains: string[];
   roleTitle: string;
   status: string;
   submittedAt: string | null;
@@ -143,7 +150,7 @@ export async function loadReviewQueue(
     supabase
       .from('applications')
       .select(
-        'id, status, submitted_at, created_at, created_by, roles!inner ( id, title, companies!inner ( name ) )',
+        'id, status, submitted_at, created_at, created_by, roles!inner ( id, title, companies!inner ( name, domains ) )',
       )
       .eq('user_id', userId)
       .eq('needs_review', true)
@@ -188,7 +195,7 @@ export async function loadReviewQueue(
     submitted_at: string | null;
     created_at: string;
     created_by: string;
-    roles: { id: string; title: string; companies: { name: string } };
+    roles: { id: string; title: string; companies: { name: string; domains: string[] | null } };
   };
 
   const applications: ReviewApplicationRow[] = (
@@ -199,6 +206,7 @@ export async function loadReviewQueue(
     applicationId: raw.id,
     roleId: raw.roles.id,
     companyName: raw.roles.companies.name,
+    companyDomains: excludableDomains(raw.roles.companies.domains),
     roleTitle: raw.roles.title,
     status: raw.status,
     submittedAt: raw.submitted_at,
@@ -270,4 +278,53 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 
 export function classificationLabel(value: string): string {
   return CLASSIFICATION_LABELS[value] ?? value;
+}
+
+/** One pursuit as the "some other role" picker needs it: a name and a status. */
+export interface SearchableRole {
+  applicationId: string;
+  companyName: string;
+  roleTitle: string;
+  status: string;
+  everSubmitted: boolean;
+}
+
+/**
+ * The roles a typed query should offer, best first.
+ *
+ * The scorer above ranks the three suggestions by how well the *message*
+ * matches; this ranks by how well the *typing* does, which is a different
+ * question and deliberately dumber. Every whitespace-separated term has to
+ * appear somewhere in "company · title", so "canonical eng" narrows the way a
+ * person expects it to, and a company name alone lists that company's roles.
+ */
+export function matchRoles(
+  roles: readonly SearchableRole[],
+  query: string,
+  limit = 8,
+): SearchableRole[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return roles.slice(0, limit);
+
+  return roles
+    .map((role) => {
+      const company = role.companyName.toLowerCase();
+      const title = role.roleTitle.toLowerCase();
+      const haystack = `${company} ${title}`;
+      if (!terms.every((term) => haystack.includes(term))) return null;
+      // Where the term landed decides the order: the company you typed the
+      // start of, then the title you typed the start of, then anything that
+      // merely contains the letters. Otherwise "ubs" buries UBS under
+      // "Columbus Health".
+      const rank = terms.reduce(
+        (total, term) =>
+          total + (company.startsWith(term) ? 0 : title.startsWith(term) ? 1 : 2),
+        0,
+      );
+      return { role, rank };
+    })
+    .filter((entry): entry is { role: SearchableRole; rank: number } => entry !== null)
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit)
+    .map((entry) => entry.role);
 }

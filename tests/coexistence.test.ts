@@ -77,13 +77,62 @@ describe('coexistence with the commerce app in public', () => {
     },
   );
 
+  it('puts nothing in Supabase\'s own `vault` schema', async () => {
+    // `vault` belongs to Supabase Vault, the encrypted secrets store, and it
+    // exists on every hosted project. The notes workspace wanted that name,
+    // and taking it would have been worse than a collision: the grants at the
+    // end of a schema migration say "all tables in schema", so `grant select
+    // ... to authenticated` would have handed every signed-in user
+    // vault.secrets -- which carries no RLS, because nothing is meant to
+    // reach it. Exposing the schema to PostgREST would then have published it.
+    //
+    // The notes live in `obsidian`. This asserts they stayed there.
+    const rows = await admin<{ tablename: string }[]>`
+      select c.relname as tablename
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'vault' and c.relkind = 'r' and c.relname <> 'secrets'
+      order by 1`;
+    expect(rows.map((r) => r.tablename)).toEqual([]);
+  });
+
+  it('grants no application role access to Supabase Vault', async () => {
+    const rows = await admin<{ grantee: string }[]>`
+      select distinct grantee from information_schema.role_table_grants
+      where table_schema = 'vault'
+        and grantee in ('anon', 'authenticated')
+      order by 1`;
+    expect(rows.map((r) => r.grantee)).toEqual([]);
+  });
+
   it.runIf(neighbourPresent)('does not overwrite the neighbour functions', async () => {
-    for (const fn of ['handle_new_user', 'touch_updated_at']) {
+    // Each schema keeps its own copy; none of them clobbers a neighbour's.
+    // `obsidian` -- the vault workspace's schema -- appears for
+    // touch_updated_at and not for handle_new_user because it has updated_at
+    // columns but creates nothing on sign-up: a vault exists once someone
+    // connects a repository, not once they have an account.
+    //
+    // `todo` appears for the same reason as obsidian: tasks have an updated_at
+    // and nothing in the module is created on sign-up -- a list exists because
+    // you wrote something on it.
+    //
+    // `core` appears for touch_updated_at because account_settings has an
+    // updated_at, and its sign-up function is deliberately NOT called
+    // handle_new_user: a third function of that name would be a fourth chance
+    // for one of these to replace another, and `create or replace function`
+    // does not error the way a duplicate table does.
+    const owners: Record<string, string[]> = {
+      handle_new_user: [APP_SCHEMA, 'public'],
+      handle_new_user_settings: ['core'],
+      touch_updated_at: ['core', APP_SCHEMA, 'obsidian', 'public', 'todo'],
+    };
+
+    for (const [fn, expected] of Object.entries(owners)) {
       const rows = await admin<{ nspname: string }[]>`
         select n.nspname from pg_proc p
         join pg_namespace n on n.oid = p.pronamespace
         where p.proname = ${fn} order by 1`;
-      expect(rows.map((r) => r.nspname), fn).toEqual([APP_SCHEMA, 'public']);
+      expect(rows.map((r) => r.nspname), fn).toEqual(expected);
     }
   });
 
@@ -97,12 +146,15 @@ describe('coexistence with the commerce app in public', () => {
     expect(rows.map((r) => r.tgname)).toEqual([
       'on_auth_user_created',
       'on_auth_user_created_job_search',
+      'on_auth_user_created_settings',
     ]);
   });
 
   it.runIf(neighbourPresent)('gives one signup a profile in each app', async () => {
     // The point of sharing auth.users: one login, and each app seeds its own
-    // profile row without knowing the other exists.
+    // profile row without knowing the other exists. Account settings make it
+    // three rows now -- the two profiles plus the one place the settings that
+    // belong to neither app actually live.
     await admin`insert into auth.users (email) values ('shared@example.com')`;
 
     const [ours] = await admin<{ count: number }[]>`
@@ -112,8 +164,13 @@ describe('coexistence with the commerce app in public', () => {
       select count(*)::int from public.profiles p
       join auth.users u on u.id = p.id where u.email = 'shared@example.com'`;
 
+    const [settings] = await admin<{ count: number }[]>`
+      select count(*)::int from core.account_settings s
+      join auth.users u on u.id = s.user_id where u.email = 'shared@example.com'`;
+
     expect(ours.count).toBe(1);
     expect(theirs.count).toBe(1);
+    expect(settings.count).toBe(1);
   });
 
   it.runIf(neighbourPresent)('cascades a deleted account out of both apps', async () => {

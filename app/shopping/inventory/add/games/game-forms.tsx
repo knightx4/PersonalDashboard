@@ -47,23 +47,23 @@ export function GameCard({
           className="h-24 w-24 shrink-0 rounded-md object-cover bg-canvas"
         />
       ) : (
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-md bg-canvas text-xs text-ink-faint">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-md bg-canvas text-small text-ink-muted">
           No image
         </div>
       )}
       <div className="min-w-0 flex-1">
         <p className="font-medium text-ink">{game.title}</p>
-        <p className="text-sm text-ink-muted">{gameSubtitle(game)}</p>
+        <p className="text-body text-ink-muted">{gameSubtitle(game)}</p>
         {game.bggId && (
-          <p className="mt-1 text-[12px] text-ink-faint">BGG #{game.bggId}</p>
+          <p className="mt-1 text-small text-ink-muted">BGG #{game.bggId}</p>
         )}
         {game.needsConfirmation ? (
-          <p className="mt-2 text-[13px] text-accent-orange">
+          <p className="mt-2 text-ui text-caution">
             {game.confirmationReason ??
               'More than one edition matches — confirm before this drives a sell decision.'}
           </p>
         ) : (
-          <p className="mt-2 text-[13px] text-brand">
+          <p className="mt-2 text-ui text-accent">
             Confident match ({Math.round(game.matchConfidence * 100)}%).
           </p>
         )}
@@ -87,7 +87,7 @@ export function GameCard({
 
         {game.needsConfirmation && (game.alternates?.length ?? 0) > 0 && (
           <div className="mt-3">
-            <p className="text-[13px] font-medium text-ink">Other editions on BGG</p>
+            <p className="text-ui font-medium text-ink">Other editions on BGG</p>
             <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
               {game.alternates?.map((candidate, index) => (
                 <li
@@ -95,8 +95,8 @@ export function GameCard({
                   className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-[13px] text-ink">{candidate.title}</p>
-                    <p className="text-[12px] text-ink-muted">{gameSubtitle(candidate)}</p>
+                    <p className="text-ui text-ink">{candidate.title}</p>
+                    <p className="text-small text-ink-muted">{gameSubtitle(candidate)}</p>
                   </div>
                   {onPick && (
                     <Button
@@ -154,7 +154,7 @@ export function AddGameManualForm({
       }
     >
       {compact && (
-        <p className="text-sm font-medium text-ink">Add it by hand</p>
+        <p className="text-body font-medium text-ink">Add it by hand</p>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -185,7 +185,7 @@ export function AddGameManualForm({
       </Button>
       <FieldError>{state.error}</FieldError>
       {state.message && (
-        <p className="text-sm text-brand">
+        <p className="text-body text-accent">
           {state.message}{' '}
           {state.savedIds?.[0] && (
             <Link className="underline" href={`/shopping/inventory/${state.savedIds[0]}`}>
@@ -240,7 +240,7 @@ export function GameSearchForm() {
       </form>
       <FieldError>{searchState.error ?? saveState.error}</FieldError>
       {saveState.message && (
-        <p className="text-sm text-brand">
+        <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
             <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>

@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
+import { excludableDomains } from '@/lib/jobs/review/exclusions';
 import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -86,10 +88,104 @@ export async function linkMessage(
   return { error: null };
 }
 
+const newRoleSchema = z.object({
+  messageId: z.string().uuid(),
+  companyName: z.string().trim().min(1, 'Which company is this?').max(200),
+  title: z.string().trim().min(1, 'What is the role called?').max(200),
+});
+
 /**
- * Dismiss a message. The subject and sender are cleared at the same time,
- * because a message that turns out to be irrelevant must not keep its
- * retention exemption — the database constraint enforces the same rule.
+ * The fourth option: none of these, it is a new pursuit.
+ *
+ * The queue offered three existing applications and "not relevant", which
+ * leaves the common case unhandled — mail about something real that has
+ * nothing on file yet. Dismissing it loses the evidence, and creating the role
+ * on another page and coming back to link it by hand is four screens for one
+ * decision.
+ *
+ * The pursuit is created with no submitted date: linking the message writes
+ * the event its classification implies, and status is derived from events, so
+ * a rejection lands as rejected and an interview invite as in process without
+ * this having to guess.
+ */
+export async function createRoleFromMessage(input: {
+  messageId: string;
+  companyName: string;
+  title: string;
+}): Promise<{ error: string | null; roleId: string | null }> {
+  const parsed = newRoleSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message, roleId: null };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: message } = await supabase
+    .from('inbox_messages')
+    .select('id, user_id')
+    .eq('id', parsed.data.messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!message) return { error: 'That message is no longer in the queue.', roleId: null };
+
+  const company = await ensureCompany(supabase, user.id, parsed.data.companyName);
+  if (company.error) return { error: company.error, roleId: null };
+
+  const { data: role, error: roleError } = await supabase
+    .from('roles')
+    .insert({
+      user_id: user.id,
+      company_id: company.id,
+      title: parsed.data.title,
+      source: 'recruiter_inbound',
+    })
+    .select('id')
+    .single();
+
+  if (roleError || !role) {
+    return { error: roleError?.message ?? 'Could not create the role.', roleId: null };
+  }
+
+  const { data: application, error: applicationError } = await supabase
+    .from('applications')
+    .insert({
+      user_id: user.id,
+      role_id: role.id,
+      source: 'recruiter_inbound',
+      // A person read the message and said this is a real pursuit, which is
+      // exactly what the inferred flag exists to ask about.
+      created_by: 'manual',
+    })
+    .select('id')
+    .single();
+
+  if (applicationError || !application) {
+    // The role would otherwise sit there with nothing attached to it.
+    await supabase.from('roles').delete().eq('id', role.id).eq('user_id', user.id);
+    return {
+      error: applicationError?.message ?? 'Could not create the pursuit.',
+      roleId: null,
+    };
+  }
+
+  const linked = await linkMessage(parsed.data.messageId, application.id as string);
+  if (linked.error) return { error: linked.error, roleId: role.id as string };
+
+  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/pipeline');
+  return { error: null, roleId: role.id as string };
+}
+
+/**
+ * Dismiss a message. This row is only this workspace's verdict: the envelope —
+ * subject, sender, reply-to, thread — lives in `core.ingested_messages` and is
+ * not ours to clear, because a message the job side finds irrelevant may be an
+ * order confirmation the commerce side is keeping. Scrubbing happens once in
+ * core, by the sweep at the end of a sync, when every workspace has disclaimed
+ * it. Writing the envelope columns here is what produced the "from_address not
+ * in the schema cache" error: they stopped existing on this table at the
+ * ingestion unification.
  */
 export async function dismissMessage(messageId: string): Promise<{ error: string | null }> {
   await requireUser();
@@ -100,10 +196,6 @@ export async function dismissMessage(messageId: string): Promise<{ error: string
     .update({
       classification: 'not_relevant',
       parse_status: 'skipped',
-      subject: null,
-      from_address: null,
-      reply_to_address: null,
-      thread_id: null,
       resulting_application_id: null,
       link_method: null,
       link_confidence: null,
@@ -176,14 +268,100 @@ export async function deleteInferredApplication(
   return { error: null };
 }
 
-/** Acknowledge a conflicting event. It stays on the timeline; the flag clears. */
+/**
+ * Not relevant, and nothing from this employer ever again.
+ *
+ * The one-off verdict was always available; what was missing was the standing
+ * one. An agency or a job board that spawned one inferred pursuit will spawn
+ * another next sync, and answering the same row every week is how a review
+ * queue stops being worked.
+ *
+ * Only the employer's own domains are written. greenhouse.io is on the record
+ * of every Greenhouse customer, and excluding it to be rid of one company
+ * would silently drop every other company's mail with it -- see
+ * lib/jobs/review/exclusions.ts, which is also what decides whether this
+ * button is offered at all.
+ */
+export async function excludeCompanyForApplication(
+  applicationId: string,
+): Promise<{ error: string | null; message?: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: application } = await supabase
+    .from('applications')
+    .select('id, created_by, roles!inner ( companies!inner ( name, domains ) )')
+    .eq('id', applicationId)
+    .eq('user_id', user.id)
+    .maybeSingle<{
+      id: string;
+      created_by: string;
+      roles: { companies: { name: string; domains: string[] | null } };
+    }>();
+
+  if (!application) return { error: 'That application no longer exists.' };
+
+  const company = application.roles.companies;
+  const domains = excludableDomains(company.domains);
+  if (domains.length === 0) {
+    return {
+      error: `No sending domain of ${company.name}'s own is on file, so there is nothing to exclude. Add one under Settings → Excluded senders.`,
+    };
+  }
+
+  // Already-excluded domains are not an error: the point of the button is the
+  // outcome, and a second click should read as "yes, still excluded". Filtered
+  // rather than upserted, because the uniqueness is an expression index on
+  // (user_id, lower(domain)) and ON CONFLICT cannot name it.
+  const { data: already } = await supabase
+    .from('excluded_senders')
+    .select('domain')
+    .eq('user_id', user.id);
+
+  const have = new Set(
+    ((already ?? []) as Array<{ domain: string }>).map((row) => row.domain.toLowerCase()),
+  );
+  const missing = domains.filter((domain) => !have.has(domain));
+
+  if (missing.length > 0) {
+    const { error } = await supabase
+      .from('excluded_senders')
+      .insert(missing.map((domain) => ({ user_id: user.id, domain })));
+    if (error) return { error: error.message };
+  }
+
+  // The pursuit in front of you goes too, where it is one the inbox invented.
+  // A hand-created application is a decision you made and is never removed by
+  // a button about senders.
+  if (application.created_by === 'email_inferred') {
+    const removed = await deleteInferredApplication(applicationId);
+    if (removed.error) return { error: removed.error };
+  }
+
+  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/settings');
+  return {
+    error: null,
+    message: `Removed, and mail from ${domains.join(', ')} will no longer open a pursuit.`,
+  };
+}
+
+/**
+ * Acknowledge a conflicting event. It stays on the timeline; the flag clears.
+ *
+ * `acknowledged_at` is what makes that stick. Clearing the flag is an update to
+ * application_events, which fires the sync trigger, which re-derives
+ * needs_review for every event sitting on a closed pursuit — so without a
+ * record that a person answered it, the flag came straight back and the button
+ * did nothing at all.
+ */
 export async function acknowledgeEvent(eventId: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
   const { error } = await supabase
     .from('application_events')
-    .update({ needs_review: false })
+    .update({ needs_review: false, acknowledged_at: new Date().toISOString() })
     .eq('id', eventId)
     .eq('user_id', user.id);
 

@@ -5,12 +5,19 @@ import { Copy, Mail, ShieldAlert, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
-import { TimezoneField } from '@/components/ui/timezone-field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
+import { syncProgress, type SyncPhase } from '@/lib/core/inbox/progress';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
-import { addEvidence, addResumeVersion, deleteEvidence } from './evidence-actions';
+import {
+  acceptEvidence,
+  addEvidence,
+  addResumeVersion,
+  deleteEvidence,
+  proposeEvidence,
+} from './evidence-actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
+import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 
 export function SettingsView(props: {
   email: string;
@@ -18,8 +25,6 @@ export function SettingsView(props: {
   gmailConfigured: boolean;
   appOrigin: string;
   profile: {
-    displayName: string;
-    timezone: string;
     targetTitles: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
@@ -27,7 +32,13 @@ export function SettingsView(props: {
     bannedConstructions: string;
   };
   accounts: InboxAccount[];
-  resumes: Array<{ id: string; label: string; isDefault: boolean; notes: string | null }>;
+  resumes: Array<{
+    id: string;
+    label: string;
+    isDefault: boolean;
+    notes: string | null;
+    hasText: boolean;
+  }>;
   excludedSenders: Array<{ id: string; domain: string }>;
   evidence: Array<{
     id: string;
@@ -45,9 +56,9 @@ export function SettingsView(props: {
       {props.banner && (
         <p
           className={cn(
-            'rounded-lg px-3 py-2 text-[13px]',
+            'rounded-lg px-3 py-2 text-ui',
             props.banner.tone === 'ok' && 'bg-status-offer-tint text-status-offer',
-            props.banner.tone === 'warn' && 'bg-accent-orange-tint text-ink',
+            props.banner.tone === 'warn' && 'bg-caution-tint text-ink',
             props.banner.tone === 'err' && 'bg-status-rejected-tint text-status-rejected',
           )}
         >
@@ -63,7 +74,7 @@ export function SettingsView(props: {
       <BookmarkletSection appOrigin={props.appOrigin} />
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
-      <EvidenceSection evidence={props.evidence} />
+      <EvidenceSection evidence={props.evidence} resumes={props.resumes} />
       <DangerSection />
     </div>
   );
@@ -74,8 +85,6 @@ function ProfileSection({
   email,
 }: {
   profile: {
-    displayName: string;
-    timezone: string;
     targetTitles: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
@@ -88,22 +97,19 @@ function ProfileSection({
 
   return (
     <section className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Profile</h2>
-      <p className="mt-0.5 text-[13px] text-ink-muted">{email}</p>
+      <h2 className="text-body font-semibold text-ink">Job search</h2>
+      <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
+      <p className="mt-2 text-small text-ink-muted">
+        Your name and timezone are account settings now — they hold across every workspace, so
+        they live under{' '}
+        <a href="/account" className="font-medium text-accent underline underline-offset-2">
+          Account
+        </a>
+        .
+      </p>
 
       <form action={action} className="mt-4 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="displayName">Name</Label>
-            <Input id="displayName" name="displayName" defaultValue={profile.displayName} />
-          </div>
-          <div>
-            <Label htmlFor="timezone">Timezone</Label>
-            <TimezoneField id="timezone" name="timezone" defaultValue={profile.timezone} />
-            <p className="mt-1 text-[11px] text-ink-faint">
-              Interview times and &ldquo;this week&rdquo; are read in this zone.
-            </p>
-          </div>
           <div>
             <Label htmlFor="searchStartedOn">Search started</Label>
             <Input
@@ -112,7 +118,7 @@ function ProfileSection({
               type="date"
               defaultValue={profile.searchStartedOn}
             />
-            <p className="mt-1 text-[11px] text-ink-faint">Anchors every funnel time series.</p>
+            <p className="mt-1 text-micro text-ink-muted">Anchors every funnel time series.</p>
           </div>
           <div>
             <Label htmlFor="ghostThresholdDays">Ghost after</Label>
@@ -124,7 +130,7 @@ function ProfileSection({
               max={180}
               defaultValue={profile.ghostThresholdDays}
             />
-            <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+            <p className="mt-1 text-micro leading-relaxed text-ink-muted">
               Days of silence before a live pursuit is treated as ghosted. Derived, never set by
               hand — the moment it becomes manual, nobody maintains it and the funnel counts
               abandoned pursuits as live ones.
@@ -140,7 +146,7 @@ function ProfileSection({
             defaultValue={profile.targetTitles}
             placeholder="Strategic Finance Analyst, FP&A Manager"
           />
-          <p className="mt-1 text-[11px] text-ink-faint">
+          <p className="mt-1 text-micro text-ink-muted">
             Seeds relevance scoring when mail is classified.
           </p>
         </div>
@@ -154,8 +160,8 @@ function ProfileSection({
             defaultValue={profile.writingStyleNotes}
             placeholder="Direct. Specific numbers. No throat-clearing. British spelling."
           />
-          <p className="mt-1 text-[11px] text-ink-faint">
-            Injected into every generated draft in Phase 2. Revise it whenever one comes back
+          <p className="mt-1 text-micro text-ink-muted">
+            Injected into every generated draft. Revise it whenever one comes back
             wrong.
           </p>
         </div>
@@ -167,20 +173,21 @@ function ProfileSection({
             name="bannedConstructions"
             rows={4}
             defaultValue={profile.bannedConstructions}
+            placeholder={DEFAULT_BANNED_CONSTRUCTIONS.join('\n')}
           />
-          <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+          <p className="mt-1 text-micro leading-relaxed text-ink-muted">
             One per line. Checked deterministically after generation rather than only asked for in
             the prompt — a prompt instruction is not reliable enough for something you would
-            notice in every single draft.
+            notice in every single draft. Leave it empty and the list shown here is used.
           </p>
         </div>
 
         {state.error && (
-          <p role="alert" className="text-[13px] text-status-rejected">
+          <p role="alert" className="text-ui text-status-rejected">
             {state.error}
           </p>
         )}
-        {state.message && <p className="text-[13px] text-status-offer">{state.message}</p>}
+        {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
 
         <Button type="submit" size="sm">
           Save
@@ -216,6 +223,70 @@ function backfillStateOf(account: InboxAccount) {
   };
 }
 
+/** The shape /api/inbox/sync reports a run in. */
+type SyncJob = {
+  jobId: string;
+  type?: string;
+  status: string;
+  phase: SyncPhase | null;
+  messagesSeen: number;
+  messagesParsed: number;
+  messagesTotal: number | null;
+  done: boolean;
+  error?: string;
+};
+
+/**
+ * What the check is doing, while it does it.
+ *
+ * Check now used to answer with one line -- "Started. Progress appears in the
+ * banner at the top." -- and the banner only shows while a job is mid-flight,
+ * which a short check is often past by the time the page repaints. So the
+ * button read as doing nothing at all. This watches the run it started and
+ * says where it is, and stays on screen with the result once it ends.
+ */
+function SyncProgressBar({ accountId, job }: { accountId: string; job: SyncJob }) {
+  const view = syncProgress({
+    status: job.status,
+    phase: job.phase,
+    messagesSeen: job.messagesSeen,
+    messagesParsed: job.messagesParsed,
+    messagesTotal: job.messagesTotal,
+    error: job.error ?? null,
+  });
+
+  return (
+    <div className="mt-2" aria-live="polite" data-account={accountId}>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-canvas"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(view.fraction * 100)}
+      >
+        <div
+          className={cn(
+            'h-full rounded-full transition-[width] duration-500 ease-out',
+            view.failed ? 'bg-status-rejected' : 'bg-accent',
+          )}
+          style={{ width: `${Math.round(view.fraction * 100)}%` }}
+        />
+      </div>
+      <p
+        className={cn(
+          'tabular mt-1.5 text-small',
+          view.failed ? 'text-status-rejected' : 'text-ink-muted',
+        )}
+      >
+        {view.detail}
+      </p>
+    </div>
+  );
+}
+
+/** While a run is live, ask how it is going. */
+const SYNC_POLL_MS = 2000;
+
 function InboxSection({
   accounts,
   gmailConfigured,
@@ -225,7 +296,38 @@ function InboxSection({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Record<string, SyncJob>>({});
+  const [watching, setWatching] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // Polling stops when the run does. A finished job stays on screen -- "read
+  // 4 messages, linked 1" is the answer to "did that do anything", and it is
+  // gone the moment you reload, which is the right lifetime for it.
+  useEffect(() => {
+    if (!watching) return;
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/inbox/sync?accountId=${encodeURIComponent(watching!)}`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { job: SyncJob | null };
+        if (cancelled || !data.job) return;
+        setJobs((current) => ({ ...current, [watching!]: data.job! }));
+        if (data.job.done) setWatching(null);
+      } catch {
+        // A dropped poll is not worth saying anything about; the next one is
+        // two seconds away, and the run is unaffected either way.
+      }
+    }
+
+    void poll();
+    const id = window.setInterval(() => void poll(), SYNC_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [watching]);
 
   async function startSync(accountId: string, mode: 'backfill' | 'incremental') {
     setBusy(accountId);
@@ -237,7 +339,14 @@ function InboxSection({
         body: JSON.stringify({ accountId, mode }),
       });
       const data = await response.json();
-      setNote(response.ok ? 'Started. Progress appears in the banner at the top.' : data.error);
+      if (!response.ok) {
+        setNote(data.error);
+        return;
+      }
+      // The POST answers with the job row it started, so the bar has something
+      // to show before the first poll comes back.
+      if (data.jobId) setJobs((current) => ({ ...current, [accountId]: data as SyncJob }));
+      setWatching(accountId);
     } catch {
       setNote('Could not start the scan.');
     } finally {
@@ -247,8 +356,8 @@ function InboxSection({
 
   return (
     <section id="inboxes" className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Connected inboxes</h2>
-      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
+      <h2 className="text-body font-semibold text-ink">Connected inboxes</h2>
+      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Read-only, scoped to a search query about recruiting mail. Message bodies are never
         stored. Subjects and senders are kept only for the messages that turn out to be relevant —
         everything else keeps nothing but an id and a date so the next scan can skip it.
@@ -264,7 +373,7 @@ function InboxSection({
               </Button>
             </a>
           ) : (
-            <p className="rounded-lg bg-canvas px-3 py-2 text-[13px] text-ink-muted">
+            <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
               Inbox scanning for the job search side is not connected yet — it needs its own
               Google grant, separate from the one the shopping side uses. Everything else works
               without it: add roles by pasting a job link, or use the capture bookmarklet.
@@ -276,24 +385,24 @@ function InboxSection({
           {accounts.map((account) => (
             <li key={account.id} className="rounded-lg border border-border p-3">
               <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-[13px] font-medium text-ink">{account.emailAddress}</span>
+                <span className="text-ui font-medium text-ink">{account.emailAddress}</span>
                 <span
                   className={cn(
-                    'rounded-full px-1.5 py-0.5 text-[11px]',
+                    'rounded-full px-1.5 py-0.5 text-micro',
                     account.status === 'active'
                       ? 'bg-status-offer-tint text-status-offer'
-                      : 'bg-accent-orange-tint text-ink',
+                      : 'bg-caution-tint text-ink',
                   )}
                 >
                   {account.status.replace(/_/g, ' ')}
                 </span>
-                <span className="tabular ml-auto text-[11px] text-ink-faint">
+                <span className="tabular ml-auto text-micro text-ink-muted">
                   last checked {formatDate(account.lastSyncedAt)}
                 </span>
               </div>
 
               {account.status === 'needs_reauth' && (
-                <p className="mt-2 rounded bg-accent-orange-tint px-2 py-1.5 text-[12px] text-ink">
+                <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
                   Google stopped honouring the token. Reconnect below. If this happens weekly, the
                   OAuth app is still in Testing status — Google expires refresh tokens every seven
                   days there.
@@ -306,7 +415,7 @@ function InboxSection({
                 // partway. It resumes where it stopped -- which the page has to
                 // actually say, or the only reading left is that nothing
                 // happened the last six times.
-                <p className="mt-2 rounded bg-canvas px-2 py-1.5 text-[12px] text-ink-muted">
+                <p className="mt-2 rounded bg-canvas px-2 py-1.5 text-small text-ink-muted">
                   First scan stopped partway — {account.latestBackfill.messagesSeen} messages read
                   {account.latestBackfill.finishedAt
                     ? `, ${formatDate(account.latestBackfill.finishedAt)}`
@@ -343,7 +452,7 @@ function InboxSection({
                 </Button>
                 <a
                   href="/api/auth/gmail/connect?return_to=/jobs/settings"
-                  className="text-[12px] text-ink-muted underline underline-offset-2 hover:text-ink"
+                  className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
                 >
                   Reconnect
                 </a>
@@ -361,21 +470,25 @@ function InboxSection({
                   Disconnect
                 </Button>
               </div>
+
+              {jobs[account.id] && (
+                <SyncProgressBar accountId={account.id} job={jobs[account.id]} />
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      {note && <p className="mt-3 text-[13px] text-ink-muted">{note}</p>}
+      {note && <p className="mt-3 text-ui text-ink-muted">{note}</p>}
 
-      <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
+      <p className="mt-3 text-ui leading-relaxed text-ink-muted">
         Your inbox is checked automatically <strong className="font-medium">once a day</strong>.
         Use <strong className="font-medium">Check now</strong> when you are expecting something —
         an interview invite is the one kind of mail where a day of delay actually costs you.
         Running it more often is free and never duplicates anything.
       </p>
 
-      <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+      <p className="mt-2 text-micro leading-relaxed text-ink-muted">
         Coverage is partial by design. Recruiters emailing from a company address with a subject
         like &ldquo;quick question&rdquo; match no keyword, so a second pass searches the domains
         of the companies you track. Add domains on a company page when its mail is not linking, and
@@ -404,8 +517,8 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
 
   return (
     <section id="bookmarklet" className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Capture application questions</h2>
-      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
+      <h2 className="text-body font-semibold text-ink">Capture application questions</h2>
+      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Drag this to your bookmarks bar. On an application form, click it: it reads the question
         labels and sends them here. It runs in your browser inside your session, which is why it
         works on Workday and iCIMS where nothing server-side can. It never reads what you have
@@ -417,7 +530,7 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
           <a
             href={href}
             onClick={(event) => event.preventDefault()}
-            className="press cursor-grab rounded-lg border border-border bg-canvas px-3 py-1.5 text-[13px] font-medium text-brand"
+            className="press cursor-grab rounded-lg border border-border bg-canvas px-3 py-1.5 text-ui font-medium text-accent"
             title="Drag me to your bookmarks bar"
           >
             Capture questions
@@ -442,7 +555,7 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
         )}
       </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
+      <p className="mt-3 text-micro leading-relaxed text-ink-muted">
         Only Greenhouse publishes its application questions to an API, so for every other vendor
         this is the way in. The paste box on any role always works too.
       </p>
@@ -460,8 +573,8 @@ function ExcludedSendersSection({
 
   return (
     <section className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Excluded senders</h2>
-      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
+      <h2 className="text-body font-semibold text-ink">Excluded senders</h2>
+      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Mail from Indeed is already excluded everywhere for everyone — it is suggested jobs, not
         anything you applied to. Add a domain here for anything else that keeps showing up as a
         lead it should not be, like a job board or a newsletter.
@@ -470,11 +583,11 @@ function ExcludedSendersSection({
       {excludedSenders.length > 0 && (
         <ul className="mt-3 space-y-1">
           {excludedSenders.map((entry) => (
-            <li key={entry.id} className="flex items-center gap-2 text-[13px]">
+            <li key={entry.id} className="flex items-center gap-2 text-ui">
               <span className="tabular text-ink">{entry.domain}</span>
               <button
                 type="button"
-                className="ml-auto text-ink-faint hover:text-status-rejected"
+                className="ml-auto text-ink-muted hover:text-status-rejected"
                 onClick={() =>
                   startTransition(async () => {
                     await removeExcludedSender(entry.id);
@@ -498,8 +611,8 @@ function ExcludedSendersSection({
           Exclude
         </Button>
       </form>
-      {state.error && <p className="mt-2 text-[13px] text-status-rejected">{state.error}</p>}
-      {state.message && <p className="mt-2 text-[13px] text-status-offer">{state.message}</p>}
+      {state.error && <p className="mt-2 text-ui text-status-rejected">{state.error}</p>}
+      {state.message && <p className="mt-2 text-ui text-status-offer">{state.message}</p>}
     </section>
   );
 }
@@ -507,14 +620,14 @@ function ExcludedSendersSection({
 function ResumeSection({
   resumes,
 }: {
-  resumes: Array<{ id: string; label: string; isDefault: boolean; notes: string | null }>;
+  resumes: Array<{ id: string; label: string; notes: string | null; isDefault: boolean; hasText: boolean }>;
 }) {
   const [state, action] = useActionState(addResumeVersion, {});
 
   return (
     <section className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Resume versions</h2>
-      <p className="mt-0.5 text-[13px] text-ink-muted">
+      <h2 className="text-body font-semibold text-ink">Resume versions</h2>
+      <p className="mt-0.5 text-ui text-ink-muted">
         Point applications at a version, and you find out which one correlates with getting past
         resume review.
       </p>
@@ -522,37 +635,56 @@ function ResumeSection({
       {resumes.length > 0 && (
         <ul className="mt-3 space-y-1">
           {resumes.map((resume) => (
-            <li key={resume.id} className="flex items-baseline gap-2 text-[13px]">
+            <li key={resume.id} className="flex items-baseline gap-2 text-ui">
               <span className="font-medium text-ink">{resume.label}</span>
-              {resume.isDefault && <span className="text-[11px] text-brand">default</span>}
+              {resume.isDefault && <span className="text-micro text-accent">default</span>}
+              {!resume.hasText && (
+                <span className="text-micro text-ink-muted">no text pasted</span>
+              )}
               {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
             </li>
           ))}
         </ul>
       )}
 
-      <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="w-32">
-          <Label htmlFor="label">Label</Label>
-          <Input id="label" name="label" required placeholder="C" />
+      <form action={action} className="mt-3 space-y-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-32">
+            <Label htmlFor="label">Label</Label>
+            <Input id="label" name="label" required placeholder="C" />
+          </div>
+          <div className="min-w-48 flex-1">
+            <Label htmlFor="notes">What is different about it</Label>
+            <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
+          </div>
+          <Button type="submit" size="sm" variant="secondary">
+            Add
+          </Button>
         </div>
-        <div className="min-w-48 flex-1">
-          <Label htmlFor="notes">What is different about it</Label>
-          <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
+        <div>
+          <Label htmlFor="textContent">Paste the text</Label>
+          <Textarea
+            id="textContent"
+            name="textContent"
+            rows={4}
+            placeholder="Paste the whole resume. Formatting does not matter."
+          />
+          <p className="mt-1 text-small text-ink-muted">
+            Optional, but it is what the evidence bank reads to propose your stories.
+          </p>
         </div>
-        <Button type="submit" size="sm" variant="secondary">
-          Add
-        </Button>
       </form>
-      {state.error && <p className="mt-2 text-[13px] text-status-rejected">{state.error}</p>}
-      {state.message && <p className="mt-2 text-[13px] text-status-offer">{state.message}</p>}
+      {state.error && <p className="mt-2 text-ui text-status-rejected">{state.error}</p>}
+      {state.message && <p className="mt-2 text-ui text-status-offer">{state.message}</p>}
     </section>
   );
 }
 
 function EvidenceSection({
   evidence,
+  resumes,
 }: {
+  resumes: Array<{ id: string; label: string; hasText: boolean }>;
   evidence: Array<{
     id: string;
     title: string;
@@ -569,18 +701,18 @@ function EvidenceSection({
 
   return (
     <section className="rounded-card border border-border bg-surface p-5">
-      <h2 className="text-sm font-semibold text-ink">Evidence bank</h2>
-      <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">
+      <h2 className="text-body font-semibold text-ink">Evidence bank</h2>
+      <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Your actual experience, in your own words. Twenty to thirty entries is the target. The
         quality ceiling of every draft this app will ever write is set here — no amount of prompt
         engineering compensates for an empty bank, which is why the editor exists before the
         writing does.
       </p>
 
-      <p className="tabular mt-2 text-[13px] text-ink">
+      <p className="tabular mt-2 text-ui text-ink">
         {evidence.length} stored
         {evidence.length < 20 && (
-          <span className="ml-2 text-accent-orange">
+          <span className="ml-2 text-caution">
             {20 - evidence.length} short of a useful bank
           </span>
         )}
@@ -591,21 +723,21 @@ function EvidenceSection({
           {evidence.map((item) => (
             <li key={item.id} className="rounded-lg border border-border p-3">
               <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-[13px] font-medium text-ink">{item.title}</span>
-                <span className="tabular text-[11px] text-ink-faint">
+                <span className="text-ui font-medium text-ink">{item.title}</span>
+                <span className="tabular text-micro text-ink-muted">
                   {'★'.repeat(item.strength)}
                 </span>
                 {item.skills.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted"
+                    className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted"
                   >
                     {skill.replace(/_/g, ' ')}
                   </span>
                 ))}
                 <button
                   type="button"
-                  className="ml-auto text-ink-faint hover:text-status-rejected"
+                  className="ml-auto text-ink-muted hover:text-status-rejected"
                   onClick={() =>
                     startTransition(async () => {
                       await deleteEvidence(item.id);
@@ -616,14 +748,16 @@ function EvidenceSection({
                   <Trash2 className="size-3.5" strokeWidth={1.75} />
                 </button>
               </div>
-              <p className="mt-1 line-clamp-3 text-[12px] text-ink-muted">{item.body}</p>
+              <p className="mt-1 line-clamp-3 text-small text-ink-muted">{item.body}</p>
               {item.metrics && (
-                <p className="tabular mt-1 text-[12px] text-ink">{item.metrics}</p>
+                <p className="tabular mt-1 text-small text-ink">{item.metrics}</p>
               )}
             </li>
           ))}
         </ul>
       )}
+
+      <SeedFromWriting resumes={resumes} />
 
       <form action={action} className="mt-4 space-y-3 border-t border-border pt-4">
         <div>
@@ -669,14 +803,271 @@ function EvidenceSection({
           />
         </div>
 
-        {state.error && <p className="text-[13px] text-status-rejected">{state.error}</p>}
-        {state.message && <p className="text-[13px] text-status-offer">{state.message}</p>}
+        {state.error && <p className="text-ui text-status-rejected">{state.error}</p>}
+        {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
 
         <Button type="submit" size="sm">
           Add to the bank
         </Button>
       </form>
     </section>
+  );
+}
+
+/**
+ * Seeding the bank from writing that already exists in the account.
+ *
+ * The one-at-a-time form below is why the bank is empty: nobody fills in six
+ * fields twenty times. A resume, the answers you have approved and the
+ * debriefs you wrote are all stories in your own words already, so the model
+ * only has to split them up. It proposes; you tick and edit. Nothing lands
+ * unread, because a bad item in the bank is invisible after the fact and
+ * degrades every match built on top of it.
+ */
+type EvidenceDraft = {
+  title: string;
+  body: string;
+  context: string | null;
+  metrics: string | null;
+  strength: number;
+  /** Kept as typed text, so a half-finished tag is not lost on every keystroke. */
+  skillsText: string;
+  picked: boolean;
+};
+
+function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: string; hasText: boolean }> }) {
+  const readable = resumes.filter((resume) => resume.hasText);
+
+  const [, startTransition] = useTransition();
+
+  const [kind, setKind] = useState<'resume' | 'answers' | 'debriefs'>('resume');
+  const [resumeVersionId, setResumeVersionId] = useState(readable[0]?.id ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<EvidenceDraft[] | null>(null);
+
+  const sources: Array<{ value: typeof kind; label: string }> = [
+    { value: 'resume', label: 'A resume' },
+    { value: 'answers', label: 'Approved answers' },
+    { value: 'debriefs', label: 'Interview debriefs' },
+  ];
+
+  function patch(index: number, changes: Partial<EvidenceDraft>) {
+    setDrafts((current) =>
+      (current ?? []).map((draft, i) => (i === index ? { ...draft, ...changes } : draft)),
+    );
+  }
+
+  const picked = (drafts ?? []).filter((draft) => draft.picked);
+
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-canvas p-3">
+      <h3 className="text-ui font-medium text-ink">Seed it from what you have written</h3>
+      <p className="mt-0.5 text-small leading-relaxed text-ink-muted">
+        Read a resume, your approved behavioural answers, or your interview debriefs, and propose
+        the stories in them. Nothing is added until you tick it.
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <div>
+          <Label htmlFor="seed-kind">Read</Label>
+          <Select
+            id="seed-kind"
+            value={kind}
+            onChange={(event) => {
+              setKind(event.target.value as typeof kind);
+              setDrafts(null);
+              setError(null);
+              setMessage(null);
+            }}
+          >
+            {sources.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {kind === 'resume' && (
+          <div>
+            <Label htmlFor="seed-resume">Version</Label>
+            <Select
+              id="seed-resume"
+              value={resumeVersionId}
+              disabled={readable.length === 0}
+              onChange={(event) => setResumeVersionId(event.target.value)}
+            >
+              {readable.length === 0 ? (
+                <option value="">No version has text pasted</option>
+              ) : (
+                readable.map((resume) => (
+                  <option key={resume.id} value={resume.id}>
+                    {resume.label}
+                  </option>
+                ))
+              )}
+            </Select>
+          </div>
+        )}
+
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy || (kind === 'resume' && !resumeVersionId)}
+          onClick={() => {
+            setBusy(true);
+            setError(null);
+            setMessage(null);
+            setDrafts(null);
+            startTransition(async () => {
+              const result = await proposeEvidence({
+                kind,
+                resumeVersionId: kind === 'resume' ? resumeVersionId : undefined,
+              });
+              setBusy(false);
+              if (result.error || !result.proposal) {
+                setError(result.error ?? 'Nothing came back.');
+                return;
+              }
+              setDrafts(
+                result.proposal.candidates.map((candidate) => ({
+                  ...candidate,
+                  picked: true,
+                  skillsText: candidate.skills.join(', '),
+                })),
+              );
+            });
+          }}
+        >
+          {busy ? 'Reading…' : 'Propose'}
+        </Button>
+
+        {error && <span className="text-small text-status-rejected">{error}</span>}
+        {message && <span className="text-small text-status-offer">{message}</span>}
+      </div>
+
+      {drafts && drafts.length > 0 && (
+        <div className="mt-3 space-y-2 border-t border-border pt-3">
+          <p className="text-small text-ink-muted">
+            {drafts.length} proposed. Edit anything that is not how you would put it — this is the
+            text every future draft quotes.
+          </p>
+
+          {drafts.map((draft, index) => (
+            <div
+              key={index}
+              className={cn(
+                'rounded-lg border p-2',
+                draft.picked ? 'border-border-strong bg-surface' : 'border-border opacity-60',
+              )}
+            >
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-2"
+                  checked={draft.picked}
+                  onChange={(event) => patch(index, { picked: event.target.checked })}
+                  aria-label={`Add ${draft.title}`}
+                />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Input
+                    value={draft.title}
+                    aria-label="Short handle"
+                    onChange={(event) => patch(index, { title: event.target.value })}
+                  />
+                  <Textarea
+                    rows={3}
+                    value={draft.body}
+                    aria-label="The story"
+                    onChange={(event) => patch(index, { body: event.target.value })}
+                  />
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Input
+                      value={draft.context ?? ''}
+                      placeholder="Where and when"
+                      aria-label="Where and when"
+                      onChange={(event) => patch(index, { context: event.target.value })}
+                    />
+                    <Input
+                      value={draft.metrics ?? ''}
+                      placeholder="The number"
+                      aria-label="The number"
+                      onChange={(event) => patch(index, { metrics: event.target.value })}
+                    />
+                    <Select
+                      value={String(draft.strength)}
+                      aria-label="How strong is it"
+                      onChange={(event) => patch(index, { strength: Number(event.target.value) })}
+                    >
+                      {[5, 4, 3, 2, 1].map((level) => (
+                        <option key={level} value={level}>
+                          {'★'.repeat(level)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <Input
+                    value={draft.skillsText}
+                    placeholder="Tags"
+                    aria-label="Tags"
+                    onChange={(event) => patch(index, { skillsText: event.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || picked.length === 0}
+              onClick={() => {
+                setBusy(true);
+                setError(null);
+                startTransition(async () => {
+                  const result = await acceptEvidence({
+                    items: picked.map((draft) => ({
+                      title: draft.title.trim(),
+                      body: draft.body.trim(),
+                      context: draft.context?.trim() || null,
+                      metrics: draft.metrics?.trim() || null,
+                      strength: draft.strength,
+                      skills: draft.skillsText
+                        .split(/[,\n]/)
+                        .map((entry) => entry.trim())
+                        .filter(Boolean),
+                    })),
+                  });
+                  setBusy(false);
+                  if (result.error) {
+                    setError(result.error);
+                    return;
+                  }
+                  setDrafts(null);
+                  setMessage(`Added ${result.added} to the bank.`);
+                });
+              }}
+            >
+              Add {picked.length} to the bank
+            </Button>
+            <button
+              type="button"
+              className="text-small text-ink-muted hover:text-ink"
+              onClick={() => {
+                setDrafts(null);
+                setMessage(null);
+              }}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -687,11 +1078,11 @@ function DangerSection() {
 
   return (
     <section className="rounded-card border border-status-rejected/30 bg-surface p-5">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-status-rejected">
+      <h2 className="flex items-center gap-2 text-body font-semibold text-status-rejected">
         <ShieldAlert className="size-4" strokeWidth={1.75} />
         Delete everything
       </h2>
-      <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
+      <p className="mt-1 text-ui leading-relaxed text-ink-muted">
         Revokes the Google grant, deletes every row and every stored file, and removes the account
         itself. There is no undo and no export first.
       </p>
@@ -737,7 +1128,7 @@ function DangerSection() {
         </Button>
       </div>
       {error && (
-        <p role="alert" className="mt-2 text-[13px] text-status-rejected">
+        <p role="alert" className="mt-2 text-ui text-status-rejected">
           {error}
         </p>
       )}

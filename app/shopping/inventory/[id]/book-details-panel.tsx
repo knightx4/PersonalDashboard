@@ -51,7 +51,7 @@ function Fact({
   return (
     <div>
       <dt className="text-ink-muted">{label}</dt>
-      <dd className={value ? (mono ? 'font-mono text-ink' : 'text-ink') : 'text-ink-faint'}>
+      <dd className={value ? (mono ? 'font-mono text-ink' : 'text-ink') : 'text-ink-muted'}>
         {value || 'Not listed'}
       </dd>
     </div>
@@ -94,13 +94,13 @@ function CandidateRow({
         <div className="h-16 w-11 shrink-0 rounded bg-canvas" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-ink">{candidate.title}</p>
+        <p className="text-body font-medium text-ink">{candidate.title}</p>
         {candidate.authors.length > 0 && (
-          <p className="text-[13px] text-ink-muted">{candidate.authors.join(', ')}</p>
+          <p className="text-ui text-ink-muted">{candidate.authors.join(', ')}</p>
         )}
-        <p className="text-[13px] text-ink-faint">{editionLine(candidate)}</p>
+        <p className="text-ui text-ink-muted">{editionLine(candidate)}</p>
         {candidate.isbn13 && (
-          <p className="font-mono text-[12px] text-ink-muted">ISBN {candidate.isbn13}</p>
+          <p className="font-mono text-small text-ink-muted">ISBN {candidate.isbn13}</p>
         )}
         <form action={action} className="mt-2">
           <input type="hidden" name="inventory_item_id" value={inventoryItemId} />
@@ -115,6 +115,14 @@ function CandidateRow({
   );
 }
 
+/**
+ * A book's identity, its condition, and the confirmation gate pricing waits on.
+ *
+ * The top of the item's one Details box, not a box of its own — see the note on
+ * GameDetailsPanel. The ISBNs are rendered only when the catalog has them,
+ * because the books template carries an ISBN field of its own and the page
+ * hides whichever of the pair is the duplicate.
+ */
 export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
   const [confirmState, confirmAction, confirmPending] = useActionState(
     confirmBookEdition,
@@ -126,17 +134,14 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
   );
 
   return (
-    <section className="space-y-4 rounded-card border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold text-ink">Book details</h2>
-        {book.autoImported && (
-          <span className="text-[12px] text-ink-faint">Imported from an order email</span>
-        )}
-      </div>
+    <div className="space-y-4">
+      {book.autoImported && (
+        <p className="text-small text-ink-muted">Imported from an order email</p>
+      )}
 
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
-        <Fact label="ISBN-13" value={book.isbn13} mono />
-        <Fact label="ISBN-10" value={book.isbn10} mono />
+      <dl className="grid gap-2 text-body sm:grid-cols-2">
+        {book.isbn13 && <Fact label="ISBN-13" value={book.isbn13} mono />}
+        {book.isbn10 && <Fact label="ISBN-10" value={book.isbn10} mono />}
         <div className="sm:col-span-2">
           <Fact
             label="Authors"
@@ -158,10 +163,10 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
       </dl>
 
       {book.needsConfirmation && (
-        <div className="space-y-3 rounded-lg border border-accent-orange/30 bg-accent-orange/5 p-3">
+        <div className="space-y-3 rounded-lg border border-caution/30 bg-caution-fill/5 p-3">
           <div>
-            <h3 className="text-sm font-semibold text-ink">Which edition is on your shelf?</h3>
-            <p className="mt-1 text-[13px] text-ink-muted">
+            <h3 className="text-body font-semibold text-ink">Which edition is on your shelf?</h3>
+            <p className="mt-1 text-ui text-ink-muted">
               {book.confirmationReason ??
                 'We could not pin this to a single printing, and buyback quotes are per ISBN.'}
             </p>
@@ -179,16 +184,16 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
               <div className="h-16 w-11 shrink-0 rounded bg-canvas" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+              <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
                 Our best guess
               </p>
-              <p className="text-sm font-medium text-ink">{book.title}</p>
+              <p className="text-body font-medium text-ink">{book.title}</p>
               {book.authors.length > 0 && (
-                <p className="text-[13px] text-ink-muted">{book.authors.join(', ')}</p>
+                <p className="text-ui text-ink-muted">{book.authors.join(', ')}</p>
               )}
-              <p className="text-[13px] text-ink-faint">{editionLine(book)}</p>
+              <p className="text-ui text-ink-muted">{editionLine(book)}</p>
               {book.isbn13 && (
-                <p className="font-mono text-[12px] text-ink-muted">ISBN {book.isbn13}</p>
+                <p className="font-mono text-small text-ink-muted">ISBN {book.isbn13}</p>
               )}
               <form action={confirmAction} className="mt-2">
                 <input
@@ -202,14 +207,14 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
               </form>
               <FieldError>{confirmState.error}</FieldError>
               {confirmState.message && (
-                <p className="mt-1 text-[13px] text-brand">{confirmState.message}</p>
+                <p className="mt-1 text-ui text-accent">{confirmState.message}</p>
               )}
             </div>
           </div>
 
           {book.candidates.length > 0 && (
             <div>
-              <p className="mb-1 text-[13px] font-medium text-ink">
+              <p className="mb-1 text-ui font-medium text-ink">
                 Other printings we found
               </p>
               <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
@@ -224,9 +229,9 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
             </div>
           )}
 
-          <p className="text-[12px] text-ink-faint">
+          <p className="text-small text-ink-muted">
             Neither one? Scan the barcode on the back cover from{' '}
-            <Link href="/shopping/inventory/add" className="text-brand hover:underline">
+            <Link href="/shopping/inventory/add/books" className="text-accent hover:underline">
               Add books
             </Link>{' '}
             — the ISBN settles it in one shot.
@@ -256,6 +261,6 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
         </Button>
         <FieldError>{conditionState.error}</FieldError>
       </form>
-    </section>
+    </div>
   );
 }

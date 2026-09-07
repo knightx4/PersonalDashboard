@@ -1,8 +1,13 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
-import { TopNav } from '@/components/shell/top-nav';
+import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadActivity } from '@/lib/shell/activity';
+import { loadShoppingBrief } from '@/lib/shell/brief';
+import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/onboarding';
 import { countReviewItems } from '@/lib/review/load';
@@ -25,23 +30,53 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox] = await Promise.all([
+  const [{ data: profile }, reviewCount, inbox, settings, counts, activity] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
     loadInboxBannerState(user.id),
+    loadAccountSettings(user.id),
+    loadModuleCounts(user.id),
+    loadActivity(),
   ]);
+
+  const brief = await loadShoppingBrief(user.id, settings.timezone, reviewCount);
+
+  /**
+   * Review carries a count because an unattended review queue is how the
+   * dashboard quietly becomes wrong. Nothing else here has earned one.
+   */
+  const sections: NavSection[] = [
+    { href: '/shopping/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+    { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
+    { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
+    { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
+    { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
+    { href: '/shopping/share', label: 'Share', icon: 'share' },
+    { href: '/shopping/review', label: 'Review', icon: 'review', badge: reviewCount },
+  ];
 
   const { accountIds, initialJob } = inbox;
 
   return (
-    <div className="min-h-full">
-      <TopNav
+    <div data-workspace="shopping">
+      <AppShell
+        module="shopping"
+        sections={sections}
+        settingsHref="/shopping/settings"
+        settingsLabel="Shopping settings"
+        feedbackHref="/shopping/feedback"
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
-        reviewCount={reviewCount}
-      />
-      <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
+        enabledModules={settings.enabledModules}
+        counts={switcherCounts(counts)}
+        theme={settings.theme}
+        activity={activity}
+        brief={brief}
+        banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
+      >
+        {children}
+      </AppShell>
     </div>
   );
 }

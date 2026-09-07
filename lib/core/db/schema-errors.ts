@@ -1,7 +1,8 @@
 /**
  * Turning a missing Exposed-schemas entry into a sentence.
  *
- * Three schemas back this app -- `public`, `job_search` and `core` -- but
+ * Five schemas back this app -- `public`, `job_search`, `core`, `obsidian`
+ * (the vault workspace) and `todo` -- but
  * PostgREST only serves the ones listed under Settings -> API -> Exposed
  * schemas in the Supabase dashboard. That list is not in version control and
  * does not survive a project restore, so it is the step that gets forgotten.
@@ -27,8 +28,8 @@ export class SchemaNotExposedError extends Error {
     super(
       `The "${schema}" schema is not exposed by the API, so nothing in it can be read or written. ` +
         'In the Supabase dashboard open Settings → API → Exposed schemas and make sure the list ' +
-        'includes public, job_search and core. No migration or deploy is needed — the change takes ' +
-        'effect immediately.',
+        'includes public, job_search, core, obsidian and todo. No migration or deploy is needed — the change ' +
+        'takes effect immediately.',
     );
     this.name = 'SchemaNotExposedError';
   }

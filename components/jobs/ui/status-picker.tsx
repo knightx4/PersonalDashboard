@@ -68,7 +68,7 @@ export function StatusPicker({
             }
           });
         }}
-        className="h-7 rounded-lg border border-border bg-surface px-1.5 text-[12px] text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+        className="h-7 rounded-lg border border-border bg-surface px-1.5 text-small text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
       >
         {SETTABLE.map((option) => (
           <option key={option} value={option}>
@@ -77,7 +77,7 @@ export function StatusPicker({
         ))}
       </select>
       {error && (
-        <span role="alert" className="text-[11px] text-status-rejected">
+        <span role="alert" className="text-micro text-status-rejected">
           {error}
         </span>
       )}

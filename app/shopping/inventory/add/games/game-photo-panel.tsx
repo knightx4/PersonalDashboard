@@ -110,7 +110,7 @@ export function GameShelfPhotoPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Pick photos from your library or take new ones — straight off an iPhone
         is fine, no converting. Several shots of a big shelf merge into one
         list, a box seen twice is listed once, and every readable box becomes a
@@ -152,15 +152,15 @@ export function GameShelfPhotoPanel() {
       <FieldError>{error ?? saveState.error}</FieldError>
 
       {photosRead > 0 && (
-        <p className="text-sm text-ink">
+        <p className="text-body text-ink">
           Read {photosRead} photo{photosRead === 1 ? '' : 's'} · matched {matched.length} of{' '}
           {rows.length} box{rows.length === 1 ? '' : 'es'}.
         </p>
       )}
-      {saveState.message && <p className="text-sm text-brand">{saveState.message}</p>}
+      {saveState.message && <p className="text-body text-accent">{saveState.message}</p>}
 
       {unreadable > 0 && (
-        <div className="rounded-lg border border-accent-orange/30 bg-accent-orange/5 px-3 py-2 text-[13px] text-ink">
+        <div className="rounded-lg border border-caution/30 bg-caution-fill/5 px-3 py-2 text-ui text-ink">
           {unreadable} box(es) were visible but not identifiable — turned away, hidden,
           or cut off. Re-shoot that part of the shelf, or add those by hand.
         </div>
@@ -193,8 +193,8 @@ export function GameShelfPhotoPanel() {
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-ink">{game.title}</p>
-                    <p className="text-[13px] text-ink-muted">{gameSubtitle(game)}</p>
-                    <p className="text-[12px] text-ink-faint">
+                    <p className="text-ui text-ink-muted">{gameSubtitle(game)}</p>
+                    <p className="text-small text-ink-muted">
                       Read as “{row.raw}”
                       {row.sighting?.confidence
                         ? ` · photo confidence ${row.sighting.confidence}`
@@ -202,7 +202,7 @@ export function GameShelfPhotoPanel() {
                       {game.needsConfirmation ? ' · needs a look' : ''}
                     </p>
                     {row.sighting?.note && (
-                      <p className="text-[12px] text-accent-orange">{row.sighting.note}</p>
+                      <p className="text-small text-caution">{row.sighting.note}</p>
                     )}
                   </div>
                 </li>
@@ -213,7 +213,7 @@ export function GameShelfPhotoPanel() {
             {savePending ? 'Saving…' : 'Add ticked games'}
           </Button>
           {saveState.savedIds && saveState.savedIds.length > 0 && (
-            <Link href="/shopping/inventory" className="text-[13px] text-brand underline">
+            <Link href="/shopping/inventory" className="text-ui text-accent underline">
               View inventory
             </Link>
           )}
@@ -227,20 +227,20 @@ export function GameShelfPhotoPanel() {
             name="titles_json"
             value={JSON.stringify(unmatched.map((row) => row.raw))}
           />
-          <p className="text-sm font-medium text-ink">
+          <p className="text-body font-medium text-ink">
             Read but not matched ({unmatched.length})
           </p>
-          <p className="text-[13px] text-ink-muted">
+          <p className="text-ui text-ink-muted">
             The photo read these names; BoardGameGeek did not confirm them. Save them
             as typed names now — the box is on your shelf either way — and attach a
             BGG id later from the item page.
           </p>
           {unmatchedError && (
-            <p className="text-[13px] text-accent-orange">{unmatchedError}</p>
+            <p className="text-ui text-caution">{unmatchedError}</p>
           )}
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {unmatched.map((row, index) => (
-              <li key={`${row.raw}-${index}`} className="flex gap-3 px-4 py-2 text-[13px]">
+              <li key={`${row.raw}-${index}`} className="flex gap-3 px-4 py-2 text-ui">
                 <input
                   type="checkbox"
                   name="selected"
@@ -264,7 +264,7 @@ export function GameShelfPhotoPanel() {
           </Button>
           <FieldError>{byNameState.error}</FieldError>
           {byNameState.message && (
-            <p className="text-[13px] text-brand">{byNameState.message}</p>
+            <p className="text-ui text-accent">{byNameState.message}</p>
           )}
         </form>
       )}

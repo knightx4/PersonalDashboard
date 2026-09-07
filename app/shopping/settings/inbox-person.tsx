@@ -32,7 +32,7 @@ export function InboxPerson({
 
   if (people.length === 0) {
     return (
-      <p className="text-xs text-ink-faint">
+      <p className="text-small text-ink-muted">
         Add someone under People above to say whose inbox this is.
       </p>
     );
@@ -40,7 +40,7 @@ export function InboxPerson({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label htmlFor={`person-${accountId}`} className="text-xs text-ink-muted">
+      <label htmlFor={`person-${accountId}`} className="text-small text-ink-muted">
         Whose inbox
       </label>
 
@@ -53,7 +53,7 @@ export function InboxPerson({
         you notice.
       */}
       {!value && (
-        <span className="rounded-full bg-accent-orange-tint px-2 py-0.5 text-[11px] font-medium text-accent-orange">
+        <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-caution">
           Not assigned
         </span>
       )}
@@ -61,7 +61,7 @@ export function InboxPerson({
         id={`person-${accountId}`}
         value={value}
         disabled={pending}
-        className="h-8 w-auto min-w-40 text-[13px]"
+        className="h-8 w-auto min-w-40 text-ui"
         onChange={(event) => {
           const next = event.target.value;
           setValue(next);
@@ -79,8 +79,8 @@ export function InboxPerson({
           </option>
         ))}
       </Select>
-      {pending && <span className="text-xs text-ink-faint">Saving…</span>}
-      {!pending && saved && <span className="text-xs text-ink-muted">{saved}</span>}
+      {pending && <span className="text-small text-ink-muted">Saving…</span>}
+      {!pending && saved && <span className="text-small text-ink-muted">{saved}</span>}
     </div>
   );
 }

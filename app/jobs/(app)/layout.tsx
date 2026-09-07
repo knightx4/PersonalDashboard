@@ -1,9 +1,14 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
-import { TopNav } from '@/components/jobs/shell/top-nav';
-import { InboxSyncBanner } from '@/components/jobs/shell/inbox-sync-banner';
+import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadActivity } from '@/lib/shell/activity';
+import { loadJobsBrief } from '@/lib/shell/brief';
+import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
 import { onboardingNeeded } from '@/lib/jobs/onboarding';
 import { countReviewItems } from '@/lib/jobs/review/load';
 
@@ -30,23 +35,57 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/jobs/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox] = await Promise.all([
+  const [{ data: profile }, reviewCount, inbox, settings, counts, activity] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     countReviewItems(supabase, core, user.id),
     loadInboxBannerState(user.id),
+    loadAccountSettings(user.id),
+    loadModuleCounts(user.id),
+    loadActivity(),
   ]);
+
+  const brief = await loadJobsBrief(user.id, reviewCount);
+
+  /**
+   * Ten sections is over the eight the design language allows, and grouping
+   * them is a routing change rather than a nav one -- so for now the strip
+   * scrolls, fades at the edge, and brings the active tab into view. See
+   * docs/DESIGN-UPDATE-PLAN.md.
+   */
+  const sections: NavSection[] = [
+    { href: '/jobs/today', label: 'This week', icon: 'week' },
+    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+    { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+    { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
+    { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
+    { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
+    { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+    { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
+    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
+    { href: '/jobs/review', label: 'Review', icon: 'review', badge: reviewCount },
+  ];
 
   const { accountIds, initialJob } = inbox;
 
   return (
-    <div className="min-h-full">
-      <TopNav
+    <div data-workspace="jobs">
+      <AppShell
+        module="jobs"
+        sections={sections}
+        settingsHref="/jobs/settings"
+        settingsLabel="Job search settings"
+        feedbackHref="/jobs/feedback"
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
-        reviewCount={reviewCount}
-      />
-      <InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">{children}</main>
+        enabledModules={settings.enabledModules}
+        counts={switcherCounts(counts)}
+        theme={settings.theme}
+        activity={activity}
+        brief={brief}
+        banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
+      >
+        {children}
+      </AppShell>
     </div>
   );
 }

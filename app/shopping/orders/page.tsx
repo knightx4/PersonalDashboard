@@ -14,6 +14,7 @@ type OrderSourceMessage = {
 import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
@@ -230,8 +231,58 @@ export default async function OrdersPage({
     orders.map((order, index) => [order.id, displayTotals[index] ?? order.total_cents]),
   );
 
+  /** What is narrowing this page, said out loud above the results. */
+  const chips: FilterChip[] = [];
+  if (q) {
+    chips.push({
+      label: 'Search',
+      value: q,
+      clearHref: hrefFor({ range, status, merchant: activeMerchant, tag: activeTag, person: personId ?? undefined }),
+    });
+  }
+  if (activeMerchant) {
+    const merchant = merchants.find((entry) => entry.id === activeMerchant);
+    if (merchant) {
+      chips.push({
+        label: 'Merchant',
+        value: merchant.name,
+        clearHref: hrefFor({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
+      });
+    }
+  }
+  if (activeTag) {
+    const tag = tags.find((entry) => entry.id === activeTag);
+    if (tag) {
+      chips.push({
+        label: 'Tag',
+        value: tag.name,
+        clearHref: hrefFor({ range, status, merchant: activeMerchant, q: q || undefined, person: personId ?? undefined }),
+      });
+    }
+  }
+  if (status) {
+    const entry = STATUSES.find((option) => option.id === status);
+    if (entry) {
+      chips.push({
+        label: 'Status',
+        value: entry.label,
+        clearHref: hrefFor({ range, merchant: activeMerchant, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
+      });
+    }
+  }
+  if (personId) {
+    const person = byPerson.get(personId);
+    if (person) {
+      chips.push({
+        label: 'Whose',
+        value: person.name,
+        clearHref: hrefFor({ range, status, merchant: activeMerchant, tag: activeTag, q: q || undefined }),
+      });
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-6 lg:flex-row">
+    <div className="flex flex-col gap-6 xl:flex-row">
       <LeftRail>
         <RailGroup label="Time range">
           {RANGES.map((entry) => (
@@ -362,6 +413,8 @@ export default async function OrdersPage({
           }
         />
 
+        <FilterChips chips={chips} clearAllHref="/shopping/orders" />
+
         <form className="mb-5" action="/shopping/orders" method="get">
           <input type="hidden" name="range" value={range} />
           {status && <input type="hidden" name="status" value={status} />}
@@ -371,7 +424,7 @@ export default async function OrdersPage({
           {activeTag && <input type="hidden" name="tag" value={activeTag} />}
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -413,13 +466,13 @@ export default async function OrdersPage({
               return (
                 <section key={key}>
                   <div className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                    <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
                       {monthLabel(key)}
-                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-faint">
+                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-muted">
                         {monthOrders.length}
                       </span>
                     </h2>
-                    <p className="tabular text-[12px] text-ink-muted">
+                    <p className="tabular text-small text-ink-muted">
                       {formatMoney(monthTotal, displayCurrency)}
                     </p>
                   </div>

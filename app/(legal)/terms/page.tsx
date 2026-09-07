@@ -17,7 +17,7 @@ export default function TermsPage() {
   return (
     <article>
       <h1>Terms of Service</h1>
-      <p className="!text-ink-faint">Last updated {LAST_UPDATED}</p>
+      <p className="!text-ink-muted">Last updated {LAST_UPDATED}</p>
 
       <p>
         These terms cover your use of Personal Dashboard. By creating an account you agree to
@@ -81,8 +81,8 @@ export default function TermsPage() {
         <strong>[TODO: contact email]</strong>
       </p>
 
-      <p className="!mt-8 !text-[13px]">
-        <Link href="/privacy" className="text-brand hover:underline">
+      <p className="!mt-8 !text-ui">
+        <Link href="/privacy" className="text-accent hover:underline">
           Privacy Policy
         </Link>
       </p>

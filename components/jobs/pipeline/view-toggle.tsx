@@ -41,9 +41,9 @@ export function PipelineViewToggle({ view }: { view: PipelineView }) {
             })
           }
           className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium transition-colors duration-150',
+            'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-small font-medium transition-colors duration-150',
             shown === id
-              ? 'bg-brand-tint text-brand'
+              ? 'bg-accent-tint text-accent'
               : 'bg-surface text-ink-muted hover:bg-canvas hover:text-ink',
           )}
         >

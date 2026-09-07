@@ -57,8 +57,8 @@ function EditPolicyForm({
     <div className="space-y-3 rounded-lg border border-border bg-canvas/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-ink">{policy.name}</p>
-          <p className="text-[12px] text-ink-muted">{policyMeta(policy)}</p>
+          <p className="text-body font-semibold text-ink">{policy.name}</p>
+          <p className="text-small text-ink-muted">{policyMeta(policy)}</p>
         </div>
         {onDone && (
           <button
@@ -103,7 +103,7 @@ function EditPolicyForm({
         )}
       </form>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[12px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-small text-positive">{state.message}</p>}
     </div>
   );
 }
@@ -121,8 +121,8 @@ function AddMerchantForm({
     <div className="space-y-3 rounded-lg border border-dashed border-border bg-canvas/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-ink">Add a retailer</p>
-          <p className="text-[12px] text-ink-muted">
+          <p className="text-body font-semibold text-ink">Add a retailer</p>
+          <p className="text-small text-ink-muted">
             Creates a personal merchant with its own return window.
           </p>
         </div>
@@ -164,7 +164,7 @@ function AddMerchantForm({
         </div>
       </form>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[12px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-small text-positive">{state.message}</p>}
     </div>
   );
 }
@@ -284,7 +284,7 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Deadlines use delivery date plus this window. Search a retailer to edit its policy,
         or add one that isn’t listed. Your changes stay private to you.
       </p>
@@ -294,7 +294,7 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
           <Label htmlFor={`${listId}-search`}>Find a retailer</Label>
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -340,7 +340,7 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
             className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-surface shadow-sm"
           >
             {matches.length === 0 && !canAdd ? (
-              <li className="px-3 py-3 text-sm text-ink-muted">
+              <li className="px-3 py-3 text-body text-ink-muted">
                 No matches. Type at least 2 characters to add a new retailer.
               </li>
             ) : (
@@ -353,8 +353,8 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
                       role="option"
                       aria-selected={highlight === index}
                       className={cn(
-                        'flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors',
-                        highlight === index ? 'bg-brand-tint text-brand' : 'hover:bg-canvas',
+                        'flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-body transition-colors',
+                        highlight === index ? 'bg-accent-tint text-accent' : 'hover:bg-canvas',
                       )}
                       onMouseEnter={() => setHighlight(index)}
                       onClick={() => selectPolicy(policy)}
@@ -362,12 +362,12 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
                       <span className="min-w-0 truncate font-medium text-ink">
                         {policy.name}
                         {policy.onOrders && (
-                          <span className="ml-2 text-[11px] font-normal text-ink-muted">
+                          <span className="ml-2 text-micro font-normal text-ink-muted">
                             in your orders
                           </span>
                         )}
                       </span>
-                      <span className="shrink-0 tabular text-[12px] text-ink-muted">
+                      <span className="shrink-0 tabular text-small text-ink-muted">
                         {windowLabel(policy.effectiveDays)}
                         {policy.hasOverride ? ' · custom' : ''}
                       </span>
@@ -382,10 +382,10 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
                       role="option"
                       aria-selected={highlight === matches.length}
                       className={cn(
-                        'flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-sm transition-colors',
+                        'flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-body transition-colors',
                         highlight === matches.length
-                          ? 'bg-brand-tint text-brand'
-                          : 'text-brand hover:bg-canvas',
+                          ? 'bg-accent-tint text-accent'
+                          : 'text-accent hover:bg-canvas',
                       )}
                       onMouseEnter={() => setHighlight(matches.length)}
                       onClick={() => startAdd(query)}
@@ -426,11 +426,11 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
       )}
 
       <div>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+        <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
           Your policies
         </h3>
         {customized.length === 0 ? (
-          <p className="text-sm text-ink-faint">
+          <p className="text-body text-ink-muted">
             Nothing customized yet. Search above when you want to change a window — seeded
             defaults apply until then.
           </p>
@@ -445,21 +445,21 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
                     onClick={() => selectPolicy(policy)}
                     className={cn(
                       'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-canvas',
-                      active && 'bg-brand-tint/50',
+                      active && 'bg-accent-tint/50',
                     )}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink">{policy.name}</p>
-                      <p className="truncate text-[12px] text-ink-muted">
+                      <p className="truncate text-body font-medium text-ink">{policy.name}</p>
+                      <p className="truncate text-small text-ink-muted">
                         {policy.hasOverride ? 'Custom' : 'Default'}
                         {policy.onOrders ? ' · in your orders' : ''}
                       </p>
                     </div>
-                    <span className="tabular shrink-0 text-[13px] font-medium text-ink">
+                    <span className="tabular shrink-0 text-ui font-medium text-ink">
                       {windowLabel(policy.effectiveDays)}
                     </span>
                     {active ? (
-                      <Check className="size-4 shrink-0 text-brand" strokeWidth={1.75} />
+                      <Check className="size-4 shrink-0 text-accent" strokeWidth={1.75} />
                     ) : null}
                   </button>
                 </li>

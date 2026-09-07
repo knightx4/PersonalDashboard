@@ -29,19 +29,19 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
   return (
     <div className="rounded-card border border-border bg-surface p-4">
       <header className="flex flex-wrap items-baseline gap-2">
-        <h1 className="text-[15px] font-semibold text-ink">{contact.fullName}</h1>
-        {contact.title && <span className="text-[13px] text-ink-muted">{contact.title}</span>}
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-[11px] text-ink-muted">
+        <h1 className="text-lead font-semibold text-ink">{contact.fullName}</h1>
+        {contact.title && <span className="text-ui text-ink-muted">{contact.title}</span>}
+        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted">
           {contact.relationship.replace(/_/g, ' ')}
         </span>
-        <span className="ml-auto text-[11px] text-ink-faint">
+        <span className="ml-auto text-micro text-ink-muted">
           {contact.status.replace(/_/g, ' ')}
         </span>
         {!editing && (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-ink-faint hover:text-ink"
+            className="text-ink-muted hover:text-ink"
             title="Edit their details"
           >
             <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -61,22 +61,22 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
       ) : (
         <>
           {contact.howWeConnect && (
-            <p className="mt-1 text-[13px] text-ink-muted">{contact.howWeConnect}</p>
+            <p className="mt-1 text-ui text-ink-muted">{contact.howWeConnect}</p>
           )}
-          <div className="mt-1 flex flex-wrap gap-3 text-[13px]">
+          <div className="mt-1 flex flex-wrap gap-3 text-ui">
             {contact.linkedinUrl && (
               <a
                 href={contact.linkedinUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-brand underline underline-offset-2"
+                className="text-accent underline underline-offset-2"
               >
                 LinkedIn
               </a>
             )}
             {contact.email && <span className="text-ink-muted">{contact.email}</span>}
           </div>
-          {contact.notes && <p className="mt-2 text-[13px] text-ink-muted">{contact.notes}</p>}
+          {contact.notes && <p className="mt-2 text-ui text-ink-muted">{contact.notes}</p>}
         </>
       )}
 
@@ -121,18 +121,18 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
         >
           Log
         </Button>
-        {note && <span className="text-[12px] text-ink-muted">{note}</span>}
+        {note && <span className="text-small text-ink-muted">{note}</span>}
       </div>
 
       {contact.touches.length > 0 ? (
         <ul className="mt-3 divide-y divide-border border-t border-border">
           {contact.touches.map((touch) => (
-            <li key={touch.id} className="flex flex-wrap items-center gap-2 py-1.5 text-[13px]">
-              <span className="tabular w-24 text-ink-faint">
+            <li key={touch.id} className="flex flex-wrap items-center gap-2 py-1.5 text-ui">
+              <span className="tabular w-24 text-ink-muted">
                 {formatDate(touch.sentAt, timezone)}
               </span>
               <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
-              <span className="text-ink-faint">{touch.direction}</span>
+              <span className="text-ink-muted">{touch.direction}</span>
               {touch.message && (
                 <span className="min-w-0 flex-1 truncate text-ink-muted">{touch.message}</span>
               )}
@@ -158,13 +158,13 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
           ))}
         </ul>
       ) : (
-        <p className="mt-3 border-t border-border pt-3 text-[13px] text-ink-faint">
+        <p className="mt-3 border-t border-border pt-3 text-ui text-ink-muted">
           Nothing logged yet.
         </p>
       )}
 
       {pendingReply.length > 0 && (
-        <p className="mt-2 text-[11px] text-ink-faint">
+        <p className="mt-2 text-micro text-ink-muted">
           {pendingReply.length} send{pendingReply.length === 1 ? '' : 's'} still unanswered.
         </p>
       )}
@@ -278,7 +278,7 @@ function ContactEditForm({
         />
       </div>
       {error && (
-        <p role="alert" className="text-[13px] text-status-rejected">
+        <p role="alert" className="text-ui text-status-rejected">
           {error}
         </p>
       )}

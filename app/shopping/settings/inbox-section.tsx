@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AlertCircle, Mail, RefreshCw } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import { publicEnv } from '@/lib/env';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { disconnectInbox } from './actions';
 import { InboxSyncButton, type InboxSyncProgress } from './inbox-sync-button';
@@ -56,7 +57,9 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
     case 'exchange':
       return {
         tone: 'err',
-        text: 'Google rejected the token exchange. Confirm the OAuth client redirect URI is exactly https://shopping.selveyknight.com/api/auth/gmail/callback',
+        text:
+          'Google rejected the token exchange. Confirm the OAuth client redirect URI ' +
+          `is exactly ${publicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, '')}/api/auth/gmail/callback`,
       };
     case 'profile':
       return {
@@ -106,10 +109,10 @@ export function InboxSection({
       {banner && (
         <p
           className={cn(
-            'mb-3 rounded-lg border px-3 py-2 text-sm',
-            banner.tone === 'ok' && 'border-emerald-200 bg-emerald-50 text-emerald-900',
-            banner.tone === 'warn' && 'border-amber-200 bg-amber-50 text-amber-950',
-            banner.tone === 'err' && 'border-red-200 bg-red-50 text-red-900',
+            'mb-3 rounded-lg border px-3 py-2 text-body',
+            banner.tone === 'ok' && 'border-border bg-positive-tint text-positive',
+            banner.tone === 'warn' && 'border-border bg-caution-tint text-caution',
+            banner.tone === 'err' && 'border-danger bg-danger-tint text-danger',
           )}
         >
           {banner.text}
@@ -126,8 +129,8 @@ export function InboxSection({
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">{account.email_address}</p>
-                    <p className="text-xs text-ink-muted">
+                    <p className="truncate text-body font-medium text-ink">{account.email_address}</p>
+                    <p className="text-small text-ink-muted">
                       {STATUS_LABEL[account.status] ?? account.status}
                       {account.last_synced_at
                         ? ` · Last synced ${new Date(account.last_synced_at).toLocaleString()}`
@@ -179,7 +182,7 @@ export function InboxSection({
           )}
         </div>
       ) : (
-        <div className="space-y-3 text-sm text-ink-muted">
+        <div className="space-y-3 text-body text-ink-muted">
           <p>
             No inbox connected. The app works without one — you can add orders by hand. Connect Gmail
             to import order confirmations from one or more inboxes.
@@ -193,7 +196,7 @@ export function InboxSection({
               Connect Gmail
             </Link>
           ) : (
-            <p className="flex items-start gap-2 text-amber-900">
+            <p className="flex items-start gap-2 text-caution">
               <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
               Gmail OAuth credentials are not set on this server. Add GOOGLE_GMAIL_CLIENT_ID and
               GOOGLE_GMAIL_CLIENT_SECRET to the environment.
@@ -203,10 +206,10 @@ export function InboxSection({
       )}
 
       {accounts.length > 0 && configured && (
-        <p className="mt-3 text-xs text-ink-faint">
+        <p className="mt-3 text-small text-ink-muted">
           We request read-only Gmail access on each inbox you connect. Email bodies are never
           stored — only parsed order metadata. For accurate product names and line items, set{' '}
-          <code className="text-[11px]">ANTHROPIC_API_KEY</code> on Vercel (Haiku). Without it
+          <code className="text-micro">ANTHROPIC_API_KEY</code> on Vercel (Haiku). Without it
           we still import totals from a simpler heuristic parser.
         </p>
       )}

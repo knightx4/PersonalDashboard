@@ -29,18 +29,18 @@ export interface Person {
  * with no background is the failure that produces.
  */
 export const PERSON_BADGE_CLASS: Record<PersonColour, string> = {
-  brand: 'bg-brand-tint text-brand',
-  orange: 'bg-accent-orange-tint text-accent-orange',
-  pink: 'bg-accent-pink-tint text-accent-pink',
+  brand: 'bg-accent-tint text-accent',
+  orange: 'bg-caution-tint text-caution',
+  pink: 'bg-w-shopping-tint text-w-shopping',
   green: 'bg-status-offer-tint text-status-offer',
   purple: 'bg-status-final-tint text-status-final',
   slate: 'bg-status-lead-tint text-status-lead',
 };
 
 export const PERSON_DOT_CLASS: Record<PersonColour, string> = {
-  brand: 'bg-brand',
-  orange: 'bg-accent-orange',
-  pink: 'bg-accent-pink',
+  brand: 'bg-accent',
+  orange: 'bg-caution-fill',
+  pink: 'bg-w-shopping',
   green: 'bg-status-offer',
   purple: 'bg-status-final',
   slate: 'bg-status-lead',

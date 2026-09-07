@@ -52,7 +52,7 @@ export function SearchField({
     // the page's primary action, where a percentage width collapses to nothing.
     <div className="relative w-40 sm:w-64">
       <Search
-        className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+        className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
         strokeWidth={1.75}
         aria-hidden
       />
@@ -65,7 +65,7 @@ export function SearchField({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-8 text-base text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 sm:text-[13px]"
+        className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-8 text-base text-ink placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 sm:text-ui"
       />
       {value && (
         <button
@@ -74,7 +74,7 @@ export function SearchField({
             typing.current = true;
             setValue('');
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-faint hover:text-ink"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-muted hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={2} aria-hidden />
           <span className="sr-only">Clear search</span>

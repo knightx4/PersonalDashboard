@@ -91,7 +91,7 @@ export function BarcodeScanPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Point your camera at the ISBN barcode on the back cover. Scanning needs
         camera permission and works best over HTTPS.
       </p>
@@ -110,12 +110,12 @@ export function BarcodeScanPanel() {
         )}
       </div>
       {lastCode && (
-        <p className="font-mono text-sm text-ink-muted">Last code: {lastCode}</p>
+        <p className="font-mono text-body text-ink-muted">Last code: {lastCode}</p>
       )}
       <FieldError>{error ?? searchState.error ?? saveState.error}</FieldError>
-      {searchPending && <p className="text-sm text-ink-muted">Looking up ISBN…</p>}
+      {searchPending && <p className="text-body text-ink-muted">Looking up ISBN…</p>}
       {saveState.message && (
-        <p className="text-sm text-brand">
+        <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
             <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>
@@ -130,7 +130,7 @@ export function BarcodeScanPanel() {
       {searchState.book && (
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="font-medium text-ink">{searchState.book.title}</p>
-          <p className="text-sm text-ink-muted">
+          <p className="text-body text-ink-muted">
             {searchState.book.authors.join(', ')}
             {searchState.book.isbn13 ? ` · ${searchState.book.isbn13}` : ''}
           </p>

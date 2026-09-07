@@ -11,12 +11,12 @@ export type MutedMerchant = {
 export function MutedMerchantsSection({ exclusions }: { exclusions: MutedMerchant[] }) {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Muted senders are skipped on Import and Reset &amp; re-scan. Open any order and choose
         “Don’t import from…” to add one — it’s remembered automatically.
       </p>
       {exclusions.length === 0 ? (
-        <p className="text-sm text-ink-faint">Nothing muted yet.</p>
+        <p className="text-body text-ink-muted">Nothing muted yet.</p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {exclusions.map((row) => {
@@ -25,12 +25,12 @@ export function MutedMerchantsSection({ exclusions }: { exclusions: MutedMerchan
             return (
               <li
                 key={row.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 text-body"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">{label}</p>
                   {row.match_domain && (
-                    <p className="truncate text-[12px] text-ink-faint">{row.match_domain}</p>
+                    <p className="truncate text-small text-ink-muted">{row.match_domain}</p>
                   )}
                 </div>
                 <form action={restoreMerchantExclusion}>

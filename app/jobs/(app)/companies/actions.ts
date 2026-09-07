@@ -16,6 +16,7 @@ import {
 import { fetchSiteIcon } from '@/lib/jobs/enrich/site-icon';
 import { lookupCompanyOnline } from '@/lib/jobs/enrich/ai-company';
 import { statusRank, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { slugify } from '@/lib/jobs/slug';
 
 const updateSchema = z.object({
   companyId: z.string().uuid(),
@@ -64,6 +65,61 @@ export async function updateCompany(
   if (error) return { error: error.message };
   revalidatePath('/jobs/companies');
   return { error: null };
+}
+
+const renameSchema = z.object({
+  companyId: z.string().uuid(),
+  name: z.string().trim().min(1, 'A company needs a name.').max(120),
+});
+
+/**
+ * Correct a company's name.
+ *
+ * Its own action rather than a field on `updateCompany`, because the name is
+ * the one column that is not just a value: the slug is derived from it, the
+ * slug is this company's URL, and `ensureCompany` matches on the slug when the
+ * inbox meets this company again. Leaving the slug behind would mean the next
+ * email from them quietly created a second company, so the slug moves with the
+ * name and the caller is handed the new URL to go to.
+ *
+ * A name whose slug is already taken is refused by (user_id, slug) in the
+ * database; it is checked first so the answer is a sentence rather than a
+ * constraint violation.
+ */
+export async function renameCompany(
+  companyId: string,
+  name: string,
+): Promise<{ error: string | null; slug: string | null }> {
+  const parsed = renameSchema.safeParse({ companyId, name });
+  if (!parsed.success) return { error: parsed.error.issues[0].message, slug: null };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const slug = slugify(parsed.data.name);
+
+  const { data: clash } = await supabase
+    .from('companies')
+    .select('id, name')
+    .eq('user_id', user.id)
+    .eq('slug', slug)
+    .neq('id', parsed.data.companyId)
+    .maybeSingle();
+
+  if (clash) return { error: `You already have a company called ${clash.name}.`, slug: null };
+
+  const { error } = await supabase
+    .from('companies')
+    .update({ name: parsed.data.name, slug })
+    .eq('id', parsed.data.companyId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message, slug: null };
+
+  revalidatePath('/jobs/companies');
+  revalidatePath('/jobs/companies/[slug]', 'page');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/pipeline');
+  return { error: null, slug };
 }
 
 const lookupSchema = z.object({ companyId: z.string().uuid() });
@@ -202,6 +258,10 @@ export async function applyCompanyEnrichment(
 
   if (writeError) return { applied: [], error: writeError.message };
 
+  // The detail page is where the button was pressed, so it is the page that
+  // has to change. Revalidating only the list left the fields exactly as they
+  // were until a manual reload.
+  revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/companies');
   return { applied: describePatch(patch), error: null };
 }
@@ -321,6 +381,7 @@ export async function applyAiCompanyEnrichment(
 
   if (writeError) return { applied: [], error: writeError.message };
 
+  revalidatePath('/jobs/companies/[slug]', 'page');
   revalidatePath('/jobs/companies');
   return { applied, error: null };
 }

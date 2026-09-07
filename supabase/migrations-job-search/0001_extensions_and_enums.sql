@@ -153,7 +153,8 @@ create type touch_channel as enum ('linkedin_dm', 'linkedin_connect', 'email', '
 create type touch_direction as enum ('outbound', 'inbound');
 
 -- ---------------------------------------------------------------------------
--- Writing layer (tables exist in the MVP so Phase 2 needs no migration)
+-- Writing layer (tables exist in the MVP; see docs/EVIDENCE-LAYER.md, which
+-- adds columns to `roles` for the match and nothing else)
 -- ---------------------------------------------------------------------------
 create type question_kind as enum (
   'motivation', 'fit', 'behavioral', 'technical', 'logistics', 'demographic', 'other'

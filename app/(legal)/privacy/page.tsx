@@ -24,7 +24,7 @@ export default function PrivacyPage() {
   return (
     <article>
       <h1>Privacy Policy</h1>
-      <p className="!text-ink-faint">Last updated {LAST_UPDATED}</p>
+      <p className="!text-ink-muted">Last updated {LAST_UPDATED}</p>
 
       <p>
         Personal Dashboard helps you see what you already own and what you spend. To do that it
@@ -160,7 +160,7 @@ export default function PrivacyPage() {
           You can also revoke our access directly at{' '}
           <a
             href="https://myaccount.google.com/permissions"
-            className="text-brand hover:underline"
+            className="text-accent hover:underline"
           >
             myaccount.google.com/permissions
           </a>
@@ -198,8 +198,17 @@ export default function PrivacyPage() {
         headquarters, rough headcount, logo. That sends <strong>the company&rsquo;s name to
         Wikidata</strong> and may fetch the company&rsquo;s own public homepage to read its
         icon. Nothing about you is sent with either request, and neither happens unless you
-        press the button. We deliberately do not use a favicon or logo service, because that
-        would mean handing a third party the list of companies you are interested in.
+        press the button.
+      </p>
+      <p>
+        Separately, company logos on the board and in lists fall back to{' '}
+        <strong>Google&rsquo;s public favicon endpoint</strong> when no logo has been stored yet.
+        Your browser requests it directly, so what Google can see is the company&rsquo;s domain
+        alongside your IP address &mdash; in aggregate, the list of companies you are looking at.
+        No key, no account, and nothing about the role or the application is sent. If that trade
+        is not one you want, set <code>USE_FAVICON_SERVICE</code> to false in{' '}
+        <code>lib/jobs/companies/avatar.ts</code>: logos then come only from Wikidata and the
+        company&rsquo;s own site, and everything else shows initials.
       </p>
 
       <h2>Information about other people</h2>
@@ -240,7 +249,7 @@ export default function PrivacyPage() {
         adheres to the{' '}
         <a
           href="https://developers.google.com/terms/api-services-user-data-policy"
-          className="text-brand hover:underline"
+          className="text-accent hover:underline"
         >
           Google API Services User Data Policy
         </a>
@@ -252,8 +261,8 @@ export default function PrivacyPage() {
         If we change how we handle your data we will update this page and the date at the top.
       </p>
 
-      <p className="!mt-8 !text-[13px]">
-        <Link href="/terms" className="text-brand hover:underline">
+      <p className="!mt-8 !text-ui">
+        <Link href="/terms" className="text-accent hover:underline">
           Terms of Service
         </Link>
       </p>

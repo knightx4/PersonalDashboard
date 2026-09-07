@@ -33,6 +33,21 @@ export async function asUser<T>(
   }) as Promise<T>;
 }
 
+/**
+ * Run a callback as `anon` -- no session, no JWT claims. This is the role a
+ * visitor with a share link actually has, and the only thing it may usefully
+ * reach is the two functions in 0041.
+ */
+export async function asAnon<T>(
+  fn: (tx: postgres.TransactionSql) => Promise<T>,
+): Promise<T> {
+  return sql.begin(async (tx) => {
+    await tx.unsafe(`set local role anon`);
+    await tx.unsafe(`set local search_path = public, extensions`);
+    return fn(tx);
+  }) as Promise<T>;
+}
+
 /** Create an auth.users row (and, via trigger, its profile). */
 export async function createUser(email: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -47,10 +62,12 @@ export async function truncateAll(): Promise<void> {
   // user-scoped merchants cascade with their creator; global seed rows stay
   await admin`delete from merchants where not is_global`;
   await admin`delete from fx_rates`;
-  // Reference data, keyed by ISBN rather than by user, so it does not cascade
-  // out with the accounts. Left behind, a second run against the same database
-  // trips its unique (isbn, source) key during seeding.
+  // Reference data, keyed by ISBN or BGG id rather than by user, so it does not
+  // cascade out with the accounts. Left behind, a second run against the same
+  // database trips the unique (isbn, source) / (bgg_id, source) key during
+  // seeding.
   await admin`delete from book_price_quotes`;
+  await admin`delete from game_price_quotes`;
 }
 
 export async function closeDb(): Promise<void> {

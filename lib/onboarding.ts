@@ -3,6 +3,7 @@ import 'server-only';
 import type { User } from '@supabase/supabase-js';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
+import { saveAccountIdentity } from '@/lib/core/account/settings';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -45,12 +46,16 @@ export async function markOnboardingComplete(
   userId: string,
   extras?: { timezone?: string; displayName?: string },
 ): Promise<{ error: string | null }> {
-  const patch: Record<string, string> = {
-    onboarding_completed_at: new Date().toISOString(),
-  };
-  if (extras?.timezone?.trim()) patch.timezone = extras.timezone.trim();
-  if (extras?.displayName?.trim()) patch.display_name = extras.displayName.trim();
+  // Only the flag belongs to this workspace. Name and timezone are account
+  // settings, written through saveAccountIdentity so both workspaces get them.
+  const { error } = await supabase
+    .from('profiles')
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) return { error: error.message };
 
-  const { error } = await supabase.from('profiles').update(patch).eq('id', userId);
-  return { error: error?.message ?? null };
+  return saveAccountIdentity(userId, {
+    timezone: extras?.timezone,
+    displayName: extras?.displayName,
+  });
 }

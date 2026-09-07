@@ -39,7 +39,7 @@ export function WelcomeForm() {
           autoComplete="nickname"
         />
       </div>
-      <p className="text-[13px] text-ink-muted">
+      <p className="text-ui text-ink-muted">
         “This month” and other date ranges use your local timezone.
       </p>
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">

@@ -32,7 +32,7 @@ A pipeline tracker for a job search that maintains itself from your inbox, and a
 
 Two things make it different from Huntr, Teal, and Simplify. Those tools require you to log every application by hand or through a browser extension at the moment you apply, and they treat writing as a separate resume-optimization product. Here, the confirmation email is the log entry: applying creates the record whether or not you remembered to. And the writing side is backed by a persistent, growing store of your actual experience and your previously approved answers, so the fiftieth application costs less effort than the fifth rather than more.
 
-**Positioning:** the MVP is a pipeline tracker that stays current without manual upkeep. The writing layer is Phase 2. The schema below carries every table the writing layer needs, so Phase 2 is feature work with no migration.
+**Positioning:** the MVP is a pipeline tracker that stays current without manual upkeep. The writing layer is Phase 2, since re-planned as [the evidence layer](EVIDENCE-LAYER.md). The schema below carries almost every table it needs: the matching layer adds columns to `roles`, and nothing else there requires a migration.
 
 **Scope:** this is a personal tool first, with the same multi-user foundation as Shopping Manager, for the same reason. Proper auth and row level security from day one costs about a day and retrofitting them costs a rewrite. If you never let anyone else in, you have lost a day. If you do, everything already works.
 
@@ -135,7 +135,7 @@ The cost is one more join and the risk of the UI feeling bureaucratic. Neutraliz
 | timezone | text | interview times and "this week" depend on it |
 | target_titles | text[] | seeds relevance scoring in ingestion |
 | search_started_on | date | anchors all funnel time series |
-| weekly_application_goal | int | nullable, unused until Phase 2 |
+| weekly_application_goal | int | nullable, unused |
 | writing_style_notes | text | free text, injected into every generation prompt |
 | banned_constructions | text[] | seeded with em dashes. See Answer generation |
 | onboarding_completed_at | timestamptz | |
@@ -315,7 +315,7 @@ The per-application instance. `application_id`, `question_id`, `answer` text, `s
 That last column is the grounding record. See Answer generation.
 
 ### `cover_letters`
-`user_id`, `application_id`, `body`, `status`, `evidence_item_ids` uuid[], `public_slug` text nullable, `public_expires_at`. The slug supports the shareable version in Phase 2.
+`user_id`, `application_id`, `body`, `status`, `evidence_item_ids` uuid[], `public_slug` text nullable, `public_expires_at`. The slug supports the shareable case page in [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md).
 
 ### `email_accounts`, `ingested_messages`, `sync_jobs`
 Lifted from Shopping Manager unchanged except the classification enum. `ingested_messages` gains `resulting_application_id`, `link_confidence numeric`, and `link_method text`.
@@ -546,7 +546,7 @@ Lower success rate, because the questions live behind the Apply button rather th
 
 Forty lines of JavaScript. You are already logged in and looking at the application form. The bookmarklet walks the DOM, collects every `label`, `legend`, and `aria-label` paired with its input, filters out obvious non-questions (name, email, resume upload, EEO blocks), and POSTs the list to your app with the page URL. The app matches the URL to a role and creates `application_answers` rows for anything new.
 
-This works on every ATS, including the hostile ones, because it runs in your browser inside your session. It requires one click at the moment you are already on the page. A browser extension in Phase 2 does the same thing with better ergonomics and a save-this-role button, but the bookmarklet gets you the capability in an afternoon.
+This works on every ATS, including the hostile ones, because it runs in your browser inside your session. It requires one click at the moment you are already on the page. A browser extension would do the same thing with better ergonomics and a save-this-role button, but the bookmarklet gets you the capability in an afternoon — and [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md) rules the extension out of scope as a distribution problem wearing a feature's clothes.
 
 **And the paste box stays.** Paste a block of questions, one per line or numbered, and the app splits and fingerprints them. This is the path that always works and it should be given equal visual weight rather than buried as a fallback.
 
@@ -614,13 +614,13 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Company detail.** Research notes, all roles at that company across time, contacts, all touches, all linked email. The reason companies are a separate entity is that this page stays valuable after a specific role closes.
 
-**Contacts and outreach.** List, detail, touch log with response tracking. Message drafting for outreach is Phase 2, but recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
+**Contacts and outreach.** List, detail, touch log with response tracking. Message drafting for outreach was to be later work; it has since been settled the other way — `lib/jobs/followup/compose.ts` is a deterministic template and stays one. Recording sends is MVP, because the response rate is only computable if the sends are recorded from the start.
 
 **Interviews.** Scheduled and past. Prep notes before, debrief after. A prompt to write the debrief that evening while it is fresh, since a debrief written three days later is worth very little.
 
 **Email ingestion and the review queue.** Everything above. The review queue is not optional polish. It is what keeps the pipeline trustworthy.
 
-**Question and answer capture.** Bookmarklet, paste box, and Greenhouse API where available. Question bank with canonical answers. Generation is Phase 2, but capture and manual answering are MVP, so the bank has content by the time generation exists.
+**Question and answer capture.** Bookmarklet, paste box, and Greenhouse API where available. Question bank with canonical answers. Generation comes later (see [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md)), but capture and manual answering are MVP, so the bank has content by the time generation exists.
 
 **Analytics.** The metrics from `lib/pipeline.ts`. Funnel by stage, everything grouped by source, time to first response, rejection stage distribution, activity over time. One page, no configuration.
 
@@ -628,14 +628,20 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 ### Phase 2, the writing layer
 
+**Superseded by [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md).** Parts of the list
+below have shipped, one part was deliberately settled the other way, and the
+rest is re-planned and renamed there. Kept here as the original statement of
+intent.
+
+
 - Answer generation with evidence grounding and the unsupported-claim gate
-- Cover letter generation
-- Requirement mapping rendered on the role page
-- Canonical answer promotion flow
-- Outreach message drafting from company research plus contact context
+- Cover letter generation — folded into the shareable page rather than built as its own artifact
+- ✅ Requirement mapping rendered on the role page, each line scored against the evidence bank
+- ✅ Canonical answer promotion flow
+- ~~Outreach message drafting from company research plus contact context~~ — settled the other way: `lib/jobs/followup/compose.ts` is a deterministic template and stays one
 - **The shareable application page.** A public URL per application, unguessable slug, expiring, rendering the requirement map with your evidence beside each line plus a written statement of interest. Include the link in applications. It is a work sample and a cover letter in one, and it costs nothing once the requirement map exists.
-- Follow-up reminders on rules: no response after N days, thank-you note after an interview, deadline approaching
-- Browser extension replacing the bookmarklet, with save-this-role
+- ✅ Follow-up reminders on rules: no response after N days, thank-you note after an interview, deadline approaching
+- ~~Browser extension replacing the bookmarklet, with save-this-role~~ — out of scope: a distribution problem wearing a feature's clothes
 
 ### Phase 3, later
 
@@ -662,7 +668,7 @@ app/
   api/
     auth/gmail/  authorize + callback
     capture/     bookmarklet POST endpoint
-  p/[slug]/      public shareable application page (Phase 2)
+  p/[slug]/      public shareable case page (see EVIDENCE-LAYER.md)
 middleware.ts
 lib/
   db/            schema.ts, migrations, queries
@@ -832,7 +838,7 @@ A phase at a time, in this order. Steps 1 through 5 are mostly porting.
 14. Reminders and the ghost sweep job.
 15. Account deletion with revocation and full cascade.
 16. Evidence bank editor, and seed it with twenty to thirty entries by hand.
-17. Phase 2 generation.
+17. The evidence layer — the match, the coverage number, then generation. See [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md).
 
 Three ordering notes worth respecting. Step 4 before any UI, for the same reason money math came early last time: every screen reads those numbers and they are cheap to test in isolation and expensive to correct once six components compute them inline. Step 6 before step 8, because manual use generates the real pipeline data that linking needs to match against, and testing linking against an empty database proves nothing. Step 16 before step 17, because generation quality is bounded by the evidence bank, and building generation against an empty bank produces a demo that impresses and a tool that does not work.
 

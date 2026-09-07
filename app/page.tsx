@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ModuleMark } from '@/components/ui/module-mark';
 import { buttonVariants } from '@/components/ui/button';
 
 /**
@@ -11,15 +12,8 @@ export default function HomePage() {
     <div className="min-h-dvh">
       <header className="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-6">
         <div className="flex items-center gap-2">
-          <span
-            className="size-6 rounded-md"
-            style={{
-              backgroundImage:
-                'linear-gradient(135deg, var(--color-brand) 0%, var(--color-accent-pink) 100%)',
-            }}
-            aria-hidden
-          />
-          <span className="font-display text-[15px] font-semibold tracking-tight">
+          <ModuleMark module={null} size="md" />
+          <span className="text-lead font-semibold tracking-tight">
             Personal Dashboard
           </span>
         </div>
@@ -72,8 +66,8 @@ export default function HomePage() {
             },
           ].map((feature) => (
             <div key={feature.title} className="rounded-card border border-border bg-surface p-5">
-              <h2 className="text-sm font-semibold text-ink">{feature.title}</h2>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{feature.body}</p>
+              <h2 className="text-body font-semibold text-ink">{feature.title}</h2>
+              <p className="mt-1.5 text-ui leading-relaxed text-ink-muted">{feature.body}</p>
             </div>
           ))}
         </section>
@@ -87,16 +81,16 @@ export default function HomePage() {
         */}
         <section className="pb-24">
           <div className="rounded-card border border-border bg-surface p-6">
-            <h2 className="font-display text-lg font-semibold tracking-tight text-ink">
+            <h2 className="font-display text-title tracking-tight text-ink">
               The same account also tracks a job search
             </h2>
-            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-ink-muted">
+            <p className="mt-2 max-w-2xl text-ui leading-relaxed text-ink-muted">
               Applications from first lead to offer on one board, with the roles and companies
               behind them, interviews, an answer bank, and the funnel maths over all of it. Job
               postings are kept in full, because they are usually taken down before you need them
               again; contacts hold professional details you enter yourself and nothing more. Both
               are set out in the{' '}
-              <Link href="/privacy" className="text-brand hover:underline">
+              <Link href="/privacy" className="text-accent hover:underline">
                 privacy policy
               </Link>
               .
@@ -106,7 +100,7 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-2 px-6 py-6 text-[13px] text-ink-muted">
+        <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-2 px-6 py-6 text-ui text-ink-muted">
           <span>Personal Dashboard</span>
           <nav className="flex gap-4">
             <Link href="/privacy" className="hover:text-ink">

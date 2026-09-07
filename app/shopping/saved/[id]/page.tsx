@@ -92,12 +92,12 @@ export default async function SavedItemPage({
               className="aspect-square w-full rounded-card border border-border object-cover bg-canvas"
             />
           ) : (
-            <div className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border bg-canvas text-[12px] text-ink-faint">
+            <div className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border bg-canvas text-small text-ink-muted">
               No image
             </div>
           )}
         </div>
-        <dl className="grid flex-1 gap-3 rounded-card border border-border bg-surface px-4 py-3 text-sm sm:grid-cols-2">
+        <dl className="grid flex-1 gap-3 rounded-card border border-border bg-surface px-4 py-3 text-body sm:grid-cols-2">
           <div>
             <dt className="text-ink-muted">Price</dt>
             <dd className="tabular font-medium text-ink">
@@ -113,7 +113,7 @@ export default async function SavedItemPage({
           <div className="sm:col-span-2">
             <dt className="text-ink-muted">URL</dt>
             <dd className="truncate">
-              <a href={item.url} className="text-brand hover:underline" target="_blank" rel="noreferrer">
+              <a href={item.url} className="text-accent hover:underline" target="_blank" rel="noreferrer">
                 {item.url}
               </a>
             </dd>
@@ -123,14 +123,14 @@ export default async function SavedItemPage({
 
       {ownedMatches.length > 0 && (
         <div
-          className="rounded-card border border-accent-orange/40 bg-accent-orange-tint px-4 py-3"
+          className="rounded-card border border-caution/40 bg-caution-tint px-4 py-3"
           role="status"
         >
-          <p className="text-sm font-medium text-ink">You may already own this</p>
-          <ul className="mt-2 space-y-1 text-[13px] text-ink-muted">
+          <p className="text-body font-medium text-ink">You may already own this</p>
+          <ul className="mt-2 space-y-1 text-ui text-ink-muted">
             {ownedMatches.map((match) => (
               <li key={match.id}>
-                <Link href={`/shopping/inventory/${match.id}`} className="text-brand hover:underline">
+                <Link href={`/shopping/inventory/${match.id}`} className="text-accent hover:underline">
                   {match.name}
                   {match.variant ? ` · ${match.variant}` : ''}
                 </Link>
@@ -143,7 +143,7 @@ export default async function SavedItemPage({
       )}
 
       <section className="rounded-card border border-border bg-surface p-4">
-        <h2 className="mb-4 text-sm font-semibold text-ink">Edit</h2>
+        <h2 className="mb-4 text-body font-semibold text-ink">Edit</h2>
         <EditSavedForm
           item={{
             id: item.id,
@@ -159,7 +159,7 @@ export default async function SavedItemPage({
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-ink">Queue actions</h2>
+        <h2 className="text-body font-semibold text-ink">Queue actions</h2>
         <SavedStatusActions itemId={item.id} status={item.status} />
       </section>
     </div>

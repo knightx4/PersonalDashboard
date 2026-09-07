@@ -4,6 +4,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { fireFeatureRoutine } from '@/lib/feedback/routine';
+import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 
 /**
  * One queue rendered in two places, so a write has to refresh both. Missing
@@ -138,6 +140,47 @@ export async function deleteFeedback(
   return { message: 'Deleted.' };
 }
 
+
+/**
+ * Start the routine that works this queue, now rather than on its schedule.
+ *
+ * Signed-in only, and it carries no input from the browser: the routine has
+ * its own instructions, and the button is a "go", not a prompt box.
+ */
+export async function runFeatureRoutine(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: FeedbackActionState, _formData: FormData,
+): Promise<FeedbackActionState> {
+  await requireUser();
+
+  const result = await fireFeatureRoutine({
+    apiKey: process.env.CLAUDE_API_KEY ?? null,
+    routineId: process.env.CLAUDE_FEATURE_ROUTINE_ID ?? null,
+  });
+  if (!result.ok) return { error: result.error };
+  return { message: result.detail };
+}
+
+/**
+ * How many notes are still outstanding — open, in progress, blocked or planned.
+ *
+ * Read when the capture panel opens rather than threaded down through the
+ * shell's props: the number moves every time a note is filed or worked, and one
+ * baked into a cached layout would be wrong at exactly the moment someone is
+ * deciding whether to press "Run Feature Routine".
+ */
+export async function openFeedbackCount(): Promise<number> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { count } = await supabase
+    .from('feedback_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .in('status', [...OUTSTANDING_STATUSES]);
+  return count ?? 0;
+}
 
 /** Reorder the queue by hand: 1 next, 2 normal, 3 someday. */
 export async function setFeedbackPriority(

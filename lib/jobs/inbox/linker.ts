@@ -10,7 +10,7 @@ import {
   resetRelinkAttempts,
 } from '@/lib/jobs/inbox/ingest-messages';
 import { loadCompanies, loadExcludedDomains, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
-import { normalizeTimeZone } from '@/lib/jobs/timezone';
+import { normalizeTimeZone } from '@/lib/core/timezone';
 
 /**
  * The job search workspace, as something the shared sync can hand mail to.

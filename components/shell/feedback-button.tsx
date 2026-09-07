@@ -2,15 +2,17 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
 import { MessageSquarePlus } from 'lucide-react';
 import {
+  openFeedbackCount,
   submitFeedback,
   type FeedbackActionState,
 } from '@/app/shopping/feedback/actions';
 import { Button } from '@/components/ui/button';
+import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { usePopover } from '@/lib/use-popover';
 
 /**
  * Always-available capture for bugs and ideas.
@@ -32,35 +34,37 @@ export function FeedbackButton({
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<'bug' | 'feature'>('feature');
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [state, action, pending] = useActionState(
     submitFeedback,
     {} as FeedbackActionState,
   );
 
-  // Close on Escape, and on a click outside the panel.
+  usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
+
+  // Counted when the panel opens, and again after a note is filed from it, so
+  // the number beside "Run Feature Routine" is the queue as it stands rather
+  // than as it was when the layout was rendered. A failure leaves it unknown,
+  // and the button simply shows no count.
+  const [openCount, setOpenCount] = useState<number | null>(null);
+  const submitted = state.message;
   useEffect(() => {
     if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
-    }
-    function onClick(event: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener('keydown', onKey);
-    // Deferred so the click that opened the panel does not close it.
-    const timer = setTimeout(() => document.addEventListener('click', onClick), 0);
+    let cancelled = false;
+    void openFeedbackCount()
+      .then((count) => {
+        if (!cancelled) setOpenCount(count);
+      })
+      .catch(() => {});
     return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('click', onClick);
-      clearTimeout(timer);
+      cancelled = true;
     };
-  }, [open]);
+  }, [open, submitted]);
 
   return (
     <div className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
@@ -68,7 +72,9 @@ export function FeedbackButton({
         title="Report a bug or request a feature"
         className={cn(
           'press flex size-8 items-center justify-center rounded-full transition-colors',
-          open ? 'bg-brand-tint text-brand' : 'text-ink-muted hover:bg-canvas hover:text-ink',
+          open
+            ? 'bg-accent-tint text-accent'
+            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
         )}
       >
         <MessageSquarePlus className="size-4" aria-hidden />
@@ -79,7 +85,9 @@ export function FeedbackButton({
         <div
           ref={panelRef}
           role="dialog"
+          aria-modal="true"
           aria-label="Send feedback"
+          tabIndex={-1}
           // On a phone the button sits far enough right that a panel anchored
           // to it hangs off the left edge of the screen, where nothing can
           // scroll it back into view -- and Safari answers a field focused out
@@ -103,9 +111,9 @@ export function FeedbackButton({
                   type="button"
                   onClick={() => setKind(option)}
                   className={cn(
-                    'flex-1 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors',
+                    'flex-1 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors',
                     kind === option
-                      ? 'bg-brand-tint text-brand'
+                      ? 'bg-accent-tint text-accent'
                       : 'text-ink-muted hover:bg-canvas hover:text-ink',
                   )}
                 >
@@ -129,7 +137,7 @@ export function FeedbackButton({
                     : 'The change, and what it would let you do.'
                 }
               />
-              <p className="mt-1 text-[12px] text-ink-faint">
+              <p className="mt-1 text-small text-ink-muted">
                 Saved with the page you are on ({pathname}).
               </p>
             </div>
@@ -146,24 +154,28 @@ export function FeedbackButton({
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <Button type="submit" size="sm" disabled={pending}>
-                {pending ? 'Saving…' : 'Send'}
-              </Button>
-              <Link
-                href={allHref}
-                className="text-[13px] text-brand hover:underline"
-                onClick={() => setOpen(false)}
-              >
-                See all
-              </Link>
-            </div>
+            <Button type="submit" size="sm" disabled={pending} className="self-start">
+              {pending ? 'Saving…' : 'Send'}
+            </Button>
 
             <FieldError>{state.error}</FieldError>
             {state.message && (
-              <p className="text-[13px] text-brand">{state.message}</p>
+              <p className="text-ui text-accent">{state.message}</p>
             )}
           </form>
+
+          {/* Its own section below the form, not a link on the Send row: it is
+              the other thing you can do from here, and it acts on the whole
+              queue rather than on what you just typed. "See all" sits here for
+              the same reason -- it belongs beside the count of what there is to
+              see, not next to a button that files one more. */}
+          <div className="mt-4">
+            <RunRoutineButton
+              openCount={openCount}
+              allHref={allHref}
+              onNavigate={() => setOpen(false)}
+            />
+          </div>
         </div>
       )}
     </div>

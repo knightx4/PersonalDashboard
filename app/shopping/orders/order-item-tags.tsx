@@ -25,13 +25,13 @@ export function OrderItemTags({
           {tags.map((tag) => (
             <li
               key={tag.id}
-              className="inline-flex items-center gap-1 rounded-md bg-canvas px-1.5 py-0.5 text-[12px] text-ink-muted"
+              className="inline-flex items-center gap-1 rounded-md bg-canvas px-1.5 py-0.5 text-small text-ink-muted"
             >
               <span>{tag.name}</span>
               {!readOnly && (
                 <button
                   type="button"
-                  className="text-ink-faint hover:text-red-600"
+                  className="text-ink-muted hover:text-danger"
                   aria-label={`Remove ${tag.name} tag`}
                   disabled={pending}
                   onClick={() =>
@@ -66,7 +66,7 @@ export function OrderItemTags({
             name="tag"
             placeholder="Add tag (e.g. shoes)"
             maxLength={40}
-            className="h-8 max-w-[12rem] text-[13px]"
+            className="h-8 max-w-[12rem] text-ui"
             aria-label="Add tag"
             disabled={pending}
           />

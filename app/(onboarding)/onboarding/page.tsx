@@ -87,7 +87,7 @@ export default async function OnboardingPage({
               <div
                 className={
                   active || done
-                    ? 'h-1 flex-1 rounded-full bg-brand'
+                    ? 'h-1 flex-1 rounded-full bg-accent'
                     : 'h-1 flex-1 rounded-full bg-border'
                 }
                 aria-hidden
@@ -100,29 +100,29 @@ export default async function OnboardingPage({
       {step === 'welcome' && (
         <section className="space-y-6">
           <div>
-            <p className="text-[13px] font-medium uppercase tracking-wider text-ink-faint">
+            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Welcome
             </p>
             <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               Know what you own before you buy it again
             </h1>
-            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+            <p className="mt-3 text-body leading-relaxed text-ink-muted">
               Personal Dashboard turns order confirmations into inventory and a spending picture.
               It is not a delivery tracker and never handles payment.
             </p>
           </div>
 
-          <ul className="space-y-3 text-sm text-ink">
+          <ul className="space-y-3 text-body text-ink">
             <li className="flex gap-3">
-              <Package className="mt-0.5 size-4 shrink-0 text-brand" strokeWidth={1.75} />
+              <Package className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
               <span>Every purchase lands as something you own, searchable later.</span>
             </li>
             <li className="flex gap-3">
-              <Mail className="mt-0.5 size-4 shrink-0 text-brand" strokeWidth={1.75} />
+              <Mail className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
               <span>Optional Gmail import finds confirmations so you do not type them all.</span>
             </li>
             <li className="flex gap-3">
-              <Shield className="mt-0.5 size-4 shrink-0 text-brand" strokeWidth={1.75} />
+              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
               <span>Email bodies are never stored — only structured order facts.</span>
             </li>
           </ul>
@@ -134,13 +134,13 @@ export default async function OnboardingPage({
       {step === 'gmail' && (
         <section className="space-y-6">
           <div>
-            <p className="text-[13px] font-medium uppercase tracking-wider text-ink-faint">
+            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Connect inbox
             </p>
             <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               Before you grant Gmail access
             </h1>
-            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+            <p className="mt-3 text-body leading-relaxed text-ink-muted">
               Google sign-in and Gmail read access are separate. This step asks only for
               read-only mail access, and only if you want automatic imports.
             </p>
@@ -150,17 +150,17 @@ export default async function OnboardingPage({
             <p
               className={
                 banner.tone === 'ok'
-                  ? 'rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900'
+                  ? 'rounded-lg border border-border bg-positive-tint px-3 py-2 text-body text-positive'
                   : banner.tone === 'warn'
-                    ? 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950'
-                    : 'rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900'
+                    ? 'rounded-lg border border-border bg-caution-tint px-3 py-2 text-body text-caution'
+                    : 'rounded-lg border border-danger bg-danger-tint px-3 py-2 text-body text-danger'
               }
             >
               {banner.text}
             </p>
           )}
 
-          <div className="space-y-4 rounded-card border border-border bg-surface px-4 py-4 text-sm">
+          <div className="space-y-4 rounded-card border border-border bg-surface px-4 py-4 text-body">
             <div>
               <h2 className="font-medium text-ink">What we read</h2>
               <p className="mt-1 text-ink-muted">
@@ -184,9 +184,9 @@ export default async function OnboardingPage({
                 We cannot send, modify, or delete anything in your mailbox.
               </p>
             </div>
-            <p className="text-[13px] text-ink-faint">
+            <p className="text-ui text-ink-muted">
               Full detail in the{' '}
-              <Link href="/privacy" className="text-brand hover:underline">
+              <Link href="/privacy" className="text-accent hover:underline">
                 privacy policy
               </Link>
               .
@@ -203,7 +203,7 @@ export default async function OnboardingPage({
                 Connect Gmail
               </Link>
             ) : (
-              <p className="text-sm text-amber-900">
+              <p className="text-body text-caution">
                 Gmail OAuth is not configured on this server yet. Skip and add orders manually.
               </p>
             )}
@@ -215,13 +215,13 @@ export default async function OnboardingPage({
       {step === 'done' && (
         <section className="space-y-6">
           <div>
-            <p className="text-[13px] font-medium uppercase tracking-wider text-ink-faint">
+            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Ready
             </p>
             <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
               {params.inbox === 'connected' ? 'Inbox connected' : 'You are set'}
             </h1>
-            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+            <p className="mt-3 text-body leading-relaxed text-ink-muted">
               {params.inbox === 'connected'
                 ? 'Import order confirmations from Settings when you want to fill inventory. You can also add orders by hand anytime.'
                 : 'Add orders by hand, save product URLs to your queue, and connect Gmail later from Settings if you change your mind.'}
@@ -229,7 +229,7 @@ export default async function OnboardingPage({
           </div>
 
           {banner && params.inbox === 'connected' && (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            <p className="rounded-lg border border-border bg-positive-tint px-3 py-2 text-body text-positive">
               {banner.text}
             </p>
           )}

@@ -10,7 +10,7 @@ import type { FetchedPosting } from './types';
  * publishes it.
  */
 
-interface AshbyJob {
+export interface AshbyJob {
   id?: string;
   title?: string;
   location?: string;
@@ -42,9 +42,18 @@ export async function fetchPosting(
   const job = jobId ? jobs.find((j) => j.id === jobId) : jobs[0];
   if (!job?.title) throw new Error('Ashby returned no matching posting.');
 
+  return toPosting(job, boardName, jobId);
+}
+
+/** The shape assumption, kept separate from the fetch so it can be tested. */
+export function toPosting(
+  job: AshbyJob,
+  boardName: string,
+  jobId: string | null,
+): FetchedPosting {
   return {
     vendor: 'ashby',
-    title: job.title,
+    title: job.title ?? '',
     text: job.descriptionPlain ?? stripHtml(job.descriptionHtml ?? ''),
     url: job.jobUrl ?? job.applyUrl ?? null,
     location: job.location ?? null,
@@ -52,6 +61,22 @@ export async function fetchPosting(
     boardToken: boardName,
     questions: [],
   };
+}
+
+/** The whole board, which is the only call Ashby has. */
+export async function fetchBoard(boardName: string): Promise<FetchedPosting[]> {
+  const { status, body } = await safeFetch(
+    `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(boardName)}?includeCompensation=true`,
+  );
+  if (status !== 200) throw new Error(`Ashby returned ${status} for that board.`);
+
+  return toPostings(JSON.parse(body) as { jobs?: AshbyJob[] }, boardName);
+}
+
+export function toPostings(parsed: { jobs?: AshbyJob[] }, boardName: string): FetchedPosting[] {
+  return (parsed.jobs ?? [])
+    .filter((job) => Boolean(job.title))
+    .map((job) => toPosting(job, boardName, null));
 }
 
 function stripHtml(html: string): string {

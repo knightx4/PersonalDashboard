@@ -29,7 +29,7 @@ export function PlanReturnButton({
         {pending ? 'Saving…' : planned ? 'Unmark to return' : 'Mark to return'}
       </Button>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[12px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-small text-positive">{state.message}</p>}
     </form>
   );
 }
@@ -44,7 +44,7 @@ export function MarkReturnedButton({ itemId }: { itemId: string }) {
         {pending ? 'Saving…' : 'Returned'}
       </Button>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[12px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-small text-positive">{state.message}</p>}
     </form>
   );
 }
@@ -66,7 +66,7 @@ export function UndoReturnedButton({
         {pending ? 'Restoring…' : 'Undo return'}
       </Button>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[12px] text-positive">{state.message}</p>}
+      {state.message && <p className="text-small text-positive">{state.message}</p>}
     </form>
   );
 }

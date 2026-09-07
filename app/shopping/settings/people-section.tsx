@@ -30,7 +30,7 @@ export function PeopleSection({ people }: { people: Person[] }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-ink-muted">
+      <p className="text-body text-ink-muted">
         Shopping is labelled by person, so two people can share this account and still see whose
         is whose. Add someone, then say which inbox is theirs below.
       </p>
@@ -55,7 +55,7 @@ export function PeopleSection({ people }: { people: Person[] }) {
       </form>
 
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-[13px] text-brand">{state.message}</p>}
+      {state.message && <p className="text-ui text-accent">{state.message}</p>}
     </div>
   );
 }
@@ -84,11 +84,11 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
         onChange={(event) => setName(event.target.value)}
         maxLength={60}
         aria-label={`Name for ${person.name}`}
-        className="h-8 min-w-0 flex-1 text-[13px]"
+        className="h-8 min-w-0 flex-1 text-ui"
       />
 
       {person.isDefault && (
-        <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] text-ink-faint">
+        <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-micro text-ink-muted">
           default
         </span>
       )}
@@ -111,14 +111,14 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
                   setError(result.error);
                 })
               }
-              className="press rounded px-1.5 py-0.5 text-[12px] font-medium text-red-600 hover:bg-red-50"
+              className="press rounded px-1.5 py-0.5 text-small font-medium text-danger hover:bg-danger-tint"
             >
               Remove
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="press rounded px-1 py-0.5 text-[12px] text-ink-faint hover:text-ink"
+              className="press rounded px-1 py-0.5 text-small text-ink-muted hover:text-ink"
             >
               Keep
             </button>
@@ -127,18 +127,18 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="press shrink-0 rounded px-1.5 py-0.5 text-[12px] text-ink-faint hover:text-red-600"
+            className="press shrink-0 rounded px-1.5 py-0.5 text-small text-ink-muted hover:text-danger"
           >
             Remove
           </button>
         ))}
 
       {confirming && (
-        <p className="w-full text-[11px] text-ink-faint">
+        <p className="w-full text-micro text-ink-muted">
           Their shopping stays — those orders simply stop being labelled.
         </p>
       )}
-      {error && <p className="w-full text-[12px] text-red-600">{error}</p>}
+      {error && <p className="w-full text-small text-danger">{error}</p>}
     </li>
   );
 }

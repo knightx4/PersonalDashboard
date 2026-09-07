@@ -13,16 +13,20 @@ const button = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-brand text-white hover:bg-brand-hover',
+        // A control's border is the only thing identifying it, so it is the
+        // 3:1 token rather than the container hairline. `text-surface` on the
+        // primary rather than white: in a dark theme the accent is light, and
+        // white on it would be unreadable.
+        primary: 'bg-accent text-surface hover:bg-accent-hover',
         secondary:
-          'bg-surface text-ink border border-border hover:border-border-strong hover:bg-canvas',
-        ghost: 'text-ink-muted hover:bg-brand-tint hover:text-brand',
-        danger: 'bg-surface text-red-600 border border-red-200 hover:bg-red-50',
+          'bg-surface text-ink border border-control hover:border-ink-muted hover:bg-sunken',
+        ghost: 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+        danger: 'bg-surface text-danger border border-danger hover:bg-danger-tint',
       },
       size: {
-        sm: 'h-8 px-3 text-[13px]',
-        md: 'h-10 px-4 text-sm',
-        lg: 'h-11 px-5 text-[15px]',
+        sm: 'h-8 px-3 text-ui',
+        md: 'h-10 px-4 text-body',
+        lg: 'h-11 px-5 text-lead',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },

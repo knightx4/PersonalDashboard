@@ -20,7 +20,7 @@ export function PoweredByBgg() {
         href="https://boardgamegeek.com"
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center gap-2 text-[13px] text-ink-muted transition hover:text-ink"
+        className="inline-flex items-center gap-2 text-ui text-ink-muted transition hover:text-ink"
         aria-label="Powered by BoardGameGeek"
       >
         {logoFailed ? (
