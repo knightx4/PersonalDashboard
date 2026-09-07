@@ -30,8 +30,47 @@ npx tsx scripts/notes.ts priority <id> 1|2|3
 ```
 
 Ids are shown truncated; the first 8 characters are enough for every command.
-If the CLI cannot reach the database, fall back to the Supabase MCP tools
-against the `feedback_items` table — the procedure is identical.
+
+## When the CLI cannot run
+
+`DATABASE_URL` is not set in Claude Code on the web, so `scripts/notes.ts`
+exits immediately there. That is the normal case for a scheduled run, not a
+fault — fall back to the Supabase MCP tools against `feedback_items` and do
+not spend the session diagnosing it.
+
+Use the **`Supabase`** connector. The lowercase `supabase` server in
+`.mcp.json` reports needing OAuth, which a non-interactive session cannot
+complete; they are two entries for the same project. Project ref:
+`asjztutnqxbecruvyrbj`. `feedback_items` is in `public` — the app's own tables
+are not, they are under `todo.`, `job_search.`, `vault.` and so on.
+
+The procedure is identical, and these are the writes each command makes, so
+the queue records the same thing either way:
+
+```sql
+-- list
+select id, kind, status, priority, page_path, body, created_at
+from feedback_items where status in ('open','in_progress','blocked','planned')
+order by (kind = 'bug') desc, priority asc, created_at asc;
+
+-- start
+update feedback_items set status = 'in_progress' where id = '…';
+
+-- done (after committing, so HEAD is the commit that did it)
+update feedback_items set status = 'done', resolution_note = '…',
+  commit_sha = '…', completed_at = now() where id = '…';
+
+-- block: no commit and no completion time, because it is not finished
+update feedback_items set status = 'blocked', resolution_note = '…',
+  commit_sha = null, completed_at = null where id = '…';
+
+-- decline
+update feedback_items set status = 'declined', resolution_note = '…',
+  commit_sha = null, completed_at = now() where id = '…';
+```
+
+A note is never closed without a `resolution_note`. That rule is the CLI's,
+and it does not stop applying because the writes are being made by hand.
 
 ## Statuses
 
@@ -74,6 +113,25 @@ one is closed.
 7. **Close it.** `done <id> --note "what changed, in one sentence"`. The commit
    sha is recorded automatically from HEAD, so close it after committing.
 8. **Push once per batch**, not per note, then report.
+
+`node_modules` is empty on a fresh web container, so step 5 cannot run until
+the dependencies are installed. The SessionStart hook in `.claude/hooks/`
+does that before the session starts; if it has not run for some reason,
+`npm install` first rather than reading the failure as a broken repo.
+
+## Pushing the batch
+
+Fetch with a plain `git fetch origin`. Naming refs — `git fetch origin main
+<branch>` — aborts the **whole** fetch when one of them is missing, which is
+the normal state of a working branch that has not been pushed yet. It fails
+with `couldn't find remote ref`, updates nothing, and leaves `origin/main`
+stale at whatever the clone saw. Every "how far ahead is this branch" question
+asked afterwards gets a confidently wrong answer, and the batch nearly gets
+merged on the strength of it.
+
+Merge with `--no-ff`, subject `Merge the notes batch: …`, saying what was in
+it. The merge commit is how a batch is found again later; a fast-forward
+leaves the run with no shape at all.
 
 ## When a note cannot be finished
 
