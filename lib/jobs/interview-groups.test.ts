@@ -46,6 +46,22 @@ describe('sectionInterviews', () => {
     expect(seen.sort()).toEqual(['a', 'b', 'c']);
   });
 
+  it('lists a round with nothing booked into it yet, after the rest', () => {
+    const empty: InterviewGroup = { id: 'g2', label: 'Technical round', notes: '' };
+    const sections = sectionInterviews(
+      [interview({ id: 'a' }), interview({ id: 'b', groupId: 'g1' })],
+      [SUPERDAY, empty],
+    );
+
+    expect(sections.map((s) => (s.kind === 'group' ? s.group.id : s.interview.id))).toEqual([
+      'a',
+      'g1',
+      'g2',
+    ]);
+    const round = sections[2];
+    expect(round.kind === 'group' && round.interviews).toEqual([]);
+  });
+
   it('renders a round on its own rather than losing it when its group is missing', () => {
     const sections = sectionInterviews([interview({ id: 'a', groupId: 'gone' })], []);
     expect(sections).toEqual([{ kind: 'single', interview: interview({ id: 'a', groupId: 'gone' }) }]);

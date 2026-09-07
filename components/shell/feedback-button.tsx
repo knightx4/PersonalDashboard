@@ -7,7 +7,7 @@ import {
   openFeedbackCount,
   submitFeedback,
   type FeedbackActionState,
-} from '@/app/shopping/feedback/actions';
+} from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
@@ -26,7 +26,7 @@ import { usePopover } from '@/lib/use-popover';
  * not throw you out of the app you were using.
  */
 export function FeedbackButton({
-  allHref = '/shopping/feedback',
+  allHref = '/dev/bugs',
 }: {
   allHref?: string;
 } = {}) {

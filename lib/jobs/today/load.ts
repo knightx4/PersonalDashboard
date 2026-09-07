@@ -54,6 +54,8 @@ export interface UpcomingInterview {
   companyName: string;
   roleTitle: string;
   scheduledAt: string;
+  /** False when only the day is settled: the hour is not to be shown. */
+  timeKnown: boolean;
   kind: string;
   format: string | null;
   durationMinutes: number | null;
@@ -113,10 +115,14 @@ export async function loadToday(
     supabase
       .from('interviews')
       .select(
-        'id, application_id, round, kind, scheduled_at, duration_minutes, format, meeting_url, location, prep_notes, applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, application_id, round, kind, scheduled_at, time_known, duration_minutes, format, meeting_url, location, prep_notes, applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', userId)
-      .gte('scheduled_at', now.toISOString())
+      // A day's back-reach, because a round known only by its day is stored at
+      // that day's midnight: without it, an interview later today drops off
+      // This week from the moment the day begins. The rows that reaches back
+      // for are filtered on the day being over, just below.
+      .gte('scheduled_at', new Date(now.getTime() - DAY_MS).toISOString())
       .lte('scheduled_at', new Date(now.getTime() + INTERVIEW_HORIZON_DAYS * DAY_MS).toISOString())
       .order('scheduled_at', { ascending: true })
       .limit(50),
@@ -166,6 +172,7 @@ export async function loadToday(
     application_id: string;
     kind: string;
     scheduled_at: string;
+    time_known: boolean | null;
     duration_minutes: number | null;
     format: string | null;
     meeting_url: string | null;
@@ -176,20 +183,28 @@ export async function loadToday(
 
   const interviews: UpcomingInterview[] = (
     (interviewRows.data ?? []) as unknown as InterviewRaw[]
-  ).map((row) => ({
-    id: row.id,
-    applicationId: row.application_id,
-    roleId: row.applications.roles.id,
-    companyName: row.applications.roles.companies.name,
-    roleTitle: row.applications.roles.title,
-    scheduledAt: row.scheduled_at,
-    kind: row.kind,
-    format: row.format,
-    durationMinutes: row.duration_minutes,
-    meetingUrl: row.meeting_url,
-    location: row.location,
-    hasPrep: Boolean(row.prep_notes?.trim()),
-  }));
+  )
+    // A round with an hour is upcoming until that hour; one known only by its
+    // day is upcoming until the day is out.
+    .filter((row) => {
+      const at = new Date(row.scheduled_at).getTime();
+      return (row.time_known === false ? at + DAY_MS : at) >= now.getTime();
+    })
+    .map((row) => ({
+      id: row.id,
+      applicationId: row.application_id,
+      roleId: row.applications.roles.id,
+      companyName: row.applications.roles.companies.name,
+      roleTitle: row.applications.roles.title,
+      scheduledAt: row.scheduled_at,
+      timeKnown: row.time_known ?? true,
+      kind: row.kind,
+      format: row.format,
+      durationMinutes: row.duration_minutes,
+      meetingUrl: row.meeting_url,
+      location: row.location,
+      hasPrep: Boolean(row.prep_notes?.trim()),
+    }));
 
   type ReminderRaw = {
     id: string;

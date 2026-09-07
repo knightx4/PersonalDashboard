@@ -7,14 +7,9 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { fireFeatureRoutine } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 
-/**
- * One queue rendered in two places, so a write has to refresh both. Missing
- * the second is the kind of bug that only shows up as "I closed it and it is
- * still there" from whichever workspace was not listed.
- */
+/** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
-  revalidatePath('/shopping/feedback');
-  revalidatePath('/jobs/feedback');
+  revalidatePath('/dev/bugs');
 }
 
 export type FeedbackActionState = {

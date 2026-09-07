@@ -6,6 +6,7 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
+import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 import type { ModuleId } from '@/lib/modules';
 
 /**
@@ -38,7 +39,7 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
     createLearnClient(),
   ]);
 
-  const [items, pursuits, notes, tasks, toRead] = await Promise.all([
+  const [items, pursuits, notes, tasks, toRead, openNotes] = await Promise.all([
     safe(
       supabase
         .from('inventory_items')
@@ -77,6 +78,17 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
         .then((r) => r.count),
       null,
     ),
+    // The dev workspace's own number: what is still waiting to be worked in
+    // the notes queue, which is the only thing there anyone is behind on.
+    safe(
+      supabase
+        .from('feedback_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .in('status', [...OUTSTANDING_STATUSES])
+        .then((r) => r.count),
+      null,
+    ),
   ]);
 
   return {
@@ -85,6 +97,7 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
     todo: { value: tasks, noun: 'thing to do' },
     vault: { value: notes, noun: 'note' },
     learn: { value: toRead, noun: 'thing to read' },
+    dev: { value: openNotes, noun: 'open note' },
   };
 }
 

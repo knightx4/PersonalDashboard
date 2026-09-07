@@ -12,7 +12,7 @@
  * module is never invisible while waiting for someone to write the query.
  */
 
-export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn';
+export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn' | 'dev';
 
 export type AppModule = {
   id: ModuleId;
@@ -65,7 +65,7 @@ export type AppModule = {
  * 'orb' is the app itself and is the only abstract one, which is the point --
  * it is the whole rather than one of the parts.
  */
-export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page' | 'stack';
+export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page' | 'stack' | 'bolt';
 
 export interface MarkKey {
   shape: MarkShape;
@@ -128,6 +128,21 @@ export const MODULES: readonly AppModule[] = [
     // fuchsia, rose -- rather than somewhere else on the wheel, which is what
     // keeps five differently-coloured workspaces reading as one product.
     key: { shape: 'stack', from: '#5eead4', to: '#0f766e' },
+  },
+  {
+    id: 'dev',
+    prefix: '/dev',
+    // Bugs and requests, not the ideas list: the queue is the thing with work
+    // in it, and the ideas are what you read when there is none.
+    home: '/dev/bugs',
+    label: 'Dev',
+    description: 'Bugs, requests and long-term ideas for this app',
+    accent: '--color-w-dev',
+    // Steel, and the one workspace deliberately off the sweep the others sit
+    // on. This is the app looking at itself rather than a place work lives,
+    // and a sixth hue on the same arc would have been the first pair anyone
+    // confused -- teal and green side by side in the same switcher.
+    key: { shape: 'bolt', from: '#94a3b8', to: '#475569' },
   },
 ] as const;
 
