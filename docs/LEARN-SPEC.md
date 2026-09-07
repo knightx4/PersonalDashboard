@@ -404,10 +404,18 @@ money for no benefit.
 
 ## Open questions
 
-- **Does a resolved queue actually get read?** The whole thesis is that the
-  admin work is what stops you. It might be that the admin work was a
-  convenient excuse. One track, honestly used for a fortnight, answers this and
-  nothing else will.
+- **Will resolved links actually make you read more?** This module assumes the
+  reason recommendations go unread is the twenty minutes of finding and
+  choosing sources. That assumption is untested. The competing explanation is
+  that you don't read them because you don't have a spare hour, or because the
+  source is hard going once you open it — and resolution fixes neither.
+
+  The test: build one track and use it for two weeks. Count readings marked
+  `read`. If four or five out of five get read, the friction was the problem
+  and the rest of this plan is worth building. If it is zero or one, the
+  friction was not the problem, and the next slice should target whatever
+  actually stopped you — length, difficulty, or time of day — rather than
+  continuing down the sourcing path.
 - **Text fragments in practice.** Supported across current Chrome, Edge,
   Safari and Firefox, but they fail silently on pages that changed since the
   anchor was captured, and they do not work at all inside some PDF and reader
