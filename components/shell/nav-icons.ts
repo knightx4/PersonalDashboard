@@ -7,6 +7,7 @@ import {
   Briefcase,
   Building2,
   CalendarClock,
+  CalendarDays,
   CalendarRange,
   ClipboardCheck,
   KanbanSquare,
@@ -57,6 +58,7 @@ export const NAV_ICONS = {
   activity: Activity,
   // Todo and vault
   agenda: ListChecks,
+  calendar: CalendarDays,
   tasks: ListTodo,
   notes: StickyNote,
 

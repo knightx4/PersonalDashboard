@@ -103,8 +103,14 @@ export const jobRemindersSource: AgendaSource = {
         // 23:30 UTC is tomorrow's problem in Tokyo and today's in London.
         day: dayIn(dueAt, ctx.timezone),
         at: dueAt,
+        // Labelled with the role rather than "Open the role": the agenda shows
+        // this link, and a row that names what it is about is both the context
+        // and the way through to it. Same shape a linked task's anchor has.
         link: role
-          ? { href: `/jobs/roles/${role.id as string}`, label: 'Open the role' }
+          ? {
+              href: `/jobs/roles/${role.id as string}`,
+              label: companyName ? `${companyName}${roleTitle ? ` · ${roleTitle}` : ''}` : (roleTitle ?? 'the role'),
+            }
           : { href: '/jobs/today', label: 'This week' },
         action: followUpFor({
           kind,
@@ -115,7 +121,9 @@ export const jobRemindersSource: AgendaSource = {
           correspondents,
           now: ctx.now,
         }),
-        detail: companyName ? `${companyName}${roleTitle ? ` · ${roleTitle}` : ''}` : null,
+        // The link now carries the company and role, so repeating them here
+        // would print the same words twice on one line.
+        detail: role ? null : companyName,
         completable: true,
       };
     });
