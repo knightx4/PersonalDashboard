@@ -20,7 +20,9 @@ seeded from them once (migration 0051, the *Import the build order* button).
 The documents remain the record of *why* each step is where it is. They are
 not read at runtime and are not kept in sync: the app is the working copy,
 and the two are expected to drift. Migration 0052 made the flat list a tree
-and gave a step the rest of what is described here.
+and gave a step the rest of what is described here. Migration 0054 added
+`kind`, `fog` and `resolution`, borrowed from the wayfinder planning skill —
+see *Decisions and fog*.
 
 ## The model
 
@@ -36,6 +38,9 @@ Two tables in `public`, both under row level security.
 | `title`, `detail` | What it is, and what it involves. |
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
 | `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step was written by a session from an idea and is waiting on the person; see *Proposals* below. |
+| `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on an answer. See *Decisions and fog* below. |
+| `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
+| `resolution` | The answer a decision closed with, in the person's words. Null on a build step and on a decision nobody has settled. |
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
@@ -88,6 +93,62 @@ is never picked up by `next`. A step beneath a proposed feature is not
 ready either, whatever its own status says. Nothing in the skill or the CLI
 moves a step out of `proposed` except the person's approve, on the page or
 with `scripts/plan.ts approve`.
+
+## Decisions and fog
+
+Two things a proposal could not say until migration 0054, both borrowed from
+the wayfinder planning skill. They exist because of what a shaping session
+does when it hits the edge of what it knows: it picks an answer and writes
+steps as though the question were settled, or it invents a plausible second
+half. Both read, afterwards, exactly like a plan somebody made.
+
+**A decision** is a step whose resolution is an answer rather than a commit.
+The session that shapes the feature writes the question, the two or three
+real options, what each costs and its recommendation; the person settles it
+in one box on `/dev/plan`, or with `scripts/plan.ts answer <n> --note "…"`.
+It closes as `done` with the answer in `resolution` and **no commit** — a
+question is not work, and a commit against one would be a lie the plan told
+about itself.
+
+It is a *kind* rather than a status because it moves through exactly the
+states a build step moves through — it can be not started, blocked, dropped —
+and differs only in what closing it means. As a status it would have to be
+crossed with all five of those to say where the question stood.
+
+A decision counts toward its module's progress like any other step: deciding
+is real work, and a feature held up on an unanswered question should not read
+as being further along than it is.
+
+**Never answered by a session.** `workOrder` withholds a decision from
+`--claude` however it is assigned, `scripts/plan.ts start` refuses one and
+says where it is answered instead, `add` withholds `--claude` from one, and
+the skill says it twice. The guarantee is worth the four locks: a routine
+that can answer its own questions has no questions, only guesses with a paper
+trail. The cost is real and accepted — a decision nobody answers stalls
+everything that depends on it until the person looks at the page.
+
+**Fog** is the other half. Where a decision is a question sharp enough to
+phrase, fog is the admission that a question cannot even be phrased yet: one
+paragraph on the feature saying what is not known and what would have to be
+found out. The test between them is not whether the question can be
+*answered* — it is whether it can be *asked*.
+
+Fog is a column rather than a table because it has no life beyond its step:
+it graduates into sub-steps and is cleared the moment they exist. It shows in
+the tree under the step it belongs to rather than behind the fold, because a
+plan's own admission that part of it is missing is no use if you have to open
+a step to find it. Empty fog renders nothing.
+
+**Carried forward.** Every answered decision beneath a feature appears in the
+brief of every step under it, as *Decided so far*, one line with its answer;
+the feature's own done-when appears as *Destination*. Generated from the rows
+rather than maintained, so it cannot fall out of date. This is what the
+feature is for: a session three nights later builds against what was decided
+without being told again, and never asks the same question twice.
+
+**Out of scope** was considered as a sixth status and left out. It is
+`drop <n> --note "out of scope: …"`, which reads the same and costs no
+column.
 
 ## The routines
 
@@ -155,6 +216,8 @@ denominator; in-progress counts as started, not as part done.
 
 **Work order.** Every ready step, most urgent first, and within a priority
 in reading order — modules as the switcher lists them, then top to bottom.
+Narrowed to Claude it drops decisions, however they are assigned: a ready
+decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
@@ -174,8 +237,16 @@ Claude. The menu on the line adds a sub-step, edits, moves the step up or
 down among its siblings, or deletes it with its count of sub-steps in the
 confirm.
 
+A decision is marked where a build step's checkbox would be, with a `?`. Its
+health reads *Unanswered* rather than *Ready* — on a question, "ready" would
+read as ready to be built, which is the one thing it is not — and its health
+menu offers **Answer** first, where a build step offers *Done*; *Done* is not
+offered on one at all. Opening it shows a single box, and an answer already
+given sits above that box rather than being loaded into it.
+
 Editing a step includes moving it: *Part of* lists the module's other steps,
-less the step's own subtree. A moved step goes last under its new parent.
+less the step's own subtree. A moved step goes last under its new parent. The
+editor also holds the *not yet specified* box; emptying it clears the column.
 
 ## Claude
 
@@ -189,16 +260,23 @@ list [--all]        the tree, per module
 show <n>            the brief
 ideas               ideas not yet shaped into the plan
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
+                    [--fog "…"] [--kind decision]
 approve <n>         a person's move: the step and the proposed steps beneath it
+answer <n> --note   a person's move: closes a decision on its answer, no commit
 start | done | block | drop | reopen | assign | priority | depends | undepend
 ```
 
-`done` records the HEAD commit and names the steps that became ready.
+`done` records the HEAD commit and names the steps that became ready;
+`answer` does the same without a commit. `start` refuses a proposal and
+refuses a decision. `next` and `list` mark a decision `(?)` rather than with
+a checkbox, and print a step's fog beneath it.
 
 **The brief.** `lib/plan/brief.ts` writes a step out for whoever is about
-to build it: where it sits, what it involves, done when, what it waits on
-(its own and inherited), its sub-steps as a checklist, what it unblocks,
-the note. It is what `show` prints and what *Send to Claude* sends.
+to build it: where it sits, the feature's *destination* and the decisions
+already settled beneath it, what it involves, done when, anything *not yet
+specified*, what it waits on (its own and inherited), its sub-steps as a
+checklist, what it unblocks, the note. A decision leads with its question
+instead. It is what `show` prints and what *Send to Claude* sends.
 
 **Send to Claude.** The button on a step marks it Claude's and fires the
 same routine the notes queue uses (`fireFeatureRoutine`, with

@@ -201,6 +201,7 @@ const updateSchema = z.object({
   title: titleField,
   detail: text(4000).optional(),
   acceptance: text(4000).optional(),
+  fog: text(4000).optional(),
   comment: text(4000).optional(),
   commit: text(64).optional(),
   status: statusField,
@@ -230,6 +231,7 @@ export async function updatePlanItem(
     title: field(formData, 'title'),
     detail: field(formData, 'detail'),
     acceptance: field(formData, 'acceptance'),
+    fog: field(formData, 'fog'),
     comment: field(formData, 'comment'),
     commit: field(formData, 'commit'),
     status: field(formData, 'status', 'not_started'),
@@ -251,6 +253,10 @@ export async function updatePlanItem(
     title: parsed.data.title,
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
+    // Emptied is cleared, not blanked: fog is meant to disappear the moment
+    // the steps that dispel it exist, and null is what "there is none" reads
+    // as everywhere else it is asked about.
+    fog: parsed.data.fog || null,
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,
@@ -469,6 +475,65 @@ export async function movePlanItem(
 
   revalidatePlan();
   return { message: 'Moved.' };
+}
+
+/**
+ * Settle a decision.
+ *
+ * The other way a step closes. A build step closes on a commit; a decision
+ * closes on an answer, in the person's words, recorded in `resolution` where
+ * every brief beneath the feature will carry it from then on. `commit_sha`
+ * stays null, because nothing was built.
+ *
+ * Two refusals, and both are the point. A step that is not a decision cannot
+ * be answered -- the form is only rendered on a decision, so reaching here
+ * with a build step means the id was forged, and answering it would leave a
+ * step that reads done with no commit and no work behind it. And an empty
+ * answer is refused: a question closed on nothing is exactly what this
+ * feature exists to stop, and it would be worse than the question staying
+ * open, because it would stop looking like a question.
+ *
+ * The dated line on the comment is the same one the CLI writes, so a decision
+ * answered on the page and one answered from a terminal read the same.
+ */
+export async function answerPlanDecision(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const answer = text(4000).safeParse(field(formData, 'answer'));
+  if (!answer.success) return { error: 'That answer is too long.' };
+  if (!answer.data) return { error: 'An answer is what closes a decision. Say what you decided.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('kind, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.kind !== 'decision') {
+    return { error: 'That step is work, not a question. It closes on a commit.' };
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const line = `Answered ${stamp}: ${answer.data}`;
+  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'done', resolution: answer.data, comment, commit_sha: null })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Answered.' };
 }
 
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */

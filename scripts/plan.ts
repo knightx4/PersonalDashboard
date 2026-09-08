@@ -11,12 +11,14 @@
  *   npx tsx scripts/plan.ts show <n>
  *   npx tsx scripts/plan.ts add "<title>" [--parent <n>] [--module <id>]
  *                                [--priority 1|2|3] [--size s|m|l] [--claude]
- *                                [--detail "…"] [--done-when "…"]
+ *                                [--detail "…"] [--done-when "…"] [--fog "…"]
  *                                [--proposed] [--idea <id prefix>]
+ *                                [--kind decision]
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
+ *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
  *   npx tsx scripts/plan.ts block <n> --note "what it is waiting on"
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
@@ -41,6 +43,7 @@ import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import {
   isClosed,
+  isPlanKind,
   isPlanPriority,
   isPlanSize,
   planItemFromRow,
@@ -135,8 +138,9 @@ async function resolveUser(sql: Sql): Promise<string> {
 
 async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
-    select id, number, module, parent_id, title, detail, acceptance, status, comment,
-           priority, size, assignee, commit_sha, position, started_at, completed_at, created_at
+    select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
+           resolution, comment, priority, size, assignee, commit_sha, position,
+           started_at, completed_at, created_at
     from plan_items where user_id = ${userId}
     order by position, created_at`;
   const deps = await sql<{ id: string; item_id: string; depends_on_id: string }[]>`
@@ -155,8 +159,9 @@ async function byNumber(sql: Sql, userId: string, raw: string | undefined): Prom
   const number = Number(String(raw ?? '').replace(/^#/, ''));
   if (!Number.isInteger(number) || number < 1) fail('Give a step number, the "#12" on the page.');
   const rows = await sql<Record<string, unknown>[]>`
-    select id, number, module, parent_id, title, detail, acceptance, status, comment,
-           priority, size, assignee, commit_sha, position, started_at, completed_at, created_at
+    select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
+           resolution, comment, priority, size, assignee, commit_sha, position,
+           started_at, completed_at, created_at
     from plan_items where user_id = ${userId} and number = ${number}`;
   if (rows.length === 0) fail(`No step #${number}.`);
   return planItemFromRow(rows[0]);
@@ -173,6 +178,9 @@ const GLYPH: Record<PlanStatus, string> = {
 
 function facts(node: PlanNode): string {
   const out: string[] = [];
+  // First, because it changes what every other fact on the line means: a
+  // question that is "ready" is ready for the person, not for a session.
+  if (node.kind === 'decision') out.push(node.status === 'done' ? 'answered' : 'DECISION');
   if (node.priority !== 2) out.push(`p${node.priority}`);
   if (node.size) out.push(node.size.toUpperCase());
   if (node.assignee) out.push(node.assignee);
@@ -187,9 +195,17 @@ function facts(node: PlanNode): string {
 }
 
 function printNode(node: PlanNode, indent = ''): void {
-  const head = `${indent}#${String(node.number).padEnd(4)}${GLYPH[node.status]}  ${node.title}`;
+  // An unanswered decision gets "[?]" where a build step gets its status box,
+  // so a session scanning the list sees what is a question before it reads a
+  // word of the title. An answered one keeps "[x]": it is closed either way.
+  // Round rather than square, and unlike the "[?]" a proposal wears: this is
+  // not a box waiting to be ticked, it is a question waiting to be answered.
+  const glyph = node.kind === 'decision' && !isClosed(node.status) ? '(?)' : GLYPH[node.status];
+  const head = `${indent}#${String(node.number).padEnd(4)}${glyph}  ${node.title}`;
   const tail = facts(node);
   console.log(tail ? `${head.padEnd(64)}  ${tail}` : head);
+  // The admission that part of this is not yet planned, on the line under it.
+  if (node.fog) console.log(`${indent}      fog: ${node.fog.replace(/\s+/g, ' ').slice(0, 100)}`);
   for (const child of node.children) printNode(child, indent + '  ');
 }
 
@@ -305,6 +321,8 @@ async function main(): Promise<void> {
       if (!isPlanPriority(priority)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       const size = arg('--size');
       if (size && !isPlanSize(size)) fail('Size is s, m or l.');
+      const kind = arg('--kind') ?? 'build';
+      if (!isPlanKind(kind)) fail('Kind is build or decision.');
 
       const [last] = parent
         ? await sql<{ position: number }[]>`
@@ -319,12 +337,17 @@ async function main(): Promise<void> {
       // said: a decided step inside an undecided feature is a contradiction.
       const proposed = has('--proposed') || parent?.status === 'proposed';
 
+      // A decision is never assigned to Claude, whatever --claude said. The
+      // whole guarantee is that a session cannot pick up its own question, and
+      // it is worth more enforced here than remembered at the call site.
+      const assignee = kind === 'decision' ? null : has('--claude') ? 'claude' : null;
+
       const [row] = await sql<{ id: string; number: number }[]>`
         insert into plan_items (user_id, module, parent_id, title, detail, acceptance,
-                                priority, size, assignee, status, position)
+                                fog, kind, priority, size, assignee, status, position)
         values (${userId}, ${scope}, ${parent?.id ?? null}, ${title},
-                ${arg('--detail')}, ${arg('--done-when')},
-                ${priority}, ${size}, ${has('--claude') ? 'claude' : null},
+                ${arg('--detail')}, ${arg('--done-when')}, ${arg('--fog')}, ${kind},
+                ${priority}, ${size}, ${assignee},
                 ${proposed ? 'proposed' : 'not_started'},
                 ${(last?.position ?? 0) + 10})
         returning id, number`;
@@ -345,7 +368,7 @@ async function main(): Promise<void> {
       }
 
       console.log(
-        `#${row.number} ${proposed ? 'proposed' : 'added'}${
+        `#${row.number} ${kind === 'decision' ? 'asked' : proposed ? 'proposed' : 'added'}${
           parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`
         }${ideaPrefix ? ` from idea ${ideaPrefix}` : ''}.`,
       );
@@ -378,6 +401,16 @@ async function main(): Promise<void> {
       if (item.status === 'proposed') {
         fail(`#${item.number} is only proposed. A person approves it on /dev/plan first.`);
       }
+      // The refusal this whole feature turns on. Making it the tool's rule
+      // rather than the skill's is what stops a session that means well from
+      // picking up its own question, reasoning its way to an answer, and
+      // recording it as though somebody had decided.
+      if (item.kind === 'decision') {
+        fail(
+          `#${item.number} is a decision, not work. It is answered, not built, and only by a ` +
+            `person: on /dev/plan, or with plan.ts answer ${item.number} --note "…".`,
+        );
+      }
       await sql`update plan_items set status = 'in_progress' where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} in progress.`);
       return;
@@ -386,6 +419,41 @@ async function main(): Promise<void> {
     if (command === 'reopen') {
       await sql`update plan_items set status = 'not_started' where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} reopened.`);
+      return;
+    }
+
+    /**
+     * The other way a step closes: on an answer rather than a commit.
+     *
+     * The CLI half of the page's Answer box, writing the same columns and the
+     * same dated line, so a decision settled at a terminal and one settled on
+     * the page are indistinguishable afterwards. No commit is recorded --
+     * nothing was built -- and a step that is not a decision is refused,
+     * because `done` is what closes work and it already asks for a note.
+     */
+    if (command === 'answer') {
+      const note = arg('--note');
+      if (!note) fail('--note is required for answer: say what you decided.');
+      if (item.kind !== 'decision') {
+        fail(`#${item.number} is work, not a question. Close it with done --note "…".`);
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const line = `Answered ${stamp}: ${note}`;
+      const comment = item.comment ? `${item.comment}\n\n${line}` : line;
+
+      await sql`
+        update plan_items
+        set status = 'done', resolution = ${note}, comment = ${comment}, commit_sha = null
+        where id = ${item.id} and user_id = ${userId}`;
+      console.log(`#${item.number} answered: ${note}`);
+
+      const sections = await loadTree(sql, userId);
+      const node = findNode(sections, item.id);
+      const freed = node?.blocks.filter((ref) => findNode(sections, ref.id)?.ready) ?? [];
+      if (freed.length > 0) {
+        console.log(`Now ready: ${freed.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`);
+      }
       return;
     }
 

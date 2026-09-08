@@ -351,6 +351,13 @@ export function applyView(sections: readonly PlanSection[], view: PlanView): Pla
  * — the modules in the order the switcher lists them, then top to bottom, so
  * two steps of equal weight are taken in the order the plan was written. The
  * sort is stable, which is what makes "in reading order" true.
+ *
+ * With one exception: a decision is never Claude's work, however it is
+ * assigned. A decision is a question put to the person, and a session that
+ * could pick one up would answer its own question — which is the whole thing
+ * decisions exist to prevent. It stays ready, and it stays in the unfiltered
+ * order, so it shows on the page and holds up everything waiting on it until
+ * somebody settles it.
  */
 export function workOrder(
   sections: readonly PlanSection[],
@@ -359,6 +366,7 @@ export function workOrder(
   return flattenSections(sections)
     .filter((node) => node.ready)
     .filter((node) => (options.assignee ? node.assignee === options.assignee : true))
+    .filter((node) => (options.assignee === 'claude' ? node.kind !== 'decision' : true))
     .sort((a, b) => a.priority - b.priority);
 }
 

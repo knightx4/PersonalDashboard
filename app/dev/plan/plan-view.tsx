@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleDashed,
+  HelpCircle,
   Hourglass,
   Pencil,
   Play,
@@ -23,6 +24,7 @@ import {
 import {
   addPlanDependency,
   addPlanItem,
+  answerPlanDecision,
   approvePlanItem,
   deletePlanItem,
   movePlanItem,
@@ -509,6 +511,24 @@ function EditStep({
     <form action={action} className="flex flex-col gap-(--field-gap) px-3 pb-3">
       <input type="hidden" name="id" value={node.id} />
       <StepFields prefix={prefix} node={node} status={node.status} />
+      {/* Not part of StepFields, because a step being added has nothing to be
+        * foggy about yet: fog is what you find once a feature is real and one
+        * half of it will not resolve into steps. */}
+      <div>
+        <Label htmlFor={`${prefix}-fog`}>Not yet specified</Label>
+        <Textarea
+          id={`${prefix}-fog`}
+          name="fog"
+          rows={2}
+          className="min-h-12"
+          defaultValue={node.fog ?? ''}
+          placeholder="The part nobody can see far enough into to write steps for yet."
+        />
+        <FieldHint>
+          Said plainly here rather than filled with plausible steps. Clear it once the steps
+          beneath say it.
+        </FieldHint>
+      </div>
       <div>
         <Label htmlFor={`${prefix}-comment`}>Your note</Label>
         <Textarea
@@ -569,6 +589,61 @@ function EditStep({
  * above -- is shown but not removable here, because it is not this step's to
  * remove.
  */
+/**
+ * The box a decision closes in.
+ *
+ * One field, because a decision closes on one thing: what you decided, in
+ * your words. It goes into `resolution`, where every brief written beneath
+ * this feature from now on will carry it, which is what stops a session three
+ * nights later asking the same question again.
+ *
+ * No commit is recorded and none is asked for. A question is not work, and a
+ * decision wearing a commit it had nothing to do with would be a lie the plan
+ * told about itself. An answer already given is shown above the box rather
+ * than loaded into it: changing your mind should read as a new answer, not as
+ * an edit that quietly replaces the old one in the record.
+ */
+function AnswerDecision({
+  node,
+  action,
+  pending,
+  autoFocus,
+}: {
+  node: PlanNode;
+  action: (formData: FormData) => void;
+  pending: boolean;
+  autoFocus: boolean;
+}) {
+  const field = `answer-${node.id}`;
+
+  return (
+    <div className="space-y-2 rounded-lg border border-caution/30 bg-canvas px-3 py-2.5">
+      {node.resolution && (
+        <div>
+          <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Answered</p>
+          <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
+        </div>
+      )}
+      <form action={action} className="space-y-2">
+        <input type="hidden" name="id" value={node.id} />
+        <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
+        <Textarea
+          id={field}
+          name="answer"
+          rows={2}
+          className="min-h-12"
+          autoFocus={autoFocus}
+          placeholder="What you decided, and enough of why that a session need not ask again."
+        />
+        <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>
+        <Button type="submit" size="sm" pending={pending}>
+          {node.resolution ? 'Record the new answer' : 'Answer'}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 function Dependencies({
   node,
   catalog,
@@ -792,6 +867,21 @@ type Health = {
 };
 
 function healthOf(node: PlanNode): Health {
+  // A decision not yet settled is a question, whatever else is true of it.
+  // "Ready" on a question would read as ready to be built, which is the one
+  // thing it is not: nothing happens to it until somebody answers it.
+  if (node.kind === 'decision' && !isClosed(node.status) && node.status !== 'blocked') {
+    return {
+      word: 'Unanswered',
+      tone: 'caution',
+      icon: HelpCircle,
+      title: 'A question waiting on you. It closes on an answer, not a commit.',
+    };
+  }
+  if (node.kind === 'decision' && node.status === 'done') {
+    return { word: 'Answered', tone: 'positive', icon: Check, title: node.resolution ?? undefined };
+  }
+
   switch (node.status) {
     case 'proposed':
       return {
@@ -968,6 +1058,7 @@ function PlanRow({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
+  const [answering, setAnswering] = useState(false);
   const [showChildren, setShowChildren] = useState(() => !isClosed(node.status));
 
   const [assignState, assignAction, assignPending] = useActionState(
@@ -985,10 +1076,15 @@ function PlanRow({
     sendPlanFeatureToClaude,
     {} as PlanActionState,
   );
+  const [answerState, answerAction, answerPending] = useActionState(
+    answerPlanDecision,
+    {} as PlanActionState,
+  );
 
   const hasChildren = node.children.length > 0;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
+  const isDecision = node.kind === 'decision';
   const health = healthOf(node);
   const HealthIcon = health.icon;
 
@@ -1011,7 +1107,26 @@ function PlanRow({
           },
         ]
       : []),
-    ...PLAN_STATUSES.filter((status) => status !== 'proposed').map((status) => ({
+    // A decision's first move is to answer it, in the place a build step's
+    // first move is to mark it done -- and "Done" is not offered on one at
+    // all, because a question closed with no answer is the thing decisions
+    // exist to stop. It opens the box rather than doing it, since what closes
+    // a decision is words.
+    ...(isDecision
+      ? [
+          {
+            id: 'answer',
+            label: node.resolution ? 'Change the answer' : 'Answer',
+            onSelect: () => {
+              setOpen(true);
+              setAnswering(true);
+            },
+          },
+        ]
+      : []),
+    ...PLAN_STATUSES.filter(
+      (status) => status !== 'proposed' && !(isDecision && status === 'done'),
+    ).map((status) => ({
       id: status,
       label: STATUS_LABEL[status],
       disabled: status === node.status,
@@ -1129,6 +1244,19 @@ function PlanRow({
                 aria-hidden
               />
             </button>
+          ) : isDecision ? (
+            // Where a build step's checkbox would be. A question and a piece
+            // of work are different things, and the row should say which it is
+            // before the health column is read.
+            <span
+              title="A decision: a question, closed by an answer rather than a commit."
+              className={cn(
+                LEVEL,
+                'flex h-5 shrink-0 select-none items-center justify-center self-center text-small font-semibold text-caution',
+              )}
+            >
+              ?<span className="sr-only">Decision</span>
+            </span>
           ) : (
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
@@ -1242,16 +1370,37 @@ function PlanRow({
       {(assignState.error ??
         sendState.error ??
         batchState.error ??
+        answerState.error ??
         assignState.message ??
         sendState.message ??
-        batchState.message) && (
+        batchState.message ??
+        answerState.message) && (
         <li style={inset} className="pb-1.5 pr-3 text-small">
-          <FieldError>{assignState.error ?? sendState.error ?? batchState.error}</FieldError>
-          {!assignState.error && !sendState.error && !batchState.error && (
+          <FieldError>
+            {assignState.error ?? sendState.error ?? batchState.error ?? answerState.error}
+          </FieldError>
+          {!assignState.error && !sendState.error && !batchState.error && !answerState.error && (
             <span className="text-positive">
-              {assignState.message ?? sendState.message ?? batchState.message}
+              {assignState.message ?? sendState.message ?? batchState.message ?? answerState.message}
             </span>
           )}
+        </li>
+      )}
+
+      {/* In the tree rather than behind the fold, because fog on a feature is
+          the thing you most want to see while scanning a plan: it is the part
+          that is admittedly not a plan yet, and one that only showed on a step
+          you thought to open would be a gap nobody found. Quiet and dashed, so
+          it does not read as detail. Nothing at all when there is none, which
+          is most steps most of the time. */}
+      {node.fog && (
+        <li style={inset} className="pb-1.5 pr-3">
+          <div className="border-l-2 border-dashed border-border-strong pl-2.5">
+            <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
+              Not yet specified
+            </p>
+            <p className="whitespace-pre-wrap text-small text-ink-muted">{node.fog}</p>
+          </div>
         </li>
       )}
 
@@ -1278,6 +1427,15 @@ function PlanRow({
               <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
                 {node.comment}
               </p>
+            )}
+
+            {isDecision && (
+              <AnswerDecision
+                node={node}
+                action={answerAction}
+                pending={answerPending}
+                autoFocus={answering}
+              />
             )}
 
             <Dependencies node={node} catalog={catalog} />

@@ -13,6 +13,9 @@ describe('planItemFromRow', () => {
     detail: null,
     acceptance: 'Done when it works.',
     status: 'blocked',
+    kind: 'build',
+    fog: null,
+    resolution: null,
     comment: null,
     priority: 1,
     size: 'm',
@@ -32,6 +35,20 @@ describe('planItemFromRow', () => {
     expect(item.size).toBe('m');
     expect(item.assignee).toBe('claude');
     expect(item.acceptance).toBe('Done when it works.');
+    expect(item.kind).toBe('build');
+  });
+
+  it('round-trips a decision with its fog and its answer', () => {
+    const item = planItemFromRow({
+      ...row,
+      status: 'done',
+      kind: 'decision',
+      fog: 'How the export is shaped is not yet known.',
+      resolution: 'One file per month.',
+    });
+    expect(item.kind).toBe('decision');
+    expect(item.fog).toBe('How the export is shaped is not yet known.');
+    expect(item.resolution).toBe('One file per month.');
   });
 
   it('reads a value the code no longer names back as the default rather than crashing', () => {
@@ -44,12 +61,14 @@ describe('planItemFromRow', () => {
       priority: 9,
       size: 'xxl',
       assignee: 'them',
+      kind: 'question',
     });
     expect(item.module).toBeNull();
     expect(item.status).toBe('not_started');
     expect(item.priority).toBe(2);
     expect(item.size).toBeNull();
     expect(item.assignee).toBeNull();
+    expect(item.kind).toBe('build');
   });
 });
 

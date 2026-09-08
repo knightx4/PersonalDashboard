@@ -14,6 +14,9 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     detail: null,
     acceptance: null,
     status: 'not_started',
+    kind: 'build',
+    fog: null,
+    resolution: null,
     comment: null,
     priority: 2,
     size: null,
@@ -106,5 +109,97 @@ describe('planBrief', () => {
 
   it('records the commit on a step that shipped', () => {
     expect(planBrief(sections, findNode(sections, 'schema')!)).toContain('Shipped in abc1234.');
+  });
+
+  it('carries the feature it belongs to as the destination', () => {
+    // Its own done-when says what this step is for; the destination says what
+    // the whole feature is for, which is what it has to not miss.
+    const bare = planBrief(sections, findNode(sections, 'form')!);
+    expect(bare).toContain(
+      '## Destination\n\n#3 The anonymous page — Opens without a session. Shows only owned items.',
+    );
+  });
+
+  it('gives a step with no feature above it, no decisions and no fog exactly the brief it had', () => {
+    // The one that must not grow: an ordinary step in an ordinary plan.
+    const plain = planBrief(sections, findNode(sections, 'auth')!);
+    expect(plain).not.toContain('## Destination');
+    expect(plain).not.toContain('## Decided so far');
+    expect(plain).not.toContain('## Not yet specified');
+    expect(plain).not.toContain('## Question');
+    expect(plain).toBe(
+      '# Plan step #8 — Anonymous auth\n\n' +
+        'Module: Shopping · Status: not started · Priority: normal\n\n' +
+        '## Unblocks\n\n- #2 Share links\n',
+    );
+  });
+});
+
+describe('planBrief with decisions and fog', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'feature',
+        title: 'Export',
+        acceptance: 'I can take my data out.',
+        fog: 'What the second half looks like is not yet known.',
+      }),
+      item({
+        id: 'settled',
+        title: 'One file or many?',
+        parentId: 'feature',
+        kind: 'decision',
+        status: 'done',
+        resolution: 'One file per month.',
+      }),
+      item({
+        id: 'withdrawn',
+        title: 'Do we compress it?',
+        parentId: 'feature',
+        kind: 'decision',
+        status: 'dropped',
+        resolution: 'n/a',
+      }),
+      item({
+        id: 'open-question',
+        title: 'CSV or JSON?',
+        parentId: 'feature',
+        kind: 'decision',
+        detail: 'CSV opens in a spreadsheet; JSON keeps the nesting. Recommend CSV.',
+      }),
+      item({ id: 'writer', title: 'The writer', parentId: 'feature' }),
+    ],
+    dependencies: [],
+  });
+
+  it('carries every decision already settled beneath the feature, with its answer', () => {
+    const brief = planBrief(sections, findNode(sections, 'writer')!);
+    expect(brief).toContain('## Decided so far\n\n- #10 One file or many? — One file per month.');
+  });
+
+  it('leaves out a decision that was withdrawn rather than answered', () => {
+    const brief = planBrief(sections, findNode(sections, 'writer')!);
+    expect(brief).not.toContain('Do we compress it?');
+  });
+
+  it('leads a decision with the question rather than the work', () => {
+    const brief = planBrief(sections, findNode(sections, 'open-question')!);
+    expect(brief).toContain('## Question\n\nCSV opens in a spreadsheet');
+    expect(brief).not.toContain('## What it involves');
+  });
+
+  it('does not tell a decision its own answer back', () => {
+    const brief = planBrief(sections, findNode(sections, 'settled')!);
+    expect(brief).not.toContain('## Decided so far');
+    expect(brief).toContain('## Answered\n\nOne file per month.');
+  });
+
+  it('says what is not yet specified when a step admits it', () => {
+    const brief = planBrief(sections, findNode(sections, 'feature')!);
+    expect(brief).toContain(
+      '## Not yet specified\n\nWhat the second half looks like is not yet known.',
+    );
+    // The feature's own done-when is already printed; it is not its own destination.
+    expect(brief).not.toContain('## Destination');
   });
 });
