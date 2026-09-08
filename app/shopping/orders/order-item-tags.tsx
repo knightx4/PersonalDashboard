@@ -65,11 +65,15 @@ export function OrderItemTags({
         >
           <input type="hidden" name="orderId" value={orderId} />
           <input type="hidden" name="orderItemId" value={orderItemId} />
+          {/* Width only. This carried `h-8 text-ui`, which overrode both of
+              Input's guards: the height stopped following the density dial,
+              and 13px is under the 16px that stops iOS zooming the page when
+              the field is tapped. The fourth sighting of that exact pair. */}
           <Input
             name="tag"
             placeholder="Add tag (e.g. shoes)"
             maxLength={40}
-            className="h-8 max-w-48 text-ui"
+            className="max-w-48"
             aria-label="Add tag"
             disabled={pending}
           />
