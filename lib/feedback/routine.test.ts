@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_FEATURE_ROUTINE_ID, fireFeatureRoutine } from '@/lib/feedback/routine';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  DEFAULT_FEATURE_ROUTINE_ID,
+  fireFeatureRoutine,
+  notesRoutineId,
+  planRoutineId,
+} from '@/lib/feedback/routine';
 
 describe('fireFeatureRoutine', () => {
   it('says what is missing rather than calling with no key', async () => {
@@ -66,5 +71,49 @@ describe('fireFeatureRoutine', () => {
     });
     const result = await fireFeatureRoutine({ apiKey: 'sk-test', fetch: fetchFn as never });
     expect(result).toMatchObject({ ok: false, error: 'getaddrinfo ENOTFOUND' });
+  });
+});
+
+/**
+ * Two queues, two routines. The bugs button sends no text of its own, so a
+ * button pointed at the wrong routine works the other queue in silence --
+ * which is what these say cannot happen.
+ */
+describe('which routine each button fires', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('sends each queue to its own routine', () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_ID', 'trig_notes');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_plan');
+    expect(notesRoutineId()).toBe('trig_notes');
+    expect(planRoutineId()).toBe('trig_plan');
+  });
+
+  it('falls back to the shared id both queues used to share', () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', 'trig_shared');
+    expect(notesRoutineId()).toBe('trig_shared');
+    expect(planRoutineId()).toBe('trig_shared');
+  });
+
+  it('answers null when nothing is set, which fireFeatureRoutine reads as the default', async () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', '');
+    expect(notesRoutineId()).toBeNull();
+
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+    await fireFeatureRoutine({ apiKey: 'sk-test', routineId: null, fetch: fetchFn as never });
+    const [url] = fetchFn.mock.calls[0] as unknown as [string];
+    expect(url).toContain(`/routines/${DEFAULT_FEATURE_ROUTINE_ID}/fire`);
+  });
+
+  it('ignores a variable set to blank rather than treating it as an answer', () => {
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', '   ');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', 'trig_shared');
+    expect(planRoutineId()).toBe('trig_shared');
   });
 });

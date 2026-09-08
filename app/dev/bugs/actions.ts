@@ -4,7 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { fireFeatureRoutine } from '@/lib/feedback/routine';
+import { fireFeatureRoutine, notesRoutineId } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
@@ -207,7 +207,7 @@ export async function runFeatureRoutine(
 
   const result = await fireFeatureRoutine({
     apiKey: process.env.CLAUDE_API_KEY ?? null,
-    routineId: process.env.CLAUDE_FEATURE_ROUTINE_ID ?? null,
+    routineId: notesRoutineId(),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };

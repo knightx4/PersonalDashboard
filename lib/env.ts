@@ -87,8 +87,12 @@ export function serverEnv() {
       FEEDBACK_CODE: z.string().min(1).optional(),
       /** Bearer token for firing the Claude Code routine that works the queue. */
       CLAUDE_API_KEY: z.string().min(1).optional(),
-      /** Overrides the routine that "Run Feature Routine" fires. */
+      /** Legacy: the one routine both queues used. Falls back to it below. */
       CLAUDE_FEATURE_ROUTINE_ID: z.string().min(1).optional(),
+      /** The routine "Run Feature Routine" fires -- the notes queue. */
+      CLAUDE_NOTES_ROUTINE_ID: z.string().min(1).optional(),
+      /** The routine "Send to Claude" and "Shape into a plan" fire. */
+      CLAUDE_PLAN_ROUTINE_ID: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */
