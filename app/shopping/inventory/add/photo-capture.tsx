@@ -4,7 +4,9 @@ import { useActionState, useRef, useState } from 'react';
 import { extractBooksFromPhoto } from './photo-actions';
 import { savePasteBookList, type BookActionState } from './actions';
 import { Button } from '@/components/ui/button';
+import { Card, cardVariants } from '@/components/ui/card';
 import { FieldError, Label } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import {
   PHOTO_ACCEPT,
   preparePhoto,
@@ -100,12 +102,15 @@ export function PhotoCapturePanel() {
       </div>
 
       {preview && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={preview}
-          alt="Upload preview"
-          className="max-h-64 w-full rounded-xl border border-border object-contain bg-canvas"
-        />
+        // The shared card, the same shape the saved item's photo and the save
+        // form's preview take. The edge stays deliberately: a shelf photo can
+        // be pale at its edges and would otherwise dissolve into the page on a
+        // light theme — but it is the shared edge now, so it carries `sheet`
+        // and is right under Lightbox.
+        <Card padding="none" className="overflow-hidden bg-canvas">
+          {/* eslint-disable-next-line @next/next/no-img-element -- local data URL */}
+          <img src={preview} alt="Upload preview" className="max-h-64 w-full object-contain" />
+        </Card>
       )}
 
       <Button
@@ -127,11 +132,14 @@ export function PhotoCapturePanel() {
         <form action={saveAction} className="flex flex-col gap-3">
           <input type="hidden" name="books_json" value={JSON.stringify(booksPayload)} />
           <input type="hidden" name="source" value="photo" />
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          {/* The detected list is what the page is for, so it is a card the
+              eye rests on rather than a hand-drawn box: one Card, divides
+              inside it, and rows on the density dial's rhythm. Law 11. */}
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
             {extractState.results.map((row, resultIndex) => {
               if (!row.book) {
                 return (
-                  <li key={resultIndex} className="px-4 py-3 text-body text-ink-muted">
+                  <li key={resultIndex} className="card-pad-x row-pad text-body text-ink-muted">
                     <span className="font-medium text-ink">{row.raw}</span>
                     <span className="ml-2 text-danger">{row.error ?? 'No match'}</span>
                   </li>
@@ -139,7 +147,7 @@ export function PhotoCapturePanel() {
               }
               const payloadIndex = resolved.findIndex((e) => e.index === resultIndex);
               return (
-                <li key={resultIndex} className="flex items-start gap-3 px-4 py-3">
+                <li key={resultIndex} className="card-pad-x row-pad flex items-start gap-3">
                   <input
                     type="checkbox"
                     name="selected"

@@ -285,8 +285,10 @@ function CategoryTemplateForm({
               ))}
             </Select>
           </Field>
+          {/* The dial's height, so the checkbox row sits on the same baseline
+              as the field and the select beside it at every density. */}
           <label
-            className="flex h-10 items-center gap-2 text-ui text-ink-muted"
+            className="flex h-(--control-h) items-center gap-2 text-ui text-ink-muted"
             title="Add this field’s value to the eBay search for the item"
           >
             <input

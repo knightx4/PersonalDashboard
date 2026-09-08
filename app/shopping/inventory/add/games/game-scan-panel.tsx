@@ -7,6 +7,7 @@ import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { saveGame, searchGame, type GameActionState } from './actions';
 import { AddGameManualForm, GameCard } from './game-forms';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
 import { classifyScannedCode } from '@/lib/barcodes/scan-code';
 import type { CanonicalGame } from '@/lib/games/types';
@@ -104,9 +105,12 @@ export function GameScanPanel() {
         Point the camera at the barcode on the box. Book barcodes are recognised and
         sent to the book flow instead.
       </p>
-      <div className="overflow-hidden rounded-xl border border-border bg-black">
+      {/* The viewfinder keeps a frame, and it is the shared one: a black
+          rectangle on a dark theme has no edge of its own, and this is the
+          one thing on the page that has to look like a live surface. */}
+      <Card padding="none" className="overflow-hidden bg-black">
         <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
-      </div>
+      </Card>
       <div className="flex flex-wrap gap-2">
         {!scanning ? (
           <Button type="button" onClick={startScan}>

@@ -11,7 +11,10 @@ import {
   type BookActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
+import { Card, cardVariants } from '@/components/ui/card';
+import { Group } from '@/components/ui/disclosure';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import type { CanonicalBook } from '@/lib/books/types';
 
 /**
@@ -33,11 +36,14 @@ export function AddBookManualForm({
   return (
     <form
       action={action}
-      className={
-        compact
-          ? 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'
-          : 'flex flex-col gap-3'
-      }
+      className={cn(
+        'flex flex-col gap-3',
+        // Only the fallback copy is a card: it appears under a failed lookup
+        // and has to read as a thing offered rather than as the page. The
+        // shape is the shared one -- the hand-rolled box it replaces was
+        // invisible to the gate because it was spelled in a ternary.
+        compact && cardVariants({ padding: 'standard' }),
+      )}
     >
       {compact && (
         <div>
@@ -121,7 +127,9 @@ function BookCard({
   pending: boolean;
 }) {
   return (
-    <div className="flex gap-4 rounded-xl border border-border bg-surface p-4">
+    // The one thing the search came back for, so it is a card the eye rests
+    // on rather than a hand-drawn box. Law 11.
+    <Card padding="standard" className="flex gap-4">
       {book.coverUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -178,13 +186,14 @@ function BookCard({
         </div>
 
         {book.needsConfirmation && (book.alternates?.length ?? 0) > 0 && (
-          <div className="mt-3">
-            <p className="text-ui font-medium text-ink">Other printings we found</p>
-            <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
+          // A heading and space rather than a second frame inside the card,
+          // and the shared heading rather than a fourth weight for one.
+          <Group title="Other printings we found" className="mt-3">
+            <ul className="divide-y divide-border">
               {book.alternates?.map((candidate, index) => (
                 <li
                   key={candidate.isbn13 ?? `${candidate.title}-${index}`}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  className="row-pad flex flex-wrap items-center justify-between gap-2"
                 >
                   <div className="min-w-0">
                     <p className="text-ui text-ink">{candidate.title}</p>
@@ -235,10 +244,10 @@ function BookCard({
                 </li>
               ))}
             </ul>
-          </div>
+          </Group>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -353,11 +362,13 @@ export function AddBookPasteForm() {
       {previewState.results && previewState.results.length > 0 && (
         <form action={saveAction} className="flex flex-col gap-3">
           <input type="hidden" name="books_json" value={JSON.stringify(booksPayload)} />
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          {/* The resolved list is the result the page is about: one card,
+              divides inside it, rows on the density dial. Law 11. */}
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
             {previewState.results.map((row, resultIndex) => {
               if (!row.book) {
                 return (
-                  <li key={resultIndex} className="px-4 py-3 text-body text-ink-muted">
+                  <li key={resultIndex} className="card-pad-x row-pad text-body text-ink-muted">
                     <span className="font-medium text-ink">{row.raw}</span>
                     <span className="ml-2 text-danger">{row.error ?? 'No match'}</span>
                   </li>
@@ -365,7 +376,7 @@ export function AddBookPasteForm() {
               }
               const payloadIndex = resolvedBooks.findIndex((e) => e.index === resultIndex);
               return (
-                <li key={resultIndex} className="flex items-start gap-3 px-4 py-3">
+                <li key={resultIndex} className="card-pad-x row-pad flex items-start gap-3">
                   <input
                     type="checkbox"
                     name="selected"

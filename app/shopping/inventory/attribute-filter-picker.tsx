@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { Select } from '@/components/ui/field';
 import type { AttributeFacet } from '@/lib/inventory/attribute-filters';
 
 /**
@@ -43,16 +44,24 @@ export function AttributeFilterPicker({
         Add filter
       </button>
 
+      {/* No frame and no ground, the same as RailPicker's opened list: this
+          drops into the rail rather than floating over anything, so a box
+          four pixels under the trigger would be a second hairline arguing
+          about a grouping the rail already made. Law 11.
+
+          The select is the shared control rather than a hand-rolled 32px box:
+          the height follows the density dial, the focus ring matches every
+          other field, and it is 16px on a phone -- which matters here because
+          the rail doubles as the mobile filter sheet, and a 13px control is
+          what makes Safari zoom the page when it is tapped. Its own caption
+          is gone: the first option says what it wants. Law 9. */}
       {open && (
-        <div className="mt-1 space-y-1 rounded-lg border border-border bg-surface p-2">
-          <label className="block text-micro font-medium text-ink-muted" htmlFor="attr-field">
-            Property
-          </label>
-          <select
+        <div className="mt-1.5 space-y-1">
+          <Select
             id="attr-field"
+            aria-label="Property"
             value={fieldKey}
             onChange={(event) => setFieldKey(event.target.value)}
-            className="h-8 w-full rounded-md border border-border bg-canvas px-2 text-ui text-ink focus:border-accent focus:outline-none"
           >
             <option value="">Choose a property…</option>
             {facets.map((entry) => (
@@ -60,10 +69,10 @@ export function AttributeFilterPicker({
                 {entry.label}
               </option>
             ))}
-          </select>
+          </Select>
 
           {facet && (
-            <div className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pt-1">
+            <div className="max-h-56 space-y-0.5 overflow-y-auto overscroll-contain pt-0.5">
               {facet.values.map((value) => {
                 const href = hrefFor[facet.key]?.[value];
                 if (!href) return null;
@@ -71,7 +80,9 @@ export function AttributeFilterPicker({
                   <Link
                     key={value}
                     href={href}
-                    className="block truncate rounded-md px-2 py-1 text-ui text-ink-muted hover:bg-canvas hover:text-ink"
+                    // A rail row, set exactly like the ones in every other
+                    // RailGroup — these are the same thing, revealed later.
+                    className="block truncate rounded-lg px-2.5 py-1.5 text-ui text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
                   >
                     {value}
                   </Link>
