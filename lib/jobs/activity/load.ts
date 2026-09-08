@@ -84,6 +84,33 @@ export const FORWARD_KINDS: ApplicationEventKind[] = APPLICATION_EVENT_KINDS.fil
 /** The window the headline numbers cover. */
 export const HIGHLIGHT_DAYS = 7;
 
+/** One forward event, reduced to the pursuit it happened to. */
+export interface ForwardEventOf {
+  applicationId: string;
+  /** Null only if the pursuit has somehow lost its role. */
+  roleId: string | null;
+}
+
+/**
+ * How many roles moved forward, which is not how many emails said so.
+ *
+ * A single step forward routinely arrives as several events: the invitation,
+ * the reschedule, and the confirmation are three messages about one interview,
+ * and each writes its own row. Counting rows made a week look four times as
+ * good as it was -- and the tile sits beside "new roles" and "rejections",
+ * which are both counts of things rather than counts of mail.
+ *
+ * Falling back to the application id keeps a role-less pursuit counted once
+ * rather than dropping it: it is still one thing that moved.
+ */
+export function countRolesMovedForward(events: readonly ForwardEventOf[]): number {
+  const roles = new Set<string>();
+  for (const event of events) {
+    roles.add(event.roleId ?? `application:${event.applicationId}`);
+  }
+  return roles.size;
+}
+
 /**
  * The four numbers above the feed.
  *
@@ -157,6 +184,12 @@ type ReminderRow = {
   body: string;
   created_at: string;
   applications: { roles: RoleJoin } | null;
+};
+
+/** A forward event, selected for the tile rather than for the feed. */
+type ForwardRow = {
+  application_id: string;
+  applications: { role_id: string | null } | null;
 };
 
 function nameOf(role: RoleJoin): string {
@@ -266,7 +299,7 @@ export async function loadActivity(
     runRows,
     lastWithdrawal,
     newRoleCount,
-    forwardCount,
+    forwardRows,
     rejectionCount,
     closedCount,
   ] = await Promise.all([
@@ -327,7 +360,16 @@ export async function loadActivity(
       .eq('user_id', userId)
       .gte('created_at', since),
 
-    countEvents(FORWARD_KINDS),
+    // The rows rather than a count, because this tile counts roles and the
+    // database cannot count distinct behind `head: true`. Bounded by the same
+    // seven days as the tile, so it is a handful of rows either way.
+    supabase
+      .from('application_events')
+      .select('application_id, applications!inner ( role_id )')
+      .eq('user_id', userId)
+      .gte('created_at', since)
+      .in('kind', FORWARD_KINDS as string[]),
+
     countEvents(['rejection']),
     // Withdrawal covers both: the sweep closing a cold lead and you turning
     // something down. Either way the door is shut, which is what the tile says.
@@ -377,7 +419,12 @@ export async function loadActivity(
   const highlights: ActivityHighlights = {
     days: HIGHLIGHT_DAYS,
     newRoles: newRoleCount.count ?? 0,
-    movedForward: forwardCount.count ?? 0,
+    movedForward: countRolesMovedForward(
+      ((forwardRows.data ?? []) as unknown as ForwardRow[]).map((row) => ({
+        applicationId: row.application_id,
+        roleId: row.applications?.role_id ?? null,
+      })),
+    ),
     rejections: rejectionCount.count ?? 0,
     closedOut: closedCount.count ?? 0,
   };
