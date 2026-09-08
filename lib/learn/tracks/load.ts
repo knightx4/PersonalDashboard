@@ -61,6 +61,8 @@ export type ReadingRow = {
   pageFrom: number | null;
   pageTo: number | null;
   finishedAt: string | null;
+  /** When it was put on the Read now shelf. Null means it is not on it. */
+  readNowAt: string | null;
   /**
    * Null when you wrote down a subject and no source has been found for it
    * yet. That is a normal state, not a broken row.
@@ -118,6 +120,7 @@ type ReadingRecord = {
   page_from: number | null;
   page_to: number | null;
   finished_at: string | null;
+  read_now_at: string | null;
   sources: {
     id: string;
     title: string;
@@ -155,6 +158,7 @@ function toReading(row: ReadingRecord): ReadingRow {
     pageFrom: row.page_from,
     pageTo: row.page_to,
     finishedAt: row.finished_at,
+    readNowAt: row.read_now_at,
     source: row.sources
       ? {
           id: row.sources.id,
@@ -173,7 +177,7 @@ function toReading(row: ReadingRecord): ReadingRow {
 
 const READING_COLUMNS =
   'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
-  'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, ' +
+  'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, read_now_at, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
 /**
@@ -301,6 +305,54 @@ export async function loadReading(
     trackTitle: row.tracks.title,
     trackQuestion: row.tracks.question,
   };
+}
+
+/**
+ * The Read now shelf: what you said you would read next, across every track.
+ *
+ * Deliberately not a view of the queue with a filter on it. A track is a
+ * curriculum -- ordered, reasoned, read over weeks -- and the twenty minutes
+ * in which you actually read are not asking "what is the fourth step of my
+ * Marx track", they are asking "what did I say I would read next". Those are
+ * different questions and the second one has no good answer inside the first.
+ *
+ * Finished and abandoned readings are gone from it because putting one down
+ * takes it off the shelf; the filter here is a second line, so a row that
+ * somehow kept its stamp cannot haunt the page.
+ */
+export async function loadReadNow(supabase: LearnSupabaseClient): Promise<ReadingDetail[]> {
+  const { data, error } = await supabase
+    .from('readings')
+    .select(`${READING_COLUMNS}, tracks!readings_track_fk ( id, title, question )`)
+    .not('read_now_at', 'is', null)
+    .in('status', ['queued', 'reading'])
+    .order('read_now_at');
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) return [];
+
+  return (data as unknown as Array<
+    ReadingRecord & { tracks: { id: string; title: string; question: string | null } | null }
+  >)
+    .filter((row) => row.tracks !== null)
+    .map((row) => ({
+      ...toReading(row),
+      trackId: row.tracks!.id,
+      trackTitle: row.tracks!.title,
+      trackQuestion: row.tracks!.question,
+    }));
+}
+
+/** How many are on the shelf -- for the tab's badge. */
+export async function countReadNow(supabase: LearnSupabaseClient): Promise<number> {
+  const { count, error } = await supabase
+    .from('readings')
+    .select('id', { count: 'exact', head: true })
+    .not('read_now_at', 'is', null)
+    .in('status', ['queued', 'reading']);
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  return count ?? 0;
 }
 
 /**

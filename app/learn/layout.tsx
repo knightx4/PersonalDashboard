@@ -6,6 +6,8 @@ import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadActivity } from '@/lib/shell/activity';
 import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { countReadNow } from '@/lib/learn/tracks/load';
 
 /**
  * Shell for the learn workspace.
@@ -32,10 +34,18 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const brief = await loadLearnBrief();
 
   /**
-   * One section. A track and a reading are both reached through it, so they
-   * are `alsoMatches` rather than tabs of their own -- a nav that grows an
-   * entry per depth level stops being navigation.
+   * Two sections. A track and a reading are both reached through Tracks, so
+   * they are `alsoMatches` rather than tabs of their own -- a nav that grows
+   * an entry per depth level stops being navigation.
+   *
+   * Read now is the exception that earns a tab, because it is not a deeper
+   * view of a track: it is every track's next thing on one shelf, and it is
+   * the page you open when you have twenty minutes rather than a decision to
+   * make. The badge is the count, so the tab answers "is there anything" from
+   * the column.
    */
+  const readNow = await countReadNow(await createLearnClient());
+
   const sections: NavSection[] = [
     {
       href: '/learn',
@@ -43,6 +53,13 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       icon: 'tracks',
       exact: true,
       alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
+    },
+    {
+      href: '/learn/now',
+      label: 'Read now',
+      icon: 'readNow',
+      exact: true,
+      badge: readNow,
     },
   ];
 

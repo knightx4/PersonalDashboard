@@ -299,15 +299,46 @@ export async function deleteReading(
   if (error) throw messageFor('Removing that', error);
 }
 
-/** Move a reading between statuses. The timestamps follow, in a trigger. */
+/**
+ * Move a reading between statuses. The timestamps follow, in a trigger.
+ *
+ * Finishing or giving up also takes it off the Read now shelf. Here rather
+ * than in the one action that has a shelf button beside it, because status is
+ * changed from four places and a shelf still offering something you finished
+ * last week is a shelf nobody trusts twice.
+ */
 export async function setReadingStatus(
   supabase: LearnSupabaseClient,
   readingId: string,
   status: 'queued' | 'reading' | 'read' | 'abandoned',
 ): Promise<void> {
-  const { error } = await supabase.from('readings').update({ status }).eq('id', readingId);
+  const done = status === 'read' || status === 'abandoned';
+
+  const { error } = await supabase
+    .from('readings')
+    .update(done ? { status, read_now_at: null } : { status })
+    .eq('id', readingId);
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Updating the reading', error);
+}
+
+/**
+ * Put a reading on the Read now shelf, or take it off.
+ *
+ * The stamp is the order of the shelf, so putting something back on moves it
+ * to the end -- which is what you meant by putting it back on.
+ */
+export async function setReadNow(
+  supabase: LearnSupabaseClient,
+  readingId: string,
+  on: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from('readings')
+    .update({ read_now_at: on ? new Date().toISOString() : null })
+    .eq('id', readingId);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Changing the shelf', error);
 }
 
 /** What you took from it. */

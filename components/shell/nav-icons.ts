@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  BookOpenCheck,
   Bookmark,
   Boxes,
   Briefcase,
@@ -73,6 +74,7 @@ export const NAV_ICONS = {
 
   // Learn
   tracks: BookOpen,
+  readNow: BookOpenCheck,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;
