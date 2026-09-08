@@ -10,7 +10,7 @@ import { cn } from '@/lib/cn';
  *
  * Lightbox is the one exception and it is handled by `sheet`, not here: on a
  * black bench a card is an object, and an object has an edge. In the other
- * four themes `sheet` resolves to the ordinary hairline and nothing else. See
+ * three themes `sheet` resolves to the ordinary hairline and nothing else. See
  * the token comments in app/globals.css.
  *
  * Padding is a variant rather than fixed, and a header is optional, because

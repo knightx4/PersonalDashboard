@@ -416,7 +416,7 @@ export function AppShell({
           short, and `sticky` keeps doing its job when the page is long. */}
       <div className="flex min-h-dvh min-w-0 flex-col">
         {/* The top bar is chrome, not page: it takes the shell's ground and
-            the shell's ink, the same as the column beside it. In four themes
+            the shell's ink, the same as the column beside it. In three themes
             the shell is a near-neighbour of the surface it used to use, so
             this reads as the bar picking up its own sidebar's tone. In
             Lightbox it is the difference between a white strip across the top

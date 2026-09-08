@@ -148,7 +148,7 @@ const RULES: Rule[] = [
     id: 'raw-hex',
     law: '4',
     says: 'a colour written as a hex',
-    instead: 'a token: five themes cannot follow a literal',
+    instead: 'a token: four themes cannot follow a literal',
     find: (line) => [...line.matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]),
   },
   {

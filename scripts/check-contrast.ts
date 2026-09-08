@@ -86,7 +86,6 @@ function theme(selector: string): Vars {
 const THEMES: Record<string, Vars> = {
   paper: PAPER,
   ink: theme("[data-theme='ink']"),
-  riso: theme("[data-theme='riso']"),
   lightbox: theme("[data-theme='lightbox']"),
   dusk: theme("[data-theme='dusk']"),
 };
