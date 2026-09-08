@@ -16,6 +16,7 @@ import {
   Lightbulb,
   ListChecks,
   ListTodo,
+  Map,
   MessageSquareText,
   Receipt,
   Share2,
@@ -61,6 +62,7 @@ export const NAV_ICONS = {
   // Dev
   bugs: Bug,
   ideas: Lightbulb,
+  plan: Map,
   // Todo and vault
   agenda: ListChecks,
   calendar: CalendarDays,
