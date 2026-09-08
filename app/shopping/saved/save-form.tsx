@@ -9,7 +9,7 @@ import {
 } from '@/app/shopping/saved/actions';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { Field, FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
@@ -106,18 +106,18 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
 
           <div className="flex flex-col gap-5 sm:flex-row">
             <div className="sm:w-36">
-              {preview.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
-                <img
-                  src={preview.imageUrl}
-                  alt=""
-                  className="aspect-square w-full rounded-card border border-border object-cover bg-canvas"
-                />
-              ) : (
-                <div className="flex aspect-square items-center justify-center rounded-card border border-dashed border-border bg-canvas text-small text-ink-muted">
-                  No image
-                </div>
-              )}
+              {/* Same shape as the saved item's own page: one Card holding
+                  either the picture or the words. */}
+              <Card padding="none" className="aspect-square overflow-hidden bg-canvas">
+                {preview.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- arbitrary merchant CDNs
+                  <img src={preview.imageUrl} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="flex size-full items-center justify-center text-small text-ink-muted">
+                    No image
+                  </span>
+                )}
+              </Card>
             </div>
 
             <div className="min-w-0 flex-1 space-y-4">

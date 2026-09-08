@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useActionState } from 'react';
+import { useState, useActionState, useRef } from 'react';
 import Link from 'next/link';
 import {
   noteListingIntent,
@@ -16,8 +16,9 @@ import {
   setItemsForSale,
   type ActionState,
 } from '@/app/shopping/inventory/actions';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label } from '@/components/ui/field';
+import { FieldError, InlineInput, Input } from '@/components/ui/field';
 import { formatCentsAsDollarsInput, formatMoney } from '@/lib/money';
 import type { SellQueueRow } from '@/lib/sell/load-for-sale';
 import type { SellPath } from '@/lib/sell/route';
@@ -47,6 +48,21 @@ const GROUPS: { key: SellPath | 'unpriced'; title: string; note: string | null }
   { key: 'buyback', title: 'Buyback vendor', note: null },
 ];
 
+/**
+ * The two numbers the router runs on, edited where they are read.
+ *
+ * This was a card holding two labelled fields and an Update button, and
+ * directly under it the page printed “Floor $15.00 · Effort $5.00” — the same
+ * two values a second time, because the form was not a readable statement of
+ * them. That is law 12 exactly: a form about the thing standing in front of
+ * the thing. One line now, and the line is the editor.
+ *
+ * Blur commits, and only when the value actually changed; Escape puts it back.
+ * Safe here for the same reasons it is safe on a return window: two
+ * independent dollar amounts, both reversible from the same line, and no
+ * half-valid state that could be saved by accident. Both fields are in the one
+ * form, so committing either sends the pair the action expects.
+ */
 export function SellSettingsForm({
   netFloorCents,
   effortCents,
@@ -55,34 +71,55 @@ export function SellSettingsForm({
   effortCents: number;
 }) {
   const [state, action, pending] = useActionState(updateSellSettings, {} as SellActionState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const floor = formatCentsAsDollarsInput(netFloorCents);
+  const effort = formatCentsAsDollarsInput(effortCents);
+
+  const commit = (committed: string) => (event: React.FocusEvent<HTMLInputElement>) => {
+    if (event.target.value.trim() !== committed) formRef.current?.requestSubmit();
+  };
+
+  const revertOnEscape =
+    (committed: string) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Escape') {
+        event.currentTarget.value = committed;
+        event.currentTarget.blur();
+      }
+    };
+
   return (
-    <form
-      action={action}
-      className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-end gap-3')}
-    >
-      <div>
-        <Label htmlFor="net_floor">Net floor ($)</Label>
-        <Input
-          id="net_floor"
+    <form ref={formRef} action={action} className="space-y-1">
+      {/* The field is pulled back over its own inset so the number sits
+          against the currency at rest — “Floor $15.00”, a sentence — and the
+          inset comes back as the hover box the moment it is pointed at. */}
+      <p className="flex flex-wrap items-center text-body text-ink-muted">
+        <span>Floor&nbsp;$</span>
+        <InlineInput
           name="net_floor"
-          defaultValue={formatCentsAsDollarsInput(netFloorCents)}
-          className="w-28"
+          inputMode="decimal"
+          aria-label="Net floor, in dollars — nothing below this is worth listing"
+          defaultValue={floor}
+          key={`floor-${floor}`}
+          onBlur={commit(floor)}
+          onKeyDown={revertOnEscape(floor)}
+          disabled={pending}
+          className="tabular -ml-1 w-16 font-medium text-ink"
         />
-      </div>
-      <div>
-        <Label htmlFor="effort">Effort cost ($)</Label>
-        <Input
-          id="effort"
+        <span className="ml-3">·&nbsp;Effort&nbsp;$</span>
+        <InlineInput
           name="effort"
-          defaultValue={formatCentsAsDollarsInput(effortCents)}
-          className="w-28"
+          inputMode="decimal"
+          aria-label="Effort cost per listing, in dollars"
+          defaultValue={effort}
+          key={`effort-${effort}`}
+          onBlur={commit(effort)}
+          onKeyDown={revertOnEscape(effort)}
+          disabled={pending}
+          className="tabular -ml-1 w-16 font-medium text-ink"
         />
-      </div>
-      <Button type="submit" size="sm" disabled={pending}>
-        {pending ? 'Saving…' : 'Update'}
-      </Button>
+        {pending && <span className="ml-3 text-small">Saving…</span>}
+      </p>
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-ui text-accent">{state.message}</p>}
     </form>
   );
 }
@@ -114,18 +151,8 @@ export function TestEbayConnectionButton() {
       </div>
 
       {result && (
-        <div
-          className={
-            'rounded-lg border px-3 py-2 text-ui ' +
-            (result.ok
-              ? 'border-border bg-positive-tint text-positive'
-              : failed
-                ? 'border-danger bg-danger-tint text-danger'
-                : 'border-border bg-surface text-ink')
-          }
-        >
+        <Banner tone={failed ? 'bad' : 'info'}>
           <p className="font-medium">
-            {result.ok ? '✓ ' : failed ? '✗ ' : ''}
             {result.headline}
             {result.priceCents != null && ` · ${formatMoney(result.priceCents)}`}
           </p>
@@ -140,7 +167,7 @@ export function TestEbayConnectionButton() {
             {result.detail}
           </p>
           {result.hint && <p className="mt-1 opacity-90">{result.hint}</p>}
-        </div>
+        </Banner>
       )}
     </form>
   );

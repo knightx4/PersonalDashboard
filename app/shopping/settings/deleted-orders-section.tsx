@@ -30,14 +30,16 @@ export function DeletedOrdersSection({ orders }: { orders: DeletedOrderRow[] }) 
       {orders.length === 0 ? (
         <p className="text-body text-ink-muted">No deleted orders.</p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        // Divides and space, no frame: the settings card around this
+        // already said these belong together. Law 11.
+        <ul className="divide-y divide-border">
           {orders.map((order) => {
             const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
             const deletedOn = new Date(order.deleted_at).toLocaleDateString();
             return (
               <li
                 key={order.id}
-                className="flex flex-col gap-2 px-3 py-2.5 text-body sm:flex-row sm:items-center sm:justify-between"
+                className="row-pad flex flex-col gap-2 text-body sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">

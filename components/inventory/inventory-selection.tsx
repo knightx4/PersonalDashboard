@@ -148,13 +148,9 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
   if (ids.length === 0) {
     return (
       <div className="mb-3 flex flex-wrap items-center gap-3 text-ui text-ink-muted">
-        <button
-          type="button"
-          onClick={() => selection.selectAll(allIds)}
-          className="press rounded-lg border border-border bg-surface px-2.5 py-1 font-medium text-ink-muted hover:text-ink"
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={() => selection.selectAll(allIds)}>
           Select all {allIds.length}
-        </button>
+        </Button>
         {deleteState.message ? (
           <span className="text-positive">{deleteState.message}</span>
         ) : (
@@ -167,7 +163,7 @@ export function InventoryBulkBar({ allIds }: { allIds: string[] }) {
   const hidden = ids.map((id) => <input key={id} type="hidden" name="id" value={id} />);
 
   return (
-    <div className="mb-3 space-y-2 rounded-card border border-accent/30 bg-accent-tint px-3 py-2">
+    <div className="mb-3 space-y-2 rounded-card bg-accent-tint px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-1 text-ui font-medium text-ink">
           {ids.length} selected

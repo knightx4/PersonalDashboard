@@ -61,7 +61,7 @@ export function InboxPerson({
         id={`person-${accountId}`}
         value={value}
         disabled={pending}
-        className="h-8 w-auto min-w-40 text-ui"
+        className="w-auto min-w-40"
         onChange={(event) => {
           const next = event.target.value;
           setValue(next);
