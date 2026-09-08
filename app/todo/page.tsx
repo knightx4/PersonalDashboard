@@ -2,7 +2,7 @@ import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAgenda } from '@/lib/todo/agenda/load';
-import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
+import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
@@ -37,7 +37,9 @@ export default async function TodoPage() {
         description={empty ? 'Nothing on the list.' : 'What needs you, in the order it runs out.'}
       />
 
-      <AddTask />
+      {/* The account's own today, not the browser's: Today has to mean the day
+          the list is kept in. */}
+      <AddTask today={todayIn(agenda.timezone)} />
 
       {/* A source that failed is said out loud. Silently showing a shorter
           agenda would be the worst possible failure for this page: it looks
