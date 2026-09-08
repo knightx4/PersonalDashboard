@@ -46,7 +46,7 @@ export const THEMES = [
     // The one theme whose page and cards disagree: the bench is dark, so the
     // picker's swatch and the scheme it reports both describe the bench.
     scheme: 'dark',
-    swatch: '#0d1219',
+    swatch: '#1e2734',
     ink: '#e7ebf1',
   },
   {
