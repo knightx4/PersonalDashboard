@@ -20,6 +20,8 @@ export interface GroupableInterview {
 export interface InterviewGroup {
   id: string;
   label: string | null;
+  /** Which round of the process this is. Null until it is given one. */
+  roundNumber?: number | null;
   notes: string;
 }
 
@@ -38,21 +40,23 @@ export function dayIn(iso: string, timezone: string): string {
 }
 
 /**
- * The tab's reading order: every interview exactly once, the ones in a round
- * gathered at the position of the first of them, and rounds with nothing in
- * them yet after all of it.
+ * The tab's reading order: every interview exactly once, inside its round,
+ * with the rounds in the order they happen -- first round first.
  *
- * Empty rounds are listed because a round is now made before anything is
- * booked into it -- "there will be a technical round, times to follow" -- and
- * one that did not render would be a round the user made and cannot see, let
- * alone add to. They go last for want of a position: they have no interview to
- * sort by, and putting them among the booked ones would move as things are
- * added.
+ * The round number is the order, because it is the thing that says which round
+ * is first. It is not the arrival order and it is not the calendar: a first
+ * round can be rescheduled to after a second, and the process still went
+ * screen, then technical.
+ *
+ * A round with no number yet has not been placed in the process, so it sorts
+ * after the ones that have rather than ahead of round 1 -- the same reasoning
+ * as before, applied to the number instead of to emptiness. Ties keep the
+ * order the caller gave, which is oldest first.
  *
  * A group_id pointing at a group that is not on the page cannot silently
- * swallow an interview -- it renders on its own instead. That is a state the
- * database allows only briefly, and an interview that vanishes is much worse
- * than one shown outside its round.
+ * swallow an interview -- it renders on its own, at the end. That is a state
+ * the database allows only briefly, and an interview that vanishes is much
+ * worse than one shown outside its round.
  */
 export function sectionInterviews<T extends GroupableInterview, G extends InterviewGroup>(
   interviews: readonly T[],
@@ -83,7 +87,20 @@ export function sectionInterviews<T extends GroupableInterview, G extends Interv
     sections.push({ kind: 'group', group, interviews: [] });
   }
 
-  return sections;
+  // Stable, so rounds sharing a number -- or sharing the lack of one -- keep
+  // the order they were loaded in.
+  return sections
+    .map((section, index) => ({ section, index }))
+    .sort((a, b) => sortKey(a) - sortKey(b) || a.index - b.index)
+    .map((entry) => entry.section);
+}
+
+/** Where a section sits: by round number, then everything unplaced after it. */
+function sortKey<T extends GroupableInterview, G extends InterviewGroup>(entry: {
+  section: InterviewSection<T, G>;
+}): number {
+  if (entry.section.kind !== 'group') return Number.MAX_SAFE_INTEGER;
+  return entry.section.group.roundNumber ?? Number.MAX_SAFE_INTEGER - 1;
 }
 
 /**

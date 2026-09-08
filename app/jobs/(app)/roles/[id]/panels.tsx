@@ -2220,6 +2220,19 @@ function InterviewGroupCard({
   const [showNotes, setShowNotes] = useState(group.notes.trim() !== '');
   const [saved, setSaved] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  /**
+   * Open, until you fold it.
+   *
+   * A pursuit that has been running a while carries five or six rounds, and
+   * all of them expanded is a page you scroll past rather than read. Folded
+   * away, the header still says which round it is, what it is called and how
+   * much is in it -- which is what you are scanning for when you fold one.
+   *
+   * Open by default all the same: a round you have just opened the tab to look
+   * at should be showing, and the one thing anybody wants closed -- an empty
+   * note -- is already closed on its own account.
+   */
+  const [open, setOpen] = useState(true);
   const [pending, startTransition] = useTransition();
 
   /**
@@ -2250,27 +2263,53 @@ function InterviewGroupCard({
   return (
     <section className="rounded-card border border-accent/40 bg-accent-tint/30 p-3">
       <header className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-label={open ? 'Fold this round away' : 'Open this round'}
+          className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted hover:text-accent"
+        >
+          <ChevronDown
+            className={cn('size-4 transition-transform duration-150', !open && '-rotate-90')}
+            strokeWidth={1.75}
+            aria-hidden
+          />
+        </button>
         <CalendarClock className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
         {/* The number is the round's, not the interviews'. Four conversations
             on one afternoon are all the second round; numbering each of them
-            separately was what made a superday read as rounds 1, 3 and 4. */}
-        <Input
-          type="number"
-          min={1}
-          max={99}
-          value={roundNumber}
-          onChange={(event) => setRoundNumber(event.target.value)}
-          aria-label="Which round of the process this is"
-          placeholder="#"
-          className="w-16"
-        />
-        <Input
-          value={label}
-          onChange={(event) => setLabel(event.target.value)}
-          aria-label="What to call this round"
-          placeholder="Technical round"
-          className="max-w-56"
-        />
+            separately was what made a superday read as rounds 1, 3 and 4.
+
+            Fields while the round is open, a line of text once it is folded:
+            a folded card is something you are scanning past, and two input
+            boxes in a row of them read as a form rather than as a heading. */}
+        {open ? (
+          <>
+            <Input
+              type="number"
+              min={1}
+              max={99}
+              value={roundNumber}
+              onChange={(event) => setRoundNumber(event.target.value)}
+              aria-label="Which round of the process this is"
+              placeholder="#"
+              className="w-16"
+            />
+            <Input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              aria-label="What to call this round"
+              placeholder="Technical round"
+              className="max-w-56"
+            />
+          </>
+        ) : (
+          <h3 className="text-ui font-semibold text-ink">
+            {roundNumber.trim() ? `Round ${roundNumber.trim()}` : 'Unplaced round'}
+            {label.trim() && ` · ${label.trim()}`}
+          </h3>
+        )}
         <span className="text-small text-ink-muted">
           {interviews.length === 0
             ? 'Nothing booked in yet'
@@ -2305,72 +2344,76 @@ function InterviewGroupCard({
         )}
       </header>
 
-      {/* No note until there is one, and foldable once there is -- the same
-          way a round's own notes behave one level down. A textarea shown on
-          every round whether or not anything had been written in it made an
-          empty round take the space of a full one and read as filled in. */}
-      <div className="mt-3">
-        {showNotes ? (
-          <CollapsibleField label="Notes on this round" defaultOpen>
-            <Textarea
-              rows={3}
-              value={notes}
-              autoFocus={notes === ''}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="How the round went as a whole. Each interview keeps its own notes below."
-            />
-            <div className="mt-1.5 flex items-center gap-3">
-              <Button type="button" size="sm" disabled={pending} onClick={save}>
-                Save
-              </Button>
+      {!open ? null : (
+        <>
+        {/* No note until there is one, and foldable once there is -- the same
+            way a round's own notes behave one level down. A textarea shown on
+            every round whether or not anything had been written in it made an
+            empty round take the space of a full one and read as filled in. */}
+        <div className="mt-3">
+          {showNotes ? (
+            <CollapsibleField label="Notes on this round" defaultOpen>
+              <Textarea
+                rows={3}
+                value={notes}
+                autoFocus={notes === ''}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="How the round went as a whole. Each interview keeps its own notes below."
+              />
+              <div className="mt-1.5 flex items-center gap-3">
+                <Button type="button" size="sm" disabled={pending} onClick={save}>
+                  Save
+                </Button>
+                {saved && <span className="text-small text-ink-muted">{saved}</span>}
+              </div>
+            </CollapsibleField>
+          ) : (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
+              {/* The number and the name still need saving with nothing written
+                  under them, so the button stays reachable while the note is
+                  folded away. */}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={save}
+                className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+              >
+                Save the round
+              </button>
               {saved && <span className="text-small text-ink-muted">{saved}</span>}
             </div>
-          </CollapsibleField>
-        ) : (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
-            {/* The number and the name still need saving with nothing written
-                under them, so the button stays reachable while the note is
-                folded away. */}
-            <button
-              type="button"
-              disabled={pending}
-              onClick={save}
-              className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-            >
-              Save the round
-            </button>
-            {saved && <span className="text-small text-ink-muted">{saved}</span>}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
+        <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
 
-      <div className="mt-3 space-y-3">
-        {interviews.map((interview) => (
-          <InterviewCard
-            key={interview.id}
-            interview={interview}
-            timezone={timezone}
-            companyContacts={companyContacts}
-            focused={interview.id === focusInterviewId}
-            grouped
+        <div className="mt-3 space-y-3">
+          {interviews.map((interview) => (
+            <InterviewCard
+              key={interview.id}
+              interview={interview}
+              timezone={timezone}
+              companyContacts={companyContacts}
+              focused={interview.id === focusInterviewId}
+              grouped
+            />
+          ))}
+
+          {/* The round fills up from here: another conversation in the same
+              round is one click, and an invitation that is already in the inbox
+              starts from the message rather than from a blank form. */}
+          <AddInterview
+            applicationId={applicationId}
+            groupId={group.id}
+            mailOptions={schedulingMail}
+            triggerLabel={
+              interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
+            }
           />
-        ))}
-
-        {/* The round fills up from here: another conversation in the same
-            round is one click, and an invitation that is already in the inbox
-            starts from the message rather than from a blank form. */}
-        <AddInterview
-          applicationId={applicationId}
-          groupId={group.id}
-          mailOptions={schedulingMail}
-          triggerLabel={
-            interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
-          }
-        />
-      </div>
+        </div>
+        </>
+      )}
     </section>
   );
 }
