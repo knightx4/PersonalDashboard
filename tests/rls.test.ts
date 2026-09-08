@@ -112,6 +112,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.ideas = idea.id;
 
+  const [planItem] = await admin<{ id: string }[]>`
+    insert into plan_items (user_id, module, title, detail, status, position)
+    values (
+      ${userId}, 'learn', ${`${tag} planned a step`},
+      ${`${tag} wrote down what it involves`}, 'in_progress', 10
+    )
+    returning id`;
+  ids.plan_items = planItem.id;
+
   const [bookQuote] = await admin<{ id: string }[]>`
     insert into book_price_quotes (isbn_13, source, quoted_cents, vendor_name)
     values (
