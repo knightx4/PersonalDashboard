@@ -336,6 +336,31 @@ function ImportTheBuildOrder() {
   );
 }
 
+/**
+ * The same import, offered again once the plan is not empty.
+ *
+ * A new slice gets planned in `lib/plan/seed.ts`, beside the spec that argues
+ * for it; without this the only way those steps reach the page is retyping them
+ * into a form, which is how a plan page stops being current and then stops
+ * being read. It adds what is missing and leaves everything else exactly as it
+ * is, so pressing it when there is nothing new costs a sentence saying so.
+ */
+function TopUpFromBuildOrder() {
+  const [state, action, pending] = useActionState(seedPlan, {} as PlanActionState);
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+      <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+        {pending ? 'Checking…' : 'Bring in new steps from the build order'}
+      </Button>
+      <FieldError>{state.error}</FieldError>
+      {state.message && !state.error && (
+        <span className="text-small text-ink-muted">{state.message}</span>
+      )}
+    </form>
+  );
+}
+
 export function PlanView({ sections, empty }: { sections: PlanSection[]; empty: boolean }) {
   if (empty) return <ImportTheBuildOrder />;
 
@@ -372,6 +397,7 @@ export function PlanView({ sections, empty }: { sections: PlanSection[]; empty: 
           <AddStep module={null} />
         </section>
       )}
+      <TopUpFromBuildOrder />
     </div>
   );
 }

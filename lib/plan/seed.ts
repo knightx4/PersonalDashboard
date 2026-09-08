@@ -8,8 +8,17 @@ import type { PlanStatus } from './load';
  * `docs/EVIDENCE-LAYER.md` were the plan until now and remain the record of
  * why each step is where it is; what they cannot be is a plan you work, since
  * a deployed app cannot write to a file in the repository. So the rows below
- * seed the plan once and the app owns it afterwards — nothing re-reads the
+ * seed the plan and the app owns it afterwards — nothing re-reads the
  * markdown, and the two are expected to drift.
+ *
+ * The seed is re-readable, though, and that is deliberate. Planning a new slice
+ * happens here, in a file, next to the spec it comes from; the plan page is
+ * where it is then worked. A seed that could only ever be imported into an
+ * empty plan would mean every step written after the first import had to be
+ * retyped into a form, which is the sort of friction that ends with the page
+ * being out of date and ignored. So importing brings in whatever is missing and
+ * leaves everything already there alone -- statuses, comments and edits
+ * included.
  *
  * The statuses are the ones the documents assert (a ✅ against a numbered
  * step), checked against the code where the document does not say outright.
@@ -457,3 +466,30 @@ export const PLAN_SEED: readonly PlanSeedItem[] = [
     status: 'not_started',
   },
 ];
+
+/**
+ * How a seed step is matched against a step already in the plan.
+ *
+ * Module and title, because the number is part of the title and a step's title
+ * is how the documents, the commit messages and you refer to it. Editing a
+ * seeded step's title here therefore makes it a different step and it will be
+ * imported again -- which is the right trade: retitling in the seed is rare,
+ * and the alternative is an id column that would have to be kept stable by
+ * hand forever.
+ */
+export function planStepKey(step: { module: string | null; title: string }): string {
+  return `${step.module ?? 'app'}:${step.title}`;
+}
+
+/**
+ * The seed steps that are not in the plan yet.
+ *
+ * Pure, so importing can be tested without a Supabase client -- and so the
+ * question it answers ("what would this add?") is separable from the write.
+ */
+export function seedStepsMissingFrom(
+  existing: readonly { module: string | null; title: string }[],
+): PlanSeedItem[] {
+  const seen = new Set(existing.map(planStepKey));
+  return PLAN_SEED.filter((step) => !seen.has(planStepKey(step)));
+}

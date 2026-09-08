@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId } from '@/lib/modules';
 import { PLAN_STATUSES } from '@/lib/plan/load';
-import { PLAN_SEED } from '@/lib/plan/seed';
+import { seedStepsMissingFrom } from '@/lib/plan/seed';
 
 export type PlanActionState = {
   error?: string;
@@ -181,16 +181,20 @@ export async function deletePlanItem(
 }
 
 /**
- * Write the build order in, once.
+ * Write the build order in, and later bring in what has been added to it.
  *
  * Deliberately a button rather than something that happens on first render.
  * Seeding is a write, and a write that happens because you looked at a page is
  * one nobody can decline — this way the empty plan explains what it is about to
  * do and you say when.
  *
- * It refuses when the plan already holds anything, which is what makes it safe
- * to press twice: the alternative, adding forty rows beside forty identical
- * ones, is exactly the mess that would make somebody abandon the page.
+ * Pressing it again is safe and useful rather than merely harmless. It adds
+ * only the steps the plan does not already have, matched on module and title,
+ * and touches nothing that is there: a step you marked done stays done, a
+ * comment you wrote stays written, a title you rewrote is left alone. That is
+ * what makes it possible to plan a new slice where the specs live — in a file,
+ * next to the reasoning — and then work it here, rather than retyping six long
+ * steps into a form.
  */
 export async function seedPlan(
   // Signature is fixed by useActionState; the button sends nothing.
@@ -200,22 +204,33 @@ export async function seedPlan(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { count } = await supabase
+  const { data, error: readError } = await supabase
     .from('plan_items')
-    .select('id', { count: 'exact', head: true })
+    .select('module, title, position')
     .eq('user_id', user.id);
+  if (readError) return { error: readError.message };
 
-  if (count) {
-    return { error: 'There is already a plan here. Delete it first if you want to start over.' };
+  const existing = (data ?? []) as { module: string | null; title: string; position: number }[];
+  const missing = seedStepsMissingFrom(existing);
+
+  if (missing.length === 0) {
+    return { message: 'Nothing new — the plan already holds every step in the build order.' };
   }
 
-  // Spaced by ten, and numbered within the module rather than across the whole
-  // seed, so each module's list starts at the top.
-  const byModule = new Map<string, number>();
-  const rows = PLAN_SEED.map((step) => {
-    const key = step.module ?? '';
-    const next = (byModule.get(key) ?? 0) + 10;
-    byModule.set(key, next);
+  // New steps go after whatever that module already has, spaced by ten so one
+  // can later be slotted between two others without renumbering the rest. On an
+  // empty plan this is 10, 20, 30 within each module, which is where the
+  // numbering came from in the first place.
+  const lastByModule = new Map<string, number>();
+  for (const row of existing) {
+    const key = row.module ?? 'app';
+    lastByModule.set(key, Math.max(lastByModule.get(key) ?? 0, row.position ?? 0));
+  }
+
+  const rows = missing.map((step) => {
+    const key = step.module ?? 'app';
+    const next = (lastByModule.get(key) ?? 0) + 10;
+    lastByModule.set(key, next);
     return {
       user_id: user.id,
       module: step.module,
@@ -230,5 +245,10 @@ export async function seedPlan(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: `Imported ${rows.length} steps from the build order.` };
+  return {
+    message:
+      existing.length === 0
+        ? `Imported ${rows.length} steps from the build order.`
+        : `Added ${rows.length} ${rows.length === 1 ? 'step' : 'steps'} written since the last import.`,
+  };
 }
