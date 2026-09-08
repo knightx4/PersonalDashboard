@@ -471,6 +471,65 @@ export async function movePlanItem(
   return { message: 'Moved.' };
 }
 
+/**
+ * Settle a decision.
+ *
+ * The other way a step closes. A build step closes on a commit; a decision
+ * closes on an answer, in the person's words, recorded in `resolution` where
+ * every brief beneath the feature will carry it from then on. `commit_sha`
+ * stays null, because nothing was built.
+ *
+ * Two refusals, and both are the point. A step that is not a decision cannot
+ * be answered -- the form is only rendered on a decision, so reaching here
+ * with a build step means the id was forged, and answering it would leave a
+ * step that reads done with no commit and no work behind it. And an empty
+ * answer is refused: a question closed on nothing is exactly what this
+ * feature exists to stop, and it would be worse than the question staying
+ * open, because it would stop looking like a question.
+ *
+ * The dated line on the comment is the same one the CLI writes, so a decision
+ * answered on the page and one answered from a terminal read the same.
+ */
+export async function answerPlanDecision(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const answer = text(4000).safeParse(field(formData, 'answer'));
+  if (!answer.success) return { error: 'That answer is too long.' };
+  if (!answer.data) return { error: 'An answer is what closes a decision. Say what you decided.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('kind, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.kind !== 'decision') {
+    return { error: 'That step is work, not a question. It closes on a commit.' };
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const line = `Answered ${stamp}: ${answer.data}`;
+  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'done', resolution: answer.data, comment, commit_sha: null })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Answered.' };
+}
+
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
 export async function deletePlanItem(
   _prev: PlanActionState,

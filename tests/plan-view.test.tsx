@@ -20,11 +20,13 @@ vi.mock('@/app/dev/plan/actions', () => {
   return {
     addPlanDependency: noop,
     addPlanItem: noop,
+    answerPlanDecision: noop,
     approvePlanItem: noop,
     deletePlanItem: noop,
     movePlanItem: noop,
     removePlanDependency: noop,
     seedPlan: noop,
+    sendPlanFeatureToClaude: noop,
     sendPlanItemToClaude: noop,
     setPlanItemAssignee: noop,
     setPlanItemStatus: noop,
@@ -192,6 +194,52 @@ describe('PlanView', () => {
       />,
     );
     expect(html).toContain('Nothing ready right now');
+  });
+
+  it('marks a decision as a question and never as ready work', () => {
+    // Its own tree, so the counts the other tests pin are left alone.
+    const withDecision = buildPlanTree({
+      items: [
+        item({ id: 'export', title: 'Export' }),
+        item({
+          id: 'question',
+          title: 'CSV or JSON?',
+          parentId: 'export',
+          kind: 'decision',
+          assignee: 'claude',
+        }),
+        item({
+          id: 'settled',
+          title: 'One file or many?',
+          parentId: 'export',
+          kind: 'decision',
+          status: 'done',
+          resolution: 'One file per month.',
+        }),
+        item({ id: 'writer', title: 'The writer', parentId: 'export' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(withDecision, 'all')}
+        summary={summarize(withDecision)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+      />,
+    );
+
+    // The "?" where a build step's checkbox would be, and the word that says
+    // a question is not work waiting to be picked up.
+    expect(html).toContain('>Decision<');
+    // Not "Ready", which on a question would read as ready to be built.
+    expect(html).toContain('>Unanswered<');
+    expect(html).toContain('>Answered<');
+    // Only the two decisions carry the mark; the build step beside them does
+    // not, and nor does the feature above them.
+    expect((html.match(/>Decision</g) ?? []).length).toBe(2);
   });
 
   it('opens on the import when there is no plan at all', () => {
