@@ -1,7 +1,9 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { addIdea, deleteIdea, updateIdea, type IdeaActionState } from './actions';
+import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
+import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -71,6 +73,44 @@ function AddIdea() {
   );
 }
 
+/**
+ * The way out of the ideas list.
+ *
+ * An idea has nowhere to go on its own; this is where it goes. Claude reads
+ * it and the code and writes a proposal into the plan -- a feature with its
+ * steps, done-whens and sizes -- for the person to approve there. Once that
+ * has happened the button becomes the link to what it became, because
+ * shaping the same idea twice would put two features in the plan.
+ */
+function ShapeIdea({ idea }: { idea: IdeaRow }) {
+  const [state, action, pending] = useActionState(shapeIdea, {} as IdeaActionState);
+
+  if (idea.planItem) {
+    return (
+      <Link
+        href="/dev/plan?view=all"
+        className="inline-flex items-center gap-1.5 text-small text-accent hover:underline"
+      >
+        <Sparkles className="size-3.5" aria-hidden />
+        In the plan as #{idea.planItem.number}
+        {idea.planItem.status === 'proposed' && ' · waiting for your approval'}
+      </Link>
+    );
+  }
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={idea.id} />
+      <Button type="submit" size="sm" variant="secondary" pending={pending}>
+        <Sparkles className="size-3.5" aria-hidden />
+        {pending ? 'Sending…' : 'Shape into a plan'}
+      </Button>
+      {state.message && <span className="text-small text-positive">{state.message}</span>}
+      <FieldError>{state.error}</FieldError>
+    </form>
+  );
+}
+
 function IdeaCard({ idea }: { idea: IdeaRow }) {
   const [editing, setEditing] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(
@@ -110,6 +150,7 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
         <>
           <p className="whitespace-pre-wrap text-body text-ink">{idea.body}</p>
           <div className="flex flex-wrap items-center gap-2">
+            <ShapeIdea idea={idea} />
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
               Edit
             </Button>
@@ -148,8 +189,8 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
 
       {ideas.length === 0 ? (
         <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
-          Nothing written down yet. Ideas here do not become work on their own — they wait until
-          you file one as a request.
+          Nothing written down yet. An idea here becomes work when you have Claude shape it into
+          the plan, and approve what it proposes there.
         </p>
       ) : (
         scopes.map((scope) => {

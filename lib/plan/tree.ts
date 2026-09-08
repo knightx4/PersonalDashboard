@@ -76,7 +76,7 @@ export type PlanSection = {
   progress: PlanProgress;
 };
 
-export const PLAN_VIEWS = ['all', 'open', 'ready', 'claude', 'blocked'] as const;
+export const PLAN_VIEWS = ['all', 'open', 'ready', 'proposed', 'claude', 'blocked'] as const;
 export type PlanView = (typeof PLAN_VIEWS)[number];
 
 export function isPlanView(value: string): value is PlanView {
@@ -87,6 +87,7 @@ export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   all: 'Everything',
   open: 'Open',
   ready: 'Ready',
+  proposed: 'Proposed',
   claude: "Claude's",
   blocked: 'Waiting',
 };
@@ -94,8 +95,10 @@ export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
 /** The numbers across the whole plan, for the strip at the top of the page. */
 export type PlanSummary = {
   total: number;
-  /** Not done and not dropped. */
+  /** Decided on and not finished: not proposed, not done, not dropped. */
   open: number;
+  /** Written by a session, waiting on a person. */
+  proposed: number;
   inProgress: number;
   /** Blocked by hand, or waiting on another step. */
   waiting: number;
@@ -110,15 +113,17 @@ export type PlanSummary = {
  *
  * Dropped steps leave the denominator, because a step you decided against is
  * not work outstanding and counting it would hold a finished module at 90%
- * forever. A set whose every step is dropped has no fraction at all rather
- * than a division by zero dressed up as 0%.
+ * forever. Proposed steps leave it too: nobody has decided on them yet, and
+ * a proposal that never gets approved should not have been holding a module
+ * at 60% in the meantime. A set whose every step is one of those has no
+ * fraction at all rather than a division by zero dressed up as 0%.
  *
  * In-progress counts as started and not as finished. Half-credit would make
  * the bar move when nothing shipped, which is the specific lie a progress bar
  * is worth having only if it does not tell.
  */
 export function planProgress(items: readonly { status: PlanStatus }[]): PlanProgress {
-  const live = items.filter((item) => item.status !== 'dropped');
+  const live = items.filter((item) => item.status !== 'dropped' && item.status !== 'proposed');
   const done = live.filter((item) => item.status === 'done').length;
   const inProgress = live.filter((item) => item.status === 'in_progress').length;
   const blocked = live.filter((item) => item.status === 'blocked').length;
@@ -160,9 +165,9 @@ function bySibling(a: PlanItem, b: PlanItem): number {
  *  - None of its own steps are still open. A feature with steps outstanding
  *    is worked through those steps; the feature itself is what you close when
  *    they are all done.
- *  - Nothing above it is blocked or dropped. A step under a dropped feature
- *    is dropped in all but the column, and one under a blocked feature waits
- *    with it.
+ *  - Nothing above it is blocked, dropped or still proposed. A step under a
+ *    dropped feature is dropped in all but the column, one under a blocked
+ *    feature waits with it, and one under a proposal has not been agreed to.
  */
 export function isReady(
   node: Pick<PlanNode, 'status' | 'waitingOn' | 'children'>,
@@ -171,7 +176,7 @@ export function isReady(
   if (node.status !== 'not_started') return false;
   if (node.waitingOn.length > 0) return false;
   if (node.children.some((child) => !isClosed(child.status))) return false;
-  if (ancestors.some((a) => a.status === 'blocked' || a.status === 'dropped')) return false;
+  if (ancestors.some((a) => ['blocked', 'dropped', 'proposed'].includes(a.status))) return false;
   return true;
 }
 
@@ -301,6 +306,8 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
       return !isClosed(node.status);
     case 'ready':
       return node.ready;
+    case 'proposed':
+      return node.status === 'proposed';
     case 'claude':
       return node.assignee === 'claude' && !isClosed(node.status);
     case 'blocked':
@@ -357,10 +364,11 @@ export function workOrder(
 
 export function summarize(sections: readonly PlanSection[]): PlanSummary {
   const nodes = flattenSections(sections);
-  const open = nodes.filter((node) => !isClosed(node.status));
+  const open = nodes.filter((node) => !isClosed(node.status) && node.status !== 'proposed');
   return {
     total: nodes.length,
     open: open.length,
+    proposed: nodes.filter((node) => node.status === 'proposed').length,
     inProgress: open.filter((node) => node.status === 'in_progress').length,
     waiting: open.filter((node) => node.status === 'blocked' || node.waitingOn.length > 0).length,
     ready: open.filter((node) => node.ready).length,

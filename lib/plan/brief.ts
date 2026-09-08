@@ -17,6 +17,7 @@ import { ancestorsOf, type PlanNode, type PlanSection } from './tree';
  */
 
 export const STATUS_WORD: Record<PlanStatus, string> = {
+  proposed: 'proposed',
   not_started: 'not started',
   in_progress: 'in progress',
   blocked: 'blocked',

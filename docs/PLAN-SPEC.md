@@ -35,7 +35,7 @@ Two tables in `public`, both under row level security.
 | `parent_id` | The step this is part of, or null at the top of a module's plan. Cascades on delete: removing a feature removes its steps. |
 | `title`, `detail` | What it is, and what it involves. |
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
-| `status` | `not_started`, `in_progress`, `blocked`, `done`, `dropped`. |
+| `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step was written by a session from an idea and is waiting on the person; see *Proposals* below. |
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
 | `size` | `s`, `m` or `l`. Coarse on purpose: "one sitting or not", not hours. |
@@ -60,6 +60,50 @@ Waiting on another step is a relation rather than a status because it
 clears itself: the moment the other step is done, this one is ready, and
 nobody has to remember to come back and unblock it. `blocked` is for waiting
 on the outside world — an answer, an API key, a decision.
+
+## Proposals: from an idea to the plan
+
+An idea on `/dev/ideas` is a sentence. A plan step needs a parent, steps
+beneath it, a "done when" and a size, and writing that well takes knowing
+the code. So the shaping is Claude's job and the approving is the person's.
+
+1. **Shape into a plan**, a button on each idea, fires the feature routine
+   with the idea as the brief and the shaping procedure from
+   `.claude/skills/plan` as the job.
+2. The session reads the idea and the code and writes a feature with its
+   steps into the plan, every one in the **`proposed`** status, and links
+   the idea to the feature (`ideas.plan_item_id`). It builds nothing and
+   approves nothing. Open questions go in the feature's detail.
+3. The person reviews on `/dev/plan`. The proposed view lists what is
+   waiting. Three cheap moves are the whole review: drop a step, reorder or
+   reprioritise, and **Approve** — the first choice in a proposal's health
+   menu, which moves the step and every proposed step beneath it to not
+   started in one click. Handing a step to Claude is the fourth move, and
+   the one that makes the routine pick it up.
+4. From there the building loop applies. The idea's button has become the
+   link "in the plan as #n".
+
+A proposed step is never ready, is left out of every progress count, and
+is never picked up by `next`. A step beneath a proposed feature is not
+ready either, whatever its own status says. Nothing in the skill or the CLI
+moves a step out of `proposed` except the person's approve, on the page or
+with `scripts/plan.ts approve`.
+
+## The nightly routine
+
+One routine does both queues, notes first, one plan step at a time, so each
+morning there is one thing to review rather than five. Its prompt:
+
+> Work the notes queue per .claude/skills/notes/SKILL.md until it is empty
+> or every remaining note is blocked or planned. Then, if nothing in the
+> notes queue needed a decision, run `npx tsx scripts/plan.ts next --claude`
+> and build the first step it lists, per .claude/skills/plan/SKILL.md — one
+> step only. Never touch a proposed step. Push once, then report: notes
+> closed, the plan step closed and what it made ready, and anything blocked
+> with its question, blocked items first.
+
+The *Send to Claude* and *Shape into a plan* buttons fire the same routine
+with an extra turn that names the step or the idea; the extra turn wins.
 
 ## The reading
 
@@ -88,8 +132,8 @@ denominator; in-progress counts as started, not as part done.
 in reading order — modules as the switcher lists them, then top to bottom.
 
 **Views.** `?view=` narrows the page to `open` (the default), `ready`,
-`blocked` (blocked by hand or waiting on another), `claude` (open steps
-handed to Claude) or `all`. A step that does not match stays, dimmed, when
+`proposed`, `blocked` (blocked by hand or waiting on another), `claude`
+(open steps handed to Claude) or `all`. A step that does not match stays, dimmed, when
 something beneath it does, so a ready sub-step is seen in its place.
 
 ## The page
@@ -118,7 +162,9 @@ Three ways in, all landing on the same rows.
 next [--claude]     what could be picked up, most urgent first
 list [--all]        the tree, per module
 show <n>            the brief
-add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude]
+ideas               ideas not yet shaped into the plan
+add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
+approve <n>         a person's move: the step and the proposed steps beneath it
 start | done | block | drop | reopen | assign | priority | depends | undepend
 ```
 

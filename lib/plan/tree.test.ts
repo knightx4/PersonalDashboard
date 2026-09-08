@@ -82,6 +82,11 @@ describe('planProgress', () => {
     expect(planProgress([at('in_progress', 'a'), at('not_started', 'b')]).fraction).toBe(0);
   });
 
+  it('leaves a proposed step out of the denominator, because nobody has said yes to it', () => {
+    expect(planProgress([at('done', 'a'), at('proposed', 'b')]).fraction).toBe(1);
+    expect(planProgress([at('proposed', 'a')]).fraction).toBeNull();
+  });
+
   it('counts a blocked step as live, not done, and on its own', () => {
     expect(planProgress([at('blocked', 'a'), at('done', 'b')])).toEqual({
       done: 1,
@@ -237,8 +242,8 @@ describe('isReady', () => {
     expect(isReady({ status: 'not_started', ...bare }, [])).toBe(true);
   });
 
-  it('is not a step underway, blocked, done or dropped', () => {
-    for (const status of ['in_progress', 'blocked', 'done', 'dropped'] as const) {
+  it('is not a step underway, blocked, done, dropped or merely proposed', () => {
+    for (const status of ['proposed', 'in_progress', 'blocked', 'done', 'dropped'] as const) {
       expect(isReady({ status, ...bare }, [])).toBe(false);
     }
   });
@@ -276,17 +281,20 @@ describe('isReady', () => {
     expect(findNode(sections, 'feature')!.ready).toBe(true);
   });
 
-  it('is not a step under a blocked or dropped feature', () => {
+  it('is not a step under a blocked, dropped or proposed feature', () => {
     const sections = tree([
       at('blocked', 'stuck'),
       item({ id: 'under-stuck', parentId: 'stuck' }),
       at('dropped', 'gone'),
       item({ id: 'under-gone', parentId: 'gone' }),
+      at('proposed', 'maybe'),
+      item({ id: 'under-maybe', parentId: 'maybe' }),
       at('in_progress', 'live'),
       item({ id: 'under-live', parentId: 'live' }),
     ]);
     expect(findNode(sections, 'under-stuck')!.ready).toBe(false);
     expect(findNode(sections, 'under-gone')!.ready).toBe(false);
+    expect(findNode(sections, 'under-maybe')!.ready).toBe(false);
     expect(findNode(sections, 'under-live')!.ready).toBe(true);
   });
 });
@@ -332,6 +340,18 @@ describe('applyView', () => {
       .filter((n) => n.matches)
       .map((n) => n.id);
     expect(ids.sort()).toEqual(['stuck', 'waits']);
+  });
+
+  it('shows only the proposals under "proposed", in their place', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      at('proposed', 'maybe', { parentId: 'feature' }),
+      at('proposed', 'maybe-too', { parentId: 'maybe' }),
+      item({ id: 'decided', parentId: 'feature' }),
+    ]);
+    const shown = flattenSections(applyView(sections, 'proposed'));
+    expect(shown.map((n) => n.id)).toEqual(['feature', 'maybe', 'maybe-too']);
+    expect(shown.map((n) => n.matches)).toEqual([false, true, true]);
   });
 
   it('leaves the module’s progress over the whole plan', () => {
@@ -391,12 +411,14 @@ describe('summarize', () => {
         item({ id: 'd', parentId: 'feature', assignee: 'claude' }),
         at('dropped', 'e'),
         item({ id: 'f' }),
+        at('proposed', 'g'),
       ],
       [dep('f', 'feature')],
     );
     expect(summarize(sections)).toEqual({
-      total: 7,
+      total: 8,
       open: 5,
+      proposed: 1,
       inProgress: 1,
       // c by hand, f through its dependency.
       waiting: 2,

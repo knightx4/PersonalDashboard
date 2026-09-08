@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { MODULE_IDS } from '@/lib/modules';
+import { fireFeatureRoutine } from '@/lib/feedback/routine';
+import { MODULE_IDS, MODULES } from '@/lib/modules';
 
 export type IdeaActionState = {
   error?: string;
@@ -96,4 +97,53 @@ export async function deleteIdea(
 
   revalidatePath('/dev/ideas');
   return { message: 'Deleted.' };
+}
+
+/**
+ * Hand an idea to Claude to be shaped into the plan.
+ *
+ * Not to be built. The session that wakes up reads the idea and the code and
+ * writes a feature with its steps into the plan as *proposed* -- each with a
+ * done-when and a size, waiting to be approved on the plan page. Nothing is
+ * started until a person says so there. The same routine the notes queue
+ * fires, with a different job in the extra turn.
+ */
+export async function shapeIdea(
+  _prev: IdeaActionState,
+  formData: FormData,
+): Promise<IdeaActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing idea.' };
+
+  const { data: idea } = await supabase
+    .from('ideas')
+    .select('id, body, module, plan_item_id')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!idea) return { error: 'That idea no longer exists.' };
+  if (idea.plan_item_id) return { error: 'This idea is already in the plan.' };
+
+  const scope = idea.module as string | null;
+  const label = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
+
+  const text =
+    `Shape idea ${String(idea.id).slice(0, 8)} into the plan, following the "Shaping an idea" ` +
+    'section of .claude/skills/plan/SKILL.md. Write a proposal only: a feature with its steps, ' +
+    'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
+    'Do not build anything and do not approve anything.\n\n' +
+    `Idea ${String(idea.id)} (about ${label}):\n\n${String(idea.body)}\n`;
+
+  const result = await fireFeatureRoutine({
+    apiKey: process.env.CLAUDE_API_KEY ?? null,
+    routineId: process.env.CLAUDE_FEATURE_ROUTINE_ID ?? null,
+    text,
+  });
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath('/dev/ideas');
+  return { message: 'Sent. A proposal will appear on the plan page when the session is done.' };
 }
