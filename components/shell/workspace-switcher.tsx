@@ -7,6 +7,7 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
+import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type ModuleId } from '@/lib/modules';
 
@@ -232,13 +233,18 @@ export function WorkspaceSwitcher({
       </button>
 
       {open && (
-        <div
+        <Popover
           ref={panelRef}
           role="menu"
           tabIndex={-1}
           aria-label="Workspaces"
           onKeyDown={onMenuKeyDown}
-          className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-card border border-border bg-raised p-1 shadow-lg"
+          // Below the trigger rather than pinned to the viewport: this one
+          // lives at the top of the sidebar column, where there is room both
+          // beneath it and to its right on every width the app renders at.
+          anchor="trigger-below"
+          padding="menu"
+          className="w-72"
         >
           {rows.map((row, index) => {
             const isCurrent = row.id === current;
@@ -283,7 +289,7 @@ export function WorkspaceSwitcher({
               </Link>
             );
           })}
-        </div>
+        </Popover>
       )}
     </div>
   );

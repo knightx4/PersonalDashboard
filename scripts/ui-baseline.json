@@ -57,14 +57,7 @@
   "hand-rolled-box components/jobs/pipeline/view-toggle.tsx": 1,
   "hand-rolled-box components/learn/reading-card.tsx": 2,
   "hand-rolled-box components/share/send-to-share.tsx": 1,
-  "hand-rolled-box components/shell/command-palette.tsx": 1,
-  "hand-rolled-box components/shell/feedback-button.tsx": 1,
-  "hand-rolled-box components/shell/left-rail.tsx": 2,
-  "hand-rolled-box components/shell/notifications-button.tsx": 1,
-  "hand-rolled-box components/shell/theme-picker.tsx": 2,
-  "hand-rolled-box components/shell/workspace-switcher.tsx": 1,
   "hand-rolled-box components/todo/task-form.tsx": 1,
   "hand-rolled-box components/vault/note-properties.tsx": 1,
-  "hand-rolled-box components/vault/status-banner.tsx": 2,
-  "off-scale-text components/shell/key-hints.tsx": 1
+  "hand-rolled-box components/vault/status-banner.tsx": 2
 }

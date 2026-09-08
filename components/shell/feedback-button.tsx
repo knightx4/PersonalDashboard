@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
+import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import { usePopover } from '@/lib/use-popover';
 
@@ -82,18 +83,14 @@ export function FeedbackButton({
       </button>
 
       {open && (
-        <div
+        <Popover
           ref={panelRef}
           role="dialog"
           aria-modal="true"
           aria-label="Send feedback"
           tabIndex={-1}
-          // On a phone the button sits far enough right that a panel anchored
-          // to it hangs off the left edge of the screen, where nothing can
-          // scroll it back into view -- and Safari answers a field focused out
-          // there by zooming the whole page out to reach it. Pinned to the
-          // viewport below the header until there is room to anchor it.
-          className="fixed inset-x-4 top-16 z-50 rounded-card border border-border bg-surface p-4 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-88"
+          padding="panel"
+          className="sm:w-88"
         >
           <form action={action} className="flex flex-col gap-3">
             <input type="hidden" name="page_path" value={pathname} />
@@ -176,7 +173,7 @@ export function FeedbackButton({
               onNavigate={() => setOpen(false)}
             />
           </div>
-        </div>
+        </Popover>
       )}
     </div>
   );

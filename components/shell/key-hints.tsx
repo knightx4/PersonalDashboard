@@ -52,6 +52,14 @@ export function KeyHintsProvider() {
  * accessibility tree: the control it sits on already has a name, and the
  * shortcut is announced nowhere else either, which is the honest state of it.
  */
+/**
+ * `text-micro`, which is the bottom of the scale, and not the 10px this was
+ * written at. A tenth size in a mono face is a size nobody chose -- it was one
+ * step below the floor because a keycap felt like it wanted to be small -- and
+ * the cap is 18px tall with `leading-none`, so the extra pixel changes nothing
+ * about the box and only makes ⌥ and ⌘ legible at the size they are actually
+ * read at.
+ */
 export function Kbd({
   children,
   className,
@@ -67,7 +75,7 @@ export function Kbd({
       aria-hidden
       className={cn(
         !always && 'keyhint',
-        'inline-flex h-4.5 min-w-4.5 items-center justify-center rounded border border-border-strong border-b-2 px-1 font-mono text-[10px] leading-none text-ink-muted',
+        'inline-flex h-4.5 min-w-4.5 items-center justify-center rounded border border-border-strong border-b-2 px-1 font-mono text-micro leading-none text-ink-muted',
         className,
       )}
     >
