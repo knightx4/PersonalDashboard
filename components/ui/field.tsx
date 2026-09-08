@@ -13,11 +13,26 @@ import { cn } from '@/lib/cn';
  * `text-base sm:text-ui` on every field is load-bearing: 16px is what stops
  * iOS zooming the page on focus, and anything smaller silently destroys the
  * layout on a phone.
+ *
+ * Height, inset and radius come from the density dial rather than from a
+ * class, so a form's controls cannot disagree with each other and cannot
+ * disagree with the buttons beside them. See the Density block in
+ * app/globals.css for why the default came down.
+ */
+
+/**
+ * The label is deliberately quieter than the thing it names.
+ *
+ * It was `text-ui font-medium text-ink` -- the same weight and the same ink as
+ * the value below it, on its own line, above every field. Six fields meant six
+ * lines of black text competing with six lines of black text, and the form
+ * read as a wall before it read as a form. A label is a caption: it should be
+ * legible when looked for and quiet when not.
  */
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn('mb-1.5 block text-ui font-medium text-ink', className)}
+      className={cn('mb-1 block text-small font-medium text-ink-muted', className)}
       {...props}
     />
   );
@@ -30,17 +45,23 @@ export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLab
  */
 const control =
   // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
-  'w-full rounded-lg border border-control bg-surface text-base text-ink sm:text-ui ' +
-  'placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 ' +
-  'aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:ring-danger/25 ' +
+  'w-full rounded-control border border-control bg-surface text-base text-ink sm:text-ui ' +
+  // ring-1, not ring-2. Focus was a 2px halo *plus* a border colour change,
+  // which on a 32px control is a visible thickening of the whole box; at 1px
+  // the border does the identifying and the ring only confirms it.
+  'placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40 ' +
+  'aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:ring-danger/40 ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
+
+/** Height and inset from the dial, so an input, a select and a button agree. */
+const controlBox = 'h-(--control-h) px-(--control-px)';
 
 export const Input = function Input({
   className,
   ref,
   ...props
 }: React.ComponentProps<'input'>) {
-  return <input ref={ref} className={cn(control, 'h-10 px-3', className)} {...props} />;
+  return <input ref={ref} className={cn(control, controlBox, className)} {...props} />;
 };
 
 export function Select({
@@ -49,17 +70,35 @@ export function Select({
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(control, 'h-10 px-3', className)} {...props}>
+    <select className={cn(control, controlBox, className)} {...props}>
       {children}
     </select>
   );
 }
 
+/**
+ * Grows with what is typed into it.
+ *
+ * `field-sizing: content` is the whole mechanism -- no ref, no resize
+ * observer, no client component, which matters because most of the forms
+ * using this render on the server. Where it is unsupported the browser falls
+ * back to `rows` and the min-height, which is the old behaviour, so nothing
+ * breaks; where it is supported a box for a one-line note starts one line
+ * tall instead of ninety-six pixels tall and grows as it is filled.
+ *
+ * The max-height is not optional: without it a long note pushes its own
+ * submit button off the bottom of the screen.
+ */
 export function Textarea({
   className,
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(control, 'min-h-24 px-3 py-2', className)} {...props} />;
+  return (
+    <textarea
+      className={cn(control, 'field-sizing-content max-h-64 min-h-16 px-(--control-px) py-1.5', className)}
+      {...props}
+    />
+  );
 }
 
 /**
@@ -69,7 +108,7 @@ export function Textarea({
 export function FieldError({ children, id }: { children?: React.ReactNode; id?: string }) {
   if (!children) return null;
   return (
-    <p id={id} role="alert" className="mt-1.5 text-ui text-danger">
+    <p id={id} role="alert" className="mt-1 text-small text-danger">
       {children}
     </p>
   );

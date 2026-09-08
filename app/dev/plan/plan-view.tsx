@@ -264,35 +264,36 @@ function catalogLabel(entry: PlanCatalogEntry): string {
   return `${'· '.repeat(entry.depth)}#${entry.number} ${entry.title}`;
 }
 
-/** The fields every step has, for the add and the edit form alike. */
+/**
+ * The fields every step has, for the add and the edit form alike.
+ *
+ * `fold` is what makes adding a step feel like typing rather than filling in a
+ * form. Adding one is overwhelmingly a one-line act -- a title, and the
+ * defaults for everything else -- so the add form shows the title and folds
+ * the rest away behind a word. Editing is the opposite: you opened it to
+ * change something, and which thing is not knowable, so the edit form shows
+ * everything at once.
+ *
+ * The title has no label. A caption reading "The step" above a box reading
+ * "What has to happen" is the same sentence twice, and the second one is
+ * inside the control where it is needed.
+ */
 function StepFields({
   prefix,
   node,
+  fold = false,
 }: {
   prefix: string;
   node?: Pick<PlanNode, 'title' | 'detail' | 'acceptance' | 'priority' | 'size' | 'assignee'>;
+  fold?: boolean;
 }) {
-  return (
-    <>
-      <div>
-        <Label htmlFor={`${prefix}-title`}>The step</Label>
-        <Input
-          id={`${prefix}-title`}
-          name="title"
-          defaultValue={node?.title ?? ''}
-          autoFocus
-          placeholder="What has to happen"
-        />
-      </div>
+  const [showMore, setShowMore] = useState(!fold);
+
+  const detail = (
+    <div className="grid gap-(--field-gap) sm:grid-cols-2">
       <div>
         <Label htmlFor={`${prefix}-detail`}>What it involves</Label>
-        <Textarea
-          id={`${prefix}-detail`}
-          name="detail"
-          rows={3}
-          className="min-h-16"
-          defaultValue={node?.detail ?? ''}
-        />
+        <Textarea id={`${prefix}-detail`} name="detail" rows={2} defaultValue={node?.detail ?? ''} />
       </div>
       <div>
         <Label htmlFor={`${prefix}-acceptance`}>Done when</Label>
@@ -300,12 +301,38 @@ function StepFields({
           id={`${prefix}-acceptance`}
           name="acceptance"
           rows={2}
-          className="min-h-12"
           defaultValue={node?.acceptance ?? ''}
-          placeholder="What the work is checked against. Written before the work, it is what makes “done” a fact."
+          placeholder="What the work is checked against."
         />
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-(--field-gap)">
+      <Input
+        id={`${prefix}-title`}
+        name="title"
+        defaultValue={node?.title ?? ''}
+        autoFocus
+        aria-label="The step"
+        placeholder="What has to happen"
+      />
+
+      {showMore ? (
+        detail
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowMore(true)}
+          className="press inline-flex items-center gap-1 self-start rounded-control px-1.5 py-0.5 text-small text-ink-muted hover:bg-shell-hover hover:text-accent"
+        >
+          <span aria-hidden>+</span>
+          Detail and acceptance
+        </button>
+      )}
+
+      <div className="grid grid-cols-2 gap-(--field-gap) sm:grid-cols-3">
         <div>
           <Label htmlFor={`${prefix}-priority`}>Priority</Label>
           <PrioritySelect id={`${prefix}-priority`} defaultValue={node?.priority ?? 2} />
@@ -319,7 +346,7 @@ function StepFields({
           <AssigneeSelect id={`${prefix}-assignee`} defaultValue={node?.assignee ?? null} />
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -356,18 +383,22 @@ function AddStep({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="press w-full rounded-card border border-dashed border-border bg-surface py-2 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
+        className="press inline-flex items-center gap-1.5 rounded-control px-2 py-1 text-ui text-ink-muted hover:bg-shell-hover hover:text-accent"
       >
+        <span aria-hidden className="text-body leading-none">+</span>
         {parentId ? 'Add a sub-step' : 'Add a step'}
       </button>
     );
   }
 
   return (
-    <form action={action} className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+    <form
+      action={action}
+      className={cn(cardVariants({ padding: 'dense' }), 'flex flex-col gap-(--field-gap)')}
+    >
       <input type="hidden" name="module" value={module ?? ''} />
       <input type="hidden" name="parent" value={parentId ?? ''} />
-      <StepFields prefix={prefix} />
+      <StepFields prefix={prefix} fold />
       <div className="flex flex-wrap items-center gap-2">
         <Select name="status" defaultValue="not_started" className="w-36" aria-label="Status">
           <StatusOptions />
@@ -410,7 +441,7 @@ function EditStep({
   const prefix = `edit-${node.id}`;
 
   return (
-    <form action={action} className="space-y-2 px-3 pb-3">
+    <form action={action} className="flex flex-col gap-(--field-gap) px-3 pb-3">
       <input type="hidden" name="id" value={node.id} />
       <StepFields prefix={prefix} node={node} />
       <div>

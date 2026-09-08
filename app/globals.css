@@ -917,7 +917,11 @@ body,
   --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono-stack);
 
-  --radius-card: 0.75rem;
+  --radius-card: 0.5rem;
+  /* Tighter than the card that holds them. A control is a small object and a
+   * 12px radius on a 32px box is most of the way to a pill, which reads as a
+   * button even when it is a text field. */
+  --radius-control: 0.375rem;
 
   /* 150ms ease-out everywhere. Alive, never in the way. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -964,27 +968,65 @@ body::before {
 /* ---------------------------------------------------------------------------
  * Density.
  *
- * One attribute on <html>, three values, two variables. Every card's padding
- * and every list row's vertical padding derive from these, so "how much do I
- * want to see at once" is one click in the top bar rather than a rebuild.
- * Comfortable is the default and is exactly what the app measured before the
- * dial existed; the other two only take away.
+ * One attribute on <html>, three values. Card padding, row padding, control
+ * height, control inset and the gap between fields all derive from these, so
+ * "how much do I want to see at once" is one click in the top bar rather than
+ * a rebuild.
+ *
+ * Comfortable is no longer what the app measured before the dial existed. It
+ * used to be, and the result was a form that asked for four short strings and
+ * filled a screen doing it: 40px controls, 20px card padding, a labelled line
+ * above every field. The dial was the escape hatch, which meant the default
+ * was a thing you had to escape. So the whole ladder came down a step and
+ * comfortable is now what snug was. The dial still only takes away.
+ *
+ * Control height is here rather than in a utility class because it is the
+ * measurement everything else in a form is hung off -- a select next to an
+ * input next to a button all agree because they read the same variable, and
+ * none of them can drift by someone typing h-10 out of habit.
  * ------------------------------------------------------------------------- */
 :root,
 [data-density='comfortable'] {
-  --card-p: 1.25rem;
-  --card-p-dense: 1rem;
-  --row-y: 0.625rem;
-}
-[data-density='snug'] {
   --card-p: 1rem;
   --card-p-dense: 0.75rem;
   --row-y: 0.5rem;
+  --control-h: 2.25rem;
+  --control-px: 0.625rem;
+  --field-gap: 0.75rem;
 }
-[data-density='dense'] {
-  --card-p: 0.75rem;
+[data-density='snug'] {
+  --card-p: 0.875rem;
   --card-p-dense: 0.625rem;
   --row-y: 0.375rem;
+  --control-h: 2.125rem;
+  --control-px: 0.5rem;
+  --field-gap: 0.625rem;
+}
+[data-density='dense'] {
+  --card-p: 0.625rem;
+  --card-p-dense: 0.5rem;
+  --row-y: 0.25rem;
+  --control-h: 2rem;
+  --control-px: 0.5rem;
+  --field-gap: 0.5rem;
+}
+
+/* A finger needs a bigger target than a mouse does. WCAG 2.5.8 asks 24px and
+ * a thumb wants nearer 40, so the touch sizes above are the floor and the
+ * compact ones only apply once there is a pointer's worth of precision. This
+ * is the same reasoning as the `text-base sm:text-ui` on every control, and
+ * it breaks at the same width. */
+@media (min-width: 40rem) {
+  :root,
+  [data-density='comfortable'] {
+    --control-h: 2rem;
+  }
+  [data-density='snug'] {
+    --control-h: 1.875rem;
+  }
+  [data-density='dense'] {
+    --control-h: 1.75rem;
+  }
 }
 
 @utility card-pad {

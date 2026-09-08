@@ -156,7 +156,7 @@ function PinnedField({ id, defaultChecked = false }: { id: string; defaultChecke
         type="checkbox"
         name="pinned"
         defaultChecked={defaultChecked}
-        className="size-4 accent-[var(--color-accent)]"
+        className="size-4 accent-accent"
       />
       Pin to the top
     </label>

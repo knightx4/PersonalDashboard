@@ -81,7 +81,7 @@ function Candidate({
         value={JSON.stringify(source)}
         checked={checked}
         onChange={onChoose}
-        className="mt-1 size-4 shrink-0 accent-[var(--color-accent)]"
+        className="mt-1 size-4 shrink-0 accent-accent"
       />
       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
