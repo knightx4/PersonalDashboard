@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { fireFeatureRoutine } from '@/lib/feedback/routine';
+import { fireFeatureRoutine, planRoutineId } from '@/lib/feedback/routine';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 
 export type IdeaActionState = {
@@ -139,7 +139,7 @@ export async function shapeIdea(
 
   const result = await fireFeatureRoutine({
     apiKey: process.env.CLAUDE_API_KEY ?? null,
-    routineId: process.env.CLAUDE_FEATURE_ROUTINE_ID ?? null,
+    routineId: planRoutineId(),
     text,
   });
   if (!result.ok) return { error: result.error };
