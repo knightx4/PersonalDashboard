@@ -93,6 +93,10 @@ export function serverEnv() {
       CLAUDE_NOTES_ROUTINE_ID: z.string().min(1).optional(),
       /** The routine "Send to Claude" and "Shape into a plan" fire. */
       CLAUDE_PLAN_ROUTINE_ID: z.string().min(1).optional(),
+      /** Bearer for the notes routine. Scoped to it, not to the account. */
+      CLAUDE_NOTES_ROUTINE_TOKEN: z.string().min(1).optional(),
+      /** Bearer for the plan routine. Scoped to it, not to the account. */
+      CLAUDE_PLAN_ROUTINE_TOKEN: z.string().min(1).optional(),
       /** BoardGameGeek approved-application token (bearer). */
       BGG_API_TOKEN: z.string().min(1).optional(),
       /** Optional. UPCitemdb paid key; the trial endpoint works without it. */
