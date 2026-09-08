@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Pin, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -25,8 +25,10 @@ import { addDays, type Task } from '@/lib/todo/tasks/model';
  * keep their list in.
  */
 export function AddTask({ today }: { today: string }) {
-  const [expanded, setExpanded] = useState(false);
+  const [noting, setNoting] = useState(false);
   const [dueOn, setDueOn] = useState('');
+  const [time, setTime] = useState('');
+  const [pinned, setPinned] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -42,10 +44,12 @@ export function AddTask({ today }: { today: string }) {
       const result = await addTask(prev, formData);
       if (result.message) {
         formRef.current?.reset();
-        // The date is held here rather than by the form, so the form's own
-        // reset does not reach it.
+        // The date, the hour and the pin are held here rather than by the
+        // form, so the form's own reset does not reach them.
         setDueOn('');
-        setExpanded(false);
+        setTime('');
+        setPinned(false);
+        setNoting(false);
         titleRef.current?.focus();
       }
       return result;
@@ -56,14 +60,50 @@ export function AddTask({ today }: { today: string }) {
   return (
     <form ref={formRef} action={action} className={cardVariants({ padding: 'dense' })}>
       <div className="flex items-center gap-2">
-        <Input
-          ref={titleRef}
-          name="title"
-          placeholder="What has to happen?"
-          aria-label="What has to happen?"
-          className="flex-1"
-          required
-        />
+        {/* One control, not a form: what has to happen, and when, on the line
+            you are already typing on. The two were a text box and a date
+            picker two rows apart behind a Details toggle, which is three
+            controls and a fold to write down "Thursday". */}
+        <div
+          className={cn(
+            'flex h-(--control-h) min-w-0 flex-1 items-center gap-1 rounded-control border border-control bg-surface px-(--control-px)',
+            'focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40',
+          )}
+        >
+          <input
+            ref={titleRef}
+            name="title"
+            placeholder="What has to happen?"
+            aria-label="What has to happen?"
+            required
+            // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+            className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
+          />
+          <input
+            type="date"
+            name="dueOn"
+            aria-label="Due"
+            value={dueOn}
+            onChange={(event) => {
+              setDueOn(event.target.value);
+              // A time with no day is not a due date at all; see resolveDue.
+              if (!event.target.value) setTime('');
+            }}
+            className="tabular shrink-0 bg-transparent text-small text-ink-muted outline-none"
+          />
+          {/* The hour, only once there is a day for it to be an hour of. */}
+          {dueOn && (
+            <input
+              type="time"
+              name="dueTime"
+              aria-label="At"
+              value={time}
+              onChange={(event) => setTime(event.target.value)}
+              className="tabular shrink-0 bg-transparent text-small text-ink-muted outline-none"
+            />
+          )}
+        </div>
+
         <Button type="submit" disabled={pending}>
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           Add
@@ -74,32 +114,36 @@ export function AddTask({ today }: { today: string }) {
         <QuickDay label="Today" day={today} value={dueOn} onPick={setDueOn} />
         <QuickDay label="Tomorrow" day={tomorrow} value={dueOn} onPick={setDueOn} />
 
-        {/* A date set any other way still has to be visible from out here,
-            or collapsing Details would hide the fact that there is one. */}
-        {dueOn && dueOn !== today && dueOn !== tomorrow && (
-          <span className="text-small text-ink-muted">Due {dayLabel(dueOn)}</span>
-        )}
-
-        {/* Deliberately quiet rather than accent-coloured: the whole point of
-            the form is that you do not need what is behind this. */}
         <button
           type="button"
-          onClick={() => setExpanded((open) => !open)}
+          aria-pressed={pinned}
+          onClick={() => setPinned((on) => !on)}
+          title={pinned ? 'Pinned to the top' : 'Pin to the top'}
+          className={cn(
+            'press flex size-7 items-center justify-center rounded-full transition-colors duration-150',
+            pinned ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+          )}
+        >
+          <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
+          <span className="sr-only">{pinned ? 'Pinned to the top' : 'Pin to the top'}</span>
+        </button>
+        <input type="hidden" name="pinned" value={pinned ? 'on' : ''} />
+
+        {/* One button for the one thing that genuinely needs its own room,
+            in place of a Details fold over three fields that did not. */}
+        <button
+          type="button"
+          onClick={() => setNoting((open) => !open)}
           className="ml-auto text-ui font-medium text-ink-muted transition-colors duration-150 hover:text-ink"
         >
-          {expanded ? 'Less' : 'Details'}
+          {noting ? 'Hide note' : 'Add note'}
         </button>
       </div>
 
-      {/* Rendered either way so a due date typed before expanding is still
-          submitted, and hidden rather than unmounted so nothing is lost when
-          the section is collapsed again. */}
-      <div className={cn('mt-3 space-y-3', !expanded && 'hidden')}>
-        <DueFields day={dueOn} onDayChange={setDueOn} />
-        <Field id="add-body" label="Notes">
-          <Textarea id="add-body" name="body" rows={3} />
-        </Field>
-        <PinnedField id="add-pinned" />
+      {/* Hidden rather than unmounted, so a note typed and then folded away is
+          still there and is still submitted. */}
+      <div className={cn('mt-2', !noting && 'hidden')}>
+        <Textarea id="add-body" name="body" rows={2} aria-label="Note" placeholder="Anything else." />
       </div>
 
       <FieldError>{state.error}</FieldError>
@@ -162,29 +206,14 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
 function DueFields({
   defaultDay = '',
   defaultTime = '',
-  day,
-  onDayChange,
 }: {
   defaultDay?: string;
   defaultTime?: string;
-  /** Held by the caller, where a Today button can also set it. */
-  day?: string;
-  onDayChange?: (value: string) => void;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field id="dueOn" label="Due">
-        {onDayChange ? (
-          <Input
-            id="dueOn"
-            name="dueOn"
-            type="date"
-            value={day ?? ''}
-            onChange={(event) => onDayChange(event.target.value)}
-          />
-        ) : (
-          <Input id="dueOn" name="dueOn" type="date" defaultValue={defaultDay} />
-        )}
+        <Input id="dueOn" name="dueOn" type="date" defaultValue={defaultDay} />
       </Field>
       <Field id="dueTime" label="At (optional)" hint="Leave empty for a day with no particular hour.">
         <Input id="dueTime" name="dueTime" type="time" defaultValue={defaultTime} />
@@ -241,15 +270,6 @@ function QuickDay({
       {label}
     </button>
   );
-}
-
-/** A day as a person would read it, for the line that says one is set. */
-function dayLabel(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(`${day}T00:00:00Z`));
 }
 
 /** The HH:MM a stored instant shows as, in the browser's own zone. */
