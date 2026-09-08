@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput, Input, Label } from '@/components/ui/field';
 import { Group } from '@/components/ui/disclosure';
+import { popoverSurface } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
 
@@ -365,7 +366,10 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
           <ul
             id={`${listId}-listbox`}
             role="listbox"
-            className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-surface shadow-sm"
+            className={cn(
+              popoverSurface,
+              'absolute z-20 mt-1 max-h-64 w-full overflow-auto',
+            )}
           >
             {matches.length === 0 && !canAdd ? (
               <li className="px-3 py-3 text-body text-ink-muted">

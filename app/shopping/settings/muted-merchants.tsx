@@ -18,14 +18,16 @@ export function MutedMerchantsSection({ exclusions }: { exclusions: MutedMerchan
       {exclusions.length === 0 ? (
         <p className="text-body text-ink-muted">Nothing muted yet.</p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        // Divides and space, no frame: the settings card around this
+        // already said these belong together. Law 11.
+        <ul className="divide-y divide-border">
           {exclusions.map((row) => {
             const merchant = Array.isArray(row.merchants) ? row.merchants[0] : row.merchants;
             const label = merchant?.name ?? row.match_domain ?? 'Sender';
             return (
               <li
                 key={row.id}
-                className="flex items-center justify-between gap-3 px-3 py-2.5 text-body"
+                className="row-pad flex items-center justify-between gap-3 text-body"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">{label}</p>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AlertCircle, Mail, RefreshCw } from 'lucide-react';
+import { Banner } from '@/components/ui/banner';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/cn';
 import { publicEnv } from '@/lib/env';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { disconnectInbox } from './actions';
@@ -107,26 +107,22 @@ export function InboxSection({
   return (
     <section id="inboxes" className="scroll-mt-6">
       {banner && (
-        <p
-          className={cn(
-            'mb-3 rounded-lg border px-3 py-2 text-body',
-            banner.tone === 'ok' && 'border-border bg-positive-tint text-positive',
-            banner.tone === 'warn' && 'border-border bg-caution-tint text-caution',
-            banner.tone === 'err' && 'border-danger bg-danger-tint text-danger',
-          )}
+        <Banner
+          className="mb-3"
+          tone={banner.tone === 'ok' ? 'info' : banner.tone === 'warn' ? 'warn' : 'bad'}
         >
           {banner.text}
-        </p>
+        </Banner>
       )}
 
       {accounts.length > 0 ? (
         <div className="space-y-3">
-          <ul className="space-y-3">
+          {/* One inbox per row, divided rather than boxed: the Connected
+              inboxes card is already the frame, and a ground per account
+              inside it was a second one. Law 11. */}
+          <ul className="divide-y divide-border">
             {accounts.map((account) => (
-              <li
-                key={account.id}
-                className="flex flex-col gap-3 rounded-lg border border-border bg-canvas px-3 py-3"
-              >
+              <li key={account.id} className="row-pad flex flex-col gap-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-body font-medium text-ink">{account.email_address}</p>

@@ -70,7 +70,7 @@ export function ShareLinkRow({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2">
+    <div className="row-pad flex flex-wrap items-center gap-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-ui text-ink">{url}</p>
         <p className="text-small text-ink-muted">

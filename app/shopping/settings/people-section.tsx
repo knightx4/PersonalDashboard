@@ -35,8 +35,11 @@ export function PeopleSection({ people }: { people: Person[] }) {
         is whose. Add someone, then say which inbox is theirs below.
       </p>
 
+      {/* Divides and space, no frame: the People card already said these
+          belong together, and a ground per row inside it was a second box
+          arguing with the first. Law 11. */}
       {people.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="divide-y divide-border">
           {people.map((person) => (
             <PersonRow key={person.id} person={person} canRemove={people.length > 1} />
           ))}
@@ -76,7 +79,7 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
     });
 
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas px-3 py-2">
+    <li className="row-pad flex flex-wrap items-center gap-2">
       <ColourPicker value={colour} onChange={(next) => setColour(next)} />
 
       <Input
@@ -84,11 +87,11 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
         onChange={(event) => setName(event.target.value)}
         maxLength={60}
         aria-label={`Name for ${person.name}`}
-        className="h-8 min-w-0 flex-1 text-ui"
+        className="min-w-0 flex-1"
       />
 
       {person.isDefault && (
-        <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-small text-ink-muted">
+        <span className="shrink-0 rounded-full bg-sunken px-2 py-0.5 text-small text-ink-muted">
           default
         </span>
       )}

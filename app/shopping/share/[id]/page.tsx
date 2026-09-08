@@ -119,7 +119,9 @@ export default async function ShareDetailPage({
                 return (
                   <li key={group.groupKey}>
                     <Card padding="dense" className="flex flex-wrap items-center gap-3">
-                      <div className="size-12 shrink-0 overflow-hidden rounded-lg border border-border bg-canvas">
+                      {/* Ground, no frame: this tile is already inside the
+                          row's card. Law 11. */}
+                      <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-canvas">
                         {group.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={group.imageUrl} alt="" className="size-full object-cover" />
@@ -177,7 +179,9 @@ export default async function ShareDetailPage({
 
         <div className="space-y-4">
           <CardSection title="Links">
-            <div className="space-y-2">
+            {/* Divided rows rather than a box each: the Links card is the
+                frame. Law 11. */}
+            <div className="divide-y divide-border">
               {(tokens ?? []).map((token) => (
                 <ShareLinkRow
                   key={token.id}

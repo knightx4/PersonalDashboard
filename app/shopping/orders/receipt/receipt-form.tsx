@@ -7,7 +7,7 @@ import {
   type ReceiptActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { Field, FieldError } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
@@ -69,12 +69,14 @@ export function ReceiptPhotoForm() {
         />
       </Field>
       {preview && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={preview}
-          alt="Receipt preview"
-          className="max-h-72 w-full rounded-xl border border-border object-contain bg-canvas"
-        />
+        <Card padding="none" className="overflow-hidden bg-canvas">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt="Receipt preview"
+            className="max-h-72 w-full object-contain"
+          />
+        </Card>
       )}
       <Button
         type="button"

@@ -81,8 +81,12 @@ export function InventoryRow({
           'focus-visible:bg-canvas focus-visible:outline-none',
         )}
       >
+        {/* The ground is the tile; there is no frame around it. A hairline
+            per row is box soup at list length, and the sell queue and the
+            item page's fallback have always drawn the same thumbnail without
+            one. Law 11. */}
         <span
-          className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-canvas"
+          className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-canvas"
           style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
         >
           {item.image_url ? (
