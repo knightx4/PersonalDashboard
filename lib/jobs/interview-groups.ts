@@ -23,8 +23,8 @@ export interface InterviewGroup {
   notes: string;
 }
 
-export type InterviewSection<T extends GroupableInterview> =
-  | { kind: 'group'; group: InterviewGroup; interviews: T[] }
+export type InterviewSection<T extends GroupableInterview, G extends InterviewGroup = InterviewGroup> =
+  | { kind: 'group'; group: G; interviews: T[] }
   | { kind: 'single'; interview: T };
 
 /** The calendar day an instant falls on, in the reader's zone. */
@@ -54,12 +54,12 @@ export function dayIn(iso: string, timezone: string): string {
  * database allows only briefly, and an interview that vanishes is much worse
  * than one shown outside its round.
  */
-export function sectionInterviews<T extends GroupableInterview>(
+export function sectionInterviews<T extends GroupableInterview, G extends InterviewGroup>(
   interviews: readonly T[],
-  groups: readonly InterviewGroup[],
-): Array<InterviewSection<T>> {
+  groups: readonly G[],
+): Array<InterviewSection<T, G>> {
   const byId = new Map(groups.map((group) => [group.id, group]));
-  const sections: Array<InterviewSection<T>> = [];
+  const sections: Array<InterviewSection<T, G>> = [];
   const indexOfGroup = new Map<string, number>();
 
   for (const interview of interviews) {
@@ -75,9 +75,7 @@ export function sectionInterviews<T extends GroupableInterview>(
       sections.push({ kind: 'group', group, interviews: [interview] });
       continue;
     }
-    (sections[at] as { kind: 'group'; group: InterviewGroup; interviews: T[] }).interviews.push(
-      interview,
-    );
+    (sections[at] as { kind: 'group'; group: G; interviews: T[] }).interviews.push(interview);
   }
 
   for (const group of groups) {

@@ -56,6 +56,7 @@ import {
   groupInterviews,
   linkCandidateMessage,
   linkReminderMessage,
+  linkRoundMessage,
   matchRoleRequirements,
   removeInterviewer,
   saveInterview,
@@ -64,6 +65,7 @@ import {
   shareCasePage,
   ungroupInterview,
   unlinkMessage,
+  unlinkRoundMessage,
   unshareCasePage,
   updateReminder,
 } from './actions';
@@ -169,7 +171,13 @@ export interface PanelProps {
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
   /** Superdays and the like: several rounds read as one occasion. */
-  interviewGroups: Array<{ id: string; label: string | null; notes: string }>;
+  interviewGroups: Array<{
+    id: string;
+    label: string | null;
+    notes: string;
+    /** The linked mail this round is about — the invite, the reschedule. */
+    messageIds: string[];
+  }>;
   /** Open to-dos you set for yourself, not events the inbox produced. */
   todos: Array<{
     id: string;
@@ -1706,6 +1714,7 @@ function Interviews({
                 interviews={section.interviews}
                 nextRound={section.interviews[0]?.round ?? interviews.length + 1}
                 schedulingMail={schedulingMail}
+                roleMail={messages}
                 timezone={timezone}
                 companyContacts={companyContacts}
                 focusInterviewId={focusInterviewId}
@@ -2127,17 +2136,20 @@ function InterviewGroupCard({
   interviews,
   nextRound,
   schedulingMail,
+  roleMail,
   timezone,
   companyContacts,
   focusInterviewId,
 }: {
   applicationId: string;
-  group: { id: string; label: string | null; notes: string };
+  group: PanelProps['interviewGroups'][number];
   interviews: PanelProps['interviews'];
   /** The round number given to an interview added here. */
   nextRound: number;
   /** Scheduling mail on this pursuit, as a starting point for a new one. */
   schedulingMail: PanelProps['messages'];
+  /** Every email linked to this pursuit, to say which ones this round is about. */
+  roleMail: PanelProps['messages'];
   timezone: string;
   companyContacts: PanelProps['companyContacts'];
   focusInterviewId?: string | null;
@@ -2222,6 +2234,8 @@ function InterviewGroupCard({
         </div>
       </div>
 
+      <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
+
       <div className="mt-3 space-y-3">
         {interviews.map((interview) => (
           <InterviewCard
@@ -2248,6 +2262,122 @@ function InterviewGroupCard({
         />
       </div>
     </section>
+  );
+}
+
+/**
+ * The emails this round is about, addable at any point in its life.
+ *
+ * "Add from email" used to live only on the form that makes an interview, and
+ * even there it only copied the kind across — so once a round existed there was
+ * no way to say which invitation it came out of, and nothing was written down
+ * when there had been. Both halves are fixed here: the list is on the round
+ * itself, and each pick is a row rather than a prefilled field.
+ *
+ * Several are expected. The invite, the reschedule and the panel list are three
+ * messages about one round, and all three are worth having on it.
+ */
+function RoundMail({
+  groupId,
+  messageIds,
+  roleMail,
+}: {
+  groupId: string;
+  messageIds: string[];
+  roleMail: PanelProps['messages'];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const attached = new Set(messageIds);
+  const linked = roleMail.filter((message) => attached.has(message.id));
+  const available = roleMail.filter((message) => !attached.has(message.id));
+
+  return (
+    <div className="mt-3">
+      <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+        Emails about this round
+      </h4>
+
+      {linked.length === 0 ? (
+        <p className="mt-1 text-small text-ink-muted">None named yet.</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {linked.map((message) => (
+            <li key={message.id} className="flex items-baseline gap-2 text-small">
+              {message.gmailHref ? (
+                <GmailLink href={message.gmailHref}>
+                  {message.subject ?? '(no subject)'}
+                </GmailLink>
+              ) : (
+                <span className="text-ink">{message.subject ?? '(no subject)'}</span>
+              )}
+              <button
+                type="button"
+                disabled={pending}
+                aria-label={`Take ${message.subject ?? 'this email'} off this round`}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await unlinkRoundMessage({ groupId, messageId: message.id });
+                    setError(result.error);
+                  })
+                }
+                className="text-ink-muted hover:text-status-rejected"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {adding ? (
+        available.length > 0 ? (
+          <Select
+            aria-label="Add an email to this round"
+            defaultValue=""
+            disabled={pending}
+            className="mt-1.5 h-7 w-full max-w-96 py-0 text-small"
+            onChange={(event) => {
+              const messageId = event.target.value;
+              if (!messageId) return;
+              startTransition(async () => {
+                const result = await linkRoundMessage({ groupId, messageId });
+                setError(result.error);
+                if (!result.error) setAdding(false);
+              });
+            }}
+          >
+            <option value="">Pick a linked email…</option>
+            {available.map((message) => (
+              <option key={message.id} value={message.id}>
+                {message.subject ?? '(no subject)'}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          // Only mail already linked to this pursuit is offered: a round names
+          // which of the role's emails it is about, it does not go fishing in
+          // the mailbox. Anything missing is linked under Linked mail first.
+          <p className="mt-1.5 text-small text-ink-muted">
+            {roleMail.length === 0
+              ? 'No mail is linked to this pursuit yet.'
+              : 'Every linked email is already on this round.'}
+          </p>
+        )
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="mt-1 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+        >
+          Add an email
+        </button>
+      )}
+
+      {error && <p className="mt-1 text-small text-status-rejected">{error}</p>}
+    </div>
   );
 }
 

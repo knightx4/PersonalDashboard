@@ -184,6 +184,27 @@ export default async function RoleDetailPage({
   const timezone = (profile?.timezone as string) ?? 'UTC';
 
   /**
+   * Which emails each round is about.
+   *
+   * A second round trip for the same reason as the interview notes below: it
+   * filters on ids that come out of the batch above. Skipped when the pursuit
+   * has no rounds, which is most of them.
+   */
+  const groupIds = (interviewGroups ?? []).map((group) => group.id as string);
+  const { data: groupMessageLinks } = groupIds.length
+    ? await supabase
+        .from('interview_group_messages')
+        .select('group_id, message_id')
+        .in('group_id', groupIds)
+    : { data: [] };
+
+  const messageIdsByGroup = new Map<string, string[]>();
+  for (const link of (groupMessageLinks ?? []) as Array<Record<string, unknown>>) {
+    const key = link.group_id as string;
+    messageIdsByGroup.set(key, [...(messageIdsByGroup.get(key) ?? []), link.message_id as string]);
+  }
+
+  /**
    * Loose notes written against a round.
    *
    * A second round trip rather than part of the batch above, because the
@@ -482,6 +503,7 @@ export default async function RoleDetailPage({
           id: group.id as string,
           label: (group.label as string | null) ?? null,
           notes: (group.notes as string | null) ?? '',
+          messageIds: messageIdsByGroup.get(group.id as string) ?? [],
         }))}
         todos={(reminders ?? []).map((reminder) => {
           // The mail a to-do points at is already loaded for the Linked mail

@@ -742,6 +742,87 @@ export async function saveInterviewGroup(
   return { error: null };
 }
 
+const roundMessageSchema = z.object({
+  groupId: z.string().uuid(),
+  messageId: z.string().uuid(),
+});
+
+/**
+ * Say which email this round is about.
+ *
+ * The invitation, the reschedule, the panel list: a round is regularly
+ * described by several messages, and until now none of them could be attached
+ * to it. "Add from email" on the interview form only ever copied the kind
+ * across and named the subject once, so a round that already existed had no
+ * way to be told what it came out of.
+ *
+ * The message is picked from the mail already linked to this pursuit, so this
+ * never reaches across pursuits — it is only ever saying which of the emails
+ * on this role belong to which round of it.
+ */
+export async function linkRoundMessage(input: {
+  groupId: string;
+  messageId: string;
+}): Promise<{ error: string | null }> {
+  const parsed = roundMessageSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not an email to add.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // RLS would refuse another account's message, but a zero-row write explains
+  // nothing; the check is here for a sentence worth reading.
+  const { data: message } = await supabase
+    .from('inbox_messages')
+    .select('id')
+    .eq('id', parsed.data.messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!message) return { error: 'That message is no longer in the mailbox.' };
+
+  const { error } = await supabase.from('interview_group_messages').upsert(
+    {
+      user_id: user.id,
+      group_id: parsed.data.groupId,
+      message_id: parsed.data.messageId,
+    },
+    { onConflict: 'group_id,message_id' },
+  );
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+/**
+ * Take an email back off a round.
+ *
+ * Only the statement that the two belong together goes. The message stays
+ * linked to the pursuit and keeps its place on the timeline — this is the
+ * round being corrected, not the mail being unlinked.
+ */
+export async function unlinkRoundMessage(input: {
+  groupId: string;
+  messageId: string;
+}): Promise<{ error: string | null }> {
+  const parsed = roundMessageSchema.safeParse(input);
+  if (!parsed.success) return { error: 'That is not an email to remove.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('interview_group_messages')
+    .delete()
+    .eq('group_id', parsed.data.groupId)
+    .eq('message_id', parsed.data.messageId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
 /**
  * Take an interview back out of its round. The interview survives, and so does
  * the round -- including when it is left empty. An empty round is a real state
