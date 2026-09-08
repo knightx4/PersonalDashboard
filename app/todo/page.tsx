@@ -61,7 +61,16 @@ export default async function TodoPage() {
         />
       ) : (
         <div className="mt-6 space-y-6">
-          {agenda.piles.map(({ bucket, entries, context }) => (
+          {agenda.piles.map(({ bucket, entries, context }) => {
+            // The pile in the order it is about to be drawn in, so a row can
+            // send it back with a move. Tasks only: an interview or a return
+            // deadline is not a row this account owns, so there is nowhere to
+            // write an order for it.
+            const pile = entries
+              .filter((entry) => entry.kind === 'task' && entry.task)
+              .map((entry) => entry.task!.id);
+
+            return (
             <section key={bucket}>
               <h2
                 className={cn(
@@ -121,6 +130,7 @@ export default async function TodoPage() {
                         task={entry.task}
                         timezone={agenda.timezone}
                         anchor={entry.anchor}
+                        pile={pile}
                       />
                     ) : entry.item ? (
                       <AgendaItemRow key={entry.key} item={entry.item} timezone={agenda.timezone} />
@@ -129,7 +139,8 @@ export default async function TodoPage() {
                 </Card>
               )}
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

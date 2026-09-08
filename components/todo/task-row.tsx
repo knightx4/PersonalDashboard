@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Check, Clock, Pin, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Clock, Pin, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { useToast } from '@/components/ui/toast';
@@ -10,6 +10,7 @@ import {
   completeTask,
   dropTask,
   laterTask,
+  moveTask,
   pinTask,
   removeTask,
   reopenTask,
@@ -32,15 +33,29 @@ export function TaskRow({
   task,
   timezone,
   anchor,
+  pile,
 }: {
   task: Task;
   timezone: string;
   /** What the task is about, when the list is not already inside that thing. */
   anchor?: { label: string; href: string } | null;
+  /**
+   * The tasks of the pile this row is in, in the order they are on screen.
+   *
+   * Sent back with a move because that order does not exist anywhere else: the
+   * piles are worked out from dates while rendering, not stored. Absent on a
+   * list that is not a pile -- an archive is a history and is read in the order
+   * it happened.
+   */
+  pile?: readonly string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const toast = useToast();
+
+  // A pile of one has no order to change.
+  const siblings = pile && pile.length > 1 ? pile : [];
+  const index = siblings.indexOf(task.id);
 
   if (editing) return <EditTask task={task} onDone={() => setEditing(false)} />;
 
@@ -67,6 +82,10 @@ export function TaskRow({
       await laterTask(task.id);
       toast({ text: 'until later', undo: () => bringBackTask(task.id), undone: 'brought back' });
     });
+  }
+
+  function move(direction: 'up' | 'down') {
+    start(() => moveTask(task.id, direction, [...siblings]));
   }
 
   return (
@@ -129,6 +148,18 @@ export function TaskRow({
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
         {!done && !dropped && (
           <>
+            {/* Only where there is somewhere to go: an arrow at the top of a
+                pile that does nothing is a control that lies. */}
+            {index > 0 && (
+              <IconButton label="Move up" onClick={() => move('up')}>
+                <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+            )}
+            {index !== -1 && index < siblings.length - 1 && (
+              <IconButton label="Move down" onClick={() => move('down')}>
+                <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+            )}
             <IconButton
               label={task.pinned ? 'Unpin' : 'Pin'}
               onClick={() => start(() => pinTask(task.id, !task.pinned))}

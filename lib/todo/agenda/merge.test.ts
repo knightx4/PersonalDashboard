@@ -17,6 +17,7 @@ function task(over: Partial<Task> = {}): Task {
     snoozedUntil: null,
     completedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
+    position: null,
     ...over,
   };
 }
@@ -255,5 +256,40 @@ describe('mergeAgenda', () => {
     // "unknown" must never present as "late".
     const piles = merge({ tasks: [task({ id: 'x' })] });
     expect(piles[0].bucket).toBe('someday');
+  });
+
+  it('puts a hand-placed pile in the order it was placed in', () => {
+    const piles = merge({
+      tasks: [
+        task({ id: 'c', dueOn: '2026-03-10', position: 3 }),
+        task({ id: 'a', dueOn: '2026-03-10', position: 1 }),
+        task({ id: 'b', dueAt: '2026-03-10T08:00:00.000Z', position: 2 }),
+      ],
+    });
+
+    expect(piles[0].entries.map((entry) => entry.task?.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('leaves a source item below the tasks you placed, having nowhere to place it', () => {
+    // A reminder or an interview is another workspace's row: there is no
+    // column here to write an order to, so it sorts as unplaced.
+    const piles = merge({
+      tasks: [task({ id: 'placed', dueOn: '2026-03-10', position: 1 })],
+      items: [item({ key: 'k1', day: '2026-03-10', at: '2026-03-10T07:00:00.000Z' })],
+    });
+
+    expect(piles[0].entries.map((entry) => entry.key)).toEqual(['task:placed', 'item:k1']);
+  });
+
+  it('orders an unplaced pile exactly as it did before', () => {
+    const piles = merge({
+      tasks: [
+        task({ id: 'noon', dueAt: '2026-03-10T12:00:00.000Z' }),
+        task({ id: 'pinned', dueOn: '2026-03-10', pinned: true }),
+        task({ id: 'dawn', dueAt: '2026-03-10T06:00:00.000Z' }),
+      ],
+    });
+
+    expect(piles[0].entries.map((entry) => entry.task?.id)).toEqual(['pinned', 'dawn', 'noon']);
   });
 });
