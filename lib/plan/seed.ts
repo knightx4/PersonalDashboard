@@ -288,6 +288,83 @@ export const PLAN_SEED: readonly PlanSeedItem[] = [
     detail: 'Tracks, a track, a reading, and the paste-and-confirm intake.',
     status: 'done',
   },
+  {
+    module: 'learn',
+    title: '37. Something to learn, before something to read',
+    detail:
+      'A track started with nothing in it, and a line at the foot of the list for the specific things inside it. Needed the schema to let a reading be a subject with no source, because the first thing you write down is "how central banks set rates", not a book.',
+    status: 'done',
+  },
+  {
+    module: 'learn',
+    title: '38. Find something to read for a subject',
+    detail:
+      'A different question from the resolver: that one is handed a citation and finds where it can be read, this one has only a subject and decides what is worth reading at all. At most four, and fewer is better.',
+    status: 'done',
+  },
+  {
+    module: 'learn',
+    title: '39. The import, filling in as it goes',
+    detail:
+      'Parse on its own so the list appears in a second, then one request per citation, five at a time, each row landing when it lands. Same work, a wait you can watch, and no single request long enough to be cut off.',
+    status: 'done',
+  },
+  {
+    module: 'learn',
+    title: '40. Deleting',
+    detail:
+      'Remove a reading, delete a track. The module could only add, so a search that attached the wrong book was permanent. Removal is separate from "gave up", which is a fact worth keeping.',
+    status: 'done',
+  },
+  {
+    module: 'learn',
+    title: '41. PDF passages',
+    detail:
+      'A PDF opens at the first page rather than at the page that matters. Fixing it needs a text extraction library and a week of column-and-ligature misery. Worth it only once page-one PDFs are actually annoying in practice.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '42. The MCP connector',
+    detail:
+      'A remote MCP server on this app, added as a connector in Claude, so "add those to my learn queue" works mid-conversation. The engine is identical to the paste box; this is transport and OAuth. Saves fifteen seconds a use, so it is worth a week only once the thing is in regular use.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '43. Generation from a bare topic',
+    detail:
+      'A topic with no paste currently gives an empty track. suggestSources already does most of the work, aimed at one item — pointing it at a whole topic is the obvious completion. Deliberately after the sourcing slices: testing showed generation is the weak half, and it must say what it could not find sources for.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '44. The vault link',
+    detail:
+      'Materialise the wikilinks in obsidian.notes into an edge table, keyed on blob_sha so it re-derives without fighting the one-way sync. Buys backlinks and orphans in the vault, pays off the checkbox source todo deferred, and turns every unresolved [[link]] into a candidate topic — a reading queue written over years without noticing.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '45. What you already know, told directly',
+    detail:
+      'Education, transcripts, syllabi, essays, a written-up account of work that cannot be pasted. Where the module stops being a queue and starts being a model of you, and where it stops being cheap.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '46. Suggestion rooted in what you know',
+    detail:
+      'Never bored by the basics, never dropped into something you are not ready for. Needs 44 and 45 to have produced enough signal to beat a guess, and should say so while it does not.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '47. Summarisation, only if it can be anchored',
+    detail:
+      'The only version worth building is one that cannot make anything up: every sentence anchored to a passage, the passage one click away, no orphan claims. If that cannot be enforced mechanically it does not ship — an unanchored summary is the slop this module was built against.',
+    status: 'not_started',
+  },
 
   // -------------------------------------------------------------------- jobs
   // From EVIDENCE-LAYER.md, which is the job side's own plan: six slices, each

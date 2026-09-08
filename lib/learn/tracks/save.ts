@@ -271,6 +271,24 @@ export async function attachSourceToReading(
   if (error) throw messageFor('Attaching the source', error);
 }
 
+/**
+ * Delete a track and everything under it.
+ *
+ * The readings and the import go with it on the foreign keys, which is why
+ * there is nothing to clean up here. Sources are left alone deliberately: they
+ * are deduped across tracks, so removing one track must not take a work that
+ * another track still points at, and an orphaned source costs a row nobody
+ * sees.
+ */
+export async function deleteTrack(
+  supabase: LearnSupabaseClient,
+  trackId: string,
+): Promise<void> {
+  const { error } = await supabase.from('tracks').delete().eq('id', trackId);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Deleting the track', error);
+}
+
 /** Take a reading off a track. Only ever the one you asked for; RLS does the rest. */
 export async function deleteReading(
   supabase: LearnSupabaseClient,

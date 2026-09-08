@@ -149,6 +149,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
             ${application.id}, 0.95, 'ats_job_id')`;
   ids.ingested_messages = message.id;
 
+  // The round this message belongs to. Seeded after both parents exist, since
+  // it points at an interview group and at an ingested message.
+  const [groupMessage] = await admin<{ id: string }[]>`
+    insert into interview_group_messages (user_id, group_id, message_id)
+    values (${userId}, ${group.id}, ${message.id})
+    returning id`;
+  ids.interview_group_messages = groupMessage.id;
+
   await admin`
     insert into core.sync_jobs (email_account_id, type, status)
     values (${account.id}, 'backfill', 'completed') returning id`;

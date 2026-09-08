@@ -8,6 +8,8 @@ import { loadTrack } from '@/lib/learn/tracks/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { AddForm } from './add-form';
+import { ConfirmStep } from '@/components/ui/confirm-step';
+import { removeTrack } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +45,23 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       </p>
 
       <PageHeader
+        actions={
+          <ConfirmStep
+            action={removeTrack}
+            fields={{ trackId: track.id }}
+            prompt={
+              track.readings.length === 0
+                ? 'Deletes this track. Nothing else goes with it.'
+                : `Deletes this track and its ${track.readings.length} ${
+                    track.readings.length === 1 ? 'item' : 'items'
+                  }. The sources stay, since other tracks may use them.`
+            }
+            confirmLabel="Yes, delete it"
+            pendingLabel="Deleting…"
+          >
+            Delete track
+          </ConfirmStep>
+        }
         title={track.title}
         description={
           remaining === 0

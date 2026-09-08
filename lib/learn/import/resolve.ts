@@ -1,7 +1,6 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { mapPool } from '@/lib/async/map-pool';
 import type { ReferenceCandidate } from '@/lib/learn/import/parse-heuristic';
 import {
   isEmptyResolution,
@@ -170,26 +169,17 @@ async function resolveOne(
 }
 
 /**
- * Resolve a parsed list.
- *
- * Concurrency is low on purpose. Each of these makes several web searches, so
- * five at once is a burst against whatever is being searched and against the
- * rate limit, for an import nobody is watching a spinner on -- the confirm
- * screen is the next thing they look at either way.
- *
- * A row that fails carries its error rather than sinking the import. One
- * citation the resolver could not place is one line on the confirm screen
- * saying so, which is honest and costs nothing.
- */
-/**
  * Resolve exactly one citation.
  *
- * The whole-list version below still exists for callers that want everything
- * at once, but the import screen uses this: the browser asks for one item per
- * request and paints each answer as it lands. Same total work, and a wait you
- * can watch progress through instead of a spinner that says nothing for a
- * minute. It also keeps every request short, which matters on a platform that
- * eventually stops one.
+ * One per request, called from the import screen so each answer paints as it
+ * lands rather than the whole list waiting on the slowest. It also keeps every
+ * request short, which matters on a platform that eventually stops one: a
+ * single call resolving eight citations end to end is one long request, and
+ * when it is cut off you lose all eight.
+ *
+ * Never throws. A citation that cannot be placed comes back carrying its
+ * reason, because one line on the screen saying so is what stops you assuming
+ * the list was complete.
  */
 export async function resolveOneReference(
   candidate: ReferenceCandidate,
@@ -213,42 +203,4 @@ export async function resolveOneReference(
       error: error instanceof Error ? error.message : 'Resolve failed',
     };
   }
-}
-
-export async function resolveReferences(
-  candidates: ReferenceCandidate[],
-  options: {
-    anthropicApiKey: string;
-    question?: string | null;
-    concurrency?: number;
-    client?: Anthropic;
-  },
-): Promise<ResolutionRow[]> {
-  if (candidates.length === 0) return [];
-
-  const client = options.client ?? new Anthropic({ apiKey: options.anthropicApiKey });
-  const question = options.question?.trim() || null;
-
-  return mapPool(candidates, options.concurrency ?? 3, async (candidate) => {
-    try {
-      const resolved = await resolveOne(client, candidate, question);
-      if (isEmptyResolution(resolved)) {
-        return {
-          candidate,
-          resolved,
-          error: resolved.locator_basis || 'Could not find this one.',
-        };
-      }
-      return { candidate, resolved };
-    } catch (error) {
-      if (error instanceof Anthropic.RateLimitError) {
-        return { candidate, resolved: null, error: 'Rate limited. Try this one again shortly.' };
-      }
-      return {
-        candidate,
-        resolved: null,
-        error: error instanceof Error ? error.message : 'Resolve failed',
-      };
-    }
-  });
 }
