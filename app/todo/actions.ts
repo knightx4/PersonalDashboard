@@ -146,6 +146,37 @@ export async function moveTask(
   revalidateTodo();
 }
 
+/**
+ * Drop a task somewhere in its pile.
+ *
+ * `before` is the task it should land above, or null for the foot of the pile.
+ * A neighbour rather than an index, because an index is only true of the list
+ * the sender was looking at: if the pile moved under them, an index silently
+ * puts the task somewhere else, while a neighbour that is no longer there is
+ * a request this can decline.
+ *
+ * The same trust story as `moveTask`: the pile is the caller's, and every row
+ * written is scoped to this session's user.
+ */
+export async function placeTask(
+  id: string,
+  before: string | null,
+  pile: string[],
+): Promise<void> {
+  if (id === before || !pile.includes(id)) return;
+
+  const rest = pile.filter((other) => other !== id);
+  const at = before === null ? rest.length : rest.indexOf(before);
+  if (at === -1) return;
+
+  const next = [...rest.slice(0, at), id, ...rest.slice(at)];
+  if (next.every((value, index) => value === pile[index])) return;
+
+  const user = await requireUser();
+  await reorderTasks(user.id, next);
+  revalidateTodo();
+}
+
 export async function removeTask(id: string): Promise<void> {
   const user = await requireUser();
   await deleteTask(user.id, id);

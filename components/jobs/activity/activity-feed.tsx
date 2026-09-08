@@ -27,7 +27,7 @@ const SOURCE_LABEL: Record<ActivityEntry['source'], string> = {
  *
  * These are the pipeline's own status colours rather than new ones: a
  * rejection is the same red here as it is on the board, and every pair is
- * already checked by scripts/check-contrast.ts in all five themes. The chip
+ * already checked by scripts/check-contrast.ts in all four themes. The chip
  * carries a word, never a colour alone -- the colour is what makes the one
  * line you were looking for findable, not what tells you which line it is.
  */

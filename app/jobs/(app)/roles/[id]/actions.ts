@@ -81,6 +81,41 @@ export async function addNote(input: {
   return { error: null };
 }
 
+/**
+ * Rewrite a note.
+ *
+ * The role is passed in rather than looked up: the caller is the page the note
+ * is being written on, it already knows which role it is, and a note that is
+ * saved but does not reappear until a hard reload is a note you write twice.
+ */
+export async function updateNote(input: {
+  noteId: string;
+  roleId: string;
+  body: string;
+}): Promise<{ error: string | null }> {
+  const parsed = z
+    .object({
+      noteId: z.string().uuid(),
+      roleId: z.string().uuid(),
+      body: z.string().trim().min(1, 'A note needs some text.').max(50_000),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('notes')
+    .update({ body: parsed.data.body })
+    .eq('id', parsed.data.noteId)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  return { error: null };
+}
+
 const renameRoleSchema = z.object({
   roleId: z.string().uuid(),
   title: z.string().trim().min(1, 'A role needs a name.').max(200),

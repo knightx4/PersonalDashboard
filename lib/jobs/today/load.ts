@@ -62,6 +62,9 @@ export interface UpcomingInterview {
   meetingUrl: string | null;
   location: string | null;
   hasPrep: boolean;
+  /** The round it belongs to. Every interview is in one; see interview-groups. */
+  groupId: string | null;
+  round: { id: string; roundNumber: number | null; label: string | null; notes: string } | null;
 }
 
 export interface DueReminder {
@@ -115,7 +118,7 @@ export async function loadToday(
     supabase
       .from('interviews')
       .select(
-        'id, application_id, round, kind, scheduled_at, time_known, duration_minutes, format, meeting_url, location, prep_notes, applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, application_id, round, kind, scheduled_at, time_known, duration_minutes, format, meeting_url, location, prep_notes, group_id, interview_groups ( id, round_number, label, notes ), applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', userId)
       // A day's back-reach, because a round known only by its day is stored at
@@ -178,6 +181,13 @@ export async function loadToday(
     meeting_url: string | null;
     location: string | null;
     prep_notes: string | null;
+    group_id: string | null;
+    interview_groups: {
+      id: string;
+      round_number: number | null;
+      label: string | null;
+      notes: string | null;
+    } | null;
     applications: { roles: RoleJoin };
   };
 
@@ -204,6 +214,15 @@ export async function loadToday(
       meetingUrl: row.meeting_url,
       location: row.location,
       hasPrep: Boolean(row.prep_notes?.trim()),
+      groupId: row.group_id,
+      round: row.interview_groups
+        ? {
+            id: row.interview_groups.id,
+            roundNumber: row.interview_groups.round_number,
+            label: row.interview_groups.label,
+            notes: row.interview_groups.notes ?? '',
+          }
+        : null,
     }));
 
   type ReminderRaw = {
