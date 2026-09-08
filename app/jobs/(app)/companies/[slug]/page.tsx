@@ -186,41 +186,9 @@ export default async function CompanyDetailPage({
         />
       </CardSection>
 
-      {todos.length > 0 && (
-        <CardSection
-          className="mb-6"
-          title={
-            <>
-              To-dos{' '}
-              <span className="tabular text-small font-normal text-ink-muted">{todos.length}</span>
-            </>
-          }
-        >
-          <ul className="space-y-2">
-            {todos.map((todo) => (
-              <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui">
-                <span className="tabular shrink-0 text-ink-muted">
-                  {formatDate(todo.dueAt, timezone)}
-                </span>
-                <span className="text-ink">{todo.body}</span>
-                {/* Which pursuit it belongs to, and the way to it: the to-do is
-                    the role's, and everything you would do with it beyond
-                    finishing it is done there. */}
-                {todo.role && (
-                  <Link
-                    href={`/jobs/roles/${todo.role.id}`}
-                    className="truncate text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
-                  >
-                    {todo.role.title}
-                  </Link>
-                )}
-                <ReminderActions id={todo.id} />
-              </li>
-            ))}
-          </ul>
-        </CardSection>
-      )}
-
+      {/* One section, not two. The company's own tasks and the to-dos sitting
+          on its roles answer the same question -- what is outstanding here --
+          and were being asked twice, side by side, under two names. */}
       <div className="mb-6">
         <LinkedTasks
           target="company"
@@ -228,6 +196,32 @@ export default async function CompanyDetailPage({
           returnTo={`/jobs/companies/${company.slug as string}`}
           tasks={linkedTasks}
           timezone={timezone}
+          extra={
+            todos.length > 0 ? (
+              <ul className="mt-2 divide-y divide-border">
+                {todos.map((todo) => (
+                  <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-ui">
+                    <span className="tabular shrink-0 text-ink-muted">
+                      {formatDate(todo.dueAt, timezone)}
+                    </span>
+                    <span className="text-ink">{todo.body}</span>
+                    {/* Which pursuit it belongs to, and the way to it: the to-do is
+                        the role's, and everything you would do with it beyond
+                        finishing it is done there. */}
+                    {todo.role && (
+                      <Link
+                        href={`/jobs/roles/${todo.role.id}`}
+                        className="truncate text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                      >
+                        {todo.role.title}
+                      </Link>
+                    )}
+                    <ReminderActions id={todo.id} />
+                  </li>
+                ))}
+              </ul>
+            ) : null
+          }
         />
       </div>
 

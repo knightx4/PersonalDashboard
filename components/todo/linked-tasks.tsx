@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef, useState, useTransition } from 'react';
+import { useActionState, useRef, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Check, ListChecks, Plus, Unlink } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -31,6 +31,7 @@ export function LinkedTasks({
   timezone,
   title = 'Tasks',
   compact = false,
+  extra,
 }: {
   target: LinkTarget;
   targetId: string;
@@ -40,6 +41,13 @@ export function LinkedTasks({
   timezone: string;
   title?: string;
   compact?: boolean;
+  /**
+   * Outstanding work on this thing that is not a todo-module task -- the job
+   * module's own reminders, say. It belongs under this heading rather than in
+   * a second section beside it: "what is outstanding here" is one question,
+   * and asking it twice on one page is what it looks like when it is two.
+   */
+  extra?: ReactNode;
 }) {
   const [adding, setAdding] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -94,7 +102,7 @@ export function LinkedTasks({
       )}
 
       {tasks.length === 0 ? (
-        !adding && (
+        !adding && !extra && (
           <p className="mt-2 text-ui text-ink-muted">Nothing outstanding.</p>
         )
       ) : (
@@ -111,6 +119,8 @@ export function LinkedTasks({
           ))}
         </ul>
       )}
+
+      {extra}
     </section>
   );
 }

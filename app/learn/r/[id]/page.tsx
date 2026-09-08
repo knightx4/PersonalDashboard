@@ -12,6 +12,7 @@ import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeFromTrack } from '../../t/[id]/actions';
 import { NoteForm } from './note-form';
 import { StatusButtons } from './status-buttons';
+import { ReadNowButton } from './read-now-button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -150,6 +151,18 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
       <section className="mb-5">
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where you are</h2>
         <StatusButtons readingId={reading.id} status={reading.status} />
+      </section>
+
+      {/* Separate from the status row above: where you are with a reading and
+          whether you mean to read it next are different facts, and the pair
+          that happens most is "reading" and "next". */}
+      <section className="mb-5">
+        <h2 className="mb-2 text-ui font-semibold text-ink-muted">Read next</h2>
+        <ReadNowButton readingId={reading.id} on={reading.readNowAt !== null} />
+        <p className="mt-1.5 text-small text-ink-muted">
+          Puts it on <Link href="/learn/now" className="underline underline-offset-2 hover:text-ink">Read now</Link>
+          , the shelf you read from. Finishing it takes it off again.
+        </p>
       </section>
 
       <section>

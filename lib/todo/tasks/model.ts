@@ -10,6 +10,19 @@
 
 export type TaskStatus = 'open' | 'done' | 'dropped';
 
+/**
+ * Where an unplaced thing sorts: after everything anyone has put in an order.
+ *
+ * Infinity rather than a large number, so the two cases can never be confused
+ * and no list is long enough to reach it.
+ */
+export const UNPLACED = Number.POSITIVE_INFINITY;
+
+/** How a task sorts against the hand-placed ones, whether or not it is one. */
+export function rankOf(task: Pick<Task, 'position'>): number {
+  return task.position ?? UNPLACED;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -23,6 +36,8 @@ export interface Task {
   snoozedUntil: string | null;
   completedAt: string | null;
   createdAt: string;
+  /** Where you put it by hand within its pile. Null until you move one. */
+  position: number | null;
 }
 
 /** The piles the list is shown in, in the order they matter. */
@@ -105,10 +120,13 @@ export function bucketFor(task: Task, timezone: string, now: Date): Bucket {
 /**
  * The open list, bucketed and ordered.
  *
- * Ordering inside a bucket: pinned first, then by due day, then by when it was
- * written. Not by a manual drag order, which would need a position column and
- * the fractional-index problem behind it -- worth revisiting only if sorting
- * actually grates.
+ * Ordering inside a bucket: what you placed by hand, in the order you placed
+ * it, then everything else -- pinned first, then by due day, then by when it
+ * was written.
+ *
+ * Your order wins over the pin, which is the point of having it: the automatic
+ * rules know which day a thing is due and cannot know which of four things due
+ * today you mean to do first. A pin still floats anything you have not placed.
  *
  * Snoozed tasks are dropped entirely rather than shown greyed out. "Later"
  * means later; a list that still shows what you deferred has not deferred it.
@@ -141,6 +159,13 @@ export function bucketTasks(
 }
 
 function compare(a: Task, b: Task, timezone: string): number {
+  // Placed before unplaced, and placed among themselves in the order given.
+  // First rather than after the pin so that a hand-placed order is not quietly
+  // overruled by one; see bucketTasks.
+  const rankA = rankOf(a);
+  const rankB = rankOf(b);
+  if (rankA !== rankB) return rankA - rankB;
+
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
 
   const dayA = dueDay(a, timezone);

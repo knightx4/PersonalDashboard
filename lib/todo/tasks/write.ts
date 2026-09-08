@@ -222,6 +222,39 @@ export async function unsnoozeTask(userId: string, id: string): Promise<{ error:
   return { error: error?.message ?? null };
 }
 
+/**
+ * Put a pile in the order it is being looked at.
+ *
+ * Every task in the pile is numbered 1..n rather than the moved one being
+ * squeezed between two neighbours. A personal pile is a handful of rows, so
+ * the fractional-index machinery that exists to avoid renumbering a shared
+ * unbounded list under concurrent writers would be paying for a problem this
+ * does not have -- and renumbering leaves the column readable, which halves
+ * the cost of the next bug in it.
+ *
+ * Each row is still scoped to the user, so a borrowed id from someone else's
+ * account updates nothing rather than reordering their day.
+ */
+export async function reorderTasks(
+  userId: string,
+  ids: readonly string[],
+): Promise<{ error: string | null }> {
+  const supabase = await createTodoClient();
+
+  const results = await Promise.all(
+    ids.map((id, index) =>
+      supabase
+        .from('tasks')
+        .update({ position: index + 1 })
+        .eq('id', id)
+        .eq('user_id', userId),
+    ),
+  );
+
+  const failed = results.find((result) => result.error);
+  return { error: failed?.error?.message ?? null };
+}
+
 export async function deleteTask(userId: string, id: string): Promise<{ error: string | null }> {
   const supabase = await createTodoClient();
   const { error } = await supabase.from('tasks').delete().eq('id', id).eq('user_id', userId);

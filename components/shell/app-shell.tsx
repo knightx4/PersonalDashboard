@@ -12,7 +12,6 @@ import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import {
   WorkspaceSwitcher,
@@ -433,8 +432,20 @@ export function AppShell({
               <Menu className="size-4" strokeWidth={1.75} aria-hidden />
             </button>
 
+            {/* The mark in the bar is the switcher, not a picture of one.
+                From lg up the column carries it -- and still does when the
+                column is collapsed, as its mark. Below lg there is no column
+                until you open the drawer, and this icon sat there looking
+                exactly like the thing that switches workspaces while doing
+                nothing, which made changing module a drawer away. */}
             <span className="lg:hidden">
-              <ModuleMark module={module} size="sm" />
+              <WorkspaceSwitcher
+                current={module}
+                enabled={enabledModules}
+                counts={counts}
+                onShell
+                compact
+              />
             </span>
 
             <h2 className="font-display shrink-0 truncate text-lead font-semibold tracking-tight text-shell-ink">

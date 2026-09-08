@@ -7,6 +7,7 @@ import {
   Check,
   Lightbulb,
   ChevronDown,
+  ChevronRight,
   CircleDashed,
   Hourglass,
   Play,
@@ -713,7 +714,7 @@ const TONE_DOT: Record<Health['tone'], string> = {
  */
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_3.75rem_6rem_2rem]';
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_2rem]';
 
 /** The width of one level of the tree, in the name cell. */
 const LEVEL = 'w-5';
@@ -730,7 +731,6 @@ function ColumnHeader() {
       <span>Step</span>
       <span>Health</span>
       <span className="hidden sm:block">Priority</span>
-      <span className="hidden sm:block">Who</span>
       <span className="hidden sm:block">Steps</span>
       <span />
     </li>
@@ -1006,12 +1006,11 @@ function PlanRow({
           )}
         </span>
 
-        <span className="hidden truncate text-small sm:block">
-          {node.assignee === 'claude' && <span className="text-accent">Claude</span>}
-          {node.assignee === 'me' && <span className="text-ink-muted">Me</span>}
-          {!node.assignee && <span className="text-ink-ghost">—</span>}
-        </span>
-
+        {/* No "Who" column. It was a column of dashes with the occasional
+            "Claude" in it -- one fact, on a plan whose every step is yours
+            unless you hand it over, and handing it over is a button. Who has
+            it is still on the open step, in the summary's "Claude's" view,
+            and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
         </span>
@@ -1200,37 +1199,66 @@ export function PlanView({
         />
       )}
 
-      {sections.map((section) => (
-        <section key={section.module ?? 'app'} className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-body font-semibold text-ink">{section.label}</h2>
-            <Progress label={section.label} progress={section.progress} />
-          </div>
+      {sections.map((section) => {
+        // What is finished is consulted, not read -- the same call the rows
+        // make about a closed step's children. The progress stays on the
+        // summary line either way, so a folded module still says how far it
+        // got: law 10, a fold that hides its own count has moved the work.
+        const finished = section.progress.live > 0 && section.progress.fraction === 1;
 
-          {section.nodes.length === 0 ? (
-            <p className="rounded-card border border-dashed border-border bg-surface px-4 py-4 text-center text-ui text-ink-muted">
-              {section.progress.live > 0 && section.progress.fraction === 1
-                ? `Everything planned for ${section.label} is done.`
-                : `No plan for ${section.label} yet.`}
-            </p>
-          ) : (
-            <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
-              <ColumnHeader />
-              {section.nodes.map((node) => (
-                <PlanRow
-                  key={node.id}
-                  node={node}
-                  trail={[]}
-                  catalog={catalog}
-                  canSend={canSend}
+        return (
+          <details
+            key={section.module ?? 'app'}
+            open={!finished}
+            className="group/section space-y-2"
+          >
+            <summary
+              className={cn(
+                'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
+                'rounded-control py-1 [&::-webkit-details-marker]:hidden',
+                'focus-visible:outline-2 focus-visible:outline-offset-2',
+              )}
+            >
+              <h2 className="flex items-center gap-1.5 text-body font-semibold text-ink">
+                <ChevronRight
+                  aria-hidden
+                  strokeWidth={2}
+                  className="size-3.5 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
                 />
-              ))}
-            </ul>
-          )}
+                {section.label}
+              </h2>
+              <Progress label={section.label} progress={section.progress} />
+            </summary>
 
-          {(view === 'open' || view === 'all') && <AddStep module={section.module} parentId={null} />}
-        </section>
-      ))}
+            <div className="space-y-2">
+              {section.nodes.length === 0 ? (
+                <p className="rounded-card border border-dashed border-border bg-surface px-4 py-4 text-center text-ui text-ink-muted">
+                  {finished
+                    ? `Everything planned for ${section.label} is done.`
+                    : `No plan for ${section.label} yet.`}
+                </p>
+              ) : (
+                <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
+                  <ColumnHeader />
+                  {section.nodes.map((node) => (
+                    <PlanRow
+                      key={node.id}
+                      node={node}
+                      trail={[]}
+                      catalog={catalog}
+                      canSend={canSend}
+                    />
+                  ))}
+                </ul>
+              )}
+
+              {(view === 'open' || view === 'all') && (
+                <AddStep module={section.module} parentId={null} />
+              )}
+            </div>
+          </details>
+        );
+      })}
 
       {/* The app-wide list is not offered as a section until something is in
           it, so this is the only way to put the first thing there. */}
