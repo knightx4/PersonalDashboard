@@ -6,7 +6,7 @@ import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { allSources } from '@/lib/todo/agenda/registry';
 import { todayIn } from '@/lib/todo/tasks/model';
-import { buildMonth, monthOf, monthWindow, type CalendarMonth } from '@/lib/todo/calendar/month';
+import { buildRange, viewWindow, type CalendarRange, type CalendarView } from '@/lib/todo/calendar/range';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -19,7 +19,7 @@ import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/so
  * with the list about what is happening on a Thursday.
  */
 
-export interface Calendar extends CalendarMonth {
+export interface Calendar extends CalendarRange {
   timezone: string;
   /** Sources that were switched on and did not answer, named for the page. */
   failed: string[];
@@ -27,7 +27,8 @@ export interface Calendar extends CalendarMonth {
 
 export async function loadCalendar(
   userId: string,
-  month?: string,
+  view: CalendarView = 'month',
+  anchor?: string,
   now: Date = new Date(),
 ): Promise<Calendar> {
   const [account, agendaSettings, tasks] = await Promise.all([
@@ -38,8 +39,8 @@ export async function loadCalendar(
     loadAllTasks(userId, { status: 'all' }),
   ]);
 
-  const shown = month ?? monthOf(todayIn(account.timezone, now));
-  const window = monthWindow(shown);
+  const shown = anchor ?? todayIn(account.timezone, now);
+  const window = viewWindow(view, shown);
 
   const ctx: SourceContext = {
     userId,
@@ -59,8 +60,9 @@ export async function loadCalendar(
   const dismissals = active.length > 0 ? await loadDismissals(userId) : new Map();
 
   return {
-    ...buildMonth({
-      month: shown,
+    ...buildRange({
+      view,
+      anchor: shown,
       tasks,
       items,
       context,

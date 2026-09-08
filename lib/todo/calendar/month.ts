@@ -107,9 +107,17 @@ export interface BuildInput {
   now: Date;
 }
 
-export function buildMonth(input: BuildInput): CalendarMonth {
+/**
+ * Everything the sources hold, filed under the day it falls on.
+ *
+ * Shared with the day and week views next door rather than copied into them:
+ * which day a thing belongs to, and whether it belongs on a calendar at all,
+ * must not have three answers.
+ */
+export function collectEntries(
+  input: Omit<BuildInput, 'month'>,
+): { byDay: Map<string, CalendarEntry[]>; undated: CalendarEntry[] } {
   const { timezone, now } = input;
-  const today = todayIn(timezone, now);
 
   const byDay = new Map<string, CalendarEntry[]>();
   const undated: CalendarEntry[] = [];
@@ -167,17 +175,24 @@ export function buildMonth(input: BuildInput): CalendarMonth {
     });
   }
 
+  return { byDay, undated: undated.sort(compareEntries) };
+}
+
+export function buildMonth(input: BuildInput): CalendarMonth {
+  const today = todayIn(input.timezone, input.now);
+  const { byDay, undated } = collectEntries(input);
+
   const days = monthDays(input.month).map<CalendarDay>((day) => ({
     day,
     inMonth: monthOf(day) === input.month,
     isToday: day === today,
-    entries: [...(byDay.get(day) ?? [])].sort(compare),
+    entries: [...(byDay.get(day) ?? [])].sort(compareEntries),
   }));
 
   const weeks: CalendarDay[][] = [];
   for (let index = 0; index < days.length; index += 7) weeks.push(days.slice(index, index + 7));
 
-  return { month: input.month, weeks, undated: undated.sort(compare) };
+  return { month: input.month, weeks, undated };
 }
 
 /**
@@ -187,7 +202,7 @@ export function buildMonth(input: BuildInput): CalendarMonth {
  */
 const KIND_ORDER: Record<CalendarEntry['kind'], number> = { task: 0, item: 1, context: 2 };
 
-function compare(a: CalendarEntry, b: CalendarEntry): number {
+export function compareEntries(a: CalendarEntry, b: CalendarEntry): number {
   if ((a.at === null) !== (b.at === null)) return a.at === null ? 1 : -1;
   if (a.at && b.at && a.at !== b.at) return a.at < b.at ? -1 : 1;
   if (a.kind !== b.kind) return KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
