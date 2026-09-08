@@ -5,12 +5,16 @@ import Link from 'next/link';
 import {
   Ban,
   Check,
+  Circle,
+  CircleUser,
+  Flag,
   Lightbulb,
   ChevronDown,
   ChevronRight,
   CircleDashed,
   Hourglass,
   Play,
+  Scale,
   Sparkles,
   TrendingUp,
   X,
@@ -33,7 +37,17 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldError, FieldHint, Input, Label, Select, Textarea } from '@/components/ui/field';
+import {
+  ChipSelect,
+  ComposeBody,
+  ComposeTitle,
+  FieldError,
+  FieldHint,
+  Input,
+  Label,
+  Select,
+  Textarea,
+} from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
@@ -102,41 +116,83 @@ function StatusOptions() {
   );
 }
 
+/**
+ * The four properties, as chips rather than as labelled selects.
+ *
+ * Each carries a glyph saying which property it is and its own current value,
+ * which is the whole reason the labels above them could go: "Normal" beside a
+ * flag is not ambiguous, and the caption reading "Priority" was costing a line
+ * of vertical space to repeat something the value already said. Three labelled
+ * full-width selects are three rows; three chips are part of one.
+ */
 function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriority; id?: string }) {
   return (
-    <Select id={id} name="priority" defaultValue={String(defaultValue)} aria-label="Priority">
+    <ChipSelect
+      id={id}
+      name="priority"
+      defaultValue={String(defaultValue)}
+      aria-label="Priority"
+      icon={<Flag className="size-3.5" strokeWidth={2} />}
+    >
       {PLAN_PRIORITIES.map((priority) => (
         <option key={priority} value={priority}>
           {PRIORITY_LABEL[priority]}
         </option>
       ))}
-    </Select>
+    </ChipSelect>
   );
 }
 
 function SizeSelect({ defaultValue, id }: { defaultValue: PlanSize | null; id?: string }) {
   return (
-    <Select id={id} name="size" defaultValue={defaultValue ?? ''} aria-label="Size">
-      <option value="">Size not said</option>
+    <ChipSelect
+      id={id}
+      name="size"
+      defaultValue={defaultValue ?? ''}
+      placeholderValue=""
+      aria-label="Size"
+      icon={<Scale className="size-3.5" strokeWidth={2} />}
+    >
+      <option value="">Size</option>
       {PLAN_SIZES.map((size) => (
         <option key={size} value={size}>
           {SIZE_LABEL[size]}
         </option>
       ))}
-    </Select>
+    </ChipSelect>
   );
 }
 
 function AssigneeSelect({ defaultValue, id }: { defaultValue: PlanAssignee | null; id?: string }) {
   return (
-    <Select id={id} name="assignee" defaultValue={defaultValue ?? ''} aria-label="Who is on it">
-      <option value="">Nobody yet</option>
+    <ChipSelect
+      id={id}
+      name="assignee"
+      defaultValue={defaultValue ?? ''}
+      placeholderValue=""
+      aria-label="Who is on it"
+      icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+    >
+      <option value="">Nobody</option>
       {PLAN_ASSIGNEES.map((assignee) => (
         <option key={assignee} value={assignee}>
           {ASSIGNEE_LABEL[assignee]}
         </option>
       ))}
-    </Select>
+    </ChipSelect>
+  );
+}
+
+function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
+  return (
+    <ChipSelect
+      name="status"
+      defaultValue={defaultValue}
+      aria-label="Status"
+      icon={<Circle className="size-3.5" strokeWidth={2} />}
+    >
+      <StatusOptions />
+    </ChipSelect>
   );
 }
 
@@ -272,50 +328,37 @@ function catalogLabel(entry: PlanCatalogEntry): string {
 /**
  * The fields every step has, for the add and the edit form alike.
  *
- * `fold` is what makes adding a step feel like typing rather than filling in a
- * form. Adding one is overwhelmingly a one-line act -- a title, and the
- * defaults for everything else -- so the add form shows the title and folds
- * the rest away behind a word. Editing is the opposite: you opened it to
- * change something, and which thing is not knowable, so the edit form shows
- * everything at once.
+ * This is a compose surface, not a form, and the difference is the whole
+ * point of laws 11 and 12. There is one thing to type into and it is already
+ * focused; the properties are chips carrying their own values; and there is no
+ * label, no bordered field and no second box anywhere in it. What it replaced
+ * was six captioned full-width controls stacked down a card, which is what a
+ * create surface turns into when every property is given a row of its own and
+ * a caption repeating what its value already says.
  *
- * The title has no label. A caption reading "The step" above a box reading
- * "What has to happen" is the same sentence twice, and the second one is
- * inside the control where it is needed.
+ * `fold` keeps the elaboration out of the way until it is wanted. Adding a
+ * step is overwhelmingly a one-line act -- a title and the defaults -- so the
+ * add surface opens as a title and a chip row. Editing shows everything,
+ * because you opened it to change something and which thing is not knowable.
  */
 function StepFields({
   prefix,
   node,
   fold = false,
+  status,
 }: {
   prefix: string;
   node?: Pick<PlanNode, 'title' | 'detail' | 'acceptance' | 'priority' | 'size' | 'assignee'>;
   fold?: boolean;
+  /** Rendered into the chip row when the surface owns the status too. */
+  status?: PlanStatus;
 }) {
   const [showMore, setShowMore] = useState(!fold);
-
-  const detail = (
-    <div className="grid gap-(--field-gap) sm:grid-cols-2">
-      <div>
-        <Label htmlFor={`${prefix}-detail`}>What it involves</Label>
-        <Textarea id={`${prefix}-detail`} name="detail" rows={2} defaultValue={node?.detail ?? ''} />
-      </div>
-      <div>
-        <Label htmlFor={`${prefix}-acceptance`}>Done when</Label>
-        <Textarea
-          id={`${prefix}-acceptance`}
-          name="acceptance"
-          rows={2}
-          defaultValue={node?.acceptance ?? ''}
-          placeholder="What the work is checked against."
-        />
-      </div>
-    </div>
-  );
+  const hasDetail = Boolean(node?.detail || node?.acceptance);
 
   return (
-    <div className="flex flex-col gap-(--field-gap)">
-      <Input
+    <div className="space-y-2">
+      <ComposeTitle
         id={`${prefix}-title`}
         name="title"
         defaultValue={node?.title ?? ''}
@@ -324,32 +367,45 @@ function StepFields({
         placeholder="What has to happen"
       />
 
-      {showMore ? (
-        detail
+      {showMore || hasDetail ? (
+        <>
+          <ComposeBody
+            id={`${prefix}-detail`}
+            name="detail"
+            rows={1}
+            defaultValue={node?.detail ?? ''}
+            aria-label="What it involves"
+            placeholder="What it involves…"
+          />
+          {/* The acceptance line earns its caption: it is the one field whose
+            * placeholder cannot say what it is without saying what it is for. */}
+          <div className="border-t border-border pt-2">
+            <ComposeBody
+              id={`${prefix}-acceptance`}
+              name="acceptance"
+              rows={1}
+              defaultValue={node?.acceptance ?? ''}
+              aria-label="Done when"
+              placeholder="Done when… — what the work is checked against"
+            />
+          </div>
+        </>
       ) : (
         <button
           type="button"
           onClick={() => setShowMore(true)}
-          className="press inline-flex items-center gap-1 self-start rounded-control px-1.5 py-0.5 text-small text-ink-muted hover:bg-shell-hover hover:text-accent"
+          className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
         >
           <span aria-hidden>+</span>
           Detail and acceptance
         </button>
       )}
 
-      <div className="grid grid-cols-2 gap-(--field-gap) sm:grid-cols-3">
-        <div>
-          <Label htmlFor={`${prefix}-priority`}>Priority</Label>
-          <PrioritySelect id={`${prefix}-priority`} defaultValue={node?.priority ?? 2} />
-        </div>
-        <div>
-          <Label htmlFor={`${prefix}-size`}>Size</Label>
-          <SizeSelect id={`${prefix}-size`} defaultValue={node?.size ?? null} />
-        </div>
-        <div>
-          <Label htmlFor={`${prefix}-assignee`}>Who is on it</Label>
-          <AssigneeSelect id={`${prefix}-assignee`} defaultValue={node?.assignee ?? null} />
-        </div>
+      <div className="flex flex-wrap items-center gap-1">
+        {status !== undefined && <StatusChip defaultValue={status} />}
+        <PrioritySelect id={`${prefix}-priority`} defaultValue={node?.priority ?? 2} />
+        <SizeSelect id={`${prefix}-size`} defaultValue={node?.size ?? null} />
+        <AssigneeSelect id={`${prefix}-assignee`} defaultValue={node?.assignee ?? null} />
       </div>
     </div>
   );
@@ -403,26 +459,28 @@ function AddStep({
     >
       <input type="hidden" name="module" value={module ?? ''} />
       <input type="hidden" name="parent" value={parentId ?? ''} />
-      <StepFields prefix={prefix} fold />
-      <div className="flex flex-wrap items-center gap-2">
-        <Select name="status" defaultValue="not_started" className="w-36" aria-label="Status">
-          <StatusOptions />
-        </Select>
-        <Button type="submit" size="sm" pending={pending}>
-          {pending ? 'Adding…' : parentId ? 'Add sub-step' : 'Add step'}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            setOpen(false);
-            onDone?.();
-          }}
-        >
-          Cancel
-        </Button>
+      <StepFields prefix={prefix} fold status="not_started" />
+      {/* Actions right, on their own line under a rule: the chip row above is
+        * things you set and this is the one thing you press, and running them
+        * together made the submit read as a fourth property. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
         <FieldError>{state.error}</FieldError>
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setOpen(false);
+              onDone?.();
+            }}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" pending={pending}>
+            {pending ? 'Adding…' : parentId ? 'Add sub-step' : 'Add step'}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -448,7 +506,7 @@ function EditStep({
   return (
     <form action={action} className="flex flex-col gap-(--field-gap) px-3 pb-3">
       <input type="hidden" name="id" value={node.id} />
-      <StepFields prefix={prefix} node={node} />
+      <StepFields prefix={prefix} node={node} status={node.status} />
       <div>
         <Label htmlFor={`${prefix}-comment`}>Your note</Label>
         <Textarea
@@ -484,17 +542,18 @@ function EditStep({
           />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Select name="status" defaultValue={node.status} className="w-36" aria-label="Status">
-          <StatusOptions />
-        </Select>
-        <Button type="submit" size="sm" pending={pending}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
+      {/* Status moved up into the chip row with the other three properties;
+        * it was the only one still spelled as a labelled select down here. */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
         <FieldError>{state.error}</FieldError>
+        <div className="ml-auto flex items-center gap-1">
+          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" pending={pending}>
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
       </div>
     </form>
   );

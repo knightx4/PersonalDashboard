@@ -124,7 +124,12 @@ describe('PlanView', () => {
     const html = render('open');
     expect(html).toContain('>Next<');
     expect(html).toContain('>Someday<');
-    expect(html).toContain('>Claude<');
+    // Not who has it: the Who column was dropped deliberately -- it was a
+    // column of dashes with the occasional "Claude" in it. Who has a step is
+    // on the open step, in the "Claude's" view, and in the menu that sets it,
+    // and the next two assertions are the ones that cover those.
+    expect(html).not.toContain('>Claude<');
+    expect(render('claude')).toContain('The anonymous page');
     expect(html).toContain('>Ready<');
     expect(html).toContain('Waits on #3');
     // One of the feature's three leaf steps is done; the rest are not started.

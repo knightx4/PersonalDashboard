@@ -1,8 +1,8 @@
 import { PageHeader } from '@/components/shell/page-header';
+import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
 import { Card, CardSection } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { InlineInput, Input, Label, Select, Textarea } from '@/components/ui/field';
-import { Banner } from '@/components/ui/banner';
+import { ChipSelect, ComposeBody, ComposeTitle, InlineInput } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { LAWS, RESTRAINT_LAWS } from './laws';
@@ -144,85 +144,90 @@ export default function DevUiPage() {
 
       <Section
         title="Restraint, worked"
-        lead="Laws 9 to 12 are four views of one idea: the interface should get out from in front of the thing the person came for. Each has a component that makes obeying it the easy path, because a law with no easy path is a law that gets broken by whoever is in a hurry."
+        lead="Laws 9 to 12 are four views of one idea: the interface should get out from in front of the thing the person came for. Here they are on one surface, which is the only honest way to show them — each is easy to obey alone and they are only hard together."
       >
-        <Card padding="standard" className="space-y-4">
-          <div className="grid gap-(--field-gap) sm:grid-cols-2">
-            <div>
-              <Label htmlFor="ui-demo-title">A label is a caption</Label>
-              <Input id="ui-demo-title" placeholder="Quieter than the value it names" readOnly />
-            </div>
-            <div>
-              <Label htmlFor="ui-demo-select">Controls share one height</Label>
-              <Select id="ui-demo-select" defaultValue="a">
-                <option value="a">All of them read --control-h</option>
-              </Select>
-            </div>
+        {/*
+          * This block used to be the thing it warns about: a card of labelled,
+          * bordered, full-width fields in a two-column grid, demonstrating the
+          * primitives one at a time. It read as a form because it was one. A
+          * page arguing for restraint cannot be the loudest surface in the app.
+          */}
+        <Card padding="standard" className="space-y-3">
+          <ComposeTitle defaultValue="" placeholder="What has to happen" aria-label="Demonstration title" />
+          <ComposeBody rows={1} placeholder="What it involves…" aria-label="Demonstration body" />
+          <div className="flex flex-wrap items-center gap-1">
+            <ChipSelect aria-label="Status" defaultValue="todo" icon={<Circle className="size-3.5" strokeWidth={2} />}>
+              <option value="todo">Not started</option>
+              <option value="doing">In progress</option>
+            </ChipSelect>
+            <ChipSelect aria-label="Priority" defaultValue="2" icon={<Flag className="size-3.5" strokeWidth={2} />}>
+              <option value="1">Urgent</option>
+              <option value="2">Normal</option>
+            </ChipSelect>
+            <ChipSelect aria-label="Size" defaultValue="" placeholderValue="" icon={<Scale className="size-3.5" strokeWidth={2} />}>
+              <option value="">Size</option>
+              <option value="s">Small</option>
+            </ChipSelect>
+            <ChipSelect aria-label="Assignee" defaultValue="" placeholderValue="" icon={<CircleUser className="size-3.5" strokeWidth={2} />}>
+              <option value="">Nobody</option>
+              <option value="me">Me</option>
+            </ChipSelect>
           </div>
-          <div>
-            <Label htmlFor="ui-demo-note">A text box starts at what it holds</Label>
-            <Textarea
-              id="ui-demo-note"
-              placeholder="Type into this. It grows; it does not start ninety-six pixels tall."
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="md">Primary</Button>
-            <Button size="md" variant="secondary">
-              Secondary
-            </Button>
-            <Button size="md" variant="ghost">
-              Ghost
-            </Button>
-            <p className="text-small text-ink-muted">
-              A medium button is exactly as tall as the input beside it, at every density.
-            </p>
+          <div className="flex items-center gap-1 border-t border-border pt-2">
+            <span className="text-small text-ink-muted">
+              One thing to type into, four properties carrying their own values, no label anywhere.
+            </span>
+            <span className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="ghost">
+                Cancel
+              </Button>
+              <Button size="sm">Add</Button>
+            </span>
           </div>
         </Card>
-        <Banner tone="info">
-          The density dial in the top bar moves all of this together. Comfortable is the default and
-          is what snug used to be; the dial only ever takes away.
-        </Banner>
 
-        <Card padding="standard" className="space-y-4">
-          <Group title="Law 10 — Disclosure">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Group title="9 — Density">
+            <p className="text-body text-ink-muted">
+              Every control above reads <code className="text-ui">--control-h</code> and the density
+              dial in the top bar moves them together. Comfortable is the default and is what snug
+              used to be; the dial only ever takes away.
+            </p>
+          </Group>
+          <Group title="10 — Disclosure">
             <p className="text-body text-ink-muted">
               Native <code className="text-ui">&lt;details&gt;</code>, so it folds before JavaScript
-              loads and the keyboard comes free. The closed line carries the fact that makes opening
-              it a choice rather than a check — without that, a fold has moved the work, not saved
-              it.
+              loads. The closed line carries the fact that makes opening it a choice.
             </p>
             <Disclosure title="Retailers with a custom window" meta="11 · longest 90 days">
               <p className="text-body text-ink-muted">
-                Opened. The indent is the grouping, in place of the border law 11 forbids.
+                The indent is the grouping, in place of the border law 11 forbids.
               </p>
             </Disclosure>
           </Group>
-
-          <Group title="Law 11 — Group">
+          <Group title="11 — Group and ChipSelect">
             <p className="text-body text-ink-muted">
-              A heading and space, no frame. The two rows above are groups: they are told apart by
-              their headings and the air between them, not by boxes inside this box. Ninety-three
-              places in the app currently draw the second box.
+              These four notes are groups: told apart by headings and air, not by boxes inside this
+              box. A chip is the same move on a control — the value is the label, so it is the width
+              of a word instead of a row. Ninety-one places in the app still draw the second box.
             </p>
           </Group>
-
-          <Group title="Law 12 — InlineInput">
-            <div className="flex items-center gap-3">
+          <Group title="12 — InlineInput">
+            <div className="flex items-center gap-2">
               <span className="text-body text-ink">Return window</span>
               <InlineInput
                 aria-label="Demonstration return window, in days"
                 defaultValue="30"
-                className="tabular w-16 text-right font-medium"
+                className="tabular w-14 text-right font-medium"
               />
               <span className="text-small text-ink-muted">days</span>
             </div>
             <p className="text-body text-ink-muted">
-              Point at the number. It is an input, sized and set exactly like the text it stands in
-              for, so a page of these reads as values rather than as a form.
+              Point at the number. It is an input, set exactly like the text it stands in for, so a
+              page of these reads as values rather than as a form.
             </p>
           </Group>
-        </Card>
+        </div>
       </Section>
 
       <Section

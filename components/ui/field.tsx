@@ -130,6 +130,123 @@ export function Select({
  * The max-height is not optional: without it a long note pushes its own
  * submit button off the bottom of the screen.
  */
+/**
+ * The two halves of a compose surface: a thing you are writing, not fields you
+ * are filling in.
+ *
+ * Borderless at rest *and* on hover, which is the difference between these and
+ * InlineInput above. That one stands in for a value on a page of values, so it
+ * has to advertise that it can be edited; these are the only things on their
+ * surface and there is nothing to discover -- the caret is already in the
+ * title. Chrome around them would be decoration on a blank page.
+ *
+ * The title is deliberately larger than the body. In a create surface the
+ * first line is the name of the thing and everything else is elaboration, and
+ * setting them at the same size is what makes a compose box read as a form.
+ */
+export function ComposeTitle({ className, ref, ...props }: React.ComponentProps<'input'>) {
+  return (
+    <input
+      ref={ref}
+      className={cn(
+        // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+        'w-full border-0 bg-transparent p-0 text-base font-medium text-ink outline-none sm:text-lead',
+        'placeholder:font-normal placeholder:text-ink-ghost',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function ComposeBody({
+  className,
+  ...props
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      className={cn(
+        // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+        'field-sizing-content max-h-64 w-full resize-none border-0 bg-transparent p-0 text-base text-ink outline-none sm:text-ui',
+        'placeholder:text-ink-ghost',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/**
+ * A property, set the way Linear sets one: a chip carrying its own current
+ * value, with no label anywhere near it.
+ *
+ * The pattern this replaces is a labelled full-width select, and stacking
+ * three of those is how a create form ends up four hundred pixels tall to
+ * collect three enums. A chip is different in kind, not degree: the value *is*
+ * the label, so "Normal" sitting next to a flag glyph needs no caption reading
+ * "Priority"; and the chip is the width of the word, so three of them are a
+ * row rather than three rows.
+ *
+ * Still a native `<select>` under the paint. Linear's are custom popovers and
+ * ours are not, deliberately: a native select is a real control before
+ * JavaScript loads (law 6), gets the platform's own picker on a phone, and is
+ * already correct for the keyboard and the accessibility tree. What it costs
+ * is the icon inside the open menu, which is not worth a bespoke listbox and a
+ * focus trap.
+ *
+ * `field-sizing: content` is what makes it a chip rather than a box: a select
+ * is otherwise as wide as its *widest* option, so an assignee chip would be
+ * the width of the longest name on the team no matter who is on it. With this
+ * it is the width of the current value. Where it is unsupported the chip is
+ * simply wider, which is the old behaviour and not a break.
+ *
+ * `placeholderValue` is the option that means "not set" -- it renders muted,
+ * so an unset property reads as an invitation rather than as a value.
+ */
+export function ChipSelect({
+  className,
+  icon,
+  placeholderValue,
+  value,
+  defaultValue,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement> & {
+  /** A glyph that says which property this is, in place of a label. */
+  icon?: React.ReactNode;
+  placeholderValue?: string;
+}) {
+  const current = value ?? defaultValue;
+  const unset = placeholderValue !== undefined && current === placeholderValue;
+
+  return (
+    <span
+      className={cn(
+        'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
+        'border border-transparent px-1.5 py-0.5 text-ui',
+        'hover:border-border hover:bg-sunken',
+        'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
+        className,
+      )}
+    >
+      {icon ? (
+        <span aria-hidden className="shrink-0 text-ink-ghost group-hover/chip:text-ink-muted">
+          {icon}
+        </span>
+      ) : null}
+      <select
+        value={value}
+        defaultValue={defaultValue}
+        className={cn(
+          'field-sizing-content min-w-0 cursor-pointer appearance-none truncate bg-transparent',
+          'text-ui outline-none',
+          unset ? 'text-ink-ghost' : 'text-ink',
+        )}
+        {...props}
+      />
+    </span>
+  );
+}
+
 export function Textarea({
   className,
   ...props
