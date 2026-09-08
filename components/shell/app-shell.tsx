@@ -14,9 +14,11 @@ import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import {
+  WorkspaceSheet,
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
+import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
 import type { ThemeChoice } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
@@ -102,6 +104,7 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
+  const [switcher, setSwitcher] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
 
@@ -319,14 +322,98 @@ export function AppShell({
   );
 
   /**
-   * The phone's navigation: the first four sections as a bar of tabs along
-   * the bottom, and everything else behind More. A hamburger was the only way
-   * in before, which made every section two taps away and the current one
-   * invisible. Four, because that is what fits with a label under each icon
-   * at 390px; the rest are one tap further, which is where they were anyway.
+   * The phone's navigation: sections as a bar of tabs along the bottom, the
+   * workspace switcher in the middle of them, and everything else behind More.
+   * A hamburger was the only way in before, which made every section two taps
+   * away and the current one invisible.
+   *
+   * Five slots, because that is what fits with a label under each icon at
+   * 390px. The switcher takes the centre one -- the thumb's own position, and
+   * the only control on the bar that leaves the workspace rather than moving
+   * around inside it -- so three sections show beside More, or four when there
+   * is no More. The rest are one tap further, which is where they were anyway.
    */
-  const tabs = sections.slice(0, 4);
-  const overflow = sections.length > 4 || Boolean(settingsHref);
+  const overflow = sections.length > 3 || Boolean(settingsHref);
+  const tabs = sections.slice(0, overflow ? 3 : 4);
+
+  const dockKey = (moduleById(module) ?? HOME_MARK).key.from;
+  const dockItem = 'press flex w-full flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium';
+
+  const dockTabs = tabs.map((section) => {
+    const Icon = section.icon ? NAV_ICONS[section.icon] : null;
+    const on = isActive(section);
+    return (
+      <li key={section.href}>
+        <Link
+          href={section.href}
+          aria-current={on ? 'page' : undefined}
+          className={cn(dockItem, 'relative', on ? 'text-shell-ink' : 'text-shell-muted')}
+        >
+          {Icon && <Icon className="size-5" strokeWidth={on ? 2 : 1.75} aria-hidden />}
+          <span className="truncate">{section.label}</span>
+          {section.badge !== undefined && section.badge > 0 && (
+            <span
+              className="absolute right-1/2 top-1.5 -mr-4 size-1.5 rounded-full bg-caution-fill"
+              aria-hidden
+            />
+          )}
+          <span
+            className={cn(
+              'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-150',
+              on ? 'opacity-100' : 'opacity-0',
+            )}
+            style={{ background: dockKey }}
+            aria-hidden
+          />
+        </Link>
+      </li>
+    );
+  });
+
+  if (overflow) {
+    dockTabs.push(
+      <li key="__more">
+        <button
+          type="button"
+          onClick={() => setDrawer(true)}
+          className={cn(dockItem, 'text-shell-muted')}
+        >
+          <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />
+          More
+        </button>
+      </li>,
+    );
+  }
+
+  /**
+   * The centre slot. The mark rather than an icon, because it is the one
+   * control on the bar that answers "where am I" as well as "where else could
+   * I be" -- and it is already the thing a person taps at the top of the
+   * column on a desktop.
+   */
+  const dockSwitcher = (
+    <li key="__switcher">
+      <button
+        type="button"
+        onClick={() => setSwitcher(true)}
+        aria-haspopup="menu"
+        aria-expanded={switcher}
+        className={cn(dockItem, switcher ? 'text-shell-ink' : 'text-shell-muted')}
+      >
+        {/* The mark is 24px against the tabs' 20px icons, so it is pulled back
+            in by 2px a side -- otherwise the centre label sits lower than the
+            four beside it. */}
+        <ModuleMark module={module} size="sm" className="-my-0.5" />
+        <span className="truncate">Switch</span>
+      </button>
+    </li>
+  );
+
+  // One or two tabs to the switcher's left. The bar holds four at the most --
+  // three plus More, or four with no More -- so this is dead centre of five
+  // and one past centre of four.
+  const split = dockTabs.length >= 3 ? 2 : 1;
+  const dock = [...dockTabs.slice(0, split), dockSwitcher, ...dockTabs.slice(split)];
 
   return (
     <ToastProvider>
@@ -552,56 +639,18 @@ export function AppShell({
             aria-label="Sections"
             className="fixed inset-x-0 bottom-0 z-40 border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
           >
-            <ul className="grid auto-cols-fr grid-flow-col">
-              {tabs.map((section) => {
-                const Icon = section.icon ? NAV_ICONS[section.icon] : null;
-                const on = isActive(section);
-                return (
-                  <li key={section.href}>
-                    <Link
-                      href={section.href}
-                      aria-current={on ? 'page' : undefined}
-                      className={cn(
-                        'press relative flex flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium',
-                        on ? 'text-shell-ink' : 'text-shell-muted',
-                      )}
-                    >
-                      {Icon && <Icon className="size-5" strokeWidth={on ? 2 : 1.75} aria-hidden />}
-                      <span className="truncate">{section.label}</span>
-                      {section.badge !== undefined && section.badge > 0 && (
-                        <span
-                          className="absolute right-1/2 top-1.5 -mr-4 size-1.5 rounded-full bg-caution-fill"
-                          aria-hidden
-                        />
-                      )}
-                      <span
-                        className={cn(
-                          'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-150',
-                          on ? 'opacity-100' : 'opacity-0',
-                        )}
-                        style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
-                        aria-hidden
-                      />
-                    </Link>
-                  </li>
-                );
-              })}
-              {overflow && (
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => setDrawer(true)}
-                    className="press flex w-full flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium text-shell-muted"
-                  >
-                    <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />
-                    More
-                  </button>
-                </li>
-              )}
-            </ul>
+            <ul className="grid auto-cols-fr grid-flow-col">{dock}</ul>
           </nav>
         )}
       </div>
+
+      <WorkspaceSheet
+        current={module}
+        enabled={enabledModules}
+        counts={counts}
+        open={switcher}
+        onClose={() => setSwitcher(false)}
+      />
 
       <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
     </div>
