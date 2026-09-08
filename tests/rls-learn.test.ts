@@ -283,6 +283,57 @@ describe('a reading you wrote down yourself', () => {
   });
 });
 
+describe('deleting', () => {
+  it('takes a track\'s readings and its import with it', async () => {
+    // The reason there is nothing to clean up in deleteTrack: the foreign keys
+    // do it. If they ever stopped, this fails rather than leaving orphans
+    // nobody can see or reach.
+    const track = await seedTrack(userA, 'Going', 'Does this cascade?');
+    const reading = await seedReading(userA, track, sourceA, 'fetched');
+    await admin`insert into imports (user_id, track_id, raw_text)
+                values (${userA}, ${track}, 'paste')`;
+
+    await admin`delete from tracks where id = ${track}`;
+
+    const left = await admin<{ n: number }[]>`
+      select (select count(*) from readings where id = ${reading})
+           + (select count(*) from imports where track_id = ${track}) as n`;
+    expect(Number(left[0].n)).toBe(0);
+  });
+
+  it('leaves the source alone, because another track may still want it', async () => {
+    // Sources are deduped across tracks. Deleting one track must not take a
+    // work a different track still points at.
+    const track = await seedTrack(userA, 'Going too', 'And this?');
+    await seedReading(userA, track, sourceA, 'fetched');
+
+    await admin`delete from tracks where id = ${track}`;
+
+    const source = await admin`select id from sources where id = ${sourceA}`;
+    expect(source).toHaveLength(1);
+  });
+
+  it('does not let another user delete your reading or your track', async () => {
+    const deletedReading = await asUser(
+      userB,
+      (tx) => tx`delete from readings where id = ${readingA} returning id`,
+    );
+    expect(deletedReading).toHaveLength(0);
+
+    const deletedTrack = await asUser(
+      userB,
+      (tx) => tx`delete from tracks where id = ${trackA} returning id`,
+    );
+    expect(deletedTrack).toHaveLength(0);
+  });
+
+  it('lets the owner delete their own reading', async () => {
+    const id = await seedReading(userA, trackA, sourceA, 'fetched');
+    const gone = await asUser(userA, (tx) => tx`delete from readings where id = ${id} returning id`);
+    expect(gone).toHaveLength(1);
+  });
+});
+
 describe('the rules the schema itself enforces', () => {
   it('refuses a locator with no stated basis', async () => {
     // "Never send someone to a page that is not there" is a check constraint,

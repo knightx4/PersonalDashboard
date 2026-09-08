@@ -1,18 +1,24 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { addManualReading, deleteReading } from '@/lib/learn/tracks/save';
+import { addManualReading, deleteReading, deleteTrack } from '@/lib/learn/tracks/save';
 
 /**
  * Adding to a track by hand, and taking things off it.
  *
  * Every write goes through the session client, so RLS decides which rows are
- * touched. The track id comes from the form and is not trusted for ownership:
- * the insert carries the user id from the session, and a track belonging to
- * somebody else fails the policy rather than being filtered out here.
+ * touched. The ids come from the form and are not trusted for ownership: the
+ * insert carries the user id from the session, and a row belonging to somebody
+ * else fails the policy rather than being filtered out here.
+ *
+ * The two removals take a plain FormData because ConfirmStep calls them
+ * directly rather than through useActionState. They are genuinely destructive
+ * and there is no undo, which is exactly the case that component exists for --
+ * a second click in the same place with the consequence written beside it.
  */
 
 export type TrackActionState = { error?: string };
@@ -63,26 +69,45 @@ const RemoveInput = z.object({
   trackId: z.string().uuid(),
 });
 
-export async function removeFromTrack(
-  _prev: TrackActionState,
-  formData: FormData,
-): Promise<TrackActionState> {
+/**
+ * Take one reading off a track.
+ *
+ * Throws rather than returning an error, because ConfirmStep renders what a
+ * rejected promise says and a message returned quietly would leave the button
+ * looking like it worked.
+ */
+export async function removeFromTrack(formData: FormData): Promise<void> {
   await requireUser();
 
   const parsed = RemoveInput.safeParse({
     readingId: formData.get('readingId'),
     trackId: formData.get('trackId'),
   });
-  if (!parsed.success) return { error: 'Could not remove that.' };
+  if (!parsed.success) throw new Error('Could not work out what to remove.');
 
   const supabase = await createLearnClient();
-  try {
-    await deleteReading(supabase, parsed.data.readingId);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not remove that.' };
-  }
+  await deleteReading(supabase, parsed.data.readingId);
 
   revalidatePath(`/learn/t/${parsed.data.trackId}`);
   revalidatePath('/learn');
-  return {};
+}
+
+/**
+ * Delete a whole track.
+ *
+ * Its readings and its import go with it, on the foreign keys. The sources do
+ * not: they are shared across tracks, and deleting one track must not take a
+ * work another track still points at.
+ */
+export async function removeTrack(formData: FormData): Promise<void> {
+  await requireUser();
+
+  const trackId = z.string().uuid().safeParse(formData.get('trackId'));
+  if (!trackId.success) throw new Error('Could not work out which track to delete.');
+
+  const supabase = await createLearnClient();
+  await deleteTrack(supabase, trackId.data);
+
+  revalidatePath('/learn');
+  redirect('/learn');
 }

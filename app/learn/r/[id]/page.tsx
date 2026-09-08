@@ -8,6 +8,8 @@ import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load'
 import { formatMoney } from '@/lib/money';
 import { openReading } from './actions';
 import { FindSources } from './find-sources';
+import { ConfirmStep } from '@/components/ui/confirm-step';
+import { removeFromTrack } from '../../t/[id]/actions';
 import { NoteForm } from './note-form';
 import { StatusButtons } from './status-buttons';
 import { cardVariants } from '@/components/ui/card';
@@ -153,6 +155,25 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
       <section>
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">What you took from it</h2>
         <NoteForm readingId={reading.id} note={reading.note} />
+      </section>
+
+      {/*
+        Removal, not "abandoned". Giving up on something is a fact worth
+        keeping -- it says you looked and decided against it. This is for the
+        rows that should never have been here: a search that attached the wrong
+        book, a line the parser invented out of a sentence.
+      */}
+      <section className="mt-8 border-t border-border pt-4">
+        <ConfirmStep
+          action={removeFromTrack}
+          fields={{ readingId: reading.id, trackId: reading.trackId }}
+          prompt="Removes this from the track for good. To keep it but stop working on it, mark it as gave up instead."
+          confirmLabel="Yes, remove it"
+          pendingLabel="Removing…"
+          align="start"
+        >
+          Remove from this track
+        </ConfirmStep>
       </section>
 
       {reading.source?.canonicalUrl && (
