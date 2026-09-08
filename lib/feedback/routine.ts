@@ -13,8 +13,14 @@
  *
  * Hence a variable per queue, each falling back to the old shared one and then
  * to the built-in default, so a deployment that sets neither behaves exactly as
- * it did before. The ids are not secrets (the bearer token is); they are
- * overridable so a routine can be repointed without a deploy.
+ * it did before. The ids are not secrets; they are overridable so a routine can
+ * be repointed without a deploy.
+ *
+ * The bearer token is a secret, and it is scoped to the routine rather than to
+ * the account: firing one routine with another's token answers "401 Token is
+ * not authorized for this routine". So it splits the same way, and id and token
+ * are handed out together as a pair -- a repointed id whose token stayed behind
+ * is the whole failure this shape exists to prevent.
  */
 import 'server-only';
 
@@ -29,14 +35,30 @@ function firstSet(...values: (string | undefined)[]): string | null {
   return null;
 }
 
+/**
+ * A routine and the token that may fire it.
+ *
+ * The two travel together because the token is scoped to the routine, not to
+ * the account: firing one routine with another's token answers
+ * "401 Token is not authorized for this routine". Returning them as a pair is
+ * what stops an id being repointed without its token following.
+ */
+export type RoutineTarget = { id: string | null; token: string | null };
+
 /** The routine that works the notes queue -- "Run Feature Routine". */
-export function notesRoutineId(): string | null {
-  return firstSet(process.env.CLAUDE_NOTES_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID);
+export function notesRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_NOTES_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_NOTES_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
+  };
 }
 
 /** The routine that works the plan -- "Send to Claude" and "Shape into a plan". */
-export function planRoutineId(): string | null {
-  return firstSet(process.env.CLAUDE_PLAN_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID);
+export function planRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_PLAN_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_PLAN_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
+  };
 }
 
 /** The beta header the routine API requires, as documented. */
@@ -57,7 +79,9 @@ export async function fireFeatureRoutine(options: {
   if (!options.apiKey) {
     return {
       ok: false,
-      error: 'CLAUDE_API_KEY is not set on this deployment, so the routine cannot be started.',
+      error:
+        'No token for this routine on the deployment, so it cannot be started. ' +
+        'Set CLAUDE_PLAN_ROUTINE_TOKEN or CLAUDE_NOTES_ROUTINE_TOKEN (or CLAUDE_API_KEY for both).',
     };
   }
 
