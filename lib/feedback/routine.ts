@@ -1,17 +1,43 @@
 /**
- * Fire the Claude Code routine that works this queue.
+ * Fire a Claude Code routine, and say which one each button pulls.
  *
- * The notes loop normally runs on a schedule. This is the manual pull on the
- * same rope: it starts the routine that reads feedback_items and ships the
- * fixes, so a note filed this minute does not have to wait for tonight.
+ * A routine normally runs on a schedule. Firing it is the manual pull on the
+ * same rope, so a note filed this minute does not have to wait for tonight.
  *
- * The trigger id is the one the user set up; it is not a secret (the bearer
- * token is), and it is overridable so a second routine can be pointed at
- * without a deploy.
+ * There are two ropes, because there are two queues. The notes routine reads
+ * feedback_items and ships the fixes; the plan routine works plan_items, one
+ * step at a time, and shapes an idea into a proposal. They were one routine
+ * once, which is why one id served every button -- and why a single id is now
+ * wrong: the bugs page sends no text at all, so a button pointed at the wrong
+ * routine does not fail, it quietly works the other queue.
+ *
+ * Hence a variable per queue, each falling back to the old shared one and then
+ * to the built-in default, so a deployment that sets neither behaves exactly as
+ * it did before. The ids are not secrets (the bearer token is); they are
+ * overridable so a routine can be repointed without a deploy.
  */
 import 'server-only';
 
 export const DEFAULT_FEATURE_ROUTINE_ID = 'trig_018TQKkc6qbGLmP1Y7AKWn4N';
+
+/** The first of these actually set to something. Blank is not an answer. */
+function firstSet(...values: (string | undefined)[]): string | null {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+/** The routine that works the notes queue -- "Run Feature Routine". */
+export function notesRoutineId(): string | null {
+  return firstSet(process.env.CLAUDE_NOTES_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID);
+}
+
+/** The routine that works the plan -- "Send to Claude" and "Shape into a plan". */
+export function planRoutineId(): string | null {
+  return firstSet(process.env.CLAUDE_PLAN_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID);
+}
 
 /** The beta header the routine API requires, as documented. */
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';

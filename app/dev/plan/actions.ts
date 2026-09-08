@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
-import { fireFeatureRoutine } from '@/lib/feedback/routine';
+import { fireFeatureRoutine, planRoutineId } from '@/lib/feedback/routine';
 import { planBrief } from '@/lib/plan/brief';
 import {
   PLAN_ASSIGNEES,
@@ -552,7 +552,7 @@ export async function sendPlanItemToClaude(
 
   const result = await fireFeatureRoutine({
     apiKey: process.env.CLAUDE_API_KEY ?? null,
-    routineId: process.env.CLAUDE_FEATURE_ROUTINE_ID ?? null,
+    routineId: planRoutineId(),
     text,
   });
   if (!result.ok) return { error: result.error };
