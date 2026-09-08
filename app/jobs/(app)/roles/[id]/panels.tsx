@@ -488,41 +488,54 @@ function Todos({
           ))}
         </ul>
       )}
-      <div className="flex flex-wrap items-end gap-2">
-        <Field id="todo-body" label="Add a to-do" className="min-w-48 flex-1">
-          <Input
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Record a video interview"
-          />
-        </Field>
-        <Field id="todo-due" label="Done by">
-          <Input
-            type="date"
-            value={dueAt}
-            onChange={(event) => setDueAt(event.target.value)}
-            className="w-40"
-          />
-        </Field>
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || !body.trim() || !dueAt}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await addReminder({ applicationId, body, dueAt });
-              setError(result.error);
-              if (!result.error) {
-                setBody('');
-                setDueAt('');
-              }
-            })
-          }
-        >
+      {/*
+        * One line, and no captions above it.
+        *
+        * This was two `Field`s and a button: "Add a to-do" printed above a box
+        * whose own placeholder read "Record a video interview", and "Done by"
+        * printed above a date picker that says what it is by being one. Three
+        * stacked rows and four pieces of chrome to collect a sentence and a
+        * day. Laws 9 and 12.
+        *
+        * It is a real `<form>` now rather than a button with an onClick, which
+        * is what makes Return submit it -- the thing you actually do after
+        * typing a to-do. The button stays for the pointer and for anyone who
+        * does not know that, and goes quiet until there is something to add.
+        */}
+      <form
+        className="flex flex-wrap items-center gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!body.trim() || !dueAt) return;
+          startTransition(async () => {
+            const result = await addReminder({ applicationId, body, dueAt });
+            setError(result.error);
+            if (!result.error) {
+              setBody('');
+              setDueAt('');
+            }
+          });
+        }}
+      >
+        <Input
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          aria-label="Add a to-do"
+          placeholder="Add a to-do…"
+          className="min-w-48 flex-1"
+        />
+        <Input
+          type="date"
+          value={dueAt}
+          onChange={(event) => setDueAt(event.target.value)}
+          aria-label="Done by"
+          className="w-36"
+        />
+        <Button type="submit" size="sm" variant="secondary" pending={pending} disabled={!body.trim() || !dueAt}>
           Add
         </Button>
         {error && <span className="text-small text-danger">{error}</span>}
-      </div>
+      </form>
     </CardSection>
   );
 }
