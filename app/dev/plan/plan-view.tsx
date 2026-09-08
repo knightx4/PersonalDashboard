@@ -617,7 +617,11 @@ function AnswerDecision({
   const field = `answer-${node.id}`;
 
   return (
-    <div className="space-y-2 rounded-lg border border-caution/30 bg-canvas px-3 py-2.5">
+    /* A well, not a frame: this sits inside the open step, which is already a
+       box, and the caution hairline round it was a second claim on a grouping
+       the ground had already made. The tint stays -- it is the thing saying a
+       question is waiting on you. Law 11. */
+    <div className="space-y-2 rounded-lg bg-caution-tint/40 px-3 py-2.5">
       {node.resolution && (
         <div>
           <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Answered</p>
@@ -1654,7 +1658,7 @@ export function PlanView({
 
               <div className="space-y-2">
                 {section.nodes.length === 0 ? (
-                  <p className="rounded-card border border-dashed border-border bg-surface px-4 py-4 text-center text-ui text-ink-muted">
+                  <p className={cn(cardVariants({ padding: 'standard' }), 'border-dashed text-center text-ui text-ink-muted')}>
                     {finished
                       ? `Everything planned for ${section.label} is done.`
                       : `No plan for ${section.label} yet.`}
