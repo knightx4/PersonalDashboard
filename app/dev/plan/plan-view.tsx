@@ -2,7 +2,17 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, Play, X } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  ChevronDown,
+  CircleDashed,
+  Hourglass,
+  Play,
+  Sparkles,
+  TrendingUp,
+  X,
+} from 'lucide-react';
 import {
   addPlanDependency,
   addPlanItem,
@@ -64,17 +74,6 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
   dropped: 'Dropped',
 };
 
-// The tint tokens rather than colour/10, for the reason the notes list gives:
-// the tints are tuned per theme, and 10% alpha over a dark surface is not the
-// same thing as a tint.
-const STATUS_STYLE: Record<PlanStatus, string> = {
-  not_started: 'bg-canvas text-ink-muted',
-  in_progress: 'bg-accent-tint text-accent',
-  blocked: 'bg-caution-tint text-caution',
-  done: 'bg-positive-tint text-positive',
-  dropped: 'bg-canvas text-ink-ghost line-through',
-};
-
 const PRIORITY_LABEL: Record<PlanPriority, string> = { 1: 'Next', 2: 'Normal', 3: 'Someday' };
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
 const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Claude' };
@@ -134,32 +133,6 @@ function AssigneeSelect({ defaultValue, id }: { defaultValue: PlanAssignee | nul
         </option>
       ))}
     </Select>
-  );
-}
-
-/** A small fact on a row: the priority, the size, who holds it. */
-function Chip({
-  tone = 'quiet',
-  children,
-  title,
-}: {
-  tone?: 'quiet' | 'accent' | 'positive' | 'caution';
-  children: React.ReactNode;
-  title?: string;
-}) {
-  return (
-    <span
-      title={title}
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
-        tone === 'quiet' && 'bg-canvas text-ink-muted',
-        tone === 'accent' && 'bg-accent-tint text-accent',
-        tone === 'positive' && 'bg-positive-tint text-positive',
-        tone === 'caution' && 'bg-caution-tint text-caution',
-      )}
-    >
-      {children}
-    </span>
   );
 }
 
@@ -632,22 +605,183 @@ function when(iso: string | null): string | null {
 }
 
 /**
+ * What the health column says about a step.
+ *
+ * The stored status is what you set; health is what it means right now. A
+ * step not yet started is either ready, waiting on something, or simply not
+ * reached -- three different answers the one word "not started" was hiding.
+ * The other statuses say what they are. Done and dropped are the quiet ones:
+ * finished work is consulted, not read.
+ */
+type Health = {
+  word: string;
+  tone: 'quiet' | 'ghost' | 'accent' | 'positive' | 'caution';
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  title?: string;
+};
+
+function healthOf(node: PlanNode): Health {
+  switch (node.status) {
+    case 'in_progress':
+      return { word: 'In progress', tone: 'accent', icon: TrendingUp };
+    case 'blocked':
+      return { word: 'Blocked', tone: 'caution', icon: Ban, title: node.comment ?? undefined };
+    case 'done':
+      return { word: 'Done', tone: 'positive', icon: Check };
+    case 'dropped':
+      return { word: 'Dropped', tone: 'ghost', icon: X };
+    case 'not_started':
+      if (node.waitingOn.length > 0) {
+        return {
+          word: 'Waiting',
+          tone: 'caution',
+          icon: Hourglass,
+          title: `Waits on ${node.waitingOn.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`,
+        };
+      }
+      if (node.ready) return { word: 'Ready', tone: 'positive', icon: Sparkles };
+      return { word: 'Not started', tone: 'quiet', icon: CircleDashed };
+  }
+}
+
+const TONE_TEXT: Record<Health['tone'], string> = {
+  quiet: 'text-ink-muted',
+  ghost: 'text-ink-ghost',
+  accent: 'text-accent',
+  positive: 'text-positive',
+  caution: 'text-caution',
+};
+
+const TONE_DOT: Record<Health['tone'], string> = {
+  quiet: 'bg-ink-ghost',
+  ghost: 'bg-ink-ghost',
+  accent: 'bg-accent',
+  positive: 'bg-positive',
+  caution: 'bg-caution',
+};
+
+/**
+ * The columns every row shares.
+ *
+ * One template, used by the header and by every row at every depth, is what
+ * makes the page scan: the health of a sub-sub-step sits under the health of
+ * the feature above it, because the indent lives inside the name cell rather
+ * than around the row. On a phone the three middle columns go and the name,
+ * the health and the menu stay.
+ */
+const ROW_GRID =
+  'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_3.75rem_6rem_2rem]';
+
+/** The width of one level of the tree, in the name cell. */
+const LEVEL = 'w-5';
+
+function ColumnHeader() {
+  return (
+    <li
+      aria-hidden
+      className={cn(
+        ROW_GRID,
+        'px-3 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-ghost',
+      )}
+    >
+      <span>Step</span>
+      <span>Health</span>
+      <span className="hidden sm:block">Priority</span>
+      <span className="hidden sm:block">Who</span>
+      <span className="hidden sm:block">Steps</span>
+      <span />
+    </li>
+  );
+}
+
+/**
+ * The lines that draw the tree.
+ *
+ * One slot per level above this row. An outer slot carries the line down
+ * from an ancestor that still has siblings after it; the innermost slot is
+ * the elbow into this row, continuing below when a sibling follows. It is
+ * what lets a step three deep be read as three deep at a glance, without the
+ * indent alone having to say so.
+ */
+function TreeGuides({ trail }: { trail: readonly boolean[] }) {
+  return (
+    <>
+      {trail.map((continues, level) => {
+        const last = level === trail.length - 1;
+        return (
+          <span key={level} className={cn(LEVEL, 'relative shrink-0 self-stretch')} aria-hidden>
+            {(continues || last) && (
+              <span
+                className={cn(
+                  'absolute left-2 top-0 w-px bg-border-strong',
+                  continues ? 'bottom-0' : 'h-1/2',
+                )}
+              />
+            )}
+            {last && <span className="absolute left-2 top-1/2 h-px w-2.5 bg-border-strong" />}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * Done, underway, blocked, not started: the leaf steps beneath a feature, as
+ * dots. Read from the roll-up rather than from the children on the page, so
+ * a narrowed view that has folded the done steps away still counts them.
+ */
+function Breakdown({ node }: { node: PlanNode }) {
+  const { done, inProgress, blocked, live } = node.rollup;
+  if (live === 0) return <span className="text-small text-ink-ghost">—</span>;
+
+  const counts: Array<{ status: PlanStatus; tone: Health['tone']; n: number }> = [
+    { status: 'done', tone: 'positive', n: done },
+    { status: 'in_progress', tone: 'accent', n: inProgress },
+    { status: 'blocked', tone: 'caution', n: blocked },
+    { status: 'not_started', tone: 'quiet', n: live - done - inProgress - blocked },
+  ];
+  const shown = counts.filter((c) => c.n > 0);
+  const title = shown.map((c) => `${c.n} ${STATUS_LABEL[c.status].toLowerCase()}`).join(', ');
+
+  return (
+    <span
+      className="tabular flex flex-wrap items-center gap-x-2 gap-y-0.5 text-small text-ink-muted"
+      title={`${title} of ${live}`}
+      aria-label={`${title} of ${live} steps`}
+    >
+      {shown.map((c) => (
+        <span key={c.status} className="inline-flex items-center gap-1">
+          <span className={cn('size-1.5 rounded-full', TONE_DOT[c.tone])} aria-hidden />
+          {c.n}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
  * One step: what it is, where it stands, and what is beneath it.
  *
- * Closed, it is a line -- the status, the number, the title, and the handful
- * of facts that change what gets picked up next. The detail, the acceptance
- * criteria, the note and the dependencies are behind the fold because a plan
- * is read as a list far more often than any one step of it is read in full.
- * Its sub-steps are a list of their own beneath it, folded with the chevron,
- * and the fold starts closed on a step that is finished: what is done is
- * consulted, not read.
+ * Closed, it is a line across the columns -- the number and title with the
+ * first line of what it involves dimmed beneath, then its health, its
+ * priority and size, who holds it, and the state of the steps under it. The
+ * full detail, the acceptance criteria, the note and the dependencies are
+ * behind the fold because a plan is read as a list far more often than any
+ * one step of it is read in full. Its sub-steps follow it as rows of their
+ * own, one level further in, folded with the chevron; the fold starts closed
+ * on a step that is finished, because what is done is consulted, not read.
  */
 function PlanRow({
   node,
+  trail,
   catalog,
   canSend,
 }: {
   node: PlanNode;
+  /** One entry per level above: whether that level's line carries on below this row. */
+  trail: readonly boolean[];
   catalog: readonly PlanCatalogEntry[];
   canSend: boolean;
 }) {
@@ -656,21 +790,27 @@ function PlanRow({
   const [addingChild, setAddingChild] = useState(false);
   const [showChildren, setShowChildren] = useState(() => !isClosed(node.status));
 
-  const [statusState, statusAction, statusPending] = useActionState(
-    setPlanItemStatus,
-    {} as PlanActionState,
-  );
   const [assignState, assignAction, assignPending] = useActionState(
     setPlanItemAssignee,
     {} as PlanActionState,
   );
 
   const hasChildren = node.children.length > 0;
-  const hasMore = Boolean(
-    node.detail || node.acceptance || node.comment || node.dependsOn.length || node.blocks.length,
-  );
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
+  const health = healthOf(node);
+  const HealthIcon = health.icon;
+
+  // The line under the title: what it involves, or failing that your note.
+  const gloss = (node.detail ?? node.comment ?? '').split('\n').find((line) => line.trim()) ?? '';
+
+  const statusMenu: ActionMenuItem[] = PLAN_STATUSES.map((status) => ({
+    id: status,
+    label: STATUS_LABEL[status],
+    disabled: status === node.status,
+    formAction: (formData: FormData) => setPlanItemStatus({}, formData),
+    formFields: { id: node.id, status },
+  }));
 
   const menu: ActionMenuItem[] = [
     {
@@ -707,104 +847,132 @@ function PlanRow({
     },
   ];
 
+  // Everything under the row -- the detail, the edit form, the sub-step form --
+  // sits in from the tree by the same amount the title does.
+  const inset = { paddingLeft: `${0.75 + trail.length * 1.25 + 1.25}rem` };
+
   return (
-    <li className="flex flex-col">
-      <div
+    <>
+      <li
         className={cn(
-          'flex items-start gap-2 px-3 py-2',
+          ROW_GRID,
+          'px-3',
+          gloss && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
+          closed && 'opacity-70',
         )}
       >
-        {/* The fold for the sub-steps. A spacer where there are none, so the
-            status pickers line up down the list. */}
-        {hasChildren ? (
-          <button
-            type="button"
-            onClick={() => setShowChildren((value) => !value)}
-            aria-expanded={showChildren}
-            aria-label={showChildren ? 'Hide the sub-steps' : 'Show the sub-steps'}
-            className="press mt-1.5 flex size-5 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent"
-          >
-            <ChevronDown
-              className={cn('size-3.5 transition-transform duration-150', !showChildren && '-rotate-90')}
-              strokeWidth={1.75}
-              aria-hidden
-            />
-          </button>
-        ) : (
-          <span className="size-5 shrink-0" aria-hidden />
-        )}
+        <div className="flex min-w-0 items-stretch">
+          <TreeGuides trail={trail} />
 
-        {/* The status is a picker rather than a badge you have to open the step
-            to change: "where is this" is the question the page exists for, and
-            answering it differently should not be a form. */}
-        <form action={statusAction} className="shrink-0">
-          <input type="hidden" name="id" value={node.id} />
-          <Select
-            name="status"
-            defaultValue={node.status}
-            disabled={statusPending}
-            aria-label={`Status of #${node.number} ${node.title}`}
-            className={cn('h-7 w-30 py-0 text-small', STATUS_STYLE[node.status])}
-            onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          >
-            <StatusOptions />
-          </Select>
-        </form>
+          {/* The fold for the sub-steps. A spacer where there are none, so the
+              titles at one depth line up. */}
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => setShowChildren((value) => !value)}
+              aria-expanded={showChildren}
+              aria-label={showChildren ? 'Hide the sub-steps' : 'Show the sub-steps'}
+              className={cn(
+                LEVEL,
+                'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                'h-5',
+              )}
+            >
+              <ChevronDown
+                className={cn('size-3.5 transition-transform duration-150', !showChildren && '-rotate-90')}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            </button>
+          ) : (
+            <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
+          )}
 
-        <div className="min-w-0 flex-1">
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            className={cn(
-              'flex w-full min-w-0 items-baseline gap-1.5 text-left text-ui hover:text-accent',
-              node.depth === 0 ? 'font-medium text-ink' : 'text-ink',
-            )}
+            className="min-w-0 flex-1 self-center text-left hover:text-accent"
           >
-            <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
-            <span className={cn('min-w-0', node.status === 'dropped' && 'text-ink-muted line-through')}>
-              {node.title}
+            <span
+              className={cn(
+                'flex min-w-0 items-baseline gap-1.5 text-ui',
+                trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
+              )}
+            >
+              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
+              <span className={cn('min-w-0 truncate', node.status === 'dropped' && 'text-ink-muted line-through')}>
+                {node.title}
+              </span>
             </span>
-          </button>
-
-          <div className="mt-0.5 flex flex-wrap items-center gap-1">
-            {node.priority === 1 && <Chip tone="accent">Next</Chip>}
-            {node.priority === 3 && <Chip>Someday</Chip>}
-            {node.size && <Chip title={SIZE_LABEL[node.size]}>{node.size}</Chip>}
-            {node.assignee === 'claude' && <Chip tone="accent">Claude</Chip>}
-            {node.ready && !closed && <Chip tone="positive">Ready</Chip>}
-            {node.waitingOn.length > 0 && !closed && (
-              <Chip
-                tone="caution"
-                title={node.waitingOn.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}
-              >
-                Waits on #{node.waitingOn[0].number}
-                {node.waitingOn.length > 1 && ` +${node.waitingOn.length - 1}`}
-              </Chip>
-            )}
-            {hasChildren && node.rollup.live > 0 && (
-              <span className="tabular text-small text-ink-muted">
-                {node.rollup.done}/{node.rollup.live} steps
+            {gloss && !open && (
+              <span className="block truncate text-small text-ink-muted">
+                {!node.detail && 'Note: '}
+                {gloss}
               </span>
             )}
-            {node.comment && !open && <span className="text-small text-ink-muted">· noted</span>}
-            {hasMore && !open && !node.comment && (
-              <span className="text-small text-ink-ghost">· more</span>
-            )}
-          </div>
+          </button>
         </div>
 
-        <ActionMenu label={`Actions for #${node.number}`} items={menu} className="-mr-1" />
-      </div>
+        {/* Health is a word you click to change, not a badge you have to open
+            the step to change: "where is this" is the question the page exists
+            for, and answering it differently should not be a form. */}
+        <ActionMenu
+          label={`Status of #${node.number} ${node.title}`}
+          items={statusMenu}
+          align="start"
+          className="justify-self-start"
+          triggerClassName={cn(
+            'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+            TONE_TEXT[health.tone],
+          )}
+          trigger={
+            <span className="inline-flex items-center gap-1.5" title={health.title}>
+              <HealthIcon className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+              <span className="truncate">{health.word}</span>
+            </span>
+          }
+        />
 
-      <FieldError>{statusState.error ?? assignState.error}</FieldError>
+        <span className="hidden truncate text-small sm:block">
+          {node.priority === 1 && <span className="text-accent">Next</span>}
+          {node.priority === 2 && <span className="text-ink-muted">Normal</span>}
+          {node.priority === 3 && <span className="text-ink-ghost">Someday</span>}
+          {node.size && (
+            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
+              {' · '}
+              {node.size.toUpperCase()}
+            </span>
+          )}
+        </span>
+
+        <span className="hidden truncate text-small sm:block">
+          {node.assignee === 'claude' && <span className="text-accent">Claude</span>}
+          {node.assignee === 'me' && <span className="text-ink-muted">Me</span>}
+          {!node.assignee && <span className="text-ink-ghost">—</span>}
+        </span>
+
+        <span className="hidden sm:block">
+          <Breakdown node={node} />
+        </span>
+
+        <ActionMenu label={`Actions for #${node.number}`} items={menu} className="justify-self-end" />
+      </li>
+
+      {assignState.error && (
+        <li className="px-3">
+          <FieldError>{assignState.error}</FieldError>
+        </li>
+      )}
 
       {editing ? (
-        <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />
+        <li style={inset} className="pr-3">
+          <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />
+        </li>
       ) : (
         open && (
-          <div className="space-y-3 px-3 pb-3 pl-10">
+          <li style={inset} className="space-y-3 pb-3 pr-3">
             {node.detail && <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>}
             {node.acceptance && (
               <div>
@@ -862,32 +1030,33 @@ function PlanRow({
               </form>
               {!closed && <SendToClaude node={node} canSend={canSend} />}
             </div>
-          </div>
+          </li>
         )
       )}
 
-      {(hasChildren || addingChild) && showChildren && (
-        <div className="ml-7 border-l border-border pl-1">
-          {hasChildren && (
-            <ul className="divide-y divide-border">
-              {node.children.map((child) => (
-                <PlanRow key={child.id} node={child} catalog={catalog} canSend={canSend} />
-              ))}
-            </ul>
-          )}
-          {addingChild && (
-            <div className="px-3 py-2">
-              <AddStep
-                module={node.module}
-                parentId={node.id}
-                open
-                onDone={() => setAddingChild(false)}
-              />
-            </div>
-          )}
-        </div>
+      {hasChildren &&
+        showChildren &&
+        node.children.map((child, index) => (
+          <PlanRow
+            key={child.id}
+            node={child}
+            trail={[...trail, index < node.children.length - 1]}
+            catalog={catalog}
+            canSend={canSend}
+          />
+        ))}
+
+      {addingChild && (
+        <li style={inset} className="py-2 pr-3">
+          <AddStep
+            module={node.module}
+            parentId={node.id}
+            open
+            onDone={() => setAddingChild(false)}
+          />
+        </li>
       )}
-    </li>
+    </>
   );
 }
 
@@ -977,8 +1146,15 @@ export function PlanView({
             </p>
           ) : (
             <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
+              <ColumnHeader />
               {section.nodes.map((node) => (
-                <PlanRow key={node.id} node={node} catalog={catalog} canSend={canSend} />
+                <PlanRow
+                  key={node.id}
+                  node={node}
+                  trail={[]}
+                  catalog={catalog}
+                  canSend={canSend}
+                />
               ))}
             </ul>
           )}

@@ -20,6 +20,7 @@ import {
 export type PlanProgress = {
   done: number;
   inProgress: number;
+  blocked: number;
   /** Steps that count toward the total: everything not dropped. */
   live: number;
   /** 0 to 1 over the live steps, or null when there are none to be through. */
@@ -120,10 +121,12 @@ export function planProgress(items: readonly { status: PlanStatus }[]): PlanProg
   const live = items.filter((item) => item.status !== 'dropped');
   const done = live.filter((item) => item.status === 'done').length;
   const inProgress = live.filter((item) => item.status === 'in_progress').length;
+  const blocked = live.filter((item) => item.status === 'blocked').length;
 
   return {
     done,
     inProgress,
+    blocked,
     live: live.length,
     fraction: live.length === 0 ? null : done / live.length,
   };

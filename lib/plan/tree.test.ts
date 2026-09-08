@@ -58,13 +58,13 @@ describe('planProgress', () => {
   it('counts what is done against what is still live', () => {
     expect(
       planProgress([at('done', 'a'), at('done', 'b'), at('not_started', 'c'), at('in_progress', 'd')]),
-    ).toEqual({ done: 2, inProgress: 1, live: 4, fraction: 0.5 });
+    ).toMatchObject({ done: 2, inProgress: 1, live: 4, fraction: 0.5 });
   });
 
   it('leaves a dropped step out of the denominator', () => {
     // Otherwise a module you finished sits at 90% forever because of one step
     // you decided against.
-    expect(planProgress([at('done', 'a'), at('dropped', 'b')])).toEqual({
+    expect(planProgress([at('done', 'a'), at('dropped', 'b')])).toMatchObject({
       done: 1,
       inProgress: 0,
       live: 1,
@@ -82,10 +82,11 @@ describe('planProgress', () => {
     expect(planProgress([at('in_progress', 'a'), at('not_started', 'b')]).fraction).toBe(0);
   });
 
-  it('counts a blocked step as live and not done', () => {
+  it('counts a blocked step as live, not done, and on its own', () => {
     expect(planProgress([at('blocked', 'a'), at('done', 'b')])).toEqual({
       done: 1,
       inProgress: 0,
+      blocked: 1,
       live: 2,
       fraction: 0.5,
     });
@@ -165,7 +166,7 @@ describe('buildPlanTree', () => {
     const [feature] = shopping(sections).nodes;
     // g1, g2 and direct are the leaves; "group" is a container and does not
     // count, even though it is marked done.
-    expect(feature.rollup).toEqual({ done: 1, inProgress: 1, live: 3, fraction: 1 / 3 });
+    expect(feature.rollup).toMatchObject({ done: 1, inProgress: 1, live: 3, fraction: 1 / 3 });
     expect(feature.children[1].rollup.live).toBe(0);
   });
 
@@ -176,7 +177,7 @@ describe('buildPlanTree', () => {
       at('done', 's2', { parentId: 'feature' }),
       at('not_started', 'alone'),
     ]);
-    expect(shopping(sections).progress).toEqual({
+    expect(shopping(sections).progress).toMatchObject({
       done: 2,
       inProgress: 0,
       live: 3,

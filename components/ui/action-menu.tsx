@@ -126,6 +126,7 @@ export function ActionMenu({
   align = 'end',
   trigger,
   className,
+  triggerClassName,
   onOpenChange,
 }: {
   label?: string;
@@ -134,6 +135,12 @@ export function ActionMenu({
   /** Custom trigger; defaults to ⋯. */
   trigger?: ReactNode;
   className?: string;
+  /**
+   * Classes for the trigger button itself, for a trigger that is a word
+   * rather than an icon -- a status you click to change. The default is the
+   * icon-sized square.
+   */
+  triggerClassName?: string;
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -216,6 +223,7 @@ export function ActionMenu({
         aria-controls={open ? menuId : undefined}
         active={open}
         disabled={pending}
+        className={triggerClassName}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();

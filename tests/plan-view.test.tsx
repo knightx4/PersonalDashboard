@@ -125,9 +125,18 @@ describe('PlanView', () => {
     expect(html).toContain('>Claude<');
     expect(html).toContain('>Ready<');
     expect(html).toContain('Waits on #3');
-    // One of the feature's three leaf steps is done.
-    expect(html).toContain('1/3 steps');
-    expect(html).toContain('· noted');
+    // One of the feature's three leaf steps is done; the rest are not started.
+    expect(html).toContain('1 done, 2 not started of 3');
+    // The note stands in for the missing detail under the title.
+    expect(html).toContain('Note: Waiting on the RPC review.');
+  });
+
+  it('lays every depth out on the same columns, with the tree drawn in the name cell', () => {
+    const html = render('open');
+    expect(html).toContain('>Health<');
+    expect(html).toContain('>Steps<');
+    // The sub-steps carry a guide line; the feature at the top does not.
+    expect((html.match(/bg-border-strong/g) ?? []).length).toBeGreaterThan(0);
   });
 
   it('measures each module over its leaves and says so', () => {
