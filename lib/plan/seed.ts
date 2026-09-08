@@ -366,6 +366,54 @@ export const PLAN_SEED: readonly PlanSeedItem[] = [
     status: 'not_started',
   },
 
+  // --------------------------------------------------- learn: what you know
+  // From LEARN-GRAPH-SPEC.md. The second half of the module: the queue answers
+  // where to read something, this answers what you already know and what the
+  // next thing worth learning is. Ordered so nothing that spends money is
+  // built before the thing that measures the spending.
+  {
+    module: 'learn',
+    title: '48. The spend ledger',
+    detail:
+      'In core, with a screen: module, operation, model, input and cached-input and output tokens, cost. First, before anything that spends, so every cost estimate in the spec is checkable a week after it was written rather than on a bill.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '49. The graph store and the subject screen',
+    detail:
+      'Concepts, prerequisite edges, goals, state and probes in learn, with RLS and a trigger that rejects an edge closing a cycle — the acyclic property as a database fact, not a convention. Read-only over a graph seeded by hand, no model calls at all, so the pruning rule is proven before generation can hide a bad graph behind it.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '50. Generation for a goal',
+    detail:
+      'One Sonnet call turns a named goal into the chain of concepts leading to it, deduped against the subject it joins. Shown for approval before anything is taught: a wrong graph is worse than no graph, and approval is the cheapest check there is.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '51. Probing, and a bar that tells the truth',
+    detail:
+      'One Haiku call per question, written against a concept claim rather than a heading, with the correct answer\'s reason written at the same time and stored. Ten to start and then as many as you want. The bar fills on information gained, not questions answered, so it reaches 80% in ten and never claims 100%.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '52. The graph grows from how you answer',
+    detail:
+      'A miss that points one level down adds the prerequisite under it; a hit above marks the nodes between as known-by-inference, recorded as weaker than tested. The same wrong option twice becomes a named misconception on the node — a gap and a thing steering you wrong are not the same problem.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '53. Joined to the queue',
+    detail:
+      'A shaky concept is a better input to suggestSources than a subject you typed, so finding something to read becomes a button on a gap. The note you already write after a reading becomes the way new concepts enter the graph. Both halves of the module finally paying into each other.',
+    status: 'not_started',
+  },
+
   // -------------------------------------------------------------------- jobs
   // From EVIDENCE-LAYER.md, which is the job side's own plan: six slices, each
   // useless without the one above it. It has no ✅ convention, so these were

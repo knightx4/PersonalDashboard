@@ -26,7 +26,9 @@ requested. It is a viewer today; what it is *for* is in
 it into a queue you can start: each item resolved to a link that opens, priced
 if it is not free, and pointed at the chapter or paragraph worth reading rather
 than at a 350-page book. Specified in
-[docs/LEARN-SPEC.md](docs/LEARN-SPEC.md).
+[docs/LEARN-SPEC.md](docs/LEARN-SPEC.md). The half after that — a graph of what
+you know, probed rather than assumed — is in
+[docs/LEARN-GRAPH-SPEC.md](docs/LEARN-GRAPH-SPEC.md).
 
 They share an account and a design system, and the first two share one mailbox.
 Otherwise nothing. Each owns its own Postgres schema in one Supabase project —
