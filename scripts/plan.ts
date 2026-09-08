@@ -12,6 +12,9 @@
  *   npx tsx scripts/plan.ts add "<title>" [--parent <n>] [--module <id>]
  *                                [--priority 1|2|3] [--size s|m|l] [--claude]
  *                                [--detail "…"] [--done-when "…"]
+ *                                [--proposed] [--idea <id prefix>]
+ *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
+ *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
  *   npx tsx scripts/plan.ts block <n> --note "what it is waiting on"
@@ -90,7 +93,7 @@ function positional(): string[] {
     const value = argv[i];
     if (value.startsWith('--')) {
       // Flags that take a value swallow the next argument; bare ones do not.
-      if (!['--all', '--claude'].includes(value)) i += 1;
+      if (!['--all', '--claude', '--proposed'].includes(value)) i += 1;
       continue;
     }
     out.push(value);
@@ -160,6 +163,7 @@ async function byNumber(sql: Sql, userId: string, raw: string | undefined): Prom
 }
 
 const GLYPH: Record<PlanStatus, string> = {
+  proposed: '[?]',
   not_started: '[ ]',
   in_progress: '[>]',
   blocked: '[!]',
@@ -239,6 +243,24 @@ async function main(): Promise<void> {
       return;
     }
 
+    if (command === 'ideas') {
+      const rows = await sql<{ id: string; body: string; module: string | null; created_at: Date }[]>`
+        select id, body, module, created_at from ideas
+        where user_id = ${userId} and plan_item_id is null
+        order by created_at desc`;
+      if (rows.length === 0) {
+        console.log('Every idea has been shaped into the plan, or there are none.');
+        return;
+      }
+      for (const row of rows) {
+        const scope = row.module && isModuleId(row.module) ? row.module : null;
+        console.log(
+          `${row.id.slice(0, 8)}  ${moduleLabel(scope).padEnd(18)}  ${row.body.replace(/\s+/g, ' ').slice(0, 90)}`,
+        );
+      }
+      return;
+    }
+
     if (command === 'next') {
       const sections = await loadTree(sql, userId);
       const claude = has('--claude');
@@ -293,23 +315,69 @@ async function main(): Promise<void> {
             where user_id = ${userId} and parent_id is null and module is not distinct from ${scope}
             order by position desc limit 1`;
 
-      const [row] = await sql<{ number: number }[]>`
+      // A step under a proposed parent is a proposal too, whatever the flag
+      // said: a decided step inside an undecided feature is a contradiction.
+      const proposed = has('--proposed') || parent?.status === 'proposed';
+
+      const [row] = await sql<{ id: string; number: number }[]>`
         insert into plan_items (user_id, module, parent_id, title, detail, acceptance,
-                                priority, size, assignee, position)
+                                priority, size, assignee, status, position)
         values (${userId}, ${scope}, ${parent?.id ?? null}, ${title},
                 ${arg('--detail')}, ${arg('--done-when')},
                 ${priority}, ${size}, ${has('--claude') ? 'claude' : null},
+                ${proposed ? 'proposed' : 'not_started'},
                 ${(last?.position ?? 0) + 10})
-        returning number`;
+        returning id, number`;
+
+      const ideaPrefix = arg('--idea');
+      if (ideaPrefix) {
+        const linked = await sql<{ id: string }[]>`
+          update ideas set plan_item_id = ${row.id}
+          where user_id = ${userId} and id::text like ${`${ideaPrefix}%`} and plan_item_id is null
+          returning id`;
+        if (linked.length !== 1) {
+          console.error(
+            linked.length === 0
+              ? `No unshaped idea starts with ${ideaPrefix}; the step was added without a link.`
+              : `${ideaPrefix} matches ${linked.length} ideas; all were linked. Use more characters next time.`,
+          );
+        }
+      }
+
       console.log(
-        `#${row.number} added${parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`}.`,
+        `#${row.number} ${proposed ? 'proposed' : 'added'}${
+          parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`
+        }${ideaPrefix ? ` from idea ${ideaPrefix}` : ''}.`,
       );
       return;
     }
 
     const item = await byNumber(sql, userId, target);
 
+    // Approval is the person's move. The command exists so a person at a
+    // terminal has it; a session shaping or building never runs it.
+    if (command === 'approve') {
+      const rows = await sql<{ number: number }[]>`
+        with recursive tree as (
+          select id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id from plan_items p join tree on p.parent_id = tree.id
+        )
+        update plan_items set status = 'not_started'
+        where id in (select id from tree) and status = 'proposed'
+        returning number`;
+      console.log(
+        rows.length === 0
+          ? `Nothing proposed at or under #${item.number}.`
+          : `Approved ${rows.map((r) => `#${r.number}`).join(', ')}.`,
+      );
+      return;
+    }
+
     if (command === 'start') {
+      if (item.status === 'proposed') {
+        fail(`#${item.number} is only proposed. A person approves it on /dev/plan first.`);
+      }
       await sql`update plan_items set status = 'in_progress' where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} in progress.`);
       return;

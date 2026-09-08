@@ -42,5 +42,11 @@ the step number in the subject, close it with a note. The full model is in
 [PLAN-SPEC.md](PLAN-SPEC.md).
 
 A request in the notes queue that turns out to be a body of work rather than
-a fix belongs in the plan: add it there as a feature with its steps, mark the
-note `planned`, and say which step it became.
+a fix belongs in the plan: add it there as a *proposed* feature with its
+steps, mark the note `planned`, and say which step it became. The person
+approves it on the plan page before anything is built.
+
+The whole loop, then: small things go in as notes and get fixed; big
+thoughts go in as ideas, get shaped into proposals by pressing *Shape into a
+plan*, get approved and handed over on the plan page, and get built one step
+a night. Corrections to what was built go back in as notes.

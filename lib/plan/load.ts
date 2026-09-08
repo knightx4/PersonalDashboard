@@ -15,7 +15,20 @@ import { isModuleId, type ModuleId } from '@/lib/modules';
  * tested, because that is the part a CLI and a page both need to agree on.
  */
 
-export const PLAN_STATUSES = ['not_started', 'in_progress', 'blocked', 'done', 'dropped'] as const;
+/**
+ * `proposed` is the one a person has not yet said yes to: written into the
+ * plan by a session shaping an idea, waiting to be approved, dropped or
+ * edited. It is never ready and never built. The rest are the states of a
+ * step somebody decided on.
+ */
+export const PLAN_STATUSES = [
+  'proposed',
+  'not_started',
+  'in_progress',
+  'blocked',
+  'done',
+  'dropped',
+] as const;
 
 export type PlanStatus = (typeof PLAN_STATUSES)[number];
 

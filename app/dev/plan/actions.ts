@@ -15,7 +15,7 @@ import {
   loadPlan,
 } from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
-import { buildPlanTree, findNode } from '@/lib/plan/tree';
+import { buildPlanTree, findNode, flatten } from '@/lib/plan/tree';
 
 export type PlanActionState = {
   error?: string;
@@ -313,6 +313,45 @@ export async function setPlanItemStatus(
 
   revalidatePlan();
   return { message: 'Updated.' };
+}
+
+/**
+ * Say yes to a proposal.
+ *
+ * The step and every proposed step beneath it become not started, in one
+ * click, because a feature is approved as a whole: the person who wants two
+ * of its five steps drops the other three first, and the page is where that
+ * happens. Steps beneath it that are already decided on are left alone.
+ * This is the one move a session never makes.
+ */
+export async function approvePlanItem(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const sections = buildPlanTree(await loadPlan(supabase, user.id));
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  const ids = flatten([node])
+    .filter((step) => step.status === 'proposed')
+    .map((step) => step.id);
+  if (ids.length === 0) return { message: 'Nothing left to approve there.' };
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started' })
+    .in('id', ids)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: ids.length === 1 ? 'Approved.' : `Approved ${ids.length} steps.` };
 }
 
 /** Hand a step to Claude, or take it back, in one click. */

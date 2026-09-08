@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, and close it with a note. Use when the user says "work the plan", "build the next step", "do plan #12", "what's next on the plan", or a routine is fired from the Plan page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Two jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -36,6 +36,9 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
 
 ## Which steps are yours
 
+- A **proposed** step is nobody's to build. It is a proposal waiting on the
+  person. `next` never lists one, `start` refuses one, and nothing in this
+  skill moves one out of `proposed` — that is the person's move, on the page.
 - A step **assigned to Claude** is yours to pick up on your own. `next --claude`
   lists them in order.
 - A step **named by the user** ("do #12", or a routine fired from the page with
@@ -86,6 +89,49 @@ A step that turns out to need a decision from the user is `block <n> --note
 "the question"`, with the exact question. A step that should not be done is
 `drop <n> --note "why"`. Never delete a step; deleting is the user's.
 
+## Shaping an idea
+
+The other job. An idea on the ideas page is a sentence; the plan needs a
+feature with steps, and writing that well takes knowing the code. So when the
+user says "shape idea …", or a routine is fired from the *Shape into a plan*
+button with an idea in its brief, the job is to write a **proposal** — and
+nothing else.
+
+1. **Read the idea.** `ideas` lists the ones not yet shaped, with their id
+   prefix. The brief a routine was fired with carries the full text.
+2. **Read the code it touches.** The module's spec in `docs/`, the routes and
+   lib directories it would change, the tests that would need to grow. Decide
+   what already exists, what has to be added, and in what order.
+3. **Write the feature.** One top-level step for the idea, in its module:
+
+   ```
+   npx tsx scripts/plan.ts add "<the feature>" --module <id> --proposed --idea <prefix> \
+     --size l --detail "<what it is, in two or three sentences>" \
+     --done-when "<what being finished means, from the user's side>"
+   ```
+
+   `--idea` links the idea to the feature, which is what turns the idea's
+   button into "in the plan as #n". Do this on the feature, not a step.
+4. **Write the steps beneath it**, each `--parent <n>` and each with a
+   `--done-when` and a `--size`. Steps under a proposed feature are proposed
+   automatically. Three to eight steps is the usual shape; a step sized `l`
+   should be split. Order them the way they would be built, and add
+   `depends <n> --on <m>` where one genuinely cannot start before another.
+   Put migrations and schema first, the page last, and the tests inside the
+   step they test rather than as a step of their own.
+5. **Say what you are unsure of** in the feature's `--detail`: a design
+   choice the person should make, a cost, a thing the idea did not say. A
+   proposal that hides its open questions gets approved with them still
+   open.
+6. **Stop.** Do not `start`, do not `approve`, do not assign anything to
+   Claude, do not write code. Report the feature number and its steps, and
+   the questions. The person approves on `/dev/plan`, and only then does the
+   building loop above apply.
+
+If the idea is already in the plan (`ideas` does not list it), say so and
+stop rather than shaping it twice. If the idea is really a bug or a one-line
+request, say that it belongs in the notes queue instead, and stop.
+
 ## When the CLI cannot run
 
 `DATABASE_URL` is not set in Claude Code on the web, so `scripts/plan.ts`
@@ -110,7 +156,13 @@ select d.depends_on_id, p.number, p.title, p.status
 from plan_dependencies d join plan_items p on p.id = d.depends_on_id
 where d.item_id = '…';
 
--- start
+-- a proposal, when shaping (steps beneath: same, with parent_id set)
+insert into plan_items (user_id, module, title, detail, acceptance, size, status, position)
+values ('…', 'shopping', '…', '…', '…', 'l', 'proposed', 10)
+returning id, number;
+update ideas set plan_item_id = '<the feature id>' where id = '<the idea id>';
+
+-- start (never on a proposed step)
 update plan_items set status = 'in_progress' where id = '…';
 
 -- done (after committing, so HEAD is the commit that did it)
@@ -133,6 +185,7 @@ write them. A step is never closed without a note.
 
 | Status | Meaning |
 |---|---|
+| `proposed` | Written by a session from an idea. Waiting on the person. Never built. |
 | `not_started` | Decided on, not begun. |
 | `in_progress` | Claimed right now. At most one at a time. |
 | `blocked` | Needs an answer or something outside the repo. Reason required. |

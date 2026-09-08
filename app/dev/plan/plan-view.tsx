@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Ban,
   Check,
+  Lightbulb,
   ChevronDown,
   CircleDashed,
   Hourglass,
@@ -16,6 +17,7 @@ import {
 import {
   addPlanDependency,
   addPlanItem,
+  approvePlanItem,
   deletePlanItem,
   movePlanItem,
   removePlanDependency,
@@ -67,6 +69,7 @@ export type PlanCatalogEntry = {
 };
 
 const STATUS_LABEL: Record<PlanStatus, string> = {
+  proposed: 'Proposed',
   not_started: 'Not started',
   in_progress: 'In progress',
   blocked: 'Blocked',
@@ -180,6 +183,7 @@ function SummaryStrip({ summary, view }: { summary: PlanSummary; view: View }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
     { view: 'ready', value: summary.ready, noun: 'ready' },
+    { view: 'proposed', value: summary.proposed, noun: 'proposed' },
     { view: 'blocked', value: summary.waiting, noun: 'waiting' },
     { view: null, value: summary.inProgress, noun: 'underway' },
     { view: 'claude', value: summary.claude, noun: "Claude's" },
@@ -653,6 +657,13 @@ type Health = {
 
 function healthOf(node: PlanNode): Health {
   switch (node.status) {
+    case 'proposed':
+      return {
+        word: 'Proposed',
+        tone: 'accent',
+        icon: Lightbulb,
+        title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
+      };
     case 'in_progress':
       return { word: 'In progress', tone: 'accent', icon: TrendingUp };
     case 'blocked':
@@ -835,13 +846,30 @@ function PlanRow({
   // The line under the title: what it involves, or failing that your note.
   const gloss = (node.detail ?? node.comment ?? '').split('\n').find((line) => line.trim()) ?? '';
 
-  const statusMenu: ActionMenuItem[] = PLAN_STATUSES.map((status) => ({
-    id: status,
-    label: STATUS_LABEL[status],
-    disabled: status === node.status,
-    formAction: (formData: FormData) => setPlanItemStatus({}, formData),
-    formFields: { id: node.id, status },
-  }));
+  // A proposal's first choice is to approve it, with the proposed steps
+  // beneath it; the plain statuses follow, and "proposed" is not offered on a
+  // step that has already been decided on -- that is a door that only opens
+  // one way.
+  const proposedBeneath = flatten([node]).filter((step) => step.status === 'proposed').length;
+  const statusMenu: ActionMenuItem[] = [
+    ...(node.status === 'proposed'
+      ? [
+          {
+            id: 'approve',
+            label: proposedBeneath > 1 ? `Approve, with ${proposedBeneath - 1} beneath` : 'Approve',
+            formAction: (formData: FormData) => approvePlanItem({}, formData),
+            formFields: { id: node.id },
+          },
+        ]
+      : []),
+    ...PLAN_STATUSES.filter((status) => status !== 'proposed').map((status) => ({
+      id: status,
+      label: STATUS_LABEL[status],
+      disabled: status === node.status,
+      formAction: (formData: FormData) => setPlanItemStatus({}, formData),
+      formFields: { id: node.id, status },
+    })),
+  ];
 
   const menu: ActionMenuItem[] = [
     {
@@ -1150,13 +1178,23 @@ export function PlanView({
       {nothingToShow && view !== 'open' && view !== 'all' && (
         <EmptyState
           tone="finished"
-          title={`Nothing ${view === 'ready' ? 'ready' : view === 'blocked' ? 'waiting' : "of Claude's"} right now`}
+          title={`Nothing ${
+            view === 'ready'
+              ? 'ready'
+              : view === 'blocked'
+                ? 'waiting'
+                : view === 'proposed'
+                  ? 'proposed'
+                  : "of Claude's"
+          } right now`}
           description={
             view === 'ready'
               ? 'Every open step is underway, blocked, or waiting on another. Finish one and the next becomes ready.'
               : view === 'blocked'
                 ? 'Nothing is blocked and nothing waits on another step.'
-                : 'Hand a step to Claude from its menu, or send one straight to the routine.'
+                : view === 'proposed'
+                  ? 'Shape an idea from the ideas page and its proposal will appear here for you to approve.'
+                  : 'Hand a step to Claude from its menu, or send one straight to the routine.'
           }
           seed={`plan-${view}`}
         />

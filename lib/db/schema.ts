@@ -608,6 +608,8 @@ export const ideas = pgTable(
     body: text('body').notNull(),
     /** The module it is about, or null for the app as a whole. */
     module: text('module'),
+    /** The plan feature it was shaped into, once it has been. See 0053. */
+    planItemId: uuid('plan_item_id'),
     ...timestamps,
   },
   (t) => [index('ideas_user_created_idx').on(t.userId, t.createdAt)],

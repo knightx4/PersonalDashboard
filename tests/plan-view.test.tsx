@@ -20,6 +20,7 @@ vi.mock('@/app/dev/plan/actions', () => {
   return {
     addPlanDependency: noop,
     addPlanItem: noop,
+    approvePlanItem: noop,
     deletePlanItem: noop,
     movePlanItem: noop,
     removePlanDependency: noop,
@@ -78,6 +79,7 @@ const whole = buildPlanTree({
     item({ id: 'form', title: 'The keep or sell form', parentId: 'feature' }),
     item({ id: 'deletion', title: 'Account deletion', priority: 3 }),
     item({ id: 'stuck', title: 'Outlook ingestion', module: 'jobs', status: 'blocked' }),
+    item({ id: 'maybe', title: 'Receipts by photo', module: 'jobs', status: 'proposed' }),
   ],
   dependencies: [dep('page', 'schema'), dep('form', 'page')],
 });
@@ -92,7 +94,7 @@ const catalog = flattenSections(whole).map((node) => ({
   closed: node.status === 'done' || node.status === 'dropped',
 }));
 
-function render(view: 'all' | 'open' | 'ready' | 'claude' | 'blocked', empty = false) {
+function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked', empty = false) {
   return renderToStaticMarkup(
     <PlanView
       sections={applyView(whole, view)}
@@ -142,7 +144,16 @@ describe('PlanView', () => {
   it('measures each module over its leaves and says so', () => {
     const html = render('all');
     expect(html).toContain('Shopping: 1 of 4 done');
+    // The proposal does not count until it is approved.
     expect(html).toContain('Job search: 0 of 1 done');
+  });
+
+  it('shows a proposal as one, and offers only proposals under that view', () => {
+    const html = render('proposed');
+    expect(html).toContain('>Proposed<');
+    expect(html).toContain('Receipts by photo');
+    expect(html).not.toContain('Outlook ingestion');
+    expect(html).toContain('href="/dev/plan?view=proposed"');
   });
 
   it('offers every view as a link, and the counts behind them', () => {
