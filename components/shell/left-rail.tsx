@@ -179,13 +179,24 @@ export function RailPicker({
       <h2 className="mb-2 px-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
         {label}
       </h2>
+      {/* The shared button, not a fifth drawing of one. This was a control
+          wearing the *container* hairline -- `border-border`, which owes no
+          contrast because a container is also identified by its fill -- at a
+          height nothing beside it shared, four pixels above the search field
+          it reveals. `secondary` brings `border-control` (3:1, WCAG 1.4.11)
+          and the dial's height, so the trigger and the field under it are the
+          same control. All the caller adds is the full width and what
+          "filtered" looks like. */}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         className={cn(
-          'press flex w-full items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-left text-ui',
-          active ? 'bg-accent-tint font-medium text-accent' : 'bg-surface text-ink-muted',
+          buttonVariants({ variant: 'secondary' }),
+          'w-full justify-between gap-2 text-left font-normal',
+          active
+            ? 'border-accent bg-accent-tint font-medium text-accent hover:border-accent hover:bg-accent-tint'
+            : 'text-ink-muted',
         )}
       >
         <span className="flex-1 truncate">{active?.label ?? anyLabel}</span>

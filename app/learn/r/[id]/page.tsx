@@ -90,7 +90,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
 
         <p className="flex items-start gap-2 text-body text-ink">
           {verified ? (
-            <BadgeCheck className="mt-0.5 size-4 shrink-0 text-positive" strokeWidth={2} aria-hidden />
+            <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
           ) : (
             <AlertTriangle
               className="mt-0.5 size-4 shrink-0 text-caution"
@@ -130,7 +130,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
                 Open
               </Button>
               {!verified && (
-                <span className="ml-3 text-caption text-ink-muted">
+                <span className="ml-3 text-small text-ink-muted">
                   Finds the passage on the way, the first time.
                 </span>
               )}
@@ -190,7 +190,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
       </section>
 
       {reading.source?.canonicalUrl && (
-        <p className="mt-6 text-caption text-ink-muted">
+        <p className="mt-6 text-small text-ink-muted">
           <a
             href={reading.source.canonicalUrl}
             target="_blank"

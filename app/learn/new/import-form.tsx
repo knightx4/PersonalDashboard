@@ -116,7 +116,7 @@ function ResolvedRow({ row, index }: { row: PreviewRow; index: number }) {
           <span className="text-body font-medium text-ink">{resolved.title}</span>
           {resolved.author && <span className="text-ui text-ink-muted">{resolved.author}</span>}
           {access && (
-            <span className="rounded-pill border border-border px-1.5 py-0.5 text-caption text-ink-muted">
+            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
               {price ? `${access} · ${price}` : access}
             </span>
           )}
@@ -131,11 +131,11 @@ function ResolvedRow({ row, index }: { row: PreviewRow; index: number }) {
         <span className="mt-0.5 block text-ui text-ink-muted">{resolved.locator_basis}</span>
 
         {resolved.canonical_url ? (
-          <span className="mt-0.5 block truncate text-caption text-ink-muted">
+          <span className="mt-0.5 block truncate text-small text-ink-muted">
             {resolved.canonical_url}
           </span>
         ) : (
-          <span className="mt-0.5 block text-caption text-ink-muted">
+          <span className="mt-0.5 block text-small text-ink-muted">
             No free link found — the location still tells you where to look.
           </span>
         )}
@@ -294,7 +294,7 @@ export function ImportForm() {
         {parseState.error && <span className="text-ui text-danger">{parseState.error}</span>}
       </div>
 
-      <p className="mt-3 text-caption text-ink-muted">
+      <p className="mt-3 text-small text-ink-muted">
         The list appears straight away, then each item is looked up one at a time. Nothing is saved
         until you confirm.
       </p>

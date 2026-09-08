@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { BookOpen } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { toggleReadNow, type ReadingActionState } from './actions';
 
@@ -30,17 +31,18 @@ export function ReadNowButton({ readingId, on }: { readingId: string; on: boolea
 function Submit({ on }: { on: boolean }) {
   const { pending } = useFormStatus();
 
+  // The secondary button supplies the shape -- the dial's height, the control
+  // radius, the press and the focus ring -- and the only thing this adds is
+  // what "down" looks like. Hand-drawing the frame is how a toggle ends up
+  // 30px beside a 32px button.
   return (
     <button
       type="submit"
       disabled={pending}
       aria-pressed={on}
       className={cn(
-        'press inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-ui transition-colors duration-150',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50',
-        on
-          ? 'border-accent bg-accent-tint font-medium text-accent'
-          : 'border-control bg-surface text-ink hover:bg-sunken',
+        buttonVariants({ variant: 'secondary' }),
+        on && 'border-accent bg-accent-tint text-accent hover:border-accent hover:bg-accent-tint',
       )}
     >
       <BookOpen className="size-3.5" strokeWidth={1.75} aria-hidden />

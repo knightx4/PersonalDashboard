@@ -84,7 +84,11 @@ const TYPE_SCALE = [
 function Swatch({ swatch, name, note }: { swatch: string; name: string; note: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span aria-hidden className={cn('size-7 shrink-0 rounded-control border border-border', swatch)} />
+      {/* No hairline. A swatch is a solid mid-tone square on a card, and every
+          token below -- ghost included -- has an edge against the surface
+          without one being drawn. The border was the page that documents law
+          11 breaking it. */}
+      <span aria-hidden className={cn('size-7 shrink-0 rounded-control', swatch)} />
       <div className="min-w-0">
         <p className="text-ui font-medium text-ink">{name}</p>
         <p className="text-small text-ink-muted">{note}</p>

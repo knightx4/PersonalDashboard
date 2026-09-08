@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Banner } from '@/components/ui/banner';
 import { AuthForm } from '../auth-form';
 
 export const metadata = { title: 'Sign in' };
@@ -17,10 +18,13 @@ export default async function LoginPage({
       </h1>
       <p className="mt-1 mb-5 text-body text-ink-muted">Sign in to your dashboard.</p>
 
+      {/* The shared banner, the same one the onboarding steps use two screens
+          later. A failed sign-in is `warn` by the tone's own definition:
+          something is wrong and only you can fix it. */}
       {error === 'oauth' && (
-        <p className="mb-4 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
+        <Banner tone="warn" className="mb-4">
           Google sign-in did not complete. Try again, or use your email and password.
-        </p>
+        </Banner>
       )}
 
       <AuthForm mode="signin" next={next} />

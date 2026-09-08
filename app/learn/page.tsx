@@ -33,7 +33,7 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
       >
         <div className="h-full rounded-pill bg-accent" style={{ width: `${percent}%` }} />
       </div>
-      <span className="text-caption tabular-nums text-ink-muted">
+      <span className="text-small tabular-nums text-ink-muted">
         {progress.read}/{progress.read + progress.remaining}
       </span>
     </div>

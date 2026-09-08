@@ -2,9 +2,10 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { Lightbulb, Sparkles } from 'lucide-react';
 import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { IdeaRow } from '@/lib/ideas/load';
@@ -105,7 +106,9 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
         <Sparkles className="size-3.5" aria-hidden />
         {pending ? 'Sending…' : 'Shape into a plan'}
       </Button>
-      {state.message && <span className="text-small text-positive">{state.message}</span>}
+      {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"
+          is the system saying what it did. */}
+      {state.message && <span className="text-small text-ink-muted">{state.message}</span>}
       <FieldError>{state.error}</FieldError>
     </form>
   );
@@ -188,10 +191,15 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
       <AddIdea />
 
       {ideas.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
-          Nothing written down yet. An idea here becomes work when you have Claude shape it into
-          the plan, and approve what it proposes there.
-        </p>
+        // The shared empty state rather than a hand-drawn dashed paragraph:
+        // this is the whole page when the list is empty, and law 1 says that
+        // gets a real one. The dashed edge is the same dashed edge, drawn once
+        // in the primitive.
+        <EmptyState
+          icon={Lightbulb}
+          title="Nothing written down yet"
+          description="An idea here becomes work when you have Claude shape it into the plan, and approve what it proposes there."
+        />
       ) : (
         scopes.map((scope) => {
           const rows = ideas.filter((idea) => idea.module === scope);

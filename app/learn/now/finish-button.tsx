@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Check } from 'lucide-react';
-import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
 import { updateStatus, type ReadingActionState } from '../r/[id]/actions';
 
 /**
@@ -31,18 +31,13 @@ export function FinishButton({ readingId }: { readingId: string }) {
 function Submit() {
   const { pending } = useFormStatus();
 
+  // The shared button, not a fourth drawing of one: this was a hand-typed
+  // control frame at a hand-typed height, which is a button that agrees with
+  // nothing beside it at any density.
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={cn(
-        'press inline-flex items-center gap-1.5 rounded-lg border border-control bg-surface px-3 py-1.5 text-ui text-ink',
-        'transition-colors duration-150 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-2',
-        'disabled:opacity-50',
-      )}
-    >
+    <Button type="submit" variant="secondary" pending={pending}>
       <Check className="size-3.5" strokeWidth={2} aria-hidden />
       {pending ? 'Marking…' : 'Read it'}
-    </button>
+    </Button>
   );
 }

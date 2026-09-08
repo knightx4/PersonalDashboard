@@ -723,10 +723,16 @@ function Dependencies({
       {candidates.length > 0 && (
         <form action={addAction} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="item" value={node.id} />
+          {/* Width only. This carried `h-8 py-0 text-small`, which overrode
+              three things the primitive is for: the dial's height, so it was
+              32px on a phone where every control beside it is 36; and
+              `text-base sm:text-ui`, which is the 16px that stops iOS zooming
+              the whole page when the select is tapped. Twelve-pixel type on a
+              native picker bought nothing and cost that. */}
           <Select
             name="depends_on"
             defaultValue=""
-            className="h-8 w-auto max-w-xs py-0 text-small"
+            className="w-auto max-w-xs"
             aria-label="A step this one has to wait for"
           >
             <option value="">Wait on a step…</option>
@@ -740,7 +746,7 @@ function Dependencies({
               </optgroup>
             ))}
           </Select>
-          <Button type="submit" size="sm" variant="ghost" pending={addPending}>
+          <Button type="submit" variant="ghost" pending={addPending}>
             {addPending ? 'Adding…' : 'Add'}
           </Button>
           <FieldError>{addState.error ?? removeState.error}</FieldError>
@@ -1384,7 +1390,11 @@ function PlanRow({
             {assignState.error ?? sendState.error ?? batchState.error ?? answerState.error}
           </FieldError>
           {!assignState.error && !sendState.error && !batchState.error && !answerState.error && (
-            <span className="text-positive">
+            // Ink, not green. The tones above are a status system where
+            // positive means done; this is a transient "Assigned" or "Sent"
+            // from the action that just ran, which is the system reporting
+            // itself and is not a claim about money (law 4).
+            <span className="text-ink-muted">
               {assignState.message ?? sendState.message ?? batchState.message ?? answerState.message}
             </span>
           )}

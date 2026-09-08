@@ -64,8 +64,17 @@ export function AddTask({ today }: { today: string }) {
             you are already typing on. The two were a text box and a date
             picker two rows apart behind a Details toggle, which is three
             controls and a fold to write down "Thursday". */}
+        {/* A control's own frame, not a grouping frame. Law 11 is about
+            borders standing in for space, alignment and a shared ground; this
+            is field.tsx's `control` and `controlBox` drawn around three inputs
+            that read as one field, at the same tokens and off the same dial
+            `Input` uses. The gate cannot tell a control's edge from a
+            container's, and there is no exported shell for a composite control
+            -- one caller does not earn a primitive, so the shape is written
+            out here and matches the one it copies exactly. */}
         <div
           className={cn(
+            // ui-ok: hand-rolled-box -- a control's frame, not a box. See above.
             'flex h-(--control-h) min-w-0 flex-1 items-center gap-1 rounded-control border border-control bg-surface px-(--control-px)',
             'focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40',
           )}
@@ -163,8 +172,11 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
 
   return (
     // Not a card: an editor that opens in place of a row sits on the canvas
-    // tone so it reads as the row unfolded, not as a second sheet.
-    <form action={action} className="space-y-3 rounded-lg border border-border bg-canvas p-3">
+    // tone so it reads as the row unfolded, not as a second sheet. The well is
+    // the whole of that claim -- the hairline it used to carry as well was a
+    // third frame inside the card inside the row, saying nothing the recess
+    // had not already said. Law 11.
+    <form action={action} className="card-pad-dense space-y-3 rounded-card bg-canvas">
       <input type="hidden" name="id" value={task.id} />
       <Field id={`title-${task.id}`} label="Title">
         <Input id={`title-${task.id}`} name="title" defaultValue={task.title} required />

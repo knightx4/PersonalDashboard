@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { popoverSurface } from '@/components/ui/popover';
+import { cn } from '@/lib/cn';
 import { addToShare } from '@/app/shopping/share/actions';
 
 export type ShareOption = { id: string; title: string };
@@ -68,14 +70,21 @@ export function SendToShare({
         <Share2 className="size-4" strokeWidth={1.75} aria-hidden />
         {pending ? 'Adding…' : text}
       </Button>
+      {/* The shared floating surface. `Popover` itself does not fit -- both of
+          its anchors assume the top bar, and this hangs off a button in a list
+          row -- but the shape is exported for exactly that, the way
+          `cardVariants` is. What it brings over the hand-drawn version is
+          `bg-raised`, which is the token for something above the page and the
+          only one that is a lit sheet under Lightbox; `bg-surface` here was
+          the same colour as the card underneath it in every theme. */}
       {open && (
-        <ul className="absolute right-0 z-20 mt-1 min-w-48 rounded-lg border border-border bg-surface py-1 shadow-lg">
+        <ul className={cn(popoverSurface, 'absolute right-0 z-20 mt-1 min-w-48 p-1')}>
           {shares.map((share) => (
             <li key={share.id}>
               <button
                 type="button"
                 onClick={() => send(share.id)}
-                className="w-full px-3 py-1.5 text-left text-ui text-ink transition-colors duration-150 hover:bg-canvas"
+                className="press w-full rounded-control px-2.5 py-1.5 text-left text-ui text-ink transition-colors duration-150 hover:bg-sunken"
               >
                 {share.title}
               </button>

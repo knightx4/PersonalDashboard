@@ -168,7 +168,31 @@ const RULES: Rule[] = [
     law: '9',
     says: 'a control height written as a number',
     instead: 'h-(--control-h), so it follows the density dial and the controls beside it',
-    find: (line) => [...line.matchAll(/\b(h-(?:9|10|11)|min-h-24)\b/g)].map((m) => m[1]!),
+    /**
+     * `h-9`, and not `min-h-9`.
+     *
+     * This is FULL_BORDER's mistake in a second rule and it was found the same
+     * way -- by reading what the gate was reporting rather than trusting the
+     * count. The pattern was `\b(h-(?:9|10|11)|min-h-24)\b`, and `\b` matches
+     * between the hyphen and the `h`, so every `min-h-9` and `max-h-10` in the
+     * tree was reported as a control written at a fixed height. It was
+     * reporting exactly two things, and neither was a control: an hour lane in
+     * the week grid (`min-h-9`, the floor an empty hour keeps so a day does
+     * not collapse) and a day square in the month grid (`sm:min-h-24`).
+     *
+     * `min-h-24` was in the list on purpose, aimed at a hand-sized textarea.
+     * But it is the same category error as the one it let through: the rule's
+     * own name and its own message say *a control height*, and a min-height is
+     * a floor on a container -- what a calendar cell, a drop target or an empty
+     * lane needs so it stays clickable when it holds nothing. There is no dial
+     * variable for that and nothing beside it to agree with, so there is
+     * nothing for the rule to be asking.
+     *
+     * So it means what it says: an exact height, on its own, which is the
+     * shape a control is written in. Everything with a prefix is a different
+     * property.
+     */
+    find: (line) => [...line.matchAll(/(?<![\w-])(h-(?:9|10|11))\b/g)].map((m) => m[1]!),
   },
   {
     id: 'scoped-token-in-var',

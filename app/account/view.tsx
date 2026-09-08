@@ -106,18 +106,20 @@ function ModulesSection({ enabled }: { enabled: ModuleId[] }) {
         turning it back on restores exactly what was there.
       </p>
 
-      <form action={action} className="mt-4 space-y-3">
-        {MODULES.map((module) => {
-          return (
-            <label
-              key={module.id}
-              className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5"
-            >
+      <form action={action} className="mt-4">
+        {/* Divides, not one box per row. Six workspaces drawn as six bordered
+            rectangles inside a bordered card is the card's own hairline
+            repeated once per item, and a page of that reads as boxes rather
+            than as workspaces. The rules between them say "one list" on their
+            own -- law 11. */}
+        <div className="divide-y divide-border border-y border-border">
+          {MODULES.map((module) => (
+            <label key={module.id} className="row-pad flex items-start gap-3">
               <input
                 type="checkbox"
                 name={`module:${module.id}`}
                 defaultChecked={enabled.includes(module.id)}
-                className="mt-1 size-4 accent-[var(--c-accent)]"
+                className="mt-1 size-4 accent-accent"
               />
               <ModuleMark module={module.id} size="sm" className="mt-0.5" />
               <span className="min-w-0 flex-1">
@@ -127,11 +129,13 @@ function ModulesSection({ enabled }: { enabled: ModuleId[] }) {
                 </span>
               </span>
             </label>
-          );
-        })}
+          ))}
+        </div>
 
-        <Banner state={state} />
-        <Button type="submit">Save</Button>
+        <div className="mt-3 space-y-3">
+          <Banner state={state} />
+          <Button type="submit">Save</Button>
+        </div>
       </form>
     </section>
   );
