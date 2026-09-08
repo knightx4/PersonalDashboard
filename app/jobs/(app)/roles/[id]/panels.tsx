@@ -130,7 +130,6 @@ export interface PanelProps {
   }>;
   interviews: Array<{
     id: string;
-    round: number;
     kind: string;
     scheduledAt: string | null;
     /** False when only the day is settled: the hour is not to be shown. */
@@ -143,7 +142,7 @@ export interface PanelProps {
     notes: string;
     /** Free-form notes written against this round, newest first. */
     customNotes: Array<{ id: string; body: string; createdAt: string }>;
-    /** The occasion this round belongs to, when it is part of one. */
+    /** The round it is in. Every interview is in one. */
     groupId: string | null;
     questionsAsked: string[];
     /** Who is in the room, as contacts rather than as names on a string. */
@@ -170,10 +169,12 @@ export interface PanelProps {
     unsupportedClaims: string[];
   }>;
   notes: Array<{ id: string; body: string; pinned: boolean; createdAt: string }>;
-  /** Superdays and the like: several rounds read as one occasion. */
+  /** The rounds of the process. Every interview is inside one of these. */
   interviewGroups: Array<{
     id: string;
     label: string | null;
+    /** Which round of the process this is. Null until it is given one. */
+    roundNumber: number | null;
     notes: string;
     /** The linked mail this round is about — the invite, the reschedule. */
     messageIds: string[];
@@ -1667,6 +1668,12 @@ function Interviews({
     INTERVIEW_MAIL.has(message.classification),
   );
 
+  // One past the highest round the pursuit has, which is what the next round
+  // to be agreed almost always is. A round with no number yet counts for
+  // nothing here rather than resetting the sequence.
+  const nextRoundNumber =
+    interviewGroups.reduce((top, group) => Math.max(top, group.roundNumber ?? 0), 0) + 1;
+
   return (
     <div className="space-y-3">
       {interviews.length === 0 && interviewGroups.length === 0 ? (
@@ -1712,7 +1719,6 @@ function Interviews({
                 applicationId={applicationId}
                 group={section.group}
                 interviews={section.interviews}
-                nextRound={section.interviews[0]?.round ?? interviews.length + 1}
                 schedulingMail={schedulingMail}
                 roleMail={messages}
                 timezone={timezone}
@@ -1734,12 +1740,11 @@ function Interviews({
       {/* Two ways in, because both happen. A round is usually agreed before
           anything in it is booked, so it is made empty and filled as the
           invitations arrive; a single conversation nobody framed as a round
-          still goes straight on the tab. */}
-      <AddRound applicationId={applicationId} nextRound={interviewGroups.length + 1} />
+          gets one made around it, because an interview is always in a round. */}
+      <AddRound applicationId={applicationId} nextRound={nextRoundNumber} />
       <AddInterview
         applicationId={applicationId}
-        nextRound={interviews.length + 1}
-        triggerLabel="Add an interview on its own"
+        triggerLabel="Add an interview in a round of its own"
         seed={seed}
         onSeedUsed={onSeedUsed}
       />
@@ -1769,7 +1774,7 @@ function AddRound({ applicationId, nextRound }: { applicationId: string; nextRou
           startTransition(async () => {
             const result = await createInterviewRound({
               applicationId,
-              label: `Round ${nextRound}`,
+              roundNumber: nextRound,
             });
             setError(result.error);
           })
@@ -1938,21 +1943,18 @@ function fieldsFromSchedule(
 
 function InterviewHeading({
   interviewId,
-  round,
   kind,
   when,
   scheduledAt,
   timeKnown,
 }: {
   interviewId: string;
-  round: number;
   kind: string;
   when: string;
   scheduledAt: string | null;
   timeKnown: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draftRound, setDraftRound] = useState(String(round));
   const [draftKind, setDraftKind] = useState(kind);
   const [draftDate, setDraftDate] = useState(fieldsFromSchedule(scheduledAt, timeKnown).date);
   const [draftTime, setDraftTime] = useState(fieldsFromSchedule(scheduledAt, timeKnown).time);
@@ -1962,12 +1964,13 @@ function InterviewHeading({
   if (!editing) {
     return (
       <header className="flex flex-wrap items-baseline justify-between gap-2">
+        {/* No round number here. The interview is one conversation inside a
+            round, and the round above it is what carries the number. */}
         <h3 className="text-ui font-semibold text-ink">
-          Round {round} · {interviewKindLabel(kind)}
+          {interviewKindLabel(kind)}
           <button
             type="button"
             onClick={() => {
-              setDraftRound(String(round));
               setDraftKind(kind);
               const fields = fieldsFromSchedule(scheduledAt, timeKnown);
               setDraftDate(fields.date);
@@ -1990,18 +1993,6 @@ function InterviewHeading({
   return (
     <header className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
-        <div>
-          <Label htmlFor={`round-${interviewId}`}>Round</Label>
-          <Input
-            id={`round-${interviewId}`}
-            type="number"
-            min={1}
-            max={99}
-            value={draftRound}
-            onChange={(event) => setDraftRound(event.target.value)}
-            className="w-20"
-          />
-        </div>
         <div>
           <Label htmlFor={`kind-${interviewId}`}>Kind</Label>
           <Select
@@ -2045,13 +2036,7 @@ function InterviewHeading({
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
-              const parsedRound = Number(draftRound);
-              if (!Number.isInteger(parsedRound) || parsedRound < 1) {
-                setError('Rounds start at 1.');
-                return;
-              }
               const result = await saveInterview(interviewId, {
-                round: parsedRound,
                 kind: draftKind,
                 ...scheduleFromFields(draftDate, draftTime),
               });
@@ -2096,7 +2081,7 @@ function GroupTheseRounds({
   return (
     <div className={cn(cardVariants(), 'flex flex-wrap items-center gap-3 border-dashed px-4 py-2.5')}>
       <p className="text-ui text-ink-muted">
-        {interviewIds.length} rounds on {label}.
+        {interviewIds.length} interviews on {label}, in separate rounds.
       </p>
       <Button
         type="button"
@@ -2110,7 +2095,7 @@ function GroupTheseRounds({
           })
         }
       >
-        Group them as one day
+        Make them one round
       </Button>
       {error && <span className="text-small text-status-rejected">{error}</span>}
     </div>
@@ -2134,7 +2119,6 @@ function InterviewGroupCard({
   applicationId,
   group,
   interviews,
-  nextRound,
   schedulingMail,
   roleMail,
   timezone,
@@ -2144,8 +2128,6 @@ function InterviewGroupCard({
   applicationId: string;
   group: PanelProps['interviewGroups'][number];
   interviews: PanelProps['interviews'];
-  /** The round number given to an interview added here. */
-  nextRound: number;
   /** Scheduling mail on this pursuit, as a starting point for a new one. */
   schedulingMail: PanelProps['messages'];
   /** Every email linked to this pursuit, to say which ones this round is about. */
@@ -2155,6 +2137,9 @@ function InterviewGroupCard({
   focusInterviewId?: string | null;
 }) {
   const [label, setLabel] = useState(group.label ?? '');
+  const [roundNumber, setRoundNumber] = useState(
+    group.roundNumber === null ? '' : String(group.roundNumber),
+  );
   const [notes, setNotes] = useState(group.notes);
   /** A round starts with no note on it, because that is the truth. */
   const [showNotes, setShowNotes] = useState(group.notes.trim() !== '');
@@ -2162,10 +2147,48 @@ function InterviewGroupCard({
   const [removing, setRemoving] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  /**
+   * The round's three fields go together, because they are edited together:
+   * the number and the name sit side by side in the header and the note folds
+   * out under them, and one Save for all of it is what the card looks like it
+   * offers.
+   *
+   * A blank number is a round nobody has placed yet, not a zero.
+   */
+  const save = () =>
+    startTransition(async () => {
+      const trimmed = roundNumber.trim();
+      const parsed = trimmed === '' ? null : Number(trimmed);
+      if (parsed !== null && (!Number.isInteger(parsed) || parsed < 1 || parsed > 99)) {
+        setSaved('Rounds are numbered 1 to 99.');
+        return;
+      }
+
+      const result = await saveInterviewGroup(group.id, {
+        label,
+        notes,
+        roundNumber: parsed,
+      });
+      setSaved(result.error ?? 'Saved.');
+    });
+
   return (
     <section className="rounded-card border border-accent/40 bg-accent-tint/30 p-3">
       <header className="flex flex-wrap items-center gap-2">
         <CalendarClock className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+        {/* The number is the round's, not the interviews'. Four conversations
+            on one afternoon are all the second round; numbering each of them
+            separately was what made a superday read as rounds 1, 3 and 4. */}
+        <Input
+          type="number"
+          min={1}
+          max={99}
+          value={roundNumber}
+          onChange={(event) => setRoundNumber(event.target.value)}
+          aria-label="Which round of the process this is"
+          placeholder="#"
+          className="w-16"
+        />
         <Input
           value={label}
           onChange={(event) => setLabel(event.target.value)}
@@ -2222,17 +2245,7 @@ function InterviewGroupCard({
               placeholder="How the round went as a whole. Each interview keeps its own notes below."
             />
             <div className="mt-1.5 flex items-center gap-3">
-              <Button
-                type="button"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await saveInterviewGroup(group.id, { label, notes });
-                    setSaved(result.error ?? 'Saved.');
-                  })
-                }
-              >
+              <Button type="button" size="sm" disabled={pending} onClick={save}>
                 Save
               </Button>
               {saved && <span className="text-small text-ink-muted">{saved}</span>}
@@ -2241,21 +2254,16 @@ function InterviewGroupCard({
         ) : (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
-            {/* The label still needs saving even with nothing written under
-                it, so the button stays reachable while the note is folded
-                away. */}
+            {/* The number and the name still need saving with nothing written
+                under them, so the button stays reachable while the note is
+                folded away. */}
             <button
               type="button"
               disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await saveInterviewGroup(group.id, { label, notes });
-                  setSaved(result.error ?? 'Saved.');
-                })
-              }
+              onClick={save}
               className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
             >
-              Save the name
+              Save the round
             </button>
             {saved && <span className="text-small text-ink-muted">{saved}</span>}
           </div>
@@ -2282,7 +2290,6 @@ function InterviewGroupCard({
         <AddInterview
           applicationId={applicationId}
           groupId={group.id}
-          nextRound={nextRound}
           mailOptions={schedulingMail}
           triggerLabel={
             interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
@@ -2465,7 +2472,6 @@ function InterviewCard({
     >
       <InterviewHeading
         interviewId={interview.id}
-        round={interview.round}
         kind={interview.kind}
         when={formatInterviewWhen(interview.scheduledAt, interview.timeKnown, timezone)}
         scheduledAt={interview.scheduledAt}
@@ -2615,7 +2621,7 @@ function InterviewCard({
             onClick={() => startTransition(() => void ungroupInterview(interview.id))}
             className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
           >
-            Not part of this day
+            Move it to its own round
           </button>
         )}
         <span className="ml-auto">
@@ -2707,7 +2713,6 @@ function CollapsibleField({
  */
 function AddInterview({
   applicationId,
-  nextRound,
   groupId = null,
   mailOptions = [],
   triggerLabel = 'Add an interview',
@@ -2715,8 +2720,7 @@ function AddInterview({
   onSeedUsed,
 }: {
   applicationId: string;
-  nextRound: number;
-  /** The round this is being added inside, when it is being added inside one. */
+  /** The round this goes in. Null means a new round holding just this one. */
   groupId?: string | null;
   /** Scheduling mail on this pursuit, offered as a starting point. */
   mailOptions?: PanelProps['messages'];
@@ -2856,7 +2860,6 @@ function AddInterview({
             startTransition(async () => {
               const result = await addInterview({
                 applicationId,
-                round: nextRound,
                 kind,
                 groupId,
                 ...scheduleFromFields(date, time),
@@ -2871,7 +2874,7 @@ function AddInterview({
             })
           }
         >
-          {groupId ? 'Add it to this round' : `Add round ${nextRound}`}
+          {groupId ? 'Add it to this round' : 'Add it in a round of its own'}
         </Button>
         <button type="button" onClick={close} className="text-small text-ink-muted hover:text-ink">
           Cancel

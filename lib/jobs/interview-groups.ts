@@ -87,28 +87,52 @@ export function sectionInterviews<T extends GroupableInterview, G extends Interv
 }
 
 /**
- * The days worth offering to group: two or more ungrouped rounds on one date.
+ * The days worth offering to gather: one date holding interviews that sit in
+ * two or more different rounds, none of which anyone has built up.
  *
- * Offered rather than done automatically. Two screens on the same Tuesday for
- * two different reasons are not a superday, and the app does not know which
- * this is -- but it does know when the question is worth asking, and asking it
- * only then keeps the button off every ordinary round.
+ * "Ungrouped" is no longer a state anything can be in -- every interview is
+ * inside a round. What is still true, and still worth asking about, is the
+ * shape this has always been for: four invitations for one afternoon, each
+ * arriving separately and each getting a round of its own, when they are one
+ * occasion.
+ *
+ * A round already holding more than one interview is left strictly alone.
+ * Somebody put those together on purpose, and dissolving that to build a
+ * different grouping would undo a decision rather than offer one.
+ *
+ * Offered rather than done automatically, for the reason it always was. Two
+ * screens on the same Tuesday for two different reasons are not a superday,
+ * and the app does not know which this is -- but it does know when the
+ * question is worth asking, and asking it only then keeps the button off every
+ * ordinary round.
  */
 export function groupableDays<T extends GroupableInterview>(
   interviews: readonly T[],
   timezone: string,
 ): Array<{ day: string; interviewIds: string[] }> {
-  const byDay = new Map<string, string[]>();
+  // A round holding one interview is a round nobody has deliberately built.
+  const sizeOfRound = new Map<string, number>();
+  for (const interview of interviews) {
+    if (!interview.groupId) continue;
+    sizeOfRound.set(interview.groupId, (sizeOfRound.get(interview.groupId) ?? 0) + 1);
+  }
+
+  const byDay = new Map<string, Array<{ id: string; round: string | null }>>();
 
   for (const interview of interviews) {
-    if (interview.groupId) continue;
     if (!interview.scheduledAt) continue;
+    if (interview.groupId && (sizeOfRound.get(interview.groupId) ?? 0) > 1) continue;
     const day = dayIn(interview.scheduledAt, timezone);
-    byDay.set(day, [...(byDay.get(day) ?? []), interview.id]);
+    byDay.set(day, [...(byDay.get(day) ?? []), { id: interview.id, round: interview.groupId }]);
   }
 
   return [...byDay.entries()]
-    .filter(([, ids]) => ids.length > 1)
+    .filter(([, onDay]) => {
+      if (onDay.length < 2) return false;
+      // Two interviews already in one round are not two rounds to gather.
+      const rounds = new Set(onDay.map((entry) => entry.round ?? `loose:${entry.id}`));
+      return rounds.size > 1;
+    })
     .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([day, interviewIds]) => ({ day, interviewIds }));
+    .map(([day, onDay]) => ({ day, interviewIds: onDay.map((entry) => entry.id) }));
 }

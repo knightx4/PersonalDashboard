@@ -69,26 +69,50 @@ describe('sectionInterviews', () => {
 });
 
 describe('groupableDays', () => {
-  it('offers a day that holds more than one ungrouped round', () => {
+  it('offers a day that holds interviews from more than one round', () => {
     expect(
       groupableDays(
         [
-          interview({ id: 'a', scheduledAt: '2026-03-12T14:00:00.000Z' }),
-          interview({ id: 'b', scheduledAt: '2026-03-12T16:00:00.000Z' }),
-          interview({ id: 'c', scheduledAt: '2026-03-19T16:00:00.000Z' }),
+          interview({ id: 'a', scheduledAt: '2026-03-12T14:00:00.000Z', groupId: 'r1' }),
+          interview({ id: 'b', scheduledAt: '2026-03-12T16:00:00.000Z', groupId: 'r2' }),
+          interview({ id: 'c', scheduledAt: '2026-03-19T16:00:00.000Z', groupId: 'r3' }),
         ],
         'UTC',
       ),
     ).toEqual([{ day: '2026-03-12', interviewIds: ['a', 'b'] }]);
   });
 
-  it('says nothing about a day with one round, or about rounds already grouped', () => {
+  it('says nothing about a day whose interviews are already one round', () => {
     expect(
       groupableDays(
         [
-          interview({ id: 'a', scheduledAt: '2026-03-12T14:00:00.000Z' }),
-          interview({ id: 'b', scheduledAt: '2026-03-12T16:00:00.000Z', groupId: 'g1' }),
+          interview({ id: 'a', scheduledAt: '2026-03-12T14:00:00.000Z', groupId: 'r1' }),
+          interview({ id: 'b', scheduledAt: '2026-03-12T16:00:00.000Z', groupId: 'r1' }),
         ],
+        'UTC',
+      ),
+    ).toEqual([]);
+  });
+
+  it('leaves a round somebody has built up out of it entirely', () => {
+    // r1 holds two conversations because the user put them together. Offering
+    // to gather one of them into a new round would undo that decision.
+    expect(
+      groupableDays(
+        [
+          interview({ id: 'a', scheduledAt: '2026-03-12T14:00:00.000Z', groupId: 'r1' }),
+          interview({ id: 'b', scheduledAt: '2026-03-12T16:00:00.000Z', groupId: 'r1' }),
+          interview({ id: 'c', scheduledAt: '2026-03-12T18:00:00.000Z', groupId: 'r2' }),
+        ],
+        'UTC',
+      ),
+    ).toEqual([]);
+  });
+
+  it('says nothing about a day holding a single round', () => {
+    expect(
+      groupableDays(
+        [interview({ id: 'a', scheduledAt: '2026-03-12T14:00:00.000Z', groupId: 'r1' })],
         'UTC',
       ),
     ).toEqual([]);
@@ -103,8 +127,8 @@ describe('groupableDays', () => {
   it('reads the day in the reader’s zone, not UTC', () => {
     // 23:00 and 01:00 UTC are one Tokyo day; in UTC they are two.
     const rounds = [
-      interview({ id: 'a', scheduledAt: '2026-03-12T23:00:00.000Z' }),
-      interview({ id: 'b', scheduledAt: '2026-03-13T01:00:00.000Z' }),
+      interview({ id: 'a', scheduledAt: '2026-03-12T23:00:00.000Z', groupId: 'r1' }),
+      interview({ id: 'b', scheduledAt: '2026-03-13T01:00:00.000Z', groupId: 'r2' }),
     ];
     expect(groupableDays(rounds, 'Asia/Tokyo')).toEqual([
       { day: '2026-03-13', interviewIds: ['a', 'b'] },

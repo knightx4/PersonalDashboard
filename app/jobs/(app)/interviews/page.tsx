@@ -23,6 +23,22 @@ function interviewHref(roleId: string, interviewId: string): string {
   return `/jobs/roles/${roleId}?tab=interviews&interview=${interviewId}`;
 }
 
+/**
+ * What round this is, read off the round rather than the interview.
+ *
+ * The number belongs to the round now, and a round can have been given a name
+ * instead of, or as well as, a number -- "Final round" says more than "3". A
+ * round with neither is one nobody has placed yet, which the column says
+ * plainly rather than inventing a number for.
+ */
+function roundName(group: { round_number: number | null; label: string | null } | null): string {
+  if (!group) return '—';
+  if (group.label && group.round_number !== null) return `${group.round_number} · ${group.label}`;
+  if (group.label) return group.label;
+  if (group.round_number !== null) return String(group.round_number);
+  return '—';
+}
+
 export default async function InterviewsPage() {
   const user = await requireUser();
   const supabase = await createClient();
@@ -31,7 +47,7 @@ export default async function InterviewsPage() {
     supabase
       .from('interviews')
       .select(
-        'id, round, kind, scheduled_at, time_known, format, status, notes, applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, kind, scheduled_at, time_known, format, status, notes, interview_groups ( round_number, label ), applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', user.id)
       .order('scheduled_at', { ascending: false }),
@@ -42,7 +58,8 @@ export default async function InterviewsPage() {
 
   type Row = {
     id: string;
-    round: number;
+    /** The round it is in, which is what carries the number and the name. */
+    interview_groups: { round_number: number | null; label: string | null } | null;
     kind: string;
     scheduled_at: string | null;
     /** False when only the day is settled — see formatInterviewWhen. */
@@ -158,7 +175,8 @@ function Section({
   title: string;
   rows: Array<{
     id: string;
-    round: number;
+    /** The round it is in, which is what carries the number and the name. */
+    interview_groups: { round_number: number | null; label: string | null } | null;
     kind: string;
     scheduled_at: string | null;
     time_known: boolean | null;
@@ -180,7 +198,7 @@ function Section({
             <TH>When</TH>
             <TH>Company</TH>
             <TH>Role</TH>
-            <TH num>Round</TH>
+            <TH>Round</TH>
             <TH>Kind</TH>
             <TH>Debrief</TH>
           </TR>
@@ -206,8 +224,8 @@ function Section({
                   {row.applications.roles.title}
                 </Link>
               </TD>
-              <TD label="Round" num muted>
-                {row.round}
+              <TD label="Round" muted>
+                {roundName(row.interview_groups)}
               </TD>
               <TD label="Kind" muted>
                 {row.kind.replace(/_/g, ' ')}
