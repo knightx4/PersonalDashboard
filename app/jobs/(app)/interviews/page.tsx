@@ -6,6 +6,8 @@ import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatInterviewWhen } from '@/lib/jobs/applications/load';
+import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
+import { roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Interviews' };
@@ -23,22 +25,6 @@ function interviewHref(roleId: string, interviewId: string): string {
   return `/jobs/roles/${roleId}?tab=interviews&interview=${interviewId}`;
 }
 
-/**
- * What round this is, read off the round rather than the interview.
- *
- * The number belongs to the round now, and a round can have been given a name
- * instead of, or as well as, a number -- "Final round" says more than "3". A
- * round with neither is one nobody has placed yet, which the column says
- * plainly rather than inventing a number for.
- */
-function roundName(group: { round_number: number | null; label: string | null } | null): string {
-  if (!group) return '—';
-  if (group.label && group.round_number !== null) return `${group.round_number} · ${group.label}`;
-  if (group.label) return group.label;
-  if (group.round_number !== null) return String(group.round_number);
-  return '—';
-}
-
 export default async function InterviewsPage() {
   const user = await requireUser();
   const supabase = await createClient();
@@ -47,7 +33,7 @@ export default async function InterviewsPage() {
     supabase
       .from('interviews')
       .select(
-        'id, kind, scheduled_at, time_known, format, status, notes, interview_groups ( round_number, label ), applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, kind, scheduled_at, time_known, format, status, notes, group_id, interview_groups ( id, round_number, label, notes ), applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', user.id)
       .order('scheduled_at', { ascending: false }),
@@ -58,8 +44,14 @@ export default async function InterviewsPage() {
 
   type Row = {
     id: string;
+    group_id: string | null;
     /** The round it is in, which is what carries the number and the name. */
-    interview_groups: { round_number: number | null; label: string | null } | null;
+    interview_groups: {
+      id: string;
+      round_number: number | null;
+      label: string | null;
+      notes: string | null;
+    } | null;
     kind: string;
     scheduled_at: string | null;
     /** False when only the day is settled — see formatInterviewWhen. */
@@ -71,6 +63,58 @@ export default async function InterviewsPage() {
   };
 
   const rows = (interviews ?? []) as unknown as Row[];
+
+  /**
+   * One row per round, not per interview.
+   *
+   * A superday is one occasion with four conversations in it. Listed four
+   * times over it reads as four separate things to prepare for and four
+   * separate debriefs to write, when it is one of each. The role's own
+   * Interviews tab is where the individual conversation is read.
+   */
+  const rounds: RoundView[] = roundsOf(
+    rows.map((row) => ({ id: row.id, scheduledAt: row.scheduled_at, groupId: row.group_id, row })),
+    rows
+      .map((row) => row.interview_groups)
+      .filter((group): group is NonNullable<Row['interview_groups']> => group !== null)
+      .map((group) => ({
+        id: group.id,
+        label: group.label,
+        roundNumber: group.round_number,
+        notes: group.notes ?? '',
+      })),
+  ).map(({ group, interviews: members, lead }) => {
+    const times = members
+      .map((member) => whenOf(member.row))
+      .filter((time): time is { at: number; display: string; timeKnown: boolean } => time !== null);
+    // Shown at its first conversation, and over only once its last one is.
+    const first = times.length > 0 ? times.reduce((a, b) => (a.at <= b.at ? a : b)) : null;
+    const last = times.length > 0 ? times.reduce((a, b) => (a.at >= b.at ? a : b)) : null;
+
+    return {
+      key: group?.id ?? lead.id,
+      leadId: lead.row.id,
+      roleId: lead.row.applications.roles.id,
+      companyName: lead.row.applications.roles.companies.name,
+      roleTitle: lead.row.applications.roles.title,
+      scheduledAt: first?.display ?? null,
+      timeKnown: first?.timeKnown ?? true,
+      endsAt: last === null ? null : last.at + (last.timeKnown ? 0 : DAY_MS),
+      round: roundLabel(group),
+      // Four conversations in a day is what the row has to say; one is worth
+      // naming by what it was.
+      kind:
+        members.length > 1
+          ? `${members.length} interviews`
+          : interviewKindLabel(lead.row.kind),
+      // Written up anywhere in the round: the round's own note, or any of its
+      // conversations. One debrief for one occasion.
+      notes:
+        (group?.notes?.trim() ? group.notes : null) ??
+        members.find((member) => member.row.notes?.trim())?.row.notes ??
+        null,
+    };
+  });
 
   if (rows.length === 0) {
     return (
@@ -86,7 +130,7 @@ export default async function InterviewsPage() {
     );
   }
 
-  const { upcoming, past, needDebrief } = splitByTime(rows);
+  const { upcoming, past, needDebrief } = splitByTime(rounds);
 
   return (
     <>
@@ -104,17 +148,17 @@ export default async function InterviewsPage() {
           <h2 className="text-ui font-semibold text-ink">Write these up tonight</h2>
           <ul className="mt-2 space-y-1">
             {needDebrief.map((row) => (
-              <li key={row.id} className="text-ui">
+              <li key={row.key} className="text-ui">
                 {/* Straight to the round that needs writing up, which is the
                     only reason this list exists. */}
                 <Link
-                  href={interviewHref(row.applications.roles.id, row.id)}
+                  href={interviewHref(row.roleId, row.leadId)}
                   className="font-medium text-ink transition-colors duration-150 hover:text-accent"
                 >
-                  {row.applications.roles.companies.name} · {row.applications.roles.title}
+                  {row.companyName} · {row.roleTitle}
                 </Link>
                 <span className="tabular ml-2 text-ink-muted">
-                  {formatInterviewWhen(row.scheduled_at, row.time_known ?? true, timezone)}
+                  {formatInterviewWhen(row.scheduledAt, row.timeKnown, timezone)}
                 </span>
               </li>
             ))}
@@ -130,40 +174,66 @@ export default async function InterviewsPage() {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** A round as this page draws it: one line, whatever is inside it. */
+type RoundView = {
+  key: string;
+  /** The conversation a link lands on: the first of the round. */
+  leadId: string;
+  roleId: string;
+  companyName: string;
+  roleTitle: string;
+  /** When the round starts. Null where nothing in it is scheduled yet. */
+  scheduledAt: string | null;
+  timeKnown: boolean;
+  /** When the last of it is over, as an instant. Null when unscheduled. */
+  endsAt: number | null;
+  round: string | null;
+  kind: string;
+  /** Anything written up about the round, from the round or from inside it. */
+  notes: string | null;
+};
+
+/**
+ * When one interview is, and until when.
+ *
+ * A round known only by its day is stored at that day's midnight, so the day
+ * itself counts as upcoming -- otherwise an interview this afternoon reads as
+ * past all morning.
+ */
+function whenOf(row: {
+  scheduled_at: string | null;
+  time_known: boolean | null;
+}): { at: number; display: string; timeKnown: boolean } | null {
+  if (row.scheduled_at === null) return null;
+  return {
+    at: new Date(row.scheduled_at).getTime(),
+    display: row.scheduled_at,
+    timeKnown: row.time_known !== false,
+  };
+}
+
 /**
  * Split into upcoming and past. Outside the component because reading the clock
  * during render gives a different answer on every re-render.
  *
- * needDebrief is further bounded to the last DEBRIEF_NUDGE_WINDOW_DAYS: an
- * interview from months ago with no notes is stale, not "write it up
- * tonight" — it stays visible in the Past table without the urgent banner.
+ * A round is upcoming until its last conversation is over, not its first: a
+ * two-day final is not history halfway through.
+ *
+ * needDebrief is further bounded to the last DEBRIEF_NUDGE_WINDOW_DAYS: a round
+ * from months ago with no notes is stale, not "write it up tonight" — it stays
+ * visible in the Past table without the urgent banner.
  */
-function splitByTime<
-  T extends { scheduled_at: string | null; time_known: boolean | null; notes: string | null },
->(rows: T[]): { upcoming: T[]; past: T[]; needDebrief: T[] } {
+function splitByTime<T extends { endsAt: number | null; notes: string | null }>(
+  rows: T[],
+): { upcoming: T[]; past: T[]; needDebrief: T[] } {
   const now = Date.now();
   const debriefWindowStart = now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
 
-  // A round known only by its day is stored at that day's midnight. It has not
-  // happened until the day is over, so the day itself counts as upcoming --
-  // otherwise an interview this afternoon reads as past all morning.
-  const over = (row: T): number | null =>
-    row.scheduled_at === null
-      ? null
-      : new Date(row.scheduled_at).getTime() + (row.time_known === false ? DAY_MS : 0);
-
-  const upcoming = rows.filter((row) => {
-    const at = over(row);
-    return at !== null && at >= now;
-  });
-  const past = rows.filter((row) => {
-    const at = over(row);
-    return at === null || at < now;
-  });
-  const needDebrief = past.filter((row) => {
-    const at = over(row);
-    return !row.notes && at !== null && at >= debriefWindowStart;
-  });
+  const upcoming = rows.filter((row) => row.endsAt !== null && row.endsAt >= now);
+  const past = rows.filter((row) => row.endsAt === null || row.endsAt < now);
+  const needDebrief = past.filter(
+    (row) => !row.notes && row.endsAt !== null && row.endsAt >= debriefWindowStart,
+  );
   return { upcoming, past, needDebrief };
 }
 
@@ -173,18 +243,7 @@ function Section({
   timezone,
 }: {
   title: string;
-  rows: Array<{
-    id: string;
-    /** The round it is in, which is what carries the number and the name. */
-    interview_groups: { round_number: number | null; label: string | null } | null;
-    kind: string;
-    scheduled_at: string | null;
-    time_known: boolean | null;
-    format: string | null;
-    status: string;
-    notes: string | null;
-    applications: { id: string; roles: { id: string; title: string; companies: { name: string } } };
-  }>;
+  rows: RoundView[];
   timezone: string;
 }) {
   if (rows.length === 0) return null;
@@ -205,30 +264,30 @@ function Section({
         </THead>
         <TBody>
           {rows.map((row) => (
-            /* The interview, and the role, as two separate destinations.
+            /* The round, and the role, as two separate destinations.
                Both are things you might want from this table and only one
-               of them was reachable. The row goes to the interview; the role
+               of them was reachable. The row goes to the round; the role
                cell keeps its own link, lifted above the row link with `relative`. */
-            <TR key={row.id} href={interviewHref(row.applications.roles.id, row.id)}>
+            <TR key={row.key} href={interviewHref(row.roleId, row.leadId)}>
               <TD primary className="tabular">
-                {formatInterviewWhen(row.scheduled_at, row.time_known ?? true, timezone)}
+                {formatInterviewWhen(row.scheduledAt, row.timeKnown, timezone)}
               </TD>
               <TD label="Company" muted>
-                {row.applications.roles.companies.name}
+                {row.companyName}
               </TD>
               <TD label="Role" muted>
                 <Link
-                  href={`/jobs/roles/${row.applications.roles.id}`}
+                  href={`/jobs/roles/${row.roleId}`}
                   className="relative transition-colors duration-150 hover:text-accent"
                 >
-                  {row.applications.roles.title}
+                  {row.roleTitle}
                 </Link>
               </TD>
               <TD label="Round" muted>
-                {roundName(row.interview_groups)}
+                {row.round ?? '—'}
               </TD>
               <TD label="Kind" muted>
-                {row.kind.replace(/_/g, ' ')}
+                {row.kind}
               </TD>
               <TD label="Debrief" muted>
                 {row.notes ? 'written' : '—'}

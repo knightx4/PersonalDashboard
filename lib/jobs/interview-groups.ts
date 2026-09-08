@@ -153,3 +153,75 @@ export function groupableDays<T extends GroupableInterview>(
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([day, onDay]) => ({ day, interviewIds: onDay.map((entry) => entry.id) }));
 }
+
+/**
+ * One row per round, for the lists that are about rounds rather than about
+ * interviews.
+ *
+ * This week and the Interviews table both answer "what is coming up", and a
+ * superday answered four times over is one occasion pretending to be four.
+ * The role's own tab still lists every interview -- that is the page where the
+ * individual conversation, its interviewer and its notes are the subject.
+ *
+ * The order is the caller's, taken from where each round is first seen. So a
+ * list sorted by date stays sorted by date, and the round sits where its
+ * earliest interview sat.
+ *
+ * A round whose group is not among `groups` still gets a row of its own rather
+ * than being dropped: an interview that vanishes from a list of what is coming
+ * up is much worse than one shown outside its round.
+ */
+export interface RoundRow<T extends GroupableInterview, G extends InterviewGroup> {
+  /** The round, where the group is known; null for one standing on its own. */
+  group: G | null;
+  /** Its interviews, in the order they were given. */
+  interviews: T[];
+  /** The one a link to this round should land on: the first of them. */
+  lead: T;
+}
+
+export function roundsOf<T extends GroupableInterview, G extends InterviewGroup>(
+  interviews: readonly T[],
+  groups: readonly G[],
+): Array<RoundRow<T, G>> {
+  const byId = new Map(groups.map((group) => [group.id, group]));
+  const rows: Array<RoundRow<T, G>> = [];
+  const indexOfGroup = new Map<string, number>();
+
+  for (const interview of interviews) {
+    const group = interview.groupId ? byId.get(interview.groupId) : undefined;
+    if (!group) {
+      rows.push({ group: null, interviews: [interview], lead: interview });
+      continue;
+    }
+
+    const at = indexOfGroup.get(group.id);
+    if (at === undefined) {
+      indexOfGroup.set(group.id, rows.length);
+      rows.push({ group, interviews: [interview], lead: interview });
+      continue;
+    }
+    rows[at].interviews.push(interview);
+  }
+
+  return rows;
+}
+
+/**
+ * What round this is, in words.
+ *
+ * The number belongs to the round, and a round can have been given a name
+ * instead of, or as well as, a number -- "Final round" says more than "3". A
+ * round with neither is one nobody has placed yet, which is null rather than
+ * an invented number; the caller says how it wants to draw a blank.
+ */
+export function roundLabel(
+  group: { roundNumber?: number | null; label: string | null } | null,
+): string | null {
+  if (!group) return null;
+  const number = group.roundNumber ?? null;
+  if (group.label && number !== null) return `${number} · ${group.label}`;
+  if (group.label) return group.label;
+  if (number !== null) return `Round ${number}`;
+  return null;
+}
