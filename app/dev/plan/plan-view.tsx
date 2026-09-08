@@ -714,7 +714,7 @@ const TONE_DOT: Record<Health['tone'], string> = {
  */
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_3.75rem_6rem_2rem]';
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_2rem]';
 
 /** The width of one level of the tree, in the name cell. */
 const LEVEL = 'w-5';
@@ -731,7 +731,6 @@ function ColumnHeader() {
       <span>Step</span>
       <span>Health</span>
       <span className="hidden sm:block">Priority</span>
-      <span className="hidden sm:block">Who</span>
       <span className="hidden sm:block">Steps</span>
       <span />
     </li>
@@ -1007,12 +1006,11 @@ function PlanRow({
           )}
         </span>
 
-        <span className="hidden truncate text-small sm:block">
-          {node.assignee === 'claude' && <span className="text-accent">Claude</span>}
-          {node.assignee === 'me' && <span className="text-ink-muted">Me</span>}
-          {!node.assignee && <span className="text-ink-ghost">—</span>}
-        </span>
-
+        {/* No "Who" column. It was a column of dashes with the occasional
+            "Claude" in it -- one fact, on a plan whose every step is yours
+            unless you hand it over, and handing it over is a button. Who has
+            it is still on the open step, in the summary's "Claude's" view,
+            and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
         </span>
