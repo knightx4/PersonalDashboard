@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState, useTransition } from 'react';
-import { Copy, Mail, ShieldAlert, Trash2 } from 'lucide-react';
+import { Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Banner } from '@/components/ui/banner';
@@ -79,7 +79,6 @@ export function SettingsView(props: {
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
       <EvidenceSection evidence={props.evidence} resumes={props.resumes} />
-      <DangerSection />
     </div>
   );
 }
@@ -109,7 +108,7 @@ function ProfileSection({
         <a href="/account" className="font-medium text-accent underline underline-offset-2">
           Account
         </a>
-        .
+        , and so does deleting the account, which was never the job search&rsquo;s to offer.
       </p>
 
       <form action={action} className="mt-4 space-y-4">
@@ -972,73 +971,5 @@ function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: stri
         </div>
       )}
     </Group>
-  );
-}
-
-function DangerSection() {
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  return (
-    // The app's card, with the danger border in place of the hairline: this is
-    // the one section on the page whose edge is a warning rather than a
-    // grouping, so it keeps a coloured one and gets the shared everything else.
-    <section className={cn(cardVariants({ padding: 'standard' }), 'border-danger/30')}>
-      <h2 className="flex items-center gap-2 text-body font-semibold text-danger">
-        <ShieldAlert className="size-4" strokeWidth={1.75} />
-        Delete everything
-      </h2>
-      <p className="mt-1 text-ui leading-relaxed text-ink-muted">
-        Revokes the Google grant, deletes every row and every stored file, and removes the account
-        itself. There is no undo and no export first.
-      </p>
-
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="min-w-56 flex-1">
-          <Label htmlFor="confirm">Type &ldquo;delete everything&rdquo;</Label>
-          <Input
-            id="confirm"
-            value={confirm}
-            onChange={(event) => setConfirm(event.target.value)}
-            placeholder="delete everything"
-          />
-        </div>
-        <Button
-          type="button"
-          variant="danger"
-          size="sm"
-          disabled={busy || confirm.trim().toLowerCase() !== 'delete everything'}
-          onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              const response = await fetch('/api/account/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ confirm }),
-              });
-              if (response.ok) {
-                window.location.href = '/';
-                return;
-              }
-              const data = await response.json();
-              setError(data.error ?? 'Could not delete the account.');
-            } catch {
-              setError('Could not delete the account.');
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Delete
-        </Button>
-      </div>
-      {error && (
-        <p role="alert" className="mt-2 text-ui text-danger">
-          {error}
-        </p>
-      )}
-    </section>
   );
 }
