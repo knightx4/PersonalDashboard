@@ -269,6 +269,33 @@ export default function DevUiPage() {
         </Card>
       </Section>
 
+      <Section
+        title="The gate"
+        lead="The mechanical half of these laws runs on every push. It does not ask nicely."
+      >
+        <Card padding="standard" className="space-y-2 text-body text-ink-muted">
+          <p>
+            <code className="text-ui text-ink">npm run check:ui</code> counts violations per file
+            per rule against a recorded baseline. A count going up fails; a new file has no baseline
+            entry, so new code is held to zero from its first line. A count going down asks to be
+            locked in, which is how the number only ever moves one way.
+          </p>
+          <p>
+            Five rules, all of them things a grep can settle: a hand-rolled box, a control height
+            written as a number, a scoped token read through <code className="text-ui">var()</code>,
+            a raw hex, a font size off the scale. Everything else on this page is the residue a
+            person has to read — <code className="text-ui">--list</code> shows where the machine
+            thinks the mess is, and that is where to start looking.
+          </p>
+          <p>
+            If a violation is genuinely right, say so where it is:{' '}
+            <code className="text-ui text-ink">{'/* ui-ok: why */'}</code> on the line, or{' '}
+            <code className="text-ui text-ink">ui-ok-file: rule-id</code> for a whole block. A rule
+            with no way out gets worked around, and a worked-around rule also lies.
+          </p>
+        </Card>
+      </Section>
+
       <Section title="Never">
         <Card padding="standard">
           <ul className="space-y-1.5 text-body text-ink-muted">

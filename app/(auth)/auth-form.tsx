@@ -33,6 +33,9 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
       <form action={signInWithGoogle}>
         <input type="hidden" name="next" value={next ?? '/onboarding'} />
         <Button type="submit" variant="secondary" className="w-full">
+          {/* ui-ok-file: raw-hex — Google's brand hexes, below. A logo is
+              somebody else's object and does not follow our themes, the same
+              reason the module marks carry fixed hexes. */}
           <svg className="size-4" viewBox="0 0 24 24" aria-hidden>
             <path
               fill="#4285F4"

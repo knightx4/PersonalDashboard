@@ -64,6 +64,12 @@ jobs:
       - name: Contrast
         run: npm run check:contrast
 
+      # The mechanical half of the design laws, against a ratcheting baseline:
+      # existing violations are tolerated and counted, new ones are not, and a
+      # new file is held to zero from its first line. See scripts/check-ui.ts.
+      - name: UI laws
+        run: npm run check:ui
+
       # Includes both cross-user isolation tests, each of which fails
       # automatically if a table is added to its schema without an RLS policy,
       # and the coexistence test that proves neither app's migrations reach

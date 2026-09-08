@@ -9,6 +9,7 @@ import {
 } from '@/app/shopping/settings/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input } from '@/components/ui/field';
+import { UNSET_SWATCH } from '@/lib/lists/gradients';
 
 const initial: CategoryActionState = {};
 
@@ -103,7 +104,7 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
             >
               <span
                 className="size-2 rounded-full"
-                style={{ backgroundColor: category.color ?? '#cfcfc8' }}
+                style={{ backgroundColor: category.color ?? UNSET_SWATCH }}
                 aria-hidden
               />
               {category.name}
@@ -127,7 +128,7 @@ function CustomCategoryRow({ category }: { category: SettingsCategory }) {
         <input type="hidden" name="id" value={category.id} />
         <span
           className="size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: category.color ?? '#cfcfc8' }}
+          style={{ backgroundColor: category.color ?? UNSET_SWATCH }}
           aria-hidden
         />
         <Input

@@ -34,12 +34,22 @@ export function pickListGradient(used: readonly (string | null | undefined)[]): 
   return pool[index]!;
 }
 
+/**
+ * The swatch for something with no colour chosen.
+ *
+ * A literal rather than a token on purpose: it stands in for a *user's* colour,
+ * which is data and does not follow the theme, so a themed grey here would be
+ * the only swatch in the row that changed when the theme did. It is named
+ * because it was written out in four places, one of which had drifted.
+ */
+export const UNSET_SWATCH = '#cfcfc8';
+
 /** CSS style for a list color cell — supports gradients and legacy solid hex. */
 export function listSwatchStyle(color: string | null | undefined): {
   backgroundImage?: string;
   backgroundColor?: string;
 } {
-  if (!color) return { backgroundColor: '#cfcfc8' };
+  if (!color) return { backgroundColor: UNSET_SWATCH };
   if (color.includes('gradient')) return { backgroundImage: color };
   return { backgroundColor: color };
 }

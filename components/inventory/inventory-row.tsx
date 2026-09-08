@@ -14,6 +14,7 @@ import { displayVariant } from '@/lib/inventory/display';
 import { cn } from '@/lib/cn';
 import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
+import { UNSET_SWATCH } from '@/lib/lists/gradients';
 
 export type InventoryRowItem = {
   id: string;
@@ -56,7 +57,7 @@ export function InventoryRow({
 }) {
   const title = displayNameOf(item);
   const variant = displayVariant(item.variant);
-  const accent = item.category_color ?? '#cfcfc8';
+  const accent = item.category_color ?? UNSET_SWATCH;
   const quantity = item.quantity ?? 1;
   const low = item.unit_cost_low ?? item.cost_cents;
   const high = item.unit_cost_high ?? item.cost_cents;
