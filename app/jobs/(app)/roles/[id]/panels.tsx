@@ -47,6 +47,7 @@ import {
 import {
   addInterview,
   addInterviewer,
+  addInterviewerByName,
   addNote,
   addReminder,
   createInterviewRound,
@@ -227,6 +228,15 @@ export interface PanelProps {
  * and until now that left the Interviews tab silently empty.
  */
 const INTERVIEW_MAIL = new Set(['interview_invite', 'scheduling']);
+
+/**
+ * The picker's escape hatch, as a value no contact id can collide with.
+ *
+ * Contact ids are uuids, so a word is safe; it is named rather than inlined
+ * because the option and the branch that reads it are far enough apart to
+ * drift.
+ */
+const NEW_CONTACT = 'new-contact';
 
 /** What the "Add a round" form should be seeded with, and which mail asked. */
 interface InterviewSeed {
@@ -1805,6 +1815,8 @@ function Interviewers({
   companyContacts: PanelProps['companyContacts'];
 }) {
   const [adding, setAdding] = useState(false);
+  /** The name being typed for somebody not on file yet, or null when none is. */
+  const [newName, setNewName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -1817,6 +1829,66 @@ function Interviewers({
       setError(result.error);
       if (!result.error) setAdding(false);
     });
+
+  const addByName = () =>
+    startTransition(async () => {
+      const result = await addInterviewerByName({
+        interviewId: interview.id,
+        name: newName ?? '',
+      });
+      setError(result.error);
+      if (!result.error) {
+        setNewName(null);
+        setAdding(false);
+      }
+    });
+
+  /**
+   * The name field, offered from inside the picker and instead of it when the
+   * company has nobody on file.
+   *
+   * An interviewer has by definition never emailed you, so they are exactly
+   * the people the contact list does not have yet -- which made "pick a
+   * contact" a dead end at the moment it mattered most. The person is created
+   * on this company, so the name on the round is a record with a page rather
+   * than a string.
+   */
+  const nameField = (
+    <span className="inline-flex items-center gap-1.5">
+      <Input
+        value={newName ?? ''}
+        autoFocus
+        placeholder="Their name"
+        aria-label="Name of the person to add"
+        className="h-7 w-48 py-0 text-small"
+        onChange={(event) => setNewName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && newName?.trim()) {
+            event.preventDefault();
+            addByName();
+          }
+        }}
+      />
+      <Button
+        type="button"
+        size="sm"
+        disabled={pending || !newName?.trim()}
+        onClick={addByName}
+      >
+        Add
+      </Button>
+      <button
+        type="button"
+        onClick={() => {
+          setNewName(null);
+          setError(null);
+        }}
+        className="text-small text-ink-muted hover:text-ink"
+      >
+        Cancel
+      </button>
+    </span>
+  );
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-small">
@@ -1863,13 +1935,22 @@ function Interviewers({
       ))}
 
       {adding ? (
-        available.length > 0 ? (
+        newName !== null || available.length === 0 ? (
+          nameField
+        ) : (
           <Select
             aria-label="Add an interviewer"
             defaultValue=""
             disabled={pending}
             className="h-7 w-56 py-0 text-small"
-            onChange={(event) => event.target.value && add(event.target.value)}
+            onChange={(event) => {
+              if (event.target.value === NEW_CONTACT) {
+                setNewName('');
+                setError(null);
+                return;
+              }
+              if (event.target.value) add(event.target.value);
+            }}
           >
             <option value="">Pick a contact…</option>
             {available.map((contact) => (
@@ -1877,14 +1958,8 @@ function Interviewers({
                 {contact.title ? `${contact.name} — ${contact.title}` : contact.name}
               </option>
             ))}
+            <option value={NEW_CONTACT}>+ Someone new…</option>
           </Select>
-        ) : (
-          // No picker without anyone to pick: an interviewer has to exist as a
-          // contact first, and inventing one from here would put a person on
-          // the company with nothing but a name.
-          <span className="text-ink-muted">
-            No contacts at this company yet — add them on the company page first.
-          </span>
         )
       ) : (
         <button

@@ -625,6 +625,97 @@ export async function addInterviewer(input: {
 }
 
 /** Wrong person, or an invite that swept in the room's calendar account. */
+const newInterviewerSchema = z.object({
+  interviewId: z.string().uuid(),
+  name: z.string().trim().min(1, 'A name is needed.').max(120),
+});
+
+/**
+ * Name someone who is not in the contact list yet, from the round itself.
+ *
+ * The picker could only offer people already on file, which made naming your
+ * interviewer a trip to the company page and back — and the people you most
+ * want to name are exactly the ones with no record yet, because an interviewer
+ * has by definition never sent you anything. The invite parser has always
+ * created them this way when it could read the attendees; this is the same
+ * thing done by hand when it could not.
+ *
+ * They land on the company the pursuit is at, so the name on the round is a
+ * real contact record with a page of its own rather than a loose string.
+ */
+export async function addInterviewerByName(input: {
+  interviewId: string;
+  name: string;
+}): Promise<{ error: string | null }> {
+  const parsed = newInterviewerSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: interview } = await supabase
+    .from('interviews')
+    .select('id, applications!inner ( roles!inner ( company_id ) )')
+    .eq('id', parsed.data.interviewId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!interview) return { error: 'That interview no longer exists.' };
+
+  const companyId =
+    (interview.applications as unknown as { roles: { company_id: string | null } } | null)?.roles
+      ?.company_id ?? null;
+
+  // Someone of that name already on this company is the same person, not a
+  // second copy of them: typing a name that is already in the list should
+  // attach the record rather than fork it.
+  const byName = supabase
+    .from('contacts')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('full_name', parsed.data.name);
+
+  const { data: existing } = await (
+    companyId ? byName.eq('company_id', companyId) : byName.is('company_id', null)
+  )
+    .limit(1)
+    .maybeSingle();
+
+  let contactId = (existing?.id as string | undefined) ?? null;
+
+  if (!contactId) {
+    const { data: created, error } = await supabase
+      .from('contacts')
+      .insert({
+        user_id: user.id,
+        company_id: companyId,
+        full_name: parsed.data.name,
+        relationship: 'interviewer',
+      })
+      .select('id')
+      .single();
+
+    if (error || !created) return { error: error?.message ?? 'Could not add that person.' };
+    contactId = created.id as string;
+  }
+
+  const { error } = await supabase.from('interview_participants').upsert(
+    {
+      interview_id: parsed.data.interviewId,
+      contact_id: contactId,
+      role: 'interviewer',
+    },
+    { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  revalidatePath('/jobs/contacts');
+  return { error: null };
+}
+
 export async function removeInterviewer(input: {
   interviewId: string;
   contactId: string;
