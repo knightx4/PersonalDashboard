@@ -2,8 +2,12 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
+import { Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Select } from '@/components/ui/field';
+import { Card, CardSection } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Field, FieldError, Input, Select } from '@/components/ui/field';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { createContact } from './actions';
 
@@ -65,19 +69,15 @@ export function ContactsView({
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <section className="rounded-card border border-border bg-surface p-4 lg:order-2">
-        <h2 className="text-ui font-semibold text-ink">Add someone</h2>
-        <form action={action} className="mt-3 space-y-3">
-          <div>
-            <Label htmlFor="fullName">Name</Label>
+      <CardSection id="add-contact" title="Add someone" className="lg:order-2">
+        <form action={action} className="space-y-3">
+          <Field id="fullName" label="Name">
             <Input id="fullName" name="fullName" required />
-          </div>
-          <div>
-            <Label htmlFor="title">Title</Label>
+          </Field>
+          <Field id="title" label="Title">
             <Input id="title" name="title" placeholder="Head of Finance" />
-          </div>
-          <div>
-            <Label htmlFor="companyId">Company</Label>
+          </Field>
+          <Field id="companyId" label="Company">
             <Select id="companyId" name="companyId" defaultValue="">
               <option value="">Not attached</option>
               {companies.map((company) => (
@@ -86,9 +86,8 @@ export function ContactsView({
                 </option>
               ))}
             </Select>
-          </div>
-          <div>
-            <Label htmlFor="relationship">Relationship</Label>
+          </Field>
+          <Field id="relationship" label="Relationship">
             <Select id="relationship" name="relationship" defaultValue="cold">
               {RELATIONSHIPS.map((entry) => (
                 <option key={entry} value={entry}>
@@ -96,99 +95,92 @@ export function ContactsView({
                 </option>
               ))}
             </Select>
-          </div>
-          <div>
-            <Label htmlFor="howWeConnect">How you connect</Label>
+          </Field>
+          <Field id="howWeConnect" label="How you connect">
             <Input id="howWeConnect" name="howWeConnect" placeholder="Same university, 2016" />
-          </div>
-          <div>
-            <Label htmlFor="linkedinUrl">LinkedIn</Label>
+          </Field>
+          <Field id="linkedinUrl" label="LinkedIn">
             <Input id="linkedinUrl" name="linkedinUrl" type="url" />
-          </div>
-          <div>
-            <Label htmlFor="email">Work email</Label>
+          </Field>
+          <Field id="email" label="Work email">
             <Input id="email" name="email" type="email" />
-          </div>
+          </Field>
 
-          {state.error && (
-            <p role="alert" className="text-ui text-status-rejected">
-              {state.error}
-            </p>
-          )}
-          {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
+          {/* The action returns one error for the whole form, not one per field,
+              so it sits under the fields rather than beside one of them. */}
+          <FieldError>{state.error}</FieldError>
+          {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
           <Button type="submit" size="sm">
             Add contact
           </Button>
-          <p className="text-micro leading-relaxed text-ink-muted">
+          <p className="text-small leading-relaxed text-ink-muted">
             Name, title, public professional URL, work email. Nothing else, and nothing scraped —
             this is the part of the app most worth being careful with.
           </p>
         </form>
-      </section>
+      </CardSection>
 
       <div className="lg:col-span-2">
         {contacts.length === 0 ? (
-          <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
-            Nobody yet.
-          </p>
+          <EmptyState
+            icon={Users}
+            title="Nobody yet"
+            description="The people you reach out to, and where each conversation stands. Add the first one in the form beside this."
+            action={{ label: 'Add someone', href: '#add-contact' }}
+          />
         ) : (
-          <div className="overflow-x-auto rounded-card border border-border bg-surface">
-            <table className="w-full min-w-[640px] border-collapse text-ui">
-              <thead>
-                <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
-                  <th className="px-3 py-2 font-semibold">Name</th>
-                  <th className="px-3 py-2 font-semibold">Company</th>
-                  <th className="px-3 py-2 font-semibold">Relationship</th>
-                  <th className="px-3 py-2 font-semibold">Status</th>
-                  <th className="px-3 py-2 font-semibold">Last touch</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Card padding="none" className="overflow-hidden">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Name</TH>
+                  <TH>Company</TH>
+                  <TH>Relationship</TH>
+                  <TH>Status</TH>
+                  <TH>Last touch</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {contacts.map((contact) => (
-                  <tr key={contact.id} className="border-b border-border last:border-0 hover:bg-canvas">
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`/jobs/contacts/${contact.id}`}
-                        className="font-medium text-ink hover:text-accent"
-                      >
-                        {contact.fullName}
-                      </Link>
+                  <TR key={contact.id} href={`/jobs/contacts/${contact.id}`}>
+                    <TD primary>
+                      {contact.fullName}
                       {contact.title && (
-                        <span className="ml-1.5 text-ink-muted">{contact.title}</span>
+                        <span className="ml-1.5 font-normal text-ink-muted">{contact.title}</span>
                       )}
-                    </td>
-                    <td className="px-3 py-2 text-ink-muted">
+                    </TD>
+                    <TD label="Company" muted>
                       {contact.companySlug ? (
+                        // `relative` lifts this above the row link the primary
+                        // cell stretches, so the company is still its own destination.
                         <Link
                           href={`/jobs/companies/${contact.companySlug}`}
-                          className="hover:text-accent hover:underline"
+                          className="relative transition-colors duration-150 hover:text-accent hover:underline"
                         >
                           {contact.companyName}
                         </Link>
                       ) : (
                         '—'
                       )}
-                    </td>
-                    <td className="px-3 py-2 text-ink-muted">
+                    </TD>
+                    <TD label="Relationship" muted>
                       {contact.relationship.replace(/_/g, ' ')}
-                    </td>
-                    <td className="px-3 py-2 text-ink-muted">
+                    </TD>
+                    <TD label="Status" muted>
                       {contact.status.replace(/_/g, ' ')}
                       {contact.pendingReplies > 0 && (
-                        <span className="ml-1.5 text-micro text-ink-muted">
-                          ({contact.pendingReplies} unanswered)
-                        </span>
+                        <span className="ml-1.5 text-micro">({contact.pendingReplies} unanswered)</span>
                       )}
-                    </td>
-                    <td className="tabular px-3 py-2 text-ink-muted">
+                    </TD>
+                    <TD label="Last touch" num muted>
                       {contact.lastTouchAt ? formatDate(contact.lastTouchAt, timezone) : '—'}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TBody>
+            </Table>
+          </Card>
         )}
       </div>
     </div>

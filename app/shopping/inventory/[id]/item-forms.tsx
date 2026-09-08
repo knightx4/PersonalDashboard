@@ -9,7 +9,9 @@ import {
   type ActionState,
 } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Select } from '@/components/ui/field';
+import { CardSection, cardVariants } from '@/components/ui/card';
+import { Field, FieldError, Input, Select } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { formatCentsAsDollarsInput } from '@/lib/money';
 import { listSwatchStyle } from '@/lib/lists/gradients';
@@ -24,16 +26,15 @@ export function DisposeForm({
   const [state, action, pending] = useActionState(disposeInventoryItem, initial);
 
   return (
-    <form action={action} className="space-y-3 rounded-card border border-border bg-surface p-4">
+    <form action={action} className={cn(cardVariants({ padding: 'dense' }), 'space-y-3')}>
       <input type="hidden" name="id" value={itemId} />
-      <h3 className="text-body font-semibold text-ink">Mark disposed</h3>
+      <h3 className="text-ui font-semibold text-ink">Mark disposed</h3>
       <p className="text-ui text-ink-muted">
         Record that you no longer own this. Sold and gifted update status to match;
         consumed / donated / trashed / recycled mark it disposed.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="disposal_method">How</Label>
+        <Field id="disposal_method" label="How">
           <Select id="disposal_method" name="disposal_method" required defaultValue="">
             <option value="" disabled>
               Choose…
@@ -44,18 +45,17 @@ export function DisposeForm({
               </option>
             ))}
           </Select>
-        </div>
-        <div>
-          <Label htmlFor="disposal_proceeds">Proceeds (optional)</Label>
+        </Field>
+        <Field id="disposal_proceeds" label="Proceeds (optional)">
           <Input
             id="disposal_proceeds"
             name="disposal_proceeds"
             inputMode="decimal"
             placeholder="0.00"
           />
-        </div>
+        </Field>
       </div>
-      <Button type="submit" variant="secondary" disabled={pending}>
+      <Button type="submit" variant="secondary" pending={pending}>
         {pending ? 'Saving…' : 'Mark disposed'}
       </Button>
       {state.message && <p className="text-body text-positive">{state.message}</p>}
@@ -74,23 +74,22 @@ export function ReturnForm({
   const [state, action, pending] = useActionState(markInventoryReturned, initial);
 
   return (
-    <form action={action} className="space-y-3 rounded-card border border-border bg-surface p-4">
+    <form action={action} className={cn(cardVariants({ padding: 'dense' }), 'space-y-3')}>
       <input type="hidden" name="id" value={itemId} />
-      <h3 className="text-body font-semibold text-ink">Mark returned</h3>
+      <h3 className="text-ui font-semibold text-ink">Mark returned</h3>
       <p className="text-ui text-ink-muted">
         Creates a refunded return. Inventory status is derived from that — it is never written
         by hand.
       </p>
-      <div>
-        <Label htmlFor="refund_amount">Refund amount</Label>
+      <Field id="refund_amount" label="Refund amount">
         <Input
           id="refund_amount"
           name="refund_amount"
           inputMode="decimal"
           defaultValue={formatCentsAsDollarsInput(defaultRefundCents)}
         />
-      </div>
-      <Button type="submit" variant="secondary" disabled={pending}>
+      </Field>
+      <Button type="submit" variant="secondary" pending={pending}>
         {pending ? 'Saving…' : 'Mark returned'}
       </Button>
       {state.message && <p className="text-body text-positive">{state.message}</p>}
@@ -124,13 +123,11 @@ export function ItemListsForm({
   const selected = new Set(selectedListIds);
 
   return (
-    <div className="space-y-3 rounded-card border border-border bg-surface p-4">
-      <div>
-        <h3 className="text-body font-semibold text-ink">Lists</h3>
-        <p className="mt-1 text-ui text-ink-muted">
-          Personal trackers — not categories. Filter inventory by any list you add here.
-        </p>
-      </div>
+    <CardSection title="Lists">
+      <div className="space-y-3">
+      <p className="text-ui text-ink-muted">
+        Personal trackers — not categories. Filter inventory by any list you add here.
+      </p>
 
       {lists.length > 0 ? (
         <form action={saveAction} className="space-y-3">
@@ -156,7 +153,7 @@ export function ItemListsForm({
               </li>
             ))}
           </ul>
-          <Button type="submit" variant="secondary" size="sm" disabled={savePending}>
+          <Button type="submit" variant="secondary" size="sm" pending={savePending}>
             {savePending ? 'Saving…' : 'Save lists'}
           </Button>
           {saveState.message && <p className="text-body text-positive">{saveState.message}</p>}
@@ -180,10 +177,10 @@ export function ItemListsForm({
             maxLength={40}
             autoFocus
             placeholder="To return, Gift ideas, Cabin…"
-            className="min-w-[12rem] flex-1"
+            className="min-w-48 flex-1"
             aria-label="New list name"
           />
-          <Button type="submit" size="sm" disabled={createPending}>
+          <Button type="submit" size="sm" pending={createPending}>
             {createPending ? 'Adding…' : 'Add'}
           </Button>
           <Button
@@ -207,6 +204,7 @@ export function ItemListsForm({
           )}
         </div>
       )}
-    </div>
+      </div>
+    </CardSection>
   );
 }

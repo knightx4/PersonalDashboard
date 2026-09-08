@@ -12,6 +12,8 @@ import {
   type FindState,
   type ReadingActionState,
 } from './actions';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 /**
  * Turning a subject you wrote down into something you can open.
@@ -132,7 +134,7 @@ export function FindSources({ readingId }: { readingId: string }) {
             : `${findState.candidates.length} worth reading. Pick the one for this — nothing is saved until you do.`}
         </p>
 
-        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {findState.candidates.map((source, index) => (
             <Candidate
               key={`${source.title}-${index}`}

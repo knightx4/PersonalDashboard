@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@/lib/cn';
 import {
   filterReturnsRows,
   groupReturnsByOrder,
@@ -128,7 +130,7 @@ export default async function ReturnsPage({
           actions={
             <Link
               href="/shopping/settings#return-policies"
-              className="text-body font-medium text-accent hover:underline"
+              className="text-ui font-medium text-accent hover:underline"
             >
               Edit return policies
             </Link>
@@ -156,7 +158,7 @@ export default async function ReturnsPage({
         ) : group === 'orders' ? (
           <ReturnsOrderList groups={orderGroups} />
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
             {rows.map((row) => (
               <ReturnItemRow key={row.inventoryItemId} row={row} />
             ))}

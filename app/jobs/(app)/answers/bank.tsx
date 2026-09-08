@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/field';
 import { promoteToCanonical } from '@/app/jobs/(app)/roles/actions';
 
@@ -47,13 +49,13 @@ function QuestionCard({
   const suggestion = !question.canonicalAnswer && question.approvedAnswer;
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
+    <section className={cn(cardVariants({ padding: 'dense' }))}>
       <header className="flex flex-wrap items-baseline gap-2">
         <h2 className="min-w-0 flex-1 text-ui font-medium text-ink">{question.text}</h2>
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted">
+        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
           {question.kind}
         </span>
-        <span className="tabular text-micro text-ink-muted">
+        <span className="tabular text-small text-ink-muted">
           seen {question.timesSeen}×
         </span>
       </header>
@@ -90,7 +92,7 @@ function QuestionCard({
         </Button>
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {question.usedIn > 0 && (
-          <span className="ml-auto text-micro text-ink-muted">
+          <span className="ml-auto text-small text-ink-muted">
             used on {question.usedIn} application{question.usedIn === 1 ? '' : 's'}
           </span>
         )}

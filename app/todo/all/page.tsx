@@ -1,9 +1,13 @@
 import Link from 'next/link';
+import { ListChecks, Search } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks } from '@/lib/todo/tasks/load';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/field';
 import { TaskRow } from '@/components/todo/task-row';
 import { cn } from '@/lib/cn';
 
@@ -77,28 +81,80 @@ export default async function AllTasksPage({
             search box that does not work on a slow connection. */}
         <form action="/todo/all" className="ml-auto flex items-center gap-2">
           <input type="hidden" name="status" value={status} />
-          <input
+          <Input
             type="search"
             name="q"
             defaultValue={search}
             placeholder="Search titles"
             aria-label="Search titles"
-            className="h-9 w-48 rounded-lg border border-border bg-surface px-3 text-body text-ink placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+            className="w-48"
           />
         </form>
       </div>
 
       {tasks.length === 0 ? (
-        <p className="mt-6 rounded-card border border-border bg-surface p-8 text-center text-ui text-ink-muted">
-          {search ? `Nothing matching “${search}”.` : 'Nothing here.'}
-        </p>
+        <AllTasksEmpty
+          status={status}
+          search={search}
+          seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:todo-all`}
+        />
       ) : (
-        <div className="mt-4 divide-y divide-border rounded-card border border-border bg-surface px-3">
+        <Card padding="none" className="mt-4 divide-y divide-border px-3">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} timezone={settings.timezone} />
           ))}
-        </div>
+        </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Three kinds of nothing. A search that found nothing offers to clear itself;
+ * an empty Open list is the list finished, so it gets the quiet-day mark; an
+ * empty archive is waiting for the agenda to feed it.
+ */
+function AllTasksEmpty({
+  status,
+  search,
+  seed,
+}: {
+  status: Filter;
+  search: string;
+  seed: string;
+}) {
+  if (search) {
+    return (
+      <EmptyState
+        icon={Search}
+        title="Nothing matched"
+        description={`No ${status === 'all' ? '' : `${status} `}task has “${search}” in its title.`}
+        action={{ label: 'Clear the search', href: `/todo/all?status=${status}` }}
+        className="mt-6"
+      />
+    );
+  }
+
+  if (status === 'open') {
+    return (
+      <EmptyState
+        tone="finished"
+        seed={seed}
+        title="Nothing open."
+        description="Everything you wrote down is done or dropped. Write the next thing on the agenda."
+        action={{ label: 'Go to the agenda', href: '/todo' }}
+        className="mt-6"
+      />
+    );
+  }
+
+  return (
+    <EmptyState
+      icon={ListChecks}
+      title="Nothing here yet"
+      description="Tasks you finish or drop on the agenda are kept here, so what happened is never lost."
+      action={{ label: 'Go to the agenda', href: '/todo' }}
+      className="mt-6"
+    />
   );
 }

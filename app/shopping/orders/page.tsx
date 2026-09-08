@@ -17,6 +17,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { Input } from '@/components/ui/field';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
@@ -476,7 +478,7 @@ export default async function OrdersPage({
                       {formatMoney(monthTotal, displayCurrency)}
                     </p>
                   </div>
-                  <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                  <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
                     {monthOrders.map((order) => {
                       const merchant = Array.isArray(order.merchants)
                         ? order.merchants[0]

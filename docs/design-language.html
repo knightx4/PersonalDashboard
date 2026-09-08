@@ -841,7 +841,7 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
     <tr><td><strong>Paper</strong></td><td>Warm, quiet, printed</td><td>Light <code>#faf9f6</code></td><td>Fine grain, 3.5%</td><td>The default. Daylight, long sessions.</td></tr>
     <tr><td><strong>Ink</strong></td><td>Near-black, low chroma, blue-to-pink accent arc</td><td>Dark <code>#08090a</code></td><td>Grain, 4%, overlay</td><td>The default dark.</td></tr>
     <tr><td><strong>Riso</strong></td><td>Duotone print, high chroma</td><td>Cream <code>#f6f2e8</code></td><td>Grain, 5.5%</td><td>The loudest one.</td></tr>
-    <tr><td><strong>Lightbox</strong></td><td>Near-black chrome, lit content</td><td>Shell <code>#101317</code> / page <code>#e5e2db</code></td><td>Grain, 3%</td><td>The one theme where the frame recedes completely.</td></tr>
+    <tr><td><strong>Lightbox</strong></td><td>Lit sheets on a blue-black bench</td><td>Bench <code>#0d1219</code> / sheet <code>rgb(251 252 254 / .96)</code></td><td>Grain, 7%, overlay</td><td>The one theme where the frame recedes completely.</td></tr>
     <tr><td><strong>Dusk</strong></td><td>Plum-cast dark, soft edges</td><td>Dark <code>#110d1a</code></td><td>Grain, 5%</td><td>Late. Lower contrast ceiling, still AA.</td></tr>
   </tbody>
 </table>
@@ -853,6 +853,8 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   <li>The choice lives on <code>core.account_settings</code>, so it follows the account across devices — and is mirrored into a cookie so the server renders the right theme on first paint. <strong>A theme that flashes white before going dark is worse than no dark mode.</strong></li>
   <li><strong>Every theme must pass the same contrast gate.</strong> There is no "expressive theme" exemption. Riso is louder <em>and</em> passes.</li>
   <li>The picker previews live on hover — you see the room before you move into it.</li>
+  <li><strong>Lightbox is the one theme with a resting shadow, and it is the exception that proves the rule.</strong> Its cards are objects on a bench, so <code>--sheet-edge</code> gives every sheet a 1px lit top edge, a bench-coloured outline in place of the grey hairline, a deep soft drop and a faint bloom. The token is <code>none</code> in the other four; nothing outside <code>globals.css</code> knows.</li>
+  <li><strong>Density is a second dial in the same panel.</strong> Comfortable · Snug · Dense sets <code>data-density</code> on <code>&lt;html&gt;</code>, which drives <code>--card-p</code> and <code>--row-y</code>. Per device, in a cookie: a laptop and a phone want different answers.</li>
 </ul>
 
 <h2 id="texture">Texture and material</h2>
@@ -872,7 +874,8 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 }</code></pre>
 
 <ul>
-  <li><strong>3–5% on the neutral themes. 11% on Riso, where it is the point.</strong> Above ~12% it stops reading as material and starts reading as a rendering bug.</li>
+  <li><strong>6% on the neutral themes, 7% on the Lightbox bench, 9% on Riso, where it is the point.</strong> It was 3.5% and did not survive a 1x screenshot, which means it was not doing its job on most monitors. Above ~12% it stops reading as material and starts reading as a rendering bug.</li>
+  <li><strong>Riso's texture is a halftone dot, not noise.</strong> A printed theme with no printing in it was the doc and the app disagreeing; the app now carries the 6px dot on <code>--grain</code> in its own block.</li>
   <li><code>pointer-events: none</code> is not optional — a full-viewport overlay that swallows clicks is a catastrophic, hard-to-diagnose bug.</li>
   <li>The texture never sits <em>between</em> the user and text they are reading closely. Long-form prose — a vault note — lifts onto <code>--surface</code>, which the grain sits over at a lower effective contrast because the surface is lighter. If it ever reduces legibility, the grain loses.</li>
   <li>No texture inside charts, tables, or any element the user is measuring by eye.</li>
@@ -1161,13 +1164,43 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
   </p>
 </div>
 
-<pre><code>&lt;<span class="k">Card</span> padding=<span class="s">"dense"</span>&gt;                    <span class="c">// "standard" | "dense" | "none"</span>
-  &lt;<span class="k">CardHeader</span> title=<span class="s">"Where it went"</span> action={...} /&gt;
+<pre><code>&lt;<span class="k">Card</span> padding=<span class="s">"dense"</span>&gt;                    <span class="c">// "standard" | "dense" | "none"; both follow the density dial</span>
+  &lt;<span class="k">CardHeader</span>&gt;&lt;<span class="k">CardTitle</span>&gt;Where it went&lt;/<span class="k">CardTitle</span>&gt;&lt;/<span class="k">CardHeader</span>&gt;
   &lt;<span class="k">CardBody</span>&gt;…&lt;/<span class="k">CardBody</span>&gt;
 &lt;/<span class="k">Card</span>&gt;
 
+<span class="c">// A heading plus content -- the shape half the app was hand-rolling.</span>
+&lt;<span class="k">CardSection</span> title=<span class="s">"Recent orders"</span> hint=<span class="s">"The last five."</span> action={&lt;Link…/&gt;}&gt;…&lt;/<span class="k">CardSection</span>&gt;
+
+<span class="c">// A link or list item that is a card.</span>
+&lt;<span class="k">Link</span> className={cn(cardVariants({ interactive: <span class="s">true</span> }), <span class="s">'flex gap-3 p-4'</span>)}&gt;
+
 <span class="c">// Headerless is first-class — most cards do not need a title bar.</span>
 &lt;<span class="k">Card</span> padding=<span class="s">"standard"</span>&gt;…&lt;/<span class="k">Card</span>&gt;</code></pre>
+
+<p>
+  Every card carries the <code>sheet</code> class, which is inert in four themes and is the lit
+  edge in Lightbox (see <a href="#themes">Themes</a>). It is why the primitive is not optional:
+  a hand-written card is a card with no edge on the bench.
+</p>
+
+<h3 id="figure">The figure</h3>
+<p>
+  <strong>The one number a page is about is not in a card.</strong> A card says "one of several
+  things on this page"; the spend figure is the reason the dashboard exists. <code>&lt;Figure&gt;</code>
+  sets it on the page ground in the display face at <code>text-figure-xl</code> (72px, 48 on a
+  phone), hangs the reconciliation line and the delta beneath it as a caption, and puts the numbers
+  that used to get a card each — value owned, the order count, what is still returnable — in a quiet
+  row under a rule. One figure per page. Nothing else is ever set at that size. Law 7 still holds:
+  the number is tabular, plain, and its only flourish is its scale.
+</p>
+<pre><code>&lt;<span class="k">Figure</span>
+  label=<span class="s">"Spent · this month"</span> meta=<span class="s">"1 – 7 Sep"</span>
+  value={&lt;CountUpMoney cents={net} /&gt;}
+  aside={&lt;FigureDelta label=<span class="s">"−18%"</span> direction=<span class="s">"down"</span> suffix=<span class="s">"vs prior period"</span> /&gt;}
+  caption=<span class="s">"$1,843.62 gross, less $120.00 refunded"</span>
+  secondary={[{ value: <span class="s">'$12,480'</span>, label: <span class="s">'value owned'</span> }, …]}
+/&gt;</code></pre>
 
 <div class="demo on-canvas">
   <div class="demo-label">Card · standard padding · no shadow at rest</div>
@@ -1250,12 +1283,27 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 </ul>
 
 <h4>Table rules</h4>
+<p>
+  <strong>Use <code>&lt;Table&gt;</code></strong> from <code>components/ui/table.tsx</code>. There were eight
+  hand-built tables that disagreed on header casing, on whether a row lit up, and on which sliver
+  of a row was the link. The primitive holds every rule below so no file has to.
+</p>
+<pre><code>&lt;<span class="k">Table</span> flush&gt;                              <span class="c">// flush: inside a padded card</span>
+  &lt;<span class="k">THead</span>&gt;&lt;<span class="k">TR</span>&gt;&lt;<span class="k">TH</span>&gt;Item&lt;/<span class="k">TH</span>&gt;&lt;<span class="k">TH</span> num&gt;Total&lt;/<span class="k">TH</span>&gt;&lt;/<span class="k">TR</span>&gt;&lt;/<span class="k">THead</span>&gt;
+  &lt;<span class="k">TBody</span>&gt;
+    &lt;<span class="k">TR</span> href=<span class="s">"/shopping/orders/…"</span>&gt;         <span class="c">// the whole row goes here</span>
+      &lt;<span class="k">TD</span> primary&gt;Sony WH-1000XM5&lt;/<span class="k">TD</span>&gt;    <span class="c">// carries the link, stretched over the row</span>
+      &lt;<span class="k">TD</span> num label=<span class="s">"Total"</span>&gt;$348.00&lt;/<span class="k">TD</span>&gt;   <span class="c">// label: what the cell is called on a phone</span>
+    &lt;/<span class="k">TR</span>&gt;
+  &lt;/<span class="k">TBody</span>&gt;
+&lt;/<span class="k">Table</span>&gt;</code></pre>
 <ul>
-  <li><code>overflow-x-auto</code> wrapper, <code>min-w-[720px]</code> on the table, and a <strong>right edge fade</strong> so the scroll is discoverable. A silently scrollable table on a phone is a table with hidden columns.</li>
-  <li>Headers: <code>text-micro</code>, uppercase, <code>tracking-wider</code>, <code>ink-muted</code>, bottom border <code>border-strong</code>.</li>
+  <li>Headers: <code>text-micro</code>, uppercase, <code>tracking-wider</code>, <code>ink-muted</code>.</li>
   <li>Sortable headers are links that write <code>?sort=</code>, with the active one in <code>accent</code> and an arrow. If a table has more than ten rows it is sortable.</li>
-  <li>Numeric columns right-aligned and <code>tabular</code>. Always.</li>
-  <li>Below <code>sm</code>, a table with more than four columns <strong>becomes a list</strong>. Do not ship a five-column table to a phone and call the horizontal scroll a design.</li>
+  <li>Numeric columns right-aligned and <code>tabular</code>. Always. (<code>TH num</code>, <code>TD num</code>.)</li>
+  <li>A row with one destination goes there from anywhere in the row (<code>TR href</code> + <code>TD primary</code>), and says so under the cursor.</li>
+  <li>Below <code>md</code>, every row <strong>stacks into label/value pairs</strong> and the header row goes. Do not ship a five-column table to a phone and call the horizontal scroll a design. A table that is genuinely a grid — a calendar — sets <code>stack={false}</code> and gets the right-edge fade instead.</li>
+  <li>Row height follows the density dial (<code>row-pad</code>).</li>
 </ul>
 
 <h3>Filters</h3>
@@ -1495,8 +1543,10 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 </table>
 
 <p style="font-size:13.5px;color:var(--ink-muted)">
-  The codebase currently reaches for confirm at every tier, including a <code>window.confirm</code>
-  in <code>action-menu.tsx</code> whose own comment warns against it.
+  Mechanics: <code>useToast()</code> from <code>components/ui/toast.tsx</code> for "do it, then offer
+  undo" — bottom left, monospace, six seconds, at most two at once; <code>&lt;ConfirmStep&gt;</code> from
+  <code>components/ui/confirm-step.tsx</code> for the inline two-step; and <code>ActionMenu</code> items
+  with <code>confirm</code> arm in place inside the menu. There is no <code>window.confirm</code> left.
 </p>
 
 <h3>Bulk</h3>
@@ -1682,6 +1732,11 @@ footer.doc{max-width:1000px;margin:0 auto;padding:2rem 1.25rem 5rem;font-size:13
 </ul>
 
 <h2 id="alive">Alive — the things a big product would not ship</h2>
+<p style="font-size:13.5px;color:var(--ink-muted)">
+  Shipped: the sigil (<code>components/ui/sigil.tsx</code>, via <code>EmptyState tone="finished"</code>),
+  the status line, hold-⌘ hints (<code>components/shell/key-hints.tsx</code>; ⌥1–9 open sections),
+  the density dial. Not yet: marginalia, seams, sound.
+</p>
 
 <p>
   Each of these is deliberately outside what a large team could justify. Each is here because this

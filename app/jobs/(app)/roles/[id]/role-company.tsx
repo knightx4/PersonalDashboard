@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/field';
 import { moveRoleToCompany } from './actions';
 
 /**
@@ -33,9 +35,14 @@ export function RoleCompany({
   if (!editing) {
     return (
       <span className="inline-flex items-center gap-1.5">
-        <Link href={`/jobs/companies/${slug}`} className="hover:text-accent">
+        <Link
+          href={`/jobs/companies/${slug}`}
+          className="transition-colors duration-150 hover:text-accent"
+        >
           {name}
         </Link>
+        {/* The icon button's full hit target, pulled in with negative margins
+            so a 32px box does not push the subtitle's line apart. */}
         <button
           type="button"
           onClick={() => {
@@ -44,13 +51,10 @@ export function RoleCompany({
             setEditing(true);
           }}
           title="Move this role to another company"
-          aria-label="Move this role to another company"
+          className="press -my-2 flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
-          <Pencil
-            className="size-3 shrink-0 text-ink-muted hover:text-accent"
-            strokeWidth={1.75}
-            aria-hidden
-          />
+          <Pencil className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+          <span className="sr-only">Move this role to another company</span>
         </button>
       </span>
     );
@@ -76,11 +80,12 @@ export function RoleCompany({
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <input
+      <Input
         autoFocus
         value={draft}
         disabled={pending}
         list="role-companies"
+        aria-label="Company"
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
@@ -92,30 +97,26 @@ export function RoleCompany({
             setEditing(false);
           }
         }}
-        className="rounded-lg border border-border bg-surface px-2 py-0.5 text-ui text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+        className="h-8 w-64 px-2"
       />
       <datalist id="role-companies">
         {companies.map((company) => (
           <option key={company} value={company} />
         ))}
       </datalist>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={save}
-        className="text-small text-accent underline underline-offset-2 disabled:opacity-50"
-      >
+      <Button type="button" size="sm" variant="secondary" pending={pending} onClick={save}>
         {pending ? 'Moving…' : 'Move'}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        size="sm"
+        variant="ghost"
         disabled={pending}
         onClick={() => setEditing(false)}
-        className="text-small text-ink-muted underline underline-offset-2 disabled:opacity-50"
       >
         Cancel
-      </button>
-      {error && <span className="text-small text-status-rejected">{error}</span>}
+      </Button>
+      {error && <span className="text-small text-danger">{error}</span>}
     </span>
   );
 }

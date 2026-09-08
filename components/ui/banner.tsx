@@ -20,7 +20,9 @@ import { cn } from '@/lib/cn';
  * the system merely *did* belongs in the status line instead.
  */
 const banner = cva(
-  'flex items-start gap-2.5 rounded-card border border-border px-4 py-3 text-body text-ink',
+  // A sheet the size of a paragraph, so under Lightbox it has the edge the
+  // cards have and sits on the bench the same way.
+  'sheet flex items-start gap-2.5 rounded-card border px-4 py-3 text-body text-ink',
   {
     variants: {
       tone: {
@@ -55,7 +57,7 @@ export function Banner({ className, tone, icon = true, children, ...props }: Ban
       className={cn(banner({ tone }), className)}
       {...props}
     >
-      {icon && <Glyph className={cn('mt-0.5 size-4 shrink-0', iconClass)} strokeWidth={2} aria-hidden />}
+      {icon && <Glyph className={cn('mt-0.5 size-4 shrink-0', iconClass)} strokeWidth={1.75} aria-hidden />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );

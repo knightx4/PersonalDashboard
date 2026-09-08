@@ -46,7 +46,7 @@ export function ApplyDecision({
         <Button
           size="sm"
           variant="secondary"
-          disabled={pending}
+          pending={pending}
           onClick={() =>
             startTransition(async () => {
               const result = await applyDecision({ shareId, groupKey });

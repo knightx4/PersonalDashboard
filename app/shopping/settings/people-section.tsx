@@ -88,7 +88,7 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
       />
 
       {person.isDefault && (
-        <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-micro text-ink-muted">
+        <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-small text-ink-muted">
           default
         </span>
       )}
@@ -134,7 +134,7 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
         ))}
 
       {confirming && (
-        <p className="w-full text-micro text-ink-muted">
+        <p className="w-full text-small text-ink-muted">
           Their shopping stays — those orders simply stop being labelled.
         </p>
       )}

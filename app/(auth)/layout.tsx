@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +13,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </span>
       </Link>
 
-      <div className="w-full max-w-sm rounded-card border border-border bg-surface p-6">
+      <div className={cn(cardVariants({ padding: 'standard' }), 'w-full max-w-sm')}>
         {children}
       </div>
 

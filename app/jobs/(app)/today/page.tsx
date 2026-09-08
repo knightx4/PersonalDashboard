@@ -1,7 +1,10 @@
 import Link from 'next/link';
-import { CalendarClock, CheckCircle2, Clock, MailQuestion, PenLine, Video } from 'lucide-react';
+import { CalendarClock, Clock, MailQuestion, PenLine, Video } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
 import { ReminderActions } from './reminder-actions';
@@ -45,25 +48,16 @@ export default async function TodayPage() {
         }
       />
 
+      {/* Finished, not empty: the week has nothing with a clock on it. That
+          earns the day's sigil rather than a placeholder box. */}
       {board.clear && (
-        <div className="rounded-card border border-border bg-surface p-8 text-center">
-          <CheckCircle2
-            className="mx-auto size-8 text-status-offer"
-            strokeWidth={1.5}
-            aria-hidden
-          />
-          <p className="mt-3 text-body font-medium text-ink">Nothing needs you today.</p>
-          <p className="mt-1 text-ui text-ink-muted">
-            No interviews in the next {INTERVIEW_HORIZON_DAYS} days, and nothing waiting on a
-            reply.
-          </p>
-          <Link
-            href="/jobs/pipeline"
-            className="mt-4 inline-block text-ui font-medium text-accent underline underline-offset-2"
-          >
-            Look at the pipeline anyway
-          </Link>
-        </div>
+        <EmptyState
+          tone="finished"
+          seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:jobs`}
+          title="Nothing needs you today."
+          description={`No interviews in the next ${INTERVIEW_HORIZON_DAYS} days, and nothing waiting on a reply.`}
+          action={{ label: 'Look at the pipeline anyway', href: '/jobs/pipeline' }}
+        />
       )}
 
       <div className="space-y-6">
@@ -78,14 +72,14 @@ export default async function TodayPage() {
               {board.interviews.map((interview) => (
                 <li
                   key={interview.id}
-                  className="relative flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5"
+                  className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1"
                 >
                   <span className="tabular w-full text-ui font-medium text-ink sm:w-44">
                     {formatInterviewWhen(interview.scheduledAt, interview.timeKnown, timezone)}
                   </span>
                   <Link
                     href={`/jobs/roles/${interview.roleId}?tab=interviews&interview=${interview.id}`}
-                    className="text-ui font-medium text-ink hover:text-accent"
+                    className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
                   >
                     {/* The whole row opens the same place -- prep materials on
                         the role's Interviews tab -- so this stretches to cover
@@ -128,13 +122,13 @@ export default async function TodayPage() {
           >
             <ul className="divide-y divide-border">
               {board.waiting.map((row) => (
-                <li key={row.eventId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5">
+                <li key={row.eventId} className="row-pad flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="tabular w-full text-small text-ink-muted sm:w-44">
                     {formatDateTime(row.occurredAt, timezone)}
                   </span>
                   <Link
                     href={`/jobs/roles/${row.roleId}`}
-                    className="text-ui font-medium text-ink hover:text-accent"
+                    className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
                   >
                     {row.companyName} · {row.roleTitle}
                   </Link>
@@ -154,11 +148,11 @@ export default async function TodayPage() {
           <Section icon={Clock} title="Nudges" hint="Raised by the nightly sweep.">
             <ul className="divide-y divide-border">
               {board.reminders.map((reminder) => (
-                <li key={reminder.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5">
+                <li key={reminder.id} className="row-pad flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   {reminder.roleId ? (
                     <Link
                       href={`/jobs/roles/${reminder.roleId}`}
-                      className="text-ui font-medium text-ink hover:text-accent"
+                      className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
                     >
                       {reminder.companyName} · {reminder.roleTitle}
                     </Link>
@@ -194,9 +188,9 @@ function DraftLink({ href }: { href: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="press inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-canvas px-2 py-0.5 text-small font-medium text-ink"
+      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
     >
-      <PenLine className="size-3" strokeWidth={2} aria-hidden />
+      <PenLine className="size-3.5" strokeWidth={1.75} aria-hidden />
       Draft follow-up
     </a>
   );
@@ -216,16 +210,17 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
+    <Card padding="dense">
       <header className="mb-1 flex items-baseline gap-2">
         <Icon
           className={tone === 'brand' ? 'size-4 text-accent' : 'size-4 text-ink-muted'}
           strokeWidth={1.75}
+          aria-hidden
         />
         <h2 className="text-ui font-semibold text-ink">{title}</h2>
         <span className="text-small text-ink-muted">{hint}</span>
       </header>
       {children}
-    </section>
+    </Card>
   );
 }

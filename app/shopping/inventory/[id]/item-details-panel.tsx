@@ -5,7 +5,9 @@ import { lookupItemAttributes, saveCategoryTemplate } from './attribute-actions'
 import type { AttributeActionState } from './attribute-actions';
 import { updateInventoryItem, type ActionState } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { CardSection, cardVariants } from '@/components/ui/card';
+import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import {
   ATTRIBUTE_FIELD_TYPES,
   type AttributeField,
@@ -84,23 +86,23 @@ export function ItemDetailsPanel({
   const [editingTemplate, setEditingTemplate] = useState(false);
 
   return (
-    <section className="space-y-4 rounded-card border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-body font-semibold text-ink">Details</h2>
-          <p className="mt-1 text-ui text-ink-muted">
-            {categoryName
-              ? `What this is, and the fields ${categoryName} items carry. Change those for every item in the category below.`
-              : 'What this is. Give it a category to get a set of fields for its kind.'}
-          </p>
-        </div>
+    <CardSection
+      title="Details"
+      action={
         <form action={lookupAction}>
           <input type="hidden" name="id" value={itemId} />
-          <Button type="submit" size="sm" variant="secondary" disabled={lookupPending}>
+          <Button type="submit" size="sm" variant="secondary" pending={lookupPending}>
             {lookupPending ? 'Searching…' : 'Search'}
           </Button>
         </form>
-      </div>
+      }
+    >
+      <div className="space-y-4">
+      <p className="text-ui text-ink-muted">
+        {categoryName
+          ? `What this is, and the fields ${categoryName} items carry. Change those for every item in the category below.`
+          : 'What this is. Give it a category to get a set of fields for its kind.'}
+      </p>
 
       {!searchAvailable && (
         <p className="text-ui text-ink-muted">
@@ -116,17 +118,14 @@ export function ItemDetailsPanel({
       <form action={saveAction} className="space-y-4 border-t border-border pt-4">
         <input type="hidden" name="id" value={itemId} />
 
-        <div>
-          <Label htmlFor="name">Name</Label>
+        <Field id="name" label="Name">
           <Input id="name" name="name" required defaultValue={item.name} />
-        </div>
+        </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="variant">Variant</Label>
+          <Field id="variant" label="Variant">
             <Input id="variant" name="variant" defaultValue={item.variant ?? ''} />
-          </div>
-          <div>
-            <Label htmlFor="category_id">Category</Label>
+          </Field>
+          <Field id="category_id" label="Category">
             <Select id="category_id" name="category_id" defaultValue={categoryId ?? ''}>
               <option value="">Uncategorized</option>
               {categories.map((category) => (
@@ -135,23 +134,38 @@ export function ItemDetailsPanel({
                 </option>
               ))}
             </Select>
-          </div>
+          </Field>
         </div>
-        <div>
-          <Label htmlFor="notes">Notes</Label>
+        <Field id="notes" label="Notes">
           <Textarea
             id="notes"
             name="notes"
             defaultValue={item.notes ?? ''}
             placeholder="Where it lives, warranty info, anything useful…"
           />
-        </div>
+        </Field>
 
         {fields.length > 0 ? (
           <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
             {fields.map((field) => (
-              <div key={field.key}>
-                <Label htmlFor={`attr_${field.key}`}>{field.label}</Label>
+              <Field
+                key={field.key}
+                id={`attr_${field.key}`}
+                label={field.label}
+                // A saved link is offered under its own field, in the hint slot.
+                hint={
+                  field.type === 'url' && values[field.key] ? (
+                    <a
+                      href={values[field.key]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-accent hover:underline"
+                    >
+                      Open link
+                    </a>
+                  ) : undefined
+                }
+              >
                 <Input
                   id={`attr_${field.key}`}
                   name={`attr_${field.key}`}
@@ -160,17 +174,7 @@ export function ItemDetailsPanel({
                   type={field.type === 'url' ? 'url' : 'text'}
                   placeholder={field.type === 'url' ? 'https://…' : undefined}
                 />
-                {field.type === 'url' && values[field.key] && (
-                  <a
-                    href={values[field.key]}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1 inline-block text-small text-accent hover:underline"
-                  >
-                    Open link
-                  </a>
-                )}
-              </div>
+              </Field>
             ))}
           </div>
         ) : (
@@ -188,18 +192,16 @@ export function ItemDetailsPanel({
         )}
 
         <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="new_label">Add a field (this item only)</Label>
+          <Field id="new_label" label="Add a field (this item only)">
             <Input id="new_label" name="new_label" placeholder="Expansion, condition…" />
-          </div>
-          <div>
-            <Label htmlFor="new_value">Value</Label>
+          </Field>
+          <Field id="new_value" label="Value">
             <Input id="new_value" name="new_value" />
-          </div>
+          </Field>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" size="sm" disabled={savePending}>
+          <Button type="submit" size="sm" pending={savePending}>
             {savePending ? 'Saving…' : 'Save details'}
           </Button>
           {categoryId && (
@@ -224,7 +226,8 @@ export function ItemDetailsPanel({
           template={template}
         />
       )}
-    </section>
+      </div>
+    </CardSection>
   );
 }
 
@@ -242,10 +245,11 @@ function CategoryTemplateForm({
   const [rows, setRows] = useState<AttributeField[]>(() => [...template]);
 
   return (
-    <form action={action} className="space-y-3 rounded-card border border-border bg-canvas p-4">
+    // A card inside a card, so it sits on the canvas colour to read as nested.
+    <form action={action} className={cn(cardVariants({ padding: 'dense' }), 'space-y-3 bg-canvas')}>
       <input type="hidden" name="category_id" value={categoryId} />
       <div>
-        <h3 className="text-body font-semibold text-ink">
+        <h3 className="text-ui font-semibold text-ink">
           {categoryName ?? 'Category'} template
         </h3>
         <p className="mt-1 text-ui text-ink-muted">
@@ -264,17 +268,15 @@ function CategoryTemplateForm({
               back positionally, so a missing entry would shift every field
               below it onto the wrong row. */}
           <input type="hidden" name="field_in_search" value={row.inSearch ? '1' : '0'} />
-          <div className="min-w-[10rem] flex-1">
-            <Label htmlFor={`field_label_${index}`}>Field</Label>
+          <Field id={`field_label_${index}`} label="Field" className="min-w-40 flex-1">
             <Input
               id={`field_label_${index}`}
               name="field_label"
               defaultValue={row.label}
               placeholder="Players, Brand, Size…"
             />
-          </div>
-          <div>
-            <Label htmlFor={`field_type_${index}`}>Kind</Label>
+          </Field>
+          <Field id={`field_type_${index}`} label="Kind">
             <Select id={`field_type_${index}`} name="field_type" defaultValue={row.type}>
               {ATTRIBUTE_FIELD_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -282,9 +284,9 @@ function CategoryTemplateForm({
                 </option>
               ))}
             </Select>
-          </div>
+          </Field>
           <label
-            className="flex h-9 items-center gap-2 text-ui text-ink-muted"
+            className="flex h-10 items-center gap-2 text-ui text-ink-muted"
             title="Add this field’s value to the eBay search for the item"
           >
             <input
@@ -317,7 +319,7 @@ function CategoryTemplateForm({
       </Button>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" pending={pending}>
           {pending ? 'Saving…' : 'Save template'}
         </Button>
         {state.message && <p className="text-body text-positive">{state.message}</p>}

@@ -6,6 +6,7 @@ import { RotateCcw, Tag } from 'lucide-react';
 import { separateCopy, ungroupItems } from '@/app/shopping/inventory/group-actions';
 import type { ActionState } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
+import { CardSection } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/cn';
@@ -62,30 +63,37 @@ export function CopiesPanel({
   const pending = separatePending || ungroupPending;
 
   return (
-    <section className="space-y-3 rounded-card border border-border bg-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-body font-semibold text-ink">
-            Copies{' '}
-            <span className="font-normal text-ink-muted">({copies.length})</span>
-          </h2>
-          <p className="mt-1 text-ui text-ink-muted">
-            {copies.length === 1
-              ? 'One of these, bought once.'
-              : derived
-                ? 'Stacked because they look like the same thing. Everything above describes the item; what differs between copies is here.'
-                : 'Grouped by you. Everything above describes the item; what differs between copies is here.'}
-          </p>
-        </div>
-        {groupId && (
+    <CardSection
+      title={
+        <>
+          Copies <span className="font-normal text-ink-muted">({copies.length})</span>
+        </>
+      }
+      action={
+        groupId ? (
           <form action={ungroupAction}>
             <input type="hidden" name="group_id" value={groupId} />
-            <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              pending={ungroupPending}
+            >
               {ungroupPending ? 'Ungrouping…' : 'Ungroup'}
             </Button>
           </form>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
+      <div className="space-y-3">
+      <p className="text-ui text-ink-muted">
+        {copies.length === 1
+          ? 'One of these, bought once.'
+          : derived
+            ? 'Stacked because they look like the same thing. Everything above describes the item; what differs between copies is here.'
+            : 'Grouped by you. Everything above describes the item; what differs between copies is here.'}
+      </p>
 
       <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
         {copies.map((copy, index) => (
@@ -105,13 +113,13 @@ export function CopiesPanel({
               )}
               {copy.forSale && (
                 <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-caution">
-                  <Tag className="size-3" strokeWidth={2} aria-hidden />
+                  <Tag className="size-3.5" strokeWidth={1.75} aria-hidden />
                   For sale
                 </span>
               )}
               {copy.returnPlanned && (
                 <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-accent">
-                  <RotateCcw className="size-3" strokeWidth={2} aria-hidden />
+                  <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
                   To return
                 </span>
               )}
@@ -126,7 +134,7 @@ export function CopiesPanel({
             ) : (
               <Link
                 href={`/shopping/inventory/${copy.id}`}
-                className="shrink-0 text-small text-accent hover:underline"
+                className="shrink-0 text-ui font-medium text-accent hover:underline"
               >
                 Open
               </Link>
@@ -156,6 +164,7 @@ export function CopiesPanel({
         </p>
       )}
       <FieldError>{separateState.error ?? ungroupState.error}</FieldError>
-    </section>
+      </div>
+    </CardSection>
   );
 }

@@ -15,6 +15,8 @@ import {
   type ParseState,
   type PreviewRow,
 } from './actions';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 /**
  * Paste, watch it fill in, confirm.
@@ -218,7 +220,7 @@ function ResolvingList({ parsed }: { parsed: ParsedImport }) {
           : `${found} of ${slots.length} placed. Untick anything you do not want.`}
       </p>
 
-      <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+      <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
         {slots.map((slot, index) =>
           slot.state === 'done' ? (
             <ResolvedRow key={`${slot.row.raw}-${index}`} row={slot.row} index={index} />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import { X } from 'lucide-react';
 import { addOrderItemTag, removeOrderItemTag } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
@@ -28,11 +29,12 @@ export function OrderItemTags({
               className="inline-flex items-center gap-1 rounded-md bg-canvas px-1.5 py-0.5 text-small text-ink-muted"
             >
               <span>{tag.name}</span>
+              {/* A glyph inside the chip, not a standalone icon button: the
+                  32px icon-button shape would be taller than the chip. */}
               {!readOnly && (
                 <button
                   type="button"
-                  className="text-ink-muted hover:text-danger"
-                  aria-label={`Remove ${tag.name} tag`}
+                  className="press flex items-center rounded-sm text-ink-muted transition-colors duration-150 hover:text-danger disabled:opacity-50"
                   disabled={pending}
                   onClick={() =>
                     startTransition(async () => {
@@ -44,7 +46,8 @@ export function OrderItemTags({
                     })
                   }
                 >
-                  ×
+                  <X className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Remove {tag.name} tag</span>
                 </button>
               )}
             </li>
@@ -66,12 +69,12 @@ export function OrderItemTags({
             name="tag"
             placeholder="Add tag (e.g. shoes)"
             maxLength={40}
-            className="h-8 max-w-[12rem] text-ui"
+            className="h-8 max-w-48 text-ui"
             aria-label="Add tag"
             disabled={pending}
           />
-          <Button type="submit" size="sm" variant="ghost" disabled={pending}>
-            Add
+          <Button type="submit" size="sm" variant="ghost" pending={pending}>
+            {pending ? 'Adding…' : 'Add'}
           </Button>
         </form>
       )}

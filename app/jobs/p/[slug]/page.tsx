@@ -82,7 +82,7 @@ export default async function PublicCasePage({
     <main className="mx-auto max-w-2xl px-5 py-12">
       <header>
         <p className="text-ui text-ink-muted">{page.company}</p>
-        <h1 className="font-display mt-0.5 text-2xl text-ink">{page.role}</h1>
+        <h1 className="font-display mt-0.5 text-title tracking-tight text-ink">{page.role}</h1>
       </header>
 
       {page.body && (

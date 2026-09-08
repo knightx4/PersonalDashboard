@@ -113,11 +113,42 @@ const renderBoundaries = {
 };
 
 /**
- * Both derived-number rules, in ONE entry.
+ * The design language, as far as a regex can hold it.
+ *
+ * Each of these is a class of drift that was measured in the tree before the
+ * rule existed: 28 off-scale type sizes, 16 distinct page widths, two hex
+ * colours hidden in classNames. A rule is cheaper than a review pass and does
+ * not get tired. Applied to every string and template literal in app/ and
+ * components/, which is broader than className alone but is where the strings
+ * are; a prose string that happens to contain "text-2xl" is not a thing this
+ * codebase writes.
+ */
+const OFF_SCALE_TYPE = String.raw`\btext-(xs|sm|base|lg|xl|[2-9]xl)\b`;
+const ARBITRARY_WIDTH = String.raw`\bmax-w-\[(?!1400px\])`;
+const RAW_HEX = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline|shadow|from|to|via)-\[#`;
+const RAW_PALETTE = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline|decoration|from|to|via)-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d`;
+
+const TYPE_MESSAGE =
+  "Off the type scale. Use the named steps in app/globals.css -- micro, small, ui, body, lead, title, figure, figure-lg, figure-xl. 13px is chrome, 14px is content; a hero figure is text-figure-lg.";
+const WIDTH_MESSAGE =
+  "An arbitrary width. Page widths are three: the shell is max-w-[1400px], a reading column is max-w-3xl, a single form is max-w-2xl. Anything narrower uses a named size (max-w-xs, max-w-sm, ...). See docs/design-language.html#widths.";
+const HEX_MESSAGE =
+  "A raw hex colour cannot follow the theme and is wrong in four of the five. Add a token to app/globals.css and use its utility.";
+const PALETTE_MESSAGE =
+  "A raw Tailwind palette colour cannot follow the theme and is wrong in four of the five. Use a semantic token: accent, positive, caution, danger, or a status colour.";
+
+const stringRules = (pattern, message) => [
+  { selector: `Literal[value=/${pattern}/]`, message },
+  { selector: `TemplateElement[value.raw=/${pattern}/]`, message },
+];
+
+/**
+ * Both derived-number rules AND the design-language rules, in ONE entry.
  *
  * Money math lives in lib/money.ts and funnel math in lib/jobs/pipeline.ts.
  * They are unrelated rules over the same files, so they have to share a config
- * object -- split across two, the second would replace the first.
+ * object -- split across two, the second would replace the first. The
+ * design-language rules join them here for exactly the same reason.
  */
 const derivedNumberBoundaries = {
   files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}"],
@@ -135,6 +166,10 @@ const derivedNumberBoundaries = {
         message:
           "Compute funnel rates through lib/jobs/pipeline.ts so the denominator rules -- cohorting, the too-early window, per-source grouping -- stay in one tested place.",
       },
+      ...stringRules(OFF_SCALE_TYPE, TYPE_MESSAGE),
+      ...stringRules(ARBITRARY_WIDTH, WIDTH_MESSAGE),
+      ...stringRules(RAW_HEX, HEX_MESSAGE),
+      ...stringRules(RAW_PALETTE, PALETTE_MESSAGE),
     ],
   },
 };

@@ -1,11 +1,33 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import { Palette } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { usePopover } from '@/lib/use-popover';
 import { setTheme } from '@/app/theme-actions';
+import { setDensity } from '@/app/density-actions';
 import { THEMES, type ThemeChoice, type ThemeId } from '@/lib/theme';
+import { DENSITIES, parseDensity, type Density } from '@/lib/density';
+
+/**
+ * The density attribute on <html> is the store; this component only reads it.
+ * The server put it there from the cookie, a click writes it back, and an
+ * observer on the attribute is what makes the radio group follow.
+ */
+function subscribeDensity(onStoreChange: () => void): () => void {
+  const observer = new MutationObserver(onStoreChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-density'],
+  });
+  return () => observer.disconnect();
+}
+function getDensitySnapshot(): Density {
+  return parseDensity(document.documentElement.getAttribute('data-density'));
+}
+function getDensityServerSnapshot(): Density {
+  return 'comfortable';
+}
 
 /**
  * Choosing the room.
@@ -29,6 +51,27 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * The density dial lives in the same panel: it is the other "how does this
+   * room feel" control, and a second icon in the bar would be one too many.
+   * Read from the document after mount -- the server put it on <html> from
+   * the cookie -- and written straight back to it on click, with the cookie
+   * following behind, so the whole app tightens before the round trip.
+   */
+  const density = useSyncExternalStore(
+    subscribeDensity,
+    getDensitySnapshot,
+    getDensityServerSnapshot,
+  );
+  function chooseDensity(next: Density) {
+    const root = document.documentElement;
+    if (next === 'comfortable') root.removeAttribute('data-density');
+    else root.setAttribute('data-density', next);
+    startTransition(() => {
+      void setDensity(next);
+    });
+  }
 
   const chosen = override !== undefined ? override : value;
   const showing = preview !== undefined ? preview : chosen;
@@ -198,6 +241,29 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
           >
             Follow the system
           </button>
+
+          <p className="mt-1 border-t border-border px-2 pb-1.5 pt-2.5 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+            Density
+          </p>
+          <div role="radiogroup" aria-label="Density" className="flex gap-1 px-1 pb-1">
+            {DENSITIES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={density === option.id}
+                onClick={() => chooseDensity(option.id)}
+                className={cn(
+                  'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
+                  density === option.id
+                    ? 'bg-accent-tint text-accent'
+                    : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

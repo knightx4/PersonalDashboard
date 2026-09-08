@@ -9,7 +9,7 @@ export const metadata = { title: 'Add receipt photo' };
 export default async function ReceiptPhotoPage() {
   await requireUser();
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-2xl">
       <PageHeader
         title="Receipt photo"
         description="Turn a paper receipt into an order and inventory units. Reuses the email extraction gate."

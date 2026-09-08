@@ -26,7 +26,7 @@ export function PipelineViewToggle({ view }: { view: PipelineView }) {
     <span
       role="group"
       aria-label="Pipeline view"
-      className="inline-flex overflow-hidden rounded-lg border border-border"
+      className="inline-flex overflow-hidden rounded-lg border border-control"
     >
       {VIEWS.map(({ id, label, icon: Icon }) => (
         <button
@@ -41,10 +41,10 @@ export function PipelineViewToggle({ view }: { view: PipelineView }) {
             })
           }
           className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-small font-medium transition-colors duration-150',
+            'press inline-flex h-8 items-center gap-1.5 px-2.5 text-ui font-medium transition-colors duration-150',
             shown === id
               ? 'bg-accent-tint text-accent'
-              : 'bg-surface text-ink-muted hover:bg-canvas hover:text-ink',
+              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
           )}
         >
           <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />

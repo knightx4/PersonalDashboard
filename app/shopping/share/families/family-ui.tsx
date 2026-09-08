@@ -23,7 +23,7 @@ export function FamilySuggestionCard({ family }: { family: PendingSuggestion }) 
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-body font-semibold text-ink">{family.name}</h2>
+          <h2 className="text-ui font-semibold text-ink">{family.name}</h2>
           <p className="text-ui text-ink-muted">{family.members.length} games</p>
         </div>
         <div className="flex gap-2">

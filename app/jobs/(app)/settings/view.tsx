@@ -18,6 +18,7 @@ import {
 } from './evidence-actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
+import { cardVariants } from '@/components/ui/card';
 
 export function SettingsView(props: {
   email: string;
@@ -96,7 +97,7 @@ function ProfileSection({
   const [state, action] = useActionState<SettingsState, FormData>(updateProfile, {});
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Job search</h2>
       <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
       <p className="mt-2 text-small text-ink-muted">
@@ -118,7 +119,7 @@ function ProfileSection({
               type="date"
               defaultValue={profile.searchStartedOn}
             />
-            <p className="mt-1 text-micro text-ink-muted">Anchors every funnel time series.</p>
+            <p className="mt-1 text-small text-ink-muted">Anchors every funnel time series.</p>
           </div>
           <div>
             <Label htmlFor="ghostThresholdDays">Ghost after</Label>
@@ -146,7 +147,7 @@ function ProfileSection({
             defaultValue={profile.targetTitles}
             placeholder="Strategic Finance Analyst, FP&A Manager"
           />
-          <p className="mt-1 text-micro text-ink-muted">
+          <p className="mt-1 text-small text-ink-muted">
             Seeds relevance scoring when mail is classified.
           </p>
         </div>
@@ -160,7 +161,7 @@ function ProfileSection({
             defaultValue={profile.writingStyleNotes}
             placeholder="Direct. Specific numbers. No throat-clearing. British spelling."
           />
-          <p className="mt-1 text-micro text-ink-muted">
+          <p className="mt-1 text-small text-ink-muted">
             Injected into every generated draft. Revise it whenever one comes back
             wrong.
           </p>
@@ -355,7 +356,7 @@ function InboxSection({
   }
 
   return (
-    <section id="inboxes" className="rounded-card border border-border bg-surface p-5">
+    <section id="inboxes" className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Connected inboxes</h2>
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Read-only, scoped to a search query about recruiting mail. Message bodies are never
@@ -396,7 +397,7 @@ function InboxSection({
                 >
                   {account.status.replace(/_/g, ' ')}
                 </span>
-                <span className="tabular ml-auto text-micro text-ink-muted">
+                <span className="tabular ml-auto text-small text-ink-muted">
                   last checked {formatDate(account.lastSyncedAt)}
                 </span>
               </div>
@@ -516,7 +517,7 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
   }, [appOrigin]);
 
   return (
-    <section id="bookmarklet" className="rounded-card border border-border bg-surface p-5">
+    <section id="bookmarklet" className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Capture application questions</h2>
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Drag this to your bookmarks bar. On an application form, click it: it reads the question
@@ -572,7 +573,7 @@ function ExcludedSendersSection({
   const [, startTransition] = useTransition();
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Excluded senders</h2>
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Mail from Indeed is already excluded everywhere for everyone — it is suggested jobs, not
@@ -625,7 +626,7 @@ function ResumeSection({
   const [state, action] = useActionState(addResumeVersion, {});
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Resume versions</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
         Point applications at a version, and you find out which one correlates with getting past
@@ -639,7 +640,7 @@ function ResumeSection({
               <span className="font-medium text-ink">{resume.label}</span>
               {resume.isDefault && <span className="text-micro text-accent">default</span>}
               {!resume.hasText && (
-                <span className="text-micro text-ink-muted">no text pasted</span>
+                <span className="text-small text-ink-muted">no text pasted</span>
               )}
               {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
             </li>
@@ -700,7 +701,7 @@ function EvidenceSection({
   const [, startTransition] = useTransition();
 
   return (
-    <section className="rounded-card border border-border bg-surface p-5">
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Evidence bank</h2>
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Your actual experience, in your own words. Twenty to thirty entries is the target. The
@@ -724,13 +725,13 @@ function EvidenceSection({
             <li key={item.id} className="rounded-lg border border-border p-3">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-ui font-medium text-ink">{item.title}</span>
-                <span className="tabular text-micro text-ink-muted">
+                <span className="tabular text-small text-ink-muted">
                   {'★'.repeat(item.strength)}
                 </span>
                 {item.skills.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted"
+                    className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted"
                   >
                     {skill.replace(/_/g, ' ')}
                   </span>

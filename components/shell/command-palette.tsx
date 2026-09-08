@@ -188,7 +188,7 @@ export function CommandPalette({
         className="relative w-full max-w-lg overflow-hidden rounded-card border border-border bg-raised shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+          <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
           <input
             ref={inputRef}
             value={query}
@@ -215,7 +215,7 @@ export function CommandPalette({
             aria-label="Command"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
-          <kbd className="shrink-0 rounded border border-border-strong border-b-2 px-1.5 py-0.5 font-mono text-micro text-ink-muted">
+          <kbd className="shrink-0 rounded border border-border-strong border-b-2 px-1.5 py-0.5 font-mono text-small text-ink-muted">
             esc
           </kbd>
         </div>
@@ -249,7 +249,7 @@ export function CommandPalette({
                   <span className="shrink-0 text-small text-ink-muted">{command.hint}</span>
                 )}
                 {index === active && (
-                  <CornerDownLeft className="size-3.5 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+                  <CornerDownLeft className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
                 )}
               </button>
             ))

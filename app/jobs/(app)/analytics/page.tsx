@@ -1,7 +1,10 @@
 import { BarChart3 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { CardSection } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Figure } from '@/components/ui/figure';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { loadPipeline, toFunnelApplications } from '@/lib/jobs/applications/load';
 import {
   RESPONSE_WINDOW_DAYS,
@@ -80,31 +83,30 @@ export default async function AnalyticsPage() {
         description="Where in the funnel you are losing, and whether that differs by channel."
       />
 
-      <section className="mb-6 grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Applications sent" value={String(overall.applicationsSent)} />
-        <Metric
-          label="Confirmation rate"
-          value={formatRate(overall.confirmationRate)}
-          hint="Not progress. It only proves the application landed somewhere real."
-        />
-        <Metric
-          label="Human response rate"
-          value={formatRate(overall.responseRate)}
-          hint="Automated confirmations and bulk rejections are excluded. This is the number the search turns on."
-        />
-        <Metric
-          label="Median days to reply"
-          value={formatDays(overall.medianDaysToResponse)}
-        />
-      </section>
+      {/* The response rate is the number the search turns on, so it is the
+          figure; the three that used to share a grid with it are its
+          supporting row. */}
+      <Figure
+        className="mb-8"
+        label="Human response rate"
+        meta={`${overall.applicationsSent} sent`}
+        value={formatRate(overall.responseRate)}
+        caption="Automated confirmations and bulk rejections are excluded."
+        secondary={[
+          { value: String(overall.applicationsSent), label: 'applications sent' },
+          {
+            value: formatRate(overall.confirmationRate),
+            label: 'confirmed as received — not progress, only proof it landed',
+          },
+          { value: formatDays(overall.medianDaysToResponse), label: 'median days to a reply' },
+        ]}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-ui font-semibold text-ink">The funnel</h2>
-          <p className="mt-0.5 text-small text-ink-muted">
-            Each bar is everything that ever reached that rung — a rejection after an onsite still
-            counts as having reached the onsite.
-          </p>
+        <CardSection
+          title="The funnel"
+          hint="Each bar is everything that ever reached that rung — a rejection after an onsite still counts as having reached the onsite."
+        >
           <ul className="mt-3 space-y-2">
             {LADDER.map((rung, index) => {
               const count = reached(rung.stage);
@@ -126,7 +128,7 @@ export default async function AnalyticsPage() {
                     />
                   </div>
                   {advance !== null && (
-                    <p className="tabular mt-0.5 text-micro text-ink-muted">
+                    <p className="tabular mt-0.5 text-small text-ink-muted">
                       {formatRate(advance)} advanced from {LADDER[index - 1].label.toLowerCase()}
                     </p>
                   )}
@@ -134,103 +136,91 @@ export default async function AnalyticsPage() {
               );
             })}
           </ul>
-        </section>
+        </CardSection>
 
-        <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-ui font-semibold text-ink">By channel</h2>
-          <p className="mt-0.5 text-small text-ink-muted">
-            The comparison a single blended number hides. This is usually the most actionable
-            table in the app.
-          </p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-ui">
-              <thead>
-                <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
-                  <th className="px-2 py-1.5 font-semibold">Source</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Sent</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Replied</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Screened</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Ghosted</th>
-                </tr>
-              </thead>
-              <tbody>
+        <CardSection
+          title="By channel"
+          hint="The comparison a single blended number hides. This is usually the most actionable table in the app."
+        >
+          <div className="mt-3">
+            <Table flush>
+              <THead>
+                <TR>
+                  <TH>Source</TH>
+                  <TH num>Sent</TH>
+                  <TH num>Replied</TH>
+                  <TH num>Screened</TH>
+                  <TH num>Ghosted</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {bySource.map(({ source, metrics }) => (
-                  <tr key={source} className="border-b border-border">
-                    <td className="px-2 py-1.5 text-ink">{SOURCE_LABELS[source]}</td>
-                    <td className="tabular px-2 py-1.5 text-right text-ink-muted">
+                  <TR key={source}>
+                    <TD primary>{SOURCE_LABELS[source]}</TD>
+                    <TD label="Sent" num muted>
                       {metrics.applicationsSent}
-                    </td>
-                    <td className="tabular px-2 py-1.5 text-right text-ink">
+                    </TD>
+                    <TD label="Replied" num>
                       {formatRate(metrics.responseRate)}
-                    </td>
-                    <td className="tabular px-2 py-1.5 text-right text-ink-muted">
+                    </TD>
+                    <TD label="Screened" num muted>
                       {formatRate(metrics.screenRate)}
-                    </td>
-                    <td className="tabular px-2 py-1.5 text-right text-ink-muted">
+                    </TD>
+                    <TD label="Ghosted" num muted>
                       {formatRate(metrics.ghostRate)}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
-        </section>
+        </CardSection>
 
-        <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-ui font-semibold text-ink">By month applied</h2>
-          <p className="mt-0.5 text-small text-ink-muted">
-            Cohorted by submission date, always. Applications sent in June stay the June cohort
-            forever and their response rate fills in as replies arrive.
-          </p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-ui">
-              <thead>
-                <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
-                  <th className="px-2 py-1.5 font-semibold">Month</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Sent</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Replied</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">Screened</th>
-                </tr>
-              </thead>
-              <tbody>
+        <CardSection
+          title="By month applied"
+          hint="Cohorted by submission date, always. Applications sent in June stay the June cohort forever and their response rate fills in as replies arrive."
+        >
+          <div className="mt-3">
+            <Table flush>
+              <THead>
+                <TR>
+                  <TH>Month</TH>
+                  <TH num>Sent</TH>
+                  <TH num>Replied</TH>
+                  <TH num>Screened</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {cohorts.map(({ period, metrics }) => (
-                  <tr key={period.label} className="border-b border-border">
-                    <td className="tabular px-2 py-1.5 text-ink">{period.label}</td>
-                    <td className="tabular px-2 py-1.5 text-right text-ink-muted">
+                  <TR key={period.label}>
+                    <TD primary className="tabular">
+                      {period.label}
+                    </TD>
+                    <TD label="Sent" num muted>
                       {metrics.applicationsSent}
-                    </td>
-                    <td className="tabular px-2 py-1.5 text-right">
-                      {metrics.tooEarly ? (
-                        <span className="text-ink-muted">too early</span>
-                      ) : (
-                        <span className="text-ink">{formatRate(metrics.responseRate)}</span>
-                      )}
-                    </td>
-                    <td className="tabular px-2 py-1.5 text-right">
-                      {metrics.tooEarly ? (
-                        <span className="text-ink-muted">—</span>
-                      ) : (
-                        <span className="text-ink-muted">{formatRate(metrics.screenRate)}</span>
-                      )}
-                    </td>
-                  </tr>
+                    </TD>
+                    <TD label="Replied" num muted={metrics.tooEarly}>
+                      {metrics.tooEarly ? 'too early' : formatRate(metrics.responseRate)}
+                    </TD>
+                    <TD label="Screened" num muted>
+                      {metrics.tooEarly ? '—' : formatRate(metrics.screenRate)}
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
-          <p className="mt-2 text-micro leading-relaxed text-ink-muted">
+          <p className="mt-2 text-small leading-relaxed text-ink-muted">
             A month is marked &ldquo;too early&rdquo; until its newest applications are{' '}
             {RESPONSE_WINDOW_DAYS} days old. Including them would drag every rate toward zero and
             make recent effort look like failure.
           </p>
-        </section>
+        </CardSection>
 
-        <section className="rounded-card border border-border bg-surface p-4">
-          <h2 className="text-ui font-semibold text-ink">Where rejections happen</h2>
-          <p className="mt-0.5 text-small text-ink-muted">
-            Rejection at resume review and rejection after a final round are opposite diagnoses
-            leading to opposite responses. Without this split, every rejection looks the same.
-          </p>
+        <CardSection
+          title="Where rejections happen"
+          hint="Rejection at resume review and rejection after a final round are opposite diagnoses leading to opposite responses. Without this split, every rejection looks the same."
+        >
           {rejections.length === 0 ? (
             <p className="mt-3 text-ui text-ink-muted">No rejections recorded yet.</p>
           ) : (
@@ -255,18 +245,9 @@ export default async function AnalyticsPage() {
               })}
             </ul>
           )}
-        </section>
+        </CardSection>
       </div>
     </>
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="bg-surface px-4 py-3">
-      <p className="text-micro uppercase tracking-wider text-ink-muted">{label}</p>
-      <p className="tabular font-display mt-1 text-2xl font-semibold text-ink">{value}</p>
-      {hint && <p className="mt-1 text-micro leading-relaxed text-ink-muted">{hint}</p>}
-    </div>
-  );
-}

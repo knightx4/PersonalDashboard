@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { ExternalLink, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Input, Label } from '@/components/ui/field';
+import { cardVariants } from '@/components/ui/card';
+import { Field, FieldError, Input } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatDate } from '@/lib/jobs/applications/load';
 import {
@@ -113,7 +114,7 @@ export function ReviewList({
 
   return (
     <div ref={containerRef} className="space-y-2">
-      <p className="text-micro text-ink-muted">
+      <p className="text-small text-ink-muted">
         <kbd className="rounded border border-border bg-surface px-1">j</kbd>/
         <kbd className="rounded border border-border bg-surface px-1">k</kbd> to move,{' '}
         <kbd className="rounded border border-border bg-surface px-1">1</kbd>–
@@ -132,8 +133,9 @@ export function ReviewList({
           key={`${row.kind}-${row.id}`}
           onClick={() => setCursor(index)}
           className={cn(
-            'rounded-card border bg-surface p-4 transition-colors duration-150',
-            index === cursor ? 'border-accent ring-2 ring-accent/15' : 'border-border',
+            cardVariants({ padding: 'dense' }),
+            'transition-colors duration-150',
+            index === cursor && 'border-accent ring-2 ring-accent/15',
           )}
         >
           {row.kind === 'message' && (
@@ -205,12 +207,12 @@ function MessageRow({
         <ul className="mt-3 space-y-1.5">
           {row.candidates.map((candidate, index) => (
             <li key={candidate.applicationId} className="flex flex-wrap items-center gap-2">
-              <kbd className="rounded border border-border bg-canvas px-1.5 text-micro text-ink-muted">
+              <kbd className="rounded border border-border bg-canvas px-1.5 text-small text-ink-muted">
                 {index + 1}
               </kbd>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-ui text-ink">{candidate.label}</p>
-                <p className="truncate text-micro text-ink-muted">
+                <p className="truncate text-small text-ink-muted">
                   {candidate.reason}
                   {candidate.confidence !== null &&
                     ` · ${Math.round(candidate.confidence * 100)}% match`}
@@ -259,10 +261,10 @@ function MessageRow({
             href={row.gmailHref}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+            className="inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
           >
             Open in Gmail
-            <ExternalLink className="size-3" strokeWidth={1.75} />
+            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
           </a>
         )}
       </footer>
@@ -297,14 +299,10 @@ function OtherRolePicker({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-      >
+      <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => setOpen(true)}>
         <Search className="size-3.5" strokeWidth={1.75} aria-hidden />
         Some other role — search all {roles.length}
-      </button>
+      </Button>
     );
   }
 
@@ -312,15 +310,16 @@ function OtherRolePicker({
 
   return (
     <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
-      <Label htmlFor={`other-role-${row.id}`}>Link to another role</Label>
-      <Input
-        id={`other-role-${row.id}`}
-        autoFocus
-        value={query}
-        disabled={pending}
-        placeholder="Company or role title"
-        onChange={(event) => setQuery(event.target.value)}
-      />
+      <Field id={`other-role-${row.id}`} label="Link to another role">
+        <Input
+          id={`other-role-${row.id}`}
+          autoFocus
+          value={query}
+          disabled={pending}
+          placeholder="Company or role title"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </Field>
 
       {matches.length === 0 ? (
         <p className="mt-2 text-small text-ink-muted">No role matches that.</p>
@@ -339,7 +338,7 @@ function OtherRolePicker({
                     onDone(result.error ?? `Linked to ${label}.`);
                   })
                 }
-                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface disabled:opacity-50"
+                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface disabled:opacity-50"
               >
                 <span className="min-w-0 flex-1 truncate text-ui text-ink">
                   {role.companyName} · {role.roleTitle}
@@ -354,13 +353,9 @@ function OtherRolePicker({
         </ul>
       )}
 
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="mt-2 text-small text-ink-muted underline underline-offset-2 hover:text-ink"
-      >
+      <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => setOpen(false)}>
         Cancel
-      </button>
+      </Button>
     </div>
   );
 }
@@ -391,14 +386,10 @@ function NewRoleForm({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-      >
+      <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => setOpen(true)}>
         <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
         None of these — start a new role
-      </button>
+      </Button>
     );
   }
 
@@ -424,32 +415,32 @@ function NewRoleForm({
       <p className="text-small font-medium text-ink">Start a new role from this message</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <div>
-          <Label htmlFor={`company-${row.id}`}>Company</Label>
-          <Input
-            id={`company-${row.id}`}
-            list="review-companies"
-            value={company}
-            disabled={pending}
-            onChange={(event) => setCompany(event.target.value)}
-          />
+          <Field id={`company-${row.id}`} label="Company">
+            <Input
+              id={`company-${row.id}`}
+              list="review-companies"
+              value={company}
+              disabled={pending}
+              onChange={(event) => setCompany(event.target.value)}
+            />
+          </Field>
           <datalist id="review-companies">
             {companies.map((name) => (
               <option key={name} value={name} />
             ))}
           </datalist>
         </div>
-        <div>
-          <Label htmlFor={`title-${row.id}`}>Role</Label>
+        <Field id={`title-${row.id}`} label="Role">
           <Input
             id={`title-${row.id}`}
             value={title}
             disabled={pending}
             onChange={(event) => setTitle(event.target.value)}
           />
-        </div>
+        </Field>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={submit}>
+        <Button type="button" size="sm" pending={pending} onClick={submit}>
           {pending ? 'Creating…' : 'Create and link'}
         </Button>
         <Button
@@ -461,9 +452,9 @@ function NewRoleForm({
         >
           Cancel
         </Button>
-        {error && <span className="text-small text-status-rejected">{error}</span>}
       </div>
-      <p className="mt-2 text-micro text-ink-muted">
+      <FieldError>{error}</FieldError>
+      <p className="mt-2 text-small text-ink-muted">
         No applied date is set: this message writes the event its kind implies, and the status
         follows from that.
       </p>
@@ -530,7 +521,7 @@ function ApplicationRow({
         </Button>
         <Link
           href={`/jobs/roles/${row.roleId}`}
-          className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+          className="text-ui font-medium text-accent hover:underline"
         >
           Edit the details
         </Link>

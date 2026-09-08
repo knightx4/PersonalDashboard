@@ -4,6 +4,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { SearchField } from '@/components/jobs/shell/search-field';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
@@ -145,21 +146,21 @@ export default async function CompaniesPage({
           </RailGroup>
         </LeftRail>
 
-        <div className="min-w-0 flex-1 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-ui">
-            <thead>
-              <tr className="border-b border-border text-left text-micro uppercase tracking-wider text-ink-muted">
-                <th className="px-2 py-2 font-semibold">Company</th>
-                <th className="px-2 py-2 font-semibold">Priority</th>
-                <th className="px-2 py-2 font-semibold">Activity</th>
-                <th className="px-2 py-2 font-semibold">Roles</th>
-                <th className="px-2 py-2 font-semibold">Domains</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="min-w-0 flex-1">
+          <Table>
+            <THead>
+              <TR>
+                <TH>Company</TH>
+                <TH>Priority</TH>
+                <TH>Activity</TH>
+                <TH num>Roles</TH>
+                <TH>Domains</TH>
+              </TR>
+            </THead>
+            <TBody>
               {filtered.map((company) => (
-                <tr key={company.id} className="border-b border-border hover:bg-surface">
-                  <td className="px-2 py-1.5">
+                <TR key={company.id} href={`/jobs/companies/${company.slug}`}>
+                  <TD primary>
                     <span className="flex items-center gap-2">
                       <CompanyAvatar
                         company={{
@@ -173,31 +174,32 @@ export default async function CompaniesPage({
                         imageClassName="size-4"
                       />
                       <span className="min-w-0">
-                        <Link
-                          href={`/jobs/companies/${company.slug}`}
-                          className="font-medium text-ink hover:text-accent"
-                        >
-                          {company.name}
-                        </Link>
+                        {company.name}
                         {company.hq_location && (
-                          <span className="ml-1.5 text-ink-muted">{company.hq_location}</span>
+                          <span className="ml-1.5 font-normal text-ink-muted">
+                            {company.hq_location}
+                          </span>
                         )}
                       </span>
                     </span>
-                  </td>
-                  <td className="px-2 py-1.5 text-ink-muted">{company.priority}</td>
-                  <td className="px-2 py-1.5 text-ink-muted">
+                  </TD>
+                  <TD label="Priority" muted>
+                    {company.priority}
+                  </TD>
+                  <TD label="Activity" muted>
                     {company.status.replace(/_/g, ' ')}
-                  </td>
-                  <td className="tabular px-2 py-1.5 text-ink-muted">{company.roles.length}</td>
-                  <td className="px-2 py-1.5 text-ink-muted">
+                  </TD>
+                  <TD label="Roles" num muted>
+                    {company.roles.length}
+                  </TD>
+                  <TD label="Domains" muted>
                     {company.domains.length > 0 ? company.domains.join(', ') : '—'}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
-          <p className="mt-2 text-micro text-ink-muted">
+            </TBody>
+          </Table>
+          <p className="mt-2 text-small text-ink-muted">
             Domains are what let a recruiter&rsquo;s personal work address find its company. Add
             them on the company page when mail is not linking.
           </p>

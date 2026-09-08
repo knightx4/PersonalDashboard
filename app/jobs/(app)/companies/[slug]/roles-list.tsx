@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { GitMerge } from 'lucide-react';
+import { Briefcase, GitMerge } from 'lucide-react';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FieldError, Label, Select } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import { mergeRoles } from '../actions';
@@ -45,7 +47,16 @@ export function RolesList({
   const [pending, startTransition] = useTransition();
 
   if (roles.length === 0) {
-    return <p className="mt-2 text-ui text-ink-muted">No roles saved at this company yet.</p>;
+    // Already inside the section's card, so the placeholder border comes off.
+    return (
+      <EmptyState
+        icon={Briefcase}
+        title="No roles saved at this company yet"
+        description="A role you add here is what the inbox links its mail to."
+        action={{ label: 'Add a role', href: '/jobs/roles/new' }}
+        className="border-0 py-8"
+      />
+    );
   }
 
   function toggle(roleId: string) {
@@ -82,26 +93,28 @@ export function RolesList({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-micro text-ink-muted">
+        <p className="text-small text-ink-muted">
           {picking
             ? 'Pick the roles that are really the same posting, then which one to keep.'
             : null}
         </p>
         {roles.length > 1 && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => (picking ? cancel() : setPicking(true))}
-            className="ml-auto flex shrink-0 items-center gap-1 text-small font-medium text-ink-muted underline underline-offset-2 hover:text-ink"
+            className="ml-auto shrink-0"
           >
             <GitMerge className="size-3.5" strokeWidth={1.75} aria-hidden />
             {picking ? 'Cancel' : 'Merge roles'}
-          </button>
+          </Button>
         )}
       </div>
 
       <ul className="divide-y divide-border">
         {roles.map((role) => (
-          <li key={role.id} className="flex flex-wrap items-center gap-2 py-2">
+          <li key={role.id} className="row-pad flex flex-wrap items-center gap-2">
             {picking && (
               <input
                 type="checkbox"
@@ -113,7 +126,7 @@ export function RolesList({
             )}
             <Link
               href={`/jobs/roles/${role.id}`}
-              className="flex-1 text-ui font-medium text-ink hover:text-accent"
+              className="flex-1 text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
             >
               {role.title}
             </Link>
@@ -125,7 +138,7 @@ export function RolesList({
                   status={application.status}
                   submittedAt={application.submittedAt}
                 />
-                <span className="tabular text-micro text-ink-muted">
+                <span className="tabular text-small text-ink-muted">
                   {application.attempt > 1 && `#${application.attempt} `}
                   {formatDate(application.submittedAt, timezone)}
                 </span>
@@ -137,14 +150,14 @@ export function RolesList({
 
       {picking && selected.size >= 2 && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas p-2.5">
-          <label className="text-small text-ink-muted" htmlFor="merge-survivor">
+          <Label className="mb-0" htmlFor="merge-survivor">
             Keep
-          </label>
-          <select
+          </Label>
+          <Select
             id="merge-survivor"
             value={survivorId ?? ''}
             onChange={(event) => setSurvivorId(event.target.value)}
-            className="rounded-lg border border-border bg-surface px-2 py-1 text-ui text-ink"
+            className="h-8 w-auto"
           >
             {[...selected].map((id) => {
               const role = roles.find((r) => r.id === id);
@@ -155,18 +168,18 @@ export function RolesList({
                 </option>
               );
             })}
-          </select>
+          </Select>
           <span className="text-small text-ink-muted">
             {selected.size - 1} other{selected.size - 1 === 1 ? '' : 's'} fold into it as one
             application.
           </span>
-          <Button type="button" size="sm" disabled={pending} onClick={merge} className="ml-auto">
+          <Button type="button" size="sm" pending={pending} onClick={merge} className="ml-auto">
             {pending ? 'Merging…' : `Merge ${selected.size} roles`}
           </Button>
         </div>
       )}
 
-      {error && <p className="mt-2 text-small text-status-rejected">{error}</p>}
+      <FieldError>{error}</FieldError>
     </div>
   );
 }

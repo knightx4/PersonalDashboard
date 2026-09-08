@@ -3,7 +3,8 @@ import { Link2, Share2 } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Card } from '@/components/ui/card';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { CreateShareForm } from './share-ui';
 
 export const metadata = { title: 'Shared forms' };
@@ -44,7 +45,7 @@ export default async function SharesPage() {
         actions={
           <Link
             href="/shopping/share/families"
-            className="text-ui text-ink-muted hover:text-ink"
+            className="text-ui font-medium text-accent hover:underline"
           >
             Grouping
           </Link>
@@ -58,6 +59,10 @@ export default async function SharesPage() {
               icon={Share2}
               title="Nothing shared yet"
               description="Make a form, put things on it from your inventory, then send the link."
+              // The composer is beside this on a wide screen and below it on a
+              // phone; either way the first step is the same box.
+              action={{ label: 'Make a form', href: '#new-share' }}
+              secondaryAction={{ label: 'Open inventory', href: '/shopping/inventory' }}
             />
           ) : (
             <ul className="space-y-3">
@@ -69,23 +74,24 @@ export default async function SharesPage() {
 
                 return (
                   <li key={share.id}>
-                    <Link href={`/shopping/share/${share.id}`} className="block">
-                      <Card interactive className="p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-body font-medium text-ink">{share.title}</p>
-                            <p className="mt-0.5 text-ui text-ink-muted">
-                              {items} {items === 1 ? 'item' : 'items'} · {answers} answered
-                              {share.status !== 'active' && ' · archived'}
-                            </p>
-                          </div>
-                          <span className="flex shrink-0 items-center gap-1 text-small text-ink-muted">
-                            <Link2 className="size-3.5" aria-hidden />
-                            {live.length} live
-                            {seen && ' · opened'}
-                          </span>
+                    <Link
+                      href={`/shopping/share/${share.id}`}
+                      className={cn(cardVariants({ padding: 'dense', interactive: true }), 'block')}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-body font-medium text-ink">{share.title}</p>
+                          <p className="mt-0.5 text-ui text-ink-muted">
+                            {items} {items === 1 ? 'item' : 'items'} · {answers} answered
+                            {share.status !== 'active' && ' · archived'}
+                          </p>
                         </div>
-                      </Card>
+                        <span className="flex shrink-0 items-center gap-1 text-small text-ink-muted">
+                          <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                          {live.length} live
+                          {seen && ' · opened'}
+                        </span>
+                      </div>
                     </Link>
                   </li>
                 );

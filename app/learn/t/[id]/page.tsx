@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTrack } from '@/lib/learn/tracks/load';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { AddForm } from './add-form';
 
 export const dynamic = 'force-dynamic';
@@ -58,11 +60,11 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       )}
 
       {track.readings.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-6 text-center text-body text-ink-muted">
+        <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
           Nothing in this track yet. Write down what you want to learn.
         </p>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {track.readings.map((reading) => (
             <ReadingCard key={reading.id} reading={reading} />
           ))}

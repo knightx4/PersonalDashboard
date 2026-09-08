@@ -1,9 +1,12 @@
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadCalendar } from '@/lib/todo/calendar/load';
 import { addMonths, isMonth } from '@/lib/todo/calendar/month';
+import { cn } from '@/lib/cn';
 import { PageHeader } from '@/components/shell/page-header';
+import { Banner } from '@/components/ui/banner';
+import { cardVariants } from '@/components/ui/card';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
 
 export const metadata = { title: 'Calendar' };
@@ -37,7 +40,9 @@ export default async function TodoCalendarPage({
   }).format(new Date(`${calendar.month}-01T00:00:00Z`));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    // No width of its own: a calendar is a grid, and seven columns want every
+    // bit of the shell's 1400. The other todo pages are reading columns.
+    <div>
       <PageHeader title="Calendar" description="Everything with a date on it, month by month." />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -49,7 +54,7 @@ export default async function TodoCalendarPage({
           </MonthLink>
           <Link
             href="/todo/calendar"
-            className="rounded-lg px-3 py-1.5 text-ui font-medium text-ink-muted hover:bg-canvas hover:text-ink"
+            className="rounded-lg px-3 py-1.5 text-ui font-medium text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
           >
             Today
           </Link>
@@ -62,13 +67,10 @@ export default async function TodoCalendarPage({
       {/* Same rule as the agenda: a source that failed is said out loud, because
           a silently shorter month looks exactly like a quiet one. */}
       {calendar.failed.length > 0 && (
-        <p className="mt-4 flex items-start gap-2 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-          <span>
-            {calendar.failed.join(' and ')} could not be read just now, so anything from{' '}
-            {calendar.failed.length > 1 ? 'them' : 'it'} is missing from this month.
-          </span>
-        </p>
+        <Banner tone="bad" className="mt-4">
+          {calendar.failed.join(' and ')} could not be read just now, so anything from{' '}
+          {calendar.failed.length > 1 ? 'them' : 'it'} is missing from this month.
+        </Banner>
       )}
 
       <CalendarMonthGrid weeks={calendar.weeks} timezone={calendar.timezone} />
@@ -83,7 +85,7 @@ export default async function TodoCalendarPage({
               {calendar.undated.length}
             </span>
           </h2>
-          <ul className="mt-1 space-y-1 rounded-card border border-border bg-surface p-3">
+          <ul className={cn(cardVariants({ padding: 'dense' }), 'mt-1 space-y-1')}>
             {calendar.undated.map((entry) => (
               <li key={entry.key}>
                 <Pill entry={entry} timezone={calendar.timezone} />
@@ -110,7 +112,7 @@ function MonthLink({
       href={{ pathname: '/todo/calendar', query: { month } }}
       aria-label={label}
       title={label}
-      className="flex size-9 items-center justify-center rounded-lg text-ink-muted hover:bg-canvas hover:text-ink"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
     >
       {children}
     </Link>

@@ -51,10 +51,11 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <>
+    // One person, read top to bottom: a reading column.
+    <div className="mx-auto max-w-3xl">
       <Link
         href="/jobs/contacts"
-        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
       >
         <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
         Contacts
@@ -98,6 +99,6 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           })),
         }}
       />
-    </>
+    </div>
   );
 }

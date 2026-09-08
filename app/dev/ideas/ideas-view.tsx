@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { IdeaRow } from '@/lib/ideas/load';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -47,7 +49,7 @@ function AddIdea() {
   const [state, action, pending] = useActionState(addIdea, {} as IdeaActionState);
 
   return (
-    <form action={action} className="rounded-card border border-border bg-surface p-4">
+    <form action={action} className={cardVariants({ padding: 'dense' })}>
       <Label htmlFor="idea-body">The idea</Label>
       <Textarea
         id="idea-body"
@@ -159,7 +161,7 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
                 {scopeLabel(scope)}{' '}
                 <span className="font-normal text-ink-muted">({rows.length})</span>
               </h2>
-              <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+              <ul className={cn(cardVariants(), 'divide-y divide-border')}>
                 {rows.map((idea) => (
                   <IdeaCard key={idea.id} idea={idea} />
                 ))}

@@ -89,7 +89,7 @@ function CandidateRow({
         <form action={action} className="mt-2">
           <input type="hidden" name="inventory_item_id" value={inventoryItemId} />
           <input type="hidden" name="candidate_json" value={JSON.stringify(candidate)} />
-          <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+          <Button type="submit" size="sm" variant="secondary" pending={pending}>
             {pending ? 'Switching…' : 'This is my box'}
           </Button>
         </form>
@@ -151,7 +151,7 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
       {game.needsConfirmation && (
         <div className="space-y-3 rounded-lg border border-caution/30 bg-caution-fill/5 p-3">
           <div>
-            <h3 className="text-body font-semibold text-ink">Which box is on your shelf?</h3>
+            <h3 className="text-ui font-semibold text-ink">Which box is on your shelf?</h3>
             <p className="mt-1 text-ui text-ink-muted">
               {game.confirmationReason ??
                 'We could not pin this to a single edition, and asking prices differ a lot between them.'}{' '}
@@ -181,7 +181,7 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
               )}
               <form action={confirmAction} className="mt-2">
                 <input type="hidden" name="inventory_item_id" value={game.inventoryItemId} />
-                <Button type="submit" size="sm" disabled={confirmPending}>
+                <Button type="submit" size="sm" pending={confirmPending}>
                   {confirmPending ? 'Saving…' : 'This is the right box'}
                 </Button>
               </form>

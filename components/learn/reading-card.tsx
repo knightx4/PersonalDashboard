@@ -74,7 +74,7 @@ export function LocatorLine({ reading }: { reading: ReadingRow }) {
 
 function StatusIcon({ status }: { status: ReadingRow['status'] }) {
   if (status === 'read') {
-    return <Check className="size-4 shrink-0 text-positive" strokeWidth={2.5} aria-label="Read" />;
+    return <Check className="size-4 shrink-0 text-positive" strokeWidth={2} aria-label="Read" />;
   }
   if (status === 'abandoned') {
     return (

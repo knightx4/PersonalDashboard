@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 
 /**
  * Public homepage. Google requires a working homepage on a verified domain
@@ -10,7 +11,7 @@ import { buttonVariants } from '@/components/ui/button';
 export default function HomePage() {
   return (
     <div className="min-h-dvh">
-      <header className="mx-auto flex h-16 max-w-[1100px] items-center justify-between px-6">
+      <header className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
         <div className="flex items-center gap-2">
           <ModuleMark module={null} size="md" />
           <span className="text-lead font-semibold tracking-tight">
@@ -27,12 +28,12 @@ export default function HomePage() {
         </nav>
       </header>
 
-      <main className="mx-auto max-w-[1100px] px-6">
+      <main className="mx-auto max-w-5xl px-6">
         <section className="py-20 sm:py-28">
-          <h1 className="font-display max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-ink sm:text-5xl">
+          <h1 className="font-display max-w-2xl text-figure font-semibold tracking-[-0.03em] text-ink sm:text-figure-lg">
             You already own two of these.
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted">
+          <p className="mt-5 max-w-xl text-lead leading-relaxed text-ink-muted">
             Personal Dashboard reads your order confirmations and turns them into a picture of
             what you own and what you spend. Not a delivery tracker — a way to stop buying the
             same thing twice.
@@ -65,7 +66,7 @@ export default function HomePage() {
               body: 'Save things you want by pasting a link. If you buy it later, from any store, we notice and tick it off.',
             },
           ].map((feature) => (
-            <div key={feature.title} className="rounded-card border border-border bg-surface p-5">
+            <div key={feature.title} className={cardVariants({ padding: 'standard' })}>
               <h2 className="text-body font-semibold text-ink">{feature.title}</h2>
               <p className="mt-1.5 text-ui leading-relaxed text-ink-muted">{feature.body}</p>
             </div>
@@ -80,7 +81,7 @@ export default function HomePage() {
           shopping.
         */}
         <section className="pb-24">
-          <div className="rounded-card border border-border bg-surface p-6">
+          <div className={cardVariants({ padding: 'standard' })}>
             <h2 className="font-display text-title tracking-tight text-ink">
               The same account also tracks a job search
             </h2>
@@ -100,7 +101,7 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-2 px-6 py-6 text-ui text-ink-muted">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-6 py-6 text-ui text-ink-muted">
           <span>Personal Dashboard</span>
           <nav className="flex gap-4">
             <Link href="/privacy" className="hover:text-ink">

@@ -34,10 +34,26 @@ const button = cva(
 );
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof button>;
+  VariantProps<typeof button> & {
+    /**
+     * The action is in flight. Disables the button and marks it busy, and
+     * makes it a live region so the label it changes to -- "Saving…" -- is
+     * read out rather than only seen. Pass this instead of `disabled` when
+     * a transition is the reason.
+     */
+    pending?: boolean;
+  };
 
-export function Button({ className, variant, size, ...props }: ButtonProps) {
-  return <button className={cn(button({ variant, size }), className)} {...props} />;
+export function Button({ className, variant, size, pending, disabled, ...props }: ButtonProps) {
+  return (
+    <button
+      className={cn(button({ variant, size }), className)}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
+      aria-live={pending === undefined ? undefined : 'polite'}
+      {...props}
+    />
+  );
 }
 
 export { button as buttonVariants };

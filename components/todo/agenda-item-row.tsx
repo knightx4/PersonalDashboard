@@ -18,15 +18,15 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
   const [pending, start] = useTransition();
 
   return (
-    <div className={cn('group flex items-start gap-3 py-2.5', pending && 'opacity-50')}>
+    <div className={cn('group row-pad flex items-start gap-3', pending && 'opacity-50')}>
       {item.completable ? (
         <button
           type="button"
           aria-label="Mark done"
           onClick={() => start(() => completeItem(item.source, item.key))}
-          className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-control hover:border-accent"
+          className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-control transition-colors duration-150 hover:border-accent"
         >
-          <Check className="size-3 opacity-0 group-hover:opacity-40" strokeWidth={3} aria-hidden />
+          <Check className="size-3 opacity-0 group-hover:opacity-40" strokeWidth={2} aria-hidden />
         </button>
       ) : (
         <span
@@ -40,7 +40,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           {item.link ? (
             <a
               href={item.link.href}
-              className="text-ui font-medium text-ink hover:text-accent"
+              className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
             >
               {item.title}
             </a>
@@ -68,7 +68,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           {item.link && (
             <a
               href={item.link.href}
-              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 hover:text-accent"
+              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
             >
               {item.link.label}
             </a>
@@ -93,7 +93,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           type="button"
           title="Later"
           onClick={() => start(() => deferItem(item.source, item.key))}
-          className="press flex size-7 items-center justify-center rounded text-ink-muted hover:bg-canvas hover:text-ink"
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Later</span>
@@ -102,7 +102,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           type="button"
           title="Not this one"
           onClick={() => start(() => dismissItem(item.source, item.key))}
-          className="press flex size-7 items-center justify-center rounded text-ink-muted hover:bg-canvas hover:text-ink"
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Not this one</span>

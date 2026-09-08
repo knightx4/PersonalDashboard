@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
+import { FieldError } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
@@ -132,11 +135,11 @@ export function PipelineBoard({
             <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
               <span className="text-ui font-semibold text-ink">{column.label}</span>
               <span className="tabular text-ui text-ink-muted">{columnRows.length}</span>
-              {column.hint && <span className="text-micro text-ink-muted">{column.hint}</span>}
+              {column.hint && <span className="text-small text-ink-muted">{column.hint}</span>}
             </summary>
             <div className="space-y-2 px-2 pb-2">
               {columnRows.map((row) => (
-                <Card
+                <PipelineCard
                   key={row.applicationId}
                   row={row}
                   dragging={dragging === row.applicationId}
@@ -145,7 +148,7 @@ export function PipelineBoard({
                 />
               ))}
               {columnRows.length === 0 && (
-                <p className="px-1.5 py-2 text-small text-ink-muted">Nothing here</p>
+                <p className="px-1.5 py-2 text-ui text-ink-muted">Nothing here</p>
               )}
             </div>
           </details>
@@ -172,12 +175,12 @@ export function PipelineBoard({
             <span className="tabular text-ui text-ink-muted">{columnRows.length}</span>
           </header>
           {column.hint && (
-            <p className="mb-2 px-1.5 text-micro leading-snug text-ink-muted">{column.hint}</p>
+            <p className="mb-2 px-1.5 text-small leading-snug text-ink-muted">{column.hint}</p>
           )}
 
           <div className="space-y-2">
             {columnRows.map((row) => (
-              <Card
+              <PipelineCard
                 key={row.applicationId}
                 row={row}
                 dragging={dragging === row.applicationId}
@@ -186,7 +189,7 @@ export function PipelineBoard({
               />
             ))}
             {columnRows.length === 0 && (
-              <p className="px-1.5 py-6 text-center text-small text-ink-muted">Nothing here</p>
+              <p className="px-1.5 py-6 text-center text-ui text-ink-muted">Nothing here</p>
             )}
           </div>
         </section>
@@ -195,11 +198,7 @@ export function PipelineBoard({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <p role="alert" className="rounded-lg bg-status-rejected-tint px-3 py-2 text-ui text-status-rejected">
-          {error}
-        </p>
-      )}
+      <FieldError>{error}</FieldError>
 
       <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
       <div
@@ -212,13 +211,13 @@ export function PipelineBoard({
       </div>
 
       {closedRows.length > 0 && (
-        <details className="rounded-card border border-border bg-surface">
+        <details className={cn(cardVariants())}>
           <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink-muted">
             Closed — {closedRows.length}
           </summary>
           <div className="grid gap-2 border-t border-border p-3 sm:grid-cols-2 lg:grid-cols-4">
             {closedRows.map((row) => (
-              <Card key={row.applicationId} row={row} dragging={false} muted />
+              <PipelineCard key={row.applicationId} row={row} dragging={false} muted />
             ))}
           </div>
         </details>
@@ -227,7 +226,8 @@ export function PipelineBoard({
   );
 }
 
-function Card({
+/** Named apart from the ui Card: this one is a pursuit, dressed in the card's classes. */
+function PipelineCard({
   row,
   dragging,
   muted = false,
@@ -252,8 +252,9 @@ function Card({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        'group rounded-lg border border-border bg-surface p-2.5',
-        !muted && 'lift cursor-grab',
+        cardVariants({ interactive: !muted }),
+        'group p-2.5',
+        !muted && 'cursor-grab',
         dragging && 'dragging',
         muted && 'opacity-70',
       )}
@@ -278,7 +279,7 @@ function Card({
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/roles/${row.roleId}`}
-            className="block truncate text-ui font-medium text-ink hover:text-accent"
+            className="block truncate text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
           >
             {row.roleTitle}
           </Link>
@@ -290,7 +291,7 @@ function Card({
           </p>
         </div>
         {row.excitement !== null && (
-          <span className="tabular shrink-0 text-micro text-ink-muted" title="Excitement">
+          <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
             {'★'.repeat(row.excitement)}
           </span>
         )}
@@ -303,7 +304,7 @@ function Card({
       </div>
 
       {row.nextAction && (
-        <p className="mt-1.5 truncate rounded bg-canvas px-1.5 py-1 text-micro text-ink-muted">
+        <p className="mt-1.5 truncate rounded bg-canvas px-1.5 py-1 text-small text-ink-muted">
           {row.nextAction}
           {row.nextActionDue && <span className="ml-1 text-caution">· {row.nextActionDue}</span>}
         </p>
@@ -328,7 +329,7 @@ function Card({
             </span>
           )}
           {row.needsReview && (
-            <AlertTriangle className="size-3.5 text-caution" strokeWidth={2} aria-label="Needs review" />
+            <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-label="Needs review" />
           )}
           <span
             className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
@@ -359,26 +360,23 @@ function QuickReject({ row }: { row: PipelineRow }) {
   if (confirming) {
     return (
       <span className="flex shrink-0 items-center gap-1">
-        <button
+        <Button
           type="button"
-          disabled={pending}
+          variant="danger"
+          size="sm"
+          pending={pending}
           onClick={() =>
             startTransition(async () => {
               await moveApplication(row.applicationId, 'rejected');
               setConfirming(false);
             })
           }
-          className="press rounded px-1.5 py-0.5 text-micro font-medium text-status-rejected hover:bg-status-rejected-tint"
         >
           {pending ? 'Moving…' : 'Reject'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          className="press rounded px-1 py-0.5 text-micro text-ink-muted hover:text-ink"
-        >
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)}>
           Keep
-        </button>
+        </Button>
       </span>
     );
   }
@@ -388,9 +386,9 @@ function QuickReject({ row }: { row: PipelineRow }) {
       type="button"
       title="Send straight to rejected"
       onClick={() => setConfirming(true)}
-      className="press shrink-0 rounded p-0.5 text-ink-muted opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
     >
-      <Ban className="size-3.5" strokeWidth={2} aria-hidden />
+      <Ban className="size-4" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Send straight to rejected</span>
     </button>
   );
@@ -414,25 +412,22 @@ function Dismiss({ row }: { row: PipelineRow }) {
   if (confirming) {
     return (
       <span className="flex shrink-0 items-center gap-1">
-        <button
+        <Button
           type="button"
-          disabled={pending}
+          variant="danger"
+          size="sm"
+          pending={pending}
           onClick={() =>
             startTransition(async () => {
               await dismissPursuit(row.applicationId);
             })
           }
-          className="press rounded px-1.5 py-0.5 text-micro font-medium text-status-rejected hover:bg-status-rejected-tint"
         >
           {pending ? 'Removing…' : 'Remove'}
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          className="press rounded px-1 py-0.5 text-micro text-ink-muted hover:text-ink"
-        >
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)}>
           Keep
-        </button>
+        </Button>
       </span>
     );
   }
@@ -442,9 +437,9 @@ function Dismiss({ row }: { row: PipelineRow }) {
       type="button"
       title="Not a real pursuit — remove it"
       onClick={() => setConfirming(true)}
-      className="press shrink-0 rounded p-0.5 text-ink-muted opacity-0 transition-opacity duration-150 hover:text-status-rejected focus-visible:opacity-100 group-hover:opacity-100"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
     >
-      <X className="size-3.5" strokeWidth={2} aria-hidden />
+      <X className="size-4" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Not a real pursuit — remove it</span>
     </button>
   );

@@ -12,8 +12,10 @@ import { PageHeader } from '@/components/shell/page-header';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { EmptyState } from '@/components/ui/empty-state';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
 import {
@@ -684,7 +686,7 @@ export default async function InventoryPage({
               <Select
                 name="sort"
                 defaultValue={sort}
-                className="h-9 w-auto min-w-[10rem]"
+                className="h-9 w-auto min-w-40"
                 aria-label="Sort inventory"
                 disabled={Boolean(q)}
               >
@@ -701,7 +703,7 @@ export default async function InventoryPage({
               <Select
                 name="group"
                 defaultValue={group}
-                className="h-9 w-auto min-w-[10rem]"
+                className="h-9 w-auto min-w-40"
                 aria-label="Group inventory"
               >
                 {GROUP_OPTIONS.map((option) => (
@@ -714,13 +716,15 @@ export default async function InventoryPage({
             <SubmitOnChange />
             {/* Hidden once the selects submit themselves; still there, and
                 still the only way through, with JavaScript off. */}
-            <button
+            <Button
               type="submit"
+              variant="secondary"
+              size="sm"
               data-fallback-submit
-              className="press h-9 rounded-lg border border-control bg-surface px-3 text-ui font-medium text-ink-muted hover:text-ink"
+              className="h-9"
             >
               Apply
-            </button>
+            </Button>
             {q && (
               <p className="text-small text-ink-muted">
                 Sorted by relevance while searching
@@ -772,7 +776,7 @@ export default async function InventoryPage({
                         </p>
                       </div>
                     )}
-                    <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                    <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
                       {section.items.map((item) => (
                         <InventoryRow
                           key={item.id}

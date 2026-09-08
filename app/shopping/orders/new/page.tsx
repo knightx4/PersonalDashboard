@@ -29,6 +29,8 @@ export default async function NewOrderPage() {
   const defaultDate = todayInTimezone(profile?.timezone ?? 'UTC');
 
   return (
+    // A form, but not a narrow one: each line item is a six-field row, and at
+    // the single-form width those fields would be too tight to type into.
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Add an order"
@@ -48,8 +50,8 @@ export default async function NewOrderPage() {
         }
       />
       <OrderForm
-      people={people}
-      defaultPersonId={defaultPerson(people)?.id ?? null}
+        people={people}
+        defaultPersonId={defaultPerson(people)?.id ?? null}
         merchants={merchants ?? []}
         categories={categories ?? []}
         defaultDate={defaultDate}

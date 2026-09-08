@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Minus, Package, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { cardVariants } from '@/components/ui/card';
 import type { ShareGroup } from '@/lib/share/read/load-disposition';
 import { respondToShare } from './actions';
 
@@ -135,7 +136,8 @@ export function DispositionGroup({
   return (
     <li
       className={cn(
-        'rounded-card border border-border bg-surface p-4 transition-opacity',
+        cardVariants({ padding: 'dense' }),
+        'transition-opacity',
         pending && 'opacity-70',
       )}
     >

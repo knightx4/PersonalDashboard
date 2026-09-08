@@ -11,7 +11,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Still returnable</CardTitle>
-        <Link href="/shopping/returns" className="text-small font-medium text-accent hover:underline">
+        <Link href="/shopping/returns" className="text-ui font-medium text-accent hover:underline">
           Returns tracker
         </Link>
       </CardHeader>
@@ -26,7 +26,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
               <li key={row.inventoryItemId}>
                 <Link
                   href={`/shopping/inventory/${row.inventoryItemId}`}
-                  className="flex items-center gap-3 py-2.5 transition-colors hover:bg-canvas"
+                  className="row-pad flex items-center gap-3 transition-colors duration-150 hover:bg-canvas"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ui font-medium text-ink">{row.name}</p>

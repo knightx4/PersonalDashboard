@@ -26,9 +26,9 @@ export default async function FamiliesPage() {
     <>
       <Link
         href="/shopping/share"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted hover:text-ink"
+        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
       >
-        <ArrowLeft className="size-3.5" aria-hidden /> Shared forms
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
       </Link>
 
       <PageHeader
@@ -41,12 +41,14 @@ export default async function FamiliesPage() {
           icon={Layers}
           title="Nothing to group"
           description="Either everything is already grouped, or no two games on your shelf are named after each other."
+          action={{ label: 'Open inventory', href: '/shopping/inventory' }}
+          secondaryAction={{ label: 'Shared forms', href: '/shopping/share' }}
         />
       ) : (
         <ul className="max-w-2xl space-y-3">
           {suggestions.map((family) => (
             <li key={family.slug}>
-              <Card className="p-4">
+              <Card padding="dense">
                 <FamilySuggestionCard family={family} />
               </Card>
             </li>

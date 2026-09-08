@@ -2,9 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { softDeleteOrder } from '@/app/shopping/orders/actions';
+import { restoreDeletedOrder, softDeleteOrder } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
+
+/** restoreDeletedOrder ends in redirect(); when that surfaces as a throw the restore still happened. */
+function isRedirect(err: unknown): boolean {
+  const digest =
+    typeof err === 'object' && err && 'digest' in err
+      ? String((err as { digest: unknown }).digest)
+      : '';
+  return digest.startsWith('NEXT_REDIRECT');
+}
 
 export function DeleteOrderButton({
   orderId,
@@ -14,6 +24,7 @@ export function DeleteOrderButton({
   merchantName: string;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +48,7 @@ export function DeleteOrderButton({
 
   return (
     <div className="inline-flex flex-col items-end gap-1">
-      <p className="max-w-[16rem] text-right text-small text-ink-muted">
+      <p className="max-w-xs text-right text-small text-ink-muted">
         Delete {label}? You can restore it later from Settings.
       </p>
       <div className="flex items-center gap-2">
@@ -54,7 +65,7 @@ export function DeleteOrderButton({
           type="button"
           variant="danger"
           size="sm"
-          disabled={pending}
+          pending={pending}
           onClick={() => {
             setError(null);
             setPending(true);
@@ -68,6 +79,20 @@ export function DeleteOrderButton({
                   setPending(false);
                   return;
                 }
+                // A soft delete is reversible, so the confirm above is the
+                // gate and this is the way back once it has gone through.
+                toast({
+                  text: 'order deleted',
+                  undone: 'order restored',
+                  undo: async () => {
+                    try {
+                      await restoreDeletedOrder(formData);
+                    } catch (err) {
+                      if (!isRedirect(err)) throw err;
+                    }
+                    router.refresh();
+                  },
+                });
                 router.push('/shopping/orders');
                 router.refresh();
               } catch (err) {

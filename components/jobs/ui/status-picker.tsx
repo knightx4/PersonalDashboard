@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
+import { Select } from '@/components/ui/field';
 import { statusLabel } from '@/lib/jobs/status-label';
 import { APPLICATION_STATUSES, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
@@ -51,7 +52,8 @@ export function StatusPicker({
 
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>
-      <select
+      {/* The primitive, shrunk to the row it sits in: a status is chrome, not a form field. */}
+      <Select
         value={shown}
         disabled={busy}
         aria-label="Status"
@@ -68,16 +70,16 @@ export function StatusPicker({
             }
           });
         }}
-        className="h-7 rounded-lg border border-border bg-surface px-1.5 text-small text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+        className="h-7 w-auto px-1.5 text-small"
       >
         {SETTABLE.map((option) => (
           <option key={option} value={option}>
             {statusLabel(option, everSubmitted)}
           </option>
         ))}
-      </select>
+      </Select>
       {error && (
-        <span role="alert" className="text-micro text-status-rejected">
+        <span role="alert" className="text-small text-danger">
           {error}
         </span>
       )}

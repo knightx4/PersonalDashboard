@@ -100,7 +100,7 @@ export default async function AnswersPage({
               />
             ))}
           </RailGroup>
-          <p className="px-1 text-micro leading-relaxed text-ink-muted">
+          <p className="px-1 text-small leading-relaxed text-ink-muted">
             Questions are deduped by fingerprint, so the same question asked in different words
             lands on one row.
           </p>

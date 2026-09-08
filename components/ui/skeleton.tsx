@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { cardVariants } from './card';
 
 /**
  * Skeletons, never spinners.
@@ -34,7 +35,7 @@ export function PageHeaderSkeleton({ action = true }: { action?: boolean }) {
 /** A bordered list of rows -- the app's most common shape. */
 export function RowsSkeleton({ rows = 6, thumb = false }: { rows?: number; thumb?: boolean }) {
   return (
-    <div className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+    <div className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} className="flex items-center gap-3 px-3 py-3">
           {thumb && <Skeleton className="size-11 shrink-0 rounded-lg" />}

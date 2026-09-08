@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import { Button } from '@/components/ui/button';
 import { SNOOZE_DAYS } from '@/lib/jobs/today/load';
 import { completeWaiting, snoozeWaiting } from './actions';
 
@@ -19,23 +20,25 @@ function DismissActions({
 
   return (
     <span className="ml-auto flex shrink-0 items-center gap-2">
-      <button
+      <Button
         type="button"
-        disabled={busy}
+        variant="ghost"
+        size="sm"
+        pending={busy}
         onClick={() => startTransition(() => void onSnooze())}
-        className="text-small text-ink-muted underline underline-offset-2 hover:text-ink disabled:opacity-50"
       >
         Later
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
-        disabled={busy}
+        variant="secondary"
+        size="sm"
+        pending={busy}
         onClick={() => startTransition(() => void onComplete())}
-        className="press rounded-lg border border-border bg-canvas px-2 py-0.5 text-small font-medium text-ink disabled:opacity-50"
         title={`Snoozing pushes it ${SNOOZE_DAYS} days`}
       >
         Dismiss
-      </button>
+      </Button>
     </span>
   );
 }

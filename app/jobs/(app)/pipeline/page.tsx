@@ -222,7 +222,7 @@ export default async function PipelinePage({
             </RailGroup>
           )}
 
-          <p className="px-1 text-micro leading-relaxed text-ink-muted">
+          <p className="px-1 text-small leading-relaxed text-ink-muted">
             Priority lives on the company, not the pursuit —{' '}
             <Link href="/jobs/companies" className="underline underline-offset-2">
               set it there

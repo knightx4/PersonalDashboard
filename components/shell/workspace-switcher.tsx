@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { Kbd } from '@/components/shell/key-hints';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type ModuleId } from '@/lib/modules';
 
@@ -217,13 +218,14 @@ export function WorkspaceSwitcher({
         >
           {active.label}
         </span>
+        {!compact && <Kbd>⌘K</Kbd>}
         <ChevronsUpDown
           className={cn(
             'size-3.5 shrink-0',
             onShell ? 'text-shell-muted' : 'text-ink-muted',
             compact && 'hidden',
           )}
-          strokeWidth={2}
+          strokeWidth={1.75}
           aria-hidden
         />
         <span className="sr-only">Switch workspace</span>

@@ -1,58 +1,139 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/server';
+import { createClient as createShoppingClient } from '@/lib/auth/server';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { AppShell } from '@/components/shell/app-shell';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { Card } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
+import { EmptyState } from '@/components/ui/empty-state';
 import { describeCount, loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
+import { countReviewItems as countShoppingReview } from '@/lib/review/load';
+import { countReviewItems as countJobsReview } from '@/lib/jobs/review/load';
+import {
+  loadJobsBrief,
+  loadLearnBrief,
+  loadShoppingBrief,
+  loadTodoBrief,
+  loadVaultBrief,
+  type Brief,
+} from '@/lib/shell/brief';
+import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Home' };
 
+async function safe<T>(work: PromiseLike<T>, fallback: T): Promise<T> {
+  try {
+    return await work;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
- * The front door to the account, not to either module.
+ * What time of day it is where the reader is, not where the server is.
+ */
+function greeting(timezone: string, now: Date): string {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: timezone }).format(
+      now,
+    ),
+  );
+  if (hour < 5) return 'Still up';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/**
+ * The front door to the account, not to any one module.
  *
- * One account now does several unrelated things, and none should have to
- * stand in for another's landing page. This is where onboarding and a
- * signed-in visit to `/` both end up; each tile goes straight into that
- * module rather than by way of another menu.
+ * It reads like this morning's front page rather than a launcher: the date,
+ * set large, then the one sentence each workspace would say if it could say
+ * only one -- the same brief that sits in each workspace's top bar, gathered
+ * here in one column. That is the question none of the modules can answer on
+ * its own: what, across all of them, needs me today.
  *
- * The tiles come from lib/modules.ts, the same list the workspace switcher
- * uses, so a module added there appears here too -- with a count if one is
- * written below, and its description if not. The vault was added to the
- * switcher and missed here, which is the bug this arrangement removes.
+ * A quiet day looks quiet. When no workspace has anything to say, the column
+ * is the day's sigil and one line, not five rows of "nothing". The agenda's
+ * overdue and due-today entries follow, capped, because they are the one list
+ * worth seeing before choosing a room. The tiles come last and are small:
+ * they are doors, and doors do not need to be the biggest thing in the hall.
  *
- * Above the tiles: the two or three things that actually need today. That is
- * the one question none of the modules can answer on its own, and it is what
- * this page was missing -- it showed counts, which is news about the account
- * rather than anything to do. A front door showing forty rows would be a list,
- * and /todo is already the list.
- *
- * A module switched off under Account is not listed. That is what the switch
- * means, and a tile for a hidden module would make it a lie.
+ * A module switched off under Account is not listed anywhere here. That is
+ * what the switch means.
  */
 export default async function HomePage() {
   const user = await requireUser();
   const settings = await loadAccountSettings(user.id);
+  const now = new Date();
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: settings.timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 
-  const [counts, agenda] = await Promise.all([
+  const [counts, agenda, shopping, core, jobs] = await Promise.all([
     loadModuleCounts(user.id),
     // The agenda reads three schemas; a failure in any of them must cost this
     // page a section, not the whole front door.
     loadAgenda(user.id).catch(() => null),
+    createShoppingClient(),
+    createCoreClient(),
+    createJobsClient(),
   ]);
+
+  const enabled = MODULES.filter((module) => moduleEnabled(settings, module.id));
+  const on = (id: ModuleId) => enabled.some((module) => module.id === id);
+
+  // Each brief already swallows its own failures; the review counts feed two
+  // of them and are guarded here for the same reason.
+  const [shoppingReview, jobsReview] = await Promise.all([
+    on('shopping') ? safe(countShoppingReview(shopping, core, user.id), 0) : 0,
+    on('jobs') ? safe(countJobsReview(jobs, core, user.id), 0) : 0,
+  ]);
+
+  const loaded = await Promise.all([
+    on('shopping')
+      ? safe(loadShoppingBrief(user.id, settings.timezone, shoppingReview), null)
+      : null,
+    on('jobs') ? safe(loadJobsBrief(user.id, jobsReview), null) : null,
+    on('todo') ? safe(loadTodoBrief(user.id, settings.timezone), null) : null,
+    on('vault') ? safe(loadVaultBrief(), null) : null,
+    on('learn') ? safe(loadLearnBrief(), null) : null,
+  ]);
+  // The dev workspace has no brief of its own yet: its queue is the feedback
+  // list, and the button in the header already says how long it is.
+  const paired: ReadonlyArray<readonly [ModuleId, Brief | null]> = [
+    ['shopping', loaded[0]],
+    ['jobs', loaded[1]],
+    ['todo', loaded[2]],
+    ['vault', loaded[3]],
+    ['learn', loaded[4]],
+  ];
+  const briefs = paired.filter(
+    (entry): entry is readonly [ModuleId, Brief] => entry[1] !== null,
+  );
 
   // Overdue and today only, capped. Everything else is a page away.
   const due = (agenda?.piles ?? [])
     .filter((pile) => pile.bucket === 'overdue' || pile.bucket === 'today')
     .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })))
-    .slice(0, 4);
+    .slice(0, 5);
 
-  const enabled = MODULES.filter((module) => moduleEnabled(settings, module.id));
+  const date = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: settings.timezone,
+  }).format(now);
 
   return (
     <div className="min-h-full">
@@ -66,45 +147,84 @@ export default async function HomePage() {
         theme={settings.theme}
       >
         <div className="mx-auto max-w-3xl">
+          <header className="border-b border-border-strong pb-6 pt-2">
+            <p className="text-ui text-ink-muted">
+              {greeting(settings.timezone, now)}
+              {settings.displayName ? `, ${settings.displayName.split(' ')[0]}` : ''}
+            </p>
+            <h1 className="font-display mt-1 text-figure-lg font-semibold tracking-[-0.04em] text-ink sm:text-figure-xl">
+              {date}
+            </h1>
+          </header>
+
           {agenda === null && (
-            <Banner tone="bad">
-            The agenda could not be read just now, so anything due today is missing from this page.
+            <Banner tone="bad" className="mt-6">
+              The agenda could not be read just now, so anything due today is missing from this
+              page.
             </Banner>
           )}
 
-        {/* Nothing at all when there is nothing at all -- no "0 things due",
-            no empty card. A quiet day should look quiet, and a front door that
-            insists on saying something is one people stop reading. */}
-          {due.length > 0 && (
-            <Card padding="standard" className="mt-6">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-ui font-semibold text-ink">Today</h2>
-              <Link
-                href="/todo"
-                className="text-small font-medium text-accent underline underline-offset-2"
-              >
-                The agenda
-              </Link>
-            </div>
-
+          {briefs.length > 0 ? (
             <ul className="mt-2 divide-y divide-border">
-              {due.map(({ bucket, entry }) => (
-                <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
-                  {bucket === 'overdue' && (
-                    <span className="shrink-0 text-micro font-medium text-danger">
-                      {BUCKET_LABELS.overdue}
-                    </span>
+              {briefs.map(([module, brief]) => (
+                <li key={module} className="flex items-center gap-3 py-3.5">
+                  <ModuleMark module={module} size="sm" />
+                  {brief.href ? (
+                    <Link
+                      href={brief.href}
+                      className="min-w-0 flex-1 truncate text-lead text-ink hover:text-accent"
+                    >
+                      {brief.text}
+                    </Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-lead text-ink">{brief.text}</span>
                   )}
-                  <span className="min-w-0 flex-1 truncate text-ui text-ink">
-                    {entry.task?.title ?? entry.item?.title}
-                  </span>
+                  {brief.tone === 'caution' && (
+                    <span className="size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />
+                  )}
                 </li>
               ))}
             </ul>
+          ) : (
+            <EmptyState
+              tone="finished"
+              seed={`${user.id}:${today}:home`}
+              title="Nothing needs you."
+              description="Every workspace is quiet. Whatever you do next is your choice, not the app's."
+            />
+          )}
+
+          {/* Nothing at all when there is nothing at all -- no "0 things due",
+              no empty card. */}
+          {due.length > 0 && (
+            <Card padding="standard" className="mt-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="text-ui font-semibold text-ink">Today</h2>
+                <Link
+                  href="/todo"
+                  className="text-small font-medium text-accent underline underline-offset-2"
+                >
+                  The agenda
+                </Link>
+              </div>
+              <ul className="mt-2 divide-y divide-border">
+                {due.map(({ bucket, entry }) => (
+                  <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
+                    {bucket === 'overdue' && (
+                      <span className="shrink-0 text-micro font-medium text-danger">
+                        {BUCKET_LABELS.overdue}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-ui text-ink">
+                      {entry.task?.title ?? entry.item?.title}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <nav aria-label="Workspaces" className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {enabled.map((module) => (
               <ModuleCard
                 key={module.id}
@@ -114,7 +234,7 @@ export default async function HomePage() {
                 stat={describeCount(counts[module.id]) || module.description}
               />
             ))}
-          </div>
+          </nav>
         </div>
       </AppShell>
     </div>
@@ -137,14 +257,11 @@ function ModuleCard({
   stat: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="lift flex items-center gap-4 rounded-card border border-border bg-surface p-5"
-    >
-      <ModuleMark module={module} size="lg" />
-      <span>
-        <span className="block text-lead font-semibold text-ink">{title}</span>
-        <span className="tabular block text-ui text-ink-muted">{stat}</span>
+    <Link href={href} className={cn(cardVariants({ interactive: true }), 'flex items-center gap-3 p-4')}>
+      <ModuleMark module={module} size="md" />
+      <span className="min-w-0">
+        <span className="block text-ui font-semibold text-ink">{title}</span>
+        <span className="tabular block truncate text-small text-ink-muted">{stat}</span>
       </span>
     </Link>
   );

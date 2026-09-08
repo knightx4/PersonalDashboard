@@ -60,11 +60,11 @@ export function OrderRow({ order }: { order: OrderRowData }) {
   ].filter(Boolean);
 
   return (
-    <li className="group flex items-stretch hover:bg-canvas">
+    <li className="group flex items-stretch transition-colors duration-150 hover:bg-canvas">
       <Link
         href={`/shopping/orders/${order.id}`}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 pr-2 transition-colors duration-150',
+          'row-pad flex min-w-0 flex-1 items-center gap-3 pl-3 pr-2 transition-colors duration-150',
           'focus-visible:bg-canvas focus-visible:outline-none',
         )}
       >

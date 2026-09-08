@@ -4,7 +4,9 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { markOnboardingComplete, onboardingNeeded } from '@/lib/jobs/onboarding';
+import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
+import { Card, cardVariants } from '@/components/ui/card';
 import { CompaniesForm, FinishForm, SkipForm, WelcomeForm } from './forms';
 
 export const metadata = { title: 'Welcome' };
@@ -55,7 +57,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Welcome
             </p>
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               A pipeline that keeps itself current
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -67,15 +69,15 @@ export default async function OnboardingPage({
 
           <ul className="space-y-3 text-body text-ink">
             <li className="flex gap-3">
-              <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               <span>Confirmations, rejections, interview invites and recruiter mail, read and filed.</span>
             </li>
             <li className="flex gap-3">
-              <FileText className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <FileText className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               <span>Paste a job link and the description, requirements and questions come with it.</span>
             </li>
             <li className="flex gap-3">
-              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               <span>Email bodies are never stored. Never fills in a form or applies for you.</span>
             </li>
           </ul>
@@ -90,7 +92,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Step 2
             </p>
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               Who are you going after?
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -100,13 +102,13 @@ export default async function OnboardingPage({
             </p>
           </div>
 
-          <div className="flex items-start gap-3 rounded-card border border-border bg-surface p-4">
-            <Building2 className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+          <Card padding="dense" className="flex items-start gap-3">
+            <Building2 className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
             <p className="text-ui leading-relaxed text-ink-muted">
               You can skip this and add companies as you go — every role you add creates its
               company automatically.
             </p>
-          </div>
+          </Card>
 
           <CompaniesForm />
           <a
@@ -124,7 +126,7 @@ export default async function OnboardingPage({
             <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
               Step 3
             </p>
-            <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               Let it read your job-search mail
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
@@ -138,16 +140,16 @@ export default async function OnboardingPage({
             Gmail query is broader and less well-bounded, so the explanation has
             to be specific rather than reassuring.
           */}
-          <ul className="space-y-3 rounded-card border border-border bg-surface p-4 text-ui text-ink">
+          <ul className={cn(cardVariants({ padding: 'dense' }), 'space-y-3 text-ui text-ink')}>
             <li className="flex gap-3">
-              <Lock className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <Lock className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               <span>
                 <strong className="font-medium">Read-only.</strong> It cannot send, delete, or
                 change anything in your mailbox.
               </span>
             </li>
             <li className="flex gap-3">
-              <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               <span>
                 <strong className="font-medium">Scoped to a search.</strong> It looks at mail
                 matching a recruiting query — applicant tracking systems, application-shaped
@@ -155,7 +157,7 @@ export default async function OnboardingPage({
               </span>
             </li>
             <li className="flex gap-3">
-              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               <span>
                 <strong className="font-medium">Bodies are never stored.</strong> A message is
                 read, turned into structured facts, and discarded. Subjects and senders are kept
@@ -196,7 +198,7 @@ export default async function OnboardingPage({
       {step === 'done' && (
         <section className="space-y-6">
           <div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display text-title font-semibold tracking-tight text-ink">
               You are set up
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">

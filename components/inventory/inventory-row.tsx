@@ -89,7 +89,7 @@ export function InventoryRow({
             <img
               src={item.image_url}
               alt=""
-              className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+              className="size-full object-cover transition-transform duration-200"
             />
           ) : (
             <span className="flex size-full items-center justify-center text-ink-muted">
@@ -125,7 +125,7 @@ export function InventoryRow({
             category were a caption on the number. */}
         <div className="hidden w-28 shrink-0 sm:block">
           {item.category_name && (
-            <span className="inline-flex items-center gap-1 truncate text-micro text-ink-muted">
+            <span className="inline-flex items-center gap-1 truncate text-small text-ink-muted">
               <CategoryGlyph slug={item.category_slug} className="size-3 shrink-0" />
               <span className="truncate">{item.category_name}</span>
             </span>
@@ -142,7 +142,7 @@ export function InventoryRow({
             )}
           </p>
           {quantity > 1 && (
-            <p className="tabular text-micro text-ink-muted">
+            <p className="tabular text-small text-ink-muted">
               {formatMoney(item.cost_cents)} total
             </p>
           )}
@@ -172,7 +172,7 @@ export function InventoryImageFallback({
 }) {
   return (
     <span className={cn('flex items-center justify-center bg-canvas text-ink-muted', className)}>
-      <CategoryGlyph slug={categorySlug} className="size-8" strokeWidth={1.5} />
+      <CategoryGlyph slug={categorySlug} className="size-8" strokeWidth={1.75} />
     </span>
   );
 }

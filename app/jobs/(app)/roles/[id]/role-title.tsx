@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/field';
 import { renameRole } from './actions';
 
 /**
@@ -30,7 +31,7 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
       >
         {shown}
         <Pencil
-          className="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="size-4 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
           strokeWidth={1.75}
           aria-hidden
         />
@@ -59,10 +60,13 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <input
+      {/* This input *is* the page title while it is open, so it keeps the
+          heading's face and size rather than the control's 13px. */}
+      <Input
         autoFocus
         value={draft}
         disabled={pending}
+        aria-label="Role name"
         onChange={(event) => setDraft(event.target.value)}
         onBlur={save}
         onKeyDown={(event) => {
@@ -75,9 +79,9 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
             setEditing(false);
           }
         }}
-        className="rounded-lg border border-border bg-surface px-2 py-1 font-display text-xl font-semibold tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
+        className="font-display h-auto w-auto py-1 text-title font-semibold tracking-tight sm:text-title"
       />
-      {error && <span className="text-small font-normal text-status-rejected">{error}</span>}
+      {error && <span className="text-small font-normal text-danger">{error}</span>}
     </span>
   );
 }

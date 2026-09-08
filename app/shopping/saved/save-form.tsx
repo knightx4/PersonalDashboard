@@ -7,8 +7,11 @@ import {
   type ActionState,
   type PreviewState,
 } from '@/app/shopping/saved/actions';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
+import { cardVariants } from '@/components/ui/card';
+import { Field, FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 
 const previewInitial: PreviewState = {};
@@ -55,16 +58,17 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
             autoFocus={compact}
           />
           {!compact && (
-            <p className="mt-1.5 text-ui text-ink-muted">
+            <FieldHint>
               We pull title, image and price from the page when we can. You can edit
               everything before saving.
-            </p>
+            </FieldHint>
           )}
           <FieldError>{!dismissedPreview ? preview.error : undefined}</FieldError>
         </div>
         <Button
           type="submit"
-          disabled={previewPending || !urlInputValue.trim()}
+          pending={previewPending}
+          disabled={!urlInputValue.trim()}
           className="sm:mt-0 shrink-0"
         >
           {previewPending ? 'Looking up…' : 'Look up'}
@@ -72,20 +76,14 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
       </form>
 
       {ready && (
-        <form
-          action={saveAction}
-          className="space-y-5 rounded-card border border-border bg-surface p-4"
-        >
+        <form action={saveAction} className={cn(cardVariants({ padding: 'dense' }), 'space-y-5')}>
           <input type="hidden" name="url" value={preview.url} />
           <input type="hidden" name="merchant_id" value={preview.merchantId ?? ''} />
           <input type="hidden" name="currency" value={preview.currency ?? 'USD'} />
 
           {(preview.ownedMatches?.length ?? 0) > 0 && (
-            <div
-              className="rounded-card border border-caution/40 bg-caution-tint px-4 py-3"
-              role="status"
-            >
-              <p className="text-body font-medium text-ink">You may already own this</p>
+            <Banner tone="warn">
+              <p className="font-medium">You may already own this</p>
               <ul className="mt-2 space-y-1 text-ui text-ink-muted">
                 {preview.ownedMatches!.map((match) => (
                   <li key={match.id}>
@@ -103,7 +101,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
               <p className="mt-2 text-small text-ink-muted">
                 Warning only — you can still save it to the queue.
               </p>
-            </div>
+            </Banner>
           )}
 
           <div className="flex flex-col gap-5 sm:flex-row">
@@ -123,8 +121,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
             </div>
 
             <div className="min-w-0 flex-1 space-y-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
+              <Field id="title" label="Title">
                 <Input
                   id="title"
                   name="title"
@@ -132,10 +129,9 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                   defaultValue={preview.title ?? ''}
                   key={`title-${preview.url}`}
                 />
-              </div>
+              </Field>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="price">Price</Label>
+                <Field id="price" label="Price">
                   <Input
                     id="price"
                     name="price"
@@ -144,9 +140,8 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                     defaultValue={preview.price ?? ''}
                     key={`price-${preview.url}`}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="image_url">Image URL</Label>
+                </Field>
+                <Field id="image_url" label="Image URL">
                   <Input
                     id="image_url"
                     name="image_url"
@@ -154,16 +149,15 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
                     defaultValue={preview.imageUrl ?? ''}
                     key={`image-${preview.url}`}
                   />
-                </div>
+                </Field>
               </div>
-              <div>
-                <Label htmlFor="notes">Notes</Label>
+              <Field id="notes" label="Notes">
                 <Textarea
                   id="notes"
                   name="notes"
                   placeholder="Size, colour, why you want it…"
                 />
-              </div>
+              </Field>
               <p className="text-ui text-ink-muted">
                 {preview.merchantName
                   ? `Merchant: ${preview.merchantName}`
@@ -176,7 +170,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled={savePending}>
+            <Button type="submit" pending={savePending}>
               {savePending ? 'Saving…' : 'Save to queue'}
             </Button>
             <Button

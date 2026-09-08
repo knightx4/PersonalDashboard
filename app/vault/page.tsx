@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/field';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load';
 import { VaultStatusBanner } from '@/components/vault/status-banner';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +102,7 @@ export default async function VaultPage({
                   <FolderTree className="size-3.5" strokeWidth={2} aria-hidden />
                   {group.folder || 'Vault root'}
                 </h2>
-                <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+                <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
                   {group.notes.map((note) => (
                     <li key={note.id}>
                       <Link

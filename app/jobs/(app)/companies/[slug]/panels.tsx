@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { CardSection } from '@/components/ui/card';
+import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
 import {
@@ -111,11 +112,10 @@ function Research({
   const [pending, startTransition] = useTransition();
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-ui font-semibold text-ink">What you know about this place</h2>
-      <p className="mt-0.5 text-small text-ink-muted">
-        The one long-form field. It outlives every posting.
-      </p>
+    <CardSection
+      title="What you know about this place"
+      hint="The one long-form field. It outlives every posting."
+    >
       <Textarea
         rows={8}
         value={text}
@@ -139,7 +139,7 @@ function Research({
         </Button>
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
       </div>
-    </section>
+    </CardSection>
   );
 }
 
@@ -178,27 +178,22 @@ function Details({
     setForm((current) => ({ ...current, [key]: value }));
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-ui font-semibold text-ink">Details</h2>
-
+    <CardSection title="Details">
       <div className="mt-3 space-y-3">
-        <div>
-          <Label htmlFor="domains">Email domains</Label>
+        <Field
+          id="domains"
+          label="Email domains"
+          hint="This is what lets a recruiter’s personal work address find this company. It is also the list the second inbox query searches, which is how direct outreach gets caught at all."
+        >
           <Input
             id="domains"
             value={form.domains}
             onChange={(event) => set('domains')(event.target.value)}
             placeholder="ramp.com, ramp.co"
           />
-          <p className="mt-1 text-micro leading-relaxed text-ink-muted">
-            This is what lets a recruiter&rsquo;s personal work address find this company. It is
-            also the list the second inbox query searches, which is how direct outreach gets
-            caught at all.
-          </p>
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="priority">Priority</Label>
+        <Field id="priority" label="Priority">
           <Select
             id="priority"
             value={form.priority}
@@ -210,34 +205,33 @@ function Details({
               </option>
             ))}
           </Select>
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="industry">Industry</Label>
+        <Field id="industry" label="Industry">
           <Input
             id="industry"
             value={form.industry}
             onChange={(event) => set('industry')(event.target.value)}
           />
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="hqLocation">HQ</Label>
+        <Field id="hqLocation" label="HQ">
           <Input
             id="hqLocation"
             value={form.hqLocation}
             onChange={(event) => set('hqLocation')(event.target.value)}
           />
-        </div>
+        </Field>
 
         <div>
-          <Label htmlFor="website">Homepage</Label>
-          <Input
-            id="website"
-            value={form.website}
-            onChange={(event) => set('website')(event.target.value)}
-            placeholder="https://"
-          />
+          <Field id="website" label="Homepage">
+            <Input
+              id="website"
+              value={form.website}
+              onChange={(event) => set('website')(event.target.value)}
+              placeholder="https://"
+            />
+          </Field>
           {form.website && (
             <a
               href={form.website}
@@ -250,23 +244,21 @@ function Details({
           )}
         </div>
 
-        <div>
-          <Label htmlFor="careersUrl">Careers page</Label>
+        <Field id="careersUrl" label="Careers page">
           <Input
             id="careersUrl"
             value={form.careersUrl}
             onChange={(event) => set('careersUrl')(event.target.value)}
           />
-        </div>
+        </Field>
 
-        <div>
-          <Label htmlFor="linkedinUrl">LinkedIn</Label>
+        <Field id="linkedinUrl" label="LinkedIn">
           <Input
             id="linkedinUrl"
             value={form.linkedinUrl}
             onChange={(event) => set('linkedinUrl')(event.target.value)}
           />
-        </div>
+        </Field>
       </div>
 
       <div className="mt-3 flex items-center gap-3">
@@ -297,7 +289,7 @@ function Details({
 
       <Enrichment companyId={companyId} />
       <AiEnrichment companyId={companyId} />
-    </section>
+    </CardSection>
   );
 }
 
@@ -338,13 +330,13 @@ function Enrichment({ companyId }: { companyId: string }) {
   return (
     <div className="mt-4 border-t border-border pt-3">
       <div className="flex items-center gap-3">
-        <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={lookUp}>
+        <Button type="button" size="sm" variant="secondary" pending={pending} onClick={lookUp}>
           {pending ? 'Looking up…' : 'Look up on Wikidata'}
         </Button>
         {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 
-      <p className="mt-1 text-micro leading-relaxed text-ink-muted">
+      <p className="mt-1 text-small leading-relaxed text-ink-muted">
         Fills blank fields only — anything you have typed is left exactly as it is.
       </p>
 
@@ -355,7 +347,7 @@ function Enrichment({ companyId }: { companyId: string }) {
             <p className="text-small text-ink-muted">{proposal.description}</p>
           )}
 
-          <p className="mt-1 text-micro text-ink-muted">
+          <p className="mt-1 text-small text-ink-muted">
             {proposal.verified
               ? 'Matched on the company’s own website, so this is the right one.'
               : 'Matched on name only — no website on the record to check it against. Have a look before applying.'}
@@ -435,13 +427,13 @@ function AiEnrichment({ companyId }: { companyId: string }) {
   return (
     <div className="mt-3 border-t border-border pt-3">
       <div className="flex items-center gap-3">
-        <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={lookUp}>
+        <Button type="button" size="sm" variant="secondary" pending={pending} onClick={lookUp}>
           {pending ? 'Searching…' : 'Search with AI'}
         </Button>
         {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 
-      <p className="mt-1 text-micro leading-relaxed text-ink-muted">
+      <p className="mt-1 text-small leading-relaxed text-ink-muted">
         For the companies Wikidata has never heard of. Reads the web for a homepage and a plain
         summary; fills blank fields only.
       </p>
@@ -473,7 +465,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
           )}
 
           {proposal.sources.length > 0 && (
-            <p className="mt-2 text-micro text-ink-muted">
+            <p className="mt-2 text-small text-ink-muted">
               Sources:{' '}
               {proposal.sources.map((source, index) => (
                 <span key={source.url}>
@@ -513,8 +505,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
 
 function Contacts({ contacts }: { contacts: CompanyContact[] }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-ui font-semibold text-ink">People</h2>
+    <CardSection title="People">
       {contacts.length === 0 ? (
         <p className="mt-2 text-ui text-ink-muted">
           Nobody recorded here yet. Add people from the contacts page.
@@ -522,19 +513,19 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
       ) : (
         <ul className="mt-2 divide-y divide-border">
           {contacts.map((contact) => (
-            <li key={contact.id} className="flex flex-wrap items-baseline gap-2 py-2">
+            <li key={contact.id} className="row-pad flex flex-wrap items-baseline gap-2">
               <Link
                 href={`/jobs/contacts/${contact.id}`}
-                className="text-ui font-medium text-ink hover:underline"
+                className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
                 title="See details, notes and logged sends"
               >
                 {contact.fullName}
               </Link>
               {contact.title && <span className="text-small text-ink-muted">{contact.title}</span>}
-              <span className="rounded-full bg-canvas px-1.5 py-0.5 text-micro text-ink-muted">
+              <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
                 {contact.relationship.replace(/_/g, ' ')}
               </span>
-              <span className="text-micro text-ink-muted">{contact.status.replace(/_/g, ' ')}</span>
+              <span className="text-small text-ink-muted">{contact.status.replace(/_/g, ' ')}</span>
               {contact.linkedinUrl && (
                 <a
                   href={contact.linkedinUrl}
@@ -549,11 +540,11 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
           ))}
         </ul>
       )}
-      <p className="mt-2 text-micro leading-relaxed text-ink-muted">
+      <p className="mt-2 text-small leading-relaxed text-ink-muted">
         Name, title, public professional URL and work email only. This is other people&rsquo;s
         data, and it has no product value beyond contacting them.
       </p>
-    </section>
+    </CardSection>
   );
 }
 
@@ -587,15 +578,16 @@ function Touches({
   const answered = outbound.filter((t) => t.respondedAt !== null);
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">Outreach</h2>
-        {outbound.length > 0 && (
+    <CardSection
+      title="Outreach"
+      action={
+        outbound.length > 0 ? (
           <span className="tabular text-small text-ink-muted">
             {answered.length} of {outbound.length} answered
           </span>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
       {touches.length === 0 ? (
         <p className="mt-2 text-ui text-ink-muted">
           No sends recorded. Response rate is only computable if the sends are recorded from the
@@ -604,7 +596,7 @@ function Touches({
       ) : (
         <ul className="mt-2 divide-y divide-border">
           {touches.map((touch) => (
-            <li key={touch.id} className="py-2">
+            <li key={touch.id} className="row-pad">
               <div className="flex flex-wrap items-baseline gap-2 text-ui">
                 <span className="font-medium text-ink">{touch.contactName}</span>
                 <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
@@ -612,9 +604,9 @@ function Touches({
                   {formatDate(touch.sentAt, timezone)}
                 </span>
                 {touch.respondedAt ? (
-                  <span className="text-micro text-status-offer">replied</span>
+                  <span className="text-micro text-ink">replied</span>
                 ) : (
-                  <span className="text-micro text-ink-muted">no reply yet</span>
+                  <span className="text-small text-ink-muted">no reply yet</span>
                 )}
               </div>
               {touch.message && (
@@ -624,7 +616,7 @@ function Touches({
           ))}
         </ul>
       )}
-    </section>
+    </CardSection>
   );
 }
 
@@ -642,8 +634,7 @@ function Notes({
   const [pending, startTransition] = useTransition();
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-ui font-semibold text-ink">Notes</h2>
+    <CardSection title="Notes">
       <Textarea
         rows={3}
         value={body}
@@ -666,19 +657,19 @@ function Notes({
         >
           Add
         </Button>
-        {error && <span className="text-small text-status-rejected">{error}</span>}
+        <FieldError>{error}</FieldError>
       </div>
 
       <ul className="mt-3 space-y-2">
         {notes.map((note) => (
           <li key={note.id} className="rounded-lg bg-canvas p-2.5">
             <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
-            <p className="tabular mt-1 text-micro text-ink-muted">
+            <p className="tabular mt-1 text-small text-ink-muted">
               {formatDate(note.createdAt, timezone)}
             </p>
           </li>
         ))}
       </ul>
-    </section>
+    </CardSection>
   );
 }

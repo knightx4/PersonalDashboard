@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import { Check, Clock, Pin, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { ConfirmStep } from '@/components/ui/confirm-step';
+import { useToast } from '@/components/ui/toast';
 import {
   bringBackTask,
   completeTask,
@@ -21,6 +23,10 @@ import { EditTask } from './task-form';
  * The checkbox is the whole interaction most of the time, so it is the first
  * thing under the pointer and everything else is quieter. Nothing here opens a
  * detail page: a task with a detail page is a ticket, and this is a list.
+ *
+ * Done, drop and later each have an inverse in app/todo/actions.ts, so they
+ * happen at once and offer the way back in a toast. Delete has none, so it is
+ * the one action here that asks first.
  */
 export function TaskRow({
   task,
@@ -34,26 +40,49 @@ export function TaskRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
+  const toast = useToast();
 
   if (editing) return <EditTask task={task} onDone={() => setEditing(false)} />;
 
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
 
+  function complete() {
+    start(async () => {
+      await completeTask(task.id);
+      toast({ text: 'done', undo: () => reopenTask(task.id), undone: 'reopened' });
+    });
+  }
+
+  function drop() {
+    start(async () => {
+      await dropTask(task.id);
+      // reopenTask is the inverse of a drop: bringBackTask undoes a snooze.
+      toast({ text: 'dropped', undo: () => reopenTask(task.id), undone: 'back on the list' });
+    });
+  }
+
+  function later() {
+    start(async () => {
+      await laterTask(task.id);
+      toast({ text: 'until later', undo: () => bringBackTask(task.id), undone: 'brought back' });
+    });
+  }
+
   return (
-    <div className={cn('group flex items-start gap-3 py-2.5', pending && 'opacity-50')}>
+    <div className={cn('group row-pad flex items-start gap-3', pending && 'opacity-50')}>
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() => start(() => (done ? reopenTask(task.id) : completeTask(task.id)))}
+        onClick={() => (done ? start(() => reopenTask(task.id)) : complete())}
         className={cn(
-          'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border',
+          'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border transition-colors duration-150',
           done
             ? 'border-status-offer bg-status-offer text-surface'
             : 'border-control hover:border-accent',
         )}
       >
-        {done && <Check className="size-3" strokeWidth={3} aria-hidden />}
+        {done && <Check className="size-3" strokeWidth={2} aria-hidden />}
       </button>
 
       <div className="min-w-0 flex-1">
@@ -62,7 +91,7 @@ export function TaskRow({
             type="button"
             onClick={() => setEditing(true)}
             className={cn(
-              'text-left text-ui font-medium text-ink hover:text-accent',
+              'text-left text-ui font-medium text-ink transition-colors duration-150 hover:text-accent',
               (done || dropped) && 'text-ink-muted line-through',
             )}
           >
@@ -70,7 +99,7 @@ export function TaskRow({
           </button>
 
           {task.pinned && !done && !dropped && (
-            <Pin className="size-3 text-accent" strokeWidth={2} aria-label="Pinned" />
+            <Pin className="size-3 text-accent" strokeWidth={1.75} aria-label="Pinned" />
           )}
 
           <DueLabel task={task} timezone={timezone} />
@@ -78,13 +107,13 @@ export function TaskRow({
           {anchor && (
             <a
               href={anchor.href}
-              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 hover:text-accent"
+              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
             >
               {anchor.label}
             </a>
           )}
 
-          {dropped && <span className="text-micro text-ink-muted">dropped</span>}
+          {dropped && <span className="text-small text-ink-muted">dropped</span>}
         </div>
 
         {task.body && (
@@ -111,11 +140,11 @@ export function TaskRow({
                 <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
             ) : (
-              <IconButton label="Later" onClick={() => start(() => laterTask(task.id))}>
+              <IconButton label="Later" onClick={later}>
                 <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
             )}
-            <IconButton label="Drop" onClick={() => start(() => dropTask(task.id))}>
+            <IconButton label="Drop" onClick={drop}>
               <X className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
           </>
@@ -126,9 +155,16 @@ export function TaskRow({
             <IconButton label="Reopen" onClick={() => start(() => reopenTask(task.id))}>
               <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
-            <IconButton label="Delete" onClick={() => start(() => removeTask(task.id))}>
+            <ConfirmStep
+              prompt="Deletes this task for good. Dropping it keeps it in the archive."
+              confirmLabel="Delete"
+              pendingLabel="Deleting…"
+              onConfirm={() => removeTask(task.id)}
+              className="size-8 px-0 text-ink-muted hover:bg-sunken hover:text-ink"
+            >
               <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-            </IconButton>
+              <span className="sr-only">Delete</span>
+            </ConfirmStep>
           </>
         )}
       </div>
@@ -150,7 +186,7 @@ function IconButton({
       type="button"
       title={label}
       onClick={onClick}
-      className="press flex size-7 items-center justify-center rounded text-ink-muted hover:bg-canvas hover:text-ink"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
     >
       {children}
       <span className="sr-only">{label}</span>

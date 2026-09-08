@@ -23,7 +23,10 @@ export type ActionMenuItem = {
   /** Server action (FormData). May redirect or return a result. */
   formAction?: (formData: FormData) => unknown | Promise<unknown>;
   formFields?: Record<string, string>;
-  /** Confirm before submit / select. Prefer inline confirm UIs — window.confirm is often blocked. */
+  /**
+   * Confirm before submit / select. Shown in place, inside the menu: the item
+   * arms on the first click and does it on the second. Never window.confirm.
+   */
   confirm?: string;
   /** When false, keep the menu open after selecting (for multi-step menus). Default true. */
   closeOnSelect?: boolean;
@@ -135,6 +138,8 @@ export function ActionMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  /** The item whose confirm is showing, if any. Cleared whenever the menu closes. */
+  const [armed, setArmed] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -166,9 +171,13 @@ export function ActionMenu({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only bind while open
   }, [open]);
 
-  function runItem(item: ActionMenuItem) {
+  function runItem(item: ActionMenuItem, confirmed = false) {
     if (item.disabled || pending) return;
-    if (item.confirm && !window.confirm(item.confirm)) return;
+    if (item.confirm && !confirmed) {
+      setArmed(item.id);
+      return;
+    }
+    setArmed(null);
 
     const shouldClose = item.closeOnSelect !== false;
     if (shouldClose) setMenuOpen(false);
@@ -213,7 +222,7 @@ export function ActionMenu({
           setMenuOpen(!open);
         }}
       >
-        {trigger ?? <MoreHorizontal className="size-4" strokeWidth={2} aria-hidden />}
+        {trigger ?? <MoreHorizontal className="size-4" strokeWidth={1.75} aria-hidden />}
       </IconActionButton>
 
       {open &&
@@ -228,6 +237,45 @@ export function ActionMenu({
             className="fixed z-50 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg"
           >
             {items.map((item) => {
+              if (armed === item.id) {
+                return (
+                  <div key={item.id} role="none" className="px-3 py-2">
+                    <p className="text-small leading-snug text-ink-muted">{item.confirm}</p>
+                    <div className="mt-2 flex justify-end gap-1.5">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="press rounded-md px-2 py-1 text-ui text-ink-muted hover:bg-canvas hover:text-ink"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setArmed(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        autoFocus
+                        className={cn(
+                          'press rounded-md px-2 py-1 text-ui font-medium',
+                          item.destructive
+                            ? 'bg-danger-tint text-danger hover:opacity-90'
+                            : 'bg-accent-tint text-accent hover:opacity-90',
+                        )}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          runItem(item, true);
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
               const itemClass = cn(
                 'flex w-full items-center px-3 py-2 text-left text-ui transition-colors',
                 item.destructive

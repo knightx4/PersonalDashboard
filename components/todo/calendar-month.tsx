@@ -1,5 +1,8 @@
 import Link from 'next/link';
+import { CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
 
 /**
@@ -28,7 +31,7 @@ export function CalendarMonthGrid({
 
   return (
     <>
-      <div className="mt-4 hidden overflow-hidden rounded-card border border-border bg-surface sm:block">
+      <Card padding="none" className="mt-4 hidden overflow-hidden sm:block">
         <div className="grid grid-cols-7 border-b border-border">
           {WEEKDAYS.map((label) => (
             <div key={label} className="px-2 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
@@ -69,17 +72,20 @@ export function CalendarMonthGrid({
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {/* The phone view: the days that hold something, in order. */}
       <div className="mt-4 space-y-3 sm:hidden">
         {busy.length === 0 ? (
-          <p className="rounded-card border border-border bg-surface p-6 text-center text-ui text-ink-muted">
-            Nothing this month.
-          </p>
+          <EmptyState
+            icon={CalendarDays}
+            title="Nothing this month"
+            description="Anything with a date on it lands on its day here."
+            action={{ label: 'Add a task', href: '/todo' }}
+          />
         ) : (
           busy.map((day) => (
-            <div key={day.day} className="rounded-card border border-border bg-surface p-3">
+            <Card key={day.day} padding="dense">
               <p
                 className={cn(
                   'text-ui font-semibold',
@@ -100,7 +106,7 @@ export function CalendarMonthGrid({
                   </li>
                 ))}
               </ul>
-            </div>
+            </Card>
           ))
         )}
       </div>
@@ -134,7 +140,7 @@ export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: stri
         entry.done && 'text-ink-muted line-through',
       )}
     >
-      {time && <span className="tabular shrink-0 text-micro text-ink-muted">{time}</span>}
+      {time && <span className="tabular shrink-0 text-small text-ink-muted">{time}</span>}
       <span className="truncate">{entry.title}</span>
     </span>
   );
@@ -142,7 +148,11 @@ export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: stri
   if (!entry.href) return body;
 
   return (
-    <Link href={entry.href} className="block hover:text-accent" title={entry.title}>
+    <Link
+      href={entry.href}
+      className="block transition-colors duration-150 hover:text-accent"
+      title={entry.title}
+    >
       {body}
     </Link>
   );

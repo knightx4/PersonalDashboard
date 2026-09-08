@@ -8,16 +8,22 @@ import { cn } from '@/lib/cn';
  * canvas. Shadow belongs only to things genuinely floating -- menus and
  * popovers -- and transiently on `lift` hover.
  *
+ * Lightbox is the one exception and it is handled by `sheet`, not here: on a
+ * black bench a card is an object, and an object has an edge. In the other
+ * four themes `sheet` resolves to the ordinary hairline and nothing else. See
+ * the token comments in app/globals.css.
+ *
  * Padding is a variant rather than fixed, and a header is optional, because
  * the previous version of this component insisted on both and so nobody used
  * it. The utility string it was competing with had been hand-written in over
  * a hundred places, which is how card padding ended up as p-3, p-4, p-5 and
- * p-8 depending on who wrote the file.
+ * p-8 depending on who wrote the file. Both variants derive from the density
+ * dial, so the whole app tightens together.
  */
-const card = cva('rounded-card border border-border bg-surface', {
+const card = cva('sheet rounded-card border bg-surface', {
   variants: {
     /** standard: a card the eye rests on. dense: a card holding a list. */
-    padding: { standard: 'p-5', dense: 'p-4', none: '' },
+    padding: { standard: 'card-pad', dense: 'card-pad-dense', none: '' },
     interactive: { true: 'lift cursor-pointer', false: '' },
   },
   defaultVariants: { padding: 'none', interactive: false },
@@ -29,12 +35,15 @@ export function Card({ className, padding, interactive, ...props }: CardProps) {
   return <div className={cn(card({ padding, interactive }), className)} {...props} />;
 }
 
+/** The card's classes without the element, for a <Link> or <li> that is a card. */
+export const cardVariants = card;
+
 /**
  * Only for a card using `padding="none"`. A card with its own padding puts its
  * title in whatever heading the page needs instead.
  */
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('px-5 pt-5 pb-3', className)} {...props} />;
+  return <div className={cn('card-pad-x pt-(--card-p) pb-3', className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
@@ -42,7 +51,7 @@ export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHead
 }
 
 export function CardBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('px-5 pb-5', className)} {...props} />;
+  return <div className={cn('card-pad-x pb-(--card-p)', className)} {...props} />;
 }
 
 /**
