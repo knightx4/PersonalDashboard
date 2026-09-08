@@ -115,8 +115,19 @@ type Rule = {
  * worse than a miss here: the only ways to clear one are to write `ui-ok:` on a
  * line that never broke the law, which turns the gate into a lie, or to mangle
  * correct code until the grep stops matching.
+ *
+ * That was first fixed with a lookbehind, which stopped `bg-border` but left a
+ * subtler one: the lookahead excluding `border-t` and `border-2` let
+ * `border-<colour>` through, so `border-t border-border` -- a top rule with a
+ * colour, and no frame anywhere -- would have been reported as a box. Nothing
+ * in the tree was spelled that way, so it never fired, but a latent false
+ * positive in a gate is a trap laid for whoever writes that line next.
+ *
+ * So this stopped being a pattern with exceptions and became what it always
+ * meant: the token is exactly `border`, on its own. Everything hyphenated is
+ * something else -- a side, a width, a colour -- and none of those is a frame.
  */
-const FULL_BORDER = /(?<![\w-])border\b(?!-[trblxy]\b)(?!-\d)/;
+const FULL_BORDER = /(?:^|\s)border(?=\s|$)/;
 
 /**
  * Every shape a class list is written in.
