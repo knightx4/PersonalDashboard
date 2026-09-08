@@ -29,12 +29,14 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   ]);
 
   /**
-   * Two lists, and the order is the point: what is being worked, then what is
-   * only being thought about. An idea that acquires a date and a page becomes
-   * a request and moves one section up by being filed as one.
+   * Three lists, and the order is the point: what is wrong now, what was
+   * decided and is being built, and what is only being thought about. A thing
+   * moves up this list as it acquires commitment — an idea becomes a plan step
+   * when it is decided on, and a bug is filed when something built is wrong.
    */
   const sections: NavSection[] = [
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
+    { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
   ];
 
