@@ -10,8 +10,11 @@ import {
   type ShelfRow,
 } from './actions';
 import { gameSubtitle } from './game-forms';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import {
   PHOTO_ACCEPT,
   preparePhoto,
@@ -159,21 +162,30 @@ export function GameShelfPhotoPanel() {
       )}
       {saveState.message && <p className="text-body text-accent">{saveState.message}</p>}
 
+      {/* A box the photo could see and not read is the page failing to tell
+          you the whole truth, and only you can fix it: that is the warn
+          Banner, not a hand-rolled caution box a shade off it. Law 2. */}
       {unreadable > 0 && (
-        <div className="rounded-lg border border-caution/30 bg-caution-fill/5 px-3 py-2 text-ui text-ink">
+        <Banner tone="warn">
           {unreadable} box(es) were visible but not identifiable — turned away, hidden,
           or cut off. Re-shoot that part of the shelf, or add those by hand.
-        </div>
+        </Banner>
       )}
 
       {matched.length > 0 && (
         <form action={saveAction} className="flex flex-col gap-3">
           <input type="hidden" name="games_json" value={JSON.stringify(payload)} />
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          {/* The read shelf is the result the page exists for: one card, with
+              divides inside it and rows on the density dial, rather than a
+              hand-drawn box. Law 11. */}
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
             {matched.map((row, index) => {
               const game = row.game!;
               return (
-                <li key={`${game.bggId ?? game.title}-${index}`} className="flex gap-3 px-4 py-3">
+                <li
+                  key={`${game.bggId ?? game.title}-${index}`}
+                  className="card-pad-x row-pad flex gap-3"
+                >
                   <input
                     type="checkbox"
                     name="selected"
@@ -238,9 +250,9 @@ export function GameShelfPhotoPanel() {
           {unmatchedError && (
             <p className="text-ui text-caution">{unmatchedError}</p>
           )}
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
             {unmatched.map((row, index) => (
-              <li key={`${row.raw}-${index}`} className="flex gap-3 px-4 py-2 text-ui">
+              <li key={`${row.raw}-${index}`} className="card-pad-x row-pad flex gap-3 text-ui">
                 <input
                   type="checkbox"
                   name="selected"

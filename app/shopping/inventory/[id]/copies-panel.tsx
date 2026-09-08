@@ -95,13 +95,16 @@ export function CopiesPanel({
             : 'Grouped by you. Everything above describes the item; what differs between copies is here.'}
       </p>
 
-      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+      {/* Divides and space, no frame: the card around this already said these
+          belong together. The one on this page keeps the accent tint, which
+          is the only grouping claim in the list that means anything. Law 11. */}
+      <ul className="divide-y divide-border">
         {copies.map((copy, index) => (
           <li
             key={copy.id}
             className={cn(
-              'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-ui',
-              copy.id === currentId && 'bg-accent-tint',
+              'row-pad flex flex-wrap items-center gap-x-3 gap-y-1 text-ui',
+              copy.id === currentId && '-mx-2 rounded-control bg-accent-tint px-2',
             )}
           >
             <span className="w-6 shrink-0 text-ink-muted">#{index + 1}</span>

@@ -9,7 +9,10 @@ import {
   type GameActionState,
 } from './actions';
 import { Button } from '@/components/ui/button';
+import { Card, cardVariants } from '@/components/ui/card';
+import { Group } from '@/components/ui/disclosure';
 import { FieldError, Input, Label } from '@/components/ui/field';
+import { cn } from '@/lib/cn';
 import type { CanonicalGame } from '@/lib/games/types';
 
 export function gameSubtitle(game: {
@@ -38,7 +41,9 @@ export function GameCard({
   pending: boolean;
 }) {
   return (
-    <div className="flex gap-4 rounded-xl border border-border bg-surface p-4">
+    // The result the search came back for, so it is a card rather than a
+    // hand-drawn box. Law 11.
+    <Card padding="standard" className="flex gap-4">
       {game.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- BGG CDN
         <img
@@ -86,13 +91,13 @@ export function GameCard({
         </div>
 
         {game.needsConfirmation && (game.alternates?.length ?? 0) > 0 && (
-          <div className="mt-3">
-            <p className="text-ui font-medium text-ink">Other editions on BGG</p>
-            <ul className="mt-1 divide-y divide-border rounded-lg border border-border">
+          // A heading and space rather than a second frame inside the card.
+          <Group title="Other editions on BGG" className="mt-3">
+            <ul className="divide-y divide-border">
               {game.alternates?.map((candidate, index) => (
                 <li
                   key={candidate.bggId ?? `${candidate.title}-${index}`}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  className="row-pad flex flex-wrap items-center justify-between gap-2"
                 >
                   <div className="min-w-0">
                     <p className="text-ui text-ink">{candidate.title}</p>
@@ -125,10 +130,10 @@ export function GameCard({
                 </li>
               ))}
             </ul>
-          </div>
+          </Group>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -147,11 +152,14 @@ export function AddGameManualForm({
   return (
     <form
       action={action}
-      className={
-        compact
-          ? 'flex flex-col gap-3 rounded-xl border border-border bg-surface p-4'
-          : 'flex flex-col gap-3'
-      }
+      className={cn(
+        'flex flex-col gap-3',
+        // The fallback copy under a failed lookup is a card; the mode's own
+        // form is the page and needs no frame. Same call as the book form,
+        // and the box it replaces was spelled in a ternary, where the gate
+        // could not see it.
+        compact && cardVariants({ padding: 'standard' }),
+      )}
     >
       {compact && (
         <p className="text-body font-medium text-ink">Add it by hand</p>

@@ -91,8 +91,12 @@ export function ItemSellPanel({
             : 'Asking prices for the same thing, less eBay fees, shipping and effort.'}
       </p>
 
+      {/* What the search came back with is a sentence and a button, not a
+          panel: it sits inside the Sell card, which is the grouping, and the
+          listings behind it fold underneath. A box here was the third frame
+          in from the page. Law 11. */}
       {searchState.query && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas px-3 py-2 text-ui">
+        <div className="flex flex-wrap items-center gap-2 text-ui">
           <span className={searchState.foundCents == null ? 'text-ink-muted' : 'text-ink'}>
             {searchState.foundCents == null
               ? `Nothing comparable is listed for “${searchState.query}”.`
