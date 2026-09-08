@@ -27,7 +27,11 @@ import {
  */
 
 const MODEL = 'claude-opus-5';
-const MAX_SEARCHES = 6;
+// Four, not six. Each search is a round trip inside one already-slow call,
+// and the sixth rarely changes the answer -- it is usually the model
+// double-checking a URL it already had. Fewer searches is the single cheapest
+// thing that makes an import feel finished sooner.
+const MAX_SEARCHES = 4;
 const TOOL_NAME = 'report_source';
 
 const SYSTEM = `You find where a recommended work can actually be read, and which
@@ -177,6 +181,40 @@ async function resolveOne(
  * citation the resolver could not place is one line on the confirm screen
  * saying so, which is honest and costs nothing.
  */
+/**
+ * Resolve exactly one citation.
+ *
+ * The whole-list version below still exists for callers that want everything
+ * at once, but the import screen uses this: the browser asks for one item per
+ * request and paints each answer as it lands. Same total work, and a wait you
+ * can watch progress through instead of a spinner that says nothing for a
+ * minute. It also keeps every request short, which matters on a platform that
+ * eventually stops one.
+ */
+export async function resolveOneReference(
+  candidate: ReferenceCandidate,
+  options: { anthropicApiKey: string; question?: string | null; client?: Anthropic },
+): Promise<ResolutionRow> {
+  const client = options.client ?? new Anthropic({ apiKey: options.anthropicApiKey });
+
+  try {
+    const resolved = await resolveOne(client, candidate, options.question?.trim() || null);
+    if (isEmptyResolution(resolved)) {
+      return { candidate, resolved, error: resolved.locator_basis || 'Could not find this one.' };
+    }
+    return { candidate, resolved };
+  } catch (error) {
+    if (error instanceof Anthropic.RateLimitError) {
+      return { candidate, resolved: null, error: 'Rate limited. Try this one again shortly.' };
+    }
+    return {
+      candidate,
+      resolved: null,
+      error: error instanceof Error ? error.message : 'Resolve failed',
+    };
+  }
+}
+
 export async function resolveReferences(
   candidates: ReferenceCandidate[],
   options: {

@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { parseReferences } from '@/lib/learn/import/parse';
-import { resolveReferences } from '@/lib/learn/import/resolve';
+import { resolveOneReference } from '@/lib/learn/import/resolve';
+import type { ReferenceCandidate } from '@/lib/learn/import/parse-heuristic';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import { createTrack, saveImport, type SaveRow } from '@/lib/learn/tracks/save';
 
@@ -32,16 +33,7 @@ export type PreviewRow = {
   error?: string;
 };
 
-export type NewTrackState = {
-  error?: string;
-  preview?: {
-    title: string;
-    question: string | null;
-    rawText: string;
-    sourceHint: string | null;
-    rows: PreviewRow[];
-  };
-};
+export type NewTrackState = { error?: string };
 
 const PreviewInput = z.object({
   question: z.string().trim().max(2000),
@@ -66,10 +58,31 @@ function titleFor(question: string, text: string): string {
   return `Reading list, ${new Date().toISOString().slice(0, 10)}`;
 }
 
-export async function previewImport(
-  _prev: NewTrackState,
-  formData: FormData,
-): Promise<NewTrackState> {
+export type ParsedImport = {
+  title: string;
+  question: string | null;
+  rawText: string;
+  sourceHint: string | null;
+  candidates: ReferenceCandidate[];
+  /** True when there is no API key, so nothing will be searched for. */
+  unresolvable: boolean;
+};
+
+export type ParseState = { error?: string; parsed?: ParsedImport };
+
+/**
+ * Read the paste, and stop.
+ *
+ * Parsing is one cheap call and comes back in a second or two, so the list of
+ * what was found appears almost immediately. Searching for each one is the
+ * slow half and happens afterwards, one request per item, so rows fill in as
+ * they land rather than the whole screen waiting on the slowest.
+ *
+ * Splitting it this way is also what keeps each request short. A single call
+ * that resolved eight citations end to end is one long request that a platform
+ * eventually cuts off, and when it does you lose all eight.
+ */
+export async function parseImport(_prev: ParseState, formData: FormData): Promise<ParseState> {
   await requireUser();
 
   const parsed = PreviewInput.safeParse({
@@ -89,54 +102,63 @@ export async function previewImport(
     return { error: 'Nothing in that paste looked like something to read.' };
   }
 
-  // With no key the module still works: the heuristic found the citations, and
-  // they go in unresolved rather than not at all. A queue of titles you have
-  // to search yourself is what you had before this existed, so it is a floor
-  // rather than a failure.
-  if (!apiKey) {
-    return {
-      preview: {
-        title: titleFor(question, text),
-        question: question || null,
-        rawText: text,
-        sourceHint: sourceHint || null,
-        rows: candidates.map((candidate) => ({
-          raw: candidate.raw,
-          why: candidate.why,
-          resolved: {
-            title: candidate.title,
-            author: candidate.author,
-            kind: 'page' as const,
-            canonical_url: candidate.url?.startsWith('https://') ? candidate.url : null,
-            access: 'unknown' as const,
-            locator_kind: 'whole' as const,
-            locator_basis: 'Read from your paste; nothing was searched for or checked.',
-            locator_verified: false,
-            not_found: false,
-          },
-        })),
-      },
-    };
-  }
-
-  const resolutions = await resolveReferences(candidates, {
-    anthropicApiKey: apiKey,
-    question: question || null,
-  });
-
   return {
-    preview: {
+    parsed: {
       title: titleFor(question, text),
       question: question || null,
       rawText: text,
       sourceHint: sourceHint || null,
-      rows: resolutions.map((row) => ({
-        raw: row.candidate.raw,
-        why: row.candidate.why,
-        resolved: row.resolved,
-        error: row.error,
-      })),
+      candidates,
+      // With no key the module still works: the heuristic found the citations
+      // and they go in unresolved rather than not at all. A queue of titles you
+      // have to search yourself is what you had before this existed.
+      unresolvable: !apiKey,
     },
+  };
+}
+
+/**
+ * Find where one of them can be read.
+ *
+ * Called once per item, in parallel, from the screen. Never throws: a citation
+ * that cannot be placed comes back carrying its reason, because one line
+ * saying so is what stops you assuming the list was complete.
+ */
+export async function resolveCandidate(input: {
+  candidate: ReferenceCandidate;
+  question: string | null;
+}): Promise<PreviewRow> {
+  await requireUser();
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return {
+      raw: input.candidate.raw,
+      why: input.candidate.why,
+      resolved: {
+        title: input.candidate.title,
+        author: input.candidate.author,
+        kind: 'page' as const,
+        canonical_url: input.candidate.url?.startsWith('https://') ? input.candidate.url : null,
+        access: 'unknown' as const,
+        locator_kind: 'whole' as const,
+        locator_basis: 'Read from your paste; nothing was searched for or checked.',
+        locator_verified: false,
+        not_found: false,
+      },
+    };
+  }
+
+  const row = await resolveOneReference(input.candidate, {
+    anthropicApiKey: apiKey,
+    question: input.question,
+  });
+
+  return {
+    raw: row.candidate.raw,
+    why: row.candidate.why,
+    resolved: row.resolved,
+    error: row.error,
   };
 }
 
