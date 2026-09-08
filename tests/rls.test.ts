@@ -106,6 +106,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.feedback_items = feedback.id;
 
+  const [idea] = await admin<{ id: string }[]>`
+    insert into ideas (user_id, body, module)
+    values (${userId}, ${`${tag} had an idea`}, 'learn')
+    returning id`;
+  ids.ideas = idea.id;
+
   const [bookQuote] = await admin<{ id: string }[]>`
     insert into book_price_quotes (isbn_13, source, quoted_cents, vendor_name)
     values (

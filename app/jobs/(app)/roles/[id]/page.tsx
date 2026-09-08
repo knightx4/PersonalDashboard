@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
-import { publicEnv } from '@/lib/env';
+import { requestOrigin } from '@/lib/auth/origin';
 import { PageHeader } from '@/components/shell/page-header';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
@@ -112,7 +112,7 @@ export default async function RoleDetailPage({
         // reading a round, and the contact carries the LinkedIn and the title
         // that make the name worth clicking.
         .select(
-          `id, round, kind, scheduled_at, duration_minutes, format, status, prep_notes, notes,
+          `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
            questions_asked, group_id,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
         )
@@ -395,7 +395,10 @@ export default async function RoleDetailPage({
             : null
         }
         caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
-        appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
+        // The live host rather than NEXT_PUBLIC_APP_URL: a case-page link is
+        // sent to a hiring manager, and an env var that still holds its
+        // localhost default would hand them a link only the sender can open.
+        appOrigin={await requestOrigin()}
         timezone={timezone}
         initialTab={tab === 'interviews' ? 'interviews' : undefined}
         focusInterviewId={focusInterviewId ?? null}
@@ -414,6 +417,7 @@ export default async function RoleDetailPage({
           round: interview.round as number,
           kind: interview.kind as string,
           scheduledAt: interview.scheduled_at as string | null,
+          timeKnown: (interview.time_known as boolean | null) ?? true,
           debriefDue: debriefDue(interview.scheduled_at as string | null),
           format: interview.format as string | null,
           status: interview.status as string,

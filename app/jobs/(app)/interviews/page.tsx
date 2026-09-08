@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
-import { formatDateTime } from '@/lib/jobs/applications/load';
+import { formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 
 export const metadata = { title: 'Interviews' };
@@ -31,7 +31,7 @@ export default async function InterviewsPage() {
     supabase
       .from('interviews')
       .select(
-        'id, round, kind, scheduled_at, format, status, notes, applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, round, kind, scheduled_at, time_known, format, status, notes, applications!inner ( id, roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', user.id)
       .order('scheduled_at', { ascending: false }),
@@ -45,6 +45,8 @@ export default async function InterviewsPage() {
     round: number;
     kind: string;
     scheduled_at: string | null;
+    /** False when only the day is settled — see formatInterviewWhen. */
+    time_known: boolean | null;
     format: string | null;
     status: string;
     notes: string | null;
@@ -95,7 +97,7 @@ export default async function InterviewsPage() {
                   {row.applications.roles.companies.name} · {row.applications.roles.title}
                 </Link>
                 <span className="tabular ml-2 text-ink-muted">
-                  {formatDateTime(row.scheduled_at, timezone)}
+                  {formatInterviewWhen(row.scheduled_at, row.time_known ?? true, timezone)}
                 </span>
               </li>
             ))}
@@ -119,23 +121,32 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * interview from months ago with no notes is stale, not "write it up
  * tonight" — it stays visible in the Past table without the urgent banner.
  */
-function splitByTime<T extends { scheduled_at: string | null; notes: string | null }>(
-  rows: T[],
-): { upcoming: T[]; past: T[]; needDebrief: T[] } {
+function splitByTime<
+  T extends { scheduled_at: string | null; time_known: boolean | null; notes: string | null },
+>(rows: T[]): { upcoming: T[]; past: T[]; needDebrief: T[] } {
   const now = Date.now();
   const debriefWindowStart = now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
-  const upcoming = rows.filter(
-    (row) => row.scheduled_at !== null && new Date(row.scheduled_at).getTime() >= now,
-  );
-  const past = rows.filter(
-    (row) => row.scheduled_at === null || new Date(row.scheduled_at).getTime() < now,
-  );
-  const needDebrief = past.filter(
-    (row) =>
-      !row.notes &&
-      row.scheduled_at !== null &&
-      new Date(row.scheduled_at).getTime() >= debriefWindowStart,
-  );
+
+  // A round known only by its day is stored at that day's midnight. It has not
+  // happened until the day is over, so the day itself counts as upcoming --
+  // otherwise an interview this afternoon reads as past all morning.
+  const over = (row: T): number | null =>
+    row.scheduled_at === null
+      ? null
+      : new Date(row.scheduled_at).getTime() + (row.time_known === false ? DAY_MS : 0);
+
+  const upcoming = rows.filter((row) => {
+    const at = over(row);
+    return at !== null && at >= now;
+  });
+  const past = rows.filter((row) => {
+    const at = over(row);
+    return at === null || at < now;
+  });
+  const needDebrief = past.filter((row) => {
+    const at = over(row);
+    return !row.notes && at !== null && at >= debriefWindowStart;
+  });
   return { upcoming, past, needDebrief };
 }
 
@@ -150,6 +161,7 @@ function Section({
     round: number;
     kind: string;
     scheduled_at: string | null;
+    time_known: boolean | null;
     format: string | null;
     status: string;
     notes: string | null;
@@ -181,7 +193,7 @@ function Section({
                cell keeps its own link, lifted above the row link with `relative`. */
             <TR key={row.id} href={interviewHref(row.applications.roles.id, row.id)}>
               <TD primary className="tabular">
-                {formatDateTime(row.scheduled_at, timezone)}
+                {formatInterviewWhen(row.scheduled_at, row.time_known ?? true, timezone)}
               </TD>
               <TD label="Company" muted>
                 {row.applications.roles.companies.name}

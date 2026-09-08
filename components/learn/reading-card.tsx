@@ -50,6 +50,10 @@ export function LocatorLine({ reading }: { reading: ReadingRow }) {
         ? `p. ${reading.pageFrom}`
         : null;
 
+  // Nothing to point into. A confidence badge on a reading with no source
+  // would be claiming something about a document that does not exist.
+  if (!reading.source) return null;
+
   const where = [reading.locatorLabel, pages].filter(Boolean).join(', ');
   if (!where && reading.locatorConfidence === 'verified') return null;
 
@@ -111,15 +115,24 @@ export function ReadingCard({ reading }: { reading: ReadingRow }) {
                   : 'text-body font-medium text-ink'
               }
             >
-              {reading.source.title}
+              {reading.subject}
             </span>
-            {reading.source.author && (
+            {reading.source?.author && (
               <span className="text-ui text-ink-muted">{reading.source.author}</span>
             )}
-            <AccessBadge
-              access={reading.source.access}
-              priceCents={reading.source.priceCents}
-            />
+            {reading.source ? (
+              <AccessBadge
+                access={reading.source.access}
+                priceCents={reading.source.priceCents}
+              />
+            ) : (
+              // Written down, nothing found for it yet. Said plainly rather
+              // than left blank, because a row with no source and no note
+              // about it reads as a row that failed.
+              <span className="rounded-pill border border-dashed border-border px-1.5 py-0.5 text-caption text-ink-muted">
+                No source yet
+              </span>
+            )}
           </span>
 
           {reading.why && (

@@ -5,7 +5,7 @@ import {
   deleteFeedback,
   updateFeedbackStatus,
   type FeedbackActionState,
-} from './actions';
+} from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select } from '@/components/ui/field';

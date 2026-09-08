@@ -181,6 +181,7 @@ const CHECKS: Check[] = [
   { ink: '--c-w-todo', grounds: [...GROUNDS, '--c-w-todo-tint'], min: TEXT, why: 'todo accent' },
   { ink: '--c-w-vault', grounds: [...GROUNDS, '--c-w-vault-tint'], min: TEXT, why: 'vault accent' },
   { ink: '--c-w-learn', grounds: [...GROUNDS, '--c-w-learn-tint'], min: TEXT, why: 'learn accent' },
+  { ink: '--c-w-dev', grounds: [...GROUNDS, '--c-w-dev-tint'], min: TEXT, why: 'dev accent' },
   { ink: '--c-positive', grounds: [...GROUNDS, '--c-positive-tint'], min: TEXT, why: 'refunds and savings' },
   { ink: '--c-caution', grounds: [...GROUNDS, '--c-caution-tint'], min: TEXT, why: 'needs attention' },
   { ink: '--c-danger', grounds: [...GROUNDS, '--c-danger-tint'], min: TEXT, why: 'destructive and rejected' },
@@ -244,6 +245,7 @@ CHECKS.push(
   { ink: '--c-w-todo-lit', grounds: PAGE, min: TEXT, why: 'todo accent on the page ground' },
   { ink: '--c-w-vault-lit', grounds: PAGE, min: TEXT, why: 'vault accent on the page ground' },
   { ink: '--c-w-learn-lit', grounds: PAGE, min: TEXT, why: 'learn accent on the page ground' },
+  { ink: '--c-w-dev-lit', grounds: PAGE, min: TEXT, why: 'dev accent on the page ground' },
 );
 
 /**
@@ -255,7 +257,14 @@ CHECKS.push(
  * it is worth pinning the sheet value too, or a hue could be fixed for the
  * bench and quietly broken on a card.
  */
-for (const hue of ['--c-w-shopping', '--c-w-jobs', '--c-w-todo', '--c-w-vault', '--c-w-learn'] as const) {
+for (const hue of [
+  '--c-w-shopping',
+  '--c-w-jobs',
+  '--c-w-todo',
+  '--c-w-vault',
+  '--c-w-learn',
+  '--c-w-dev',
+] as const) {
   CHECKS.push({
     ink: '--c-surface',
     grounds: [hue],

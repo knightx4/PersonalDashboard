@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { formatDateTime } from '@/lib/jobs/applications/load';
+import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
 import { ReminderActions } from './reminder-actions';
 import { WaitingActions } from './waiting-actions';
@@ -75,7 +75,7 @@ export default async function TodayPage() {
                   className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1"
                 >
                   <span className="tabular w-full text-ui font-medium text-ink sm:w-44">
-                    {formatDateTime(interview.scheduledAt, timezone)}
+                    {formatInterviewWhen(interview.scheduledAt, interview.timeKnown, timezone)}
                   </span>
                   <Link
                     href={`/jobs/roles/${interview.roleId}?tab=interviews&interview=${interview.id}`}

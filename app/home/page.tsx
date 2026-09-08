@@ -109,15 +109,18 @@ export default async function HomePage() {
     on('vault') ? safe(loadVaultBrief(), null) : null,
     on('learn') ? safe(loadLearnBrief(), null) : null,
   ]);
-  const briefs = (
-    [
-      ['shopping', loaded[0]],
-      ['jobs', loaded[1]],
-      ['todo', loaded[2]],
-      ['vault', loaded[3]],
-      ['learn', loaded[4]],
-    ] as const
-  ).filter((entry): entry is readonly [ModuleId, Brief] => entry[1] !== null);
+  // The dev workspace has no brief of its own yet: its queue is the feedback
+  // list, and the button in the header already says how long it is.
+  const paired: ReadonlyArray<readonly [ModuleId, Brief | null]> = [
+    ['shopping', loaded[0]],
+    ['jobs', loaded[1]],
+    ['todo', loaded[2]],
+    ['vault', loaded[3]],
+    ['learn', loaded[4]],
+  ];
+  const briefs = paired.filter(
+    (entry): entry is readonly [ModuleId, Brief] => entry[1] !== null,
+  );
 
   // Overdue and today only, capped. Everything else is a page away.
   const due = (agenda?.piles ?? [])

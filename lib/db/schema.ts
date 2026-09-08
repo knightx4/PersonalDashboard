@@ -593,6 +593,24 @@ export const feedbackItems = pgTable(
   ],
 );
 
+/**
+ * Long-term ideas: things that might be worth doing one day, and are not
+ * waiting on anyone. Separate from `feedback_items` because everything in that
+ * queue is a claim that something should happen soon, and an idea is not.
+ */
+export const ideas = pgTable(
+  'ideas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    body: text('body').notNull(),
+    /** The module it is about, or null for the app as a whole. */
+    module: text('module'),
+    ...timestamps,
+  },
+  (t) => [index('ideas_user_created_idx').on(t.userId, t.createdAt)],
+);
+
 /** Shared ISBN quote cache (buyback / Browse / later sold comps). */
 export const bookPriceQuotes = pgTable(
   'book_price_quotes',

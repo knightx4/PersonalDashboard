@@ -74,7 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         sections={sections}
         settingsHref="/jobs/settings"
         settingsLabel="Job search settings"
-        feedbackHref="/jobs/feedback"
+        feedbackHref="/dev/bugs"
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
