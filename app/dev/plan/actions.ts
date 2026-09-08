@@ -201,6 +201,7 @@ const updateSchema = z.object({
   title: titleField,
   detail: text(4000).optional(),
   acceptance: text(4000).optional(),
+  fog: text(4000).optional(),
   comment: text(4000).optional(),
   commit: text(64).optional(),
   status: statusField,
@@ -230,6 +231,7 @@ export async function updatePlanItem(
     title: field(formData, 'title'),
     detail: field(formData, 'detail'),
     acceptance: field(formData, 'acceptance'),
+    fog: field(formData, 'fog'),
     comment: field(formData, 'comment'),
     commit: field(formData, 'commit'),
     status: field(formData, 'status', 'not_started'),
@@ -251,6 +253,10 @@ export async function updatePlanItem(
     title: parsed.data.title,
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
+    // Emptied is cleared, not blanked: fog is meant to disappear the moment
+    // the steps that dispel it exist, and null is what "there is none" reads
+    // as everywhere else it is asked about.
+    fog: parsed.data.fog || null,
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,
@@ -471,6 +477,65 @@ export async function movePlanItem(
   return { message: 'Moved.' };
 }
 
+/**
+ * Settle a decision.
+ *
+ * The other way a step closes. A build step closes on a commit; a decision
+ * closes on an answer, in the person's words, recorded in `resolution` where
+ * every brief beneath the feature will carry it from then on. `commit_sha`
+ * stays null, because nothing was built.
+ *
+ * Two refusals, and both are the point. A step that is not a decision cannot
+ * be answered -- the form is only rendered on a decision, so reaching here
+ * with a build step means the id was forged, and answering it would leave a
+ * step that reads done with no commit and no work behind it. And an empty
+ * answer is refused: a question closed on nothing is exactly what this
+ * feature exists to stop, and it would be worse than the question staying
+ * open, because it would stop looking like a question.
+ *
+ * The dated line on the comment is the same one the CLI writes, so a decision
+ * answered on the page and one answered from a terminal read the same.
+ */
+export async function answerPlanDecision(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const answer = text(4000).safeParse(field(formData, 'answer'));
+  if (!answer.success) return { error: 'That answer is too long.' };
+  if (!answer.data) return { error: 'An answer is what closes a decision. Say what you decided.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('kind, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.kind !== 'decision') {
+    return { error: 'That step is work, not a question. It closes on a commit.' };
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const line = `Answered ${stamp}: ${answer.data}`;
+  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'done', resolution: answer.data, comment, commit_sha: null })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Answered.' };
+}
+
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
 export async function deletePlanItem(
   _prev: PlanActionState,
@@ -588,6 +653,83 @@ export async function sendPlanItemToClaude(
   });
   if (!result.ok) return { error: result.error };
   return { message: `Sent. ${result.detail}` };
+}
+
+/**
+ * Hand a whole feature over and start the routine on it now.
+ *
+ * The step-at-a-time button is right when you are watching; a feature of seven
+ * steps pressed seven times is not. So this one cascades -- every open step
+ * beneath becomes Claude's, the way approving cascades -- and fires once with
+ * the feature's brief, which already carries its steps and what each waits on.
+ * The session works them in order and stops at the first thing it should not
+ * decide alone.
+ *
+ * It refuses a proposal, because a proposal is not work yet, and it refuses a
+ * feature with nothing open beneath it, because there would be nothing to do.
+ * Proposed steps beneath an approved feature are left alone rather than swept
+ * in: a step nobody has said yes to is not part of the batch.
+ */
+export async function sendPlanFeatureToClaude(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const data = await loadPlan(supabase, user.id);
+  const sections = buildPlanTree(data);
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  if (node.status === 'proposed') {
+    return { error: `#${node.number} is only a proposal. Approve it first.` };
+  }
+
+  // Itself included: a feature is closed when its steps are, and the session
+  // needs it to be its own to close.
+  const open = flatten([node]).filter(
+    (step) => !isClosed(step.status) && step.status !== 'proposed',
+  );
+  if (open.length === 0) return { error: 'Nothing open under that step.' };
+
+  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
+  if (toHandOver.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ assignee: 'claude' })
+      .in('id', toHandOver)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePlan();
+  }
+
+  const steps = open.length - 1;
+  const text =
+    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
+    '.claude/skills/plan/SKILL.md. Build its steps ONE AT A TIME in the order the plan ' +
+    'gives, each verified, committed and closed before the next is claimed, and keep ' +
+    'going until every step beneath it is closed, something blocks, or the session is ' +
+    'running short. Stop at the first step that needs a decision from me: block it with ' +
+    'the exact question rather than guessing, and do not skip past it to a later step. ' +
+    'Push once at the end of the batch and report every step you closed, by number and ' +
+    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
+    'the plan is the source of truth.\n\n' +
+    planBrief(sections, node);
+
+  const routine = planRoutine();
+  const result = await fireFeatureRoutine({
+    apiKey: routine.token,
+    routineId: routine.id,
+    text,
+  });
+  if (!result.ok) return { error: result.error };
+  return {
+    message: `Sent #${node.number} and its ${steps === 1 ? 'step' : `${steps} steps`}. ${result.detail}`,
+  };
 }
 
 /**

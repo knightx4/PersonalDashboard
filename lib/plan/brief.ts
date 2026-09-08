@@ -1,6 +1,6 @@
 import { MODULES } from '@/lib/modules';
 import { isClosed, type PlanStatus } from './load';
-import { ancestorsOf, type PlanNode, type PlanSection } from './tree';
+import { ancestorsOf, flatten, type PlanNode, type PlanSection } from './tree';
 
 /**
  * A step written out for whoever is about to build it.
@@ -42,9 +42,49 @@ function steps(nodes: readonly PlanNode[], indent = ''): string[] {
   return nodes.flatMap((node) => [indent + line(node), ...steps(node.children, indent + '  ')]);
 }
 
+/**
+ * The feature a step belongs to: the nearest step above it that says what
+ * being finished means. That is what a feature is in practice — the level at
+ * which somebody wrote down a destination — so it is found rather than
+ * declared, and a plan two levels deep and one five levels deep both work.
+ *
+ * A step with no such ancestor is its own feature, which is what a top-level
+ * step is. Its destination is its own done-when, already printed, so nothing
+ * is repeated; what it gains is the decisions settled beneath it.
+ */
+function featureOf(node: PlanNode, ancestors: readonly PlanNode[]): PlanNode {
+  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+    if (ancestors[i].acceptance) return ancestors[i];
+  }
+  return ancestors[0] ?? node;
+}
+
+/**
+ * Every question already settled beneath a feature, with its answer.
+ *
+ * This is the whole point of the feature: a session three nights later builds
+ * against what was decided without being told again, and never asks the same
+ * question twice. Generated from the rows rather than maintained by hand, so
+ * it cannot fall out of date. Dropped decisions are left out — a question
+ * withdrawn was never answered — and so is the step being briefed, which does
+ * not need to be told its own answer.
+ */
+function decidedSoFar(feature: PlanNode, node: PlanNode): PlanNode[] {
+  return flatten([feature]).filter(
+    (item) =>
+      item.id !== node.id &&
+      item.kind === 'decision' &&
+      item.status === 'done' &&
+      Boolean(item.resolution),
+  );
+}
+
 export function planBrief(sections: readonly PlanSection[], node: PlanNode): string {
   const ancestors = ancestorsOf(sections, node.id);
   const out: string[] = [];
+
+  const feature = featureOf(node, ancestors);
+  const decided = decidedSoFar(feature, node);
 
   out.push(`# Plan step #${node.number} — ${node.title}`);
   out.push('');
@@ -62,12 +102,30 @@ export function planBrief(sections: readonly PlanSection[], node: PlanNode): str
     out.push(`Part of: ${ancestors.map((a) => `#${a.number} ${a.title}`).join(' › ')}`);
   }
 
+  // Where the whole feature is going, above what this one step is for. A step
+  // built against its own done-when alone can meet it and still miss the point.
+  if (feature.id !== node.id && feature.acceptance) {
+    out.push('', '## Destination', '', `#${feature.number} ${feature.title} — ${feature.acceptance}`);
+  }
+
+  if (decided.length > 0) {
+    out.push('', '## Decided so far', '');
+    for (const item of decided) out.push(`- #${item.number} ${item.title} — ${item.resolution}`);
+  }
+
   if (node.detail) {
-    out.push('', '## What it involves', '', node.detail);
+    // A decision is a question with its options, not a description of work.
+    out.push('', node.kind === 'decision' ? '## Question' : '## What it involves', '', node.detail);
   }
 
   if (node.acceptance) {
     out.push('', '## Done when', '', node.acceptance);
+  }
+
+  // What nobody can see yet. Said plainly, because the alternative a proposal
+  // reaches for is plausible steps invented to fill the gap.
+  if (node.fog) {
+    out.push('', '## Not yet specified', '', node.fog);
   }
 
   if (node.dependsOn.length > 0) {
@@ -97,6 +155,10 @@ export function planBrief(sections: readonly PlanSection[], node: PlanNode): str
 
   if (node.comment) {
     out.push('', '## Notes', '', node.comment);
+  }
+
+  if (node.resolution) {
+    out.push('', '## Answered', '', node.resolution);
   }
 
   if (node.commitSha) {

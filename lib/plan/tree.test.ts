@@ -27,6 +27,9 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     detail: null,
     acceptance: null,
     status: 'not_started',
+    kind: 'build',
+    fog: null,
+    resolution: null,
     comment: null,
     priority: 2,
     size: null,
@@ -397,6 +400,21 @@ describe('workOrder', () => {
       item({ id: 'nobody' }),
     ]);
     expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
+  });
+
+  it('never hands Claude a decision, however it is assigned', () => {
+    // The one thing a routine must not do is answer its own question.
+    const sections = tree([
+      item({ id: 'work', assignee: 'claude' }),
+      item({ id: 'question', assignee: 'claude', kind: 'decision' }),
+    ]);
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
+  });
+
+  it('still lists a decision unfiltered, so the person sees it', () => {
+    const sections = tree([item({ id: 'question', assignee: 'claude', kind: 'decision' })]);
+    expect(workOrder(sections).map((n) => n.id)).toEqual(['question']);
+    expect(workOrder(sections, { assignee: 'me' }).map((n) => n.id)).toEqual([]);
   });
 });
 

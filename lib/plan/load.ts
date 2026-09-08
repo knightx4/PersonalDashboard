@@ -69,6 +69,22 @@ export function isPlanAssignee(value: string): value is PlanAssignee {
   return (PLAN_ASSIGNEES as readonly string[]).includes(value);
 }
 
+/**
+ * What closing a step means.
+ *
+ * A `build` step closes on a commit. A `decision` closes on an answer: the
+ * question and its real options are written by whoever shaped the feature,
+ * and the person settles it on the page. It is a kind rather than a status
+ * because it moves through exactly the states a build step moves through and
+ * differs only in what finishing it looks like — see migration 0054.
+ */
+export const PLAN_KINDS = ['build', 'decision'] as const;
+export type PlanKind = (typeof PLAN_KINDS)[number];
+
+export function isPlanKind(value: string): value is PlanKind {
+  return (PLAN_KINDS as readonly string[]).includes(value);
+}
+
 export type PlanItem = {
   id: string;
   /** The short, stable handle: "#12". Per account, never reused. */
@@ -82,6 +98,15 @@ export type PlanItem = {
   /** Done when. What the work is checked against, written before the work. */
   acceptance: string | null;
   status: PlanStatus;
+  /** Whether it closes on a commit or on an answer. */
+  kind: PlanKind;
+  /**
+   * What is not yet known. One paragraph admitting the part of a feature
+   * nobody can see far enough into to write steps for. Null once it can be.
+   */
+  fog: string | null;
+  /** The answer a decision closed with, in the person's words. */
+  resolution: string | null;
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
   priority: PlanPriority;
@@ -109,8 +134,8 @@ export type PlanData = {
 };
 
 const ITEM_COLUMNS =
-  'id, number, module, parent_id, title, detail, acceptance, status, comment, priority, size, ' +
-  'assignee, commit_sha, position, started_at, completed_at, created_at';
+  'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
+  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at';
 
 /**
  * Every row of the account's plan, in one read. The whole tree is what the
@@ -161,6 +186,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
   const stamp = (value: unknown): string | null =>
     value instanceof Date ? value.toISOString() : value == null ? null : String(value);
   const status = String(row.status ?? '');
+  const kind = String(row.kind ?? '');
   const size = row.size as string | null;
   const assignee = row.assignee as string | null;
   const priority = Number(row.priority ?? 2);
@@ -174,6 +200,9 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     detail: (row.detail as string | null) ?? null,
     acceptance: (row.acceptance as string | null) ?? null,
     status: isPlanStatus(status) ? status : 'not_started',
+    kind: isPlanKind(kind) ? kind : 'build',
+    fog: (row.fog as string | null) ?? null,
+    resolution: (row.resolution as string | null) ?? null,
     comment: (row.comment as string | null) ?? null,
     priority: isPlanPriority(priority) ? priority : 2,
     size: size && isPlanSize(size) ? size : null,
