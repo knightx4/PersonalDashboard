@@ -64,6 +64,47 @@ export const Input = function Input({
   return <input ref={ref} className={cn(control, controlBox, className)} {...props} />;
 };
 
+/**
+ * A control that reads as text until you touch it.
+ *
+ * Law 12: a value and its editor are the same object in the same place at the
+ * same size. The alternative this replaces is the pattern the app reached for
+ * everywhere -- click a row, a panel opens above it carrying a label, a
+ * bordered field and a Save button, all to change one number -- and the reason
+ * it kept being reached for is that there was no other way to spell it.
+ *
+ * At rest: no border, no fill, sized and set exactly like the text it stands
+ * in for, so a page of these looks like a page of values rather than a page of
+ * inputs. On hover it picks up a ground, on focus the full control border, so
+ * it is discoverable by pointing at it and unmistakable once entered.
+ *
+ * It is still an `<input>` all the way down, so the caret, selection,
+ * keyboard, autofill and the accessibility tree are the real ones. Give it an
+ * `aria-label` -- there is no visible label by construction, which is the
+ * point of it and also the one way it can go wrong.
+ */
+export function InlineInput({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<'input'>) {
+  return (
+    <input
+      ref={ref}
+      className={cn(
+        // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+        'w-full rounded-control border border-transparent bg-transparent px-1 py-0.5 text-base text-ink sm:text-ui',
+        'hover:border-border hover:bg-sunken',
+        'focus:border-accent focus:bg-surface focus:outline-none focus:ring-1 focus:ring-accent/40',
+        'placeholder:text-ink-ghost aria-invalid:border-danger',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export function Select({
   className,
   children,

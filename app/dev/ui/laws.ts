@@ -53,13 +53,44 @@ export const LAWS: readonly Law[] = [
 ];
 
 /**
- * The ninth law, added after a review of what the app actually looked like
- * rather than what it was supposed to. It is listed apart because the other
- * eight are about truthfulness and this one is about restraint, and because it
- * is the one most recently broken.
+ * The restraint laws, added after a review of what the app actually looked
+ * like rather than what it was supposed to.
+ *
+ * They are listed apart because the first eight are about truthfulness — what
+ * the interface is allowed to claim — and these four are about how much of
+ * itself it is allowed to show while claiming it. They are also the ones being
+ * broken most, which is the honest reason they had to be written down: nobody
+ * sets out to build a wall of boxes, it accretes one reasonable-looking
+ * bordered div at a time.
+ *
+ * Read them together. Density says take less room; collapse says give the room
+ * back when you are not using it; borders says stop drawing the room; and
+ * forms says the room should not look like paperwork. They are four views of
+ * one idea, which is that the interface should get out from in front of the
+ * thing the person came for.
  */
-export const DENSITY_LAW: Law = {
-  n: 9,
-  title: 'Take up the room the content needs, and no more.',
-  body: 'A form asking for four short strings should not fill a screen. Chrome — labels, padding, borders, headings — is overhead paid so the content can be read; when there is more overhead than content, the ratio is wrong. Prefer a placeholder to a label, a fold to a scroll, and one row to three.',
-};
+export const RESTRAINT_LAWS: readonly Law[] = [
+  {
+    n: 9,
+    title: 'Take up the room the content needs, and no more.',
+    body: 'A form asking for four short strings should not fill a screen. Chrome — labels, padding, borders, headings — is overhead paid so the content can be read; when there is more overhead than content, the ratio is wrong. Prefer a placeholder to a label, a fold to a scroll, and one row to three.',
+  },
+  {
+    n: 10,
+    title: 'Anything long can be folded away.',
+    body: 'A section the reader is done with should be collapsible, and its collapsed line has to carry enough — a count, a total, the one fact it is about — that opening it is a choice rather than a check. A fold that hides whether it is worth opening has moved the work rather than saved it. Collapse with <details>, so it folds before JavaScript loads and a keyboard and a screen reader get it for free.',
+  },
+  {
+    n: 11,
+    title: 'A border is the last resort for grouping.',
+    body: 'Space groups. Alignment groups. A shared ground groups. A border is what you reach for when none of those can, and a border inside a border is almost always a mistake — the outer one already said "these belong together" and the inner one is arguing with it. If a group inside a card needs marking, give it a heading and space above it, not a second frame.',
+  },
+  {
+    n: 12,
+    title: 'Edit the thing, not a form about the thing.',
+    body: 'A value and its editor are the same object in the same place at the same size: click the number, type a new one, leave. A labelled field in a bordered panel with its own Save button is what you fall back to when a thing genuinely cannot be edited where it is read — a multi-field create, a destructive change worth confirming. It is not the default, and it is never how one number gets changed.',
+  },
+];
+
+/** Kept for the page that renders the ninth on its own. */
+export const DENSITY_LAW: Law = RESTRAINT_LAWS[0];

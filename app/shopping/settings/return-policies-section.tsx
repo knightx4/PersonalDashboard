@@ -10,14 +10,15 @@ import {
   useState,
   useTransition,
 } from 'react';
-import { Check, Plus, Search, X } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import {
   createMerchantReturnPolicy,
   saveMerchantReturnPolicy,
   type ActionState,
 } from '@/app/shopping/returns/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label } from '@/components/ui/field';
+import { FieldError, InlineInput, Input, Label } from '@/components/ui/field';
+import { Group } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
 
@@ -42,72 +43,92 @@ function matchesQuery(name: string, query: string): boolean {
   return name.toLowerCase().includes(q);
 }
 
-function EditPolicyForm({
+/**
+ * One retailer, edited where it is read.
+ *
+ * This replaced a panel: clicking a row used to open a bordered card above the
+ * list carrying a heading, a labelled field, a Save button and a close button,
+ * in order to change one number. That is laws 11 and 12 broken together -- a
+ * second box inside the settings card, and a form standing in for the value it
+ * edits. The number is now the input, in the row, at the size it is read at.
+ *
+ * Commit is on Enter or on leaving the field, and only when it actually
+ * changed; Escape puts it back. Blur-to-commit is safe here and would not be
+ * everywhere: the field is one integer, the change is reversible from the same
+ * row, and there is no partially-valid state to save by accident.
+ */
+function PolicyRow({
   policy,
-  onDone,
+  autoFocus = false,
 }: {
   policy: MerchantPolicyRow;
-  onDone?: () => void;
+  autoFocus?: boolean;
 }) {
   const [state, action, pending] = useActionState(saveMerchantReturnPolicy, initial);
-  const defaultValue =
-    policy.effectiveDays == null ? '' : String(policy.effectiveDays);
+  const formRef = useRef<HTMLFormElement>(null);
+  const committed = policy.effectiveDays == null ? '' : String(policy.effectiveDays);
+
+  function commit(event: React.FocusEvent<HTMLInputElement>) {
+    if (event.target.value.trim() !== committed) formRef.current?.requestSubmit();
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      event.currentTarget.value = committed;
+      event.currentTarget.blur();
+    }
+  }
 
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-canvas/60 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-body font-semibold text-ink">{policy.name}</p>
-          <p className="text-small text-ink-muted">{policyMeta(policy)}</p>
-        </div>
-        {onDone && (
-          <button
-            type="button"
-            onClick={onDone}
-            className="rounded-md p-1 text-ink-muted hover:bg-surface hover:text-ink"
-            aria-label="Clear selection"
-          >
-            <X className="size-4" strokeWidth={1.75} />
-          </button>
-        )}
-      </div>
-
-      <form action={action} className="flex flex-wrap items-end gap-2">
+    <li className="row-pad">
+      <form ref={formRef} action={action} className="flex items-center gap-3">
         <input type="hidden" name="merchant_id" value={policy.merchantId} />
-        <div className="min-w-[8rem] flex-1">
-          <Label htmlFor={`window-${policy.merchantId}`}>Return window (days)</Label>
-          <Input
-            id={`window-${policy.merchantId}`}
+        <input type="hidden" name="intent" value="save" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-medium text-ink">{policy.name}</p>
+          <p className="truncate text-small text-ink-muted">{policyMeta(policy)}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <InlineInput
             name="return_window_days"
             inputMode="numeric"
+            aria-label={`Return window for ${policy.name}, in days`}
             placeholder="None"
-            defaultValue={defaultValue}
-            key={`${policy.merchantId}-${defaultValue}-${policy.hasOverride}`}
-            autoFocus
+            defaultValue={committed}
+            key={`${policy.merchantId}-${committed}`}
+            autoFocus={autoFocus}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
+            disabled={pending}
+            className="tabular w-16 text-right font-medium"
           />
+          <span className="text-small text-ink-muted">days</span>
         </div>
-        <Button type="submit" name="intent" value="save" size="sm" disabled={pending}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
         {policy.hasOverride && (
           <Button
             type="submit"
             name="intent"
             value="reset"
             size="sm"
-            variant="secondary"
+            variant="ghost"
             disabled={pending}
           >
             Use default
           </Button>
         )}
       </form>
-      <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-small text-positive">{state.message}</p>}
-    </div>
+      {state.error && <FieldError>{state.error}</FieldError>}
+    </li>
   );
 }
 
+/**
+ * Adding a retailer is the case law 12 leaves alone: two fields that have to
+ * arrive together, creating something that does not exist yet to be edited in
+ * place. It keeps the form and loses the box -- a heading and space say
+ * "these belong together" as well as a dashed border did, and do not argue
+ * with the card around them. Law 11.
+ */
 function AddMerchantForm({
   initialName,
   onCancel,
@@ -118,25 +139,21 @@ function AddMerchantForm({
   const [state, action, pending] = useActionState(createMerchantReturnPolicy, initial);
 
   return (
-    <div className="space-y-3 rounded-lg border border-dashed border-border bg-canvas/60 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-body font-semibold text-ink">Add a retailer</p>
-          <p className="text-small text-ink-muted">
-            Creates a personal merchant with its own return window.
-          </p>
-        </div>
+    <Group
+      title="Add a retailer"
+      action={
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md p-1 text-ink-muted hover:bg-surface hover:text-ink"
+          className="press rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
           aria-label="Cancel"
         >
           <X className="size-4" strokeWidth={1.75} />
         </button>
-      </div>
-      <form action={action} className="space-y-3">
-        <div>
+      }
+    >
+      <form action={action} className="flex flex-wrap items-end gap-(--field-gap)">
+        <div className="min-w-40 flex-1">
           <Label htmlFor="new-merchant-name">Name</Label>
           <Input
             id="new-merchant-name"
@@ -147,25 +164,23 @@ function AddMerchantForm({
             autoFocus
           />
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[8rem] flex-1">
-            <Label htmlFor="new-merchant-days">Return window (days)</Label>
-            <Input
-              id="new-merchant-days"
-              name="return_window_days"
-              inputMode="numeric"
-              placeholder="e.g. 30"
-              defaultValue="30"
-            />
-          </div>
-          <Button type="submit" size="sm" disabled={pending}>
-            {pending ? 'Adding…' : 'Add retailer'}
-          </Button>
+        <div className="w-32">
+          <Label htmlFor="new-merchant-days">Window (days)</Label>
+          <Input
+            id="new-merchant-days"
+            name="return_window_days"
+            inputMode="numeric"
+            placeholder="e.g. 30"
+            defaultValue="30"
+          />
         </div>
+        <Button type="submit" pending={pending}>
+          {pending ? 'Adding…' : 'Add'}
+        </Button>
       </form>
       <FieldError>{state.error}</FieldError>
       {state.message && <p className="text-small text-positive">{state.message}</p>}
-    </div>
+    </Group>
   );
 }
 
@@ -199,6 +214,19 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
         }),
     [policies],
   );
+
+  /**
+   * What the list shows: everything already customized, plus whatever was just
+   * picked out of the search if it is not in that set yet. Picking a retailer
+   * with no override used to have nowhere to go except a panel; now it becomes
+   * a row, is edited there, and stays once it has a window of its own.
+   */
+  const rows = useMemo(() => {
+    if (!selected || customized.some((p) => p.merchantId === selected.merchantId)) {
+      return customized;
+    }
+    return [selected, ...customized];
+  }, [selected, customized]);
 
   const matches = useMemo(() => {
     const filtered = policies.filter((p) => matchesQuery(p.name, deferredQuery));
@@ -413,61 +441,32 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
         />
       )}
 
-      {selected && !adding && (
-        <EditPolicyForm
-          key={selected.merchantId}
-          policy={selected}
-          onDone={() => {
-            setSelectedId(null);
-            setQuery('');
-            inputRef.current?.focus();
-          }}
-        />
-      )}
-
-      <div>
-        <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-          Your policies
-        </h3>
-        {customized.length === 0 ? (
+      {/*
+        * One list, not a list and a panel above it. A retailer picked out of
+        * the search that has no policy yet joins the top of the same list and
+        * is edited in the same row as the rest, which is why selecting one no
+        * longer opens anything. Law 12.
+        */}
+      <Group title="Your policies">
+        {rows.length === 0 ? (
           <p className="text-body text-ink-muted">
             Nothing customized yet. Search above when you want to change a window — seeded
             defaults apply until then.
           </p>
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-            {customized.map((policy) => {
-              const active = policy.merchantId === selectedId;
-              return (
-                <li key={policy.merchantId}>
-                  <button
-                    type="button"
-                    onClick={() => selectPolicy(policy)}
-                    className={cn(
-                      'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-canvas',
-                      active && 'bg-accent-tint/50',
-                    )}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-body font-medium text-ink">{policy.name}</p>
-                      <p className="truncate text-small text-ink-muted">
-                        {policy.hasOverride ? 'Custom' : 'Default'}
-                        {policy.onOrders ? ' · in your orders' : ''}
-                      </p>
-                    </div>
-                    <span className="tabular shrink-0 text-ui font-medium text-ink">
-                      {windowLabel(policy.effectiveDays)}
-                    </span>
-                    {active ? (
-                      <Check className="size-4 shrink-0 text-accent" strokeWidth={1.75} />
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
+          // Divides and space, no frame: the card around this already said
+          // these belong together. Law 11.
+          <ul className="divide-y divide-border">
+            {rows.map((policy) => (
+              <PolicyRow
+                key={policy.merchantId}
+                policy={policy}
+                autoFocus={policy.merchantId === selectedId}
+              />
+            ))}
           </ul>
         )}
-      </div>
+      </Group>
     </div>
   );
 }

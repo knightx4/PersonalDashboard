@@ -1,10 +1,11 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { InlineInput, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Banner } from '@/components/ui/banner';
 import { cn } from '@/lib/cn';
-import { DENSITY_LAW, LAWS } from './laws';
+import { Disclosure, Group } from '@/components/ui/disclosure';
+import { LAWS, RESTRAINT_LAWS } from './laws';
 
 export const metadata = { title: 'UI' };
 
@@ -124,10 +125,10 @@ export default function DevUiPage() {
 
       <Section
         title="The laws"
-        lead="The product's character, not style preferences. Everything else on this page is one of these applied to a surface."
+        lead="The product's character, not style preferences. Everything else on this page is one of these applied to a surface. The first eight are about what the interface may claim; the last four are about how much of itself it may show while claiming it."
       >
         <ol className="space-y-2">
-          {[...LAWS, DENSITY_LAW].map((law) => (
+          {[...LAWS, ...RESTRAINT_LAWS].map((law) => (
             <li key={law.n}>
               <Card padding="dense" className="flex gap-3">
                 <span className="text-ui font-semibold tabular-nums text-accent">{law.n}</span>
@@ -142,8 +143,8 @@ export default function DevUiPage() {
       </Section>
 
       <Section
-        title="Density"
-        lead="Law 9 is the one most recently broken, so it gets the worked example. Chrome is overhead paid so content can be read. These are the sizes that make the ratio come out right."
+        title="Restraint, worked"
+        lead="Laws 9 to 12 are four views of one idea: the interface should get out from in front of the thing the person came for. Each has a component that makes obeying it the easy path, because a law with no easy path is a law that gets broken by whoever is in a hurry."
       >
         <Card padding="standard" className="space-y-4">
           <div className="grid gap-(--field-gap) sm:grid-cols-2">
@@ -182,6 +183,46 @@ export default function DevUiPage() {
           The density dial in the top bar moves all of this together. Comfortable is the default and
           is what snug used to be; the dial only ever takes away.
         </Banner>
+
+        <Card padding="standard" className="space-y-4">
+          <Group title="Law 10 — Disclosure">
+            <p className="text-body text-ink-muted">
+              Native <code className="text-ui">&lt;details&gt;</code>, so it folds before JavaScript
+              loads and the keyboard comes free. The closed line carries the fact that makes opening
+              it a choice rather than a check — without that, a fold has moved the work, not saved
+              it.
+            </p>
+            <Disclosure title="Retailers with a custom window" meta="11 · longest 90 days">
+              <p className="text-body text-ink-muted">
+                Opened. The indent is the grouping, in place of the border law 11 forbids.
+              </p>
+            </Disclosure>
+          </Group>
+
+          <Group title="Law 11 — Group">
+            <p className="text-body text-ink-muted">
+              A heading and space, no frame. The two rows above are groups: they are told apart by
+              their headings and the air between them, not by boxes inside this box. Ninety-three
+              places in the app currently draw the second box.
+            </p>
+          </Group>
+
+          <Group title="Law 12 — InlineInput">
+            <div className="flex items-center gap-3">
+              <span className="text-body text-ink">Return window</span>
+              <InlineInput
+                aria-label="Demonstration return window, in days"
+                defaultValue="30"
+                className="tabular w-16 text-right font-medium"
+              />
+              <span className="text-small text-ink-muted">days</span>
+            </div>
+            <p className="text-body text-ink-muted">
+              Point at the number. It is an input, sized and set exactly like the text it stands in
+              for, so a page of these reads as values rather than as a form.
+            </p>
+          </Group>
+        </Card>
       </Section>
 
       <Section
@@ -235,6 +276,9 @@ export default function DevUiPage() {
               'Write a hex, a font size, or a control height that is not a token.',
               'Read a scoped token through var(--color-…) in an inline style or an arbitrary value. Use the utility.',
               'Spend a label, a border and a heading on a field that needs a placeholder.',
+              'Draw a box inside a box. Give the inner group a heading and space instead.',
+              'Open a panel to edit one value that could be edited where it is read.',
+              'Fold a section behind a line that does not say what is inside it.',
               'Delay the user to be charming.',
             ].map((line) => (
               <li key={line} className="flex gap-2">
