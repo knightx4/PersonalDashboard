@@ -62,10 +62,17 @@ export type AppModule = {
  * this size is a smudge, and an outline of a briefcase is indistinguishable
  * from an outline of a bag.
  *
- * 'orb' is the app itself and is the only abstract one, which is the point --
- * it is the whole rather than one of the parts.
+ * They are also all drawn from one vocabulary -- flats, right angles and 45
+ * degree cuts, radii around a sixth of the shape. There are no arcs and no
+ * circles left in the set, which is what stops seven silhouettes chosen for
+ * seven different reasons from looking like seven different people drew them.
+ *
+ * 'dash' is the app itself and is the only abstract one, which is the point --
+ * it is the whole rather than one of the parts. It is also the only key that
+ * is a single element, and deliberately the flattest and widest thing any mark
+ * contains, because on the home page and in a browser tab it is the mark.
  */
-export type MarkShape = 'orb' | 'bag' | 'briefcase' | 'check' | 'page' | 'stack' | 'bolt';
+export type MarkShape = 'dash' | 'bag' | 'briefcase' | 'check' | 'page' | 'stack' | 'bolt';
 
 export interface MarkKey {
   shape: MarkShape;
@@ -147,14 +154,31 @@ export const MODULES: readonly AppModule[] = [
 ] as const;
 
 /**
- * The mark for the whole app: the topbar when no module is active, and every
- * signed-out page.
+ * The mark for the whole app: the topbar when no module is active, every
+ * signed-out page, and the favicon.
  *
  * The app's own accent rather than a module's, and flat rather than a
  * gradient. A two-hue ramp was decoration pretending to be identity -- three
  * of the four module marks started on the same blue, so the hue was not
  * something a person could identify a workspace by. The glyph is the
  * mnemonic; the hue confirms it.
+ *
+ * -- Why a dash --
+ * The key was an orb: a filled circle, the largest coloured area in any mark
+ * in the set, and the only shape in the whole system with no drawn corner. It
+ * had two problems at once. It was where nearly all of the mark's colour went,
+ * so the app read as a gradient blob rather than as a black-and-white
+ * constellation with something bright in the corner; and being a circle among
+ * six angular silhouettes, it looked like a logo that had wandered in from
+ * another product rather than the head of this family.
+ *
+ * A dash fixes both. It is punctuation -- flat, horizontal, cut square at both
+ * ends, drawn with exactly the same instrument as the stack's bars and the
+ * page's fold. It carries under half the orb's ink, which is what turns the
+ * gradient from the subject of the mark into a flare across it. And it is the
+ * only element in any mark that is emphatically wider than it is tall, so it
+ * is what the eye reaches first even at sixteen pixels, where every other
+ * shape in the set has already given up its detail.
  */
 export const HOME_MARK = {
   label: 'Home',
@@ -166,8 +190,13 @@ export const HOME_MARK = {
    * ramp is decoration pretending to be identity. Here it *is* the identity:
    * blue into pink is what this product has used for itself since before it
    * had modules, and the home mark is the only thing entitled to wear it.
+   *
+   * Kept exactly as it was through the redraw, on purpose. The brief was to
+   * spend less of the mark on it, not to change it -- these two hexes are the
+   * one thing about this product's appearance that predates everything else in
+   * this file.
    */
-  key: { shape: 'orb', from: '#6a82fb', to: '#ff6b9d' },
+  key: { shape: 'dash', from: '#6a82fb', to: '#ff6b9d' },
 } as const;
 
 export function moduleById(id: ModuleId | null): AppModule | null {
