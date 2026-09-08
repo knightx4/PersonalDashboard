@@ -406,7 +406,16 @@ export function AppShell({
         </div>
       )}
 
-      <div className="min-w-0">
+      {/* A column, so the status line can be held against the foot of the
+          window on a page too short to reach it.
+
+          `sticky bottom-0` only pins an element that would otherwise be below
+          the fold; on a short page there is nothing to pin it against, so the
+          line came to rest directly under the content with empty page beneath
+          it. Making this a full-height flex column and letting `main` take the
+          slack puts the line at the bottom of the window when the page is
+          short, and `sticky` keeps doing its job when the page is long. */}
+      <div className="flex min-h-dvh min-w-0 flex-col">
         {/* The top bar is chrome, not page: it takes the shell's ground and
             the shell's ink, the same as the column beside it. In four themes
             the shell is a near-neighbour of the surface it used to use, so
@@ -512,7 +521,13 @@ export function AppShell({
         {banner}
         <main
           className={cn(
-            'mx-auto max-w-[1400px] px-4 py-6 sm:px-6',
+            // `w-full` because a flex item's width comes from its content
+            // rather than from the line box: without it a narrow page would
+            // shrink-wrap instead of filling up to the max-width.
+            'mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6',
+            // Takes the leftover height, so the status line below it is held
+            // against the foot of the window rather than the foot of the text.
+            'flex-1',
             // Room for the tab bar, which is fixed over the foot of the page.
             tabs.length > 0 && 'pb-24 lg:pb-6',
           )}

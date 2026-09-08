@@ -363,16 +363,19 @@ async function writeEvent(
   // No invite: the model's date, on the same terms as before.
   const interviewDate = opts.extracted?.dates?.find((d) => d.kind === 'interview');
   if (interviewDate && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
-    const { count } = await supabase
-      .from('interviews')
-      .select('id', { count: 'exact', head: true })
-      .eq('application_id', opts.applicationId);
+    const groupId = await newRoundFor(supabase, {
+      userId: opts.userId,
+      applicationId: opts.applicationId,
+    });
+    if (!groupId) return;
+
     const { data: created } = await supabase
       .from('interviews')
       .insert({
         user_id: opts.userId,
         application_id: opts.applicationId,
-        round: (count ?? 0) + 1,
+        group_id: groupId,
+        round: 1,
         kind: interviewKind ?? 'recruiter_screen',
         scheduled_at: interviewDate.at,
         format: 'video',
@@ -390,6 +393,46 @@ async function writeEvent(
       });
     }
   }
+}
+
+/**
+ * A round to put a newly-booked interview in.
+ *
+ * Every interview lives inside a round, so the inbox makes one the moment it
+ * books something the pursuit has no round for. Numbered one past the highest
+ * on the pursuit, which is what a new round arriving by mail almost always is.
+ *
+ * Deliberately one round per booking rather than reusing the last: two
+ * invitations are two conversations until somebody says otherwise, and the
+ * role page offers to gather same-day ones into a single round. Guessing the
+ * other way round would silently fold a second-round screen into the first.
+ */
+async function newRoundFor(
+  supabase: AppSupabaseClient,
+  opts: { userId: string; applicationId: string },
+): Promise<string | null> {
+  const { data: rounds } = await supabase
+    .from('interview_groups')
+    .select('round_number')
+    .eq('application_id', opts.applicationId)
+    .eq('user_id', opts.userId);
+
+  const highest = (rounds ?? []).reduce(
+    (top, row) => Math.max(top, (row.round_number as number | null) ?? 0),
+    0,
+  );
+
+  const { data } = await supabase
+    .from('interview_groups')
+    .insert({
+      user_id: opts.userId,
+      application_id: opts.applicationId,
+      round_number: highest + 1,
+    })
+    .select('id')
+    .maybeSingle();
+
+  return (data?.id as string | undefined) ?? null;
 }
 
 /**
@@ -518,17 +561,19 @@ async function applyInvite(
   // A cancellation for an interview we never recorded is nothing to record.
   if (invite.cancelled) return;
 
-  const { count } = await supabase
-    .from('interviews')
-    .select('id', { count: 'exact', head: true })
-    .eq('application_id', opts.applicationId);
+  const groupId = await newRoundFor(supabase, {
+    userId: opts.userId,
+    applicationId: opts.applicationId,
+  });
+  if (!groupId) return;
 
   const { data: created } = await supabase
     .from('interviews')
     .insert({
       user_id: opts.userId,
       application_id: opts.applicationId,
-      round: (count ?? 0) + 1,
+      group_id: groupId,
+      round: 1,
       kind: opts.fallbackKind ?? 'recruiter_screen',
       format: invite.format ?? 'video',
       ...patch,

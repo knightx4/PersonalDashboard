@@ -114,6 +114,62 @@ export async function updateFeedbackStatus(
   return { message: 'Updated.' };
 }
 
+const editSchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(['bug', 'feature']),
+  body: z.string().trim().min(3, 'Write a sentence or two describing it.').max(4000),
+});
+
+/**
+ * Reword a note that has not been worked yet.
+ *
+ * These are written in a few seconds on a phone, so half of them say less than
+ * they meant to -- and until now the only way to add the detail was to delete
+ * the note and file it again, losing its place in the queue and its age.
+ *
+ * Only while it is still outstanding. A note that has been done, or declined,
+ * is a record of what was asked and what was decided: editing the ask after
+ * the fact would make its resolution note answer a question nobody put. The
+ * check is here rather than only in the list, because it is the rule and not
+ * merely the presentation of it.
+ */
+export async function editFeedback(
+  _prev: FeedbackActionState,
+  formData: FormData,
+): Promise<FeedbackActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const parsed = editSchema.safeParse({
+    id: formData.get('id'),
+    kind: String(formData.get('kind') ?? 'feature'),
+    body: String(formData.get('body') ?? ''),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { data: existing } = await supabase
+    .from('feedback_items')
+    .select('status')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!existing) return { error: 'That note no longer exists.' };
+  if (!(OUTSTANDING_STATUSES as readonly string[]).includes(existing.status as string)) {
+    return { error: 'That one is already closed. Reopen it first to change what it asks for.' };
+  }
+
+  const { error } = await supabase
+    .from('feedback_items')
+    .update({ kind: parsed.data.kind, body: parsed.data.body })
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidateFeedback();
+  return { message: 'Saved.' };
+}
+
 export async function deleteFeedback(
   _prev: FeedbackActionState,
   formData: FormData,

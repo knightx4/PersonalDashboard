@@ -1,16 +1,17 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import {
   deleteFeedback,
+  editFeedback,
   updateFeedbackStatus,
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { FieldError, Select } from '@/components/ui/field';
+import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
+import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -42,6 +43,35 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
     deleteFeedback,
     {} as FeedbackActionState,
   );
+  const [editState, editAction, editPending] = useActionState(
+    editFeedback,
+    {} as FeedbackActionState,
+  );
+
+  /**
+   * Only while the note is still outstanding.
+   *
+   * A note that has been done or declined is the record of what was asked and
+   * what was decided about it; rewording the ask afterwards would leave its
+   * resolution note answering a question nobody put. The server refuses it
+   * too — this only keeps the button off the cards where it would fail.
+   */
+  const [editing, setEditing] = useState(false);
+  const canEdit = isOutstanding(row);
+
+  /**
+   * The form stays open on an error so the text is not lost, and closes when a
+   * save actually lands.
+   *
+   * Compared by identity rather than by the text of the message: the action
+   * returns a fresh object per dispatch, so two consecutive saves are
+   * distinguishable where two "Saved." strings would not be.
+   */
+  const [settled, setSettled] = useState<FeedbackActionState | null>(null);
+  if (editState.message && editState !== settled) {
+    setSettled(editState);
+    setEditing(false);
+  }
 
   return (
     <li className="row-pad flex flex-col gap-2 px-4">
@@ -71,7 +101,42 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         <code className="text-small text-ink-muted">{row.id.slice(0, 8)}</code>
       </div>
 
-      <p className="whitespace-pre-wrap text-body text-ink">{row.body}</p>
+      {editing ? (
+        <form action={editAction} className="flex flex-col gap-2">
+          <input type="hidden" name="id" value={row.id} />
+          <Textarea
+            name="body"
+            rows={4}
+            defaultValue={row.body}
+            autoFocus
+            aria-label="What this note asks for"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              name="kind"
+              defaultValue={row.kind}
+              className="w-32"
+              aria-label="Bug or feature"
+            >
+              <option value="bug">Bug</option>
+              <option value="feature">Feature</option>
+            </Select>
+            <Button type="submit" size="sm" pending={editPending}>
+              {editPending ? 'Saving…' : 'Save'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="whitespace-pre-wrap text-body text-ink">{row.body}</p>
+      )}
 
       {row.resolutionNote && (
         <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
@@ -101,13 +166,18 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             {statusPending ? 'Saving…' : 'Set'}
           </Button>
         </form>
+        {canEdit && !editing && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )}
         <form action={deleteAction}>
           <input type="hidden" name="id" value={row.id} />
           <Button type="submit" size="sm" variant="ghost" disabled={deletePending}>
             Delete
           </Button>
         </form>
-        <FieldError>{statusState.error ?? deleteState.error}</FieldError>
+        <FieldError>{statusState.error ?? deleteState.error ?? editState.error}</FieldError>
       </div>
     </li>
   );

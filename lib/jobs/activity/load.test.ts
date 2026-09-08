@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FORWARD_KINDS, activityEntries, groupByDay } from '@/lib/jobs/activity/load';
+import {
+  FORWARD_KINDS,
+  activityEntries,
+  countRolesMovedForward,
+  groupByDay,
+} from '@/lib/jobs/activity/load';
 import { APPLICATION_EVENT_KINDS } from '@/lib/jobs/pipeline';
 
 const role = (id: string, title: string, company: string) => ({
@@ -214,5 +219,50 @@ describe('the "moved forward" headline', () => {
   it('leaves out the two that only look like progress', () => {
     expect(FORWARD_KINDS).not.toContain('submitted');
     expect(FORWARD_KINDS).not.toContain('confirmation');
+  });
+
+  it('counts a role once however many emails said it moved', () => {
+    // The invitation, the reschedule and the confirmation: three events, one
+    // interview, one role that moved.
+    expect(
+      countRolesMovedForward([
+        { applicationId: 'app-1', roleId: 'role-1' },
+        { applicationId: 'app-1', roleId: 'role-1' },
+        { applicationId: 'app-1', roleId: 'role-1' },
+      ]),
+    ).toBe(1);
+  });
+
+  it('counts a second attempt at the same role once, not twice', () => {
+    expect(
+      countRolesMovedForward([
+        { applicationId: 'app-1', roleId: 'role-1' },
+        { applicationId: 'app-2', roleId: 'role-1' },
+      ]),
+    ).toBe(1);
+  });
+
+  it('still counts different roles separately', () => {
+    expect(
+      countRolesMovedForward([
+        { applicationId: 'app-1', roleId: 'role-1' },
+        { applicationId: 'app-2', roleId: 'role-2' },
+        { applicationId: 'app-3', roleId: 'role-3' },
+      ]),
+    ).toBe(3);
+  });
+
+  it('keeps a pursuit with no role, rather than dropping it', () => {
+    expect(
+      countRolesMovedForward([
+        { applicationId: 'app-1', roleId: null },
+        { applicationId: 'app-1', roleId: null },
+        { applicationId: 'app-2', roleId: null },
+      ]),
+    ).toBe(2);
+  });
+
+  it('is zero for a quiet week', () => {
+    expect(countRolesMovedForward([])).toBe(0);
   });
 });

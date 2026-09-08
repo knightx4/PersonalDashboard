@@ -117,6 +117,9 @@ export default async function RoleDetailPage({
            interview_participants ( role, contacts ( id, full_name, title ) )`,
         )
         .eq('application_id', current.id)
+        // `round` is the interview's place inside its own round now, so it
+        // says nothing across the pursuit. The clock does.
+        .order('scheduled_at', { ascending: true, nullsFirst: false })
         .order('round', { ascending: true }),
       supabase
         .from('application_answers')
@@ -133,7 +136,7 @@ export default async function RoleDetailPage({
       // impression of the day as a whole. Empty for almost every pursuit.
       supabase
         .from('interview_groups')
-        .select('id, label, notes')
+        .select('id, label, notes, round_number')
         .eq('application_id', current.id)
         .order('created_at', { ascending: true }),
       supabase
@@ -182,6 +185,27 @@ export default async function RoleDetailPage({
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+
+  /**
+   * Which emails each round is about.
+   *
+   * A second round trip for the same reason as the interview notes below: it
+   * filters on ids that come out of the batch above. Skipped when the pursuit
+   * has no rounds, which is most of them.
+   */
+  const groupIds = (interviewGroups ?? []).map((group) => group.id as string);
+  const { data: groupMessageLinks } = groupIds.length
+    ? await supabase
+        .from('interview_group_messages')
+        .select('group_id, message_id')
+        .in('group_id', groupIds)
+    : { data: [] };
+
+  const messageIdsByGroup = new Map<string, string[]>();
+  for (const link of (groupMessageLinks ?? []) as Array<Record<string, unknown>>) {
+    const key = link.group_id as string;
+    messageIdsByGroup.set(key, [...(messageIdsByGroup.get(key) ?? []), link.message_id as string]);
+  }
 
   /**
    * Loose notes written against a round.
@@ -414,7 +438,6 @@ export default async function RoleDetailPage({
         }))}
         interviews={(interviews ?? []).map((interview) => ({
           id: interview.id as string,
-          round: interview.round as number,
           kind: interview.kind as string,
           scheduledAt: interview.scheduled_at as string | null,
           timeKnown: (interview.time_known as boolean | null) ?? true,
@@ -481,7 +504,9 @@ export default async function RoleDetailPage({
         interviewGroups={(interviewGroups ?? []).map((group) => ({
           id: group.id as string,
           label: (group.label as string | null) ?? null,
+          roundNumber: (group.round_number as number | null) ?? null,
           notes: (group.notes as string | null) ?? '',
+          messageIds: messageIdsByGroup.get(group.id as string) ?? [],
         }))}
         todos={(reminders ?? []).map((reminder) => {
           // The mail a to-do points at is already loaded for the Linked mail
