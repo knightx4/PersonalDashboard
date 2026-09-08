@@ -109,6 +109,25 @@ type Rule = {
  */
 const FULL_BORDER = /\bborder\b(?!-[trblxy]\b)(?!-\d)/;
 
+/**
+ * Every shape a class list is written in.
+ *
+ * The first two are the obvious ones. The third is here because a sweep found
+ * two boxes this missed: a class list spelled inside a ternary, a `cn()` call
+ * or a concatenation is still a class list, and reading only `className="…"`
+ * meant a box drawn conditionally was invisible while the identical box drawn
+ * unconditionally was caught. That is the worst kind of gap in a gate -- not
+ * that it misses things, but that what it misses correlates with the code
+ * being complicated, which is where the mistakes are.
+ *
+ * So the third alternative takes any single- or double-quoted string that
+ * looks like a class list, anywhere on the line. It is looser than the first
+ * two on purpose: the two rules that consume it both require a `rounded-` and
+ * a bare `border` in the same string, which prose does not contain.
+ */
+const CLASS_STRING =
+  /className=(?:"([^"]*)"|\{`([^`]*)`\})|'([^']*\b(?:rounded|border|bg)-[^']*)'/g;
+
 const RULES: Rule[] = [
   {
     id: 'hand-rolled-box',
@@ -117,8 +136,8 @@ const RULES: Rule[] = [
     instead: 'Card, CardSection, or Group where the grouping needs no frame at all',
     find: (line) => {
       const out: string[] = [];
-      for (const match of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
-        const value = match[1] ?? match[2] ?? '';
+      for (const match of line.matchAll(CLASS_STRING)) {
+        const value = match[1] ?? match[2] ?? match[3] ?? '';
         if (/\brounded-/.test(value) && FULL_BORDER.test(value)) out.push(value.slice(0, 64));
       }
       return out;

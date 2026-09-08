@@ -243,6 +243,26 @@ export function ChipSelect({
         )}
         {...props}
       />
+      {/* The caret is not decoration and is not optional.
+        *
+        * A chip in a row of chips is obviously interactive because everything
+        * beside it is; a chip standing among static facts is not, and that is
+        * where this first went wrong. On an item page the condition chip sat
+        * in a list reading "Publisher / Avery", "Year / 2018", "Condition /
+        * Good" -- three facts, one of them secretly a control, and nothing on
+        * it saying so until the pointer arrived. `appearance-none` had taken
+        * the platform's own caret away and put nothing back.
+        *
+        * So it is drawn here, ghosted at rest and muted on hover: enough to
+        * say "this opens" without becoming a box. A select that gives no hint
+        * it is a select is not a quiet control, it is a hidden one. */}
+      <svg
+        aria-hidden
+        viewBox="0 0 10 6"
+        className="pointer-events-none -ml-0.5 size-2.5 shrink-0 text-ink-ghost group-hover/chip:text-ink-muted"
+      >
+        <path d="M1 1.5 5 5l4-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </span>
   );
 }
