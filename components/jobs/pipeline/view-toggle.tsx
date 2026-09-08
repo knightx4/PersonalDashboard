@@ -2,13 +2,13 @@
 
 import { useOptimistic, useTransition } from 'react';
 import { Columns3, Rows3 } from 'lucide-react';
-import { cn } from '@/lib/cn';
+import { Segmented } from '@/components/ui/segmented';
 import type { PipelineView } from '@/components/jobs/pipeline/board';
 import { setPipelineView } from '@/app/jobs/(app)/pipeline/actions';
 
-const VIEWS: Array<{ id: PipelineView; label: string; icon: typeof Columns3 }> = [
-  { id: 'board', label: 'Board', icon: Columns3 },
-  { id: 'list', label: 'List', icon: Rows3 },
+const VIEWS = [
+  { value: 'board' as const, label: 'Board', icon: <Columns3 className="size-3.5" strokeWidth={1.75} aria-hidden /> },
+  { value: 'list' as const, label: 'List', icon: <Rows3 className="size-3.5" strokeWidth={1.75} aria-hidden /> },
 ];
 
 /**
@@ -17,40 +17,29 @@ const VIEWS: Array<{ id: PipelineView; label: string; icon: typeof Columns3 }> =
  * Optimistic because the write is a preference on the profile and the redraw
  * comes back through revalidation: without it the pressed segment would stay
  * unpressed for a round trip, which reads as the button not working.
+ *
+ * The control itself is the shared `Segmented`. This used to draw its own
+ * bordered box at a hand-written 32px, which is one density's answer written
+ * down as if it were every density's: on a phone the dial gives controls 36px
+ * for a thumb and this stayed 32, and at the dense setting everything beside it
+ * came down to 28 and this stayed 32 again.
  */
 export function PipelineViewToggle({ view }: { view: PipelineView }) {
   const [busy, startTransition] = useTransition();
   const [shown, setShown] = useOptimistic(view);
 
   return (
-    <span
-      role="group"
-      aria-label="Pipeline view"
-      className="inline-flex overflow-hidden rounded-lg border border-control"
-    >
-      {VIEWS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          type="button"
-          disabled={busy}
-          aria-pressed={shown === id}
-          onClick={() =>
-            startTransition(async () => {
-              setShown(id);
-              await setPipelineView(id);
-            })
-          }
-          className={cn(
-            'press inline-flex h-8 items-center gap-1.5 px-2.5 text-ui font-medium transition-colors duration-150',
-            shown === id
-              ? 'bg-accent-tint text-accent'
-              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-          )}
-        >
-          <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {label}
-        </button>
-      ))}
-    </span>
+    <Segmented
+      label="Pipeline view"
+      value={shown}
+      options={VIEWS}
+      disabled={busy}
+      onChange={(next) =>
+        startTransition(async () => {
+          setShown(next);
+          await setPipelineView(next);
+        })
+      }
+    />
   );
 }

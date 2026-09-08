@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil } from 'lucide-react';
-import { FieldError } from '@/components/ui/field';
+import { FieldError, InlineInput } from '@/components/ui/field';
 import { renameCompany } from '../actions';
 
 /**
@@ -67,10 +67,22 @@ export function CompanyName({ companyId, name }: { companyId: string; name: stri
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <input
+      {/* The title is the field. This drew its own bordered box at the title's
+        * size, which is the shape law 12 exists to get rid of -- a form about
+        * the name, standing where the name was. `InlineInput` is the same
+        * input without the box: it arrives focused, so it wears the accent
+        * ring the moment it appears, and leaving it commits.
+        *
+        * The size has to be named at both breakpoints because the primitive
+        * sets `text-base sm:text-ui` -- 16px on a phone is what stops Safari
+        * zooming the page on focus, and a title-sized field is already past
+        * that, so the exception does not apply here and the `sm:` half has to
+        * be overridden or the heading shrinks to interface size on a laptop. */}
+      <InlineInput
         autoFocus
         value={draft}
         disabled={pending}
+        aria-label="Company name"
         onChange={(event) => setDraft(event.target.value)}
         onBlur={save}
         onKeyDown={(event) => {
@@ -83,8 +95,7 @@ export function CompanyName({ companyId, name }: { companyId: string; name: stri
             setEditing(false);
           }
         }}
-        // A control, so its border is the 3:1 token; the size matches the page title it stands in for.
-        className="rounded-lg border border-control bg-surface px-2 py-1 font-display text-title font-semibold tracking-tight text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
+        className="w-auto font-display text-title font-semibold tracking-tight sm:text-title"
       />
       <FieldError>{error}</FieldError>
     </span>

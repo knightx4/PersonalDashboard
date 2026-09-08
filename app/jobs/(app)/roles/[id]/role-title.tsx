@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Pencil } from 'lucide-react';
-import { Input } from '@/components/ui/field';
+import { InlineInput } from '@/components/ui/field';
 import { renameRole } from './actions';
 
 /**
@@ -61,8 +61,14 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       {/* This input *is* the page title while it is open, so it keeps the
-          heading's face and size rather than the control's 13px. */}
-      <Input
+        * heading's face and size rather than the control's 13px, and it is
+        * `InlineInput` rather than `Input` for the same reason: law 12 asks
+        * for the value and its editor to be one object, and a bordered box
+        * standing where a heading was is a form about the title. The size has
+        * to be named at both breakpoints because the primitive sets `text-base
+        * sm:text-ui` to stop Safari zooming on a phone, and a title is already
+        * well past 16px. The same call the company name beside it makes. */}
+      <InlineInput
         autoFocus
         value={draft}
         disabled={pending}
@@ -79,7 +85,7 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
             setEditing(false);
           }
         }}
-        className="font-display h-auto w-auto py-1 text-title font-semibold tracking-tight sm:text-title"
+        className="font-display w-auto text-title font-semibold tracking-tight sm:text-title"
       />
       {error && <span className="text-small font-normal text-danger">{error}</span>}
     </span>

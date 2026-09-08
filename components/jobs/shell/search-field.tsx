@@ -2,6 +2,7 @@
 
 import { Search, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Input } from '@/components/ui/field';
 import { useEffect, useRef, useState } from 'react';
 
 /**
@@ -14,16 +15,6 @@ import { useEffect, useRef, useState } from 'react';
  * Typing is debounced and pushed with `replace`, so a search does not leave one
  * history entry per keystroke between you and the page you came from.
  */
-/**
- * The field's own classes, kept raw for the icon layout. `text-base sm:text-ui`
- * is the same deliberate exception the Field primitive makes: 16px stops iOS
- * zooming the page on focus.
- */
-const control =
-  // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
-  'h-9 w-full rounded-lg border border-control bg-surface pl-8 pr-8 text-base text-ink sm:text-ui ' +
-  'placeholder:text-ink-ghost focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25';
-
 export function SearchField({
   placeholder = 'Search company or role',
   paramName = 'q',
@@ -66,7 +57,13 @@ export function SearchField({
         strokeWidth={1.75}
         aria-hidden
       />
-      <input
+      {/* The shared control, inset for the two glyphs.
+        *
+        * It drew its own box at its own hand-written height until the sweep,
+        * which made it taller than every other field on the page and the one
+        * field that could not follow the density dial down. The inset is the
+        * only thing this has left to say. */}
+      <Input
         type="search"
         value={value}
         onChange={(event) => {
@@ -75,7 +72,7 @@ export function SearchField({
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={control}
+        className="pl-8 pr-8"
       />
       {value && (
         <button
@@ -84,7 +81,7 @@ export function SearchField({
             typing.current = true;
             setValue('');
           }}
-          // Sized to sit inside a 36px field, so smaller than the standard size-8 icon button.
+          // Sized to sit inside the field, so smaller than the standard size-8 icon button.
           className="press absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={2} aria-hidden />

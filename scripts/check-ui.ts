@@ -106,8 +106,17 @@ type Rule = {
 /**
  * `border` on its own. `border-t` is a rule drawn between things rather than a
  * frame drawn around one, and law 11 is about frames.
+ *
+ * The lookbehind is what stops `bg-border` counting as a border. `border` is
+ * both a utility and the name of a colour token, so `bg-border`, `divide-border`
+ * and `ring-border` all contained the word and none of them draws an edge --
+ * which is how a 1px progress track spelled `h-1 flex-1 rounded-full bg-border`
+ * came to be reported as a hand-rolled box in three files. A false positive is
+ * worse than a miss here: the only ways to clear one are to write `ui-ok:` on a
+ * line that never broke the law, which turns the gate into a lie, or to mangle
+ * correct code until the grep stops matching.
  */
-const FULL_BORDER = /\bborder\b(?!-[trblxy]\b)(?!-\d)/;
+const FULL_BORDER = /(?<![\w-])border\b(?!-[trblxy]\b)(?!-\d)/;
 
 /**
  * Every shape a class list is written in.

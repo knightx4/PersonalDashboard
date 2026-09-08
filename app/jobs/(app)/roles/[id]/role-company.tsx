@@ -97,7 +97,11 @@ export function RoleCompany({
             setEditing(false);
           }
         }}
-        className="h-8 w-64 px-2"
+        // Width only. The height and the inset come off the density dial, so
+        // this lines up with the two buttons beside it at every density -- it
+        // was a hand-typed 32px, which is one density's answer written down as
+        // if it were every density's.
+        className="w-64"
       />
       <datalist id="role-companies">
         {companies.map((company) => (

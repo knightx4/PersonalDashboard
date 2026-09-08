@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -728,13 +729,19 @@ function TodoMail({
 
 /**
  * Colour carries the verdict, so a map is readable at a glance without reading
- * every line. Gap is the same red as a rejection on purpose: it is the answer
- * that saves you the hour, not a failure state to be softened.
+ * every line. Gap is red on purpose: it is the answer that saves you the hour,
+ * not a failure state to be softened.
+ *
+ * The good/middling/bad triad, not the pipeline's stage hues -- which resolve
+ * to the same three values in every theme, and which law 4 gives to one stage
+ * each and to nothing else. A requirement is not a stage. Every line also
+ * carries a dot and a word, so the colour is what makes the gaps findable
+ * rather than what says which line is which.
  */
 const VERDICT_STYLE: Record<MatchVerdict, { dot: string; label: string; text: string }> = {
-  strong: { dot: 'bg-status-offer', label: 'Strong', text: 'text-status-offer' },
+  strong: { dot: 'bg-positive', label: 'Strong', text: 'text-positive' },
   partial: { dot: 'bg-caution-fill', label: 'Partial', text: 'text-caution' },
-  gap: { dot: 'bg-status-rejected', label: 'Gap', text: 'text-status-rejected' },
+  gap: { dot: 'bg-danger', label: 'Gap', text: 'text-danger' },
 };
 
 function Posting({
@@ -1578,7 +1585,11 @@ function AnswerCard({
       </div>
 
       {draft && (
-        <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
+        // A well, not a frame. This is the one thing on the page that is not
+        // yours yet -- a machine's suggestion waiting to be inserted or thrown
+        // away -- and a recessed ground says that without adding a second
+        // border inside the answer card. Law 11: a shared ground groups.
+        <div className="mt-3 rounded-card bg-canvas p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
             <span className="text-small text-ink-muted">
@@ -1792,11 +1803,19 @@ function AddRound({ applicationId, nextRound }: { applicationId: string; nextRou
             setError(result.error);
           })
         }
-        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
+        // The empty slot at the end of the rounds, drawn in the card's own
+        // classes with the border dashed -- the same spelling AddInterview
+        // below already used for the identical affordance. It was hand-written
+        // here, which is how two buttons doing one job ended up with two
+        // radii and two edges.
+        className={cn(
+          cardVariants(),
+          'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
+        )}
       >
         {pending ? 'Adding…' : 'Add a round'}
       </button>
-      {error && <p className="mt-1 text-small text-status-rejected">{error}</p>}
+      {error && <p className="mt-1 text-small text-danger">{error}</p>}
     </div>
   );
 }
@@ -1930,7 +1949,7 @@ function Interviewers({
                 }),
               )
             }
-            className="text-ink-muted hover:text-status-rejected"
+            className="text-ink-muted hover:text-danger"
           >
             ×
           </button>
@@ -1974,7 +1993,7 @@ function Interviewers({
         </button>
       )}
 
-      {error && <span className="text-status-rejected">{error}</span>}
+      {error && <span className="text-danger">{error}</span>}
     </div>
   );
 }
@@ -2129,7 +2148,7 @@ function InterviewHeading({
           Cancel
         </Button>
       </div>
-      {error && <p className="text-small text-status-rejected">{error}</p>}
+      {error && <p className="text-small text-danger">{error}</p>}
     </header>
   );
 }
@@ -2175,7 +2194,7 @@ function GroupTheseRounds({
       >
         Make them one round
       </Button>
-      {error && <span className="text-small text-status-rejected">{error}</span>}
+      {error && <span className="text-small text-danger">{error}</span>}
     </div>
   );
 }
@@ -2264,7 +2283,11 @@ function InterviewGroupCard({
     });
 
   return (
-    <section className="rounded-card border border-accent/40 bg-accent-tint/30 p-3">
+    // A card, in the app's card, rather than a rectangle that happened to look
+    // like one. The accent edge and wash stay: a round is the one container on
+    // this tab that holds other cards, and the tint is what says which
+    // interviews belong to which round without indenting them.
+    <Card padding="dense" className="border-accent/40 bg-accent-tint/30">
       <header className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -2340,7 +2363,7 @@ function InterviewGroupCard({
                 }
               });
             }}
-            className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected"
+            className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-danger"
           >
             {removing ? 'Really remove it?' : 'Remove this round'}
           </button>
@@ -2417,7 +2440,7 @@ function InterviewGroupCard({
         </div>
         </>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -2479,7 +2502,7 @@ function RoundMail({
                     setError(result.error);
                   })
                 }
-                className="text-ink-muted hover:text-status-rejected"
+                className="text-ink-muted hover:text-danger"
               >
                 ×
               </button>
@@ -2532,7 +2555,7 @@ function RoundMail({
         </button>
       )}
 
-      {error && <p className="mt-1 text-small text-status-rejected">{error}</p>}
+      {error && <p className="mt-1 text-small text-danger">{error}</p>}
     </div>
   );
 }
@@ -2681,7 +2704,7 @@ function InterviewCard({
                     Cancel
                   </button>
                   {draftError && (
-                    <span className="text-small text-status-rejected">{draftError}</span>
+                    <span className="text-small text-danger">{draftError}</span>
                   )}
                 </div>
               </div>
@@ -2753,7 +2776,7 @@ function InterviewCard({
                 type="button"
                 disabled={pending}
                 onClick={() => startTransition(() => void deleteInterview(interview.id))}
-                className="press text-small font-medium text-status-rejected"
+                className="press text-small font-medium text-danger"
               >
                 Delete
               </button>
@@ -2769,7 +2792,7 @@ function InterviewCard({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected"
+              className="text-small text-ink-muted underline underline-offset-2 hover:text-danger"
             >
               Not a real round — remove it
             </button>
@@ -2780,16 +2803,18 @@ function InterviewCard({
   );
 }
 
-/** One of the kinds of note a round can be given. */
+/**
+ * One of the kinds of note a round can be given.
+ *
+ * A button, so it is drawn as one. It used to spell its own box -- a container
+ * hairline around a control, at a height nothing else on the row shared -- and
+ * three of them in a line read as three little cards rather than as a choice.
+ */
 function NoteKindButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="press rounded-lg border border-border px-2 py-0.5 text-small font-medium text-ink-muted hover:border-accent hover:text-accent"
-    >
+    <Button type="button" variant="secondary" size="sm" onClick={onClick}>
       + {label}
-    </button>
+    </Button>
   );
 }
 
@@ -3000,7 +3025,7 @@ function AddInterview({
         <button type="button" onClick={close} className="text-small text-ink-muted hover:text-ink">
           Cancel
         </button>
-        {error && <span className="text-small text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-danger">{error}</span>}
       </div>
     </section>
   );
@@ -3038,7 +3063,7 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
           >
             Add note
           </Button>
-          {error && <span className="text-small text-status-rejected">{error}</span>}
+          {error && <span className="text-small text-danger">{error}</span>}
         </div>
       </section>
 
@@ -3181,7 +3206,7 @@ function NoteWindow({
           {formatDate(note.createdAt, timezone)}
         </span>
         <span className="min-w-0 flex-1" />
-        {error && <span className="text-small text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-danger">{error}</span>}
         {status && <span className="text-small text-ink-muted">{status}</span>}
         <Button
           type="button"
@@ -3372,32 +3397,35 @@ function MatchCandidates({
   return (
     <div className="space-y-2">
       {visible.length > 0 && (
-        <details className={cardVariants()}>
-          <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink">
-            Possible matches — {visible.length}
-          </summary>
-          <div className="space-y-2 border-t border-border p-3">
-            <p className="text-small text-ink-muted">
-              Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not a
-              match and it will not be suggested again for this pursuit.
-            </p>
-            <ul className="space-y-1.5">
-              {visible.map((candidate) => (
-                <MatchRow
-                  key={candidate.id}
-                  message={candidate}
-                  timezone={timezone}
-                  busy={pendingId === candidate.id}
-                  onDecline={() => decide(candidate.id, declineCandidateMessage)}
-                  onLink={() => decide(candidate.id, linkCandidateMessage)}
-                />
-              ))}
-            </ul>
-          </div>
-        </details>
+        // The shared fold, in the shared card. Hand-rolled until the sweep: its
+        // own summary, its own padding and no chevron, where every other fold
+        // in the app has one. The count moves to the primitive's `meta`, which
+        // is what law 10 asks the closed line to carry.
+        <Card padding="dense">
+          <Disclosure title="Possible matches" meta={`${visible.length} unlinked`}>
+            <div className="space-y-2">
+              <p className="text-small text-ink-muted">
+                Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not
+                a match and it will not be suggested again for this pursuit.
+              </p>
+              <ul className="divide-y divide-border">
+                {visible.map((candidate) => (
+                  <MatchRow
+                    key={candidate.id}
+                    message={candidate}
+                    timezone={timezone}
+                    busy={pendingId === candidate.id}
+                    onDecline={() => decide(candidate.id, declineCandidateMessage)}
+                    onLink={() => decide(candidate.id, linkCandidateMessage)}
+                  />
+                ))}
+              </ul>
+            </div>
+          </Disclosure>
+        </Card>
       )}
 
-      {error && <p className="text-small text-status-rejected">{error}</p>}
+      {error && <p className="text-small text-danger">{error}</p>}
 
       {searching ? (
         <AddOtherSearch applicationId={applicationId} timezone={timezone} onClose={() => setSearching(false)} />
@@ -3429,7 +3457,10 @@ function MatchRow({
   onLink: () => void;
 }) {
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-canvas px-2.5 py-2 text-ui">
+    // A row in a list, inside a card that is already a box: the divides on the
+    // list do the separating and this stops drawing a box per message. Six
+    // suggestions used to be six frames inside one.
+    <li className="row-pad flex flex-wrap items-center gap-x-3 gap-y-1 text-ui">
       <span className="tabular w-full text-small text-ink-muted sm:w-32">
         {formatDate(message.receivedAt, timezone)}
       </span>
@@ -3452,14 +3483,9 @@ function MatchRow({
             Not a match
           </button>
         )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onLink}
-          className="press rounded-lg border border-border bg-surface px-2 py-0.5 text-small font-medium text-ink disabled:opacity-50"
-        >
+        <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={onLink}>
           Link
-        </button>
+        </Button>
       </span>
     </li>
   );
@@ -3521,7 +3547,7 @@ function AddOtherSearch({
           Close
         </button>
       </div>
-      {error && <p className="mt-2 text-small text-status-rejected">{error}</p>}
+      {error && <p className="mt-2 text-small text-danger">{error}</p>}
       {results !== null && (
         <ul className="mt-2 space-y-1.5">
           {results.length === 0 && (
