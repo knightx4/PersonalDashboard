@@ -201,6 +201,7 @@ const updateSchema = z.object({
   title: titleField,
   detail: text(4000).optional(),
   acceptance: text(4000).optional(),
+  fog: text(4000).optional(),
   comment: text(4000).optional(),
   commit: text(64).optional(),
   status: statusField,
@@ -230,6 +231,7 @@ export async function updatePlanItem(
     title: field(formData, 'title'),
     detail: field(formData, 'detail'),
     acceptance: field(formData, 'acceptance'),
+    fog: field(formData, 'fog'),
     comment: field(formData, 'comment'),
     commit: field(formData, 'commit'),
     status: field(formData, 'status', 'not_started'),
@@ -251,6 +253,10 @@ export async function updatePlanItem(
     title: parsed.data.title,
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
+    // Emptied is cleared, not blanked: fog is meant to disappear the moment
+    // the steps that dispel it exist, and null is what "there is none" reads
+    // as everywhere else it is asked about.
+    fog: parsed.data.fog || null,
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,

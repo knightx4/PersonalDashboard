@@ -242,6 +242,39 @@ describe('PlanView', () => {
     expect((html.match(/>Decision</g) ?? []).length).toBe(2);
   });
 
+  it('shows what a feature admits it cannot see yet, and nothing when it can', () => {
+    const foggy = buildPlanTree({
+      items: [
+        item({
+          id: 'export',
+          title: 'Export',
+          fog: 'How the second half is shaped is not yet known.',
+        }),
+        item({ id: 'writer', title: 'The writer', parentId: 'export' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(foggy, 'all')}
+        summary={summarize(foggy)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+      />,
+    );
+
+    // In the tree, not behind a fold: a plan's own admission that part of it
+    // is missing is no use if you have to open a step to find it.
+    expect(html).toContain('Not yet specified');
+    expect(html).toContain('How the second half is shaped is not yet known.');
+    // Exactly once -- the step beneath it has no fog and shows no block.
+    expect((html.match(/Not yet specified/g) ?? []).length).toBe(1);
+    // And a plan with none of it anywhere says nothing at all.
+    expect(render('all')).not.toContain('Not yet specified');
+  });
+
   it('opens on the import when there is no plan at all', () => {
     expect(render('open', true)).toContain('Import the build order');
   });

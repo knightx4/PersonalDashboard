@@ -511,6 +511,24 @@ function EditStep({
     <form action={action} className="flex flex-col gap-(--field-gap) px-3 pb-3">
       <input type="hidden" name="id" value={node.id} />
       <StepFields prefix={prefix} node={node} status={node.status} />
+      {/* Not part of StepFields, because a step being added has nothing to be
+        * foggy about yet: fog is what you find once a feature is real and one
+        * half of it will not resolve into steps. */}
+      <div>
+        <Label htmlFor={`${prefix}-fog`}>Not yet specified</Label>
+        <Textarea
+          id={`${prefix}-fog`}
+          name="fog"
+          rows={2}
+          className="min-h-12"
+          defaultValue={node.fog ?? ''}
+          placeholder="The part nobody can see far enough into to write steps for yet."
+        />
+        <FieldHint>
+          Said plainly here rather than filled with plausible steps. Clear it once the steps
+          beneath say it.
+        </FieldHint>
+      </div>
       <div>
         <Label htmlFor={`${prefix}-comment`}>Your note</Label>
         <Textarea
@@ -1366,6 +1384,23 @@ function PlanRow({
               {assignState.message ?? sendState.message ?? batchState.message ?? answerState.message}
             </span>
           )}
+        </li>
+      )}
+
+      {/* In the tree rather than behind the fold, because fog on a feature is
+          the thing you most want to see while scanning a plan: it is the part
+          that is admittedly not a plan yet, and one that only showed on a step
+          you thought to open would be a gap nobody found. Quiet and dashed, so
+          it does not read as detail. Nothing at all when there is none, which
+          is most steps most of the time. */}
+      {node.fog && (
+        <li style={inset} className="pb-1.5 pr-3">
+          <div className="border-l-2 border-dashed border-border-strong pl-2.5">
+            <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
+              Not yet specified
+            </p>
+            <p className="whitespace-pre-wrap text-small text-ink-muted">{node.fog}</p>
+          </div>
         </li>
       )}
 
