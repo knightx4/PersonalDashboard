@@ -28,6 +28,12 @@ if it is not free, and pointed at the chapter or paragraph worth reading rather
 than at a 350-page book. Specified in
 [docs/LEARN-SPEC.md](docs/LEARN-SPEC.md).
 
+**Dev** (`/dev`) is the app looking at itself: the bugs and requests filed
+from the header button, the build plan as a tree of features and the steps
+that get you to each, and the long-term ideas that have not become either.
+The plan is the source of truth for what gets built next, by a person or by a
+Claude session — specified in [docs/PLAN-SPEC.md](docs/PLAN-SPEC.md).
+
 They share an account and a design system, and the first two share one mailbox.
 Otherwise nothing. Each owns its own Postgres schema in one Supabase project —
 `public` for shopping, `job_search` for the job side, `obsidian` for the notes,
@@ -38,6 +44,10 @@ timezone belongs to none of them, and no workspace owns any of those facts. See
 [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
+
+The live plan is `/dev/plan` in the app, and `npx tsx scripts/plan.ts list`
+from a terminal. The documents below are where it came from and why each
+step is where it is; the app is where it is worked.
 
 Build order steps 1–14 and books/sell assistant (16–18) are done. See
 [docs/BUILD-ORDER.md](docs/BUILD-ORDER.md) for what is next on the shopping
@@ -128,6 +138,12 @@ lib/
   core/account/    account settings -- the one timezone, and which modules are on
   todo/            tasks/ (pure model + queries), links/ (what a task is about),
                    agenda/ (the source interface, the registry, the pure merge)
+lib/
+  plan/            load (rows), tree (nesting, readiness, roll-ups -- pure),
+                   brief (a step written out for whoever builds it), seed
+scripts/
+  plan.ts          the plan from a terminal: next, show, start, done, block
+  notes.ts         the bug and request queue, likewise
 supabase/
   migrations/      the source of truth for the database
   local/           auth shim for the local test database only

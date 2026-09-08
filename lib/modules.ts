@@ -136,7 +136,7 @@ export const MODULES: readonly AppModule[] = [
     // in it, and the ideas are what you read when there is none.
     home: '/dev/bugs',
     label: 'Dev',
-    description: 'Bugs, requests and long-term ideas for this app',
+    description: 'Bugs, the build plan and long-term ideas for this app',
     accent: '--color-w-dev',
     // Steel, and the one workspace deliberately off the sweep the others sit
     // on. This is the app looking at itself rather than a place work lives,

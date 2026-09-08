@@ -1,89 +1,55 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isPlanStatus,
-  planProgress,
-  planSections,
-  type PlanItem,
-  type PlanStatus,
-} from '@/lib/plan/load';
+import { isPlanStatus, planItemFromRow } from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import { MODULES } from '@/lib/modules';
 
-function item(over: Partial<PlanItem> & { id: string }): PlanItem {
-  return {
+describe('planItemFromRow', () => {
+  const row = {
+    id: 'id',
+    number: 12,
     module: 'shopping',
+    parent_id: null,
     title: 'A step',
     detail: null,
-    status: 'not_started',
+    acceptance: 'Done when it works.',
+    status: 'blocked',
     comment: null,
-    position: 0,
-    ...over,
+    priority: 1,
+    size: 'm',
+    assignee: 'claude',
+    commit_sha: null,
+    position: 10,
+    started_at: null,
+    completed_at: null,
+    created_at: '2026-01-01T00:00:00Z',
   };
-}
 
-const at = (status: PlanStatus, id: string) => item({ id, status });
-
-describe('planProgress', () => {
-  it('counts what is done against what is still live', () => {
-    expect(
-      planProgress([at('done', 'a'), at('done', 'b'), at('not_started', 'c'), at('in_progress', 'd')]),
-    ).toEqual({ done: 2, inProgress: 1, live: 4, fraction: 0.5 });
+  it('reads a row as the app sees it', () => {
+    const item = planItemFromRow(row);
+    expect(item.number).toBe(12);
+    expect(item.status).toBe('blocked');
+    expect(item.priority).toBe(1);
+    expect(item.size).toBe('m');
+    expect(item.assignee).toBe('claude');
+    expect(item.acceptance).toBe('Done when it works.');
   });
 
-  it('leaves a dropped step out of the denominator', () => {
-    // Otherwise a module you finished sits at 90% forever because of one step
-    // you decided against.
-    expect(planProgress([at('done', 'a'), at('dropped', 'b')])).toEqual({
-      done: 1,
-      inProgress: 0,
-      live: 1,
-      fraction: 1,
+  it('reads a value the code no longer names back as the default rather than crashing', () => {
+    // A module removed from lib/modules, a status a later migration dropped, a
+    // size somebody typed into the database by hand.
+    const item = planItemFromRow({
+      ...row,
+      module: 'retired',
+      status: 'someday',
+      priority: 9,
+      size: 'xxl',
+      assignee: 'them',
     });
-  });
-
-  it('gives no fraction at all rather than dividing by zero', () => {
-    expect(planProgress([]).fraction).toBeNull();
-    expect(planProgress([at('dropped', 'a')]).fraction).toBeNull();
-  });
-
-  it('does not count in progress as part done', () => {
-    // Half credit would move the bar when nothing shipped.
-    expect(planProgress([at('in_progress', 'a'), at('not_started', 'b')]).fraction).toBe(0);
-  });
-});
-
-describe('planSections', () => {
-  it('gives every module a section, even one with no steps yet', () => {
-    const sections = planSections([item({ id: 'a', module: 'jobs' })]);
-    expect(sections.map((section) => section.module)).toEqual(MODULES.map((m) => m.id));
-    expect(sections.find((section) => section.module === 'vault')?.items).toEqual([]);
-  });
-
-  it('orders the steps within a module by position', () => {
-    const sections = planSections([
-      item({ id: 'third', position: 30 }),
-      item({ id: 'first', position: 10 }),
-      item({ id: 'second', position: 20 }),
-    ]);
-    const shopping = sections.find((section) => section.module === 'shopping');
-    expect(shopping?.items.map((step) => step.id)).toEqual(['first', 'second', 'third']);
-  });
-
-  it('shows the app-wide section only once something is in it', () => {
-    expect(planSections([item({ id: 'a' })]).some((s) => s.module === null)).toBe(false);
-    expect(
-      planSections([item({ id: 'a', module: null })]).some((s) => s.module === null),
-    ).toBe(true);
-  });
-
-  it('puts every step in exactly one section', () => {
-    const items = [
-      item({ id: 'a', module: 'jobs' }),
-      item({ id: 'b', module: 'shopping' }),
-      item({ id: 'c', module: null }),
-    ];
-    const seen = planSections(items).flatMap((section) => section.items.map((step) => step.id));
-    expect(seen.sort()).toEqual(['a', 'b', 'c']);
+    expect(item.module).toBeNull();
+    expect(item.status).toBe('not_started');
+    expect(item.priority).toBe(2);
+    expect(item.size).toBeNull();
+    expect(item.assignee).toBeNull();
   });
 });
 

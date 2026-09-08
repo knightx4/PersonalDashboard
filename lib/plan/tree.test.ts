@@ -1,0 +1,427 @@
+import { describe, expect, it } from 'vitest';
+import type { PlanDependency, PlanItem, PlanStatus } from '@/lib/plan/load';
+import {
+  ancestorsOf,
+  applyView,
+  buildPlanTree,
+  findNode,
+  flattenSections,
+  isReady,
+  leavesOf,
+  planProgress,
+  subtreeIds,
+  summarize,
+  workOrder,
+} from '@/lib/plan/tree';
+import { MODULES } from '@/lib/modules';
+
+let counter = 0;
+
+function item(over: Partial<PlanItem> & { id: string }): PlanItem {
+  counter += 1;
+  return {
+    number: counter,
+    module: 'shopping',
+    parentId: null,
+    title: `Step ${over.id}`,
+    detail: null,
+    acceptance: null,
+    status: 'not_started',
+    comment: null,
+    priority: 2,
+    size: null,
+    assignee: null,
+    commitSha: null,
+    position: counter * 10,
+    startedAt: null,
+    completedAt: null,
+    createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    ...over,
+  };
+}
+
+const at = (status: PlanStatus, id: string, over: Partial<PlanItem> = {}) =>
+  item({ id, status, ...over });
+
+function dep(itemId: string, dependsOnId: string): PlanDependency {
+  return { id: `${itemId}->${dependsOnId}`, itemId, dependsOnId };
+}
+
+function tree(items: PlanItem[], dependencies: PlanDependency[] = []) {
+  return buildPlanTree({ items, dependencies });
+}
+
+const shopping = (sections: ReturnType<typeof tree>) =>
+  sections.find((section) => section.module === 'shopping')!;
+
+describe('planProgress', () => {
+  it('counts what is done against what is still live', () => {
+    expect(
+      planProgress([at('done', 'a'), at('done', 'b'), at('not_started', 'c'), at('in_progress', 'd')]),
+    ).toEqual({ done: 2, inProgress: 1, live: 4, fraction: 0.5 });
+  });
+
+  it('leaves a dropped step out of the denominator', () => {
+    // Otherwise a module you finished sits at 90% forever because of one step
+    // you decided against.
+    expect(planProgress([at('done', 'a'), at('dropped', 'b')])).toEqual({
+      done: 1,
+      inProgress: 0,
+      live: 1,
+      fraction: 1,
+    });
+  });
+
+  it('gives no fraction at all rather than dividing by zero', () => {
+    expect(planProgress([]).fraction).toBeNull();
+    expect(planProgress([at('dropped', 'a')]).fraction).toBeNull();
+  });
+
+  it('does not count in progress as part done', () => {
+    // Half credit would move the bar when nothing shipped.
+    expect(planProgress([at('in_progress', 'a'), at('not_started', 'b')]).fraction).toBe(0);
+  });
+
+  it('counts a blocked step as live and not done', () => {
+    expect(planProgress([at('blocked', 'a'), at('done', 'b')])).toEqual({
+      done: 1,
+      inProgress: 0,
+      live: 2,
+      fraction: 0.5,
+    });
+  });
+});
+
+describe('buildPlanTree', () => {
+  it('gives every module a section, even one with no steps yet', () => {
+    const sections = tree([item({ id: 'a', module: 'jobs' })]);
+    expect(sections.map((section) => section.module)).toEqual(MODULES.map((m) => m.id));
+    expect(sections.find((section) => section.module === 'vault')?.nodes).toEqual([]);
+  });
+
+  it('shows the app-wide section only once something is in it', () => {
+    expect(tree([item({ id: 'a' })]).some((s) => s.module === null)).toBe(false);
+    expect(tree([item({ id: 'a', module: null })]).some((s) => s.module === null)).toBe(true);
+  });
+
+  it('nests steps under their parent, to any depth', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      item({ id: 'step', parentId: 'feature' }),
+      item({ id: 'substep', parentId: 'step' }),
+      item({ id: 'leaf', parentId: 'substep' }),
+    ]);
+    const [feature] = shopping(sections).nodes;
+    expect(feature.id).toBe('feature');
+    expect(feature.depth).toBe(0);
+    expect(feature.children.map((n) => n.id)).toEqual(['step']);
+    expect(feature.children[0].children[0].children[0].id).toBe('leaf');
+    expect(feature.children[0].children[0].children[0].depth).toBe(3);
+  });
+
+  it('orders siblings by position, then by age', () => {
+    const sections = tree([
+      item({ id: 'third', position: 30 }),
+      item({ id: 'first', position: 10 }),
+      item({ id: 'second', position: 20 }),
+      item({ id: 'older-tie', position: 20, createdAt: '2025-01-01T00:00:00Z' }),
+    ]);
+    expect(shopping(sections).nodes.map((n) => n.id)).toEqual([
+      'first',
+      'older-tie',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('puts every step in exactly one place', () => {
+    const sections = tree([
+      item({ id: 'a', module: 'jobs' }),
+      item({ id: 'b' }),
+      item({ id: 'c', parentId: 'b' }),
+      item({ id: 'd', module: null }),
+    ]);
+    expect(
+      flattenSections(sections)
+        .map((node) => node.id)
+        .sort(),
+    ).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('shows a step whose parent is missing at the top rather than losing it', () => {
+    const sections = tree([item({ id: 'orphan', parentId: 'gone' })]);
+    expect(shopping(sections).nodes.map((n) => n.id)).toEqual(['orphan']);
+    expect(shopping(sections).nodes[0].depth).toBe(0);
+  });
+
+  it('rolls a feature up over its leaf steps, not its intermediate ones', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      at('done', 'group', { parentId: 'feature' }),
+      at('done', 'g1', { parentId: 'group' }),
+      at('not_started', 'g2', { parentId: 'group' }),
+      at('in_progress', 'direct', { parentId: 'feature' }),
+    ]);
+    const [feature] = shopping(sections).nodes;
+    // g1, g2 and direct are the leaves; "group" is a container and does not
+    // count, even though it is marked done.
+    expect(feature.rollup).toEqual({ done: 1, inProgress: 1, live: 3, fraction: 1 / 3 });
+    expect(feature.children[1].rollup.live).toBe(0);
+  });
+
+  it('measures a module over its leaves, so a feature with steps is not double counted', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      at('done', 's1', { parentId: 'feature' }),
+      at('done', 's2', { parentId: 'feature' }),
+      at('not_started', 'alone'),
+    ]);
+    expect(shopping(sections).progress).toEqual({
+      done: 2,
+      inProgress: 0,
+      live: 3,
+      fraction: 2 / 3,
+    });
+    expect(leavesOf(shopping(sections).nodes).map((n) => n.id)).toEqual(['s1', 's2', 'alone']);
+  });
+});
+
+describe('dependencies', () => {
+  it('resolves what a step waits on and what it unblocks', () => {
+    const sections = tree(
+      [item({ id: 'schema' }), item({ id: 'page' }), at('done', 'rpc')],
+      [dep('page', 'schema'), dep('page', 'rpc')],
+    );
+    const page = findNode(sections, 'page')!;
+    expect(page.dependsOn.map((link) => link.item.id)).toEqual(['schema', 'rpc']);
+    // Only the unfinished one still holds it up.
+    expect(page.waitingOn.map((ref) => ref.id)).toEqual(['schema']);
+    expect(findNode(sections, 'schema')!.blocks.map((ref) => ref.id)).toEqual(['page']);
+  });
+
+  it('passes a feature’s wait down to every step under it', () => {
+    const sections = tree(
+      [
+        item({ id: 'auth' }),
+        item({ id: 'feature' }),
+        item({ id: 'step', parentId: 'feature' }),
+        item({ id: 'substep', parentId: 'step' }),
+      ],
+      [dep('feature', 'auth')],
+    );
+    expect(findNode(sections, 'substep')!.waitingOn.map((ref) => ref.id)).toEqual(['auth']);
+    // Declared on the feature, not on the substep: the two lists differ.
+    expect(findNode(sections, 'substep')!.dependsOn).toEqual([]);
+  });
+
+  it('names an inherited and an own wait on the same step once', () => {
+    const sections = tree(
+      [item({ id: 'auth' }), item({ id: 'feature' }), item({ id: 'step', parentId: 'feature' })],
+      [dep('feature', 'auth'), dep('step', 'auth')],
+    );
+    expect(findNode(sections, 'step')!.waitingOn.map((ref) => ref.id)).toEqual(['auth']);
+  });
+
+  it('ignores a dependency pointing at a step that no longer exists', () => {
+    const sections = tree([item({ id: 'a' })], [dep('a', 'gone'), dep('gone', 'a')]);
+    expect(findNode(sections, 'a')!.dependsOn).toEqual([]);
+    expect(findNode(sections, 'a')!.blocks).toEqual([]);
+  });
+});
+
+describe('isReady', () => {
+  const bare = { waitingOn: [], children: [] };
+
+  it('is a step not yet started, waiting on nothing, with nothing open beneath it', () => {
+    expect(isReady({ status: 'not_started', ...bare }, [])).toBe(true);
+  });
+
+  it('is not a step underway, blocked, done or dropped', () => {
+    for (const status of ['in_progress', 'blocked', 'done', 'dropped'] as const) {
+      expect(isReady({ status, ...bare }, [])).toBe(false);
+    }
+  });
+
+  it('is not a step still waiting on another', () => {
+    const sections = tree([item({ id: 'a' }), item({ id: 'b' })], [dep('b', 'a')]);
+    expect(findNode(sections, 'a')!.ready).toBe(true);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
+  it('becomes ready the moment what it waited on is done', () => {
+    const sections = tree([at('done', 'a'), item({ id: 'b' })], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(true);
+  });
+
+  it('treats a dropped dependency as out of the way', () => {
+    // Freezing a step forever behind a decision not to do something else is
+    // worse than letting it through; the page shows the dropped one plainly.
+    const sections = tree([at('dropped', 'a'), item({ id: 'b' })], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(true);
+  });
+
+  it('is not a feature whose steps are still open — its steps are', () => {
+    const sections = tree([item({ id: 'feature' }), item({ id: 'step', parentId: 'feature' })]);
+    expect(findNode(sections, 'feature')!.ready).toBe(false);
+    expect(findNode(sections, 'step')!.ready).toBe(true);
+  });
+
+  it('is a feature whose steps are all closed, because closing it is what is left', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      at('done', 's1', { parentId: 'feature' }),
+      at('dropped', 's2', { parentId: 'feature' }),
+    ]);
+    expect(findNode(sections, 'feature')!.ready).toBe(true);
+  });
+
+  it('is not a step under a blocked or dropped feature', () => {
+    const sections = tree([
+      at('blocked', 'stuck'),
+      item({ id: 'under-stuck', parentId: 'stuck' }),
+      at('dropped', 'gone'),
+      item({ id: 'under-gone', parentId: 'gone' }),
+      at('in_progress', 'live'),
+      item({ id: 'under-live', parentId: 'live' }),
+    ]);
+    expect(findNode(sections, 'under-stuck')!.ready).toBe(false);
+    expect(findNode(sections, 'under-gone')!.ready).toBe(false);
+    expect(findNode(sections, 'under-live')!.ready).toBe(true);
+  });
+});
+
+describe('applyView', () => {
+  const fixture = () =>
+    tree(
+      [
+        item({ id: 'feature' }),
+        at('done', 'done-step', { parentId: 'feature' }),
+        at('not_started', 'open-step', { parentId: 'feature', assignee: 'claude' }),
+        at('blocked', 'stuck', { parentId: 'feature' }),
+        at('done', 'finished-feature', { module: 'jobs' }),
+        item({ id: 'waits', module: 'jobs' }),
+      ],
+      [dep('waits', 'feature')],
+    );
+
+  it('returns everything untouched for "all"', () => {
+    const sections = fixture();
+    expect(applyView(sections, 'all')).toEqual(sections);
+  });
+
+  it('keeps a step that does not match when one beneath it does, and says so', () => {
+    const [section] = applyView(fixture(), 'claude');
+    expect(section.module).toBe('shopping');
+    const [feature] = section.nodes;
+    expect(feature.matches).toBe(false);
+    expect(feature.children.map((n) => n.id)).toEqual(['open-step']);
+    expect(feature.children[0].matches).toBe(true);
+  });
+
+  it('drops closed steps under "open" and modules with nothing left', () => {
+    const sections = applyView(fixture(), 'open');
+    const ids = flattenSections(sections).map((n) => n.id);
+    expect(ids).not.toContain('done-step');
+    expect(ids).not.toContain('finished-feature');
+    expect(ids).toContain('waits');
+  });
+
+  it('shows the by-hand blocked and the waiting-on-another together under "blocked"', () => {
+    const ids = flattenSections(applyView(fixture(), 'blocked'))
+      .filter((n) => n.matches)
+      .map((n) => n.id);
+    expect(ids.sort()).toEqual(['stuck', 'waits']);
+  });
+
+  it('leaves the module’s progress over the whole plan', () => {
+    const before = shopping(fixture()).progress;
+    const [after] = applyView(fixture(), 'ready');
+    expect(after.progress).toEqual(before);
+  });
+
+  it('leaves out modules that have nothing to show, so a narrowed page is short', () => {
+    expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
+  });
+
+  it('keeps every module under "open", because that is where a plan gets written', () => {
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(
+      fixture().map((s) => s.module),
+    );
+  });
+});
+
+describe('workOrder', () => {
+  it('lists ready steps most urgent first, then in reading order', () => {
+    const sections = tree([
+      item({ id: 'normal-first', position: 10 }),
+      item({ id: 'someday', priority: 3, position: 20 }),
+      item({ id: 'urgent', priority: 1, position: 30 }),
+      item({ id: 'normal-second', position: 40 }),
+      item({ id: 'jobs-urgent', module: 'jobs', priority: 1 }),
+      at('in_progress', 'underway', { priority: 1 }),
+    ]);
+    expect(workOrder(sections).map((n) => n.id)).toEqual([
+      'urgent',
+      'jobs-urgent',
+      'normal-first',
+      'normal-second',
+      'someday',
+    ]);
+  });
+
+  it('can be narrowed to what Claude holds', () => {
+    const sections = tree([
+      item({ id: 'mine', assignee: 'me' }),
+      item({ id: 'theirs', assignee: 'claude' }),
+      item({ id: 'nobody' }),
+    ]);
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
+  });
+});
+
+describe('summarize', () => {
+  it('counts the plan the way the strip at the top reads it', () => {
+    const sections = tree(
+      [
+        item({ id: 'feature' }),
+        at('done', 'a', { parentId: 'feature' }),
+        at('in_progress', 'b', { parentId: 'feature', assignee: 'claude' }),
+        at('blocked', 'c', { parentId: 'feature' }),
+        item({ id: 'd', parentId: 'feature', assignee: 'claude' }),
+        at('dropped', 'e'),
+        item({ id: 'f' }),
+      ],
+      [dep('f', 'feature')],
+    );
+    expect(summarize(sections)).toEqual({
+      total: 7,
+      open: 5,
+      inProgress: 1,
+      // c by hand, f through its dependency.
+      waiting: 2,
+      // d alone: the feature has open steps and f is waiting.
+      ready: 1,
+      done: 1,
+      claude: 2,
+    });
+  });
+});
+
+describe('walking the tree', () => {
+  const sections = tree([
+    item({ id: 'root' }),
+    item({ id: 'mid', parentId: 'root' }),
+    item({ id: 'leaf', parentId: 'mid' }),
+    item({ id: 'other' }),
+  ]);
+
+  it('finds the steps above one, top first', () => {
+    expect(ancestorsOf(sections, 'leaf').map((n) => n.id)).toEqual(['root', 'mid']);
+    expect(ancestorsOf(sections, 'root')).toEqual([]);
+  });
+
+  it('names a step and everything beneath it', () => {
+    expect([...subtreeIds(findNode(sections, 'root')!)].sort()).toEqual(['leaf', 'mid', 'root']);
+    expect([...subtreeIds(findNode(sections, 'other')!)]).toEqual(['other']);
+  });
+});

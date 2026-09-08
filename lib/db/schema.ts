@@ -188,6 +188,8 @@ export const profiles = pgTable('profiles', {
   monthlyBudgetCents: integer('monthly_budget_cents'),
   defaultCooldownDays: integer('default_cooldown_days').notNull().default(7),
   onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
+  /** The last plan step number handed out. Never goes backwards; see 0052. */
+  planLastNumber: integer('plan_last_number').notNull().default(0),
   /** Sell assistant: only surface items that net at least this many cents. */
   sellNetFloorCents: integer('sell_net_floor_cents'),
   /** Flat per-listing effort penalty used in net_self math. */
@@ -609,6 +611,67 @@ export const ideas = pgTable(
     ...timestamps,
   },
   (t) => [index('ideas_user_created_idx').on(t.userId, t.createdAt)],
+);
+
+/**
+ * The plan: what is being built, as a tree. Mirrors 0051 and 0052; the
+ * numbering, the parent and dependency guards, and the started/completed
+ * timestamps are triggers there and are not repeated here.
+ */
+export const planItems = pgTable(
+  'plan_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    /** The short, stable handle -- "#12" -- per account. Assigned by trigger. */
+    number: integer('number').notNull(),
+    /** The workspace this step belongs to, or null for the app as a whole. */
+    module: text('module'),
+    /** The step this is part of, or null at the top of a module's plan. */
+    parentId: uuid('parent_id'),
+    title: text('title').notNull(),
+    detail: text('detail'),
+    /** Done when. */
+    acceptance: text('acceptance'),
+    status: text('status').notNull().default('not_started'),
+    comment: text('comment'),
+    /** 1 next, 2 normal, 3 someday. */
+    priority: smallint('priority').notNull().default(2),
+    /** s, m or l. */
+    size: text('size'),
+    /** 'me' or 'claude'. */
+    assignee: text('assignee'),
+    commitSha: text('commit_sha'),
+    position: integer('position').notNull().default(0),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index('plan_items_user_module_idx').on(t.userId, t.module, t.position),
+    index('plan_items_user_parent_idx').on(t.userId, t.parentId, t.position),
+    uniqueIndex('plan_items_user_number_key').on(t.userId, t.number),
+  ],
+);
+
+/** `itemId` cannot start until `dependsOnId` is done. */
+export const planDependencies = pgTable(
+  'plan_dependencies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => planItems.id, { onDelete: 'cascade' }),
+    dependsOnId: uuid('depends_on_id')
+      .notNull()
+      .references(() => planItems.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('plan_dependencies_pair_key').on(t.itemId, t.dependsOnId),
+    index('plan_dependencies_user_depends_on_idx').on(t.userId, t.dependsOnId),
+  ],
 );
 
 /** Shared ISBN quote cache (buyback / Browse / later sold comps). */
