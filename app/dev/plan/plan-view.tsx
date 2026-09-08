@@ -930,7 +930,26 @@ function PlanRow({
     })),
   ];
 
+  // The open steps beneath this one, which a hand-over covers as well. Said in
+  // the label rather than found out afterwards.
+  const openBeneath = flatten([node]).filter(
+    (step) => step.id !== node.id && !isClosed(step.status),
+  ).length;
+  const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
+  const handOver = node.assignee !== 'claude';
+  const assignLabel = handOver
+    ? `Hand to Claude${beneath}`
+    : `Take back from Claude${beneath}`;
+
   const menu: ActionMenuItem[] = [
+    {
+      // First, because marking a step as Claude's is the move this page exists
+      // to make and it should not need the step opened first.
+      id: 'assign',
+      label: assignLabel,
+      formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
+      formFields: { id: node.id, assignee: handOver ? 'claude' : '' },
+    },
     {
       id: 'add-child',
       label: 'Add a sub-step',
@@ -1142,7 +1161,7 @@ function PlanRow({
                   value={node.assignee === 'claude' ? '' : 'claude'}
                 />
                 <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
-                  {node.assignee === 'claude' ? 'Take back from Claude' : 'Hand to Claude'}
+                  {assignLabel}
                 </Button>
               </form>
               {!closed && <SendToClaude node={node} canSend={canSend} />}
