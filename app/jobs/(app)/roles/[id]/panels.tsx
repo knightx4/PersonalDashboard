@@ -2156,6 +2156,8 @@ function InterviewGroupCard({
 }) {
   const [label, setLabel] = useState(group.label ?? '');
   const [notes, setNotes] = useState(group.notes);
+  /** A round starts with no note on it, because that is the truth. */
+  const [showNotes, setShowNotes] = useState(group.notes.trim() !== '');
   const [saved, setSaved] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -2205,33 +2207,59 @@ function InterviewGroupCard({
         )}
       </header>
 
+      {/* No note until there is one, and foldable once there is -- the same
+          way a round's own notes behave one level down. A textarea shown on
+          every round whether or not anything had been written in it made an
+          empty round take the space of a full one and read as filled in. */}
       <div className="mt-3">
-        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-          Notes on this round
-        </h4>
-        <Textarea
-          rows={3}
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          placeholder="How the round went as a whole. Each interview keeps its own notes below."
-          className="mt-1"
-        />
-        <div className="mt-1.5 flex items-center gap-3">
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await saveInterviewGroup(group.id, { label, notes });
-                setSaved(result.error ?? 'Saved.');
-              })
-            }
-          >
-            Save
-          </Button>
-          {saved && <span className="text-small text-ink-muted">{saved}</span>}
-        </div>
+        {showNotes ? (
+          <CollapsibleField label="Notes on this round" defaultOpen>
+            <Textarea
+              rows={3}
+              value={notes}
+              autoFocus={notes === ''}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="How the round went as a whole. Each interview keeps its own notes below."
+            />
+            <div className="mt-1.5 flex items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await saveInterviewGroup(group.id, { label, notes });
+                    setSaved(result.error ?? 'Saved.');
+                  })
+                }
+              >
+                Save
+              </Button>
+              {saved && <span className="text-small text-ink-muted">{saved}</span>}
+            </div>
+          </CollapsibleField>
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
+            {/* The label still needs saving even with nothing written under
+                it, so the button stays reachable while the note is folded
+                away. */}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await saveInterviewGroup(group.id, { label, notes });
+                  setSaved(result.error ?? 'Saved.');
+                })
+              }
+              className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+            >
+              Save the name
+            </button>
+            {saved && <span className="text-small text-ink-muted">{saved}</span>}
+          </div>
+        )}
       </div>
 
       <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
@@ -2749,24 +2777,33 @@ function AddInterview({
       ) : (
         // Add from email, in the round rather than off in the mail tab: the
         // subject is the whole reason you remember which conversation this is.
+        //
+        // A dropdown rather than the subjects laid out in a row. Subject lines
+        // are long and there are as many of them as the pursuit has scheduling
+        // mail, so spread out they wrapped over several lines and pushed the
+        // form itself out of sight -- and read as a paragraph of links rather
+        // than as a list of one thing to choose.
         mailOptions.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-micro uppercase tracking-wider text-ink-muted">
-              Add from email
-            </span>
-            {mailOptions.map((message) => (
-              <button
-                key={message.id}
-                type="button"
-                onClick={() => {
-                  setFromMail({ kind: 'recruiter_screen', fromSubject: message.subject });
-                  setError(null);
-                }}
-                className="max-w-full truncate text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-              >
-                {message.subject ?? '(no subject)'}
-              </button>
-            ))}
+          <div className="mb-3">
+            <Label htmlFor={`${fieldId}-mail`}>Add from email</Label>
+            <Select
+              id={`${fieldId}-mail`}
+              defaultValue=""
+              className="w-full max-w-96"
+              onChange={(event) => {
+                const message = mailOptions.find((option) => option.id === event.target.value);
+                if (!message) return;
+                setFromMail({ kind: 'recruiter_screen', fromSubject: message.subject });
+                setError(null);
+              }}
+            >
+              <option value="">Start from a scheduling email…</option>
+              {mailOptions.map((message) => (
+                <option key={message.id} value={message.id}>
+                  {message.subject ?? '(no subject)'}
+                </option>
+              ))}
+            </Select>
           </div>
         )
       )}
