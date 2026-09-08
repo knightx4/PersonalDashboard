@@ -134,6 +134,54 @@ describe('timezone handling', () => {
     expect(event.startsAt?.toISOString()).toBe('2026-09-03T08:00:00.000Z');
   });
 
+  it('reads the Windows zone names Outlook writes', () => {
+    // The Galaxy superday, verbatim: four Outlook invites carrying
+    // TZID="Eastern Standard Time", which Intl rejects. They used to land in
+    // the unknown-zone fallback below and be stored as their own wall clock,
+    // so 10:30am Eastern read back as 6:30am.
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'BEGIN:VEVENT',
+      'UID:outlook@galaxy',
+      'DTSTART;TZID="Eastern Standard Time":20260915T103000',
+      'DTEND;TZID="Eastern Standard Time":20260915T113000',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const [event] = parseIcs(ics);
+    expect(event.startsAt?.toISOString()).toBe('2026-09-15T14:30:00.000Z');
+    expect(event.durationMinutes).toBe(60);
+  });
+
+  it('reads "Eastern Standard Time" as the zone, not as a fixed -05:00', () => {
+    // Windows names the zone after its standard offset all year round. Read
+    // as EST literally, a September booking would be an hour early.
+    const summer = parseIcs(
+      [
+        'BEGIN:VCALENDAR',
+        'BEGIN:VEVENT',
+        'UID:edt',
+        'DTSTART;TZID=Eastern Standard Time:20260915T103000',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n'),
+    )[0];
+    const winter = parseIcs(
+      [
+        'BEGIN:VCALENDAR',
+        'BEGIN:VEVENT',
+        'UID:est',
+        'DTSTART;TZID=Eastern Standard Time:20261215T103000',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n'),
+    )[0];
+
+    expect(summer.startsAt?.toISOString()).toBe('2026-09-15T14:30:00.000Z'); // EDT
+    expect(winter.startsAt?.toISOString()).toBe('2026-12-15T15:30:00.000Z'); // EST
+  });
+
   it('falls back to the wall clock when the zone is one nobody has heard of', () => {
     const ics = [
       'BEGIN:VCALENDAR',

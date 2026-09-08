@@ -19,6 +19,8 @@
  * and already installed.
  */
 
+import { toIanaZone } from './windows-zones';
+
 export interface IcsAttendee {
   name: string | null;
   email: string | null;
@@ -189,14 +191,18 @@ function wallClockToUtc(
   if (!Number.isFinite(wallMs)) return null;
   if (!timeZone) return new Date(wallMs);
 
-  try {
-    let instant = wallMs - zoneOffsetMs(wallMs, timeZone);
-    instant = wallMs - zoneOffsetMs(instant, timeZone);
-    return new Date(instant);
-  } catch {
+  // Outlook writes Windows zone names — TZID="Eastern Standard Time" — which
+  // `Intl` rejects outright. Translating first is what keeps those invites out
+  // of the fallback below, where the hour would silently come out four wrong.
+  const zone = toIanaZone(timeZone);
+  if (!zone) {
     // An unknown TZID is the sender's bug, not a reason to lose the invite.
     return new Date(wallMs);
   }
+
+  let instant = wallMs - zoneOffsetMs(wallMs, zone);
+  instant = wallMs - zoneOffsetMs(instant, zone);
+  return new Date(instant);
 }
 
 interface ParsedDate {
