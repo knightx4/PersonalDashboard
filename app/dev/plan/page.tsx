@@ -1,6 +1,7 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
+import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
   buildPlanTree,
@@ -78,7 +79,7 @@ export default async function DevPlanPage({
         view={view}
         catalog={catalog}
         empty={data.items.length === 0}
-        canSend={Boolean(process.env.CLAUDE_API_KEY)}
+        canSend={Boolean(planRoutine().token)}
       />
     </div>
   );

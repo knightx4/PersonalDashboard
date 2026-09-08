@@ -700,7 +700,9 @@ function SendToClaude({
         {pending ? 'Sending…' : 'Send to Claude'}
       </Button>
       {!canSend && quiet && (
-        <span className="text-small text-ink-muted">Needs CLAUDE_API_KEY on the deployment.</span>
+        <span className="text-small text-ink-muted">
+          Needs the plan routine&apos;s token on the deployment.
+        </span>
       )}
     </form>
   );
