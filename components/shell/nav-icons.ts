@@ -20,6 +20,7 @@ import {
   MessageSquareText,
   Receipt,
   Share2,
+  Shapes,
   StickyNote,
   Tag,
   Undo2,
@@ -63,6 +64,7 @@ export const NAV_ICONS = {
   bugs: Bug,
   ideas: Lightbulb,
   plan: Map,
+  ui: Shapes,
   // Todo and vault
   agenda: ListChecks,
   calendar: CalendarDays,

@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
  * under prefers-reduced-motion -- see globals.css.
  */
 const button = cva(
-  'press inline-flex items-center justify-center gap-2 rounded-lg font-medium ' +
+  'press inline-flex items-center justify-center gap-1.5 rounded-control font-medium ' +
     'transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 ' +
     'focus-visible:outline-2 focus-visible:outline-offset-2',
   {
@@ -23,10 +23,16 @@ const button = cva(
         ghost: 'text-ink-muted hover:bg-accent-tint hover:text-accent',
         danger: 'bg-surface text-danger border border-danger hover:bg-danger-tint',
       },
+      /**
+       * `md` reads the same variable the inputs and selects do, so a button
+       * on a form row lines up with them at every density without anyone
+       * measuring. `sm` and `lg` are the deliberate exceptions either side --
+       * a button inside a table row, and the one button a page is about.
+       */
       size: {
-        sm: 'h-8 px-3 text-ui',
-        md: 'h-10 px-4 text-body',
-        lg: 'h-11 px-5 text-lead',
+        sm: 'h-7 px-2.5 text-ui',
+        md: 'h-(--control-h) px-3 text-ui',
+        lg: 'h-9 px-4 text-body',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },

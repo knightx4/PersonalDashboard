@@ -70,7 +70,7 @@ export function AgendaSettingsForm({
                         name={`source:${source.id}`}
                         defaultChecked={enabled.includes(source.id)}
                         disabled={!source.available}
-                        className="mt-1 size-4 accent-[var(--color-accent)]"
+                        className="mt-1 size-4 accent-accent"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-ui font-medium text-ink">
