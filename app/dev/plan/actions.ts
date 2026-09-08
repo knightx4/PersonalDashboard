@@ -591,6 +591,83 @@ export async function sendPlanItemToClaude(
 }
 
 /**
+ * Hand a whole feature over and start the routine on it now.
+ *
+ * The step-at-a-time button is right when you are watching; a feature of seven
+ * steps pressed seven times is not. So this one cascades -- every open step
+ * beneath becomes Claude's, the way approving cascades -- and fires once with
+ * the feature's brief, which already carries its steps and what each waits on.
+ * The session works them in order and stops at the first thing it should not
+ * decide alone.
+ *
+ * It refuses a proposal, because a proposal is not work yet, and it refuses a
+ * feature with nothing open beneath it, because there would be nothing to do.
+ * Proposed steps beneath an approved feature are left alone rather than swept
+ * in: a step nobody has said yes to is not part of the batch.
+ */
+export async function sendPlanFeatureToClaude(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const data = await loadPlan(supabase, user.id);
+  const sections = buildPlanTree(data);
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  if (node.status === 'proposed') {
+    return { error: `#${node.number} is only a proposal. Approve it first.` };
+  }
+
+  // Itself included: a feature is closed when its steps are, and the session
+  // needs it to be its own to close.
+  const open = flatten([node]).filter(
+    (step) => !isClosed(step.status) && step.status !== 'proposed',
+  );
+  if (open.length === 0) return { error: 'Nothing open under that step.' };
+
+  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
+  if (toHandOver.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ assignee: 'claude' })
+      .in('id', toHandOver)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePlan();
+  }
+
+  const steps = open.length - 1;
+  const text =
+    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
+    '.claude/skills/plan/SKILL.md. Build its steps ONE AT A TIME in the order the plan ' +
+    'gives, each verified, committed and closed before the next is claimed, and keep ' +
+    'going until every step beneath it is closed, something blocks, or the session is ' +
+    'running short. Stop at the first step that needs a decision from me: block it with ' +
+    'the exact question rather than guessing, and do not skip past it to a later step. ' +
+    'Push once at the end of the batch and report every step you closed, by number and ' +
+    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
+    'the plan is the source of truth.\n\n' +
+    planBrief(sections, node);
+
+  const routine = planRoutine();
+  const result = await fireFeatureRoutine({
+    apiKey: routine.token,
+    routineId: routine.id,
+    text,
+  });
+  if (!result.ok) return { error: result.error };
+  return {
+    message: `Sent #${node.number} and its ${steps === 1 ? 'step' : `${steps} steps`}. ${result.detail}`,
+  };
+}
+
+/**
  * Write the build order in, once.
  *
  * Deliberately a button rather than something that happens on first render.

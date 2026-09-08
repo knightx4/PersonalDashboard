@@ -28,6 +28,7 @@ import {
   movePlanItem,
   removePlanDependency,
   seedPlan,
+  sendPlanFeatureToClaude,
   sendPlanItemToClaude,
   setPlanItemAssignee,
   setPlanItemStatus,
@@ -682,29 +683,56 @@ function SendToClaude({
   canSend,
   action,
   pending,
+  batchAction,
+  batchPending,
   quiet,
 }: {
   node: PlanNode;
   canSend: boolean;
   action: (formData: FormData) => void;
   pending: boolean;
+  /** The whole subtree in one press. Only worth offering where there is one. */
+  batchAction: (formData: FormData) => void;
+  batchPending: boolean;
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
 }) {
+  // Every open step beneath, the feature itself aside: what the batch would
+  // take on, and the only reason to offer it.
+  const beneath = flatten([node]).filter(
+    (step) => step.id !== node.id && !isClosed(step.status) && step.status !== 'proposed',
+  ).length;
+
   return (
-    <form action={action} className="flex flex-wrap items-center gap-2">
-      <input type="hidden" name="id" value={node.id} />
-      <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Play className="size-3.5" aria-hidden />
-        {pending ? 'Sending…' : 'Send to Claude'}
-      </Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <form action={action}>
+        <input type="hidden" name="id" value={node.id} />
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
+          <Play className="size-3.5" aria-hidden />
+          {pending ? 'Sending…' : 'Send to Claude'}
+        </Button>
+      </form>
+      {beneath > 0 && (
+        <form action={batchAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="ghost"
+            pending={batchPending}
+            title="Hand every open step beneath this one to Claude, worked in order"
+          >
+            {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
+          </Button>
+        </form>
+      )}
       {!canSend && quiet && (
         <span className="text-small text-ink-muted">
           Needs the plan routine&apos;s token on the deployment.
         </span>
       )}
-    </form>
+    </div>
   );
 }
 
@@ -950,6 +978,11 @@ function PlanRow({
   // of the quick icons and what happened is said once, in one place.
   const [sendState, sendAction, sendPending] = useActionState(
     sendPlanItemToClaude,
+    {} as PlanActionState,
+  );
+  // The same rope pulled for the whole subtree: one press, every step beneath.
+  const [batchState, batchAction, batchPending] = useActionState(
+    sendPlanFeatureToClaude,
     {} as PlanActionState,
   );
 
@@ -1206,11 +1239,18 @@ function PlanRow({
       </li>
 
       {/* What the last action did, wherever it was started from. */}
-      {(assignState.error ?? sendState.error ?? assignState.message ?? sendState.message) && (
+      {(assignState.error ??
+        sendState.error ??
+        batchState.error ??
+        assignState.message ??
+        sendState.message ??
+        batchState.message) && (
         <li style={inset} className="pb-1.5 pr-3 text-small">
-          <FieldError>{assignState.error ?? sendState.error}</FieldError>
-          {!assignState.error && !sendState.error && (
-            <span className="text-positive">{assignState.message ?? sendState.message}</span>
+          <FieldError>{assignState.error ?? sendState.error ?? batchState.error}</FieldError>
+          {!assignState.error && !sendState.error && !batchState.error && (
+            <span className="text-positive">
+              {assignState.message ?? sendState.message ?? batchState.message}
+            </span>
           )}
         </li>
       )}
@@ -1288,7 +1328,14 @@ function PlanRow({
                   canSend={canSend}
                   action={sendAction}
                   pending={sendPending}
-                  quiet={!sendState.error && !sendState.message}
+                  batchAction={batchAction}
+                  batchPending={batchPending}
+                  quiet={
+                    !sendState.error &&
+                    !sendState.message &&
+                    !batchState.error &&
+                    !batchState.message
+                  }
                 />
               )}
             </div>

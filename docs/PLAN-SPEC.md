@@ -89,21 +89,46 @@ ready either, whatever its own status says. Nothing in the skill or the CLI
 moves a step out of `proposed` except the person's approve, on the page or
 with `scripts/plan.ts approve`.
 
-## The nightly routine
+## The routines
 
-One routine does both queues, notes first, one plan step at a time, so each
-morning there is one thing to review rather than five. Its prompt:
+Two of them, because there are two queues. **Morning notes review** runs on a
+schedule and works `feedback_items`; **Plan step builder** has no schedule at
+all and works `plan_items`, fired only by a button here or on the ideas page.
+They were one routine once, and one is what the buttons had to share.
 
-> Work the notes queue per .claude/skills/notes/SKILL.md until it is empty
-> or every remaining note is blocked or planned. Then, if nothing in the
-> notes queue needed a decision, run `npx tsx scripts/plan.ts next --claude`
-> and build the first step it lists, per .claude/skills/plan/SKILL.md — one
-> step only. Never touch a proposed step. Push once, then report: notes
-> closed, the plan step closed and what it made ready, and anything blocked
-> with its question, blocked items first.
+That sharing had to end for a reason worth writing down: the bugs page's
+*Run Feature Routine* sends **no text of its own**, leaning entirely on the
+routine's standing prompt. So a button pointed at the wrong routine does not
+fail — it quietly works the other queue. Hence a variable per queue, and a
+token per queue beside it, because a routine token is scoped to the routine
+rather than to the account and the other one's answers `401 Token is not
+authorized for this routine`:
 
-The *Send to Claude* and *Shape into a plan* buttons fire the same routine
-with an extra turn that names the step or the idea; the extra turn wins.
+| | id | token |
+|---|---|---|
+| notes | `CLAUDE_NOTES_ROUTINE_ID` | `CLAUDE_NOTES_ROUTINE_TOKEN` |
+| plan | `CLAUDE_PLAN_ROUTINE_ID` | `CLAUDE_PLAN_ROUTINE_TOKEN` |
+
+The ids fall back to `CLAUDE_FEATURE_ROUTINE_ID` and then to a built-in
+default; the tokens fall back to `CLAUDE_API_KEY`. `lib/feedback/routine.ts`
+hands out an id and a token together as one pair, so an id cannot be repointed
+without its token following.
+
+The plan routine's standing prompt is the frame; the turn a button appends
+says what this firing is for, and wins:
+
+- ***Send to Claude*** on a step — build that one step, then stop.
+- ***Send all n beneath*** on a feature — every open step under it becomes
+  Claude's, the way approving cascades, and one session works them in plan
+  order, each verified, committed and closed before the next is claimed. It
+  stops at the first step that needs a decision, blocking it with the question
+  rather than skipping to a later one. Push and merge happen once, at the end.
+- ***Shape into a plan*** on an idea — write the proposal and nothing else.
+
+The batch button is the one to think twice about. There is no review point
+between its steps, so a step that gets something wrong early has the rest
+built on top of it before anybody looks. Send a migration on its own; batch
+the rest once you have seen what it did.
 
 ## The reading
 
