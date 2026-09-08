@@ -6,7 +6,7 @@ import {
   type PlanItem,
   type PlanStatus,
 } from '@/lib/plan/load';
-import { PLAN_SEED, planStepKey, seedStepsMissingFrom } from '@/lib/plan/seed';
+import { PLAN_SEED } from '@/lib/plan/seed';
 import { MODULES } from '@/lib/modules';
 
 function item(over: Partial<PlanItem> & { id: string }): PlanItem {
@@ -117,39 +117,5 @@ describe('the seed', () => {
       expect(seen.has(key), `${key} appears twice`).toBe(false);
       seen.add(key);
     }
-  });
-});
-
-/**
- * Importing twice is the normal case, not the edge case: a slice gets planned
- * in the seed after the first import and has to reach the page somehow.
- */
-describe('bringing in what is missing', () => {
-  it('takes everything when the plan is empty', () => {
-    expect(seedStepsMissingFrom([])).toHaveLength(PLAN_SEED.length);
-  });
-
-  it('takes nothing when the plan already holds the whole seed', () => {
-    expect(seedStepsMissingFrom(PLAN_SEED)).toEqual([]);
-  });
-
-  it('takes only the steps that are not there', () => {
-    const held = PLAN_SEED.slice(0, PLAN_SEED.length - 2);
-    const missing = seedStepsMissingFrom(held);
-    expect(missing.map(planStepKey)).toEqual(PLAN_SEED.slice(-2).map(planStepKey));
-  });
-
-  it('does not confuse two modules that number their steps the same way', () => {
-    // Every module starts at 1., so the title alone is not a key.
-    const oneModule = PLAN_SEED.filter((step) => step.module === 'jobs');
-    expect(oneModule.length).toBeGreaterThan(0);
-    const missing = seedStepsMissingFrom(oneModule);
-    expect(missing.some((step) => step.module === 'jobs')).toBe(false);
-    expect(missing.some((step) => step.module !== 'jobs')).toBe(true);
-  });
-
-  it('ignores steps of your own that the seed never had', () => {
-    const mine = [{ module: null, title: 'Something I added myself' }];
-    expect(seedStepsMissingFrom([...PLAN_SEED, ...mine])).toEqual([]);
   });
 });

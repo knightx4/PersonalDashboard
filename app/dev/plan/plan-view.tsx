@@ -5,7 +5,6 @@ import { ChevronDown } from 'lucide-react';
 import {
   addPlanItem,
   deletePlanItem,
-  seedPlan,
   setPlanItemStatus,
   updatePlanItem,
   type PlanActionState,
@@ -302,67 +301,24 @@ function AddStep({ module }: { module: ModuleId | null }) {
 }
 
 /**
- * The empty state, which is also the import.
+ * The plan is empty only if you emptied it.
  *
- * A button rather than a seed that runs when you first look at the page:
- * writing forty rows because somebody opened a tab is a write nobody got to
- * decline, and saying what it will do first costs one click.
+ * There is no import button any more -- the seed is brought in on the way into
+ * the page -- so nothing here is a step you can take. Saying that plainly beats
+ * an empty page that looks broken.
  */
-function ImportTheBuildOrder() {
-  const [state, action, pending] = useActionState(seedPlan, {} as PlanActionState);
-
+function NothingLeft() {
   return (
-    <form
-      action={action}
-      className={cn(cardVariants(), 'border-dashed px-4 py-8 text-center')}
-    >
-      <p className="text-ui text-ink">Nothing here yet.</p>
-      <p className="mx-auto mt-1 max-w-prose text-ui text-ink-muted">
-        The build order in <code>docs/BUILD-ORDER.md</code> and the job side&rsquo;s own plan can be
-        written in as a starting point — every numbered step, with the ones already marked done
-        carried across. After that this list is the plan, and the documents are background reading:
-        nothing here reads them again, and the two will drift.
-      </p>
-      <div className="mt-4 flex flex-col items-center gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Importing…' : 'Import the build order'}
-        </Button>
-        <FieldError>{state.error}</FieldError>
-        {state.message && !state.error && (
-          <span className="text-small text-ink-muted">{state.message}</span>
-        )}
-      </div>
-    </form>
-  );
-}
-
-/**
- * The same import, offered again once the plan is not empty.
- *
- * A new slice gets planned in `lib/plan/seed.ts`, beside the spec that argues
- * for it; without this the only way those steps reach the page is retyping them
- * into a form, which is how a plan page stops being current and then stops
- * being read. It adds what is missing and leaves everything else exactly as it
- * is, so pressing it when there is nothing new costs a sentence saying so.
- */
-function TopUpFromBuildOrder() {
-  const [state, action, pending] = useActionState(seedPlan, {} as PlanActionState);
-
-  return (
-    <form action={action} className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-      <Button type="submit" size="sm" variant="ghost" disabled={pending}>
-        {pending ? 'Checking…' : 'Bring in new steps from the build order'}
-      </Button>
-      <FieldError>{state.error}</FieldError>
-      {state.message && !state.error && (
-        <span className="text-small text-ink-muted">{state.message}</span>
-      )}
-    </form>
+    <p className={cn(cardVariants(), 'border-dashed px-4 py-8 text-center text-ui text-ink-muted')}>
+      Nothing here. Every step in the build order has been brought in and then deleted; steps are
+      offered once, so they will not come back on their own. Add one below, or write it into{' '}
+      <code>lib/plan/seed.ts</code>.
+    </p>
   );
 }
 
 export function PlanView({ sections, empty }: { sections: PlanSection[]; empty: boolean }) {
-  if (empty) return <ImportTheBuildOrder />;
+  if (empty) return <NothingLeft />;
 
   return (
     <div className="space-y-6">
@@ -397,7 +353,6 @@ export function PlanView({ sections, empty }: { sections: PlanSection[]; empty: 
           <AddStep module={null} />
         </section>
       )}
-      <TopUpFromBuildOrder />
     </div>
   );
 }

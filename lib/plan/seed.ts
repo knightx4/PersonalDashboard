@@ -482,14 +482,16 @@ export function planStepKey(step: { module: string | null; title: string }): str
 }
 
 /**
- * The seed steps that are not in the plan yet.
+ * The seed steps whose keys have never been handed over.
  *
- * Pure, so importing can be tested without a Supabase client -- and so the
- * question it answers ("what would this add?") is separable from the write.
+ * Pure, so the sync can be tested without a Supabase client -- and so the
+ * question it answers ("what would this add?") stays separable from the write.
+ *
+ * Note what it is not asked: which steps the plan currently holds. A step you
+ * deleted is not missing, it is refused, and the difference is the only thing
+ * that makes importing on every visit bearable.
  */
-export function seedStepsMissingFrom(
-  existing: readonly { module: string | null; title: string }[],
-): PlanSeedItem[] {
-  const seen = new Set(existing.map(planStepKey));
+export function seedStepsNotYetOffered(offeredKeys: Iterable<string>): PlanSeedItem[] {
+  const seen = offeredKeys instanceof Set ? offeredKeys : new Set(offeredKeys);
   return PLAN_SEED.filter((step) => !seen.has(planStepKey(step)));
 }

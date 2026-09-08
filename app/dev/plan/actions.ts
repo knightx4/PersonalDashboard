@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId } from '@/lib/modules';
 import { PLAN_STATUSES } from '@/lib/plan/load';
-import { seedStepsMissingFrom } from '@/lib/plan/seed';
 
 export type PlanActionState = {
   error?: string;
@@ -178,77 +177,4 @@ export async function deletePlanItem(
 
   revalidatePlan();
   return { message: 'Deleted.' };
-}
-
-/**
- * Write the build order in, and later bring in what has been added to it.
- *
- * Deliberately a button rather than something that happens on first render.
- * Seeding is a write, and a write that happens because you looked at a page is
- * one nobody can decline — this way the empty plan explains what it is about to
- * do and you say when.
- *
- * Pressing it again is safe and useful rather than merely harmless. It adds
- * only the steps the plan does not already have, matched on module and title,
- * and touches nothing that is there: a step you marked done stays done, a
- * comment you wrote stays written, a title you rewrote is left alone. That is
- * what makes it possible to plan a new slice where the specs live — in a file,
- * next to the reasoning — and then work it here, rather than retyping six long
- * steps into a form.
- */
-export async function seedPlan(
-  // Signature is fixed by useActionState; the button sends nothing.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _prev: PlanActionState, _formData: FormData,
-): Promise<PlanActionState> {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { data, error: readError } = await supabase
-    .from('plan_items')
-    .select('module, title, position')
-    .eq('user_id', user.id);
-  if (readError) return { error: readError.message };
-
-  const existing = (data ?? []) as { module: string | null; title: string; position: number }[];
-  const missing = seedStepsMissingFrom(existing);
-
-  if (missing.length === 0) {
-    return { message: 'Nothing new — the plan already holds every step in the build order.' };
-  }
-
-  // New steps go after whatever that module already has, spaced by ten so one
-  // can later be slotted between two others without renumbering the rest. On an
-  // empty plan this is 10, 20, 30 within each module, which is where the
-  // numbering came from in the first place.
-  const lastByModule = new Map<string, number>();
-  for (const row of existing) {
-    const key = row.module ?? 'app';
-    lastByModule.set(key, Math.max(lastByModule.get(key) ?? 0, row.position ?? 0));
-  }
-
-  const rows = missing.map((step) => {
-    const key = step.module ?? 'app';
-    const next = (lastByModule.get(key) ?? 0) + 10;
-    lastByModule.set(key, next);
-    return {
-      user_id: user.id,
-      module: step.module,
-      title: step.title,
-      detail: step.detail,
-      status: step.status,
-      position: next,
-    };
-  });
-
-  const { error } = await supabase.from('plan_items').insert(rows);
-  if (error) return { error: error.message };
-
-  revalidatePlan();
-  return {
-    message:
-      existing.length === 0
-        ? `Imported ${rows.length} steps from the build order.`
-        : `Added ${rows.length} ${rows.length === 1 ? 'step' : 'steps'} written since the last import.`,
-  };
 }
