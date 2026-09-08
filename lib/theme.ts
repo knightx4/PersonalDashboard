@@ -32,14 +32,6 @@ export const THEMES = [
     ink: '#f7f8f8',
   },
   {
-    id: 'riso',
-    label: 'Riso',
-    mood: 'Cream and halftone',
-    scheme: 'light',
-    swatch: '#f6f2e8',
-    ink: '#191713',
-  },
-  {
     id: 'lightbox',
     label: 'Lightbox',
     mood: 'Lit sheets, blue-black bench',

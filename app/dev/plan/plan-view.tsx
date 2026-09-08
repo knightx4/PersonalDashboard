@@ -13,6 +13,7 @@ import {
   ChevronRight,
   CircleDashed,
   Hourglass,
+  Pencil,
   Play,
   Scale,
   Sparkles,
@@ -676,9 +677,21 @@ function Dependencies({
  * because the action says exactly what is missing when it cannot, and a
  * button that is simply absent leaves nobody knowing what to set.
  */
-function SendToClaude({ node, canSend }: { node: PlanNode; canSend: boolean }) {
-  const [state, action, pending] = useActionState(sendPlanItemToClaude, {} as PlanActionState);
-
+function SendToClaude({
+  node,
+  canSend,
+  action,
+  pending,
+  quiet,
+}: {
+  node: PlanNode;
+  canSend: boolean;
+  action: (formData: FormData) => void;
+  pending: boolean;
+  /** Nothing has been said about the last run yet, so the missing-key note is
+      worth the room. */
+  quiet: boolean;
+}) {
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={node.id} />
@@ -686,12 +699,45 @@ function SendToClaude({ node, canSend }: { node: PlanNode; canSend: boolean }) {
         <Play className="size-3.5" aria-hidden />
         {pending ? 'Sending…' : 'Send to Claude'}
       </Button>
-      {!canSend && !state.error && !state.message && (
+      {!canSend && quiet && (
         <span className="text-small text-ink-muted">Needs CLAUDE_API_KEY on the deployment.</span>
       )}
-      {state.message && <span className="text-small text-positive">{state.message}</span>}
-      <FieldError>{state.error}</FieldError>
     </form>
+  );
+}
+
+/**
+ * One of the row's quick actions.
+ *
+ * An icon on the row rather than a button behind the fold: sending a step to
+ * Claude, handing it over and editing it are the three things done to a step
+ * without needing to read it first, and reaching them through the step's own
+ * detail made every one of them two clicks and a scroll.
+ */
+function RowIconButton({
+  label,
+  type = 'button',
+  pending = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  type?: 'button' | 'submit';
+  pending?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type={type}
+      title={label}
+      onClick={onClick}
+      disabled={pending}
+      className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
+    >
+      {children}
+      <span className="sr-only">{label}</span>
+    </button>
   );
 }
 
@@ -771,9 +817,12 @@ const TONE_DOT: Record<Health['tone'], string> = {
  * than around the row. On a phone the three middle columns go and the name,
  * the health and the menu stay.
  */
+// The last column holds the row's quick actions as well as its menu, so it is
+// wide enough for them from sm up -- reserved rather than grown on hover,
+// because a column that widens under the pointer moves every row beside it.
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_2rem]';
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
 const LEVEL = 'w-5';
@@ -895,6 +944,12 @@ function PlanRow({
     setPlanItemAssignee,
     {} as PlanActionState,
   );
+  // Held by the row rather than by the button, because the same action is one
+  // of the quick icons and what happened is said once, in one place.
+  const [sendState, sendAction, sendPending] = useActionState(
+    sendPlanItemToClaude,
+    {} as PlanActionState,
+  );
 
   const hasChildren = node.children.length > 0;
   const descendants = flatten([node]).length - 1;
@@ -930,7 +985,38 @@ function PlanRow({
     })),
   ];
 
+  // The open steps beneath this one, which a hand-over covers as well. Said in
+  // the label rather than found out afterwards.
+  const openBeneath = flatten([node]).filter(
+    (step) => step.id !== node.id && !isClosed(step.status),
+  ).length;
+  const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
+  const handOver = node.assignee !== 'claude';
+  const assignLabel = handOver
+    ? `Hand to Claude${beneath}`
+    : `Take back from Claude${beneath}`;
+
   const menu: ActionMenuItem[] = [
+    {
+      // First, because marking a step as Claude's is the move this page exists
+      // to make and it should not need the step opened first.
+      id: 'assign',
+      label: assignLabel,
+      formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
+      formFields: { id: node.id, assignee: handOver ? 'claude' : '' },
+    },
+    // The quick icons are only there from sm up and only under a pointer, so
+    // the menu carries the same two actions for a phone and for a keyboard.
+    ...(closed
+      ? []
+      : [
+          {
+            id: 'send',
+            label: 'Send to Claude',
+            formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
+            formFields: { id: node.id },
+          },
+        ]),
     {
       id: 'add-child',
       label: 'Add a sub-step',
@@ -974,7 +1060,7 @@ function PlanRow({
       <li
         className={cn(
           ROW_GRID,
-          'px-3',
+          'group px-3',
           gloss && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
           closed && 'opacity-70',
@@ -990,6 +1076,11 @@ function PlanRow({
               type="button"
               onClick={() => setShowChildren((value) => !value)}
               aria-expanded={showChildren}
+              title={
+                showChildren
+                  ? `Fold the ${node.children.length} sub-steps`
+                  : `Unfold the ${node.children.length} sub-steps`
+              }
               aria-label={showChildren ? 'Hide the sub-steps' : 'Show the sub-steps'}
               className={cn(
                 LEVEL,
@@ -1007,10 +1098,15 @@ function PlanRow({
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
 
+          {/* The title opens the step itself, which the chevron beside it
+              never does -- that one is the tree, and only the tree. The two
+              were told apart by nothing but position, so this one says what it
+              is, and what it opens is a panel rather than another level. */}
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
+            title={open ? `Close #${node.number}` : `Open #${node.number}`}
             className="min-w-0 flex-1 self-center text-left hover:text-accent"
           >
             <span
@@ -1074,12 +1170,46 @@ function PlanRow({
           <Breakdown node={node} />
         </span>
 
-        <ActionMenu label={`Actions for #${node.number}`} items={menu} className="justify-self-end" />
+        {/* The three things done to a step without reading it first, then the
+            menu for everything else. Under the pointer or under focus, so a
+            plan at rest is a plan rather than a wall of icons; the same three
+            are in the menu, which is how a phone reaches them. */}
+        <div className="flex items-center justify-self-end">
+          <div className="hidden items-center opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
+            {!closed && (
+              <form action={sendAction}>
+                <input type="hidden" name="id" value={node.id} />
+                <RowIconButton type="submit" label="Send to Claude" pending={sendPending}>
+                  <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+                </RowIconButton>
+              </form>
+            )}
+            <form action={assignAction}>
+              <input type="hidden" name="id" value={node.id} />
+              <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
+              <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
+                <CircleUser
+                  className={cn('size-3.5', !handOver && 'text-accent')}
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+              </RowIconButton>
+            </form>
+            <RowIconButton label="Edit" onClick={() => setEditing(true)}>
+              <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+            </RowIconButton>
+          </div>
+          <ActionMenu label={`Actions for #${node.number}`} items={menu} />
+        </div>
       </li>
 
-      {assignState.error && (
-        <li className="px-3">
-          <FieldError>{assignState.error}</FieldError>
+      {/* What the last action did, wherever it was started from. */}
+      {(assignState.error ?? sendState.error ?? assignState.message ?? sendState.message) && (
+        <li style={inset} className="pb-1.5 pr-3 text-small">
+          <FieldError>{assignState.error ?? sendState.error}</FieldError>
+          {!assignState.error && !sendState.error && (
+            <span className="text-positive">{assignState.message ?? sendState.message}</span>
+          )}
         </li>
       )}
 
@@ -1089,7 +1219,12 @@ function PlanRow({
         </li>
       ) : (
         open && (
-          <li style={inset} className="space-y-3 pb-3 pr-3">
+          // The step itself, as a panel with an edge of its own. It was loose
+          // rows at the next indent, which made opening a step look like
+          // unfolding one more level of the tree -- the same gesture and the
+          // same shape for two different meanings.
+          <li style={inset} className="pb-3 pr-3">
+            <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
             {node.detail && <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>}
             {node.acceptance && (
               <div>
@@ -1142,10 +1277,19 @@ function PlanRow({
                   value={node.assignee === 'claude' ? '' : 'claude'}
                 />
                 <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
-                  {node.assignee === 'claude' ? 'Take back from Claude' : 'Hand to Claude'}
+                  {assignLabel}
                 </Button>
               </form>
-              {!closed && <SendToClaude node={node} canSend={canSend} />}
+              {!closed && (
+                <SendToClaude
+                  node={node}
+                  canSend={canSend}
+                  action={sendAction}
+                  pending={sendPending}
+                  quiet={!sendState.error && !sendState.message}
+                />
+              )}
+            </div>
             </div>
           </li>
         )
@@ -1258,66 +1402,79 @@ export function PlanView({
         />
       )}
 
-      {sections.map((section) => {
-        // What is finished is consulted, not read -- the same call the rows
-        // make about a closed step's children. The progress stays on the
-        // summary line either way, so a folded module still says how far it
-        // got: law 10, a fold that hides its own count has moved the work.
-        const finished = section.progress.live > 0 && section.progress.fraction === 1;
+      {/* The sections as a stack of their own. They were spaced like the parts
+          of the page -- a summary strip, a filter row, a plan -- which left a
+          collapsed module marooned between two large gaps. Between sections
+          the right distance is smaller than that. */}
+      <div className="space-y-3">
+        {sections.map((section) => {
+          // What is finished is consulted, not read -- the same call the rows
+          // make about a closed step's children. The progress stays on the
+          // summary line either way, so a folded module still says how far it
+          // got: law 10, a fold that hides its own count has moved the work.
+          const finished = section.progress.live > 0 && section.progress.fraction === 1;
 
-        return (
-          <details
-            key={section.module ?? 'app'}
-            open={!finished}
-            className="group/section space-y-2"
-          >
-            <summary
-              className={cn(
-                'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
-                'rounded-control py-1 [&::-webkit-details-marker]:hidden',
-                'focus-visible:outline-2 focus-visible:outline-offset-2',
-              )}
+          return (
+            <details
+              key={section.module ?? 'app'}
+              open={!finished}
+              className="group/section space-y-2"
             >
-              <h2 className="flex items-center gap-1.5 text-body font-semibold text-ink">
-                <ChevronRight
-                  aria-hidden
-                  strokeWidth={2}
-                  className="size-3.5 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
-                />
-                {section.label}
-              </h2>
-              <Progress label={section.label} progress={section.progress} />
-            </summary>
+              <summary
+                className={cn(
+                  'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
+                  'rounded-card [&::-webkit-details-marker]:hidden',
+                  'focus-visible:outline-2 focus-visible:outline-offset-2',
+                  // Closed, a section is a shut drawer with a ground of its own.
+                  // It was a bare line of text sitting in a large gap, which read
+                  // as a heading somebody had forgotten to put anything under.
+                  // Open, the list beneath it is the object on the page, so the
+                  // header stands back down to being a heading.
+                  'bg-sunken px-3 py-2.5',
+                  'group-open/section:bg-transparent group-open/section:px-0 group-open/section:py-1',
+                )}
+              >
+                <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
+                  <ChevronRight
+                    aria-hidden
+                    strokeWidth={2}
+                    className="size-4 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
+                  />
+                  {section.label}
+                </h2>
+                <Progress label={section.label} progress={section.progress} />
+              </summary>
 
-            <div className="space-y-2">
-              {section.nodes.length === 0 ? (
-                <p className="rounded-card border border-dashed border-border bg-surface px-4 py-4 text-center text-ui text-ink-muted">
-                  {finished
-                    ? `Everything planned for ${section.label} is done.`
-                    : `No plan for ${section.label} yet.`}
-                </p>
-              ) : (
-                <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
-                  <ColumnHeader />
-                  {section.nodes.map((node) => (
-                    <PlanRow
-                      key={node.id}
-                      node={node}
-                      trail={[]}
-                      catalog={catalog}
-                      canSend={canSend}
-                    />
-                  ))}
-                </ul>
-              )}
+              <div className="space-y-2">
+                {section.nodes.length === 0 ? (
+                  <p className="rounded-card border border-dashed border-border bg-surface px-4 py-4 text-center text-ui text-ink-muted">
+                    {finished
+                      ? `Everything planned for ${section.label} is done.`
+                      : `No plan for ${section.label} yet.`}
+                  </p>
+                ) : (
+                  <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
+                    <ColumnHeader />
+                    {section.nodes.map((node) => (
+                      <PlanRow
+                        key={node.id}
+                        node={node}
+                        trail={[]}
+                        catalog={catalog}
+                        canSend={canSend}
+                      />
+                    ))}
+                  </ul>
+                )}
 
-              {(view === 'open' || view === 'all') && (
-                <AddStep module={section.module} parentId={null} />
-              )}
-            </div>
-          </details>
-        );
-      })}
+                {(view === 'open' || view === 'all') && (
+                  <AddStep module={section.module} parentId={null} />
+                )}
+              </div>
+            </details>
+          );
+        })}
+      </div>
 
       {/* The app-wide list is not offered as a section until something is in
           it, so this is the only way to put the first thing there. */}

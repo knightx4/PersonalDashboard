@@ -6,7 +6,7 @@ import { cn } from './cn';
  * tell them apart without being told about this project's scales. Left
  * untold, it treated `text-surface` and `text-body` as the same kind of class
  * and deleted the first -- which rendered the primary button's label in the
- * inherited colour and made it invisible in three of the five themes.
+ * inherited colour and made it invisible in three of the four themes.
  */
 describe('cn', () => {
   it('keeps a text colour and a text size together', () => {

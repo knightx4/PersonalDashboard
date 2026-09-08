@@ -12,6 +12,7 @@ import {
   PLAN_PRIORITIES,
   PLAN_SIZES,
   PLAN_STATUSES,
+  isClosed,
   loadPlan,
 } from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
@@ -354,7 +355,18 @@ export async function approvePlanItem(
   return { message: ids.length === 1 ? 'Approved.' : `Approved ${ids.length} steps.` };
 }
 
-/** Hand a step to Claude, or take it back, in one click. */
+/**
+ * Hand a step to Claude, or take it back, in one click.
+ *
+ * The step and every open step beneath it, for the same reason approving works
+ * that way: work is handed over as a whole, and marking five sub-steps one at
+ * a time is how four of them get missed. Closed steps are left alone -- who
+ * was going to do a finished thing is history, not an instruction.
+ *
+ * A proposed step can be handed over. This column says who a step is for, not
+ * that it has been agreed to, and nothing picks up a proposal: `next --claude`
+ * lists approved steps only.
+ */
 export async function setPlanItemAssignee(
   _prev: PlanActionState,
   formData: FormData,
@@ -366,15 +378,33 @@ export async function setPlanItemAssignee(
   const assignee = assigneeField.safeParse(field(formData, 'assignee'));
   if (!id.success || !assignee.success) return { error: 'Missing step or assignee.' };
 
+  const sections = buildPlanTree(await loadPlan(supabase, user.id));
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  // The step itself whatever state it is in -- you asked for this one -- and
+  // the open ones beneath it.
+  const ids = [
+    node.id,
+    ...flatten([node])
+      .filter((step) => step.id !== node.id && !isClosed(step.status))
+      .map((step) => step.id),
+  ];
+
   const { error } = await supabase
     .from('plan_items')
     .update({ assignee: assignee.data })
-    .eq('id', id.data)
+    .in('id', ids)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: assignee.data === 'claude' ? 'Handed to Claude.' : 'Updated.' };
+  if (assignee.data !== 'claude') {
+    return { message: ids.length === 1 ? 'Taken back.' : `Took back ${ids.length} steps.` };
+  }
+  return {
+    message: ids.length === 1 ? 'Handed to Claude.' : `Handed ${ids.length} steps to Claude.`,
+  };
 }
 
 /**

@@ -258,7 +258,7 @@ export function ModuleMark({
       style={{
         background: TILE,
         // A near-black tile on a near-black surface needs an edge, or the mark
-        // dissolves into the sidebar in three of the five themes.
+        // dissolves into the sidebar in three of the four themes.
         boxShadow:
           'inset 0 0 0 1px rgb(255 255 255 / 0.09), inset 0 1px 0 rgb(255 255 255 / 0.13)',
       }}

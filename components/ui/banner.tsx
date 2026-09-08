@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
  *
  * There were three unrelated implementations of this, one of them in raw
  * emerald-50/emerald-200/emerald-950 with no token in sight -- which meant it
- * was a bug in four of the five themes the moment a second theme existed.
+ * was a bug in three of the four themes the moment a second theme existed.
  *
  * The tone is a claim, not a colour choice:
  *   info     something is happening that you did not start and need not act on

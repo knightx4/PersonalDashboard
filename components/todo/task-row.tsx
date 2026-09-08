@@ -1,7 +1,18 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { ArrowDown, ArrowUp, Check, Clock, Pin, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Clock,
+  GripVertical,
+  Pin,
+  RotateCcw,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { useToast } from '@/components/ui/toast';
@@ -12,6 +23,7 @@ import {
   laterTask,
   moveTask,
   pinTask,
+  placeTask,
   removeTask,
   reopenTask,
 } from '@/app/todo/actions';
@@ -29,6 +41,16 @@ import { EditTask } from './task-form';
  * happen at once and offer the way back in a toast. Delete has none, so it is
  * the one action here that asks first.
  */
+/**
+ * Which task is in the air.
+ *
+ * Module-level rather than state, because `dragover` cannot read the
+ * dataTransfer -- the payload is only legible on `drop` -- and a row still has
+ * to decide whether the thing crossing it is one of its own siblings before it
+ * offers to catch it. One list is dragged at a time, so one variable is enough.
+ */
+let dragging: string | null = null;
+
 export function TaskRow({
   task,
   timezone,
@@ -51,6 +73,9 @@ export function TaskRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
+  const [grabbed, setGrabbed] = useState(false);
+  /** Which edge of this row the dragged task would land on, while it is over. */
+  const [edge, setEdge] = useState<'top' | 'bottom' | null>(null);
   const toast = useToast();
 
   // A pile of one has no order to change.
@@ -88,8 +113,87 @@ export function TaskRow({
     start(() => moveTask(task.id, direction, [...siblings]));
   }
 
+  /** A row can be reordered when it is in a pile and still on the list. */
+  const sortable = index !== -1 && !done && !dropped;
+  /** Whether the task crossing this row is one this row could catch. */
+  const catching = dragging !== null && dragging !== task.id && siblings.includes(dragging);
+
+  function onDragOver(event: React.DragEvent) {
+    if (!sortable || !catching) return;
+    // Only a preventDefault here makes the row a drop target at all.
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const box = event.currentTarget.getBoundingClientRect();
+    setEdge(event.clientY < box.top + box.height * 0.5 ? 'top' : 'bottom');
+  }
+
+  function onDrop(event: React.DragEvent) {
+    if (!sortable) return;
+    event.preventDefault();
+    const moved = event.dataTransfer.getData('text/plain');
+    setEdge(null);
+    if (!moved || moved === task.id || !siblings.includes(moved)) return;
+    // Above this row, or above whatever is under it -- and null at the foot,
+    // where there is nothing to be above.
+    const before = edge === 'top' ? task.id : (siblings[index + 1] ?? null);
+    if (before === moved) return;
+    start(() => placeTask(moved, before, [...siblings]));
+  }
+
   return (
-    <div className={cn('group row-pad flex items-start gap-3', pending && 'opacity-50')}>
+    <div
+      className={cn(
+        'group row-pad relative flex items-start gap-3',
+        pending && 'opacity-50',
+        grabbed && 'opacity-40',
+      )}
+      draggable={grabbed}
+      onDragStart={(event) => {
+        dragging = task.id;
+        event.dataTransfer.setData('text/plain', task.id);
+        event.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragEnd={() => {
+        dragging = null;
+        setGrabbed(false);
+        setEdge(null);
+      }}
+      onDragOver={onDragOver}
+      onDragLeave={() => setEdge(null)}
+      onDrop={onDrop}
+    >
+      {/* Where it would land. A line rather than a gap, so nothing below it
+          moves while the pointer is still deciding. */}
+      {edge && (
+        <span
+          className={cn(
+            'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent',
+            edge === 'top' ? 'top-0' : 'bottom-0',
+          )}
+          aria-hidden
+        />
+      )}
+
+      {/* The grip, on the row's own margin, appearing under the pointer.
+          Hidden where there is no pointer to hover with: a touch screen
+          cannot drag this and keeps the arrows on the right instead. */}
+      <span
+        className="-ml-1 mt-0.5 hidden w-3 shrink-0 justify-center [@media(hover:hover)]:flex"
+        aria-hidden
+      >
+        {sortable && (
+          <GripVertical
+            className={cn(
+              'size-4 cursor-grab text-ink-ghost opacity-0 transition-opacity duration-150 group-hover:opacity-100',
+              grabbed && 'cursor-grabbing opacity-100',
+            )}
+            strokeWidth={1.75}
+            onMouseDown={() => setGrabbed(true)}
+            onMouseUp={() => setGrabbed(false)}
+          />
+        )}
+      </span>
+
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
@@ -148,18 +252,26 @@ export function TaskRow({
       <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
         {!done && !dropped && (
           <>
-            {/* Only where there is somewhere to go: an arrow at the top of a
+            {/* The arrows are how a task moves without a pointer: a touch
+                screen cannot drag the grip, and neither can a keyboard. So
+                they stand down where there is a pointer -- but come back the
+                moment focus lands in the row, because a control that only a
+                mouse can reach is a control some people do not have.
+
+                Only where there is somewhere to go: an arrow at the top of a
                 pile that does nothing is a control that lies. */}
-            {index > 0 && (
-              <IconButton label="Move up" onClick={() => move('up')}>
-                <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />
-              </IconButton>
-            )}
-            {index !== -1 && index < siblings.length - 1 && (
-              <IconButton label="Move down" onClick={() => move('down')}>
-                <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
-              </IconButton>
-            )}
+            <span className="contents [@media(hover:hover)]:hidden [@media(hover:hover)]:group-focus-within:contents">
+              {index > 0 && (
+                <IconButton label="Move up" onClick={() => move('up')}>
+                  <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              )}
+              {index !== -1 && index < siblings.length - 1 && (
+                <IconButton label="Move down" onClick={() => move('down')}>
+                  <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              )}
+            </span>
             <IconButton
               label={task.pinned ? 'Unpin' : 'Pin'}
               onClick={() => start(() => pinTask(task.id, !task.pinned))}
