@@ -60,58 +60,20 @@ export function AddTask({ today }: { today: string }) {
   return (
     <form ref={formRef} action={action} className={cardVariants({ padding: 'dense' })}>
       <div className="flex items-center gap-2">
-        {/* One control, not a form: what has to happen, and when, on the line
-            you are already typing on. The two were a text box and a date
-            picker two rows apart behind a Details toggle, which is three
-            controls and a fold to write down "Thursday". */}
-        {/* A control's own frame, not a grouping frame. Law 11 is about
-            borders standing in for space, alignment and a shared ground; this
-            is field.tsx's `control` and `controlBox` drawn around three inputs
-            that read as one field, at the same tokens and off the same dial
-            `Input` uses. The gate cannot tell a control's edge from a
-            container's, and there is no exported shell for a composite control
-            -- one caller does not earn a primitive, so the shape is written
-            out here and matches the one it copies exactly. */}
-        <div
-          className={cn(
-            // ui-ok: hand-rolled-box -- a control's frame, not a box. See above.
-            'flex h-(--control-h) min-w-0 flex-1 items-center gap-1 rounded-control border border-control bg-surface px-(--control-px)',
-            'focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40',
-          )}
-        >
-          <input
-            ref={titleRef}
-            name="title"
-            placeholder="What has to happen?"
-            aria-label="What has to happen?"
-            required
-            // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
-            className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-ghost sm:text-ui"
-          />
-          <input
-            type="date"
-            name="dueOn"
-            aria-label="Due"
-            value={dueOn}
-            onChange={(event) => {
-              setDueOn(event.target.value);
-              // A time with no day is not a due date at all; see resolveDue.
-              if (!event.target.value) setTime('');
-            }}
-            className="tabular shrink-0 bg-transparent text-small text-ink-muted outline-none"
-          />
-          {/* The hour, only once there is a day for it to be an hour of. */}
-          {dueOn && (
-            <input
-              type="time"
-              name="dueTime"
-              aria-label="At"
-              value={time}
-              onChange={(event) => setTime(event.target.value)}
-              className="tabular shrink-0 bg-transparent text-small text-ink-muted outline-none"
-            />
-          )}
-        </div>
+        {/* The line you type on holds one thing: what has to happen. The date
+            used to sit in here beside it, inside a shared frame -- but a
+            native date input is the widest control a browser draws, and on a
+            phone it took so much of the line that the title had barely room
+            for two words. It has moved down to the day chips, which is where
+            the answer to "when" is given anyway. */}
+        <Input
+          ref={titleRef}
+          name="title"
+          placeholder="What has to happen?"
+          aria-label="What has to happen?"
+          required
+          className="min-w-0 flex-1"
+        />
 
         <Button type="submit" disabled={pending}>
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
@@ -122,6 +84,38 @@ export function AddTask({ today }: { today: string }) {
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <QuickDay label="Today" day={today} value={dueOn} onPick={setDueOn} />
         <QuickDay label="Tomorrow" day={tomorrow} value={dueOn} onPick={setDueOn} />
+
+        {/* Any other day, right where the two easy ones are: the chips answer
+            "when" and this is the same question asked in full. Unframed and
+            quiet, so a row of chips stays a row of chips rather than growing a
+            boxed field in the middle of it. */}
+        <input
+          type="date"
+          name="dueOn"
+          aria-label="Due"
+          value={dueOn}
+          onChange={(event) => {
+            setDueOn(event.target.value);
+            // A time with no day is not a due date at all; see resolveDue.
+            if (!event.target.value) setTime('');
+          }}
+          className={cn(
+            'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-150',
+            'focus:ring-1 focus:ring-accent/40',
+            dueOn ? 'text-ink' : 'text-ink-muted',
+          )}
+        />
+        {/* The hour, only once there is a day for it to be an hour of. */}
+        {dueOn && (
+          <input
+            type="time"
+            name="dueTime"
+            aria-label="At"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            className="tabular rounded-full bg-transparent px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-150 focus:ring-1 focus:ring-accent/40"
+          />
+        )}
 
         <button
           type="button"
