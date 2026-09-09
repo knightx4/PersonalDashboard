@@ -10,6 +10,7 @@ import { NotificationsButton } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
+import { CaptureButton, CaptureFab, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
@@ -426,6 +427,7 @@ export function AppShell({
   return (
     <ToastProvider>
     <KeyHintsProvider />
+    <CaptureProvider>
     <div
       className={cn(
         'min-h-dvh lg:grid',
@@ -588,6 +590,7 @@ export function AppShell({
                 account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
             <div className="flex shrink-0 items-center gap-0.5">
+              <CaptureButton />
               <ThemePicker value={theme} />
               <NotificationsButton />
               <FeedbackButton allHref={feedbackHref} />
@@ -642,6 +645,8 @@ export function AppShell({
         </main>
         <StatusLine lines={activity} />
 
+        <CaptureFab />
+
         <nav
           // Named for what is actually in it: on home and the account page it
           // holds no sections at all, and a landmark called "Sections" that
@@ -667,6 +672,7 @@ export function AppShell({
 
       <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
     </div>
+    </CaptureProvider>
     </ToastProvider>
   );
 }
