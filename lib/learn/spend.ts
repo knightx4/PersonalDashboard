@@ -33,6 +33,7 @@ export const LEARN_OPERATIONS = [
   'plan-topic',
   'locate-passage',
   'generate-chain',
+  'write-probe',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, AlertTriangle, BadgeCheck, CircleDashed, CircleDot } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
@@ -184,12 +185,20 @@ export default async function SubjectPage({
         }
         actions={
           counts.total > 0 ? (
-            <Link
-              href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
-              className="text-ui text-ink-muted hover:text-ink"
-            >
-              {showEverything ? 'Show what is left' : 'Show the whole graph'}
-            </Link>
+            <>
+              <Link
+                href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
+                className="text-ui text-ink-muted hover:text-ink"
+              >
+                {showEverything ? 'Show what is left' : 'Show the whole graph'}
+              </Link>
+              <Link
+                href={`/learn/s/${id}/probe`}
+                className={buttonVariants({ variant: 'secondary' })}
+              >
+                Probe this
+              </Link>
+            </>
           ) : undefined
         }
       />

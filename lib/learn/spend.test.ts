@@ -47,6 +47,7 @@ describe('the operation names', () => {
       'plan-topic',
       'locate-passage',
       'generate-chain',
+      'write-probe',
     ]);
   });
 });
