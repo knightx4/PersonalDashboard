@@ -1289,7 +1289,17 @@ function PlanRow({
               )}
             >
               <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
-              <span className={cn('min-w-0 truncate', node.status === 'dropped' && 'text-ink-muted line-through')}>
+              {/* Truncated closed, whole open. A row is a line and a long title
+                * has to give way to keep it one; but opening the step is the
+                * gesture that means "show me this one", and a name still cut
+                * off after it leaves no way to read it at all. */}
+              <span
+                className={cn(
+                  'min-w-0',
+                  open ? 'break-words' : 'truncate',
+                  node.status === 'dropped' && 'text-ink-muted line-through',
+                )}
+              >
                 {node.title}
               </span>
             </span>
