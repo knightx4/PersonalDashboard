@@ -477,7 +477,11 @@ describe('summarize', () => {
     );
     expect(summarize(sections)).toEqual({
       total: 8,
-      open: 5,
+      // Everything not done and not dropped, the proposal included: it is the
+      // count of what the Open view lists.
+      open: 6,
+      // c is blocked and g is a proposal nobody has decided on.
+      onYou: 2,
       proposed: 1,
       inProgress: 1,
       // c by hand, f through its dependency.
@@ -569,5 +573,34 @@ describe('tallyHealth', () => {
     const whole = tree([at('done', 'a'), at('not_started', 'b')]);
     const narrowed = applyView(whole, 'ready');
     expect(shopping(narrowed).tally).toEqual(shopping(whole).tally);
+  });
+});
+
+describe('the On you view', () => {
+  const sections = tree([
+    at('not_started', 'q', { kind: 'decision' }),
+    at('proposed', 'p'),
+    at('blocked', 'b'),
+    at('not_started', 'r'),
+    at('in_progress', 'w'),
+    at('done', 'q2', { kind: 'decision' }),
+  ]);
+
+  it('keeps what cannot move until the person acts', () => {
+    const ids = flattenSections(applyView(sections, 'you')).map((node) => node.id);
+    expect(ids.sort()).toEqual(['b', 'p', 'q']);
+  });
+
+  it('leaves out work they could simply do', () => {
+    // A ready step assigned to them is not a question being asked of them, and
+    // mixing it in makes "waiting on you" a list that cannot be cleared.
+    const ids = flattenSections(applyView(sections, 'you')).map((node) => node.id);
+    expect(ids).not.toContain('r');
+    expect(ids).not.toContain('w');
+  });
+
+  it('leaves out a question already answered', () => {
+    const ids = flattenSections(applyView(sections, 'you')).map((node) => node.id);
+    expect(ids).not.toContain('q2');
   });
 });

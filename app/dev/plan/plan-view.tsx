@@ -289,6 +289,41 @@ function SendTheQueue({ count }: { count: number }) {
   );
 }
 
+/**
+ * What a narrowed view says when it finds nothing.
+ *
+ * Empty is the good state for most of these, so each one says what it means
+ * and what would put something in it -- law 1: an empty section gets a real
+ * empty state rather than a blank. `open` and `all` are not here on purpose:
+ * an empty plan is a different thing entirely and the page says so elsewhere,
+ * and an empty module under Open is the invitation to plan it.
+ */
+const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> = {
+  ready: {
+    title: 'Nothing ready right now',
+    description:
+      'Every open step is underway, blocked, or waiting on another. Finish one and the next becomes ready.',
+  },
+  blocked: {
+    title: 'Nothing waiting right now',
+    description: 'Nothing is blocked and nothing waits on another step.',
+  },
+  proposed: {
+    title: 'Nothing proposed right now',
+    description:
+      'Shape an idea from the ideas page and its proposal will appear here for you to approve.',
+  },
+  claude: {
+    title: "Nothing of Claude's right now",
+    description: 'Hand a step to Claude from its menu, or send one straight to the routine.',
+  },
+  you: {
+    title: 'Nothing waiting on you',
+    description:
+      'Every question has been answered, every proposal decided on, and nothing is blocked. The plan can move without you.',
+  },
+};
+
 function SummaryStrip({
   summary,
   view,
@@ -302,6 +337,8 @@ function SummaryStrip({
 }) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
+    // Second, because it is the one number on this line that is a request.
+    { view: 'you', value: summary.onYou, noun: 'on you' },
     { view: 'ready', value: summary.ready, noun: 'ready' },
     { view: 'proposed', value: summary.proposed, noun: 'proposed' },
     { view: 'blocked', value: summary.waiting, noun: 'waiting' },
@@ -2290,27 +2327,11 @@ export function PlanView({
     <div className="space-y-6">
       <SummaryStrip summary={summary} view={view} queued={queued} />
 
-      {nothingToShow && view !== 'open' && view !== 'all' && (
+      {nothingToShow && EMPTY_VIEW[view] && (
         <EmptyState
           tone="finished"
-          title={`Nothing ${
-            view === 'ready'
-              ? 'ready'
-              : view === 'blocked'
-                ? 'waiting'
-                : view === 'proposed'
-                  ? 'proposed'
-                  : "of Claude's"
-          } right now`}
-          description={
-            view === 'ready'
-              ? 'Every open step is underway, blocked, or waiting on another. Finish one and the next becomes ready.'
-              : view === 'blocked'
-                ? 'Nothing is blocked and nothing waits on another step.'
-                : view === 'proposed'
-                  ? 'Shape an idea from the ideas page and its proposal will appear here for you to approve.'
-                  : 'Hand a step to Claude from its menu, or send one straight to the routine.'
-          }
+          title={EMPTY_VIEW[view].title}
+          description={EMPTY_VIEW[view].description}
           seed={`plan-${view}`}
         />
       )}

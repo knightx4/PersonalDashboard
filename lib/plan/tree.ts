@@ -81,7 +81,7 @@ export type PlanSection = {
   tally: PlanTally;
 };
 
-export const PLAN_VIEWS = ['all', 'open', 'ready', 'proposed', 'claude', 'blocked'] as const;
+export const PLAN_VIEWS = ['all', 'open', 'you', 'ready', 'proposed', 'claude', 'blocked'] as const;
 export type PlanView = (typeof PLAN_VIEWS)[number];
 
 export function isPlanView(value: string): value is PlanView {
@@ -91,6 +91,7 @@ export function isPlanView(value: string): value is PlanView {
 export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   all: 'Everything',
   open: 'Open',
+  you: 'On you',
   ready: 'Ready',
   proposed: 'Proposed',
   claude: "Claude's",
@@ -100,8 +101,24 @@ export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
 /** The numbers across the whole plan, for the strip at the top of the page. */
 export type PlanSummary = {
   total: number;
-  /** Decided on and not finished: not proposed, not done, not dropped. */
+  /**
+   * Everything not finished: not done, not dropped.
+   *
+   * Proposals are in it. They used to be left out, on the grounds that nobody
+   * had decided on them yet -- but that made the number disagree with the
+   * Open view standing next to it, which has always listed them, and it made
+   * "open" mean "open except for the part nobody has looked at", which is the
+   * part most worth knowing about. A proposal is outstanding work in the only
+   * sense the word is used here: it is not done, and somebody has to deal
+   * with it.
+   *
+   * `planProgress` still leaves proposals out of its denominator, and that is
+   * a different question -- how far through the decided work a module is,
+   * which a proposal nobody has approved should not be holding back.
+   */
   open: number;
+  /** Open steps that cannot move until the person acts. See `needsThePerson`. */
+  onYou: number;
   /** Written by a session, waiting on a person. */
   proposed: number;
   inProgress: number;
@@ -379,12 +396,35 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
   return chain;
 }
 
+/**
+ * A step that cannot move until the person does something about it.
+ *
+ * Three kinds, and the test for each is "would anybody else be allowed to
+ * settle this": an unanswered question is theirs by definition and a session
+ * that answered one would be guessing with a paper trail; a proposal is a
+ * session's suggestion and nothing happens to it until somebody says yes; a
+ * blocked step is blocked with the exact thing it needs written on it, and
+ * that thing is nearly always a person's to supply.
+ *
+ * A ready step assigned to them is deliberately not here. That is work they
+ * could do, and mixing it in would make "everything waiting on you" a list you
+ * cannot clear in an evening -- which is how a list like this stops being
+ * opened.
+ */
+export function needsThePerson(node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'>) {
+  if (isClosed(node.status)) return false;
+  const health = healthOf(node);
+  return health === 'unanswered' || health === 'proposed' || health === 'blocked';
+}
+
 function matchesView(node: PlanNode, view: PlanView): boolean {
   switch (view) {
     case 'all':
       return true;
     case 'open':
       return !isClosed(node.status);
+    case 'you':
+      return needsThePerson(node);
     case 'ready':
       return node.ready;
     case 'proposed':
@@ -475,10 +515,15 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
 
 export function summarize(sections: readonly PlanSection[]): PlanSummary {
   const nodes = flattenSections(sections);
-  const open = nodes.filter((node) => !isClosed(node.status) && node.status !== 'proposed');
+  // Everything still outstanding, proposals included -- what the Open view
+  // lists. The counts below it are about the decided work, so they keep the
+  // narrower set: a proposal is not "ready", not "underway" and not Claude's.
+  const outstanding = nodes.filter((node) => !isClosed(node.status));
+  const open = outstanding.filter((node) => node.status !== 'proposed');
   return {
     total: nodes.length,
-    open: open.length,
+    open: outstanding.length,
+    onYou: outstanding.filter((node) => needsThePerson(node)).length,
     proposed: nodes.filter((node) => node.status === 'proposed').length,
     inProgress: open.filter((node) => node.status === 'in_progress').length,
     waiting: open.filter((node) => node.status === 'blocked' || node.waitingOn.length > 0).length,
