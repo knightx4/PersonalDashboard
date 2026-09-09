@@ -25,7 +25,8 @@ import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
 
 export type SavedChain = {
   subjectId: string;
-  goalId: string;
+  /** Null when the chain was a floor rather than something new to aim at. */
+  goalId: string | null;
   conceptsAdded: number;
   edgesAdded: number;
 };
@@ -83,6 +84,12 @@ export async function saveChain(
   chain: ProposedChain,
   /** What they actually typed, kept as the goal rather than the tidy node name. */
   asked: string,
+  /**
+   * A floor added under a claim somebody missed is a level appearing in a
+   * subject they are already working on, not a new thing to aim at, so it
+   * writes no goal -- the goals already there simply grow a rung.
+   */
+  options: { goal?: boolean } = {},
 ): Promise<SavedChain> {
   const { id: subjectId } = await findOrCreateSubject(supabase, userId, chain.subject);
 
@@ -135,6 +142,10 @@ export async function saveChain(
     const { error } = await supabase.from('concept_edges').insert(edges);
     assertSchemaExposed(error, LEARN_SCHEMA);
     if (error) throw fail('Saving the prerequisites', error);
+  }
+
+  if (options.goal === false) {
+    return { subjectId, goalId: null, conceptsAdded: fresh.length, edgesAdded: edges.length };
   }
 
   const goalConceptId = idByName.get(chain.goalConcept.toLowerCase()) ?? null;

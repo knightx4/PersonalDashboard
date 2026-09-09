@@ -9,11 +9,7 @@ import { generateChain } from '@/lib/learn/graph/generate';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
-import {
-  proposedConceptSchema,
-  proposedEdgeSchema,
-  type ProposedChain,
-} from '@/lib/learn/graph/chain-payload';
+import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 
 /**
  * Naming a goal, and deciding what to do with what comes back.
@@ -88,33 +84,6 @@ export async function proposeGoal(
   return { chain: result.chain, asked: parsed.data.goal };
 }
 
-/**
- * The shape the proposal rides back in.
- *
- * Re-validated rather than trusted: it went out to a browser and came back, so
- * it is user input whoever wrote the form, and this is the last point before
- * rows are written.
- */
-const chainSchema = z.object({
-  subject: z.string().trim().min(1).max(200),
-  goalConcept: z.string().trim().min(1).max(200),
-  nodes: z
-    .array(
-      proposedConceptSchema.extend({
-        // A claim and basis are empty only for an existing node the chain
-        // pulled in to stay readable; that one already has both in its row.
-        claim: z.string().trim().max(1000),
-        basis: z.string().trim().max(500),
-        existingId: z.string().uuid().nullable(),
-      }),
-    )
-    .min(1)
-    .max(20),
-  edges: z.array(proposedEdgeSchema).max(40),
-  joined: z.number().int().min(0),
-  dropped: z.array(z.object({ name: z.string(), reason: z.string() })).max(40),
-});
-
 export async function approveChain(
   _prev: ApproveState,
   formData: FormData,
@@ -139,7 +108,7 @@ export async function approveChain(
     return { error: 'That proposal did not survive the trip. Ask again.' };
   }
 
-  const safe = chainSchema.safeParse(payload);
+  const safe = approvedChainSchema.safeParse(payload);
   if (!safe.success) return { error: 'That proposal did not survive the trip. Ask again.' };
 
   const supabase = await createLearnClient();

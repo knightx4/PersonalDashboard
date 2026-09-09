@@ -49,6 +49,7 @@ describe('the operation names', () => {
       'generate-chain',
       'write-probe',
       'name-misconception',
+      'propose-floor',
     ]);
   });
 });

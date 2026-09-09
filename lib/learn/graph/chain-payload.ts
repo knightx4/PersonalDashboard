@@ -229,3 +229,32 @@ export function normaliseChain(
     dropped,
   };
 }
+
+/**
+ * The shape a proposal rides back in from a form.
+ *
+ * Re-validated rather than trusted: it went out to a browser and came back, so
+ * it is user input whoever wrote the form, and this is the last point before
+ * rows are written. Shared by both approval paths -- a goal's chain and a
+ * floor added under a missed claim are the same thing arriving.
+ */
+export const approvedChainSchema = z.object({
+  subject: z.string().trim().min(1).max(200),
+  goalConcept: z.string().trim().min(1).max(200),
+  nodes: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(200),
+        // Empty only for a node the chain pulled in to stay readable; that one
+        // already has its claim and basis in its own row.
+        claim: z.string().trim().max(1000),
+        basis: z.string().trim().max(500),
+        existingId: z.string().uuid().nullable(),
+      }),
+    )
+    .min(1)
+    .max(20),
+  edges: z.array(proposedEdgeSchema).max(40),
+  joined: z.number().int().min(0),
+  dropped: z.array(z.object({ name: z.string(), reason: z.string() })).max(40),
+});

@@ -16,6 +16,11 @@ import {
   setMisconception,
 } from '@/lib/learn/graph/session';
 import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
+import { proposeFloor } from '@/lib/learn/graph/floor';
+import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { loadSubject } from '@/lib/learn/graph/load';
+import { prerequisiteMap } from '@/lib/learn/graph/model';
+import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 
 /**
@@ -44,6 +49,8 @@ export type AskState = {
     chosenIndex: number;
     /** Named only when the same wrong answer has now been picked twice. */
     misconception?: string;
+    /** True when this claim has nothing under it, so the floor can be looked for. */
+    couldGoDeeper?: boolean;
   };
 };
 
@@ -192,6 +199,14 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     }
   }
 
+  // Growth trigger 2. Getting something wrong with nothing underneath it in
+  // the graph is a fact about the graph first: there is nothing to fall back
+  // to and nothing to be told to learn instead, which means the chain was
+  // drawn starting too high. Offered rather than done, since it is generated
+  // at the moment somebody is least inclined to argue with it.
+  const prerequisites = prerequisiteMap(graph).get(parsed.data.conceptId) ?? [];
+  const couldGoDeeper = !outcome.correct && prerequisites.length === 0;
+
   return {
     ...prev,
     error: undefined,
@@ -202,6 +217,105 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       correctIndex: answeredRow?.correctIndex ?? -1,
       chosenIndex: parsed.data.chosenIndex,
       misconception,
+      couldGoDeeper,
     },
   };
+}
+
+export type FloorState = {
+  error?: string;
+  /** Proposed, not saved. Nothing reaches the graph until it is approved. */
+  chain?: ProposedChain;
+  message?: string;
+};
+
+/**
+ * Work out what a missed claim rests on.
+ *
+ * Writes nothing, like every other generated graph in this module. The
+ * approval matters more here than usual: this is proposed at the moment
+ * somebody has just got something wrong, which is exactly when they are least
+ * likely to push back on being told what they are missing.
+ */
+export async function findFloor(_prev: FloorState, formData: FormData): Promise<FloorState> {
+  const user = await requireUser();
+
+  const conceptId = z.string().uuid().safeParse(formData.get('conceptId'));
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!conceptId.success || !subjectId.success) {
+    return { error: 'Could not work out which claim that was.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'This needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+  const [subject, graph] = await Promise.all([
+    loadSubject(supabase, subjectId.data),
+    loadGraph(supabase, subjectId.data),
+  ]);
+  const concept = graph.concepts.find((c) => c.id === conceptId.data);
+  if (!subject || !concept) return { error: 'That is not there any more.' };
+
+  const missed = (await probesFor(supabase, concept.id)).find(
+    (probe) => probe.chosenIndex !== null && probe.chosenIndex !== probe.correctIndex,
+  );
+
+  const spend = collectSpend();
+  const result = await proposeFloor({
+    subject: subject.name,
+    concept: concept.name,
+    claim: concept.claim,
+    existing: await existingConcepts(supabase, subject.id),
+    missedQuestion: missed?.question ?? null,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'propose-floor', spend.reports);
+
+  if (!result.ok) {
+    return result.reason === 'nothing-missing'
+      ? { message: result.detail }
+      : { error: result.detail };
+  }
+
+  return { chain: result.chain };
+}
+
+/**
+ * Attach an approved floor.
+ *
+ * The same writer as an approved goal chain, minus the goal: this is adding a
+ * level to a subject somebody is already working on, not starting something
+ * new, so no goal row is created and the existing ones simply grow a rung.
+ */
+export async function approveFloor(_prev: FloorState, formData: FormData): Promise<FloorState> {
+  const user = await requireUser();
+
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject that was.' };
+
+  const raw = formData.get('chain');
+  if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return { error: 'That proposal did not survive the trip. Ask again.' };
+  }
+
+  const safe = approvedChainSchema.safeParse(payload);
+  if (!safe.success) return { error: 'That proposal did not survive the trip. Ask again.' };
+  const chain = safe.data as ProposedChain;
+
+  const supabase = await createLearnClient();
+  try {
+    await saveChain(supabase, user.id, chain, chain.goalConcept, { goal: false });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  return { message: 'Added underneath. It will show up as the next thing to learn.' };
 }
