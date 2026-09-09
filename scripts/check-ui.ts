@@ -256,8 +256,26 @@ function scan(): Hit[] {
         const trimmed = line.trimStart();
         if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) return;
 
-        // The valve: on this line, or on the one above it.
-        if (line.includes('ui-ok:') || (index > 0 && lines[index - 1]!.includes('ui-ok:'))) return;
+        // The valve: on this line, or anywhere in the comment block directly
+        // above it.
+        //
+        // It used to read exactly one line up, which quietly made the valve
+        // unusable for the reasons this codebase actually writes. Every
+        // justification here is a paragraph -- that is the house style and the
+        // point of it -- so a four-line explanation put `ui-ok:` on its first
+        // line and the marker fell out of range. The only way to be excused
+        // was to give a one-line reason, which is the opposite of what the
+        // valve is for.
+        if (line.includes('ui-ok:')) return;
+        let above = index - 1;
+        while (above >= 0) {
+          const previous = lines[above]!.trim();
+          const isComment =
+            previous.startsWith('//') || previous.startsWith('*') || previous.startsWith('/*');
+          if (!isComment) break;
+          if (previous.includes('ui-ok:')) return;
+          above -= 1;
+        }
         for (const rule of RULES) {
           if (excused.has(rule.id)) continue;
           for (const text of rule.find(line)) hits.push({ file, line: index + 1, rule, text });

@@ -1,5 +1,6 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
+import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewList } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
@@ -753,6 +754,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelineBoard rows={pipelineRows} view="board" />,
+  },
+  {
+    /* The experiment. Same rows, same width, beside the thing it questions. */
+    id: 'jobs-pipeline-dense',
+    label: 'Pipeline · Dense list (experiment)',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelineDenseList rows={pipelineRows} />,
   },
   {
     id: 'jobs-pipeline-list',
