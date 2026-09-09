@@ -13,7 +13,8 @@
  * `bg-surface` compiles to `background-color: var(--c-surface)` and follows
  * whatever theme is active rather than baking one theme's hex into the CSS.
  *
- * See docs/design-language.html for the rules these values exist to serve.
+ * See /dev/ui (app/dev/ui) for the rules these values exist to serve; the
+ * numbers there are held to this file by tests/dev-ui-measurements.test.ts.
  * Every text/ground pair below is checked by scripts/check-contrast.ts, which
  * fails CI on anything under threshold. Do not hand-tune a value without
  * re-running it.

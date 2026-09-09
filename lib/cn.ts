@@ -21,6 +21,7 @@ const TEXT_SIZES = [
   'title',
   'figure',
   'figure-lg',
+  'figure-xl',
 ] as const;
 
 const COLOURS = [
@@ -45,6 +46,16 @@ const COLOURS = [
   'w-todo-tint',
   'w-vault',
   'w-vault-tint',
+  'w-learn',
+  'w-learn-tint',
+  'w-dev',
+  'w-dev-tint',
+  'page',
+  'shell',
+  'shell-ink',
+  'shell-muted',
+  'shell-border',
+  'shell-hover',
   'positive',
   'positive-tint',
   'caution',

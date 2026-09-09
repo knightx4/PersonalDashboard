@@ -1,11 +1,18 @@
 /**
- * The eight laws, as data.
+ * The fifteen laws, as data.
  *
  * They live in a module rather than in the page's JSX so that the page is a
  * layout and this is the content, and so that anything else that needs to
- * quote a law -- a review checklist, a prompt, a test -- reads the same words.
- * These are the product's character, not style preferences: they are what
- * makes six unrelated workspaces feel like one place.
+ * quote a law -- a review checklist, a prompt, a test, `scripts/notes.ts
+ * laws` -- reads the same words. These are the product's character, not style
+ * preferences: they are what makes six unrelated workspaces feel like one
+ * place.
+ *
+ * Numbered once and never renumbered. The numbers are cited in `ui-ok:`
+ * comments, in check-ui rule ids and in commit messages, so a law keeps its
+ * number for life even if the group it is read under changes. The three
+ * arrays below are the order the laws were written in; `LAW_GROUPS` at the
+ * bottom is the order they are read in, which is by what they govern.
  */
 export type Law = { n: number; title: string; body: string };
 
@@ -53,21 +60,12 @@ export const LAWS: readonly Law[] = [
 ];
 
 /**
- * The restraint laws, added after a review of what the app actually looked
- * like rather than what it was supposed to.
- *
- * They are listed apart because the first eight are about truthfulness — what
- * the interface is allowed to claim — and these four are about how much of
- * itself it is allowed to show while claiming it. They are also the ones being
- * broken most, which is the honest reason they had to be written down: nobody
- * sets out to build a wall of boxes, it accretes one reasonable-looking
- * bordered div at a time.
- *
- * Read them together. Density says take less room; collapse says give the room
- * back when you are not using it; borders says stop drawing the room; and
- * forms says the room should not look like paperwork. They are four views of
- * one idea, which is that the interface should get out from in front of the
- * thing the person came for.
+ * The restraint laws: how much of itself the interface may show while making
+ * the claims above. Read them together. Density says take less room; collapse
+ * says give the room back when you are not using it; borders says stop
+ * drawing the room; and forms says the room should not look like paperwork.
+ * They are four views of one idea, which is that the interface should get out
+ * from in front of the thing the person came for.
  */
 export const RESTRAINT_LAWS: readonly Law[] = [
   {
@@ -93,14 +91,11 @@ export const RESTRAINT_LAWS: readonly Law[] = [
 ];
 
 /**
- * Laws 13 to 15: what a surface is, rather than how it is drawn.
- *
- * All twelve laws above can be satisfied by a screen that still reads badly,
- * and that is not hypothetical -- check:ui went from 111 violations to 0 across
- * 102 files without changing how any page reads. The first twelve govern
- * components. These govern the shape of the page, which is where the weight
- * actually comes from: a list built as a stack of cards, every field arriving
- * in an editor, every heading explaining itself underneath.
+ * The shape laws: what a surface is, rather than how it is drawn. All twelve
+ * above can be satisfied by a screen that still reads badly -- a list built as
+ * a stack of cards, every field arriving in an editor, every heading
+ * explaining itself underneath -- and these three are where that weight
+ * actually comes from.
  */
 export const SHAPE_LAWS: readonly Law[] = [
   {
@@ -120,5 +115,55 @@ export const SHAPE_LAWS: readonly Law[] = [
   },
 ];
 
+/** Every law, in the order written. */
+export const ALL_LAWS: readonly Law[] = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS];
+
 /** Kept for the page that renders the ninth on its own. */
 export const DENSITY_LAW: Law = RESTRAINT_LAWS[0];
+
+/**
+ * The laws by what they govern, which is the order a newcomer reads them in.
+ *
+ * The numbers are the order they were written in, and that order was three
+ * batches -- what the interface may claim, how much of itself it may show,
+ * and what shape a page is. A reader does not need that history; they need
+ * to know that laws 1 to 3 are about telling the truth and 9 to 15 are about
+ * getting out of the way. So the page groups them and keeps the numbers.
+ */
+export type LawGroup = { title: string; lead: string; laws: readonly Law[] };
+
+function byNumber(...numbers: number[]): Law[] {
+  return numbers.map((n) => {
+    const law = ALL_LAWS.find((entry) => entry.n === n);
+    if (!law) throw new Error(`No law ${n}`);
+    return law;
+  });
+}
+
+export const LAW_GROUPS: readonly LawGroup[] = [
+  {
+    title: 'Truth',
+    lead: 'What the interface is allowed to claim.',
+    laws: byNumber(1, 2, 3),
+  },
+  {
+    title: 'Colour',
+    lead: 'Every hue on screen is a statement, and there are five statements.',
+    laws: byNumber(4),
+  },
+  {
+    title: 'State',
+    lead: 'Where a view lives and what it needs in order to work.',
+    laws: byNumber(5, 6),
+  },
+  {
+    title: 'Chrome',
+    lead: 'Where the personality goes, and where the reasoning goes.',
+    laws: byNumber(7, 8),
+  },
+  {
+    title: 'Restraint and shape',
+    lead: 'How much of itself the interface shows, and what shape a page is.',
+    laws: byNumber(9, 10, 11, 12, 13, 14, 15),
+  },
+];

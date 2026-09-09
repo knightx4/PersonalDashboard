@@ -131,11 +131,11 @@ const RAW_PALETTE = String.raw`\b(bg|text|border|ring|fill|stroke|divide|outline
 const TYPE_MESSAGE =
   "Off the type scale. Use the named steps in app/globals.css -- micro, small, ui, body, lead, title, figure, figure-lg, figure-xl. 13px is chrome, 14px is content; a hero figure is text-figure-lg.";
 const WIDTH_MESSAGE =
-  "An arbitrary width. Page widths are three: the shell is max-w-[1400px], a reading column is max-w-3xl, a single form is max-w-2xl. Anything narrower uses a named size (max-w-xs, max-w-sm, ...). See docs/design-language.html#widths.";
+  "An arbitrary width. Page widths are three: the shell is max-w-[1400px], a reading column is max-w-3xl, a single form is max-w-2xl. Anything narrower uses a named size (max-w-xs, max-w-sm, ...). See the Surfaces section of /dev/ui.";
 const HEX_MESSAGE =
-  "A raw hex colour cannot follow the theme and is wrong in four of the five. Add a token to app/globals.css and use its utility.";
+  "A raw hex colour cannot follow the theme and is wrong in three of the four themes. Add a token to app/globals.css and use its utility.";
 const PALETTE_MESSAGE =
-  "A raw Tailwind palette colour cannot follow the theme and is wrong in four of the five. Use a semantic token: accent, positive, caution, danger, or a status colour.";
+  "A raw Tailwind palette colour cannot follow the theme and is wrong in three of the four. Use a semantic token: accent, positive, caution, danger, or a status colour.";
 
 const stringRules = (pattern, message) => [
   { selector: `Literal[value=/${pattern}/]`, message },
