@@ -218,7 +218,7 @@ function Details({
                   href={form.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="truncate text-accent underline underline-offset-2"
+                  className="text-accent underline underline-offset-2"
                 >
                   {form.linkedinUrl}
                 </a>

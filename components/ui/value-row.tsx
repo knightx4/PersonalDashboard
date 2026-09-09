@@ -53,11 +53,15 @@ export function ValueRow({
   return (
     <div className={cn('@md:flex @md:items-baseline @md:gap-3', className)}>
       <dt className="shrink-0 text-small text-ink-muted @md:w-40">{label}</dt>
-      {/* `break-words` is not optional here: a homepage, a careers page and a
-          LinkedIn URL are all values in this list, and a long one with no
-          spaces in it will not wrap on its own -- it ran straight out of the
-          side of the card. */}
-      <dd className="min-w-0 flex-1 whitespace-pre-wrap break-words text-ui leading-relaxed text-ink">
+      {/* Breaking mid-word is not optional here: a homepage, a careers page
+          and a LinkedIn URL are all values in this list, and a URL offers no
+          break opportunity at all -- it ran straight out of the side of the
+          card. `anywhere` rather than `break-words` because the latter only
+          breaks a word that cannot fit on a line of its own, which a URL
+          shorter than the column still technically can while overflowing it.
+          A value here must never set `truncate`: `white-space: nowrap` beats
+          all of this and puts the overflow back. */}
+      <dd className="min-w-0 flex-1 whitespace-pre-wrap [overflow-wrap:anywhere] text-ui leading-relaxed text-ink">
         {empty ? <span className="text-ink-ghost">Not set</span> : value}
       </dd>
     </div>
