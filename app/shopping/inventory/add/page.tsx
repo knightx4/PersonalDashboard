@@ -61,6 +61,8 @@ export default async function AddItemPage() {
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
+        {/* ui-ok: card-per-row -- two choosers side by side in a grid, not a
+          * scrolled list. Law 13 says cards are for exactly this. */}
         {CATALOGUED.map((entry) => (
           <Link key={entry.href} href={entry.href} className="block">
             <Card padding="dense" interactive className="h-full">

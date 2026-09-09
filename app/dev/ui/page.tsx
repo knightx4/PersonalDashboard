@@ -66,11 +66,9 @@ function Section({
  * instead, which is the whole point of the scope system.
  */
 /**
- * Three rows of nothing in particular, rendered twice in "Shape, worked".
- *
- * Invented rather than fetched: this page is a mirror of the design language,
- * not of the database, and a surface arguing about row height should not need
- * a session to make its argument.
+ * Three rows, rendered twice in "Shape, worked". Invented rather than fetched:
+ * this page mirrors the design language, not the database, and an argument
+ * about row height should not need a session to make it.
  */
 const SHAPE_DEMO = [
   { mark: 'FG', role: 'Staff Engineer', company: 'Fieldgate', age: '2d' },
@@ -84,12 +82,10 @@ const SHAPE_DEMO = [
 ] as const;
 
 /**
- * The questions worth answering before any markup exists.
- *
- * Phrased as questions rather than rules on purpose. A rule gets obeyed by the
- * person who already agrees with it; a question has to be answered by whoever
- * is about to build the thing, and the wrong answer is visible in the answer
- * rather than three weeks later in a screenshot.
+ * Questions rather than rules, because a rule is obeyed by whoever already
+ * agrees with it. A question has to be answered by whoever builds the thing,
+ * and a wrong answer shows up in the answer rather than in a screenshot three
+ * weeks later.
  */
 const BUILD_QUESTIONS: ReadonlyArray<readonly [string, string]> = [
   [
@@ -189,21 +185,25 @@ export default function DevUiPage() {
 
       <Section
         title="The laws"
-        lead="The product's character, not style preferences. Everything else on this page is one of these applied to a surface. The first eight are about what the interface may claim. Nine to twelve are about how much of itself it may show while claiming it. The last three are about what the surface is in the first place — they were written after a sweep satisfied all twelve and the screens were still wrong."
+        lead="Everything else on this page is one of these applied to a surface. One to eight are what the interface may claim. Nine to twelve are how much of itself it shows while claiming it. Thirteen to fifteen are the shape of the page, and exist because a sweep satisfied the first twelve and the screens were unchanged."
       >
-        <ol className="space-y-2">
-          {[...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS].map((law) => (
-            <li key={law.n}>
-              <Card padding="dense" className="flex gap-3">
+        {/* One surface with hairlines, not fifteen cards. It was fifteen cards
+          * until check:ui grew the law 13 rule and reported this page -- a
+          * scrolled list of cards inside the document arguing against scrolled
+          * lists of cards. */}
+        <Card padding="none">
+          <ol className="divide-y divide-border">
+            {[...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS].map((law) => (
+              <li key={law.n} className="card-pad-x row-pad flex gap-3">
                 <span className="text-ui font-semibold tabular-nums text-accent">{law.n}</span>
                 <div className="min-w-0">
                   <p className="text-body font-medium text-ink">{law.title}</p>
                   <p className="mt-0.5 text-body text-ink-muted">{law.body}</p>
                 </div>
-              </Card>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        </Card>
       </Section>
 
       <Section
@@ -318,23 +318,22 @@ export default function DevUiPage() {
 
       <Section
         title="Shape, worked"
-        lead="Laws 13 to 15 are about what a surface is, not how it is drawn — which is why a sweep satisfied every law above them and the screens were still wrong. Each pair below is the same content twice: the shape this app reached for, and the shape it should have reached for."
+        lead="Each pair is the same content twice: what the app does now, and what it should do. Both halves are real components."
       >
-        {/*
-         * Both halves of each pair are real components, not pictures of them.
-         * The left column is not a straw man -- it is what the app actually
-         * shipped, built from the same Card the rest of the app uses, which is
-         * the point: nothing on the left breaks a law. That is what made this
-         * gap invisible to the gate and visible on a phone.
-         */}
+        {/* The left column is not a straw man. It is what the app ships, built
+         * from the same Card everything else uses, and it breaks no law above.
+         * That is why check:ui cannot see this and a phone can. */}
         <Group title="13 — The same list, twice">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <p className="text-small text-ink-muted">
-                A card per row. Own edge, own margin, two lines, a tile sized to the box. About 95px
-                each — nine fit a phone screen, of two hundred and seventy-one.
+                A card per row: own border, own margin, two lines, a tile sized to the box.
+                About 95px each. Nine fit a phone screen.
               </p>
               <div className="space-y-2">
+                {/* ui-ok: card-per-row -- this is the demonstration. The card
+                  * shape is the thing being argued against, and has to be
+                  * drawn in order to be argued against. */}
                 {SHAPE_DEMO.map((row) => (
                   <Card key={row.role} padding="dense" className="flex items-center gap-3">
                     <span className="grid size-8 shrink-0 place-items-center rounded-control bg-shell text-micro text-ink-muted">
@@ -354,8 +353,8 @@ export default function DevUiPage() {
 
             <div className="space-y-2">
               <p className="text-small text-ink">
-                A line per row. One surface, hairlines between, role and company sharing a line the
-                way a subject shares one with its sender. 36px each — twenty-five fit.
+                A line per row: one surface, hairlines between, role and company on the same
+                line. 36px each. Twenty-five fit.
               </p>
               <ul className="divide-y divide-border">
                 {SHAPE_DEMO.map((row) => (
@@ -382,9 +381,8 @@ export default function DevUiPage() {
             </div>
           </div>
           <p className="text-body text-ink-muted">
-            Nothing was removed but the container. The same four facts are on the right, in a third
-            of the height, and the difference in feel between this app and the ones it is measured
-            against is mostly this multiplied by every list in it.
+            Nothing was removed but the container. The same four facts, in a third of the height.
+            Multiply by every list in the app.
           </p>
         </Group>
 
@@ -392,8 +390,8 @@ export default function DevUiPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <p className="text-small text-ink-muted">
-                Arrived in edit mode. A caption, a box, a button — three pieces of chrome standing
-                by in case today is the day this changes.
+                A caption, a box and a button, standing by in case today is the day this
+                changes.
               </p>
               <Card padding="dense" className="space-y-1">
                 <Label htmlFor="ui-demo-window">Return window</Label>
@@ -405,8 +403,8 @@ export default function DevUiPage() {
             </div>
             <div className="space-y-2">
               <p className="text-small text-ink">
-                Arrived readable. It says thirty days, because that is what someone came to find
-                out. It is also an input, so changing it costs a click.
+                It says thirty days, which is what someone came to find out. It is also an
+                input, so changing it costs one click.
               </p>
               <Card padding="dense" className="flex items-center gap-2">
                 <span className="text-body text-ink">Return window</span>
@@ -420,10 +418,39 @@ export default function DevUiPage() {
             </div>
           </div>
           <p className="text-body text-ink-muted">
-            The count that forced this law: thirty-nine textareas, thirty-one selects and fifty-two
-            Save buttons rendered on arrival across the app, on surfaces where nearly every visit is
-            someone reading.
+            On arrival this app renders 39 textareas, 31 selects and 52 Save buttons, almost all on
+            screens someone came to read.
           </p>
+        </Group>
+
+        <Group title="14 — The box nobody is typing in">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-small text-ink-muted">
+                An empty composer, open on every visit. Not a value in an editor — an editor for
+                nothing, holding the height of three lines of text that do not exist. This is the
+                single biggest source of form-feel in the app.
+              </p>
+              <Card padding="dense" className="space-y-2">
+                <Label htmlFor="ui-demo-open">Add a note</Label>
+                <ComposeBody id="ui-demo-open" rows={3} placeholder="Add a note…" aria-label="Demonstration always-open composer" />
+                <div className="flex justify-end">
+                  <Button size="sm">Save</Button>
+                </div>
+              </Card>
+            </div>
+            <div className="space-y-2">
+              <p className="text-small text-ink">
+                One line, which becomes the composer when clicked. Costs a row instead of a card,
+                and the Save arrives with the typing rather than waiting for it.
+              </p>
+              <Card padding="dense">
+                <Button size="sm" variant="ghost">
+                  + Add a note
+                </Button>
+              </Card>
+            </div>
+          </div>
         </Group>
 
         <Group title="15 — The same heading, twice">
@@ -457,7 +484,7 @@ export default function DevUiPage() {
 
       <Section
         title="Before you draw a surface"
-        lead="The laws are what to obey; these are the questions that decide which of them applies. Answer them before writing markup — every one of them is cheap now and expensive after the surface exists."
+        lead="Answer these before writing markup. Each one is cheap now and expensive once the surface exists."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">

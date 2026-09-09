@@ -7,11 +7,9 @@
  * `/preview?s=jobs-pipeline-dense` is exactly that. A `surface` column would
  * have been a second name for one idea.
  *
- * The cost of that choice is a string format three files have to agree on --
- * the action that writes it, the page that reads it back, and the queue tool
- * that sorts by it. Agreeing by copying the same template into each is how the
- * fourth caller gets it subtly wrong and its notes quietly stop grouping. So
- * the format lives here, once, with the parse beside the build.
+ * The cost is a string format four callers have to agree on. Copying the
+ * template into each is how the fifth gets it subtly wrong and its notes stop
+ * grouping, so the format lives here with the parse beside the build.
  */
 
 /** Where a note filed against `id` says the reader was standing. */
@@ -33,16 +31,12 @@ export function surfaceOf(pagePath: string | null | undefined): string | null {
 /**
  * Whether a note may be closed, and what its resolution should say.
  *
- * Pure, and here rather than inline in `scripts/notes.ts`, because this is the
- * rule that keeps a design note from being fixed in isolation and it is worth
- * being able to test. The command only prints what this returns.
+ * A surface note cannot close without naming the law it broke. Written
+ * guidance gets followed by whoever already agrees with it; a flag that will
+ * not let the command run gets followed by everyone. You cannot name a law
+ * without reading the guide.
  *
- * A surface note cannot close without naming the law it broke. That is a
- * forcing function on purpose: the skill already said "be conservative" and was
- * obeyed five times into an app that still read badly, so the guidance that
- * matters is the kind that will not let the command run. You cannot name a law
- * without reading the guide, and you cannot read the guide against one screen
- * without noticing the fix belongs everywhere that law is broken.
+ * Pure and here rather than inline in `scripts/notes.ts` so it can be tested.
  */
 export type CloseCheck = { ok: true; resolution: string } | { ok: false; error: string };
 

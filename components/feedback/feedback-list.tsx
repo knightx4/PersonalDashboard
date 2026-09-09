@@ -12,6 +12,7 @@ import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
+import { surfaceOf } from '@/lib/feedback/surfaces';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -96,7 +97,21 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         </span>
         <span className="text-small text-ink-muted">
           {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
-          {row.pagePath ? ` · ${row.pagePath}` : ''}
+          {/* A note filed from /dev/surfaces is a design note, and it read here
+            * as the raw string "/preview?s=jobs-pipeline-dense" -- which named
+            * neither the surface nor the fact that it is judged against the
+            * guide rather than fixed where it sits. */}
+          {surfaceOf(row.pagePath) ? (
+            <>
+              {' · '}
+              <a href="/dev/surfaces" className="text-accent hover:underline">
+                surface: {surfaceOf(row.pagePath)}
+              </a>
+              {' · judged against /dev/ui'}
+            </>
+          ) : (
+            (row.pagePath ?? '') && ` · ${row.pagePath}`
+          )}
         </span>
         <code className="text-small text-ink-muted">{row.id.slice(0, 8)}</code>
       </div>

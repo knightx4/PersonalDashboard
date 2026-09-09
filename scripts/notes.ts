@@ -16,17 +16,12 @@
  *
  * Ids may be given as the first 8 characters.
  *
- * Notes filed from /dev/surfaces are handled differently, and the difference is
- * the whole reason that page exists. They are not defects in one screen; they
- * are a reader saying a surface reads badly, and the thing that reads badly is
- * almost never confined to the screen it was noticed on. Worked one at a time
- * they produce nineteen individually reasonable patches and an app that still
- * does not hang together -- which is exactly what five sweeps already did.
- *
- * So: they are listed apart rather than interleaved, `laws` prints the standard
- * they are judged against, and closing one requires naming the law it broke.
- * `--law none` is allowed and is the interesting answer: it means the guide is
- * missing something, which is how laws 13 to 15 came to be written.
+ * Notes filed from /dev/surfaces are design notes, not defects in one screen.
+ * What reads badly on one surface usually reads badly on several, so they are
+ * listed apart from the rest, `laws` prints the standard they are judged
+ * against, and closing one requires naming the law it broke. `--law none` is
+ * allowed and means the guide is short a law -- which is how 13 to 15 got
+ * written.
  */
 import { execSync } from 'node:child_process';
 import postgres from 'postgres';
@@ -152,10 +147,8 @@ async function main(): Promise<void> {
     }
 
     // Two lists, not one. A design note read in isolation gets fixed in
-    // isolation, and the pattern across five of them -- which is the actual
-    // defect -- is invisible when they arrive one at a time between bug
-    // reports. Grouped, "every one of these is law 13" is the first thing
-    // visible rather than something nobody was in a position to notice.
+    // isolation, and the pattern across five of them is the actual defect.
+    // Grouped, "these are all law 13" is visible before any of them is claimed.
     const ordinary = rows.filter((row) => !surfaceOf(row.pagePath));
     const design = rows.filter((row) => surfaceOf(row.pagePath));
 
@@ -169,9 +162,9 @@ async function main(): Promise<void> {
       }
       console.log(
         `\n── ${design.length} surface note(s) across ${bySurface.size} surface(s) ──\n` +
-          'Read all of them before starting. The unit of work is the law, not the\n' +
-          'note: cluster them, fix each law everywhere it is broken, and close the\n' +
-          'cluster together. `notes.ts laws` prints the standard.\n',
+          'Read all of them before starting. The unit of work is the law, not\n' +
+          'the note: cluster them, fix each law everywhere, close the cluster\n' +
+          'together. `notes.ts laws` prints the standard.\n',
       );
       for (const [surface, notes] of bySurface) {
         console.log(`  ${surface}`);

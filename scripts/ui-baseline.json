@@ -1,1 +1,7 @@
-{}
+{
+  "card-per-row app/dev/changelog/page.tsx": 1,
+  "card-per-row app/learn/now/page.tsx": 1,
+  "card-per-row app/shopping/orders/new/order-form.tsx": 1,
+  "card-per-row app/shopping/share/[id]/page.tsx": 1,
+  "card-per-row app/shopping/share/families/page.tsx": 1
+}

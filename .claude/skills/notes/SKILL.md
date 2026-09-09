@@ -125,51 +125,37 @@ does that before the session starts; if it has not run for some reason,
 
 ## Surface notes: work the law, not the note
 
-A note whose page path looks like `/preview?s=<id>` was filed from
-`/dev/surfaces`, where the user was looking at a real surface at the width he
-reads it. `list` shows these **apart from the rest**, grouped by surface, and
-that separation is the point.
+A note whose page path is `/preview?s=<id>` was filed from `/dev/surfaces`,
+looking at a real surface at the width it is read. `list` shows these apart from
+the rest, grouped by surface.
 
-**These are not defects in one screen.** A screen that reads badly almost never
-reads badly alone — the thing wrong with it is a habit, and the habit is
-everywhere. Worked one at a time, nineteen surface notes produce nineteen
-individually reasonable patches and an app that still does not hang together.
-That is not a hypothetical: five sweeps and a polish pass already did exactly
-that, each one locally right, and the person who owns the app looked at his
-phone and said the screens were still clunky. He was right every time.
+These are not defects in one screen. What is wrong with a screen that reads
+badly is usually a habit, and the habit is everywhere. Fixed one at a time,
+nineteen notes give nineteen patches and an app that still does not hang
+together — which already happened once here.
 
-So the unit of work is the law, not the note.
+1. **Read all of them before starting.** The pattern across five notes is the
+   defect, and it is invisible when they arrive one at a time.
+2. **Read the laws.** `npx tsx scripts/notes.ts laws`, or `/dev/ui` for the
+   same laws with worked examples. Works without `DATABASE_URL`.
+3. **Cluster by law.** Most land on 9 to 15. Several notes about different
+   surfaces are usually one law.
+4. **Fix the law everywhere**, not just on the surface in the note. Grep for the
+   shape, not the screen.
+5. **Close the cluster together**, naming the law:
+   `done <id> --law 13 --note "…"`. Required for surface notes; the command
+   refuses without it.
+6. **`--law none` when no law fits.** The complaint is sound and the guide is
+   short a law. Say which in `--note`, add it to `app/dev/ui/laws.ts` with a
+   worked example in `app/dev/ui/page.tsx`, then close the batch.
 
-1. **Read all of them first.** Do not claim one and start. The pattern across
-   five notes *is* the defect, and it is invisible when they arrive one at a
-   time between bug reports.
-2. **Read the standard.** `npx tsx scripts/notes.ts laws`, or `/dev/ui` for the
-   same laws with worked examples. This works without `DATABASE_URL`.
-3. **Cluster them by law.** Most notes will land on one of laws 9 to 15 — the
-   restraint and shape laws are the ones being broken. Several notes about
-   different surfaces are usually one law, once.
-4. **Fix the law everywhere it is broken**, not only on the surface that was
-   photographed. Grep for the shape, not the screen. If a note says a list is
-   too heavy, the fix is every list of that kind; leaving the other eleven is
-   how the app stays incoherent while the queue empties.
-5. **Close the cluster together**, each note naming the law:
-   `done <id> --law 13 --note "…"`. The flag is required for surface notes and
-   the command refuses without it.
-6. **`--law none` when no law fits.** This is a real answer and the valuable
-   one: it means the complaint is sound and the guide is short a law. Say which
-   law is missing in `--note`, add it to `app/dev/ui/laws.ts` with a worked
-   example in `app/dev/ui/page.tsx`, and close the batch with the guide grown.
-   Laws 13 to 15 exist because that gap was found this way.
+One commit per law, not per note — the exception to "one note per commit"
+above. Name the law in the subject: `Make scrolled lists lists, not cards
+(law 13)`.
 
-**One commit per law, not per note.** This is the deliberate exception to "one
-note per commit" above: a law fixed in eleven files is one change, and the
-notes it closes all cite it. Name the law in the subject —
-`Make every scrolled list a list, not cards (law 13)`.
-
-Verify as always, and additionally look at the result: `npm run check:ui` reads
-zero on plenty of surfaces that read badly, which is the entire reason
-`/dev/surfaces` exists. Shoot the surfaces you changed
-(`npm run shoot -- <surface-id>`) and look at the pictures before closing.
+`check:ui` reads zero on plenty of surfaces that read badly. Shoot what you
+changed (`npm run shoot -- <surface-id>`) and look at the pictures before
+closing.
 
 ## Pushing the batch
 
