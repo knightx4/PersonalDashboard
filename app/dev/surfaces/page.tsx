@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { SURFACES } from '@/app/preview/surfaces';
+import { surfaceOf } from '@/lib/feedback/surfaces';
 import { SurfaceReview } from './review';
 
 export const metadata = { title: 'Surfaces' };
@@ -37,11 +38,9 @@ export default async function DevSurfacesPage() {
   /** Notes filed against a surface, by surface id. */
   const notesBySurface = new Map<string, typeof queue.rows>();
   for (const row of queue.rows) {
-    const match = row.pagePath?.match(/^\/preview\?s=([\w-]+)$/);
-    if (!match) continue;
-    const list = notesBySurface.get(match[1]!) ?? [];
-    list.push(row);
-    notesBySurface.set(match[1]!, list);
+    const surface = surfaceOf(row.pagePath);
+    if (!surface) continue;
+    notesBySurface.set(surface, [...(notesBySurface.get(surface) ?? []), row]);
   }
 
   const surfaces = SURFACES.map((surface) => ({

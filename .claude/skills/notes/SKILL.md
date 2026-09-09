@@ -27,6 +27,7 @@ npx tsx scripts/notes.ts done <id> --note "…" # close it; records HEAD commit
 npx tsx scripts/notes.ts block <id> --note "…" # cannot proceed; say what is needed
 npx tsx scripts/notes.ts decline <id> --note "…" # will not do; say why
 npx tsx scripts/notes.ts priority <id> 1|2|3
+npx tsx scripts/notes.ts laws          # the design laws; needs no database
 ```
 
 Ids are shown truncated; the first 8 characters are enough for every command.
@@ -57,6 +58,9 @@ order by (kind = 'bug') desc, priority asc, created_at asc;
 update feedback_items set status = 'in_progress' where id = '…';
 
 -- done (after committing, so HEAD is the commit that did it)
+-- For a surface note (page_path like '/preview?s=%') the resolution note must
+-- start with the law, exactly as the CLI writes it: 'Law 13 — …'. The CLI
+-- refuses without it; doing the writes by hand does not make that optional.
 update feedback_items set status = 'done', resolution_note = '…',
   commit_sha = '…', completed_at = now() where id = '…';
 
@@ -119,6 +123,54 @@ the dependencies are installed. The SessionStart hook in `.claude/hooks/`
 does that before the session starts; if it has not run for some reason,
 `npm install` first rather than reading the failure as a broken repo.
 
+## Surface notes: work the law, not the note
+
+A note whose page path looks like `/preview?s=<id>` was filed from
+`/dev/surfaces`, where the user was looking at a real surface at the width he
+reads it. `list` shows these **apart from the rest**, grouped by surface, and
+that separation is the point.
+
+**These are not defects in one screen.** A screen that reads badly almost never
+reads badly alone — the thing wrong with it is a habit, and the habit is
+everywhere. Worked one at a time, nineteen surface notes produce nineteen
+individually reasonable patches and an app that still does not hang together.
+That is not a hypothetical: five sweeps and a polish pass already did exactly
+that, each one locally right, and the person who owns the app looked at his
+phone and said the screens were still clunky. He was right every time.
+
+So the unit of work is the law, not the note.
+
+1. **Read all of them first.** Do not claim one and start. The pattern across
+   five notes *is* the defect, and it is invisible when they arrive one at a
+   time between bug reports.
+2. **Read the standard.** `npx tsx scripts/notes.ts laws`, or `/dev/ui` for the
+   same laws with worked examples. This works without `DATABASE_URL`.
+3. **Cluster them by law.** Most notes will land on one of laws 9 to 15 — the
+   restraint and shape laws are the ones being broken. Several notes about
+   different surfaces are usually one law, once.
+4. **Fix the law everywhere it is broken**, not only on the surface that was
+   photographed. Grep for the shape, not the screen. If a note says a list is
+   too heavy, the fix is every list of that kind; leaving the other eleven is
+   how the app stays incoherent while the queue empties.
+5. **Close the cluster together**, each note naming the law:
+   `done <id> --law 13 --note "…"`. The flag is required for surface notes and
+   the command refuses without it.
+6. **`--law none` when no law fits.** This is a real answer and the valuable
+   one: it means the complaint is sound and the guide is short a law. Say which
+   law is missing in `--note`, add it to `app/dev/ui/laws.ts` with a worked
+   example in `app/dev/ui/page.tsx`, and close the batch with the guide grown.
+   Laws 13 to 15 exist because that gap was found this way.
+
+**One commit per law, not per note.** This is the deliberate exception to "one
+note per commit" above: a law fixed in eleven files is one change, and the
+notes it closes all cite it. Name the law in the subject —
+`Make every scrolled list a list, not cards (law 13)`.
+
+Verify as always, and additionally look at the result: `npm run check:ui` reads
+zero on plenty of surfaces that read badly, which is the entire reason
+`/dev/surfaces` exists. Shoot the surfaces you changed
+(`npm run shoot -- <surface-id>`) and look at the pictures before closing.
+
 ## Pushing the batch
 
 Fetch with a plain `git fetch origin`. Naming refs — `git fetch origin main
@@ -155,6 +207,10 @@ report, not an appendix:
 | Note | Type | Page | Issue | Result |
 |---|---|---|---|---|
 | `3f9c1a2b` | Bug | `/sell` | what they wrote, quoted or trimmed | One sentence: what changed and the commit, or what it is waiting on. |
+
+For surface notes, say which law each one turned out to be, and where else that
+law was broken and fixed — the count of other places is the thing worth
+reporting, because it is the part the note itself could not see.
 
 Keep Result to a single sentence. A blocked row says what would unblock it;
 a declined row says why not. Never omit a note from the table to make the

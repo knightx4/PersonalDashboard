@@ -12,14 +12,29 @@
  *   npx tsx scripts/notes.ts block <id> --note "the question blocking it"
  *   npx tsx scripts/notes.ts decline <id> --note "why not"
  *   npx tsx scripts/notes.ts priority <id> <1|2|3>
+ *   npx tsx scripts/notes.ts laws
  *
  * Ids may be given as the first 8 characters.
+ *
+ * Notes filed from /dev/surfaces are handled differently, and the difference is
+ * the whole reason that page exists. They are not defects in one screen; they
+ * are a reader saying a surface reads badly, and the thing that reads badly is
+ * almost never confined to the screen it was noticed on. Worked one at a time
+ * they produce nineteen individually reasonable patches and an app that still
+ * does not hang together -- which is exactly what five sweeps already did.
+ *
+ * So: they are listed apart rather than interleaved, `laws` prints the standard
+ * they are judged against, and closing one requires naming the law it broke.
+ * `--law none` is allowed and is the interesting answer: it means the guide is
+ * missing something, which is how laws 13 to 15 came to be written.
  */
 import { execSync } from 'node:child_process';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
+import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS } from '../app/dev/ui/laws';
+import { checkClose, surfaceOf } from '../lib/feedback/surfaces';
 import { feedbackItems } from '../lib/db/schema';
 
 /**
@@ -52,6 +67,9 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
+/** Every law, in one list, read from the page that renders them. */
+const ALL_LAWS = [...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS];
+
 function currentCommit(): string | null {
   try {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
@@ -76,16 +94,19 @@ async function findOne(database: Db, idPrefix: string) {
   return rows[0]!;
 }
 
-function printRow(row: typeof feedbackItems.$inferSelect, verbose = false): void {
-  const flag = row.kind === 'bug' ? 'BUG ' : 'FEAT';
-  const line = [
+/** One note as a single line. Returned rather than printed so it can be indented. */
+function rowLine(row: typeof feedbackItems.$inferSelect, width = 72): string {
+  return [
     shortId(row.id),
-    flag,
+    row.kind === 'bug' ? 'BUG ' : 'FEAT',
     `p${row.priority}`,
     row.status.padEnd(11),
-    row.body.replace(/\s+/g, ' ').slice(0, verbose ? 400 : 72),
+    row.body.replace(/\s+/g, ' ').slice(0, width),
   ].join('  ');
-  console.log(line);
+}
+
+function printRow(row: typeof feedbackItems.$inferSelect, verbose = false): void {
+  console.log(rowLine(row, verbose ? 400 : 72));
   if (verbose) {
     if (row.pagePath) console.log(`        page: ${row.pagePath}`);
     if (row.resolutionNote) console.log(`        note: ${row.resolutionNote}`);
@@ -96,6 +117,20 @@ function printRow(row: typeof feedbackItems.$inferSelect, verbose = false): void
 
 async function main(): Promise<void> {
   const command = process.argv[2] ?? 'list';
+
+  // Before the connection, because it needs none -- and because DATABASE_URL is
+  // unset in Claude Code on the web, which the skill calls the normal case for a
+  // scheduled run. A standard readable only when the database happens to be
+  // reachable is a standard that goes unread exactly while it is being applied.
+  if (command === 'laws') {
+    for (const law of ALL_LAWS) {
+      console.log(`${String(law.n).padStart(2)}. ${law.title}`);
+      console.log(`    ${law.body.replace(/\s+/g, ' ')}\n`);
+    }
+    console.log('Rendered, with worked examples: /dev/ui — app/dev/ui/laws.ts is the source.');
+    return;
+  }
+
   const database = db();
 
   if (command === 'list') {
@@ -115,7 +150,34 @@ async function main(): Promise<void> {
       console.log(all ? 'No notes at all.' : 'Queue is empty — nothing open.');
       return;
     }
-    for (const row of rows) printRow(row);
+
+    // Two lists, not one. A design note read in isolation gets fixed in
+    // isolation, and the pattern across five of them -- which is the actual
+    // defect -- is invisible when they arrive one at a time between bug
+    // reports. Grouped, "every one of these is law 13" is the first thing
+    // visible rather than something nobody was in a position to notice.
+    const ordinary = rows.filter((row) => !surfaceOf(row.pagePath));
+    const design = rows.filter((row) => surfaceOf(row.pagePath));
+
+    for (const row of ordinary) printRow(row);
+
+    if (design.length > 0) {
+      const bySurface = new Map<string, typeof design>();
+      for (const row of design) {
+        const key = surfaceOf(row.pagePath)!;
+        bySurface.set(key, [...(bySurface.get(key) ?? []), row]);
+      }
+      console.log(
+        `\n── ${design.length} surface note(s) across ${bySurface.size} surface(s) ──\n` +
+          'Read all of them before starting. The unit of work is the law, not the\n' +
+          'note: cluster them, fix each law everywhere it is broken, and close the\n' +
+          'cluster together. `notes.ts laws` prints the standard.\n',
+      );
+      for (const [surface, notes] of bySurface) {
+        console.log(`  ${surface}`);
+        for (const row of notes) console.log(`    ${rowLine(row, 64)}`);
+      }
+    }
 
     const counts = rows.reduce<Record<string, number>>((acc, row) => {
       acc[row.status] = (acc[row.status] ?? 0) + 1;
@@ -181,17 +243,32 @@ async function main(): Promise<void> {
     const status: Status =
       command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'declined';
 
+    // The rule itself lives in lib/feedback/surfaces.ts, with tests. This
+    // command only reports what it decides.
+    const decision = checkClose({
+      pagePath: row.pagePath,
+      command,
+      note,
+      law: arg('--law'),
+      lawNumbers: ALL_LAWS.map((law) => law.n),
+    });
+    if (!decision.ok) {
+      console.error(decision.error);
+      process.exit(1);
+    }
+    const resolution = decision.resolution;
+
     await database
       .update(feedbackItems)
       .set({
         status,
-        resolutionNote: note,
+        resolutionNote: resolution,
         commitSha: command === 'done' ? (arg('--commit') ?? currentCommit()) : null,
         // Blocked notes are not finished, so they get no completion time.
         completedAt: command === 'block' ? null : new Date(),
       })
       .where(and(eq(feedbackItems.id, row.id), eq(feedbackItems.userId, row.userId)));
-    console.log(`${shortId(row.id)} ${status}: ${note}`);
+    console.log(`${shortId(row.id)} ${status}: ${resolution}`);
     return;
   }
 

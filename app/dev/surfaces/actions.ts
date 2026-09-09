@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { surfacePath } from '@/lib/feedback/surfaces';
 
 /**
  * A note about how a surface looks, filed into the one queue.
@@ -47,7 +48,7 @@ export async function noteOnSurface(
     // that something is broken. `bug` is reserved for things that do not work.
     kind: 'feature',
     body: parsed.data.body,
-    page_path: `/preview?s=${parsed.data.surface}`,
+    page_path: surfacePath(parsed.data.surface),
   });
   if (error) return { error: error.message };
 
