@@ -27,10 +27,12 @@
  * the draft gives: an instruction not to use a phrase leaks, and a regex does
  * not drift.
  */
+import { createHash } from 'crypto';
+
 import { z } from 'zod';
 
 import { findBannedConstructions } from '../evidence/draft-payload';
-import type { MatchVerdict } from '../evidence/match-payload';
+import { matchKey, type MatchVerdict } from '../evidence/match-payload';
 import type { RequirementKind } from '../jd/requirements';
 import { PREP_MISSING_LABEL, type PrepContext } from './prep-context';
 
@@ -89,6 +91,41 @@ export interface PrepNote {
 }
 
 export type PrepResult = { ok: true; note: PrepNote } | { ok: false; error: string };
+
+/**
+ * A fingerprint of the facts one prep note was written against.
+ *
+ * Same device as `roles.requirement_matches_key`, and it starts from that key
+ * so the two go stale together: the description and the bank are most of what
+ * the note reads. On top of them go the facts that belong to the round rather
+ * than the role — which conversations it holds and when, and who is named on
+ * them — because a note that introduces an interviewer who has since been
+ * replaced is worse than no note.
+ *
+ * What is deliberately not in here: earlier rounds at the company. They are in
+ * the note but they only ever accumulate, and keying on them would mark every
+ * prep note in the pipeline stale the evening you write up a debrief. The
+ * regenerate button is there for the person who wants that one folded in.
+ *
+ * Pure and here rather than in the action so the page can recompute it from
+ * rows it already has and say, without a model call, that a stored note is no
+ * longer the note for this round.
+ */
+export function prepKey(input: {
+  jdHash: string | null;
+  bank: readonly { id: string; strength: number; skills: string[] }[];
+  conversations: readonly { id: string; scheduledAt: string | null }[];
+  contactIds: readonly string[];
+}): string {
+  const conversations = [...input.conversations]
+    .map((conversation) => `${conversation.id}@${conversation.scheduledAt ?? 'unscheduled'}`)
+    .sort()
+    .join(',');
+  const contacts = [...input.contactIds].sort().join(',');
+  return createHash('sha1')
+    .update(`${matchKey(input.jdHash, input.bank)}\n${conversations}\n${contacts}`)
+    .digest('hex');
+}
 
 const prepSchema = z.object({
   round_summary: z.string().trim().min(1),
