@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { fetchDocument } from '@/lib/learn/providers';
 import { buildTextFragmentUrl, containsAnchor, toPlainText } from '@/lib/learn/locate/html';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
  * Finding the paragraph, when you open the reading and not before.
@@ -74,6 +75,8 @@ export async function locatePassage(input: {
   question: string | null;
   anthropicApiKey?: string | null;
   client?: Anthropic;
+  /** Told what the call cost, whether or not a passage was found. */
+  onSpend?: SpendSink;
 }): Promise<LocateOutcome> {
   const unchanged = (basis: string): LocateOutcome => ({
     openUrl: input.url,
@@ -153,6 +156,10 @@ export async function locatePassage(input: {
         },
       ],
     });
+
+    // Reported before the response is judged. A locate that came back with no
+    // passage still read the document and still cost what that cost.
+    input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
     const block = response.content.find((c) => c.type === 'tool_use');
     if (!block || block.type !== 'tool_use') {

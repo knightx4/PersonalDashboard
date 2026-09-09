@@ -80,6 +80,38 @@ export function formatMoneyOrBlank(
 }
 
 /**
+ * Format a model-call cost, which is smaller than a cent.
+ *
+ * The spend ledger counts in micro-dollars -- millionths -- because one Haiku
+ * call costs about two hundredths of a cent and every row would round to zero
+ * in the integer cents the rest of this file insists on. That exception is
+ * real, and it stops here: this is where those millionths become a string, for
+ * the same reason `formatMoney` is where cents do.
+ *
+ * Four decimal places while the number is small enough to need them, two once
+ * it is not, so a single call reads as $0.0184 and a month reads as $2.41.
+ * An unknown cost is blank rather than $0.00, on the `formatMoneyOrBlank`
+ * argument: zero is a claim, and "we have no rate for that model" is not it.
+ */
+export function formatMicroDollars(
+  micros: number | null | undefined,
+  options: { locale?: string; blank?: string } = {},
+): string {
+  const { locale = 'en-US', blank = '' } = options;
+  if (micros == null || !Number.isFinite(micros)) return blank;
+
+  const dollars = micros / 1_000_000;
+  const smallEnoughToNeedThem = Math.abs(dollars) < 1;
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: smallEnoughToNeedThem ? 4 : 2,
+    maximumFractionDigits: smallEnoughToNeedThem ? 4 : 2,
+  }).format(dollars);
+}
+
+/**
  * Parse a dollars string from a form into integer cents.
  *
  * Accepts "12", "12.3", "12.99", "$12.99", "1,299.00". Rejects more than two

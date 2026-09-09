@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CornerDownLeft, Palette, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { score } from '@/lib/search/score';
+import { HIT_KINDS, MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { popoverSurface } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
@@ -19,11 +21,25 @@ import type { NavSection } from '@/components/shell/app-shell';
  * thing", and it otherwise costs a click into the switcher, a read, and a
  * second click. This is one keystroke and a few letters.
  *
- * Deliberately not a search over your data -- that is the page's own field,
- * and conflating "where do I go" with "what do I own" makes a palette that
- * answers neither well. This is navigation and preferences: workspaces, the
- * sections of the one you are in, and the themes.
+ * Two halves in one box. The places you can go -- workspaces, the sections of
+ * the one you are in, the themes -- and the things you own: a company, a role,
+ * an order, something on a shelf, a todo, a note, a reading.
+ *
+ * They share a list rather than sitting in sections under each other, which
+ * was decided on the feature. The argument for one list is that you are
+ * looking for a thing rather than for a kind of thing, and two lists make you
+ * decide which half your quarry is in before you have found it. What keeps
+ * that legible is the mark: every row carries the ModuleMark of where it lives,
+ * so "which of these is the shopping one" is answered without a label.
+ *
+ * The navigation half is synchronous and always right. The data half is a
+ * fetch, so it arrives later, cannot arrive at all when a workspace is down,
+ * and must never hold the first half up: with no query typed this is exactly
+ * what it was before any of it existed.
  */
+
+/** A row in the one list: somewhere to go, or something you own. */
+type Row = { kind: 'command'; command: Command } | { kind: 'hit'; hit: SearchHit };
 
 type Command = {
   id: string;
@@ -34,29 +50,6 @@ type Command = {
   run: () => void;
 };
 
-/**
- * Subsequence match, not substring: "jbp" finds "Job search · Pipeline".
- *
- * Ranked so that a match at the start of a word beats one in the middle, which
- * is what makes two letters usually enough.
- */
-function score(haystack: string, needle: string): number | null {
-  if (!needle) return 0;
-  const target = haystack.toLowerCase();
-  const query = needle.toLowerCase();
-
-  let position = 0;
-  let points = 0;
-  for (const character of query) {
-    const found = target.indexOf(character, position);
-    if (found === -1) return null;
-    const atWordStart = found === 0 || target[found - 1] === ' ' || target[found - 1] === '·';
-    points += atWordStart ? 3 : 1;
-    if (found === position) points += 1;
-    position = found + 1;
-  }
-  return points;
-}
 
 export function CommandPalette({
   module,
@@ -70,6 +63,14 @@ export function CommandPalette({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  /**
+   * The last answer, and which query it answered.
+   *
+   * Kept together so both "what to show" and "is something still on its way"
+   * are derived rather than stored: an effect that clears state on its way to
+   * fetching causes a render for every keystroke, and the rows would blink.
+   */
+  const [answer, setAnswer] = useState<{ query: string; hits: SearchHit[] } | null>(null);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -145,6 +146,52 @@ export function CommandPalette({
       .map((entry) => entry.command);
   }, [commands, query]);
 
+  /**
+   * Ask, once the typing settles.
+   *
+   * Debounced, and every request aborts the one before it -- which is why the
+   * endpoint is a route handler rather than a server action. Without the
+   * abort, a slow answer to "ac" lands after the answer to "acme" and replaces
+   * it with staler results, which is the one bug that makes a palette feel
+   * broken rather than slow.
+   *
+   * The rows already on screen stay put while a newer answer is on its way.
+   * Clearing them first would make the list jump on every keystroke, and a
+   * list that moves under the cursor is worse than one that is briefly stale.
+   */
+  const needle = query.trim();
+  const searching = open && needle.length >= MIN_QUERY;
+
+  // Stale rows stay on screen while a newer answer is on its way: clearing
+  // them first would make the list jump on every keystroke, and a list that
+  // moves under the cursor is worse than one that is briefly behind.
+  const hits = useMemo<SearchHit[]>(
+    () => (searching ? (answer?.hits ?? []) : []),
+    [searching, answer],
+  );
+  const looking = searching && answer?.query !== needle;
+
+  useEffect(() => {
+    if (!searching) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(needle)}`, { signal: controller.signal })
+        .then((response) => (response.ok ? response.json() : { hits: [] }))
+        .then((body: { hits?: SearchHit[] }) => setAnswer({ query: needle, hits: body.hits ?? [] }))
+        .catch(() => {
+          // An aborted request is the normal case rather than a failure: the
+          // next keystroke cancelled it. Either way the palette keeps working,
+          // because the navigation half never depended on this.
+        });
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [needle, searching]);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -161,16 +208,34 @@ export function CommandPalette({
     inputRef.current?.focus();
   }, [open]);
 
+  /**
+   * One list. Commands first, then the things you own.
+   *
+   * The commands are already ranked against the query by the same scorer the
+   * server ranks hits with, so the two halves are ordered on the same terms;
+   * putting the navigation half first is the tie-break, because it is the half
+   * that is always right and always instant.
+   */
+  const rows = useMemo<Row[]>(
+    () => [
+      ...matches.map((command) => ({ kind: 'command' as const, command })),
+      ...hits.map((hit) => ({ kind: 'hit' as const, hit })),
+    ],
+    [matches, hits],
+  );
+
   function close() {
     setOpen(false);
     setQuery('');
     setActive(0);
+    setAnswer(null);
   }
 
-  function choose(command: Command | undefined) {
-    if (!command) return;
+  function choose(row: Row | undefined) {
+    if (!row) return;
     close();
-    command.run();
+    if (row.kind === 'command') row.command.run();
+    else router.push(row.hit.href);
   }
 
   if (!open) return null;
@@ -208,16 +273,16 @@ export function CommandPalette({
                 close();
               } else if (event.key === 'ArrowDown') {
                 event.preventDefault();
-                setActive((index) => (index + 1) % Math.max(matches.length, 1));
+                setActive((index) => (index + 1) % Math.max(rows.length, 1));
               } else if (event.key === 'ArrowUp') {
                 event.preventDefault();
-                setActive((index) => (index - 1 + matches.length) % Math.max(matches.length, 1));
+                setActive((index) => (index - 1 + rows.length) % Math.max(rows.length, 1));
               } else if (event.key === 'Enter') {
                 event.preventDefault();
-                choose(matches[active]);
+                choose(rows[active]);
               }
             }}
-            placeholder="Go to a workspace, a section, or a theme…"
+            placeholder="Go anywhere, or find anything…"
             aria-label="Command"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
@@ -230,38 +295,55 @@ export function CommandPalette({
         </div>
 
         <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
-          {matches.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="px-3 py-6 text-center text-ui text-ink-muted">
-              Nothing matches “{query}”.
+              {/* Only once looking has finished. "Nothing matches" while a
+                  request is still out is a lie that corrects itself, which is
+                  the most annoying kind. */}
+              {looking ? 'Looking…' : `Nothing matches “${query}”.`}
             </p>
           ) : (
-            matches.map((command, index) => (
-              <button
-                key={command.id}
-                type="button"
-                onClick={() => choose(command)}
-                onMouseMove={() => setActive(index)}
-                className={cn(
-                  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
-                  index === active ? 'bg-accent-tint' : 'hover:bg-sunken',
-                )}
-              >
-                {command.icon === 'theme' ? (
-                  <Palette className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-                ) : (
-                  <ModuleMark module={command.module ?? null} size="sm" />
-                )}
-                <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
-                  {command.label}
-                </span>
-                {command.hint && (
-                  <span className="shrink-0 text-small text-ink-muted">{command.hint}</span>
-                )}
-                {index === active && (
-                  <CornerDownLeft className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                )}
-              </button>
-            ))
+            rows.map((row, index) => {
+              const key = row.kind === 'command' ? row.command.id : `hit:${row.hit.kind}:${row.hit.id}`;
+              const label = row.kind === 'command' ? row.command.label : row.hit.title;
+              const hint =
+                row.kind === 'command'
+                  ? row.command.hint
+                  : (row.hit.subtitle ?? HIT_KINDS[row.hit.kind]);
+              const where = row.kind === 'command' ? (row.command.module ?? null) : row.hit.module;
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => choose(row)}
+                  onMouseMove={() => setActive(index)}
+                  className={cn(
+                    'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
+                    index === active ? 'bg-accent-tint' : 'hover:bg-sunken',
+                  )}
+                >
+                  {row.kind === 'command' && row.command.icon === 'theme' ? (
+                    <Palette className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                  ) : (
+                    // The mark of wherever it lives, so which workspace a row
+                    // belongs to is readable without a label.
+                    <ModuleMark module={where} size="sm" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{label}</span>
+                  {hint && <span className="shrink-0 truncate text-small text-ink-muted">{hint}</span>}
+                  {index === active && (
+                    <CornerDownLeft className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+                  )}
+                </button>
+              );
+            })
+          )}
+
+          {/* Quiet, and below the rows rather than in place of them, so
+              nothing already on screen moves while a newer answer lands. */}
+          {looking && rows.length > 0 && (
+            <p className="px-3 py-1.5 text-small text-ink-ghost">Looking…</p>
           )}
         </div>
       </div>
