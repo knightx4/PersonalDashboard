@@ -8,6 +8,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { countStates } from '@/lib/learn/graph/model';
 import { GoalForm } from './goal-form';
+import { PriorForm } from './prior-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,13 @@ export default async function KnowPage() {
           rather than behind a button: with no subjects yet, it is the only
           thing on the page worth doing. */}
       <GoalForm />
+
+      {/* And the other direction. A goal says what you are missing; this says
+          what you already have, which is the only thing on this page that can
+          reach what you learned before any of this existed. Second because it
+          is the rarer move -- written once for a field, not once a week. */}
+      <h2 className="mt-8 text-body font-medium text-ink">Or start from what you already know</h2>
+      <PriorForm />
     </>
   );
 }

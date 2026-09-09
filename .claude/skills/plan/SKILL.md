@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Two jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into proposed steps, dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -30,8 +30,10 @@ npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never your
 npx tsx scripts/plan.ts block <n> --note "…"   # cannot proceed; say what is needed
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
+                                               [--from <n>]  # stamp: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
+npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.
@@ -96,10 +98,26 @@ One step at a time. Do not start the next until the current one is closed.
    done.
 7. **Commit the step on its own.** One step per commit. End the subject with
    the step: `Add the anonymous share page (plan #14)`.
-8. **Close it.** `done <n> --note "what changed, in one sentence"`. The commit
+8. **Before closing, look up once.** If the feature above your step carries
+   fog, and what you just learned makes it specifiable, write those steps now
+   — `add "…" --parent <the feature> --proposed --done-when "…" --size s|m|l`
+   — and clear the patch with `fog <the feature> --clear`. Proposed, always:
+   they are a proposal like any other and wait for the same approve. Say in
+   your report what you graduated and what you cleared.
+
+   Most of the time the answer is no, and no is the right answer: you are
+   heads-down on one done-when and will miss most of what a re-shape would
+   catch. But it costs a glance, and it means fog can dissolve without
+   anybody pressing anything.
+
+   With the decision above, this is the **only** rewriting a build session
+   does beyond its own step: its own decisions, and fog it can now specify.
+   Nothing else — no reordering, no dropping somebody else's step, no
+   rewriting a done-when you disagree with, and never an approve.
+9. **Close it.** `done <n> --note "what changed, in one sentence"`. The commit
    is recorded from HEAD, so close after committing. The output names any
    steps that became ready as a result — mention them in the report.
-9. **Push once per batch**, then report: every step closed **by number and
+10. **Push once per batch**, then report: every step closed **by number and
    title**, what became ready, and what is blocked and on what. A report that
    says "closed four steps" makes the person go and look.
 
@@ -124,9 +142,10 @@ The recommendation is part of the job: a question with no proposed answer
 makes the person do the reading you already did. What you must not do is act
 on your own recommendation before they have agreed to it.
 
-Writing a decision means writing rows outside your own step, which is the one
-place "one step at a time" gives way — and only for this. A decision, its
-dependency edge, and the block on your own step: nothing else.
+Writing a decision means writing rows outside your own step, which is one of
+the two places "one step at a time" gives way — the other being fog you can
+now specify, in step 8 above. A decision, its dependency edge, and the block
+on your own step: nothing else.
 
 A step that turns out to need something else from the user — an API key, an
 account, a thing outside the repo — is `block <n> --note "the question"`, with
@@ -136,7 +155,7 @@ it. Never delete a step; deleting is the user's.
 
 ## Shaping an idea
 
-The other job. An idea on the ideas page is a sentence; the plan needs a
+The second job. An idea on the ideas page is a sentence; the plan needs a
 feature with steps, and writing that well takes knowing the code. So when the
 user says "shape idea …", or a routine is fired from the *Shape into a plan*
 button with an idea in its brief, the job is to write a **proposal** — and
@@ -197,6 +216,55 @@ If the idea is already in the plan (`ideas` does not list it), say so and
 stop rather than shaping it twice. If the idea is really a bug or a one-line
 request, say that it belongs in the notes queue instead, and stop.
 
+## Re-shaping a feature
+
+The third job, and the return trip. Shaping runs once, before anything is
+built; from then on the feature is a fixed drawing of a thing that is still
+moving. An answer settles a question and changes nothing else, fog written at
+shaping is never read again, and a step the answer made pointless goes on
+looking live until somebody notices.
+
+So when the user says "re-shape #95", or a routine is fired from the
+**Re-shape** button with a re-shape turn, the job is to read the feature
+against everything now known and write down what has changed — as
+**proposals**, and nothing else.
+
+1. **Read the feature.** `show <n>`: its done-when, its fog, its open steps,
+   and *Decided so far* — every question settled beneath it. Then read the
+   code those answers touch. An answer changes what is buildable only if you
+   know what is there.
+2. **Graduate the fog.** If an answer, or the code, has made the fog
+   specifiable, write those steps now: `add "…" --parent <n> --proposed
+   --done-when "…" --size s|m|l --from <the decision>`, and clear the patch in
+   the same breath with `fog <n> --clear`. **`--from` on every row a re-shape
+   writes**: it stamps the step with the answer that produced it, and a
+   proposed step appearing under a feature somebody approved last week is
+   confusing until it says why it is there. The gist is read off the
+   decision's own answer, so it cannot be paraphrased into something nobody
+   said. Fog that is *still* fog stays exactly as it is — a patch
+   rewritten into something vaguer is worse than one left alone. If part of it
+   has cleared and part has not, `fog <n> --note "…"` with what is left.
+3. **Say what an answer invalidated.** A step an answer made pointless is
+   `drop <n> --note "…"`, naming the answer that did it and why: "#63's answer
+   settles this on the server, so the client half is not needed." A re-shape
+   may drop, and must always say why. If you are not sure the step is dead,
+   it is not: say so in the report and leave it alone.
+4. **Write the new questions.** An answer usually surfaces the next question.
+   If it can be phrased sharply, it is a decision: `add "…?" --parent <n>
+   --kind decision --from <the decision it came out of> --detail "<the
+   question, the real options, what each costs, your recommendation>"`. If it cannot, it is fog on the feature. Same test
+   as shaping.
+5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
+   build anything, and do not re-propose what the feature already holds —
+   read the existing steps first, including ones an earlier re-shape added.
+   Report what you proposed, what you dropped and why, what fog you cleared,
+   and anything you noticed and deliberately left alone, all **by number and
+   title**.
+
+The contract this rests on: a re-shape writes proposed rows. The plan adapts
+continuously, and nothing changes without an approve — the same review, from
+a second direction.
+
 ## When the CLI cannot run
 
 `DATABASE_URL` is not set in Claude Code on the web, so `scripts/plan.ts`
@@ -247,6 +315,18 @@ set status = 'done', resolution = '<their words>', commit_sha = null,
     comment = coalesce(comment || E'\n\n', '') || 'Answered <date>: …'
 where id = '…';
 
+-- fog: write it, or clear it once the steps that dispel it exist. Not a
+-- status change, so no dated line goes in the comment.
+update plan_items set fog = '…' where id = '…';   -- or fog = null to clear
+
+-- a row a re-shape wrote, stamped with the answer that produced it. The same
+-- line `add --from` writes, and what the page and the brief read back; keep
+-- the wording exactly, including the apostrophe, or it stops being found.
+insert into plan_items (user_id, module, parent_id, title, acceptance, size,
+                        status, position, comment)
+values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
+        'From #63''s answer: <that answer, first line>');
+
 -- block: not finished, so no commit
 update plan_items
 set status = 'blocked',
@@ -282,7 +362,7 @@ Beside the status, two columns say what a step is rather than where it stands.
 | | Meaning |
 |---|---|
 | `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`. It is a kind and not a status because a decision moves through the same states — it can be not started, blocked, dropped — and differs only in what closing it means. |
-| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Cleared once the steps that dispel it exist. |
+| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. *Re-shaping a feature* above is what does that clearing. |
 
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,
