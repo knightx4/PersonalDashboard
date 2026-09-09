@@ -19,6 +19,16 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
 
   return (
     <div className={cn('group row-pad flex items-start gap-3', pending && 'opacity-50')}>
+      {/* The grip gutter, empty. A task row keeps a 12px margin here for its
+          drag handle; an agenda item cannot be reordered and so has no handle
+          to put in it. Leaving the gutter out moved the checkbox 20px left,
+          which in a list that interleaves both kinds read as the borrowed rows
+          being indented differently from the real ones. The column has to be
+          there whether or not anything is drawn in it, on exactly the same
+          media query, or the two kinds fall out of line the moment there is a
+          pointer. */}
+      <span className="-ml-1 mt-0.5 hidden w-3 shrink-0 [@media(hover:hover)]:block" aria-hidden />
+
       {item.completable ? (
         <button
           type="button"
