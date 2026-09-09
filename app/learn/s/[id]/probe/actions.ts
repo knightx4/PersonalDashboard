@@ -129,6 +129,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       conceptId: parsed.data.conceptId,
       chosenIndex: parsed.data.chosenIndex,
       wasSettled: concept?.state === 'known',
+      graph,
     });
   } catch (error) {
     return { ...prev, error: error instanceof Error ? error.message : 'Could not save that.' };

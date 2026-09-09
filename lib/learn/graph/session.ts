@@ -4,7 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { Probe } from '@/lib/learn/graph/probe-payload';
 import { barPercent, weightFor } from '@/lib/learn/graph/probe-payload';
-import type { Concept } from '@/lib/learn/graph/model';
+import { inferredFrom, type Concept, type Graph } from '@/lib/learn/graph/model';
 
 /**
  * A probe session: what to ask about next, and what an answer settles.
@@ -167,22 +167,65 @@ export type AnswerOutcome = {
   reason: string;
   weight: number;
   state: 'known' | 'shaky';
+  /** How many nodes underneath were marked known by inference. */
+  inferred: number;
 };
+
+/**
+ * Mark what a correct answer implies, weakly.
+ *
+ * Written as `inferred` rather than `tested`, and only over nodes nobody has
+ * answered about, which is what the rule in model.ts already worked out. The
+ * upsert ignores conflicts rather than overwriting: a row that appeared
+ * between the read and this write belongs to an answer, and an answer beats an
+ * inference every time.
+ */
+async function markInferred(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  conceptIds: string[],
+): Promise<number> {
+  if (conceptIds.length === 0) return 0;
+
+  const { error } = await supabase.from('concept_state').upsert(
+    conceptIds.map((conceptId) => ({
+      concept_id: conceptId,
+      user_id: userId,
+      state: 'known',
+      established: 'inferred',
+      misconception: null,
+    })),
+    { onConflict: 'concept_id', ignoreDuplicates: true },
+  );
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Recording what that implied', error);
+  return conceptIds.length;
+}
 
 /**
  * Record an answer, and move the concept with it.
  *
  * Right settles the node, wrong makes it shaky, and both record that they were
  * established by testing rather than inferred -- which is the distinction the
- * state and its basis are two columns for. What a *pattern* of answers means
- * beyond that -- a prerequisite that needs adding, a wrong option picked twice
- * becoming a named misconception -- is the next slice's, and nothing here
- * pretends to it.
+ * state and its basis are two columns for. A correct answer also settles what
+ * the node rests on, weakly and never over an answer somebody gave.
+ *
+ * What a repeated wrong answer means -- the same option twice becoming a named
+ * misconception -- is handled beside this rather than in it, because it costs a
+ * model call and this must not.
  */
 export async function recordAnswer(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { probeId: string; conceptId: string; chosenIndex: number; wasSettled: boolean },
+  input: {
+    probeId: string;
+    conceptId: string;
+    chosenIndex: number;
+    wasSettled: boolean;
+    /** The subject's graph, so a correct answer can settle what is under it. */
+    graph?: Graph;
+  },
 ): Promise<AnswerOutcome> {
   const { data, error } = await supabase
     .from('probes')
@@ -235,5 +278,13 @@ export async function recordAnswer(
   assertSchemaExposed(stateError, LEARN_SCHEMA);
   if (stateError) throw fail('Recording what that settled', stateError);
 
-  return { correct, reason: probe.reason, weight, state };
+  // Growth trigger 3: answering correctly about a node says the things it
+  // rests on are probably in place. Weakly, and never over an answer somebody
+  // actually gave -- inferredFrom already refuses those.
+  const inferred =
+    correct && input.graph
+      ? await markInferred(supabase, userId, inferredFrom(input.graph, input.conceptId))
+      : 0;
+
+  return { correct, reason: probe.reason, weight, state, inferred };
 }

@@ -210,3 +210,50 @@ export function countStates(graph: Graph): SubjectCounts {
   for (const concept of graph.concepts) counts[concept.state] += 1;
   return counts;
 }
+
+/**
+ * What a correct answer above says about what is underneath.
+ *
+ * Growth trigger 3. Answering correctly about a node means the things it rests
+ * on are probably in place -- you cannot use an idea while missing its floor
+ * -- so they are marked known and the session skips forward rather than
+ * walking down a chain somebody has visibly cleared.
+ *
+ * Two limits, and they are the whole of the honesty here:
+ *
+ *   It is `inferred`, never `tested`. The state column and the basis column
+ *   are separate precisely so this can be recorded as the weaker claim it is,
+ *   and a screen can say "inferred from something above it" rather than
+ *   implying somebody answered a question about it.
+ *
+ *   It never touches a node that has been tested. An inference must not
+ *   overwrite evidence in either direction: not a node somebody got right, and
+ *   especially not one they got wrong, which is exactly the node an inference
+ *   would be wrong about.
+ */
+export function inferredFrom(graph: Graph, conceptId: string): string[] {
+  const concepts = new Map(graph.concepts.map((concept) => [concept.id, concept]));
+  const prerequisites = prerequisiteMap(graph);
+
+  const inferred: string[] = [];
+  const seen = new Set<string>([conceptId]);
+  const queue = [conceptId];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const prerequisiteId of prerequisites.get(current) ?? []) {
+      if (seen.has(prerequisiteId)) continue;
+      seen.add(prerequisiteId);
+
+      const concept = concepts.get(prerequisiteId);
+      if (!concept) continue;
+
+      // Walk through it either way: a node somebody has already answered
+      // about is not re-marked, but what sits under it is still implied.
+      if (concept.established !== 'tested') inferred.push(prerequisiteId);
+      queue.push(prerequisiteId);
+    }
+  }
+
+  return inferred;
+}

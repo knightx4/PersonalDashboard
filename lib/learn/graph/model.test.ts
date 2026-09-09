@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   countStates,
+  inferredFrom,
   learningOrder,
   pruneForGoal,
   readyNow,
@@ -195,5 +196,55 @@ describe('how much of a subject is settled', () => {
       unknown: 0,
       total: 0,
     });
+  });
+});
+
+describe('what a correct answer implies about what is underneath', () => {
+  function withBasis(graph: Graph, ids: Record<string, 'tested' | 'inferred' | 'declared'>): Graph {
+    return {
+      ...graph,
+      concepts: graph.concepts.map((concept) =>
+        ids[concept.id] ? { ...concept, established: ids[concept.id] } : concept,
+      ),
+    };
+  }
+
+  it('marks everything beneath the node answered', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown', c: 'unknown' }, ['a>b', 'b>c']);
+    expect(inferredFrom(graph, 'c').sort()).toEqual(['a', 'b']);
+  });
+
+  it('says nothing about the node itself', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown' }, ['a>b']);
+    expect(inferredFrom(graph, 'b')).not.toContain('b');
+  });
+
+  it('leaves a node somebody has actually answered about alone', () => {
+    // An inference must never overwrite evidence -- least of all on the node
+    // they got wrong, which is exactly the one it would be wrong about.
+    const graph = withBasis(graphOf({ a: 'shaky', b: 'unknown', c: 'unknown' }, ['a>b', 'b>c']), {
+      a: 'tested',
+    });
+    expect(inferredFrom(graph, 'c')).toEqual(['b']);
+  });
+
+  it('still reaches what is under a tested node', () => {
+    const graph = withBasis(
+      graphOf({ floor: 'unknown', middle: 'known', top: 'unknown' }, ['floor>middle', 'middle>top']),
+      { middle: 'tested' },
+    );
+    expect(inferredFrom(graph, 'top')).toEqual(['floor']);
+  });
+
+  it('counts a node once when two paths reach it', () => {
+    const graph = graphOf(
+      { base: 'unknown', left: 'unknown', right: 'unknown', top: 'unknown' },
+      ['base>left', 'base>right', 'left>top', 'right>top'],
+    );
+    expect(inferredFrom(graph, 'top').sort()).toEqual(['base', 'left', 'right']);
+  });
+
+  it('implies nothing from a node with nothing under it', () => {
+    expect(inferredFrom(graphOf({ a: 'unknown' }, []), 'a')).toEqual([]);
   });
 });
