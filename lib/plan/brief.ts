@@ -79,6 +79,43 @@ function decidedSoFar(feature: PlanNode, node: PlanNode): PlanNode[] {
   );
 }
 
+/**
+ * Several steps written out as one hand-over.
+ *
+ * The order is the running order, so the checklist at the top is both the
+ * contents and the instruction: work them down the list. Then each step's own
+ * brief in full, because the session on the other end cannot be assumed to be
+ * able to read the plan for itself — that is why briefs are carried in the
+ * message at all — and a queue of names with no detail behind them would leave
+ * it guessing at every one.
+ *
+ * A step that waits on another is included and says so in its own brief. It is
+ * part of what was handed over, and dropping it here would mean a batch that
+ * quietly did less than it was asked to.
+ */
+export function planQueueBrief(
+  sections: readonly PlanSection[],
+  nodes: readonly PlanNode[],
+): string {
+  const out: string[] = [];
+
+  out.push(`# ${nodes.length} plan ${nodes.length === 1 ? 'step' : 'steps'}, in order`);
+  out.push('');
+  for (const [index, node] of nodes.entries()) {
+    const facts = [moduleLabel(node.module), PRIORITY_WORD[node.priority]];
+    if (node.waitingOn.length > 0) {
+      facts.push(`waits on ${node.waitingOn.map((ref) => `#${ref.number}`).join(', ')}`);
+    }
+    out.push(`${index + 1}. #${node.number} ${node.title} — ${facts.join(' · ')}`);
+  }
+
+  for (const node of nodes) {
+    out.push('', '---', '', planBrief(sections, node).trimEnd());
+  }
+
+  return out.join('\n') + '\n';
+}
+
 export function planBrief(sections: readonly PlanSection[], node: PlanNode): string {
   const ancestors = ancestorsOf(sections, node.id);
   const out: string[] = [];

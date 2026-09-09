@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
-import { planBrief } from '@/lib/plan/brief';
+import { planBrief, planQueueBrief } from '@/lib/plan/brief';
 import {
   PLAN_ASSIGNEES,
   PLAN_KINDS,
@@ -17,7 +17,7 @@ import {
   loadPlan,
 } from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
-import { buildPlanTree, findNode, flatten } from '@/lib/plan/tree';
+import { buildPlanTree, findNode, flatten, handedToClaude } from '@/lib/plan/tree';
 
 export type PlanActionState = {
   error?: string;
@@ -740,6 +740,63 @@ export async function sendPlanFeatureToClaude(
   if (!result.ok) return { error: result.error };
   return {
     message: `Sent #${node.number} and its ${steps === 1 ? 'step' : `${steps} steps`}. ${result.detail}`,
+  };
+}
+
+/**
+ * Send everything handed to Claude, in one press.
+ *
+ * The step button is right when you are watching one step; the feature button
+ * is right when you are looking at one feature. Neither is what you want after
+ * an afternoon spent going down the plan marking things as Claude's, which is
+ * the state this button is for: a queue built up over a session and sent when
+ * you get up from the desk.
+ *
+ * Nothing is assigned here and nothing changes state. Being handed over is
+ * exactly what these steps already are -- that is how they got into the queue
+ * -- so this is a send and only a send, and pressing it twice sends the same
+ * queue again rather than dragging anything new into it.
+ *
+ * `handedToClaude` decides what is in it: open, approved, not a decision, most
+ * urgent first. One routine works the lot in that order, because two sessions
+ * on one plan would take the same step twice.
+ */
+export async function sendPlanQueueToClaude(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const sections = buildPlanTree(await loadPlan(supabase, user.id));
+  const queue = handedToClaude(sections);
+  if (queue.length === 0) {
+    return { error: 'Nothing is handed to Claude right now. Hand a step over and it lands here.' };
+  }
+
+  const text =
+    `Work the ${queue.length} plan ${queue.length === 1 ? 'step' : 'steps'} handed to Claude, ` +
+    'following .claude/skills/plan/SKILL.md. Work them ONE AT A TIME in the order below, each ' +
+    'claimed, built, verified, committed with the step number in the subject and closed with a ' +
+    'note before the next is claimed. A step whose brief says it waits on another is worked ' +
+    'after that one, not skipped. Stop at the first step that needs a decision from me: block ' +
+    'it with the exact question rather than guessing, and carry on with the rest. Keep going ' +
+    'until every step is closed, something blocks the batch as a whole, or the session is ' +
+    'running short. Push once at the end and report every step you closed, by number and ' +
+    'title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
+    'plan is the source of truth.\n\n' +
+    planQueueBrief(sections, queue);
+
+  const routine = planRoutine();
+  const result = await fireFeatureRoutine({
+    apiKey: routine.token,
+    routineId: routine.id,
+    text,
+  });
+  if (!result.ok) return { error: result.error };
+  return {
+    message: `Sent ${queue.length === 1 ? '1 step' : `all ${queue.length} steps`}. ${result.detail}`,
   };
 }
 
