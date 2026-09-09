@@ -215,9 +215,16 @@ export default async function HomePage() {
                         {BUCKET_LABELS.overdue}
                       </span>
                     )}
-                    <span className="min-w-0 flex-1 truncate text-ui text-ink">
+                    {/* Each line goes where the thing itself lives: a task to
+                        its own row on the agenda, a source item to whatever it
+                        is about. They were plain text, which made the list
+                        something to read and then go and find by hand. */}
+                    <Link
+                      href={agendaHref(entry)}
+                      className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent"
+                    >
                       {entry.task?.title ?? entry.item?.title}
-                    </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -239,6 +246,21 @@ export default async function HomePage() {
       </AppShell>
     </div>
   );
+}
+
+/**
+ * Where one line of "Today" goes when you click it.
+ *
+ * A task has no page of its own -- it is a row on the agenda, and that is the
+ * only place it can be ticked off, rescheduled or edited -- so it links to
+ * itself there by anchor. A source item is somebody else's row: a return
+ * deadline belongs to the order, a reminder to the application, and its own
+ * link says which. Anything a source did not give a link for falls back to the
+ * agenda, which is at least the page it was read from.
+ */
+function agendaHref(entry: { task?: { id: string }; item?: { link: { href: string } | null } }): string {
+  if (entry.task) return `/todo#task-${entry.task.id}`;
+  return entry.item?.link?.href ?? '/todo';
 }
 
 /**
