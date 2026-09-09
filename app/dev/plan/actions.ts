@@ -9,6 +9,7 @@ import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
 import { planBrief } from '@/lib/plan/brief';
 import {
   PLAN_ASSIGNEES,
+  PLAN_KINDS,
   PLAN_PRIORITIES,
   PLAN_SIZES,
   PLAN_STATUSES,
@@ -37,6 +38,13 @@ const moduleField = z
   .transform((value) => (value && isModuleId(value) ? value : null));
 
 const statusField = z.enum(PLAN_STATUSES);
+
+/**
+ * What closing it will mean. Only the add form sends this, and only to raise a
+ * question: everything else on the page adds work, and a step that changed
+ * kind under an edit would be a done step whose commit had stopped counting.
+ */
+const kindField = z.enum(PLAN_KINDS);
 
 const priorityField = z.coerce
   .number()
@@ -135,6 +143,7 @@ const addSchema = z.object({
   detail: text(4000).optional(),
   acceptance: text(4000).optional(),
   status: statusField,
+  kind: kindField,
   priority: priorityField,
   size: sizeField,
   assignee: assigneeField,
@@ -161,6 +170,7 @@ export async function addPlanItem(
     detail: field(formData, 'detail'),
     acceptance: field(formData, 'acceptance'),
     status: field(formData, 'status', 'not_started'),
+    kind: field(formData, 'kind', 'build'),
     priority: field(formData, 'priority', '2'),
     size: field(formData, 'size'),
     assignee: field(formData, 'assignee'),
@@ -184,6 +194,7 @@ export async function addPlanItem(
     detail: parsed.data.detail || null,
     acceptance: parsed.data.acceptance || null,
     status: parsed.data.status,
+    kind: parsed.data.kind,
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
