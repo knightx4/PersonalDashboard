@@ -332,6 +332,14 @@ export function AppShell({
    * the only control on the bar that leaves the workspace rather than moving
    * around inside it -- so three sections show beside More, or four when there
    * is no More. The rest are one tap further, which is where they were anyway.
+   *
+   * The bar itself does not wait for sections. Home and the account page have
+   * none -- they are not workspaces -- and the bar was hung on `tabs.length`,
+   * so on exactly the two pages with no other navigation on them the way out
+   * disappeared: no bottom bar, and the switcher only in the top corner. The
+   * switcher is reason enough for the bar on its own, and the slot it takes is
+   * the same one it takes everywhere else, so the control does not move when
+   * you arrive home from a workspace.
    */
   const overflow = sections.length > 3 || Boolean(settingsHref);
   const tabs = sections.slice(0, overflow ? 3 : 4);
@@ -627,21 +635,26 @@ export function AppShell({
             // against the foot of the window rather than the foot of the text.
             'flex-1',
             // Room for the tab bar, which is fixed over the foot of the page.
-            tabs.length > 0 && 'pb-24 lg:pb-6',
+            'pb-24 lg:pb-6',
           )}
         >
           {children}
         </main>
         <StatusLine lines={activity} />
 
-        {tabs.length > 0 && (
-          <nav
-            aria-label="Sections"
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
-          >
-            <ul className="grid auto-cols-fr grid-flow-col">{dock}</ul>
-          </nav>
-        )}
+        <nav
+          // Named for what is actually in it: on home and the account page it
+          // holds no sections at all, and a landmark called "Sections" that
+          // contains one workspace switcher is a lie to anyone listing them.
+          aria-label={tabs.length > 0 ? 'Sections' : 'Workspace'}
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        >
+          {/* With no sections the switcher is the only cell, so it takes the
+              width. Its contents are centred either way, which is what "in the
+              middle" means here -- the mark and its label land where they land
+              on every other page, with a wider target under them. */}
+          <ul className="grid auto-cols-fr grid-flow-col">{dock}</ul>
+        </nav>
       </div>
 
       <WorkspaceSheet
