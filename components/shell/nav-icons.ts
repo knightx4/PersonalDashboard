@@ -12,6 +12,7 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardCheck,
+  Frame,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -67,6 +68,7 @@ export const NAV_ICONS = {
   ideas: Lightbulb,
   plan: Map,
   ui: Shapes,
+  surfaces: Frame,
   // Todo and vault
   agenda: ListChecks,
   calendar: CalendarDays,

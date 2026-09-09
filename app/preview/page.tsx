@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getUser } from '@/lib/auth/server';
 import Link from 'next/link';
 import { SURFACES } from './surfaces';
 
@@ -26,7 +27,14 @@ export default async function PreviewPage({
 }: {
   searchParams: Promise<{ s?: string; w?: string }>;
 }) {
-  if (process.env.UI_PREVIEW !== '1') notFound();
+  // Signed in, or the harness. It used to be UI_PREVIEW alone, which meant the
+  // gallery could not be reached from a deployment at all -- so the only person
+  // who could look at these surfaces was whoever was running the screenshot
+  // script, which is exactly backwards for a thing whose whole purpose is
+  // someone else looking at them. Nothing here reads a session or a database;
+  // the sign-in is there so it need not be public, not because it guards
+  // anything. See app/dev/surfaces, which frames these.
+  if (process.env.UI_PREVIEW !== '1' && !(await getUser())) notFound();
 
   const { s } = await searchParams;
   const surface = SURFACES.find((entry) => entry.id === s);

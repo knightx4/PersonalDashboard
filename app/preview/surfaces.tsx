@@ -1,6 +1,7 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
+import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewList } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
@@ -754,6 +755,40 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelineBoard rows={pipelineRows} view="board" />,
+  },
+  {
+    /* The review tool, reviewed by itself. Circular on purpose: the frames it
+     * draws are the same frames it is drawn in, so if the scaling is wrong it
+     * is wrong here too. */
+    id: 'dev-surfaces',
+    label: 'Surfaces · the review tool',
+    module: 'dev',
+    width: 'wide',
+    render: () => (
+      <SurfaceReview
+        surfaces={[
+          {
+            id: 'jobs-pipeline-dense',
+            label: 'Pipeline · Dense list (experiment)',
+            module: 'jobs',
+            notes: [
+              {
+                id: 'n1',
+                body: 'Rows are right but the stars are noisy at this size.',
+                status: 'open',
+                resolutionNote: null,
+              },
+            ],
+          },
+          {
+            id: 'jobs-role-timeline',
+            label: 'Role · Timeline and to-dos',
+            module: 'jobs',
+            notes: [],
+          },
+        ]}
+      />
+    ),
   },
   {
     /* The experiment. Same rows, same width, beside the thing it questions. */

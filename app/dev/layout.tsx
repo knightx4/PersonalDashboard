@@ -35,7 +35,11 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * when it is decided on, and a bug is filed when something built is wrong.
    *
    * UI sits below them because it is not a list of work; it is the standard
-   * the work is held to. It lives here rather than in a document because a
+   * the work is held to, and Surfaces below that because it is where the
+   * standard gets checked against the thing: every surface framed at the width
+   * it is read at, with a box to say what is wrong. A note written there lands
+   * in the same queue as Bugs and requests, which is the point -- one inbox,
+   * not two. It lives here rather than in a document because a
    * document describing an interface goes stale the week after it is written,
    * and this one renders the real components from the real tokens: if a swatch
    * on that page is wrong, the app is wrong.
@@ -45,6 +49,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
+    { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
   ];
 
   return (

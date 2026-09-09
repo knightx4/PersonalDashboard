@@ -16,12 +16,12 @@ import { createServerClient } from '@supabase/ssr';
 
 /** Everything not listed here requires a session. */
 const PUBLIC_PATHS = [
-  /* The surface gallery. It renders the app's own components against typed
-   * fixtures and reads no session and no database, so there is nothing behind
-   * it to protect -- and it 404s outright unless UI_PREVIEW=1 was set at build
-   * time, which no deployment sets. Public because a screenshot harness cannot
-   * sign in. See app/preview/page.tsx. */
-  '/preview',
+  /* The surface gallery, and only for the screenshot harness -- which cannot
+   * sign in, and which is the one caller that needs it unauthenticated. In a
+   * deployment UI_PREVIEW is unset, so /preview is not public and the page's
+   * own check requires a session. Both halves have to agree or the gallery is
+   * either unreachable or open. See app/preview/page.tsx. */
+  ...(process.env.UI_PREVIEW === '1' ? ['/preview'] : []),
   '/',
   '/login',
   '/signup',
