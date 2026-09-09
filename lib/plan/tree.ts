@@ -81,7 +81,16 @@ export type PlanSection = {
   tally: PlanTally;
 };
 
-export const PLAN_VIEWS = ['all', 'open', 'you', 'ready', 'proposed', 'claude', 'blocked'] as const;
+export const PLAN_VIEWS = [
+  'all',
+  'open',
+  'you',
+  'ready',
+  'proposed',
+  'claude',
+  'blocked',
+  'fog',
+] as const;
 export type PlanView = (typeof PLAN_VIEWS)[number];
 
 export function isPlanView(value: string): value is PlanView {
@@ -96,6 +105,7 @@ export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   proposed: 'Proposed',
   claude: "Claude's",
   blocked: 'Waiting',
+  fog: 'Not specified',
 };
 
 /** The numbers across the whole plan, for the strip at the top of the page. */
@@ -128,6 +138,8 @@ export type PlanSummary = {
   done: number;
   /** Open steps handed to Claude. */
   claude: number;
+  /** Steps carrying a "not yet specified" note, closed ones included. */
+  fog: number;
 };
 
 /**
@@ -433,6 +445,11 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
       return node.assignee === 'claude' && !isClosed(node.status);
     case 'blocked':
       return !isClosed(node.status) && (node.status === 'blocked' || node.waitingOn.length > 0);
+    // Closed steps included. A finished feature still carrying fog is the
+    // case worth seeing: the work stopped and the gap it admitted to did not
+    // get filled. Nothing else on the page shows that.
+    case 'fog':
+      return node.fog !== null;
   }
 }
 
@@ -530,5 +547,6 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
     claude: open.filter((node) => node.assignee === 'claude').length,
+    fog: nodes.filter((node) => node.fog !== null).length,
   };
 }

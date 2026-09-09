@@ -177,6 +177,54 @@ the exact question. A step that should not be done is `drop <n> --note "why"`;
 say "out of scope: …" when that is the reason, since there is no status for
 it. Never delete a step; deleting is the user's.
 
+## How to write a title and a detail
+
+Steps get read months later, by a person deciding what to build and by a
+session about to build it. Both need to know what the step is from the title
+alone. A lot of the plan currently fails that, so this is a rule, not advice.
+
+**The title says what will be true when the step is done.** Name the thing
+being built and where it goes. Aim for under about eight words. If you cannot
+say what the step produces, you do not understand it well enough to write it
+yet.
+
+| Instead of | Write |
+|---|---|
+| The record that a pass happened | Store the result of each UI review |
+| Read a briefing into claims you do not hold yet | Extract claims from a pasted briefing |
+| Map a search hit to the thing a task can point at | Link a search result to a task |
+| Re-shaping: the plan adapts as decisions land | Re-shape a feature after its questions are answered |
+
+**The detail says what the work involves.** Which files, which tables, what
+already exists, what has to be added. Two to five sentences. Write it for
+somebody who knows the codebase but has not thought about this step.
+
+**Do not write:**
+
+- Stock phrases and slogans. "the source of truth", "in one breath", "the
+  whole point", "what this exists to prevent".
+- Metaphor for machinery. A button is not a rope, a queue is not a river,
+  data does not travel. Say what the code does.
+- Titles built on a colon, or a pattern like "X, and what it means for Y".
+- Claims of significance. Not "this is the step that matters"; the plan does
+  not need to be sold to the person who wrote it.
+- Hedging that carries no information. "arguably", "it may be worth
+  considering", "somewhat".
+- Sentence structures that need re-reading. One clause after another with
+  dashes and semicolons holding them together is harder to read than three
+  sentences.
+- Abstractions with no referent. "the experience", "the flow", "adaptive
+  behaviour", "a first-class concept".
+- Restating the title in the first line of the detail.
+
+**Do write** the way you would explain the step to somebody sitting next to
+you: plainly, with the specifics in it, and no more words than the thing
+needs. Ordinary technical English. A step that reads as though nobody wrote
+it is worse than a blunt one.
+
+The same applies to a decision's question and its options, to fog, and to the
+note you close a step with.
+
 ## Shaping an idea
 
 The second job. An idea on the ideas page is a sentence; the plan needs a

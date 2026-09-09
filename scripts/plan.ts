@@ -513,6 +513,18 @@ async function main(): Promise<void> {
     if (command === 'done' || command === 'block' || command === 'drop') {
       const note = arg('--note');
       if (!note) fail(`--note is required for ${command}: say what happened.`);
+
+      // Fog on a step being closed as done is work that was never specified
+      // sitting on work that is finished. Nothing reads it again from there.
+      // Graduating it is the re-shape's first move; clearing it is one
+      // command. Blocking and dropping are fine: neither claims the step is
+      // complete.
+      if (command === 'done' && item.fog) {
+        fail(
+          `#${item.number} still says part of it is not specified. Write the steps that ` +
+            `patch covers, or run plan.ts fog ${item.number} --clear, then close it.`,
+        );
+      }
       const status: PlanStatus = command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
       const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
       const stamp = new Date().toISOString().slice(0, 10);

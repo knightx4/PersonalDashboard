@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
-import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { fireFeatureRoutine, planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
 import { planBrief, planQueueBrief } from '@/lib/plan/brief';
 import {
   PLAN_ASSIGNEES,
@@ -17,7 +17,15 @@ import {
   loadPlan,
 } from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
-import { buildPlanTree, findNode, flatten, handedToClaude } from '@/lib/plan/tree';
+import {
+  ancestorsOf,
+  buildPlanTree,
+  findNode,
+  flatten,
+  handedToClaude,
+  type PlanNode,
+  type PlanSection,
+} from '@/lib/plan/tree';
 
 export type PlanActionState = {
   error?: string;
@@ -322,6 +330,24 @@ export async function setPlanItemStatus(
   const status = statusField.safeParse(formData.get('status'));
   if (!id.success || !status.success) return { error: 'Missing step or status.' };
 
+  // Fog says part of this step was never specified. Closing it as done
+  // leaves that admission sitting on finished work, where nothing looks at
+  // it again -- which is how three features shipped still carrying theirs.
+  // Graduate it into steps, or clear it, then close.
+  if (status.data === 'done') {
+    const { data: current } = await supabase
+      .from('plan_items')
+      .select('number, fog')
+      .eq('user_id', user.id)
+      .eq('id', id.data)
+      .maybeSingle();
+    if (current?.fog) {
+      return {
+        error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
+      };
+    }
+  }
+
   const { error } = await supabase
     .from('plan_items')
     .update({ status: status.data })
@@ -544,7 +570,44 @@ export async function answerPlanDecision(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: 'Answered.' };
+
+  // The last answer under a feature starts the re-shape.
+  //
+  // #96 chose a button over firing on every answer, to stop three answers in
+  // one sitting starting three runs that raced each other. Ten days of that
+  // button never being pressed says the cost was the wrong way round: the
+  // races were hypothetical and the forgetting was not.
+  //
+  // Firing on the *last* open question fixes both. You settle three questions
+  // and one run starts, when the feature has every answer it was waiting for.
+  // Answer a fourth later and it starts again, which is correct: there is new
+  // information and the feature has not been read against it.
+  const after = buildPlanTree(await loadPlan(supabase, user.id));
+  const answered = findNode(after, id.data);
+  if (!answered) return { message: 'Answered.' };
+
+  const feature = featureOf(after, answered);
+  const stillOpen = flatten([feature]).filter(
+    (step) => step.kind === 'decision' && !isClosed(step.status),
+  ).length;
+
+  if (stillOpen > 0) {
+    return {
+      message: `Answered. ${stillOpen} more ${stillOpen === 1 ? 'question' : 'questions'} under #${feature.number}; the re-shape starts when the last one is answered.`,
+    };
+  }
+  if (feature.status === 'proposed' || feature.children.length === 0) {
+    return { message: 'Answered.' };
+  }
+
+  // A re-shape that will not start loses nothing: the answer is already
+  // recorded, and the button is still there.
+  const started = await startReshape(after, feature);
+  return {
+    message: started.ok
+      ? `Answered, and re-shaping #${feature.number} against everything settled under it. What comes back is proposed.`
+      : `Answered. The re-shape did not start: ${started.error}`,
+  };
 }
 
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
@@ -794,6 +857,52 @@ export async function sendPlanFeatureToClaude(
  * It refuses a proposal -- there is nothing agreed there to adapt -- and a leaf
  * step, which has nothing beneath it to re-read.
  */
+/**
+ * The feature a step belongs to: the highest step above it, or itself.
+ *
+ * A re-shape reads a whole feature, so a decision three levels down still
+ * sends the top of its tree.
+ */
+function featureOf(sections: readonly PlanSection[], node: PlanNode): PlanNode {
+  const ancestors = ancestorsOf(sections, node.id);
+  return ancestors[0] ?? node;
+}
+
+/**
+ * Start a re-shape of one feature.
+ *
+ * Shared by the button and by the last answer, so both send the same
+ * instruction and a change to it cannot apply to only one of them.
+ */
+async function startReshape(
+  sections: readonly PlanSection[],
+  node: PlanNode,
+): Promise<FireRoutineResult> {
+  const text =
+    `Re-shape plan feature #${node.number}, "${node.title}", following ` +
+    '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
+    'feature against every answer settled beneath it and against what the code now says, ' +
+    'and write what has changed.\n\n' +
+    'Three moves, and nothing else:\n' +
+    '- Fog the answers have made specifiable becomes proposed steps beneath the feature, ' +
+    'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
+    '(plan.ts fog <n> --clear).\n' +
+    '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
+    'that did it. A re-shape may drop, and must say why.\n' +
+    '- A question an answer surfaced is written as a fresh decision beneath the feature, ' +
+    'with its real options, what each costs, and your recommendation.\n\n' +
+    'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
+    'answer a decision, do not start or build a step, and do not re-propose something the ' +
+    'feature already holds. Report what you proposed, what you dropped and why, and what ' +
+    'fog you cleared.\n\nThe brief is below; it is the plan as the app holds it right ' +
+    'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
+    'beneath this feature.\n\n' +
+    planBrief(sections, node);
+
+  const routine = planRoutine();
+  return fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text });
+}
+
 export async function reshapePlanFeature(
   _prev: PlanActionState,
   formData: FormData,
@@ -824,33 +933,7 @@ export async function reshapePlanFeature(
     (step) => step.kind === 'decision' && step.status === 'done' && step.resolution,
   ).length;
 
-  const text =
-    `Re-shape plan feature #${node.number}, "${node.title}", following ` +
-    '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
-    'feature against every answer settled beneath it and against what the code now says, ' +
-    'and write what has changed.\n\n' +
-    'Three moves, and nothing else:\n' +
-    '- Fog the answers have made specifiable becomes proposed steps beneath the feature, ' +
-    'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
-    '(plan.ts fog <n> --clear).\n' +
-    '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
-    'that did it. A re-shape may drop, and must say why.\n' +
-    '- A question an answer surfaced is written as a fresh decision beneath the feature, ' +
-    'with its real options, what each costs, and your recommendation.\n\n' +
-    'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
-    'answer a decision, do not start or build a step, and do not re-propose something the ' +
-    'feature already holds. Report what you proposed, what you dropped and why, and what ' +
-    'fog you cleared.\n\nThe brief is below; it is the plan as the app holds it right ' +
-    'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
-    'beneath this feature.\n\n' +
-    planBrief(sections, node);
-
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
-    text,
-  });
+  const result = await startReshape(sections, node);
   if (!result.ok) return { error: result.error };
   return {
     message:

@@ -102,6 +102,34 @@ with `scripts/plan.ts approve`.
 
 ## Decisions and fog
 
+### When a re-shape starts
+
+Answering the **last** open question under a feature starts one. Not every
+answer: three questions settled in one sitting used to mean either three runs
+racing each other, or a button nobody pressed. Waiting for the last one gives
+one run, started when the feature has every answer it was waiting for. Answer
+a fourth later and another starts, which is right, because there is new
+information the feature has not been read against.
+
+The **Re-shape** button still exists for a feature with no open questions, or
+one whose code has moved on since it was written.
+
+A re-shape that will not start costs nothing. The answer is recorded by its
+own action first, so a routine that is unreachable loses an answer only from
+the run, never from the plan.
+
+### Fog and finishing
+
+`done` refuses a step that still carries fog, on the page and in the CLI.
+Fog says part of the step was never specified; a finished step carrying that
+admission is work nobody will look at again. Write the steps the patch covers,
+or clear it, then close. `blocked` and `dropped` are unaffected: neither
+claims the step is complete.
+
+The plan page counts fog in the strip at the top and has a **Not specified**
+view. Closed steps are in it, because a shipped feature still carrying fog is
+the case worth seeing.
+
 Two things a proposal could not say until migration 0054, both borrowed from
 the wayfinder planning skill. They exist because of what a shaping session
 does when it hits the edge of what it knows: it picks an answer and writes

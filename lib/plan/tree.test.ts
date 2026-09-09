@@ -490,6 +490,7 @@ describe('summarize', () => {
       ready: 1,
       done: 1,
       claude: 2,
+      fog: 0,
     });
   });
 });
@@ -602,5 +603,31 @@ describe('the On you view', () => {
   it('leaves out a question already answered', () => {
     const ids = flattenSections(applyView(sections, 'you')).map((node) => node.id);
     expect(ids).not.toContain('q2');
+  });
+});
+
+describe('fog on the frontier', () => {
+  it('counts every step carrying fog, closed ones included', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'shipped', number: 1, status: 'done', fog: 'the reviewing is not settled' }),
+        item({ id: 'live', number: 2, status: 'not_started', fog: 'unclear where it lands' }),
+        item({ id: 'clear', number: 3, status: 'not_started' }),
+      ],
+      dependencies: [],
+    });
+    expect(summarize(sections).fog).toBe(2);
+  });
+
+  it('the fog view keeps a finished step that never had its gap filled', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'shipped', number: 1, status: 'done', fog: 'still open' }),
+        item({ id: 'clear', number: 2, status: 'done' }),
+      ],
+      dependencies: [],
+    });
+    const shown = flattenSections(applyView(sections, 'fog'));
+    expect(shown.map((node) => node.number)).toEqual([1]);
   });
 });
