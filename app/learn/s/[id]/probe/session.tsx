@@ -69,6 +69,12 @@ function AnswerButton({ index, label, disabled }: { index: number; label: string
       value={index}
       disabled={pending || disabled}
       className={cn(
+        // ui-ok: hand-rolled-box -- a control's own frame, not a frame around
+        // a group. Law 11 is about a border standing in for space, alignment
+        // or a ground; the edge of an answer option is the option. The shared
+        // Button does not fit: this is full width, left aligned, and wraps to
+        // as many lines as the answer needs, where Button is centred on one
+        // line at the dial's height. Same call as components/todo/task-form.
         'w-full rounded-control border border-border px-4 py-3 text-left text-body text-ink',
         'hover:border-accent hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-70',
       )}
