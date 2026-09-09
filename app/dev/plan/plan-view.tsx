@@ -1599,6 +1599,24 @@ function PlanRow({
                   </span>
                 </span>
               )}
+              {/* Whose it is, on the row.
+                * The "Who" column was dropped for being a column of dashes,
+                * and it was right to go -- but with it went any way of seeing
+                * that a step is Claude's without opening it, hovering it, or
+                * switching to the Claude's view. Handing a step over is the
+                * move this page exists to make, and the page said nothing
+                * about the result. A mark, not a column: it appears only on
+                * the steps that have been handed over, which is what makes it
+                * worth reading. */}
+              {node.assignee === 'claude' && (
+                <span
+                  title="Handed to Claude"
+                  className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
+                >
+                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Handed to Claude</span>
+                </span>
+              )}
             </span>
             {gloss && !open && (
               <span className="block truncate text-small text-ink-muted">
@@ -1643,9 +1661,10 @@ function PlanRow({
 
         {/* No "Who" column. It was a column of dashes with the occasional
             "Claude" in it -- one fact, on a plan whose every step is yours
-            unless you hand it over, and handing it over is a button. Who has
-            it is still on the open step, in the summary's "Claude's" view,
-            and in the menu that changes it. */}
+            unless you hand it over, and handing it over is a button. The one
+            value it carried is now a mark beside the title, on the steps that
+            have it; the rest is on the open step, in the summary's "Claude's"
+            view, and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
         </span>
