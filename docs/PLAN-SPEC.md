@@ -17,6 +17,12 @@ picked up next.
 
 The plan began as `docs/BUILD-ORDER.md` and the per-module specs, and was
 seeded from them once (migration 0051, the *Import the build order* button).
+The seed itself, `lib/plan/seed.ts`, is still read: opening the page brings in
+any step in it that has never been offered to this account, recorded in
+`plan_seed_imports` (migration 0055). Offered once is the whole rule — delete a
+step you decided against and it stays deleted, and nothing already in the plan
+is touched. That is only for steps that come from the repository; steps written
+here or through `scripts/plan.ts` never go near it.
 The documents remain the record of *why* each step is where it is. They are
 not read at runtime and are not kept in sync: the app is the working copy,
 and the two are expected to drift. Migration 0052 made the flat list a tree
