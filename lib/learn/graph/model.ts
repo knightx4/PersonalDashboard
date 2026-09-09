@@ -1,0 +1,212 @@
+/**
+ * The graph, as the screens see it.
+ *
+ * Pure types and pure functions over them, with no client and no model call
+ * anywhere near. The rules here decide what a person is shown, and they are
+ * the part of this module most likely to be quietly wrong -- a view that shows
+ * thirty nodes when it should show four is not an error, it is just useless --
+ * so they are written where they can be tested against a graph built by hand.
+ */
+
+export const KNOWLEDGE_STATES = ['unknown', 'shaky', 'known', 'misconception'] as const;
+export type KnowledgeState = (typeof KNOWLEDGE_STATES)[number];
+
+export const STATE_BASES = ['tested', 'inferred', 'declared'] as const;
+export type StateBasis = (typeof STATE_BASES)[number];
+
+export type Concept = {
+  id: string;
+  name: string;
+  /** The claim itself. What a probe question would be written against. */
+  claim: string;
+  /** How this node came to be believed to belong here. */
+  basis: string;
+  state: KnowledgeState;
+  /** How the state was established. Weaker than the state itself, and shown. */
+  established: StateBasis;
+  /** Named when the state is `misconception`, null otherwise. */
+  misconception: string | null;
+  testedAt: string | null;
+};
+
+export type ConceptEdge = {
+  prerequisiteId: string;
+  dependentId: string;
+};
+
+export type Graph = {
+  concepts: Concept[];
+  edges: ConceptEdge[];
+};
+
+/**
+ * Settled means `known`, and nothing else.
+ *
+ * `shaky` is not a weak yes, it is a no with evidence, and `misconception` is
+ * the strongest possible no -- something is actively steering you wrong there.
+ * Treating either as settled would prune away exactly the nodes worth working
+ * on, which is the one mistake this file must not make.
+ */
+export function isSettled(concept: Concept): boolean {
+  return concept.state === 'known';
+}
+
+function byId(graph: Graph): Map<string, Concept> {
+  return new Map(graph.concepts.map((concept) => [concept.id, concept]));
+}
+
+/** dependent → its prerequisites. */
+export function prerequisiteMap(graph: Graph): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const concept of graph.concepts) map.set(concept.id, []);
+  for (const edge of graph.edges) {
+    const list = map.get(edge.dependentId);
+    // An edge naming a concept that is not in this graph is skipped rather
+    // than invented: a partial read is a real thing here, and a phantom node
+    // would break the walk in a way nobody could see.
+    if (list && map.has(edge.prerequisiteId)) list.push(edge.prerequisiteId);
+  }
+  return map;
+}
+
+/** prerequisite → the things that depend on it. */
+export function dependentMap(graph: Graph): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const concept of graph.concepts) map.set(concept.id, []);
+  for (const edge of graph.edges) {
+    const list = map.get(edge.prerequisiteId);
+    if (list && map.has(edge.dependentId)) list.push(edge.dependentId);
+  }
+  return map;
+}
+
+/**
+ * What a view of this goal should show.
+ *
+ * The rule from the spec: only the nodes on a path from something you already
+ * know to that goal. Read backwards from the goal, through unsettled nodes
+ * only, which is exactly that -- a node is kept when some chain of unsettled
+ * nodes runs from it to the goal.
+ *
+ * Two things fall out of it, and both are the point:
+ *
+ *   A node you know is never shown, because it cannot be on a chain of
+ *   unsettled nodes.
+ *
+ *   Everything underneath a node you know disappears with it, unless it has
+ *   another route to the goal that is still unsettled. That is the answer to
+ *   "how do I avoid being shown thirty things I already know": knowing one
+ *   node above them prunes all of them at once, and a node that genuinely
+ *   still matters for some other reason survives because that other route is
+ *   still open.
+ *
+ * The goal itself is included when it is unsettled, and the whole thing is
+ * empty when the goal is already known -- which is the honest answer to "what
+ * is left for this goal": nothing.
+ */
+export function pruneForGoal(graph: Graph, goalId: string): string[] {
+  const concepts = byId(graph);
+  const prerequisites = prerequisiteMap(graph);
+
+  const goal = concepts.get(goalId);
+  if (!goal || isSettled(goal)) return [];
+
+  const kept = new Set<string>([goalId]);
+  const queue = [goalId];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const prerequisiteId of prerequisites.get(current) ?? []) {
+      if (kept.has(prerequisiteId)) continue;
+      const prerequisite = concepts.get(prerequisiteId);
+      // A settled node ends the chain. It is not shown, and neither is
+      // anything reachable only through it.
+      if (!prerequisite || isSettled(prerequisite)) continue;
+      kept.add(prerequisiteId);
+      queue.push(prerequisiteId);
+    }
+  }
+
+  return [...kept];
+}
+
+/**
+ * The order they would be learned in.
+ *
+ * A topological walk of whichever nodes were asked for, prerequisites first,
+ * broken ties by name so the same graph always renders the same way. The graph
+ * is acyclic because the database refuses anything else; if a cycle ever did
+ * get in, the nodes it contains are appended rather than dropped, because a
+ * screen missing a node silently is worse than one showing it out of order.
+ */
+export function learningOrder(graph: Graph, ids: string[]): Concept[] {
+  const wanted = new Set(ids);
+  const concepts = byId(graph);
+  const prerequisites = prerequisiteMap(graph);
+
+  const remaining = new Map<string, number>();
+  for (const id of wanted) {
+    const count = (prerequisites.get(id) ?? []).filter((p) => wanted.has(p)).length;
+    remaining.set(id, count);
+  }
+
+  const dependents = dependentMap(graph);
+  const nameOf = (id: string) => concepts.get(id)?.name ?? id;
+
+  const ready = [...remaining.entries()]
+    .filter(([, count]) => count === 0)
+    .map(([id]) => id)
+    .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+
+  const ordered: string[] = [];
+  while (ready.length > 0) {
+    const id = ready.shift()!;
+    ordered.push(id);
+    remaining.delete(id);
+
+    const freed: string[] = [];
+    for (const dependentId of dependents.get(id) ?? []) {
+      if (!remaining.has(dependentId)) continue;
+      const left = (remaining.get(dependentId) ?? 1) - 1;
+      remaining.set(dependentId, left);
+      if (left === 0) freed.push(dependentId);
+    }
+
+    for (const id of freed.sort((a, b) => nameOf(a).localeCompare(nameOf(b)))) ready.push(id);
+  }
+
+  // Anything left is in a cycle, which the database should have made
+  // impossible. Shown at the end rather than dropped.
+  for (const id of remaining.keys()) ordered.push(id);
+
+  return ordered.map((id) => concepts.get(id)).filter((c): c is Concept => c !== undefined);
+}
+
+/**
+ * What could be started right now.
+ *
+ * The nodes in a pruned view with nothing unsettled underneath them: every
+ * prerequisite is either settled or outside this view. "The one next thing
+ * worth learning" is the first of these in learning order.
+ */
+export function readyNow(graph: Graph, ids: string[]): Concept[] {
+  const wanted = new Set(ids);
+  const prerequisites = prerequisiteMap(graph);
+  const ready = ids.filter((id) => (prerequisites.get(id) ?? []).every((p) => !wanted.has(p)));
+  return learningOrder(graph, ready);
+}
+
+export type SubjectCounts = Record<KnowledgeState, number> & { total: number };
+
+/** How much of a subject is settled. One line on the subjects list. */
+export function countStates(graph: Graph): SubjectCounts {
+  const counts: SubjectCounts = {
+    unknown: 0,
+    shaky: 0,
+    known: 0,
+    misconception: 0,
+    total: graph.concepts.length,
+  };
+  for (const concept of graph.concepts) counts[concept.state] += 1;
+  return counts;
+}
