@@ -2,6 +2,7 @@ import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/p
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
+import DevUiPage from '@/app/dev/ui/page';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewList } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
@@ -755,6 +756,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelineBoard rows={pipelineRows} view="board" />,
+  },
+  {
+    /* The design language, held to itself. It is the one surface where being
+     * wrong is self-refuting, and it is the surface most likely to drift,
+     * because it is written in prose and prose does not fail a type check. */
+    id: 'dev-ui',
+    label: 'UI · the design language',
+    module: 'dev',
+    width: 'wide',
+    render: () => <DevUiPage />,
   },
   {
     /* The review tool, reviewed by itself. Circular on purpose: the frames it
