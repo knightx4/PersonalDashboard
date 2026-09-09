@@ -7,6 +7,7 @@ import {
   sanitiseResolution,
   type ResolvedSource,
 } from '@/lib/learn/import/resolve-payload';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
  * Finding something to read about a subject you wrote down.
@@ -102,6 +103,8 @@ export async function suggestSources(input: {
   question?: string | null;
   anthropicApiKey: string;
   client?: Anthropic;
+  /** Told what the call cost, before anything is made of what it returned. */
+  onSpend?: SpendSink;
 }): Promise<SuggestResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
@@ -173,6 +176,10 @@ export async function suggestSources(input: {
       detail: error instanceof Error ? error.message : 'The search failed.',
     };
   }
+
+  // Before the response is judged. A search that came back useless still cost
+  // what it cost, and those are the calls worth seeing on the spend screen.
+  input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {

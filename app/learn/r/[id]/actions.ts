@@ -8,6 +8,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadReading } from '@/lib/learn/tracks/load';
 import { locatePassage } from '@/lib/learn/locate/locate';
 import { suggestSources } from '@/lib/learn/import/suggest';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
   attachSourceToReading,
@@ -43,7 +44,7 @@ export type FindState = {
  * minutes at the moment you were finally going to read something.
  */
 export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
-  await requireUser();
+  const user = await requireUser();
 
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
   if (!readingId.success) return { error: 'Could not work out which one to search for.' };
@@ -55,11 +56,14 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
   const reading = await loadReading(supabase, readingId.data);
   if (!reading) return { error: 'That is not there any more.' };
 
+  const spend = collectSpend();
   const result = await suggestSources({
     subject: reading.subject,
     question: reading.trackQuestion,
     anthropicApiKey: apiKey,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'suggest-sources', spend.reports);
 
   if (!result.ok) return { error: result.detail };
   return { candidates: result.sources };
@@ -213,7 +217,7 @@ export async function updateNote(
  * sent to the top of the right page is the floor, not an error.
  */
 export async function openReading(formData: FormData): Promise<void> {
-  await requireUser();
+  const user = await requireUser();
 
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
   if (!readingId.success) redirect('/learn');
@@ -235,11 +239,14 @@ export async function openReading(formData: FormData): Promise<void> {
     redirect(url);
   }
 
+  const spend = collectSpend();
   const outcome = await locatePassage({
     url: reading.source?.canonicalUrl ?? url,
     question: reading.trackQuestion,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'locate-passage', spend.reports);
 
   await setReadingLocation(supabase, reading.id, outcome).catch(() => {});
   if (reading.status === 'queued') {

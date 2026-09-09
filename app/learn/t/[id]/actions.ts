@@ -13,6 +13,7 @@ import {
   type PlanSaveRow,
 } from '@/lib/learn/tracks/save';
 import { planTopic } from '@/lib/learn/import/plan-topic';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { planStepSchema, type PlanStep } from '@/lib/learn/import/plan-payload';
 import { loadTrack } from '@/lib/learn/tracks/load';
 
@@ -136,7 +137,7 @@ export type PlanState = {
  * without a look is a queue of things somebody else decided you should read.
  */
 export async function planTrack(_prev: PlanState, formData: FormData): Promise<PlanState> {
-  await requireUser();
+  const user = await requireUser();
 
   const trackId = z.string().uuid().safeParse(formData.get('trackId'));
   if (!trackId.success) return { error: 'Could not work out which topic to plan.' };
@@ -148,11 +149,14 @@ export async function planTrack(_prev: PlanState, formData: FormData): Promise<P
   const track = await loadTrack(supabase, trackId.data);
   if (!track) return { error: 'That topic is not there any more.' };
 
+  const spend = collectSpend();
   const result = await planTopic({
     topic: track.title,
     question: track.question,
     anthropicApiKey: apiKey,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'plan-topic', spend.reports);
 
   if (!result.ok) return { error: result.detail };
   return { steps: result.steps };

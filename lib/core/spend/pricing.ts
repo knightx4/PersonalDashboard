@@ -114,3 +114,20 @@ export function totalMicros(costs: (number | null)[]): { micros: number; unprice
   }
   return { micros, unpriced };
 }
+
+/** One call's worth of spend, on its way to the ledger. */
+export type SpendReport = { model: string; usage: TokenUsage };
+
+/**
+ * Where a library function hands back what its call cost.
+ *
+ * A callback rather than a return value, because the functions that spend are
+ * the ones whose return type already carries a result the caller cares about,
+ * and threading a second concern through every union member of every one of
+ * them would make the interesting type harder to read to serve the boring
+ * concern. It also fires whether or not the call went on to produce anything
+ * usable: a response that came back malformed still cost what it cost, and a
+ * ledger that quietly omits the failures understates the bill in exactly the
+ * case you would want to see.
+ */
+export type SpendSink = (report: SpendReport) => void;

@@ -7,6 +7,7 @@ import {
   stepsWithSource,
   type PlanStep,
 } from '@/lib/learn/import/plan-payload';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
  * Turning a topic you named into a route through it.
@@ -128,6 +129,8 @@ export async function planTopic(input: {
   question?: string | null;
   anthropicApiKey: string;
   client?: Anthropic;
+  /** Told what the call cost, before anything is made of what it returned. */
+  onSpend?: SpendSink;
 }): Promise<PlanResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
@@ -184,6 +187,10 @@ export async function planTopic(input: {
       detail: error instanceof Error ? error.message : 'The search failed.',
     };
   }
+
+  // Before the response is judged: a plan that came back malformed still cost
+  // what it cost, and hiding that understates the bill exactly where it hurts.
+  input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {

@@ -83,6 +83,45 @@ describe('when it plans the topic', () => {
   });
 });
 
+describe('what it reports spending', () => {
+  it('reports the model and the tokens the call used', async () => {
+    const client = {
+      messages: {
+        create: vi.fn().mockResolvedValue({
+          content: [{ type: 'tool_use', name: 'report_plan', input: { steps: [{ subject: 'One', source: SOURCE }] } }],
+          usage: { input_tokens: 900, output_tokens: 120, cache_read_input_tokens: 4000 },
+        }),
+      },
+    };
+
+    const reports: { model: string; usage: { inputTokens: number } }[] = [];
+    await planTopic({
+      topic: 'central banking',
+      anthropicApiKey: 'test',
+      client: client as never,
+      onSpend: (report) => reports.push(report),
+    });
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0].model).toBe('claude-opus-5');
+    expect(reports[0].usage.inputTokens).toBe(900);
+  });
+
+  it('reports a call whose plan came back malformed, since it still cost that', async () => {
+    // The ledger that omits the failures understates the bill in exactly the
+    // case somebody would want to see it.
+    const reports: unknown[] = [];
+    await planTopic({
+      topic: 'central banking',
+      anthropicApiKey: 'test',
+      client: clientReturning({ steps: [{ subject: '' }] }),
+      onSpend: (report) => reports.push(report),
+    });
+
+    expect(reports).toHaveLength(1);
+  });
+});
+
 describe('when it cannot', () => {
   it('says a vague topic is vague rather than guessing at one', async () => {
     const result = await ask(clientReturning({ too_vague: true, steps: [] }));
