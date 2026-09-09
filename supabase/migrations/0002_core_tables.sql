@@ -19,7 +19,7 @@ create table profiles (
   avatar_url text,
   -- so "this month" means the user's month, not the server's
   timezone text not null default 'UTC',
-  -- Phase 2 fields, created now so Phase 2 needs no migration
+  -- anti-spending layer fields (docs/BUILD-ORDER.md step 19), created now so it needs no migration
   monthly_budget_cents int,
   default_cooldown_days int not null default 7,
   onboarding_completed_at timestamptz,
@@ -232,7 +232,7 @@ create index inventory_fp_loose_idx on inventory_items (fingerprint_loose);
 create index inventory_name_trgm_idx on inventory_items using gin (name gin_trgm_ops);
 
 -- ---------------------------------------------------------------------------
--- item_uses (Phase 2, created now so cost-per-use needs no migration)
+-- item_uses (anti-spending layer, created now so cost-per-use needs no migration)
 -- ---------------------------------------------------------------------------
 create table item_uses (
   id uuid primary key default gen_random_uuid(),
@@ -326,7 +326,7 @@ create index saved_items_user_status_idx on saved_items (user_id, status);
 create index saved_items_fp_loose_idx on saved_items (fingerprint_loose);
 
 -- ---------------------------------------------------------------------------
--- price_checks (Phase 2)
+-- price_checks (anti-spending layer; docs/BUILD-ORDER.md step 19)
 -- ---------------------------------------------------------------------------
 create table price_checks (
   id uuid primary key default gen_random_uuid(),

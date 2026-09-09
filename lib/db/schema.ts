@@ -184,7 +184,7 @@ export const profiles = pgTable('profiles', {
   timezone: text('timezone').notNull().default('UTC'),
   /** Preferred currency for dashboard / list display (orders keep native). */
   displayCurrency: text('display_currency').notNull().default('USD'),
-  /** Phase 2. Present now so Phase 2 needs no migration. */
+  /** The anti-spending layer (docs/BUILD-ORDER.md step 19). Present now so it needs no migration. */
   monthlyBudgetCents: integer('monthly_budget_cents'),
   defaultCooldownDays: integer('default_cooldown_days').notNull().default(7),
   onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
@@ -814,7 +814,8 @@ export const inventoryItemLists = pgTable(
   ],
 );
 
-/** Phase 2. Empty until then, but present so cost-per-use needs no migration. */
+/** The anti-spending layer (docs/BUILD-ORDER.md step 19). Empty until then, but present so
+ * cost-per-use needs no migration. */
 export const itemUses = pgTable(
   'item_uses',
   {
@@ -903,7 +904,7 @@ export const savedItems = pgTable(
   ],
 );
 
-/** Phase 2. */
+/** The anti-spending layer (docs/BUILD-ORDER.md step 19). */
 export const priceChecks = pgTable(
   'price_checks',
   {

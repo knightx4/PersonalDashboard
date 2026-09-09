@@ -32,7 +32,7 @@ A pipeline tracker for a job search that maintains itself from your inbox, and a
 
 Two things make it different from Huntr, Teal, and Simplify. Those tools require you to log every application by hand or through a browser extension at the moment you apply, and they treat writing as a separate resume-optimization product. Here, the confirmation email is the log entry: applying creates the record whether or not you remembered to. And the writing side is backed by a persistent, growing store of your actual experience and your previously approved answers, so the fiftieth application costs less effort than the fifth rather than more.
 
-**Positioning:** the MVP is a pipeline tracker that stays current without manual upkeep. The writing layer is Phase 2, since re-planned as [the evidence layer](EVIDENCE-LAYER.md). The schema below carries almost every table it needs: the matching layer adds columns to `roles`, and nothing else there requires a migration.
+**Positioning:** the MVP is a pipeline tracker that stays current without manual upkeep. The writing layer has been re-planned as [the evidence layer](EVIDENCE-LAYER.md). The schema below carries almost every table it needs, but the claim it was written with — that none of this needs a migration — no longer holds: the matching layer adds columns to `roles`, and interview prep adds them to `interviews`.
 
 **Scope:** this is a personal tool first, with the same multi-user foundation as Shopping Manager, for the same reason. Proper auth and row level security from day one costs about a day and retrofitting them costs a rewrite. If you never let anyone else in, you have lost a day. If you do, everything already works.
 

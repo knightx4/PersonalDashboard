@@ -637,7 +637,8 @@ order. They are not tasks and cannot be completed — the deadline stops
 mattering when the return exists or the date passes, and both of those are facts
 the shopping side already derives.
 
-`saved_items.cooldown_until` is Phase 2 on the shopping side and waits for it.
+`saved_items.cooldown_until` belongs to the anti-spending layer on the shopping
+side ([BUILD-ORDER.md](BUILD-ORDER.md) step 19) and waits for it.
 
 ## Account settings, and module settings
 
