@@ -639,10 +639,20 @@ export async function sendPlanItemToClaude(
   const node = findNode(sections, id.data);
   if (!node) return { error: 'That step no longer exists.' };
 
-  if (node.assignee !== 'claude') {
+  // Handed over and underway, in the one write. A step sent to Claude is being
+  // built from the moment the routine wakes, and a plan still reading "not
+  // started" while a session works it is the plan lying about itself -- the one
+  // thing it is not allowed to do. `started_at` comes from the trigger, so the
+  // page can also say how long it has been going.
+  const patch: Record<string, string> = {};
+  if (node.assignee !== 'claude') patch.assignee = 'claude';
+  // Only a step nobody has started moves. A blocked one keeps its status and
+  // its reason, and one already underway keeps the clock it started on.
+  if (node.status === 'not_started') patch.status = 'in_progress';
+  if (Object.keys(patch).length > 0) {
     const { error } = await supabase
       .from('plan_items')
-      .update({ assignee: 'claude' })
+      .update(patch)
       .eq('id', node.id)
       .eq('user_id', user.id);
     if (error) return { error: error.message };
