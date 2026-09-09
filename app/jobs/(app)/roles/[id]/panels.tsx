@@ -339,7 +339,16 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
 
   return (
     <div className="mt-8 border-t border-border pt-4">
+      {/* A sentence, because the button on its own was a grey line floating
+        * under the page with nothing to say when it applied. "Remove it" is
+        * unanswerable without knowing what *it* is -- and the confirm's own
+        * prompt, which does explain, only appears after you have pressed the
+        * thing you were unsure about. */}
+      <p className="text-small text-ink-muted">
+        An advert the scan mistook for a confirmation, or a role you never went for.
+      </p>
       <ConfirmStep
+        className="mt-1"
         align="start"
         prompt="Remove this pursuit? The role goes with it, and the company too if nothing else is attached to it. Any mail that created it is marked not relevant, so the next sync will not bring it back."
         confirmLabel="Yes, remove it"
@@ -493,8 +502,7 @@ function Todos({
         <ul className="mb-3 space-y-2">
           {todos.map((todo) => (
             <li key={todo.id} className="text-ui">
-              <TodoLine todo={todo} timezone={timezone} />
-              <TodoMail todo={todo} messages={messages} timezone={timezone} />
+              <TodoLine todo={todo} messages={messages} timezone={timezone} />
             </li>
           ))}
         </ul>
@@ -580,9 +588,11 @@ function dueDateInput(iso: string): string {
  */
 function TodoLine({
   todo,
+  messages,
   timezone,
 }: {
   todo: PanelProps['todos'][number];
+  messages: PanelProps['messages'];
   timezone: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -602,13 +612,33 @@ function TodoLine({
 
   if (!editing) {
     return (
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="tabular text-ink-muted">{formatDate(todo.dueAt, timezone)}</span>
-        <span className="text-ink">{todo.body}</span>
-        <Button type="button" size="sm" variant="ghost" onClick={open}>
-          Edit
-        </Button>
-        <ReminderActions id={todo.id} />
+      /* The to-do first, its date after it, the two answers at the end.
+       *
+       * It used to be a date column, then the words, then Edit, then Later,
+       * then Done, then "Link an email" underneath -- three lines for one
+       * to-do at 390px, because `ReminderActions` pushes itself right with
+       * `ml-auto` and a fixed-width date column had already spent a third of
+       * the row. The date is metadata about the sentence, not a column heading
+       * for it, so it reads small and after it, the way every other date in
+       * this module does.
+       *
+       * Below `sm` the sentence keeps the whole line and the buttons take the
+       * next one. Sharing a line with them only meant the to-do broke across
+       * two lines around them, which is a worse two lines than these. */
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="min-w-0 basis-full text-ink sm:basis-auto sm:flex-1">
+          {todo.body}
+          <span className="tabular ml-2 text-small text-ink-muted">
+            {formatDate(todo.dueAt, timezone)}
+          </span>
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          <Button type="button" size="sm" variant="ghost" onClick={open}>
+            Edit
+          </Button>
+          <ReminderActions id={todo.id} />
+        </span>
+        <TodoMail todo={todo} messages={messages} timezone={timezone} offer={false} />
       </div>
     );
   }
@@ -647,6 +677,7 @@ function TodoLine({
         Cancel
       </Button>
       {error && <span className="text-small text-danger">{error}</span>}
+      <TodoMail todo={todo} messages={messages} timezone={timezone} offer />
     </div>
   );
 }
@@ -666,10 +697,20 @@ function TodoMail({
   todo,
   messages,
   timezone,
+  offer,
 }: {
   todo: PanelProps['todos'][number];
   messages: PanelProps['messages'];
   timezone: string;
+  /**
+   * Whether to offer linking one when there is none. Off in the row: an
+   * unlinked to-do was printing "Link an email" underneath itself forever,
+   * which is a whole third line spent saying that nothing is there. It is
+   * offered where the rest of the to-do is corrected instead -- under Edit,
+   * beside the wording and the date, which is where you already are when you
+   * want to attach the mail it came from.
+   */
+  offer: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -685,7 +726,7 @@ function TodoMail({
 
   if (todo.message) {
     return (
-      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 pl-0.5 text-small text-ink-muted">
+      <p className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-small text-ink-muted">
         <Mail className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         {todo.message.gmailHref ? (
           <GmailLink href={todo.message.gmailHref}>
@@ -709,17 +750,11 @@ function TodoMail({
     );
   }
 
-  if (messages.length === 0) return null;
+  if (!offer || messages.length === 0) return null;
 
   if (!picking) {
     return (
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        className="mt-0.5"
-        onClick={() => setPicking(true)}
-      >
+      <Button type="button" size="sm" variant="ghost" onClick={() => setPicking(true)}>
         Link an email
       </Button>
     );
@@ -2527,13 +2562,27 @@ function RoundMail({
 
   return (
     <div className="mt-3">
-      <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-        Emails about this round
-      </h4>
+      {/* The heading and the way to add one share a line, and a round with no
+          mail on it says so by having nothing under that line.
+          It used to be three: the heading, then "None named yet.", then "Add
+          an email" -- three lines to report an absence, on a tab where a round
+          with one phone screen in it already runs past the fold. */}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+          Emails about this round
+        </h4>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+          >
+            Add an email
+          </button>
+        )}
+      </div>
 
-      {linked.length === 0 ? (
-        <p className="mt-1 text-small text-ink-muted">None named yet.</p>
-      ) : (
+      {linked.length > 0 && (
         <ul className="mt-1 space-y-0.5">
           {linked.map((message) => (
             <li key={message.id} className="flex items-baseline gap-2 text-small">
@@ -2563,8 +2612,8 @@ function RoundMail({
         </ul>
       )}
 
-      {adding ? (
-        available.length > 0 ? (
+      {adding &&
+        (available.length > 0 ? (
           <Select
             aria-label="Add an email to this round"
             defaultValue=""
@@ -2596,16 +2645,7 @@ function RoundMail({
               ? 'No mail is linked to this pursuit yet.'
               : 'Every linked email is already on this round.'}
           </p>
-        )
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="mt-1 text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-        >
-          Add an email
-        </button>
-      )}
+        ))}
 
       {error && <p className="mt-1 text-small text-danger">{error}</p>}
     </div>
@@ -2807,7 +2847,11 @@ function InterviewCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-3">
+      {/* Wrapping, because at 390px this row does not fit and without it the
+          links broke mid-phrase instead: "Move it to its own / round" and "Not
+          a real round — remove / it", each centred over two lines. A row that
+          wraps puts each of them on a line whole. */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         {/* Only where there is a field to save. A custom note saves itself. */}
         {(showPrep || showDebrief) && (
           <Button

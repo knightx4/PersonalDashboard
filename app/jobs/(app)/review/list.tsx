@@ -183,11 +183,23 @@ function MessageRow({
 
   return (
     <>
-      <header className="flex flex-wrap items-baseline gap-2">
+      {/*
+        * The subject takes the line; everything that classifies it goes under.
+        *
+        * All three of these headers were chip, title, badge, date on one
+        * `flex-wrap` row, and the title was the only `flex-1 min-w-0` item in
+        * it -- so it never wrapped, it shrank. At 390px that left a company
+        * called "Starli...", five characters of the only thing on the row that
+        * says which pursuit this is, so that a chip, a status badge and a year
+        * could all be read in full. `order-first` + `w-full` below `sm` gives
+        * the identity the line and lets the labels wrap beneath it; from `sm`
+        * up nothing changes at all.
+        */}
+      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="rounded-full bg-canvas px-2 py-0.5 text-micro font-medium text-ink-muted">
           {classificationLabel(row.classification)}
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
+        <h3 className="order-first w-full min-w-0 truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.subject ?? '(no subject)'}
         </h3>
         <span className="tabular text-small text-ink-muted">
@@ -496,11 +508,12 @@ function ApplicationRow({
 
   return (
     <>
-      <header className="flex flex-wrap items-baseline gap-2">
+      {/* Identity first below `sm`; see the note on the message header. */}
+      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-medium text-accent">
           Created from email
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
+        <h3 className="order-first w-full min-w-0 truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.companyName} · {row.roleTitle}
         </h3>
         <StatusBadge status={row.status as ApplicationStatus} everSubmitted={row.submittedAt !== null} />
@@ -586,11 +599,12 @@ function EventRow({
 
   return (
     <>
-      <header className="flex flex-wrap items-baseline gap-2">
+      {/* Identity first below `sm`; see the note on the message header. */}
+      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-ink">
           Arrived after it closed
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
+        <h3 className="order-first w-full min-w-0 truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.companyName} · {row.roleTitle}
         </h3>
         <StatusBadge status={row.status as ApplicationStatus} />

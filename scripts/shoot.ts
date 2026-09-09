@@ -69,13 +69,22 @@ async function main() {
     CHROME,
     [
       '--headless=new',
+      // The browser's locale, not the page's. A `type="date"` input takes its
+      // format from the browser UI language and ignores `<html lang>` -- so a
+      // default headless Chromium drew every date field as `mm/dd/yyyy` and
+      // sent a reader hunting for a US-format bug in an app that has none.
+      // en-GB is where this app is used; it makes the shots honest.
+      '--lang=en-GB',
       `--remote-debugging-port=${PROBE}`,
       '--no-sandbox',
       '--disable-gpu',
       '--hide-scrollbars',
       'about:blank',
     ],
-    { stdio: 'ignore' },
+    // `--lang` alone is not enough on Linux: Chromium reads the locale off the
+    // environment as well, and a date input drawn `mm/dd/yyyy` under a shot of
+    // an app used in London is a bug report about nothing.
+    { stdio: 'ignore', env: { ...process.env, LANG: 'en_GB.UTF-8', LANGUAGE: 'en_GB' } },
   );
   await wait(3500);
 

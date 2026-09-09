@@ -297,20 +297,69 @@ function PipelineCard({
           >
             {row.roleTitle}
           </Link>
-          <p className="truncate text-small text-ink-muted">
-            {row.companyName}
-            {row.attempt > 1 && (
-              <span className="ml-1 text-ink-muted">· attempt {row.attempt}</span>
-            )}
-          </p>
+          {/*
+            * The company and the card's numbers share a line.
+            *
+            * They used to be two: the company, then a row of its own holding
+            * an empty `<span />` on the left purely to push a coverage
+            * fraction and a two-character age to the right. That is a whole
+            * line per card spent on alignment, and eleven cards' worth of it
+            * is most of a phone screen. Both are micro type; they sit beside
+            * the company with room over.
+            */}
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="truncate text-small text-ink-muted">
+              {row.companyName}
+              {row.attempt > 1 && (
+                <span className="ml-1 text-ink-muted">· attempt {row.attempt}</span>
+              )}
+            </p>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {coverage && (
+                <span
+                  className={cn(
+                    'tabular text-micro',
+                    row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
+                  )}
+                  title={`${coverage} covered by your evidence`}
+                >
+                  {row.coverage.covered}/{row.coverage.total}
+                </span>
+              )}
+              {row.needsReview && (
+                <AlertTriangle
+                  className="size-3.5 text-caution"
+                  strokeWidth={1.75}
+                  aria-label="Needs review"
+                />
+              )}
+              <span
+                className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
+                title="Time since the last thing that happened"
+              >
+                {age}
+              </span>
+            </div>
+          </div>
         </div>
         {row.excitement !== null && (
           <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
             {'★'.repeat(row.excitement)}
           </span>
         )}
+        {/*
+          * Gone below `sm`, not merely invisible.
+          *
+          * These two are `opacity-0` until the card is hovered, and a phone
+          * has no hover -- so on a phone they were sixty-four unreachable
+          * pixels held open on every card, and the title was truncated to pay
+          * for them: "Forward Deployed Eng...", "Backend Engineer, Pay...".
+          * The one thing a card exists to say was the first thing cut, for two
+          * buttons nobody on that device could reach. Both actions are still
+          * on the role's own page, which is one tap away.
+          */}
         {!muted && (
-          <span className="flex shrink-0 items-center gap-0.5">
+          <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
             <QuickReject row={row} />
             <Dismiss row={row} />
           </span>
@@ -324,35 +373,13 @@ function PipelineCard({
         </p>
       )}
 
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        {muted ? (
+      {/* Only a closed card still needs a row of its own, and only for the
+          badge that says which kind of closed it is. */}
+      {muted && (
+        <div className="mt-1.5">
           <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
-        ) : (
-          <span />
-        )}
-        <div className="flex items-center gap-1.5">
-          {coverage && (
-            <span
-              className={cn(
-                'tabular text-micro',
-                row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
-              )}
-              title={`${coverage} covered by your evidence`}
-            >
-              {row.coverage.covered}/{row.coverage.total}
-            </span>
-          )}
-          {row.needsReview && (
-            <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-label="Needs review" />
-          )}
-          <span
-            className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
-            title="Time since the last thing that happened"
-          >
-            {age}
-          </span>
         </div>
-      </div>
+      )}
     </article>
   );
 }

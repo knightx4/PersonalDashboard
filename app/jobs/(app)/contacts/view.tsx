@@ -69,7 +69,13 @@ export function ContactsView({
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <CardSection id="add-contact" title="Add someone" className="lg:order-2">
+      {/* Below the list on a phone, beside it on a laptop.
+        *
+        * `lg:order-2` moved it to the right on a wide screen and said nothing
+        * about a narrow one, so at 390px an empty eight-field form was the
+        * first thing on the Contacts page and the contacts were under it. The
+        * form is what you came here to use second. */}
+      <CardSection id="add-contact" title="Add someone" className="order-last lg:order-2">
         <form action={action} className="space-y-3">
           <Field id="fullName" label="Name">
             <Input id="fullName" name="fullName" required />
@@ -126,7 +132,7 @@ export function ContactsView({
           <EmptyState
             icon={Users}
             title="Nobody yet"
-            description="The people you reach out to, and where each conversation stands. Add the first one in the form beside this."
+            description="The people you reach out to, and where each conversation stands. Add the first one with the form on this page."
             action={{ label: 'Add someone', href: '#add-contact' }}
           />
         ) : (
