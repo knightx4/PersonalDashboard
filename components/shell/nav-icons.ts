@@ -13,6 +13,7 @@ import {
   CalendarRange,
   ClipboardCheck,
   Frame,
+  History,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -67,6 +68,7 @@ export const NAV_ICONS = {
   bugs: Bug,
   ideas: Lightbulb,
   plan: Map,
+  changelog: History,
   ui: Shapes,
   surfaces: Frame,
   // Todo and vault

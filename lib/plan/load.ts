@@ -133,7 +133,8 @@ export type PlanData = {
   dependencies: PlanDependency[];
 };
 
-const ITEM_COLUMNS =
+/** Every column the app reads off a plan row. Shared with the changelog. */
+export const ITEM_COLUMNS =
   'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
   'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at';
 

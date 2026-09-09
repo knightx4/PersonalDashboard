@@ -259,6 +259,53 @@ Editing a step includes moving it: *Part of* lists the module's other steps,
 less the step's own subtree. A moved step goes last under its new parent. The
 editor also holds the *not yet specified* box; emptying it clears the column.
 
+## The changelog
+
+`/dev/changelog` is the fourth page in the workspace and the only one that
+looks backwards. The other three say what is going to happen; this says what
+already did — for each day, the plan steps closed and the notes fixed, newest
+first, each with the commit that shipped it and a link back to the list it
+came from.
+
+**Where a line comes from.** The app's own closed rows, and nothing else: a
+`plan_items` row marked `done`, or a `feedback_items` row marked `done`. Both
+tables already carry `commit_sha` and `completed_at`, so the changelog needs
+no table, no migration and no writing habit of its own — it is a second
+reading of rows the plan and the notes queue already maintain. That is the
+answer recorded on plan step #122, chosen over generating a file from the git
+log at build time: a deployment on Vercel knows its own sha and nothing
+before it, so reading history at runtime is not available there, and a
+generated file goes stale between releases.
+
+**What deliberately does not appear.**
+
+- **Work done off the plan and outside the notes queue.** A refactor, a UI
+  sweep, a fix nobody filed: the app never knew about it, so it has no line.
+  This is the standing cost of the answer above, and the reason to close a
+  step or a note for work worth remembering.
+- **Dropped steps and declined notes.** Both closed; neither shipped, and a
+  changelog listing them would be claiming otherwise.
+- **Anything with no `completed_at`.** The trigger sets that column from the
+  status, so a `done` row without one was edited around the app rather than
+  closed through it, and there is no day to file it under.
+
+**How it reads.** Days come from the entries rather than off a calendar, so a
+day nothing shipped on has no heading. The day is the UTC date of the instant
+the row closed, matching the activity feed on the job side rather than the
+account's timezone — one grouping rule across the app is worth more than a
+heading that is right about the evening. An account with nothing shipped gets
+an empty state, not a blank page.
+
+The reading is `lib/changelog/entries.ts`, pure and tested in the shape
+`lib/plan/tree.ts` has; the two queries behind it are `lib/changelog/load.ts`,
+each filtered by user and status and capped at 200.
+
+**Not filterable by module in v1.** The list is short enough to read straight
+through. Whether any of this should ever face the user outside `/dev` — a
+"what's new" on the front page — turns on whether lines written for a builder
+read as history to somebody who did not build them, which cannot be judged
+until the page has been lived with.
+
 ## Claude
 
 Three ways in, all landing on the same rows.
