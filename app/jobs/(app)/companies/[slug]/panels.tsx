@@ -5,6 +5,9 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
+import { AddTrigger } from '@/components/ui/add-trigger';
+import { EditableProse } from '@/components/ui/editable-prose';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
 import {
@@ -98,46 +101,33 @@ function useServerSeeded<T extends Record<string, string>>(
   return [form, setForm];
 }
 
-function Research({
-  companyId,
-  research,
-}: {
-  companyId: string;
-  research: string;
-}) {
+function Research({ companyId, research }: { companyId: string; research: string }) {
   const [form, setForm] = useServerSeeded({ research });
   const text = form.research;
-  const setText = (value: string) => setForm(() => ({ research: value }));
-  const [saved, setSaved] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
+  // The longest thing anybody writes in this app, and it used to be an
+  // eight-row textarea sitting open on arrival: never once shown as the
+  // writing it is, and hard to read because a textarea has no measure and no
+  // leading. Read by default now, and expandable, because a column inside a
+  // card is the wrong shape for something this long (laws 14 and 12).
   return (
     <CardSection
       title="What you know about this place"
       hint="The one long-form field. It outlives every posting."
     >
-      <Textarea
-        rows={8}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        className="mt-2"
-        placeholder="Funding, who runs the team, what the last two people you spoke to said, why you would or would not go."
-      />
-      <div className="mt-2 flex items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await updateCompany({ companyId, research: text });
-              setSaved(result.error ?? 'Saved.');
-            })
-          }
-        >
-          Save
-        </Button>
-        {saved && <span className="text-small text-ink-muted">{saved}</span>}
+      <div className="mt-2">
+        <EditableProse
+          label="What you know about this place"
+          value={text}
+          expandable
+          empty="Nothing on this company yet."
+          placeholder="Funding, who runs the team, what the last two people you spoke to said, why you would or would not go."
+          onSave={async (next) => {
+            const result = await updateCompany({ companyId, research: next });
+            if (result.error) return result.error;
+            setForm(() => ({ research: next }));
+          }}
+        />
       </div>
     </CardSection>
   );
@@ -172,10 +162,82 @@ function Details({
     priority,
   });
   const [saved, setSaved] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+
+  // Read first. Seven labelled boxes and a Save, stacked down the side of a
+  // page you come to to read what you know about a company -- the same law the
+  // research note above was breaking, in the same column (law 14). The
+  // captions are teaching and go with the form; the panel is the answers.
+  if (!editing) {
+    return (
+      <CardSection title="Details">
+        <ValueList className="mt-3">
+          <ValueRow label="Email domains" value={form.domains} />
+          <ValueRow label="Priority" value={form.priority} />
+          <ValueRow label="Industry" value={form.industry} />
+          <ValueRow label="HQ" value={form.hqLocation} />
+          <ValueRow
+            label="Homepage"
+            value={
+              form.website ? (
+                <a
+                  href={form.website}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent underline underline-offset-2"
+                >
+                  {form.website}
+                </a>
+              ) : null
+            }
+          />
+          <ValueRow
+            label="Careers page"
+            value={
+              form.careersUrl ? (
+                <a
+                  href={form.careersUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent underline underline-offset-2"
+                >
+                  {form.careersUrl}
+                </a>
+              ) : null
+            }
+          />
+          <ValueRow
+            label="LinkedIn"
+            value={
+              form.linkedinUrl ? (
+                <a
+                  href={form.linkedinUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent underline underline-offset-2"
+                >
+                  {form.linkedinUrl}
+                </a>
+              ) : null
+            }
+          />
+        </ValueList>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+          {saved && <span className="text-small text-ink-muted">{saved}</span>}
+        </div>
+
+        <Enrichment companyId={companyId} />
+        <AiEnrichment companyId={companyId} />
+      </CardSection>
+    );
+  }
 
   return (
     <CardSection title="Details">
@@ -284,6 +346,9 @@ function Details({
         >
           Save
         </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          Cancel
+        </Button>
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
       </div>
 
@@ -313,7 +378,9 @@ function Enrichment({ companyId }: { companyId: string }) {
       const result = await proposeCompanyEnrichment({ companyId });
       if (result.error) setMessage(result.error);
       else if (result.proposal && !result.proposal.hasChanges) {
-        setMessage(`Found ${result.proposal.label}, but every field it knows is already filled in.`);
+        setMessage(
+          `Found ${result.proposal.label}, but every field it knows is already filled in.`,
+        );
       } else setProposal(result.proposal);
     });
 
@@ -323,7 +390,9 @@ function Enrichment({ companyId }: { companyId: string }) {
       setProposal(null);
       setMessage(
         result.error ??
-          (result.applied.length ? `Filled in ${result.applied.length} field(s).` : 'Nothing to fill in.'),
+          (result.applied.length
+            ? `Filled in ${result.applied.length} field(s).`
+            : 'Nothing to fill in.'),
       );
     });
 
@@ -423,7 +492,9 @@ function AiEnrichment({ companyId }: { companyId: string }) {
       setProposal(null);
       setMessage(
         result.error ??
-          (result.applied.length ? `Filled in ${result.applied.join(' and ')}.` : 'Nothing to fill in.'),
+          (result.applied.length
+            ? `Filled in ${result.applied.join(' and ')}.`
+            : 'Nothing to fill in.'),
       );
     });
   };
@@ -456,9 +527,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
               {proposal.website}
             </a>
           )}
-          {proposal.summary && (
-            <p className="mt-1 text-small text-ink-muted">{proposal.summary}</p>
-          )}
+          {proposal.summary && <p className="mt-1 text-small text-ink-muted">{proposal.summary}</p>}
 
           {proposal.changes.length > 0 && (
             <ul className="mt-2 space-y-0.5">
@@ -490,7 +559,12 @@ function AiEnrichment({ companyId }: { companyId: string }) {
           )}
 
           <div className="mt-3 flex items-center gap-2">
-            <Button type="button" size="sm" disabled={pending || !proposal.hasChanges} onClick={apply}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || !proposal.hasChanges}
+              onClick={apply}
+            >
               Fill these in
             </Button>
             <Button
@@ -547,8 +621,8 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
         </ul>
       )}
       <p className="mt-2 text-small leading-relaxed text-ink-muted">
-        Name, title, public professional URL and work email only. This is other people&rsquo;s
-        data, and it has no product value beyond contacting them.
+        Name, title, public professional URL and work email only. This is other people&rsquo;s data,
+        and it has no product value beyond contacting them.
       </p>
     </CardSection>
   );
@@ -636,35 +710,61 @@ function Notes({
   timezone: string;
 }) {
   const [body, setBody] = useState('');
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // The notes are the section; the box that adds one is not. It was open on
+  // arrival above them, so a panel whose job is to show what you have written
+  // led with an empty box (law 14). It opens when there is something to add.
   return (
     <CardSection title="Notes">
-      <Textarea
-        rows={3}
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
-        className="mt-2"
-        placeholder="Something you heard, someone worth talking to, a reason to move faster."
-      />
-      <div className="mt-2 flex items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || !body.trim()}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await addNote({ companyId, body });
-              setError(result.error);
-              if (!result.error) setBody('');
-            })
-          }
-        >
-          Add
-        </Button>
-        <FieldError>{error}</FieldError>
-      </div>
+      {adding ? (
+        <div className="mt-2 space-y-2">
+          <Textarea
+            rows={3}
+            autoFocus
+            value={body}
+            aria-label="A note"
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Something you heard, someone worth talking to, a reason to move faster."
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || !body.trim()}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await addNote({ companyId, body });
+                  setError(result.error);
+                  if (!result.error) {
+                    setBody('');
+                    setAdding(false);
+                  }
+                })
+              }
+            >
+              Add
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setBody('');
+                setError(null);
+                setAdding(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <FieldError>{error}</FieldError>
+          </div>
+        </div>
+      ) : (
+        <AddTrigger label="Add a note" onClick={() => setAdding(true)} className="mt-2" />
+      )}
 
       <ul className="mt-3 space-y-2">
         {notes.map((note) => (

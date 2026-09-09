@@ -7,6 +7,8 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Banner } from '@/components/ui/banner';
 import { Group } from '@/components/ui/disclosure';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
+import { AddTrigger } from '@/components/ui/add-trigger';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
 import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
@@ -60,27 +62,47 @@ export function SettingsView(props: {
   return (
     <div className="space-y-6">
       {/* The shared Banner, which this was a fourth hand-rolled copy of.
-        *
-        * `ok` maps to `info` rather than to `good`: the good tone means money
-        * came back and nothing else, and "Gmail connected" was wearing it
-        * because green is what a success message reaches for. It is also the
-        * offer hue, which law 4 reserves for one stage of the pipeline and
-        * nowhere else -- so the same class was breaking the same law twice. */}
-      {props.banner && (
-        <Banner tone={BANNER_TONE[props.banner.tone]}>{props.banner.text}</Banner>
-      )}
+       *
+       * `ok` maps to `info` rather than to `good`: the good tone means money
+       * came back and nothing else, and "Gmail connected" was wearing it
+       * because green is what a success message reaches for. It is also the
+       * offer hue, which law 4 reserves for one stage of the pipeline and
+       * nowhere else -- so the same class was breaking the same law twice. */}
+      {props.banner && <Banner tone={BANNER_TONE[props.banner.tone]}>{props.banner.text}</Banner>}
 
       <ProfileSection profile={props.profile} email={props.email} />
-      <InboxSection
-        accounts={props.accounts}
-        gmailConfigured={props.gmailConfigured}
-      />
+      <InboxSection accounts={props.accounts} gmailConfigured={props.gmailConfigured} />
       <BookmarkletSection appOrigin={props.appOrigin} />
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
       <EvidenceSection evidence={props.evidence} resumes={props.resumes} />
     </div>
   );
+}
+
+/**
+ * Whether a compose surface is open, closed by the action that succeeded.
+ *
+ * A form behind a trigger has one failure mode: you add the thing, the list
+ * above grows, and the form is still sitting there open looking like it did
+ * not take. Closing on the server action's own success message is the whole
+ * of it -- errors leave it open, because an error you cannot see the form
+ * behind is an error you cannot act on.
+ */
+function useCloseOnSuccess(state: SettingsState): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(false);
+
+  // Watched during render rather than in an effect: an effect would paint the
+  // form once more after it had already succeeded, and closing it is not a
+  // synchronisation with anything outside React. The seed is what makes it
+  // fire on the transition rather than on every render.
+  const [seen, setSeen] = useState(state.message);
+  if (seen !== state.message) {
+    setSeen(state.message);
+    if (state.message && !state.error) setOpen(false);
+  }
+
+  return [open, setOpen];
 }
 
 function ProfileSection({
@@ -97,105 +119,137 @@ function ProfileSection({
   email: string;
 }) {
   const [state, action] = useActionState<SettingsState, FormData>(updateProfile, {});
+  const [editing, setEditing] = useCloseOnSuccess(state);
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Job search</h2>
       <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
       <p className="mt-2 text-small text-ink-muted">
-        Your name and timezone are account settings now — they hold across every workspace, so
-        they live under{' '}
+        Your name and timezone are account settings now — they hold across every workspace, so they
+        live under{' '}
         <a href="/account" className="font-medium text-accent underline underline-offset-2">
           Account
         </a>
         , and so does deleting the account, which was never the job search&rsquo;s to offer.
       </p>
 
-      <form action={action} className="mt-4 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="searchStartedOn">Search started</Label>
-            <Input
-              id="searchStartedOn"
-              name="searchStartedOn"
-              type="date"
-              defaultValue={profile.searchStartedOn}
+      {/* Read first. This was five labelled fields, three of them with a
+          caption underneath, standing open every time the page loaded -- so a
+          section whose values change perhaps twice in a job search greeted you
+          as a form to fill in, and the settings themselves were never once
+          simply shown (law 14). Editing is somewhere you go.
+
+          The captions go with the form, which is the only place they are
+          teaching anything; the read-out is the answers. */}
+      {!editing ? (
+        <div className="mt-4 space-y-2">
+          <ValueList>
+            <ValueRow label="Search started" value={profile.searchStartedOn} />
+            <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
+            <ValueRow label="Target titles" value={profile.targetTitles} />
+            <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
+            <ValueRow
+              label="Never write these"
+              value={profile.bannedConstructions || DEFAULT_BANNED_CONSTRUCTIONS.join('\n')}
             />
-            <p className="mt-1 text-small text-ink-muted">Anchors every funnel time series.</p>
+          </ValueList>
+          {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
+          <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        </div>
+      ) : (
+        <form action={action} className="mt-4 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="searchStartedOn">Search started</Label>
+              <Input
+                id="searchStartedOn"
+                name="searchStartedOn"
+                type="date"
+                defaultValue={profile.searchStartedOn}
+              />
+              <p className="mt-1 text-small text-ink-muted">Anchors every funnel time series.</p>
+            </div>
+            <div>
+              <Label htmlFor="ghostThresholdDays">Ghost after</Label>
+              <Input
+                id="ghostThresholdDays"
+                name="ghostThresholdDays"
+                type="number"
+                min={7}
+                max={180}
+                defaultValue={profile.ghostThresholdDays}
+              />
+              <p className="mt-1 text-micro leading-relaxed text-ink-muted">
+                Days of silence before a live pursuit is treated as ghosted. Derived, never set by
+                hand — the moment it becomes manual, nobody maintains it and the funnel counts
+                abandoned pursuits as live ones.
+              </p>
+            </div>
           </div>
+
           <div>
-            <Label htmlFor="ghostThresholdDays">Ghost after</Label>
+            <Label htmlFor="targetTitles">Target titles</Label>
             <Input
-              id="ghostThresholdDays"
-              name="ghostThresholdDays"
-              type="number"
-              min={7}
-              max={180}
-              defaultValue={profile.ghostThresholdDays}
+              id="targetTitles"
+              name="targetTitles"
+              defaultValue={profile.targetTitles}
+              placeholder="Strategic Finance Analyst, FP&A Manager"
             />
-            <p className="mt-1 text-micro leading-relaxed text-ink-muted">
-              Days of silence before a live pursuit is treated as ghosted. Derived, never set by
-              hand — the moment it becomes manual, nobody maintains it and the funnel counts
-              abandoned pursuits as live ones.
+            <p className="mt-1 text-small text-ink-muted">
+              Seeds relevance scoring when mail is classified.
             </p>
           </div>
-        </div>
 
-        <div>
-          <Label htmlFor="targetTitles">Target titles</Label>
-          <Input
-            id="targetTitles"
-            name="targetTitles"
-            defaultValue={profile.targetTitles}
-            placeholder="Strategic Finance Analyst, FP&A Manager"
-          />
-          <p className="mt-1 text-small text-ink-muted">
-            Seeds relevance scoring when mail is classified.
-          </p>
-        </div>
+          <div>
+            <Label htmlFor="writingStyleNotes">How you want to sound</Label>
+            <Textarea
+              id="writingStyleNotes"
+              name="writingStyleNotes"
+              rows={3}
+              defaultValue={profile.writingStyleNotes}
+              placeholder="Direct. Specific numbers. No throat-clearing. British spelling."
+            />
+            <p className="mt-1 text-small text-ink-muted">
+              Injected into every generated draft. Revise it whenever one comes back wrong.
+            </p>
+          </div>
 
-        <div>
-          <Label htmlFor="writingStyleNotes">How you want to sound</Label>
-          <Textarea
-            id="writingStyleNotes"
-            name="writingStyleNotes"
-            rows={3}
-            defaultValue={profile.writingStyleNotes}
-            placeholder="Direct. Specific numbers. No throat-clearing. British spelling."
-          />
-          <p className="mt-1 text-small text-ink-muted">
-            Injected into every generated draft. Revise it whenever one comes back
-            wrong.
-          </p>
-        </div>
+          <div>
+            <Label htmlFor="bannedConstructions">Never write these</Label>
+            <Textarea
+              id="bannedConstructions"
+              name="bannedConstructions"
+              rows={4}
+              defaultValue={profile.bannedConstructions}
+              placeholder={DEFAULT_BANNED_CONSTRUCTIONS.join('\n')}
+            />
+            <p className="mt-1 text-micro leading-relaxed text-ink-muted">
+              One per line. Checked deterministically after generation rather than only asked for in
+              the prompt — a prompt instruction is not reliable enough for something you would
+              notice in every single draft. Leave it empty and the list shown here is used.
+            </p>
+          </div>
 
-        <div>
-          <Label htmlFor="bannedConstructions">Never write these</Label>
-          <Textarea
-            id="bannedConstructions"
-            name="bannedConstructions"
-            rows={4}
-            defaultValue={profile.bannedConstructions}
-            placeholder={DEFAULT_BANNED_CONSTRUCTIONS.join('\n')}
-          />
-          <p className="mt-1 text-micro leading-relaxed text-ink-muted">
-            One per line. Checked deterministically after generation rather than only asked for in
-            the prompt — a prompt instruction is not reliable enough for something you would
-            notice in every single draft. Leave it empty and the list shown here is used.
-          </p>
-        </div>
+          {state.error && (
+            <p role="alert" className="text-ui text-danger">
+              {state.error}
+            </p>
+          )}
+          {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
-        {state.error && (
-          <p role="alert" className="text-ui text-danger">
-            {state.error}
-          </p>
-        )}
-        {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
-
-        <Button type="submit" size="sm">
-          Save
-        </Button>
-      </form>
+          <div className="flex items-center gap-2">
+            <Button type="submit" size="sm">
+              Save
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }
@@ -240,8 +294,8 @@ function InboxSection({
     <section id="inboxes" className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Connected inboxes</h2>
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
-        Read-only, scoped to a search query about recruiting mail. Message bodies are never
-        stored. Subjects and senders are kept only for the messages that turn out to be relevant —
+        Read-only, scoped to a search query about recruiting mail. Message bodies are never stored.
+        Subjects and senders are kept only for the messages that turn out to be relevant —
         everything else keeps nothing but an id and a date so the next scan can skip it.
       </p>
 
@@ -256,9 +310,9 @@ function InboxSection({
             </a>
           ) : (
             <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
-              Inbox scanning for the job search side is not connected yet — it needs its own
-              Google grant, separate from the one the shopping side uses. Everything else works
-              without it: add roles by pasting a job link, or use the capture bookmarklet.
+              Inbox scanning for the job search side is not connected yet — it needs its own Google
+              grant, separate from the one the shopping side uses. Everything else works without it:
+              add roles by pasting a job link, or use the capture bookmarklet.
             </p>
           )}
         </div>
@@ -275,13 +329,13 @@ function InboxSection({
                   className={cn(
                     'rounded-full px-1.5 py-0.5 text-micro',
                     account.status === 'active'
-                      // Connected is the ordinary state, so it is set quietly:
-                      // it was wearing the offer hue, which law 4 gives to one
-                      // stage of the pipeline and to nothing else, and green,
-                      // which means money came back. Amber stays on the broken
-                      // one, where "something is wrong and only you can fix it"
-                      // is exactly what it means.
-                      ? 'bg-sunken text-ink-muted'
+                      ? // Connected is the ordinary state, so it is set quietly:
+                        // it was wearing the offer hue, which law 4 gives to one
+                        // stage of the pipeline and to nothing else, and green,
+                        // which means money came back. Amber stays on the broken
+                        // one, where "something is wrong and only you can fix it"
+                        // is exactly what it means.
+                        'bg-sunken text-ink-muted'
                       : 'bg-caution-tint text-ink',
                   )}
                 >
@@ -377,16 +431,16 @@ function InboxSection({
       {note && <p className="mt-3 text-ui text-ink-muted">{note}</p>}
 
       <p className="mt-3 text-ui leading-relaxed text-ink-muted">
-        Your inbox is checked automatically <strong className="font-medium">once a day</strong>.
-        Use <strong className="font-medium">Check now</strong> when you are expecting something —
-        an interview invite is the one kind of mail where a day of delay actually costs you.
-        Running it more often is free and never duplicates anything.
+        Your inbox is checked automatically <strong className="font-medium">once a day</strong>. Use{' '}
+        <strong className="font-medium">Check now</strong> when you are expecting something — an
+        interview invite is the one kind of mail where a day of delay actually costs you. Running it
+        more often is free and never duplicates anything.
       </p>
 
       <p className="mt-2 text-micro leading-relaxed text-ink-muted">
         Coverage is partial by design. Recruiters emailing from a company address with a subject
-        like &ldquo;quick question&rdquo; match no keyword, so a second pass searches the domains
-        of the companies you track. Add domains on a company page when its mail is not linking, and
+        like &ldquo;quick question&rdquo; match no keyword, so a second pass searches the domains of
+        the companies you track. Add domains on a company page when its mail is not linking, and
         forward anything the scan misses.
       </p>
     </section>
@@ -403,9 +457,7 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
     fetch('/bookmarklet.js')
       .then((response) => response.text())
       .then((source) => {
-        setHref(
-          `javascript:${encodeURIComponent(source.replace('__APP_ORIGIN__', origin))}`,
-        );
+        setHref(`javascript:${encodeURIComponent(source.replace('__APP_ORIGIN__', origin))}`);
       })
       .catch(() => setHref(''));
   }, [appOrigin]);
@@ -416,8 +468,8 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Drag this to your bookmarks bar. On an application form, click it: it reads the question
         labels and sends them here. It runs in your browser inside your session, which is why it
-        works on Workday and iCIMS where nothing server-side can. It never reads what you have
-        typed and never submits anything.
+        works on Workday and iCIMS where nothing server-side can. It never reads what you have typed
+        and never submits anything.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -472,6 +524,7 @@ function ExcludedSendersSection({
   excludedSenders: Array<{ id: string; domain: string }>;
 }) {
   const [state, action] = useActionState(addExcludedSender, {});
+  const [adding, setAdding] = useCloseOnSuccess(state);
   const [, startTransition] = useTransition();
 
   return (
@@ -479,8 +532,8 @@ function ExcludedSendersSection({
       <h2 className="text-body font-semibold text-ink">Excluded senders</h2>
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Mail from Indeed is already excluded everywhere for everyone — it is suggested jobs, not
-        anything you applied to. Add a domain here for anything else that keeps showing up as a
-        lead it should not be, like a job board or a newsletter.
+        anything you applied to. Add a domain here for anything else that keeps showing up as a lead
+        it should not be, like a job board or a newsletter.
       </p>
 
       {excludedSenders.length > 0 && (
@@ -505,15 +558,25 @@ function ExcludedSendersSection({
         </ul>
       )}
 
-      <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="min-w-48 flex-1">
-          <Label htmlFor="domain">Domain</Label>
-          <Input id="domain" name="domain" placeholder="jobs.example.com" />
-        </div>
-        <Button type="submit" size="sm" variant="secondary">
-          Exclude
-        </Button>
-      </form>
+      {/* Behind a trigger, like every other add form on this page: the section
+          is the list of domains, and a labelled empty box under it is a form
+          on a page you came to read (law 14). */}
+      {!adding ? (
+        <AddTrigger label="Exclude a domain" onClick={() => setAdding(true)} className="mt-3" />
+      ) : (
+        <form action={action} className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-1">
+            <Label htmlFor="domain">Domain</Label>
+            <Input id="domain" name="domain" autoFocus placeholder="jobs.example.com" />
+          </div>
+          <Button type="submit" size="sm" variant="secondary">
+            Exclude
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
+            Cancel
+          </Button>
+        </form>
+      )}
       {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
       {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
     </section>
@@ -523,9 +586,16 @@ function ExcludedSendersSection({
 function ResumeSection({
   resumes,
 }: {
-  resumes: Array<{ id: string; label: string; notes: string | null; isDefault: boolean; hasText: boolean }>;
+  resumes: Array<{
+    id: string;
+    label: string;
+    notes: string | null;
+    isDefault: boolean;
+    hasText: boolean;
+  }>;
 }) {
   const [state, action] = useActionState(addResumeVersion, {});
+  const [adding, setAdding] = useCloseOnSuccess(state);
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -541,42 +611,52 @@ function ResumeSection({
             <li key={resume.id} className="flex items-baseline gap-2 text-ui">
               <span className="font-medium text-ink">{resume.label}</span>
               {resume.isDefault && <span className="text-micro text-accent">default</span>}
-              {!resume.hasText && (
-                <span className="text-small text-ink-muted">no text pasted</span>
-              )}
+              {!resume.hasText && <span className="text-small text-ink-muted">no text pasted</span>}
               {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
             </li>
           ))}
         </ul>
       )}
 
-      <form action={action} className="mt-3 space-y-2">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-32">
-            <Label htmlFor="label">Label</Label>
-            <Input id="label" name="label" required placeholder="C" />
+      {/* The section is the versions you have. The form that adds one used to
+          stand open beneath them -- two fields, a four-row paste box and two
+          captions, on a page you came to read (law 14). */}
+      {adding ? (
+        <form action={action} className="mt-3 space-y-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="w-32">
+              <Label htmlFor="label">Label</Label>
+              <Input id="label" name="label" required autoFocus placeholder="C" />
+            </div>
+            <div className="min-w-48 flex-1">
+              <Label htmlFor="notes">What is different about it</Label>
+              <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
+            </div>
           </div>
-          <div className="min-w-48 flex-1">
-            <Label htmlFor="notes">What is different about it</Label>
-            <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
+          <div>
+            <Label htmlFor="textContent">Paste the text</Label>
+            <Textarea
+              id="textContent"
+              name="textContent"
+              rows={4}
+              placeholder="Paste the whole resume. Formatting does not matter."
+            />
+            <p className="mt-1 text-small text-ink-muted">
+              Optional, but it is what the evidence bank reads to propose your stories.
+            </p>
           </div>
-          <Button type="submit" size="sm" variant="secondary">
-            Add
-          </Button>
-        </div>
-        <div>
-          <Label htmlFor="textContent">Paste the text</Label>
-          <Textarea
-            id="textContent"
-            name="textContent"
-            rows={4}
-            placeholder="Paste the whole resume. Formatting does not matter."
-          />
-          <p className="mt-1 text-small text-ink-muted">
-            Optional, but it is what the evidence bank reads to propose your stories.
-          </p>
-        </div>
-      </form>
+          <div className="flex items-center gap-2">
+            <Button type="submit" size="sm" variant="secondary">
+              Add
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <AddTrigger label="Add a version" onClick={() => setAdding(true)} className="mt-3" />
+      )}
       {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
       {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
     </section>
@@ -600,6 +680,7 @@ function EvidenceSection({
   }>;
 }) {
   const [state, action] = useActionState(addEvidence, {});
+  const [adding, setAdding] = useCloseOnSuccess(state);
   const [, startTransition] = useTransition();
 
   return (
@@ -608,16 +689,14 @@ function EvidenceSection({
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Your actual experience, in your own words. Twenty to thirty entries is the target. The
         quality ceiling of every draft this app will ever write is set here — no amount of prompt
-        engineering compensates for an empty bank, which is why the editor exists before the
-        writing does.
+        engineering compensates for an empty bank, which is why the editor exists before the writing
+        does.
       </p>
 
       <p className="tabular mt-2 text-ui text-ink">
         {evidence.length} stored
         {evidence.length < 20 && (
-          <span className="ml-2 text-caution">
-            {20 - evidence.length} short of a useful bank
-          </span>
+          <span className="ml-2 text-caution">{20 - evidence.length} short of a useful bank</span>
         )}
       </p>
 
@@ -656,9 +735,7 @@ function EvidenceSection({
                 </button>
               </div>
               <p className="mt-1 line-clamp-3 text-small text-ink-muted">{item.body}</p>
-              {item.metrics && (
-                <p className="tabular mt-1 text-small text-ink">{item.metrics}</p>
-              )}
+              {item.metrics && <p className="tabular mt-1 text-small text-ink">{item.metrics}</p>}
             </li>
           ))}
         </ul>
@@ -666,57 +743,76 @@ function EvidenceSection({
 
       <SeedFromWriting resumes={resumes} />
 
-      <form action={action} className="mt-4 space-y-3 border-t border-border pt-4">
-        <div>
-          <Label htmlFor="title">Short handle</Label>
-          <Input id="title" name="title" required placeholder="Rebuilt the close process" />
-        </div>
-        <div>
-          <Label htmlFor="body">The story</Label>
-          <Textarea
-            id="body"
-            name="body"
-            rows={4}
-            required
-            placeholder="What the situation was, what you did, what happened. Your words, not a template."
-          />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+      {/* Six fields, open on arrival, under the bank they are meant to fill.
+          The comment on SeedFromWriting below already says nobody fills this
+          in twenty times; it should not also be the first thing on the
+          section every time you come to read what is in the bank (law 14). */}
+      {!adding ? (
+        <AddTrigger label="Write one by hand" onClick={() => setAdding(true)} className="mt-3" />
+      ) : (
+        <form action={action} className="mt-4 space-y-3 border-t border-border pt-4">
           <div>
-            <Label htmlFor="context">Where and when</Label>
-            <Input id="context" name="context" placeholder="Acme, 2024" />
+            <Label htmlFor="title">Short handle</Label>
+            <Input
+              id="title"
+              name="title"
+              required
+              autoFocus
+              placeholder="Rebuilt the close process"
+            />
           </div>
           <div>
-            <Label htmlFor="metrics">The number</Label>
-            <Input id="metrics" name="metrics" placeholder="Close went from 9 days to 4" />
+            <Label htmlFor="body">The story</Label>
+            <Textarea
+              id="body"
+              name="body"
+              rows={4}
+              required
+              placeholder="What the situation was, what you did, what happened. Your words, not a template."
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="context">Where and when</Label>
+              <Input id="context" name="context" placeholder="Acme, 2024" />
+            </div>
+            <div>
+              <Label htmlFor="metrics">The number</Label>
+              <Input id="metrics" name="metrics" placeholder="Close went from 9 days to 4" />
+            </div>
+            <div>
+              <Label htmlFor="strength">How strong is it</Label>
+              <Select id="strength" name="strength" defaultValue="3">
+                {[5, 4, 3, 2, 1].map((level) => (
+                  <option key={level} value={level}>
+                    {'★'.repeat(level)}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
           <div>
-            <Label htmlFor="strength">How strong is it</Label>
-            <Select id="strength" name="strength" defaultValue="3">
-              {[5, 4, 3, 2, 1].map((level) => (
-                <option key={level} value={level}>
-                  {'★'.repeat(level)}
-                </option>
-              ))}
-            </Select>
+            <Label htmlFor="skills">Tags</Label>
+            <Input
+              id="skills"
+              name="skills"
+              placeholder="financial modeling, stakeholder management, automation"
+            />
           </div>
-        </div>
-        <div>
-          <Label htmlFor="skills">Tags</Label>
-          <Input
-            id="skills"
-            name="skills"
-            placeholder="financial modeling, stakeholder management, automation"
-          />
-        </div>
 
-        {state.error && <p className="text-ui text-danger">{state.error}</p>}
-        {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
+          {state.error && <p className="text-ui text-danger">{state.error}</p>}
+          {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
-        <Button type="submit" size="sm">
-          Add to the bank
-        </Button>
-      </form>
+          <div className="flex items-center gap-2">
+            <Button type="submit" size="sm">
+              Add to the bank
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }
@@ -742,7 +838,11 @@ type EvidenceDraft = {
   picked: boolean;
 };
 
-function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: string; hasText: boolean }> }) {
+function SeedFromWriting({
+  resumes,
+}: {
+  resumes: Array<{ id: string; label: string; hasText: boolean }>;
+}) {
   const readable = resumes.filter((resume) => resume.hasText);
 
   const [, startTransition] = useTransition();
@@ -866,9 +966,9 @@ function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: stri
           </p>
 
           {/* Third frame in from the page, so no frame at all: divides between
-            * the proposals, and the dimming that was already carrying "this one
-            * is not going in" carries it on its own now. A box per proposal
-            * made eight suggestions read as eight forms. */}
+           * the proposals, and the dimming that was already carrying "this one
+           * is not going in" carries it on its own now. A box per proposal
+           * made eight suggestions read as eight forms. */}
           <div className="divide-y divide-border">
             {drafts.map((draft, index) => (
               <div key={index} className={cn('row-pad', !draft.picked && 'opacity-60')}>

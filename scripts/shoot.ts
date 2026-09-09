@@ -51,7 +51,18 @@ const WIDTHS = [
 ] as const;
 
 /** Paper and Ink: the two poles. A surface right in both is right in Dusk. */
-const THEMES = ['paper', 'ink'] as const;
+/**
+ * Paper and ink by default: the two themes most people are in, and shooting
+ * all four doubles a run for a difference that is usually nothing.
+ *
+ * Overridable because a theme nobody can photograph is a theme nobody can
+ * judge, and the two experimental ones are exactly where judgement is needed:
+ * `SHOOT_THEMES=lightbox npm run shoot -- <surface>`.
+ */
+const THEMES = (process.env.SHOOT_THEMES ?? 'paper,ink')
+  .split(',')
+  .map((theme) => theme.trim())
+  .filter(Boolean);
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

@@ -284,6 +284,10 @@ export function CommandPalette({
             }}
             placeholder="Go anywhere, or find anything…"
             aria-label="Command"
+            // No focus ring: the palette focuses this field on open, so the
+            // global ring was drawn around the search bar permanently rather
+            // than ever indicating anything. See globals.css.
+            data-focus-ring="none"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
           {/* The shell's keycap, not a second drawing of one: this was a

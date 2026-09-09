@@ -81,3 +81,32 @@ describe('optionAnswer', () => {
     expect(optionAnswer({ letter: 'b', label: 'A CHECKBOX' })).toBe('b — A CHECKBOX');
   });
 });
+
+describe('the forms the plan actually contains', () => {
+  it('reads the lettered decisions the routine writes', () => {
+    // The exact shape of plan #129, which worked, and of #84 and #86 after
+    // they were backfilled into it. A regression here is the option buttons
+    // silently disappearing again.
+    const detail = [
+      'There are three real answers.',
+      '',
+      'A — feedback_items, the notes queue. It already has triage and priorities.',
+      '',
+      'B — ideas. The right register for "could be better".',
+      '',
+      'C — Their own table, alongside the review record. It costs a migration.',
+      '',
+      'I would file to feedback_items at priority 3, and let the routine work them.',
+    ].join('\n');
+
+    expect(planOptions(detail).map((option) => option.letter)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('does not mistake the recommendation for a fourth option', () => {
+    // "I would build the third: …" opens a paragraph and is prose. So did
+    // every option in #84 and #86 before they were lettered, which is exactly
+    // why nothing may be inferred from an unlabelled paragraph.
+    const detail = 'A — One thing.\n\nB — Another thing.\n\nI would build B, for the reason above.';
+    expect(planOptions(detail)).toHaveLength(2);
+  });
+});

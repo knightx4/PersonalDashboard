@@ -26,6 +26,7 @@ import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Field, FieldError, FieldHint, Textarea } from '@/components/ui/field';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import {
   formatCompBand,
@@ -84,7 +85,7 @@ import {
 } from '@/lib/jobs/interview-kinds';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
 import { ReminderActions } from '@/app/jobs/(app)/today/reminder-actions';
-import { Input, Label, Select } from '@/components/ui/field';
+import { ChipInput, ComposeTitle, InlineInput, Input, Label, Select } from '@/components/ui/field';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -312,11 +313,7 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
       {tab === 'posting' && <Posting {...props} />}
       {tab === 'answers' && <Answers {...props} />}
       {tab === 'interviews' && (
-        <Interviews
-          {...props}
-          seed={interviewSeed}
-          onSeedUsed={() => setInterviewSeed(null)}
-        />
+        <Interviews {...props} seed={interviewSeed} onSeedUsed={() => setInterviewSeed(null)} />
       )}
       {tab === 'notes' && <Notes {...props} />}
       {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
@@ -340,10 +337,10 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
   return (
     <div className="mt-8 border-t border-border pt-4">
       {/* A sentence, because the button on its own was a grey line floating
-        * under the page with nothing to say when it applied. "Remove it" is
-        * unanswerable without knowing what *it* is -- and the confirm's own
-        * prompt, which does explain, only appears after you have pressed the
-        * thing you were unsure about. */}
+       * under the page with nothing to say when it applied. "Remove it" is
+       * unanswerable without knowing what *it* is -- and the confirm's own
+       * prompt, which does explain, only appears after you have pressed the
+       * thing you were unsure about. */}
       <p className="text-small text-ink-muted">
         An advert the scan mistook for a confirmation, or a role you never went for.
       </p>
@@ -382,7 +379,11 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
       className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent hover:decoration-accent"
     >
       <span>{children}</span>
-      <ExternalLink className="size-3.5 shrink-0 self-center text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <ExternalLink
+        className="size-3.5 shrink-0 self-center text-ink-muted"
+        strokeWidth={1.75}
+        aria-hidden
+      />
       <span className="sr-only">Open in Gmail</span>
     </a>
   );
@@ -391,12 +392,7 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
 function Timeline({ events, timezone, otherAttempts, todos, applicationId, messages }: PanelProps) {
   return (
     <div className="space-y-4">
-      <Todos
-        todos={todos}
-        applicationId={applicationId}
-        timezone={timezone}
-        messages={messages}
-      />
+      <Todos todos={todos} applicationId={applicationId} timezone={timezone} messages={messages} />
 
       {otherAttempts.length > 0 && (
         <CardSection
@@ -493,6 +489,7 @@ function Todos({
 }) {
   const [body, setBody] = useState('');
   const [dueAt, setDueAt] = useState('');
+  const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -508,53 +505,75 @@ function Todos({
         </ul>
       )}
       {/*
-        * One line, and no captions above it.
-        *
-        * This was two `Field`s and a button: "Add a to-do" printed above a box
-        * whose own placeholder read "Record a video interview", and "Done by"
-        * printed above a date picker that says what it is by being one. Three
-        * stacked rows and four pieces of chrome to collect a sentence and a
-        * day. Laws 9 and 12.
-        *
-        * It is a real `<form>` now rather than a button with an onClick, which
-        * is what makes Return submit it -- the thing you actually do after
-        * typing a to-do. The button stays for the pointer and for anyone who
-        * does not know that, and goes quiet until there is something to add.
-        */}
-      <form
-        className="flex flex-wrap items-center gap-1.5"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!body.trim() || !dueAt) return;
-          startTransition(async () => {
-            const result = await addReminder({ applicationId, body, dueAt });
-            setError(result.error);
-            if (!result.error) {
+       * Not a form until there is something to add.
+       *
+       * This has been narrowed twice already -- from two labelled Fields and a
+       * button down to one row -- and it was still a row of bordered controls
+       * standing open under the list on every visit. The worst of them was the
+       * date: a full-height box printing "dd/mm/yyyy" in ghost text, as wide
+       * as a sentence, permanently empty. The section is the to-dos; a form
+       * for adding one is not what you came to read (law 14).
+       *
+       * Open, it is a compose surface rather than a row of fields: the
+       * sentence is the only thing set at full size, and the day is a chip
+       * beside it carrying its own glyph in place of a caption (law 9).
+       *
+       * It is a real `<form>`, which is what makes Return submit it -- the
+       * thing you actually do after typing a to-do.
+       */}
+      {adding ? (
+        <form
+          className="sheet flex flex-wrap items-center gap-2 rounded-card px-2.5 py-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!body.trim() || !dueAt) return;
+            startTransition(async () => {
+              const result = await addReminder({ applicationId, body, dueAt });
+              setError(result.error);
+              if (!result.error) {
+                setBody('');
+                setDueAt('');
+                setAdding(false);
+              }
+            });
+          }}
+        >
+          <ComposeTitle
+            autoFocus
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            aria-label="The to-do"
+            placeholder="What has to happen?"
+            className="min-w-48 flex-1"
+          />
+          <ChipInput
+            type="date"
+            value={dueAt}
+            onChange={(event) => setDueAt(event.target.value)}
+            aria-label="Done by"
+            icon={<CalendarClock className="size-3.5" strokeWidth={1.75} />}
+          />
+          <Button type="submit" size="sm" pending={pending} disabled={!body.trim() || !dueAt}>
+            Add
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
               setBody('');
               setDueAt('');
-            }
-          });
-        }}
-      >
-        <Input
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          aria-label="Add a to-do"
-          placeholder="Add a to-do…"
-          className="min-w-48 flex-1"
-        />
-        <Input
-          type="date"
-          value={dueAt}
-          onChange={(event) => setDueAt(event.target.value)}
-          aria-label="Done by"
-          className="w-36"
-        />
-        <Button type="submit" size="sm" variant="secondary" pending={pending} disabled={!body.trim() || !dueAt}>
-          Add
-        </Button>
-        {error && <span className="text-small text-danger">{error}</span>}
-      </form>
+              setError(null);
+              setAdding(false);
+            }}
+          >
+            Cancel
+          </Button>
+          {error && <span className="text-small text-danger">{error}</span>}
+        </form>
+      ) : (
+        <AddTrigger label="Add a to-do" onClick={() => setAdding(true)} />
+      )}
     </CardSection>
   );
 }
@@ -646,11 +665,7 @@ function TodoLine({
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="min-w-48 flex-1">
-        <Input
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          aria-label="To-do"
-        />
+        <Input value={body} onChange={(event) => setBody(event.target.value)} aria-label="To-do" />
       </div>
       <Input
         type="date"
@@ -1056,7 +1071,9 @@ function ShareCaseCard({
           size="sm"
           variant="secondary"
           disabled={pending || !canShare}
-          title={canShare ? undefined : 'Match the requirements first — there is nothing to show yet.'}
+          title={
+            canShare ? undefined : 'Match the requirements first — there is nothing to show yet.'
+          }
           onClick={() => {
             setError(null);
             setCopied(false);
@@ -1237,10 +1254,7 @@ function RoleDetailsCard({
           />
         </Field>
         <Field id={`ats-${roleId}`} label="ATS job id">
-          <Input
-            value={atsJobIdDraft}
-            onChange={(event) => setAtsJobIdDraft(event.target.value)}
-          />
+          <Input value={atsJobIdDraft} onChange={(event) => setAtsJobIdDraft(event.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field id={`compmin-${roleId}`} label="Comp min ($)">
@@ -1382,8 +1396,8 @@ function JobDescriptionCard({
         </pre>
       ) : (
         <p className="text-ui text-ink-muted">
-          Nothing saved. Add the description to build the requirement map and fill in the comp
-          band automatically.
+          Nothing saved. Add the description to build the requirement map and fill in the comp band
+          automatically.
         </p>
       )}
 
@@ -1426,9 +1440,7 @@ function JobDescriptionCard({
           on its own asks you for nothing and explains nothing. Hidden while
           editing, where the box you are typing in is the answer. */}
       {!editing && !lookup && jdLookupNote && (
-        <p className="mt-3 border-t border-border pt-3 text-small text-ink-muted">
-          {jdLookupNote}
-        </p>
+        <p className="mt-3 border-t border-border pt-3 text-small text-ink-muted">{jdLookupNote}</p>
       )}
     </CardSection>
   );
@@ -1436,50 +1448,87 @@ function JobDescriptionCard({
 
 function Answers({ answers, applicationId, bankSize }: PanelProps) {
   const [paste, setPaste] = useState('');
+  const [pasting, setPasting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   return (
     <div className="space-y-4">
-      <CardSection
-        title="Add the application questions"
-        hint="Use the bookmarklet on the application page, or paste them here — one per line, or numbered. Both work; the paste box always works."
-      >
-        <Textarea
-          rows={4}
-          value={paste}
-          aria-label="Application questions"
-          onChange={(event) => setPaste(event.target.value)}
-          placeholder={'1. Why do you want to work here?\n2. Tell us about a time you...'}
-        />
-        <div className="mt-2 flex items-center gap-3">
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending || !paste.trim()}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await addQuestions(applicationId, paste);
-                setMessage(result.error ?? `Added ${result.added}.`);
-                if (!result.error) setPaste('');
-              })
-            }
-          >
-            Add questions
-          </Button>
-          {message && <span className="text-small text-ink-muted">{message}</span>}
-        </div>
-      </CardSection>
+      {/* The panel is the answers. Adding questions is something you do to it
+          now and then, and it used to be a four-row textarea sitting above
+          them on every visit -- the first thing on a page you came to read.
+          It opens when you are actually adding something (law 14).
+
+          Not offered at all when there is nothing here yet: the empty state
+          below is the invitation, and two invitations to the same thing on one
+          screen is one too many. */}
+      {pasting ? (
+        <CardSection title="Add the application questions" hint="One per line, or numbered.">
+          <Textarea
+            rows={4}
+            autoFocus
+            value={paste}
+            aria-label="Application questions"
+            onChange={(event) => setPaste(event.target.value)}
+            placeholder={'1. Why do you want to work here?\n2. Tell us about a time you...'}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || !paste.trim()}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await addQuestions(applicationId, paste);
+                  setMessage(result.error ?? `Added ${result.added}.`);
+                  if (!result.error) {
+                    setPaste('');
+                    setPasting(false);
+                  }
+                })
+              }
+            >
+              Add questions
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setPaste('');
+                setPasting(false);
+              }}
+            >
+              Cancel
+            </Button>
+            {message && <span className="text-small text-ink-muted">{message}</span>}
+          </div>
+        </CardSection>
+      ) : (
+        answers.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <AddTrigger label="Add more questions" onClick={() => setPasting(true)} />
+            {message && <span className="text-small text-ink-muted">{message}</span>}
+          </div>
+        )
+      )}
 
       {answers.length === 0 ? (
         // The paste box above is the action that fills this; the link goes to
-        // the bookmarklet, which is the other way in.
-        <EmptyState
-          icon={MessageSquareText}
-          title="No questions captured yet"
-          description="No questions captured for this application yet. Paste them above, or grab them from the application page with the bookmarklet."
-          action={{ label: 'Get the bookmarklet', href: '/jobs/settings' }}
-        />
+        // the bookmarklet, which is the other way in. The paste box is no
+        // longer standing open above this, so the empty state has to offer it:
+        // law 15 puts the teaching here, which is where somebody seeing this
+        // panel for the first time is standing.
+        !pasting && (
+          <EmptyState
+            icon={MessageSquareText}
+            title="No questions captured yet"
+            description="Paste the questions from the application, or grab them from the page itself with the bookmarklet."
+            action={{ label: 'Get the bookmarklet', href: '/jobs/settings' }}
+          >
+            <AddTrigger label="Paste the questions" onClick={() => setPasting(true)} />
+          </EmptyState>
+        )
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
@@ -1501,6 +1550,7 @@ function AnswerCard({
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
   const [saved, setSaved] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // The draft lives here, beside the textarea, and never in it. It reaches the
@@ -1558,45 +1608,100 @@ function AnswerCard({
         </div>
       )}
 
-      <Textarea
-        rows={5}
-        value={text}
-        aria-label="Your answer"
-        onChange={(event) => setText(event.target.value)}
-        className="mt-2"
-      />
+      {/* The answer, read. It was a five-row textarea holding its own value,
+          open on arrival, one per question -- so a page whose job is to show
+          what you have already written showed a column of editors instead, and
+          the answers themselves were never once set as prose. Law 14. Editing
+          is one click and happens in the same place at the same size. */}
+      {editing ? (
+        <Textarea
+          rows={5}
+          value={text}
+          autoFocus
+          aria-label="Your answer"
+          onChange={(event) => setText(event.target.value)}
+          className="mt-2"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          title="Edit this answer"
+          className="mt-2 -mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left transition-colors duration-150 hover:bg-sunken"
+        >
+          {text.trim() ? (
+            <span className="block max-w-prose whitespace-pre-wrap text-ui leading-relaxed text-ink">
+              {text}
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-ui text-ink-ghost">
+              <Pencil className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+              Not answered yet.
+            </span>
+          )}
+        </button>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await saveAnswer(answer.id, text, 'draft');
-              setSaved(result.error ?? 'Saved.');
-              if (!result.error) setStatus('draft');
-            })
-          }
-        >
-          Save draft
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || !text.trim()}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await saveAnswer(answer.id, text, 'approved');
-              setSaved(result.error ?? 'Approved.');
-              if (!result.error) setStatus('approved');
-            })
-          }
-        >
-          Approve
-        </Button>
-        {status === 'approved' && !answer.canonicalAnswer && (
+        {/* Save and Approve are what you do to an answer you are writing, so
+            they are where the writing is. Reading it, the only offers are the
+            two that make sense on a finished answer: edit it, or draft one. */}
+        {editing && (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await saveAnswer(answer.id, text, 'draft');
+                  setSaved(result.error ?? 'Saved.');
+                  if (!result.error) {
+                    setStatus('draft');
+                    setEditing(false);
+                  }
+                })
+              }
+            >
+              Save draft
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending || !text.trim()}
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await saveAnswer(answer.id, text, 'approved');
+                  setSaved(result.error ?? 'Approved.');
+                  if (!result.error) {
+                    setStatus('approved');
+                    setEditing(false);
+                  }
+                })
+              }
+            >
+              Approve
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setText(answer.answer || answer.canonicalAnswer || '');
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </>
+        )}
+        {!editing && (
+          <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(true)}>
+            {text.trim() ? 'Edit' : 'Write an answer'}
+          </Button>
+        )}
+        {!editing && status === 'approved' && !answer.canonicalAnswer && (
           <Button
             type="button"
             size="sm"
@@ -1656,9 +1761,7 @@ function AnswerCard({
             </span>
           </div>
 
-          <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">
-            {draft.text}
-          </p>
+          <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">{draft.text}</p>
 
           <p className="mt-2 text-small text-ink-muted">
             Draws on{' '}
@@ -1670,9 +1773,7 @@ function AnswerCard({
 
           {draft.unsupportedClaims.length > 0 && (
             <div className="mt-2 rounded bg-caution-tint px-2 py-1.5">
-              <p className="text-small font-medium text-ink">
-                Not grounded in anything you wrote:
-              </p>
+              <p className="text-small font-medium text-ink">Not grounded in anything you wrote:</p>
               <ul className="mt-0.5 list-disc pl-4 text-small text-ink">
                 {draft.unsupportedClaims.map((claim) => (
                   <li key={claim}>{claim}</li>
@@ -1741,15 +1842,14 @@ function Interviews({
   // combination is always a miss -- a hand-link that recorded only the event,
   // or a thread the extractor read without finding a date -- so it is stated
   // rather than left as a blank the tab count already implied was correct.
-  const interviewMail = interviews.length === 0
-    ? messages.filter((message) => INTERVIEW_MAIL.has(message.classification))
-    : [];
+  const interviewMail =
+    interviews.length === 0
+      ? messages.filter((message) => INTERVIEW_MAIL.has(message.classification))
+      : [];
 
   // Scheduling mail on this pursuit, offered inside a round as the other way
   // to fill it: "add from email" rather than retyping what the invite says.
-  const schedulingMail = messages.filter((message) =>
-    INTERVIEW_MAIL.has(message.classification),
-  );
+  const schedulingMail = messages.filter((message) => INTERVIEW_MAIL.has(message.classification));
 
   // One past the highest round the pursuit has, which is what the next round
   // to be agreed almost always is. A round with no number yet counts for
@@ -1760,7 +1860,12 @@ function Interviews({
   return (
     <div className="space-y-3">
       {interviews.length === 0 && interviewGroups.length === 0 ? (
-        <div className={cn(cardVariants(), 'border-dashed px-4 py-10 text-center text-ui text-ink-muted')}>
+        <div
+          className={cn(
+            cardVariants(),
+            'border-dashed px-4 py-10 text-center text-ui text-ink-muted',
+          )}
+        >
           {interviewMail.length > 0 ? (
             <>
               <p className="text-ink">
@@ -1769,8 +1874,8 @@ function Interviews({
                   : `${interviewMail.length} emails about scheduling are linked to this pursuit, but no interview is recorded.`}
               </p>
               <p className="mt-1">
-                The mail only ever carries a booking when it arrives with a calendar invite. Add
-                the round below, or from the message itself under Linked mail.
+                The mail only ever carries a booking when it arrives with a calendar invite. Add the
+                round below, or from the message itself under Linked mail.
               </p>
             </>
           ) : (
@@ -1950,12 +2055,7 @@ function Interviewers({
           }
         }}
       />
-      <Button
-        type="button"
-        size="sm"
-        disabled={pending || !newName?.trim()}
-        onClick={addByName}
-      >
+      <Button type="button" size="sm" disabled={pending || !newName?.trim()} onClick={addByName}>
         Add
       </Button>
       <button
@@ -2001,11 +2101,12 @@ function Interviewers({
             disabled={pending}
             aria-label={`Remove ${participant.name}`}
             onClick={() =>
-              startTransition(() =>
-                void removeInterviewer({
-                  interviewId: interview.id,
-                  contactId: participant.contactId,
-                }),
+              startTransition(
+                () =>
+                  void removeInterviewer({
+                    interviewId: interview.id,
+                    contactId: participant.contactId,
+                  }),
               )
             }
             className="text-ink-muted hover:text-danger"
@@ -2235,7 +2336,9 @@ function GroupTheseRounds({
   const label = formatDate(`${day}T00:00:00.000Z`, 'UTC');
 
   return (
-    <div className={cn(cardVariants(), 'flex flex-wrap items-center gap-3 border-dashed px-4 py-2.5')}>
+    <div
+      className={cn(cardVariants(), 'flex flex-wrap items-center gap-3 border-dashed px-4 py-2.5')}
+    >
       <p className="text-ui text-ink-muted">
         {interviewIds.length} interviews on {label}, in separate rounds.
       </p>
@@ -2379,35 +2482,51 @@ function InterviewGroupCard({
             on one afternoon are all the second round; numbering each of them
             separately was what made a superday read as rounds 1, 3 and 4.
 
-            Fields while the round is open, a line of text once it is folded:
-            a folded card is something you are scanning past, and two input
-            boxes in a row of them read as a form rather than as a heading. */}
-        {open ? (
-          <>
-            <Input
-              type="number"
-              min={1}
-              max={99}
-              value={roundNumber}
-              onChange={(event) => setRoundNumber(event.target.value)}
-              aria-label="Which round of the process this is"
-              placeholder="#"
-              className="w-16"
-            />
-            <Input
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
-              aria-label="What to call this round"
-              placeholder="Technical round"
-              className="max-w-56"
-            />
-          </>
-        ) : (
-          <h3 className="text-ui font-semibold text-ink">
-            {roundNumber.trim() ? `Round ${roundNumber.trim()}` : 'Unplaced round'}
-            {label.trim() && ` · ${label.trim()}`}
-          </h3>
-        )}
+            It is the same heading open or folded. It used to become two
+            bordered input boxes the moment the round was opened, so opening a
+            round to read what was in it turned its title into a form you had
+            not asked to fill in -- and a column of open rounds was a column of
+            boxes (law 14).
+
+            Open, the two parts are InlineInputs: set exactly like the heading
+            they stand in for, picking up a ground on hover and a border on
+            focus, so they are text until they are touched and the value and
+            its editor are the same object in the same place (law 12). Folded,
+            the round is something you are scanning past and nothing there is
+            editable at all. */}
+        <h3 className="flex min-w-0 flex-1 items-baseline gap-x-1.5 text-ui font-semibold text-ink">
+          {open ? (
+            <>
+              <span className="text-ink-muted">Round</span>
+              <InlineInput
+                type="number"
+                min={1}
+                max={99}
+                value={roundNumber}
+                onChange={(event) => setRoundNumber(event.target.value)}
+                aria-label="Which round of the process this is"
+                placeholder="#"
+                // Sized to the number rather than to a fixed box, or the
+                // heading reads "Round 1      ·  First round" with a hole in
+                // it where the empty half of the input is.
+                className="field-sizing-content w-auto min-w-6 max-w-14 shrink-0 font-semibold"
+              />
+              <span className="shrink-0 text-ink-ghost">·</span>
+              <InlineInput
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                aria-label="What to call this round"
+                placeholder="Technical round"
+                className="field-sizing-content min-w-0 max-w-56 flex-1 font-semibold"
+              />
+            </>
+          ) : (
+            <>
+              {roundNumber.trim() ? `Round ${roundNumber.trim()}` : 'Unplaced round'}
+              {label.trim() && ` · ${label.trim()}`}
+            </>
+          )}
+        </h3>
         <span className="text-small text-ink-muted">
           {interviews.length === 0
             ? 'Nothing booked in yet'
@@ -2444,87 +2563,87 @@ function InterviewGroupCard({
 
       {!open ? null : (
         <>
-        {/* No note until there is one, and foldable once there is -- the same
+          {/* No note until there is one, and foldable once there is -- the same
             way a round's own notes behave one level down. A textarea shown on
             every round whether or not anything had been written in it made an
             empty round take the space of a full one and read as filled in. */}
-        <div className="mt-3">
-          {showNotes ? (
-            <CollapsibleField label="Notes on this round" defaultOpen>
-              <Textarea
-                rows={3}
-                value={notes}
-                autoFocus={notes === ''}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="How the round went as a whole. Each interview keeps its own notes below."
-              />
-              <div className="mt-1.5 flex items-center gap-3">
-                <Button type="button" size="sm" disabled={pending} onClick={save}>
-                  Save
-                </Button>
-                {saved && <span className="text-small text-ink-muted">{saved}</span>}
-              </div>
-            </CollapsibleField>
-          ) : (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
-              {/* The number and the name still need saving with nothing written
+          <div className="mt-3">
+            {showNotes ? (
+              <CollapsibleField label="Notes on this round" defaultOpen>
+                <Textarea
+                  rows={3}
+                  value={notes}
+                  autoFocus={notes === ''}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="How the round went as a whole. Each interview keeps its own notes below."
+                />
+                <div className="mt-1.5 flex items-center gap-3">
+                  <Button type="button" size="sm" disabled={pending} onClick={save}>
+                    Save
+                  </Button>
+                  {saved && <span className="text-small text-ink-muted">{saved}</span>}
+                </div>
+              </CollapsibleField>
+            ) : (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
+                {/* The number and the name still need saving with nothing written
                   under them, so the button stays reachable while the note is
                   folded away. */}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={save}
-                className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-              >
-                Save the round
-              </button>
-              {saved && <span className="text-small text-ink-muted">{saved}</span>}
-            </div>
-          )}
-        </div>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={save}
+                  className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+                >
+                  Save the round
+                </button>
+                {saved && <span className="text-small text-ink-muted">{saved}</span>}
+              </div>
+            )}
+          </div>
 
-        <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
+          <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
 
-        {/* One note for the occasion. It is stored on the round's earliest
+          {/* One note for the occasion. It is stored on the round's earliest
             conversation, so the carrier is whichever of them has one and the
             lead otherwise -- which is where the action would write it. */}
-        {prepCarrier && (
-          <RoundPrep
-            interviewId={prepCarrier.id}
-            state={{
-              note: prepCarrier.prepNote,
-              generatedAt: prepCarrier.prepNoteAt,
-              stale: prepCarrier.prepNoteStale,
-            }}
-            timezone={timezone}
-          />
-        )}
-
-        <div className="mt-3 space-y-3">
-          {interviews.map((interview) => (
-            <InterviewCard
-              key={interview.id}
-              interview={interview}
+          {prepCarrier && (
+            <RoundPrep
+              interviewId={prepCarrier.id}
+              state={{
+                note: prepCarrier.prepNote,
+                generatedAt: prepCarrier.prepNoteAt,
+                stale: prepCarrier.prepNoteStale,
+              }}
               timezone={timezone}
-              companyContacts={companyContacts}
-              focused={interview.id === focusInterviewId}
-              grouped
             />
-          ))}
+          )}
 
-          {/* The round fills up from here: another conversation in the same
+          <div className="mt-3 space-y-3">
+            {interviews.map((interview) => (
+              <InterviewCard
+                key={interview.id}
+                interview={interview}
+                timezone={timezone}
+                companyContacts={companyContacts}
+                focused={interview.id === focusInterviewId}
+                grouped
+              />
+            ))}
+
+            {/* The round fills up from here: another conversation in the same
               round is one click, and an invitation that is already in the inbox
               starts from the message rather than from a blank form. */}
-          <AddInterview
-            applicationId={applicationId}
-            groupId={group.id}
-            mailOptions={schedulingMail}
-            triggerLabel={
-              interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
-            }
-          />
-        </div>
+            <AddInterview
+              applicationId={applicationId}
+              groupId={group.id}
+              mailOptions={schedulingMail}
+              triggerLabel={
+                interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
+              }
+            />
+          </div>
         </>
       )}
     </Card>
@@ -2587,9 +2706,7 @@ function RoundMail({
           {linked.map((message) => (
             <li key={message.id} className="flex items-baseline gap-2 text-small">
               {message.gmailHref ? (
-                <GmailLink href={message.gmailHref}>
-                  {message.subject ?? '(no subject)'}
-                </GmailLink>
+                <GmailLink href={message.gmailHref}>{message.subject ?? '(no subject)'}</GmailLink>
               ) : (
                 <span className="text-ink">{message.subject ?? '(no subject)'}</span>
               )}
@@ -2688,8 +2805,7 @@ function InterviewCard({
   const [draftError, setDraftError] = useState<string | null>(null);
 
   const needsDebrief = interview.debriefDue && !notes;
-  const empty =
-    !showPrep && !showDebrief && draft === null && interview.customNotes.length === 0;
+  const empty = !showPrep && !showDebrief && draft === null && interview.customNotes.length === 0;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
@@ -2810,9 +2926,7 @@ function InterviewCard({
                   >
                     Cancel
                   </button>
-                  {draftError && (
-                    <span className="text-small text-danger">{draftError}</span>
-                  )}
+                  {draftError && <span className="text-small text-danger">{draftError}</span>}
                 </div>
               </div>
             )}
@@ -2824,9 +2938,7 @@ function InterviewCard({
             there. A custom note has no such limit. */}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-micro uppercase tracking-wider text-ink-muted">Create note</span>
-          {!showPrep && (
-            <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />
-          )}
+          {!showPrep && <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />}
           {!showDebrief && (
             <NoteKindButton label="Interview" onClick={() => setShowDebrief(true)} />
           )}
@@ -2950,7 +3062,10 @@ function CollapsibleField({
         className="flex w-full items-center gap-1 text-left text-micro font-semibold uppercase tracking-wider text-ink-muted"
       >
         <ChevronDown
-          className={cn('size-3.5 shrink-0 transition-transform duration-150', !open && '-rotate-90')}
+          className={cn(
+            'size-3.5 shrink-0 transition-transform duration-150',
+            !open && '-rotate-90',
+          )}
           strokeWidth={1.75}
           aria-hidden
         />
@@ -3020,7 +3135,10 @@ function AddInterview({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn(cardVariants(), 'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent')}
+        className={cn(
+          cardVariants(),
+          'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
+        )}
       >
         {triggerLabel}
       </button>
@@ -3031,9 +3149,8 @@ function AddInterview({
     <section className={cardVariants({ padding: 'dense' })}>
       {startedFrom ? (
         <p className="mb-3 text-small text-ink-muted">
-          From{' '}
-          <span className="text-ink">{startedFrom.fromSubject ?? 'the linked message'}</span> — that
-          mail says when it is; put the time in below.
+          From <span className="text-ink">{startedFrom.fromSubject ?? 'the linked message'}</span> —
+          that mail says when it is; put the time in below.
         </p>
       ) : (
         // Add from email, in the round rather than off in the mail tab: the
@@ -3361,7 +3478,12 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
       />
 
       {messages.length === 0 ? (
-        <p className={cn(cardVariants(), 'border-dashed px-4 py-10 text-center text-ui text-ink-muted')}>
+        <p
+          className={cn(
+            cardVariants(),
+            'border-dashed px-4 py-10 text-center text-ui text-ink-muted',
+          )}
+        >
           No mail has been linked to this pursuit yet.
         </p>
       ) : (
@@ -3393,7 +3515,9 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                       (message.subject ?? '—')
                     )}
                   </TD>
-                  <TD muted label="Kind">{message.classification.replace(/_/g, ' ')}</TD>
+                  <TD muted label="Kind">
+                    {message.classification.replace(/_/g, ' ')}
+                  </TD>
                   <TD muted label="Linked by" className="tabular">
                     {message.linkMethod?.replace(/_/g, ' ') ?? '—'}
                     {message.linkConfidence !== null &&
@@ -3437,13 +3561,7 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
  * no longer claims. Confirmed first: it is the one row action that changes the
  * timeline.
  */
-function UnlinkMessage({
-  messageId,
-  applicationId,
-}: {
-  messageId: string;
-  applicationId: string;
-}) {
+function UnlinkMessage({ messageId, applicationId }: { messageId: string; applicationId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -3494,7 +3612,10 @@ function MatchCandidates({
 
   const visible = candidates.filter((candidate) => !handled.has(candidate.id));
 
-  function decide(id: string, action: (messageId: string, applicationId: string) => Promise<{ error: string | null }>) {
+  function decide(
+    id: string,
+    action: (messageId: string, applicationId: string) => Promise<{ error: string | null }>,
+  ) {
     setError(null);
     setPendingId(id);
     startTransition(async () => {
@@ -3539,7 +3660,11 @@ function MatchCandidates({
       {error && <p className="text-small text-danger">{error}</p>}
 
       {searching ? (
-        <AddOtherSearch applicationId={applicationId} timezone={timezone} onClose={() => setSearching(false)} />
+        <AddOtherSearch
+          applicationId={applicationId}
+          timezone={timezone}
+          onClose={() => setSearching(false)}
+        />
       ) : (
         <button
           type="button"
@@ -3621,7 +3746,10 @@ function AddOtherSearch({
   function search() {
     setError(null);
     startTransition(async () => {
-      const { results: found, error: searchError } = await searchUnlinkedMessages(applicationId, term);
+      const { results: found, error: searchError } = await searchUnlinkedMessages(
+        applicationId,
+        term,
+      );
       setError(searchError);
       setResults(found);
     });
@@ -3647,7 +3775,12 @@ function AddOtherSearch({
             placeholder="Subject or sender"
           />
         </div>
-        <Button type="button" size="sm" disabled={pending || term.trim().length < 2} onClick={search}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || term.trim().length < 2}
+          onClick={search}
+        >
           Search
         </Button>
         <button

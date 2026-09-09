@@ -256,7 +256,8 @@ async function main(): Promise<void> {
       }
       console.log(
         `\n${summary.open} open: ${summary.ready} ready, ${summary.inProgress} underway, ` +
-          `${summary.waiting} waiting, ${summary.claude} with Claude. ${summary.done} done.`,
+          `${summary.waiting} waiting, ${summary.claude} with Claude, ` +
+          `${summary.onYou} on the user. ${summary.done} done.`,
       );
       return;
     }

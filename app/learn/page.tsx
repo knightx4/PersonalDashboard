@@ -24,7 +24,7 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className="h-1.5 w-28 overflow-hidden rounded-pill bg-canvas"
+        className="h-1.5 w-28 overflow-hidden rounded-pill bg-sunken"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
