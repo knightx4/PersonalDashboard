@@ -28,6 +28,8 @@ export type FeedbackRow = {
   resolutionNote: string | null;
   commitSha: string | null;
   createdAt: string;
+  /** When it closed, done or declined. Null while it is still outstanding. */
+  completedAt: string | null;
 };
 
 /** Anything not finished — including blocked, the state most easily forgotten. */
@@ -78,7 +80,9 @@ export async function loadFeedbackQueue(
   const { data } = await supabase
     .from('feedback_items')
     .select(
-      'id, kind, body, page_path, status, priority, resolution_note, commit_sha, created_at',
+      // One literal, not a concatenation: the select string is what the client
+      // infers the row shape from, and a joined one infers nothing.
+      'id, kind, body, page_path, status, priority, resolution_note, commit_sha, created_at, completed_at',
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -94,6 +98,7 @@ export async function loadFeedbackQueue(
     resolutionNote: (row.resolution_note as string | null) ?? null,
     commitSha: (row.commit_sha as string | null) ?? null,
     createdAt: row.created_at as string,
+    completedAt: (row.completed_at as string | null) ?? null,
   }));
 
   const outstanding = sortOutstanding(rows.filter(isOutstanding));
