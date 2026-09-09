@@ -48,6 +48,7 @@ describe('the operation names', () => {
       'locate-passage',
       'generate-chain',
       'write-probe',
+      'name-misconception',
     ]);
   });
 });

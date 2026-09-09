@@ -135,6 +135,35 @@ export function nextConcept(concepts: Concept[], askedCounts: Map<string, number
   return sorted[0] ?? null;
 }
 
+/**
+ * Mark a concept as carrying a named misconception.
+ *
+ * The state and the sentence are one fact -- the database refuses one without
+ * the other -- because a misconception nobody can read is indistinguishable
+ * from a gap, and the whole point of the state is that it is not one.
+ */
+export async function setMisconception(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  conceptId: string,
+  misconception: string,
+): Promise<void> {
+  const { error } = await supabase.from('concept_state').upsert(
+    {
+      concept_id: conceptId,
+      user_id: userId,
+      state: 'misconception',
+      established: 'tested',
+      misconception,
+      tested_at: new Date().toISOString(),
+    },
+    { onConflict: 'concept_id' },
+  );
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Naming that misconception', error);
+}
+
 /** Write a question as asked, before it is answered. */
 export async function recordProbe(
   supabase: LearnSupabaseClient,

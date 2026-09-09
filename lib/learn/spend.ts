@@ -34,6 +34,7 @@ export const LEARN_OPERATIONS = [
   'locate-passage',
   'generate-chain',
   'write-probe',
+  'name-misconception',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

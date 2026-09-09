@@ -13,7 +13,9 @@ import {
   probesFor,
   recordAnswer,
   recordProbe,
+  setMisconception,
 } from '@/lib/learn/graph/session';
+import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 
 /**
@@ -35,7 +37,14 @@ export type AskState = {
   /** Where the bar stood before this question. */
   percent?: number;
   /** Filled in once answered, by the answer action. */
-  answered?: { correct: boolean; reason: string; correctIndex: number; chosenIndex: number };
+  answered?: {
+    correct: boolean;
+    reason: string;
+    correctIndex: number;
+    chosenIndex: number;
+    /** Named only when the same wrong answer has now been picked twice. */
+    misconception?: string;
+  };
 };
 
 const MODEL_FOR_PROBES = 'claude-haiku-4-5';
@@ -145,6 +154,44 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   const probes = await probesFor(supabase, parsed.data.conceptId);
   const answeredRow = probes.find((probe) => probe.id === parsed.data.probeId);
 
+  // The same wrong answer twice is a position rather than a slip, and worth
+  // one call to name. Nothing here can fail loudly: a misconception that could
+  // not be named leaves the concept shaky, which is what the answer already
+  // made it, rather than half-marked.
+  let misconception: string | undefined;
+  const repeated = outcome.correct ? null : repeatedWrongAnswer(probes);
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (repeated && concept && apiKey) {
+    const spend = collectSpend();
+    const named = await nameMisconception({
+      concept: concept.name,
+      claim: concept.claim,
+      wrongAnswer: repeated.option,
+      questions: probes
+        .filter(
+          (probe) =>
+            probe.chosenIndex !== null &&
+            probe.options[probe.chosenIndex]?.trim().toLowerCase() ===
+              repeated.option.trim().toLowerCase(),
+        )
+        .map((probe) => probe.question),
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'name-misconception', spend.reports);
+
+    if (named.ok) {
+      try {
+        await setMisconception(supabase, user.id, parsed.data.conceptId, named.misconception);
+        misconception = named.misconception;
+      } catch {
+        // The answer is already recorded and the concept is already shaky.
+        // Failing to name the belief loses a sentence, not the evidence.
+      }
+    }
+  }
+
   return {
     ...prev,
     error: undefined,
@@ -154,6 +201,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       reason: outcome.reason,
       correctIndex: answeredRow?.correctIndex ?? -1,
       chosenIndex: parsed.data.chosenIndex,
+      misconception,
     },
   };
 }

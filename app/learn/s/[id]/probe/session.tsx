@@ -126,6 +126,15 @@ export function ProbeSession({ subjectId, startingPercent }: { subjectId: string
                   picked. That is what makes it worth reading. */}
               <p className="mt-1 text-body text-ink">{live.answered.reason}</p>
 
+              {live.answered.misconception && (
+                // The same wrong answer twice. Said plainly, because a gap and
+                // a thing steering you wrong are different problems and only
+                // one of them is fixed by reading more.
+                <p className="mt-3 border-l-2 border-danger pl-3 text-body text-ink">
+                  You have picked this one twice now. {live.answered.misconception}
+                </p>
+              )}
+
               <form action={ask} className="mt-4">
                 <input type="hidden" name="subjectId" value={subjectId} />
                 <AskButton label="Another one" />
