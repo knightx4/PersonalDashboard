@@ -287,7 +287,11 @@ function InboxSection({
                 >
                   {account.status.replace(/_/g, ' ')}
                 </span>
-                <span className="tabular ml-auto text-small text-ink-muted">
+                {/* Pushed right only where the row is wide enough to have a
+                    right. At 390px `ml-auto` wrapped it onto a line of its own
+                    and then held it against the far edge, so the date read as
+                    an orphan rather than as a note about the address above. */}
+                <span className="tabular text-small text-ink-muted sm:ml-auto">
                   last checked {formatDate(account.lastSyncedAt)}
                 </span>
               </div>
