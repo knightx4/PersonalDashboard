@@ -51,6 +51,7 @@ describe('the operation names', () => {
       'name-misconception',
       'propose-floor',
       'concepts-from-note',
+      'concepts-from-prior',
     ]);
   });
 });

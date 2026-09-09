@@ -29,6 +29,12 @@ export type SavedChain = {
   goalId: string | null;
   conceptsAdded: number;
   edgesAdded: number;
+  /**
+   * The ids of the nodes this write actually inserted, in the order they were
+   * proposed. Only the new ones: a node the chain matched against the subject
+   * was already there and is not this write's to say anything about.
+   */
+  conceptIds: string[];
 };
 
 function fail(action: string, error: { message: string }): Error {
@@ -98,6 +104,7 @@ export async function saveChain(
     if (node.existingId) idByName.set(node.name.toLowerCase(), node.existingId);
   }
 
+  const conceptIds: string[] = [];
   const fresh = chain.nodes.filter((node) => !node.existingId);
   if (fresh.length > 0) {
     const { data, error } = await supabase
@@ -119,6 +126,7 @@ export async function saveChain(
 
     for (const row of data as { id: string; name: string }[]) {
       idByName.set(row.name.toLowerCase(), row.id);
+      conceptIds.push(row.id);
     }
   }
 
@@ -145,7 +153,13 @@ export async function saveChain(
   }
 
   if (options.goal === false) {
-    return { subjectId, goalId: null, conceptsAdded: fresh.length, edgesAdded: edges.length };
+    return {
+      subjectId,
+      goalId: null,
+      conceptsAdded: fresh.length,
+      edgesAdded: edges.length,
+      conceptIds,
+    };
   }
 
   const goalConceptId = idByName.get(chain.goalConcept.toLowerCase()) ?? null;
@@ -171,7 +185,47 @@ export async function saveChain(
     goalId: (goal as { id: string }).id,
     conceptsAdded: fresh.length,
     edgesAdded: edges.length,
+    conceptIds,
   };
+}
+
+/**
+ * Mark concepts as known because somebody said so.
+ *
+ * The one write in this module that sets a state without a probe behind it,
+ * which is why `established` says `declared` and the subject screen renders
+ * that as "you said so". A node that got here this way is settled on your word
+ * and nothing else, and every screen that shows the state is expected to keep
+ * saying so rather than quietly promoting it to the same footing as a tested
+ * one.
+ *
+ * Only ever handed ids this write just inserted. A concept already in the
+ * graph already has a state, arrived at some way -- possibly a probe that said
+ * shaky -- and overwriting that from a paste would destroy the only evidence
+ * in the module that was actually collected rather than asserted.
+ */
+export async function declareKnown(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  conceptIds: string[],
+): Promise<void> {
+  if (conceptIds.length === 0) return;
+
+  const { error } = await supabase.from('concept_state').upsert(
+    conceptIds.map((conceptId) => ({
+      concept_id: conceptId,
+      user_id: userId,
+      state: 'known',
+      established: 'declared',
+      // Not tested, so not dated. `tested_at` is what "not checked since
+      // March" is read off, and a declaration has never been checked at all.
+      tested_at: null,
+    })),
+    { onConflict: 'concept_id' },
+  );
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Marking those as known', error);
 }
 
 /** The names a subject already holds, which is all the generator needs of it. */
