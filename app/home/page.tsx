@@ -157,6 +157,29 @@ export default async function HomePage() {
             </h1>
           </header>
 
+          {/* The doors, as marks, right under the date.
+              The tiles at the foot of the page are the considered version --
+              each with its name and what is waiting in it -- and they stay,
+              because that is what you read when you are deciding where to go.
+              This row is for when you are not deciding: you came here to get
+              to one particular workspace, and it should not be a scroll away.
+              Marks only, named for a screen reader and on hover. */}
+          {enabled.length > 0 && (
+            <nav aria-label="Jump to a workspace" className="mt-4 flex flex-wrap items-center gap-2">
+              {enabled.map((module) => (
+                <Link
+                  key={module.id}
+                  href={module.home}
+                  title={module.label}
+                  className="press rounded-[8px] transition-opacity duration-150 hover:opacity-75"
+                >
+                  <ModuleMark module={module.id} size="md" />
+                  <span className="sr-only">{module.label}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
+
           {agenda === null && (
             <Banner tone="bad" className="mt-6">
               The agenda could not be read just now, so anything due today is missing from this
@@ -231,7 +254,10 @@ export default async function HomePage() {
             </Card>
           )}
 
-          <nav aria-label="Workspaces" className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <nav
+            aria-label="Workspaces in full"
+            className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {enabled.map((module) => (
               <ModuleCard
                 key={module.id}
