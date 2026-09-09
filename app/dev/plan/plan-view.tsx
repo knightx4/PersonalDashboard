@@ -76,6 +76,7 @@ import {
   type PlanView as View,
 } from '@/lib/plan/tree';
 import { elapsedSince } from '@/lib/plan/elapsed';
+import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
 /** A step as the pickers know it: enough to name it and to place it. */
@@ -654,6 +655,14 @@ function EditStep({
  * told about itself. An answer already given is shown above the box rather
  * than loaded into it: changing your mind should read as a new answer, not as
  * an edit that quietly replaces the old one in the record.
+ *
+ * Where the question was written with lettered options, they sit above the box
+ * as chips. Pressing one writes that option into the box rather than recording
+ * it: an answer is read by every session that works beneath this feature from
+ * now on, so the last word before it is written down stays yours, and "b, but
+ * only for the shared lists" is the answer you most often actually want. The
+ * box is still the whole form when a question has no options, which is most of
+ * them.
  */
 function AnswerDecision({
   node,
@@ -667,6 +676,19 @@ function AnswerDecision({
   autoFocus: boolean;
 }) {
   const field = `answer-${node.id}`;
+  const box = useRef<HTMLTextAreaElement>(null);
+  const options = planOptions(node.detail);
+
+  // Replaces rather than appends: the chips are a choice between the options,
+  // and pressing two of them means you changed your mind, not that you want
+  // both written down. What you type after it is yours and is left alone.
+  const choose = (option: PlanOption) => {
+    const target = box.current;
+    if (!target) return;
+    target.value = optionAnswer(option);
+    target.focus();
+    target.setSelectionRange(target.value.length, target.value.length);
+  };
 
   return (
     /* A well, not a frame: this sits inside the open step, which is already a
@@ -683,13 +705,33 @@ function AnswerDecision({
       <form action={action} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />
         <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
+        {options.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {options.map((option) => (
+              <button
+                key={option.letter}
+                type="button"
+                onClick={() => choose(option)}
+                title={`Answer ${option.letter}: ${option.label}`}
+                className="press max-w-full truncate rounded-full bg-surface px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+              >
+                <span className="font-semibold text-ink">{option.letter}</span> {option.label}
+              </button>
+            ))}
+          </div>
+        )}
         <Textarea
           id={field}
+          ref={box}
           name="answer"
           rows={2}
           className="min-h-12"
           autoFocus={autoFocus}
-          placeholder="What you decided, and enough of why that a session need not ask again."
+          placeholder={
+            options.length > 0
+              ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
+              : 'What you decided, and enough of why that a session need not ask again.'
+          }
         />
         <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>
         <Button type="submit" size="sm" pending={pending}>
