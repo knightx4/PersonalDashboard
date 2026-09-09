@@ -99,9 +99,34 @@ type Rule = {
   law: string;
   says: string;
   instead: string;
-  /** Every offending span on this line, or nothing. */
-  find: (line: string) => string[];
+  /**
+   * Every offending span on this line, or nothing.
+   *
+   * `after` is the handful of lines below it, for the one rule that cannot be
+   * settled by a single line: a card drawn per row opens on the `.map(` and
+   * names `<Card` two or three lines later. Rules that do not need it ignore it.
+   */
+  find: (line: string, after: string[]) => string[];
 };
+
+/**
+ * Whether a trimmed line is comment text.
+ *
+ * `{/*` is in the list because JSX comments open that way, and leaving it out
+ * silently broke the valve for every rule that fires on markup rather than on a
+ * class string: the marker sat directly above the offending line, the walker
+ * did not recognise the line it was on as a comment, and stopped before
+ * reading it. Found by trying to excuse a card-per-row that was genuinely
+ * right and being unable to.
+ */
+function isCommentLine(trimmed: string): boolean {
+  return (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('*') ||
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('{/*')
+  );
+}
 
 /**
  * `border` on its own. `border-t` is a rule drawn between things rather than a
@@ -221,6 +246,29 @@ const RULES: Rule[] = [
     instead: 'text-micro | text-small | text-ui | text-body | text-lead | text-title | text-figure',
     find: (line) => [...line.matchAll(/\btext-\[[\d.]+(?:px|rem|em)\]/g)].map((m) => m[0]),
   },
+  {
+    id: 'card-per-row',
+    law: '13',
+    says: 'a Card drawn once per item in a list',
+    instead: 'one surface with divide-y between rows, so a row costs 36px instead of 95',
+    /**
+     * A `.map(` in JSX with a `<Card` a few lines under it.
+     *
+     * Two lines of context rather than one, because the pattern is spread over
+     * both -- and the map has to be inside JSX, or `new Map(people.map(...))`
+     * and a `days.map()` filter both report as lists of cards. Requiring the
+     * `{` in front dropped exactly those two from eleven candidates to nine,
+     * and all nine were real.
+     *
+     * This rule is fuzzier than the other five, which is what the baseline and
+     * the valve are for: a chooser of four cards side by side is law 13 obeyed,
+     * not broken, and says so on the line.
+     */
+    find: (line, after) => {
+      if (!/\{\s*[\w.[\]()\s,...]*\.map\(/.test(line)) return [];
+      return after.some((next) => /<Card\b/.test(next)) ? ['<Card> per mapped row'] : [];
+    },
+  },
 ];
 
 // -- The walk ---------------------------------------------------------------
@@ -254,7 +302,7 @@ function scan(): Hit[] {
         // comments are the two shapes that carry prose; a real declaration
         // never starts a line with `*`.
         const trimmed = line.trimStart();
-        if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) return;
+        if (isCommentLine(trimmed)) return;
 
         // The valve: on this line, or anywhere in the comment block directly
         // above it.
@@ -270,15 +318,16 @@ function scan(): Hit[] {
         let above = index - 1;
         while (above >= 0) {
           const previous = lines[above]!.trim();
-          const isComment =
-            previous.startsWith('//') || previous.startsWith('*') || previous.startsWith('/*');
-          if (!isComment) break;
+          if (!isCommentLine(previous)) break;
           if (previous.includes('ui-ok:')) return;
           above -= 1;
         }
         for (const rule of RULES) {
           if (excused.has(rule.id)) continue;
-          for (const text of rule.find(line)) hits.push({ file, line: index + 1, rule, text });
+          const after = lines.slice(index + 1, index + 7);
+          for (const text of rule.find(line, after)) {
+            hits.push({ file, line: index + 1, rule, text });
+          }
         }
       });
     }

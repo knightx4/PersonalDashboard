@@ -93,42 +93,30 @@ export const RESTRAINT_LAWS: readonly Law[] = [
 ];
 
 /**
- * The shape laws, written after a week of sweeps that passed every check and
- * still produced screens their owner called clunky.
+ * Laws 13 to 15: what a surface is, rather than how it is drawn.
  *
- * That is the fact worth recording. The mechanical gate went from a hundred and
- * eleven violations to zero across a hundred and two files; five sweeps ran;
- * every law above was satisfied. He looked at his phone and said "these are
- * still clunky", and he was right. So the first twelve laws were not wrong,
- * they were incomplete: they govern how a component is drawn, and nothing above
- * governs what the surface *is*.
- *
- * The diagnosis, once we stopped comparing tokens and started comparing
- * screens: Linear is a list you act on, and this was a stack of forms about
- * things. Every remaining difference in feel came out of that one sentence.
- * A card per row instead of a line per row. Every field sitting in its editor
- * on arrival instead of showing its answer. A heading explaining itself in a
- * sentence underneath, on every viewing, forever.
- *
- * These three are harder than the first twelve, because obeying them means
- * deciding what a screen is for rather than tidying how it looks. That is also
- * why they matter more.
+ * All twelve laws above can be satisfied by a screen that still reads badly,
+ * and that is not hypothetical -- check:ui went from 111 violations to 0 across
+ * 102 files without changing how any page reads. The first twelve govern
+ * components. These govern the shape of the page, which is where the weight
+ * actually comes from: a list built as a stack of cards, every field arriving
+ * in an editor, every heading explaining itself underneath.
  */
 export const SHAPE_LAWS: readonly Law[] = [
   {
     n: 13,
     title: 'A row is not a card.',
-    body: 'A list is one surface with hairlines in it — not a stack of objects each carrying its own edge, margin, padding and avatar tile sized to the box rather than the line. This is capacity, not taste: a row drawn as a card costs about 95px, so a phone screen holds nine of two hundred and seventy-one pursuits; the same row drawn as a line costs 36px and holds twenty-five. Cards are for a handful of things compared side by side. Anything you scroll is a list.',
+    body: 'A list is one surface with hairlines between rows, not a stack of cards each carrying its own border, margin and padding. A card row costs about 95px. A line row costs 36px. On a phone that is nine items on screen instead of twenty-five. Cards are for a few things compared side by side; anything scrolled is a list.',
   },
   {
     n: 14,
-    title: 'A page is read before it is written.',
-    body: 'The default state of a surface is the finished thing, set plainly — not every value sitting in its own editor with a Save button underneath, waiting. Editing is somewhere you go; it is not where you land. Law 12 says that when you do edit, edit the value in place. This one is earlier: most of the time nobody is editing at all, and a screen of textareas, selects and Saves is a form the person did not ask to fill in. The same screen showing its answers, each one clickable, is their work.',
+    title: 'Nothing is in edit mode until someone edits.',
+    body: 'A surface shows its values as text. It does not draw an editor around each one, and it does not leave an empty box open for words nobody is typing — an always-open compose box is the single biggest source of form-feel in this app. A box for new text is a button until it is pressed; a value is text until it is clicked. On arrival this app renders 39 textareas, 31 selects and 52 Save buttons, almost all on screens someone came to read. Law 12 says how to edit when you do; this one says not to show the editor before then.',
   },
   {
     n: 15,
-    title: 'Say it once, in the thing itself.',
-    body: 'A heading that has to explain what it means is documentation, and by the second reading it is furniture. "Submitted — sent, and landed somewhere real" is a sentence you need once and then carry forever. Prefer a name that is right to a name plus a gloss; put the teaching in the empty state, which is exactly where someone seeing the surface for the first time is standing. And never print a caption above a box whose placeholder already says the same words.',
+    title: 'Do not explain a heading underneath the heading.',
+    body: 'A sentence restating the heading above it is read once and skipped forever after. "Submitted — sent, and landed somewhere real" teaches nothing on the second visit. Name the thing correctly instead, and put the explanation in the empty state, where someone seeing it for the first time actually is. Never put a caption above a box whose placeholder says the same words.',
   },
 ];
 
