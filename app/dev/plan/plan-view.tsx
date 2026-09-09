@@ -67,13 +67,17 @@ import {
   type PlanStatus,
 } from '@/lib/plan/load';
 import {
+  PLAN_HEALTHS,
   PLAN_VIEWS,
   PLAN_VIEW_LABEL,
   flatten,
+  healthOf as planHealthOf,
+  type PlanHealth,
   type PlanNode,
   type PlanProgress,
   type PlanSection,
   type PlanSummary,
+  type PlanTally,
   type PlanView as View,
 } from '@/lib/plan/tree';
 import { reshapeOrigin } from '@/lib/plan/origin';
@@ -1264,50 +1268,86 @@ type Health = {
   title?: string;
 };
 
+/**
+ * How each state is worded and drawn.
+ *
+ * Which state a step is in is decided in lib/plan/tree.ts, so the dots beside
+ * a module heading and the health column under it cannot disagree. What is
+ * left here is presentation: the word, the icon, and the fixed part of the
+ * tooltip.
+ */
+const HEALTH: Record<PlanHealth, Health> = {
+  unanswered: {
+    word: 'Unanswered',
+    tone: 'caution',
+    icon: HelpCircle,
+    title: 'A question waiting on you. It closes on an answer, not a commit.',
+  },
+  answered: { word: 'Answered', tone: 'positive', icon: Check },
+  proposed: {
+    word: 'Proposed',
+    tone: 'accent',
+    icon: Lightbulb,
+    title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
+  },
+  in_progress: { word: 'In progress', tone: 'accent', icon: TrendingUp },
+  blocked: { word: 'Blocked', tone: 'caution', icon: Ban },
+  waiting: { word: 'Waiting', tone: 'caution', icon: Hourglass },
+  ready: { word: 'Ready', tone: 'positive', icon: Sparkles },
+  not_started: { word: 'Not started', tone: 'quiet', icon: CircleDashed },
+  done: { word: 'Done', tone: 'positive', icon: Check },
+  dropped: { word: 'Dropped', tone: 'ghost', icon: X },
+};
+
 function healthOf(node: PlanNode): Health {
-  // A decision not yet settled is a question, whatever else is true of it.
-  // "Ready" on a question would read as ready to be built, which is the one
-  // thing it is not: nothing happens to it until somebody answers it.
-  if (node.kind === 'decision' && !isClosed(node.status) && node.status !== 'blocked') {
+  const health = planHealthOf(node);
+  const base = HEALTH[health];
+
+  // The three tooltips that can only be written with the step in hand.
+  if (health === 'answered') return { ...base, title: node.resolution ?? undefined };
+  if (health === 'blocked') return { ...base, title: node.comment ?? undefined };
+  if (health === 'waiting') {
     return {
-      word: 'Unanswered',
-      tone: 'caution',
-      icon: HelpCircle,
-      title: 'A question waiting on you. It closes on an answer, not a commit.',
+      ...base,
+      title: `Waits on ${node.waitingOn.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`,
     };
   }
-  if (node.kind === 'decision' && node.status === 'done') {
-    return { word: 'Answered', tone: 'positive', icon: Check, title: node.resolution ?? undefined };
-  }
+  return base;
+}
 
-  switch (node.status) {
-    case 'proposed':
-      return {
-        word: 'Proposed',
-        tone: 'accent',
-        icon: Lightbulb,
-        title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
-      };
-    case 'in_progress':
-      return { word: 'In progress', tone: 'accent', icon: TrendingUp };
-    case 'blocked':
-      return { word: 'Blocked', tone: 'caution', icon: Ban, title: node.comment ?? undefined };
-    case 'done':
-      return { word: 'Done', tone: 'positive', icon: Check };
-    case 'dropped':
-      return { word: 'Dropped', tone: 'ghost', icon: X };
-    case 'not_started':
-      if (node.waitingOn.length > 0) {
-        return {
-          word: 'Waiting',
-          tone: 'caution',
-          icon: Hourglass,
-          title: `Waits on ${node.waitingOn.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`,
-        };
-      }
-      if (node.ready) return { word: 'Ready', tone: 'positive', icon: Sparkles };
-      return { word: 'Not started', tone: 'quiet', icon: CircleDashed };
-  }
+/**
+ * A module's steps, counted by state, as dots beside its heading.
+ *
+ * The progress bar next to this answers "how far through", which is one
+ * number and hides the shape of what is left: eleven not-started steps and
+ * eleven unanswered questions are the same bar and are not the same module.
+ * A dot per state with its count says which, without the section being
+ * opened -- and it survives the fold, which is the point (law 10).
+ *
+ * Only states that are actually present get a dot. A row of zeroes is noise,
+ * and a "0 blocked" is a fact nobody needed (law 1). The count is the label:
+ * the word is on the dot's tooltip and in its accessible name, because eight
+ * spelled-out states would be a paragraph where a glance was asked for.
+ */
+function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
+  const present = PLAN_HEALTHS.filter((health) => tally[health] > 0);
+  if (present.length === 0) return null;
+
+  return (
+    <span className="flex items-center gap-2.5" aria-label={`${label} by state`}>
+      {present.map((health) => (
+        <span
+          key={health}
+          className="flex items-center gap-1"
+          title={`${tally[health]} ${HEALTH[health].word.toLowerCase()}`}
+        >
+          <span className={cn('size-2 shrink-0 rounded-full', TONE_DOT[HEALTH[health].tone])} aria-hidden />
+          <span className="tabular text-small text-ink-muted">{tally[health]}</span>
+          <span className="sr-only">{HEALTH[health].word}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 const TONE_TEXT: Record<Health['tone'], string> = {
@@ -2188,7 +2228,10 @@ export function PlanView({
                   />
                   {section.label}
                 </h2>
-                <Progress label={section.label} progress={section.progress} />
+                <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <SectionTally tally={section.tally} label={section.label} />
+                  <Progress label={section.label} progress={section.progress} />
+                </span>
               </summary>
 
               <div className="space-y-2">

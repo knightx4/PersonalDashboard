@@ -74,6 +74,11 @@ export type PlanSection = {
   nodes: PlanNode[];
   /** Over the leaf steps of the whole module, filtered or not. */
   progress: PlanProgress;
+  /**
+   * The states of those same steps, counted. Also over the whole module: a
+   * view narrows what is listed, not what is true of the module.
+   */
+  tally: PlanTally;
 };
 
 export const PLAN_VIEWS = ['all', 'open', 'ready', 'proposed', 'claude', 'blocked'] as const;
@@ -255,6 +260,7 @@ export function buildPlanTree(data: PlanData): PlanSection[] {
         label: scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'The app as a whole',
         nodes,
         progress: planProgress(leavesOf(nodes)),
+        tally: tallyHealth(nodes),
       };
     })
     .filter((section) => section.module !== null || section.nodes.length > 0);
@@ -263,6 +269,81 @@ export function buildPlanTree(data: PlanData): PlanSection[] {
 /** The steps with no steps of their own, beneath these. */
 export function leavesOf(nodes: readonly PlanNode[]): PlanNode[] {
   return nodes.flatMap((node) => (node.children.length === 0 ? [node] : leavesOf(node.children)));
+}
+
+/**
+ * What state a step is actually in, as one word.
+ *
+ * This is not `node.status`. A question and a step share the status column but
+ * do not mean the same things by it -- an unfinished decision is not "not
+ * started", it is unanswered, and it closes on an answer rather than on a
+ * commit. Nor is "ready" a status: it is worked out from what a step waits on
+ * and what sits beneath it.
+ *
+ * It lives here rather than in the page because the page is no longer the only
+ * thing asking. The dots beside a module heading count these, and a tally that
+ * classified steps by its own slightly different rules would disagree with the
+ * health column directly beneath it, on the same screen, about the same step.
+ * The page keeps the wording, the icon and the tooltip; the rule is here.
+ */
+export const PLAN_HEALTHS = [
+  'unanswered',
+  'answered',
+  'proposed',
+  'in_progress',
+  'blocked',
+  'waiting',
+  'ready',
+  'not_started',
+  'done',
+  'dropped',
+] as const;
+export type PlanHealth = (typeof PLAN_HEALTHS)[number];
+
+export function healthOf(
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'>,
+): PlanHealth {
+  // A decision not yet settled is a question, whatever else is true of it.
+  // "Ready" on a question would read as ready to be built, which is the one
+  // thing it is not: nothing happens to it until somebody answers it.
+  if (node.kind === 'decision' && !isClosed(node.status) && node.status !== 'blocked') {
+    return 'unanswered';
+  }
+  if (node.kind === 'decision' && node.status === 'done') return 'answered';
+
+  switch (node.status) {
+    case 'proposed':
+      return 'proposed';
+    case 'in_progress':
+      return 'in_progress';
+    case 'blocked':
+      return 'blocked';
+    case 'done':
+      return 'done';
+    case 'dropped':
+      return 'dropped';
+    case 'not_started':
+      if (node.waitingOn.length > 0) return 'waiting';
+      return node.ready ? 'ready' : 'not_started';
+  }
+}
+
+/** How many steps are in each state. Every health has an entry, most of them 0. */
+export type PlanTally = Record<PlanHealth, number>;
+
+/**
+ * The states of a module's steps, counted.
+ *
+ * Over the leaves, which is the same set `planProgress` measures, and for the
+ * same reason: a feature's state is mostly a summary of the steps under it, so
+ * counting both says "twelve things" about a module that has seven. Questions
+ * are leaves and so are counted -- an unanswered one is exactly the kind of
+ * thing this is meant to surface without being opened.
+ */
+export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
+  const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
+  for (const leaf of leavesOf(nodes)) tally[healthOf(leaf)] += 1;
+  return tally;
 }
 
 /** Every step in reading order: top to bottom, each step before its steps. */

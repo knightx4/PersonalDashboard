@@ -8,6 +8,7 @@ import {
   flattenSections,
   isReady,
   leavesOf,
+  healthOf,
   planProgress,
   subtreeIds,
   handedToClaude,
@@ -505,5 +506,68 @@ describe('walking the tree', () => {
   it('names a step and everything beneath it', () => {
     expect([...subtreeIds(findNode(sections, 'root')!)].sort()).toEqual(['leaf', 'mid', 'root']);
     expect([...subtreeIds(findNode(sections, 'other')!)]).toEqual(['other']);
+  });
+});
+
+describe('healthOf', () => {
+  it('calls an unsettled question unanswered rather than not started', () => {
+    // A question does not get built, so nothing about a step's readiness
+    // applies to it: it closes on an answer.
+    expect(healthOf(shopping(tree([at('not_started', 'q', { kind: 'decision' })])).nodes[0])).toBe(
+      'unanswered',
+    );
+  });
+
+  it('separates ready, waiting and not started among not_started steps', () => {
+    const sections = tree(
+      [at('not_started', 'a'), at('not_started', 'b'), at('not_started', 'c', { parentId: 'a' })],
+      [dep('b', 'a')],
+    );
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+    // 'a' has an open step beneath it, so it is not ready; 'b' waits on 'a';
+    // 'c' has nothing above or beneath it in the way.
+    expect(healthOf(byId.get('c')!)).toBe('ready');
+    expect(healthOf(byId.get('b')!)).toBe('waiting');
+    expect(healthOf(byId.get('a')!)).toBe('not_started');
+  });
+});
+
+describe('tallyHealth', () => {
+  it('counts the leaves by state and leaves the rest at zero', () => {
+    const section = shopping(
+      tree([
+        at('done', 'a'),
+        at('blocked', 'b'),
+        at('proposed', 'c'),
+        at('not_started', 'q', { kind: 'decision' }),
+      ]),
+    );
+    expect(section.tally).toMatchObject({
+      done: 1,
+      blocked: 1,
+      proposed: 1,
+      unanswered: 1,
+      dropped: 0,
+      in_progress: 0,
+    });
+  });
+
+  it('counts a feature once, through its steps, not twice', () => {
+    // The same reason planProgress measures leaves: counting a feature and the
+    // steps under it says "three things" about a module that has two.
+    const section = shopping(
+      tree([at('not_started', 'f'), at('done', 's1', { parentId: 'f' }), at('done', 's2', { parentId: 'f' })]),
+    );
+    const total = Object.values(section.tally).reduce((sum, n) => sum + n, 0);
+    expect(total).toBe(2);
+    expect(section.tally.done).toBe(2);
+  });
+
+  it('is over the whole module, not the view', () => {
+    // A filter narrows what is listed; it does not change what is true of the
+    // module, and the dots survive the section being folded shut.
+    const whole = tree([at('done', 'a'), at('not_started', 'b')]);
+    const narrowed = applyView(whole, 'ready');
+    expect(shopping(narrowed).tally).toEqual(shopping(whole).tally);
   });
 });
