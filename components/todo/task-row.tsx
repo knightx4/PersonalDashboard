@@ -142,8 +142,13 @@ export function TaskRow({
 
   return (
     <div
+      // The handle a link from elsewhere lands on: /todo#task-<id> from the
+      // front page, so "the thing due today" on home is one click from the row
+      // that can actually be ticked off. `scroll-mt` keeps it clear of the
+      // sticky top bar, which would otherwise land it just under the header.
+      id={`task-${task.id}`}
       className={cn(
-        'group row-pad relative flex items-start gap-3',
+        'group row-pad relative flex scroll-mt-24 items-start gap-3',
         pending && 'opacity-50',
         grabbed && 'opacity-40',
       )}

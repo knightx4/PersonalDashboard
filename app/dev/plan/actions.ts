@@ -639,10 +639,20 @@ export async function sendPlanItemToClaude(
   const node = findNode(sections, id.data);
   if (!node) return { error: 'That step no longer exists.' };
 
-  if (node.assignee !== 'claude') {
+  // Handed over and underway, in the one write. A step sent to Claude is being
+  // built from the moment the routine wakes, and a plan still reading "not
+  // started" while a session works it is the plan lying about itself -- the one
+  // thing it is not allowed to do. `started_at` comes from the trigger, so the
+  // page can also say how long it has been going.
+  const patch: Record<string, string> = {};
+  if (node.assignee !== 'claude') patch.assignee = 'claude';
+  // Only a step nobody has started moves. A blocked one keeps its status and
+  // its reason, and one already underway keeps the clock it started on.
+  if (node.status === 'not_started') patch.status = 'in_progress';
+  if (Object.keys(patch).length > 0) {
     const { error } = await supabase
       .from('plan_items')
-      .update({ assignee: 'claude' })
+      .update(patch)
       .eq('id', node.id)
       .eq('user_id', user.id);
     if (error) return { error: error.message };
@@ -718,6 +728,24 @@ export async function sendPlanFeatureToClaude(
     revalidatePlan();
   }
 
+  // And every one of them underway, not only the feature at the top. The whole
+  // batch has been handed over in one press, so the plan should show the whole
+  // batch as work in hand rather than one step in progress over six that still
+  // read as untouched. A decision is left alone: it is a question put to the
+  // person, and nothing is in progress on it until they answer.
+  const toStart = open
+    .filter((step) => step.status === 'not_started' && step.kind !== 'decision')
+    .map((step) => step.id);
+  if (toStart.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ status: 'in_progress' })
+      .in('id', toStart)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePlan();
+  }
+
   const steps = open.length - 1;
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
@@ -752,10 +780,15 @@ export async function sendPlanFeatureToClaude(
  * the state this button is for: a queue built up over a session and sent when
  * you get up from the desk.
  *
- * Nothing is assigned here and nothing changes state. Being handed over is
- * exactly what these steps already are -- that is how they got into the queue
- * -- so this is a send and only a send, and pressing it twice sends the same
- * queue again rather than dragging anything new into it.
+ * Nothing is assigned here. Being handed over is exactly what these steps
+ * already are -- that is how they got into the queue -- so nothing is dragged
+ * into the queue by pressing this, and pressing it twice sends the same queue
+ * again.
+ *
+ * What it does change is the one thing that has become true: every step in the
+ * batch is now work in hand, so the ones that had not been started are marked
+ * in progress. `handedToClaude` has already left out the decisions and the
+ * proposals, so what is left is exactly what a session will build.
  *
  * `handedToClaude` decides what is in it: open, approved, not a decision, most
  * urgent first. One routine works the lot in that order, because two sessions
@@ -773,6 +806,17 @@ export async function sendPlanQueueToClaude(
   const queue = handedToClaude(sections);
   if (queue.length === 0) {
     return { error: 'Nothing is handed to Claude right now. Hand a step over and it lands here.' };
+  }
+
+  const toStart = queue.filter((step) => step.status === 'not_started').map((step) => step.id);
+  if (toStart.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ status: 'in_progress' })
+      .in('id', toStart)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePlan();
   }
 
   const text =
