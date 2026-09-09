@@ -1121,6 +1121,25 @@ form[data-auto-submit] [data-fallback-submit] {
   border-radius: 0.25rem;
 }
 
+/* The one opt-out, for a control that is already the only thing focusable on
+ * a surface that exists to hold it -- the command palette's field, which the
+ * palette focuses the instant it opens.
+ *
+ * The ring's whole job is to say which of several things has the keyboard.
+ * Inside a modal with one field there is no "which", so it stops being an
+ * answer and becomes an accent rectangle drawn permanently around the search
+ * bar, which is what it looked like. Nothing is lost: a scrim, a lifted panel
+ * and a caret already say where the typing goes.
+ *
+ * This rule has to live here, unlayered, rather than as `focus-visible:
+ * outline-none` on the element. `@import "tailwindcss"` puts every utility in
+ * a layer, and unlayered CSS beats layered CSS whatever the specificity, so
+ * the rule above wins against the utility every time. That is also why the
+ * bug survived an `outline-none` already sitting on the input. */
+[data-focus-ring='none']:focus-visible {
+  outline: none;
+}
+
 /* ---------------------------------------------------------------------------
  * Vault notes.
  *
