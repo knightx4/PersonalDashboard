@@ -79,9 +79,11 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         // failure rather than as a step you have not taken.
         <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5 border-dashed')}>
           <h2 className="mb-2 text-ui font-semibold text-ink-muted">No source yet</h2>
-          <p className="mb-4 text-body text-ink-muted">
-            You wrote this down yourself. Nothing has been found to read for it yet.
-          </p>
+          {/* The row's own basis rather than a fixed sentence: a subject can
+              get here by being typed or by being proposed for a topic, and
+              telling you the wrong one of those is the small dishonesty this
+              module is built to avoid. */}
+          <p className="mb-4 text-body text-ink-muted">{reading.locatorBasis}</p>
           <FindSources readingId={reading.id} />
         </section>
       ) : (

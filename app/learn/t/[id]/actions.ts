@@ -5,7 +5,16 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { addManualReading, deleteReading, deleteTrack } from '@/lib/learn/tracks/save';
+import {
+  addManualReading,
+  deleteReading,
+  deleteTrack,
+  savePlan,
+  type PlanSaveRow,
+} from '@/lib/learn/tracks/save';
+import { planTopic } from '@/lib/learn/import/plan-topic';
+import { planStepSchema, type PlanStep } from '@/lib/learn/import/plan-payload';
+import { loadTrack } from '@/lib/learn/tracks/load';
 
 /**
  * Adding to a track by hand, and taking things off it.
@@ -110,4 +119,90 @@ export async function removeTrack(formData: FormData): Promise<void> {
 
   revalidatePath('/learn');
   redirect('/learn');
+}
+
+export type PlanState = {
+  error?: string;
+  /** Proposed, not saved. Nothing reaches the track until you confirm. */
+  steps?: PlanStep[];
+};
+
+/**
+ * Plan a topic that has nothing in it.
+ *
+ * Proposes and writes nothing, the same rule the import path follows. It
+ * matters most here: this is the one call in the module given nothing but a
+ * topic, so it has the most room to be wrong, and a generated plan saved
+ * without a look is a queue of things somebody else decided you should read.
+ */
+export async function planTrack(_prev: PlanState, formData: FormData): Promise<PlanState> {
+  await requireUser();
+
+  const trackId = z.string().uuid().safeParse(formData.get('trackId'));
+  if (!trackId.success) return { error: 'Could not work out which topic to plan.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Planning a topic needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+  const track = await loadTrack(supabase, trackId.data);
+  if (!track) return { error: 'That topic is not there any more.' };
+
+  const result = await planTopic({
+    topic: track.title,
+    question: track.question,
+    anthropicApiKey: apiKey,
+  });
+
+  if (!result.ok) return { error: result.detail };
+  return { steps: result.steps };
+}
+
+/**
+ * Write the steps you kept.
+ *
+ * The payloads ride back through hidden fields, so they are re-validated here
+ * rather than trusted -- a form field is user input whoever wrote the form --
+ * and a row that does not survive validation is dropped rather than saved
+ * half-formed.
+ */
+export async function confirmPlan(
+  _prev: TrackActionState,
+  formData: FormData,
+): Promise<TrackActionState> {
+  const user = await requireUser();
+
+  const trackId = z.string().uuid().safeParse(formData.get('trackId'));
+  if (!trackId.success) return { error: 'Could not work out which topic to save to.' };
+
+  const rows: PlanSaveRow[] = [];
+  for (const raw of formData.getAll('step')) {
+    if (typeof raw !== 'string') continue;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const shape = planStepSchema.safeParse(payload);
+    if (!shape.success) continue;
+    rows.push({
+      subject: shape.data.subject,
+      why: shape.data.why ?? null,
+      resolved: shape.data.source ?? null,
+    });
+  }
+
+  if (rows.length === 0) return { error: 'Tick at least one step to save.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await savePlan(supabase, user.id, { trackId: trackId.data, rows });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that plan.' };
+  }
+
+  revalidatePath(`/learn/t/${trackId.data}`);
+  revalidatePath('/learn');
+  return {};
 }
