@@ -418,8 +418,12 @@ export default function DevUiPage() {
             </div>
           </div>
           <p className="text-body text-ink-muted">
-            On arrival this app renders 39 textareas, 31 selects and 52 Save buttons, almost all on
-            screens someone came to read.
+            46 textareas and 45 selects are written into markup across the app, most on screens
+            someone came to read. Counts rot, so re-measure rather than trust this line:{' '}
+            <code className="text-ui">
+              grep -rn &quot;&lt;Textarea|&lt;ComposeBody&quot; --include=*.tsx app components
+            </code>
+            .
           </p>
         </Group>
 

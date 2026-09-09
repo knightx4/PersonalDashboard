@@ -111,7 +111,7 @@ export const SHAPE_LAWS: readonly Law[] = [
   {
     n: 14,
     title: 'Nothing is in edit mode until someone edits.',
-    body: 'A surface shows its values as text. It does not draw an editor around each one, and it does not leave an empty box open for words nobody is typing — an always-open compose box is the single biggest source of form-feel in this app. A box for new text is a button until it is pressed; a value is text until it is clicked. On arrival this app renders 39 textareas, 31 selects and 52 Save buttons, almost all on screens someone came to read. Law 12 says how to edit when you do; this one says not to show the editor before then.',
+    body: 'A surface shows its values as text. It does not draw an editor around each one, and it does not leave an empty box open for words nobody is typing — an always-open compose box is the single biggest source of form-feel in this app. A box for new text is a button until it is pressed; a value is text until it is clicked. Law 12 says how to edit when you do; this one says not to show the editor before then.',
   },
   {
     n: 15,
