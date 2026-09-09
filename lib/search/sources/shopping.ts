@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createClient } from '@/lib/auth/server';
 import type { SearchContext, SearchHit, SearchSource } from '@/lib/search/sources';
-import { embedded, inventoryHit, orderHit, savedHit } from '@/lib/search/sources/map';
+import { embedded, escapeLike, inventoryHit, orderHit, savedHit } from '@/lib/search/sources/map';
 
 /**
  * Shopping, in the command palette.
@@ -17,9 +17,7 @@ import { embedded, inventoryHit, orderHit, savedHit } from '@/lib/search/sources
  * order, and the item inside it has its own row in inventory.
  */
 
-function contains(query: string): string {
-  return `%${query.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-}
+const contains = (query: string) => `%${escapeLike(query)}%`;
 
 async function findOrders(ctx: SearchContext): Promise<SearchHit[]> {
   const supabase = await createClient();

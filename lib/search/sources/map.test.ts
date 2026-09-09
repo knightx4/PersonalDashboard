@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   companyHit,
+  escapeLike,
   contactHit,
   embedded,
   inventoryHit,
@@ -138,5 +139,18 @@ describe('the shopping kinds', () => {
       match: 'Fully',
       href: '/shopping/saved/s1',
     });
+  });
+});
+
+describe('escaping what somebody typed', () => {
+  it('leaves ordinary words alone', () => {
+    expect(escapeLike('acme')).toBe('acme');
+  });
+
+  it('escapes the wildcards, so a % they typed is a % they meant', () => {
+    // Unescaped, "50%" would match everything beginning "50".
+    expect(escapeLike('50%')).toBe('50\\%');
+    expect(escapeLike('a_b')).toBe('a\\_b');
+    expect(escapeLike('back\\slash')).toBe('back\\\\slash');
   });
 });

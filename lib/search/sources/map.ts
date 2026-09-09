@@ -13,6 +13,14 @@ import type { SearchHit } from '@/lib/search/sources';
  * that it says which.
  */
 
+/**
+ * `ilike` with the wildcards escaped, so a % somebody typed is a % they meant
+ * rather than "match anything from here".
+ */
+export function escapeLike(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
 /** A PostgREST embed comes back as an object or a one-element array. */
 export function embedded<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;

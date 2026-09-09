@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createClient } from '@/lib/jobs/auth/server';
 import type { SearchContext, SearchHit, SearchSource } from '@/lib/search/sources';
-import { companyHit, contactHit, embedded, roleHit } from '@/lib/search/sources/map';
+import { companyHit, contactHit, embedded, escapeLike, roleHit } from '@/lib/search/sources/map';
 
 /**
  * The job search, in the command palette.
@@ -18,10 +18,7 @@ import { companyHit, contactHit, embedded, roleHit } from '@/lib/search/sources/
  * ilike.
  */
 
-/** `ilike` with the wildcards escaped, so a % somebody typed is a % they meant. */
-function contains(query: string): string {
-  return `%${query.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-}
+const contains = (query: string) => `%${escapeLike(query)}%`;
 
 async function findCompanies(ctx: SearchContext): Promise<SearchHit[]> {
   const supabase = await createClient();

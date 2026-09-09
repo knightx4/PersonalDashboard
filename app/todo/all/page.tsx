@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/field';
 import { TaskRow } from '@/components/todo/task-row';
 import { cn } from '@/lib/cn';
+import { FocusTask } from './focus';
 
 export const metadata = { title: 'All tasks' };
 
@@ -33,7 +34,7 @@ type Filter = (typeof FILTERS)[number]['id'];
 export default async function AllTasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; focus?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -42,6 +43,9 @@ export default async function AllTasksPage({
     ? (params.status as Filter)
     : 'open';
   const search = params.q?.trim() ?? '';
+  // A task is the one thing in the app with no page of its own, so the command
+  // palette sends you here with the row named. Absent, nothing changes.
+  const focus = params.focus?.trim() ?? '';
 
   const [settings, tasks] = await Promise.all([
     loadAccountSettings(user.id),
@@ -54,6 +58,8 @@ export default async function AllTasksPage({
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="All tasks" description="Everything, including what is finished." />
+
+      {focus && <FocusTask id={focus} />}
 
       <div className="flex flex-wrap items-center gap-2">
         <nav className="flex items-center gap-1" aria-label="Filter by status">
@@ -101,7 +107,16 @@ export default async function AllTasksPage({
       ) : (
         <Card padding="none" className="mt-4 divide-y divide-border px-3">
           {tasks.map((task) => (
-            <TaskRow key={task.id} task={task} timezone={settings.timezone} />
+            <div
+              key={task.id}
+              id={`task-${task.id}`}
+              className={cn(
+                'scroll-mt-24 -mx-3 px-3',
+                task.id === focus && 'animate-[pulse_1.2s_ease-in-out_2] rounded-lg bg-accent-tint',
+              )}
+            >
+              <TaskRow task={task} timezone={settings.timezone} />
+            </div>
           ))}
         </Card>
       )}
