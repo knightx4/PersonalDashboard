@@ -3,6 +3,8 @@ import type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 import type { PlanItem, PlanStatus } from '@/lib/plan/load';
 import {
   buildChangelog,
+  changelogEntries,
+  groupChangelog,
   moduleForPath,
   noteEntries,
   planEntries,
@@ -229,5 +231,92 @@ describe('buildChangelog', () => {
     const keys = days.flatMap((day) => day.entries.map((entry) => entry.key));
 
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe('the feature a step shipped under', () => {
+  const parents = [
+    { id: 'feature', number: 10, title: 'The share page', parentId: null },
+    { id: 'group', number: 11, title: 'The link', parentId: 'feature' },
+  ];
+
+  it('names the feature at the top, not the step just above', () => {
+    // "What did this belong to" is answered by the feature. A sub-sub-step's
+    // parent is another step, which nobody thinks of as a thing.
+    const [entry] = planEntries([step({ id: 'a', parentId: 'group' })], parents);
+    expect(entry.issue).toEqual({ id: 'feature', number: 10, title: 'The share page' });
+  });
+
+  it('gives a feature itself no issue above it', () => {
+    expect(planEntries([step({ id: 'a', parentId: null })], parents)[0].issue).toBeNull();
+  });
+
+  it('survives a parent chain that loops', () => {
+    // A cycle is data, and data can be wrong in ways that hang a page.
+    const looped = [
+      { id: 'x', number: 1, title: 'X', parentId: 'y' },
+      { id: 'y', number: 2, title: 'Y', parentId: 'x' },
+    ];
+    expect(() => planEntries([step({ id: 'a', parentId: 'x' })], looped)).not.toThrow();
+  });
+
+  it('gives a note no issue: it belongs to no feature', () => {
+    expect(noteEntries([note({ id: 'n' })])[0].issue).toBeNull();
+  });
+});
+
+describe('groupChangelog', () => {
+  const parents = [{ id: 'feature', number: 10, title: 'The share page', parentId: null }];
+
+  const entries = changelogEntries({
+    plan: [
+      step({ id: 's1', parentId: 'feature', completedAt: '2026-03-02T09:00:00Z', commitSha: 'aaa' }),
+      step({ id: 's2', parentId: 'feature', completedAt: '2026-03-04T09:00:00Z', commitSha: 'bbb' }),
+      step({ id: 'lone', parentId: null, completedAt: '2026-03-03T09:00:00Z', commitSha: 'aaa' }),
+    ],
+    planParents: parents,
+    notes: [],
+  });
+
+  it('puts a feature’s steps together however far apart the days are', () => {
+    // The whole point: two lines two days apart were one piece of work.
+    const groups = groupChangelog(entries, 'issue');
+    const feature = groups.find((group) => group.label === 'The share page')!;
+    expect(feature.entries.map((entry) => entry.id).sort()).toEqual(['s1', 's2']);
+    expect(feature.number).toBe(10);
+  });
+
+  it('lets a step with no feature above it head its own group', () => {
+    const groups = groupChangelog(entries, 'issue');
+    expect(groups.some((group) => group.key === 'plan-lone')).toBe(true);
+  });
+
+  it('puts back together what one commit closed', () => {
+    const groups = groupChangelog(entries, 'commit');
+    const aaa = groups.find((group) => group.key === 'aaa')!;
+    expect(aaa.entries.map((entry) => entry.id).sort()).toEqual(['lone', 's1']);
+  });
+
+  it('gives rows closed without a commit a heading rather than dropping them', () => {
+    // Law 2: a row that closed with no commit is a real thing that happened.
+    const withoutSha = changelogEntries({
+      plan: [step({ id: 'x', commitSha: null })],
+      notes: [],
+    });
+    const groups = groupChangelog(withoutSha, 'commit');
+    expect(groups[0].key).toBe('no-commit');
+    expect(groups[0].entries).toHaveLength(1);
+  });
+
+  it('orders groups by their newest entry, not by name', () => {
+    const groups = groupChangelog(entries, 'issue');
+    // The feature carries s2, closed on the 4th; the lone step closed on the 3rd.
+    expect(groups[0].label).toBe('The share page');
+  });
+
+  it('still groups by day the way the page always has', () => {
+    const groups = groupChangelog(entries, 'day');
+    expect(groups.map((group) => group.label)).toEqual(['2026-03-04', '2026-03-03', '2026-03-02']);
+    expect(groups.every((group) => group.kind === 'day')).toBe(true);
   });
 });

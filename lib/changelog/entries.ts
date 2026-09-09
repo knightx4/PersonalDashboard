@@ -41,10 +41,60 @@ export type ChangelogEntry = {
   /** The step's detail, or the note's resolution note. */
   detail: string | null;
   commitSha: string | null;
+  /**
+   * The feature this shipped under, when it shipped under one.
+   *
+   * The top of the plan tree above the step, not its immediate parent: the
+   * question "what did this belong to" is answered by the feature, and a
+   * sub-sub-step's parent is another step nobody thinks of as a thing.
+   * Null for a note, which belongs to no feature, and for a feature itself.
+   */
+  issue: ChangelogIssue | null;
+};
+
+export type ChangelogIssue = { id: string; number: number; title: string };
+
+/** Enough of a plan row to walk up from a step to the feature above it. */
+export type PlanParentRow = {
+  id: string;
+  number: number;
+  title: string;
+  parentId: string | null;
 };
 
 export type ChangelogDay = {
   day: string;
+  entries: ChangelogEntry[];
+};
+
+/**
+ * How the page is grouped. In the URL, so a grouping is a link somebody can
+ * keep -- law 5.
+ */
+export const CHANGELOG_GROUPINGS = ['day', 'issue', 'commit'] as const;
+export type ChangelogGrouping = (typeof CHANGELOG_GROUPINGS)[number];
+
+export function isChangelogGrouping(value: string): value is ChangelogGrouping {
+  return (CHANGELOG_GROUPINGS as readonly string[]).includes(value);
+}
+
+export const CHANGELOG_GROUPING_LABEL: Record<ChangelogGrouping, string> = {
+  day: 'By day',
+  issue: 'By issue',
+  commit: 'By commit',
+};
+
+export type ChangelogGroup = {
+  key: string;
+  /** What the heading is, so the page knows how to set it. */
+  kind: ChangelogGrouping | 'loose';
+  /**
+   * The heading. A `YYYY-MM-DD` for a day and a sha for a commit, both of
+   * which the page formats -- everything else is final text.
+   */
+  label: string;
+  /** The `#12` of a feature. Null everywhere else. */
+  number: number | null;
   entries: ChangelogEntry[];
 };
 
@@ -72,7 +122,17 @@ export function moduleForPath(path: string | null): ModuleId | null {
  * file it under — the trigger sets that column from the status, so it means a
  * row edited around the app rather than closed through it.
  */
-export function planEntries(items: readonly PlanItem[]): ChangelogEntry[] {
+export function planEntries(
+  items: readonly PlanItem[],
+  /**
+   * Every plan row, thin, so a step can name the feature above it. The steps
+   * on this page are the closed ones and their features usually are not, so
+   * the ancestors cannot be found among the entries themselves.
+   */
+  parents: readonly PlanParentRow[] = [],
+): ChangelogEntry[] {
+  const byId = new Map(parents.map((row) => [row.id, row]));
+
   return items
     .filter((item) => item.status === 'done' && item.completedAt !== null)
     .map((item) => ({
@@ -86,7 +146,35 @@ export function planEntries(items: readonly PlanItem[]): ChangelogEntry[] {
       title: item.title,
       detail: item.detail,
       commitSha: item.commitSha,
+      issue: featureAbove(item.parentId, byId),
     }));
+}
+
+/**
+ * The feature at the top of the tree above a step.
+ *
+ * Walks to the root rather than stopping at the parent, because "what did this
+ * belong to" is answered by the feature and a sub-sub-step's parent is another
+ * step. Guards against a cycle by refusing to visit a row twice: a parent
+ * chain is data, and data can be wrong in ways that hang a page.
+ */
+function featureAbove(
+  parentId: string | null,
+  byId: ReadonlyMap<string, PlanParentRow>,
+): ChangelogIssue | null {
+  const seen = new Set<string>();
+  let current = parentId;
+  let top: PlanParentRow | null = null;
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    const row = byId.get(current);
+    if (!row) break;
+    top = row;
+    current = row.parentId;
+  }
+
+  return top ? { id: top.id, number: top.number, title: top.title } : null;
 }
 
 /**
@@ -108,6 +196,9 @@ export function noteEntries(rows: readonly FeedbackRow[]): ChangelogEntry[] {
       title: row.body,
       detail: row.resolutionNote,
       commitSha: row.commitSha,
+      // A note belongs to no feature. It is its own small issue, and grouping
+      // by issue says exactly that rather than inventing a parent for it.
+      issue: null,
     }));
 }
 
@@ -130,19 +221,101 @@ function dayOf(at: string): string {
  * entries rather than counted off a calendar — most days nothing ships, and a
  * changelog of empty headings is a worse read than a short one.
  */
-export function buildChangelog(input: {
+export function changelogEntries(input: {
   plan: readonly PlanItem[];
+  planParents?: readonly PlanParentRow[];
   notes: readonly FeedbackRow[];
-}): ChangelogDay[] {
-  const entries = [...planEntries(input.plan), ...noteEntries(input.notes)].sort(
+}): ChangelogEntry[] {
+  return [...planEntries(input.plan, input.planParents), ...noteEntries(input.notes)].sort(
     (a, b) => b.at.localeCompare(a.at) || a.key.localeCompare(b.key),
   );
+}
 
+export function buildChangelog(input: {
+  plan: readonly PlanItem[];
+  planParents?: readonly PlanParentRow[];
+  notes: readonly FeedbackRow[];
+}): ChangelogDay[] {
   const days: ChangelogDay[] = [];
-  for (const entry of entries) {
+  for (const entry of changelogEntries(input)) {
     const last = days[days.length - 1];
     if (last && last.day === entry.day) last.entries.push(entry);
     else days.push({ day: entry.day, entries: [entry] });
   }
   return days;
+}
+
+/**
+ * The entries under headings, in one of three ways.
+ *
+ * By day is the default and what the page has always done: a changelog is
+ * read as "what landed lately". The other two answer questions the day
+ * grouping buries.
+ *
+ * By issue puts a feature's steps together, which is the only way to see that
+ * six lines spread over three days were one piece of work. A step's issue is
+ * the feature at the top of the tree above it; a feature that shipped itself,
+ * and a note, belong to nothing above them and stand as their own line.
+ *
+ * By commit puts everything one commit closed together. A batch closes several
+ * rows against one sha and they scatter across a day; this is how you read the
+ * commit back as the thing it was.
+ *
+ * Groups are ordered by their newest entry, never by name, so the top of the
+ * page is the most recent work whichever way it is grouped.
+ */
+export function groupChangelog(
+  entries: readonly ChangelogEntry[],
+  grouping: ChangelogGrouping,
+): ChangelogGroup[] {
+  const groups = new Map<string, ChangelogGroup>();
+
+  for (const entry of entries) {
+    const of = groupOf(entry, grouping);
+    const existing = groups.get(of.key);
+    if (existing) existing.entries.push(entry);
+    else groups.set(of.key, { ...of, entries: [entry] });
+  }
+
+  // Insertion order is already newest-first when the entries are, because a
+  // group is created by its own newest entry. Sorting explicitly anyway, so
+  // this does not silently depend on the caller having sorted.
+  return [...groups.values()].sort(
+    (a, b) => newestOf(b).localeCompare(newestOf(a)) || a.key.localeCompare(b.key),
+  );
+}
+
+function newestOf(group: ChangelogGroup): string {
+  return group.entries.reduce((newest, entry) => (entry.at > newest ? entry.at : newest), '');
+}
+
+function groupOf(
+  entry: ChangelogEntry,
+  grouping: ChangelogGrouping,
+): Omit<ChangelogGroup, 'entries'> {
+  if (grouping === 'day') {
+    return { key: entry.day, kind: 'day', label: entry.day, number: null };
+  }
+
+  if (grouping === 'commit') {
+    // Its own heading rather than dropped or quietly pooled with the rest: a
+    // row that closed without a commit is a real thing that happened, and
+    // saying so is law 2.
+    if (!entry.commitSha) {
+      return { key: 'no-commit', kind: 'loose', label: 'Closed without a commit', number: null };
+    }
+    return { key: entry.commitSha, kind: 'commit', label: entry.commitSha, number: null };
+  }
+
+  if (entry.issue) {
+    return {
+      key: `issue-${entry.issue.id}`,
+      kind: 'issue',
+      label: entry.issue.title,
+      number: entry.issue.number,
+    };
+  }
+
+  // A feature, or a note: it is the issue, so it heads its own group of one.
+  return { key: entry.key, kind: 'issue', label: entry.title, number: entry.number };
 }

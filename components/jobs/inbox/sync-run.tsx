@@ -113,7 +113,7 @@ export function SyncProgressBar({ accountId, job }: { accountId: string; job: Sy
   return (
     <div className="mt-2" aria-live="polite" data-account={accountId}>
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-canvas"
+        className="h-1.5 overflow-hidden rounded-full bg-sunken"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}

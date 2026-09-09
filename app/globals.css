@@ -279,44 +279,55 @@
   --c-sheet-scheme: light;
 
   /* ---- The bench ----
-   * Blue-grey rather than neutral, and a shade off full black: a bench at
-   * #08090c reads as a hole punched in the screen, and the sheets on it look
-   * like they are floating in nothing. Lifting it to a blue-cast near-black
-   * and laying a wash over it gives the light somewhere to come from.
+   * Blue-grey rather than neutral, and mid-toned: dark enough to be plainly
+   * the background, light enough that the room has a colour rather than
+   * being an absence of one.
    *
-   * This was briefly raised to #1e2734 to shrink the step up to a lit sheet
-   * from 16.9:1 to 13.6:1, and put back: the slate bench that bought read as
-   * a grey room rather than a dark one, and the dark is the theme. The step
-   * is softened at the edge instead -- see the outline and the bloom below,
-   * which cost the bench nothing. */
-  --c-page: #0d1219;
-  --c-page-ink: #e7ebf1;
-  --c-page-ink-muted: #9aa5b4;
-  --c-page-ink-ghost: #6d7887;
-  --c-page-border: #242c38;
-  --c-page-border-strong: #343e4c;
-  --c-page-border-control: #6d7887;
+   * It has been both. It was #0d1219, a blue-cast near-black, and the note
+   * here used to argue against lifting it -- a slate bench "read as a grey
+   * room rather than a dark one, and the dark is the theme". That was
+   * overruled by the person whose theme it is: lightbox is the experimental
+   * one, the one to play with colour in, and a near-black bench was still
+   * hard to read against. It is a mid tone now, on purpose, and the argument
+   * above is kept only so nobody re-derives it and quietly puts the black
+   * back.
+   *
+   * The whole ink ramp moved with it. Lifting a ground without lifting what
+   * sits on it is how a theme silently drops out of AA: ghost text went from
+   * 4.2:1 to 2.7:1 on the new bench before these were rewritten, which
+   * scripts/check-contrast.ts fails on. The sheets still clear the bench by
+   * 11:1, so they are as lit as they ever were -- what shrank is the drop
+   * from 16.9, and that step was never the point. */
+  --c-page: #2b3644;
+  --c-page-ink: #eef2f7;
+  --c-page-ink-muted: #b6c1ce;
+  --c-page-ink-ghost: #8a97a7;
+  --c-page-border: #3d4b5c;
+  --c-page-border-strong: #6d8098;
+  --c-page-border-control: #8a97a7;
 
   /* Three pools, held under 0.3 alpha so the bench never lightens enough to
    * put the inks above out of range. Fixed to the viewport at <body>, so it
    * reads as depth the page slides over rather than a pattern that scrolls. */
   --page-wash:
-    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.28), transparent 60%),
-    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.2), transparent 55%),
-    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.3), transparent 68%);
-  --c-page-positive: #54d6a0;
-  --c-page-caution: #f0a63f;
-  --c-page-danger: #ff8b8b;
+    radial-gradient(110% 75% at 15% -5%, rgb(86 118 176 / 0.3), transparent 60%),
+    radial-gradient(90% 70% at 88% 6%, rgb(104 96 170 / 0.24), transparent 55%),
+    radial-gradient(130% 110% at 55% 115%, rgb(38 74 116 / 0.3), transparent 68%);
+  --c-page-positive: #6fe0b0;
+  --c-page-caution: #f5b459;
+  --c-page-danger: #ff9d9d;
 
-  /* The lit twins: the same hues as below, turned up to clear the bench. */
-  --c-accent-base-lit: #8b9dff;
-  --c-accent-hover-lit: #a3b2ff;
-  --c-w-shopping-lit: #ff8fa8;
-  --c-w-jobs-lit: #b39bff;
-  --c-w-todo-lit: #4cc2f1;
-  --c-w-vault-lit: #e690f2;
-  --c-w-learn-lit: #4fd1c5;
-  --c-w-dev-lit: #a9b6c8;
+  /* The lit twins: the same hues as below, turned up to clear the bench.
+   * Turned up again with the bench: a hue that read as lit against a
+   * near-black is merely present against a mid tone. */
+  --c-accent-base-lit: #a6b4ff;
+  --c-accent-hover-lit: #bcc6ff;
+  --c-w-shopping-lit: #ffa3b8;
+  --c-w-jobs-lit: #c3b0ff;
+  --c-w-todo-lit: #6ccdf5;
+  --c-w-vault-lit: #eda6f6;
+  --c-w-learn-lit: #6fdcd2;
+  --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
    * --c-canvas is the well inside a card, not the page. See the note above.
@@ -366,25 +377,40 @@
    * as strong: light spilling onto the bench raises the ground immediately
    * around a sheet, which narrows the step exactly where the eye lands on it,
    * without dimming the sheet anywhere. */
-  --c-sheet-outline: rgb(12 16 22 / 0.35);
+  --c-sheet-outline: rgb(18 24 34 / 0.42);
+  /* The bloom is the sheet lighting the bench around it, and on this theme it
+   * is allowed to be a colour rather than a haze -- lightbox is the one to
+   * play with colour in.
+   *
+   * Two glows now instead of one. A periwinkle throw, wider and about twice
+   * the strength it was, and a cooler cyan under it offset downward, so the
+   * light around a sheet shifts hue across its edge the way real spill does
+   * rather than being one grey-blue ring. Both are still light *added to the
+   * bench*: they sit outside the sheet and change nothing on it, so no text
+   * anywhere is measured against them.
+   *
+   * The drop shadows keep their black. A coloured drop under a sheet reads as
+   * the sheet being made of coloured glass; the colour belongs in the spill. */
   --sheet-edge:
-    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
     0 1px 3px rgb(0 0 0 / 0.3),
-    0 14px 32px -14px rgb(0 0 0 / 0.6),
-    0 0 72px -6px rgb(150 180 230 / 0.26);
+    0 14px 32px -14px rgb(0 0 0 / 0.55),
+    0 0 96px -8px rgb(140 158 255 / 0.42),
+    0 18px 68px -12px rgb(74 176 232 / 0.26);
   --lift-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
     0 2px 5px rgb(0 0 0 / 0.32),
-    0 24px 44px -16px rgb(0 0 0 / 0.7),
-    0 0 88px -4px rgb(150 180 230 / 0.32);
+    0 24px 44px -16px rgb(0 0 0 / 0.62),
+    0 0 118px -6px rgb(140 158 255 / 0.5),
+    0 26px 88px -14px rgb(74 176 232 / 0.32);
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
-  --c-shell: #0d1219;
-  --c-shell-ink: #e7ebf1;
-  --c-shell-muted: #9aa5b4;
-  --c-shell-border: #242c38;
-  --c-shell-hover: #171e28;
+  --c-shell: #2b3644;
+  --c-shell-ink: #eef2f7;
+  --c-shell-muted: #b6c1ce;
+  --c-shell-border: #3d4b5c;
+  --c-shell-hover: #364354;
 
   --c-ink: #10141a;
   --c-ink-muted: #464f59;
@@ -1119,6 +1145,25 @@ form[data-auto-submit] [data-fallback-submit] {
   outline: 2px solid var(--c-accent);
   outline-offset: 2px;
   border-radius: 0.25rem;
+}
+
+/* The one opt-out, for a control that is already the only thing focusable on
+ * a surface that exists to hold it -- the command palette's field, which the
+ * palette focuses the instant it opens.
+ *
+ * The ring's whole job is to say which of several things has the keyboard.
+ * Inside a modal with one field there is no "which", so it stops being an
+ * answer and becomes an accent rectangle drawn permanently around the search
+ * bar, which is what it looked like. Nothing is lost: a scrim, a lifted panel
+ * and a caret already say where the typing goes.
+ *
+ * This rule has to live here, unlayered, rather than as `focus-visible:
+ * outline-none` on the element. `@import "tailwindcss"` puts every utility in
+ * a layer, and unlayered CSS beats layered CSS whatever the specificity, so
+ * the rule above wins against the utility every time. That is also why the
+ * bug survived an `outline-none` already sitting on the input. */
+[data-focus-ring='none']:focus-visible {
+  outline: none;
 }
 
 /* ---------------------------------------------------------------------------

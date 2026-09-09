@@ -33,7 +33,7 @@ function Bar({ percent }: { percent: number }) {
   return (
     <div className="mb-5">
       <div
-        className="h-1.5 w-full overflow-hidden rounded-pill bg-canvas"
+        className="h-1.5 w-full overflow-hidden rounded-pill bg-sunken"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}

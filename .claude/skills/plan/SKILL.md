@@ -142,6 +142,30 @@ The recommendation is part of the job: a question with no proposed answer
 makes the person do the reading you already did. What you must not do is act
 on your own recommendation before they have agreed to it.
 
+**How a decision must be written.** The page shows a question in three parts —
+the question, the options, the answer — and it can only do that if you write
+it in three parts:
+
+- **The title is the question**, as one sentence ending in a question mark.
+  Not a topic. "Which shape for the export?" is a question; "Export format" is
+  a filing label, and it is what the person has to answer from.
+- **The options go in `--detail`, lettered, one option per line**, starting at
+  `A` and running in order: `A — …`, then `B — …`. The letters are what turn
+  the paragraph into options on the page and into one-click answers; prose
+  options are shown as the prose they are. `(a)`, `A)` and `A.` are read too.
+  See `lib/plan/options.ts` for exactly what is recognised.
+- **Each option opens with its own name in one short sentence.** That first
+  sentence is what appears as the option; the cost and the reasoning follow it
+  in the same paragraph and go under the fold.
+- **Two or three options.** One is not a choice, and a set that skips a letter
+  is read as prose rather than as options.
+
+```
+--detail "A — Ship it as CSV. One file, opens anywhere, loses the nesting.
+B — Ship it as JSON. Keeps everything, needs something to read it.
+Recommend A: the nesting is one column and nobody has asked for it."
+```
+
 Writing a decision means writing rows outside your own step, which is one of
 the two places "one step at a time" gives way — the other being fog you can
 now specify, in step 8 above. A decision, its dependency edge, and the block
@@ -191,9 +215,12 @@ nothing else.
    > **Can the question be phrased sharply, right now?**
    >
    > Yes → it is a **decision**. Write it as a step:
-   > `add "…?" --parent <n> --kind decision --detail "<the question, the two
-   > or three real options, what each costs, your recommendation>"`, and
-   > `depends` the steps that cannot start until it is settled.
+   > `add "…?" --parent <n> --kind decision --detail "<the two or three real
+   > options, lettered from A, one per line, each opening with its own name in
+   > one sentence and carrying its cost after it; then your recommendation>"`,
+   > and `depends` the steps that cannot start until it is settled. Written any
+   > other way it reaches the person as a paragraph rather than as a choice —
+   > see **How a decision must be written** above.
    >
    > No → it is **fog**. Put it on the feature: `--fog "<what is not yet
    > known, and what would have to be found out>"`. It graduates into steps
@@ -251,9 +278,10 @@ against everything now known and write down what has changed — as
    it is not: say so in the report and leave it alone.
 4. **Write the new questions.** An answer usually surfaces the next question.
    If it can be phrased sharply, it is a decision: `add "…?" --parent <n>
-   --kind decision --from <the decision it came out of> --detail "<the
-   question, the real options, what each costs, your recommendation>"`. If it cannot, it is fog on the feature. Same test
-   as shaping.
+   --kind decision --from <the decision it came out of> --detail "<the real
+   options, lettered from A, one per line, each with its cost; then your
+   recommendation>"`. If it cannot, it is fog on the feature. Same test as
+   shaping, and the same three parts — see **How a decision must be written**.
 5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not re-propose what the feature already holds —
    read the existing steps first, including ones an earlier re-shape added.

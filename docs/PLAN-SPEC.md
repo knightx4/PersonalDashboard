@@ -230,10 +230,19 @@ in reading order — modules as the switcher lists them, then top to bottom.
 Narrowed to Claude it drops decisions, however they are assigned: a ready
 decision is ready for the person, not for a session.
 
-**Views.** `?view=` narrows the page to `open` (the default), `ready`,
+**Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
 (open steps handed to Claude) or `all`. A step that does not match stays, dimmed, when
 something beneath it does, so a ready sub-step is seen in its place.
+
+`open` is everything not done and not dropped — proposals included. It is the
+whole of what is outstanding, which is what the word has to mean for the
+default view to be worth landing on.
+
+`you` is the part of that which cannot move until the person acts: unanswered
+questions, proposals nobody has decided on, and blocked steps. Not their ready
+steps — that is work they could do rather than something being asked of them,
+and folding it in makes "waiting on you" a list that cannot be cleared.
 
 ## The page
 
