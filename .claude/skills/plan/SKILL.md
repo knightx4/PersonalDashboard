@@ -98,10 +98,26 @@ One step at a time. Do not start the next until the current one is closed.
    done.
 7. **Commit the step on its own.** One step per commit. End the subject with
    the step: `Add the anonymous share page (plan #14)`.
-8. **Close it.** `done <n> --note "what changed, in one sentence"`. The commit
+8. **Before closing, look up once.** If the feature above your step carries
+   fog, and what you just learned makes it specifiable, write those steps now
+   — `add "…" --parent <the feature> --proposed --done-when "…" --size s|m|l`
+   — and clear the patch with `fog <the feature> --clear`. Proposed, always:
+   they are a proposal like any other and wait for the same approve. Say in
+   your report what you graduated and what you cleared.
+
+   Most of the time the answer is no, and no is the right answer: you are
+   heads-down on one done-when and will miss most of what a re-shape would
+   catch. But it costs a glance, and it means fog can dissolve without
+   anybody pressing anything.
+
+   With the decision above, this is the **only** rewriting a build session
+   does beyond its own step: its own decisions, and fog it can now specify.
+   Nothing else — no reordering, no dropping somebody else's step, no
+   rewriting a done-when you disagree with, and never an approve.
+9. **Close it.** `done <n> --note "what changed, in one sentence"`. The commit
    is recorded from HEAD, so close after committing. The output names any
    steps that became ready as a result — mention them in the report.
-9. **Push once per batch**, then report: every step closed **by number and
+10. **Push once per batch**, then report: every step closed **by number and
    title**, what became ready, and what is blocked and on what. A report that
    says "closed four steps" makes the person go and look.
 
@@ -126,9 +142,10 @@ The recommendation is part of the job: a question with no proposed answer
 makes the person do the reading you already did. What you must not do is act
 on your own recommendation before they have agreed to it.
 
-Writing a decision means writing rows outside your own step, which is the one
-place "one step at a time" gives way — and only for this. A decision, its
-dependency edge, and the block on your own step: nothing else.
+Writing a decision means writing rows outside your own step, which is one of
+the two places "one step at a time" gives way — the other being fog you can
+now specify, in step 8 above. A decision, its dependency edge, and the block
+on your own step: nothing else.
 
 A step that turns out to need something else from the user — an API key, an
 account, a thing outside the repo — is `block <n> --note "the question"`, with

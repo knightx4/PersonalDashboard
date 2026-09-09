@@ -140,10 +140,12 @@ found out. The test between them is not whether the question can be
 *answered* — it is whether it can be *asked*.
 
 Fog is a column rather than a table because it has no life beyond its step:
-it graduates into sub-steps and is cleared once they exist. What does that
-graduating is **Re-shape** (below) — until it was built, the sentence you
-just read described a person doing it by hand, and fog written at shaping
-was never read again. It shows in the tree under the step it belongs to
+it graduates into sub-steps and is cleared once they exist. Two things do
+that graduating, and until they were built the sentence you just read
+described a person doing it by hand: **Re-shape** (below), and a build
+session that learns enough while working a step beneath the feature to
+specify what the fog admitted it could not. Both write proposed steps and
+clear the patch; neither approves anything. It shows in the tree under the step it belongs to
 rather than behind the fold, because a plan's own admission that part of it
 is missing is no use if you have to open a step to find it. Empty fog
 renders nothing.
