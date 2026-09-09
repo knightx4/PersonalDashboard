@@ -6,6 +6,7 @@ import {
   applyView,
   buildPlanTree,
   flattenSections,
+  handedToClaude,
   isPlanView,
   summarize,
   type PlanView,
@@ -80,6 +81,7 @@ export default async function DevPlanPage({
         catalog={catalog}
         empty={data.items.length === 0}
         canSend={Boolean(planRoutine().token)}
+        queued={handedToClaude(whole).length}
       />
     </div>
   );

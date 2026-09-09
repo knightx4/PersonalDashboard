@@ -32,6 +32,7 @@ import {
   seedPlan,
   sendPlanFeatureToClaude,
   sendPlanItemToClaude,
+  sendPlanQueueToClaude,
   setPlanItemAssignee,
   setPlanItemStatus,
   updatePlanItem,
@@ -240,7 +241,56 @@ function Progress({ label, progress }: { label: string; progress: PlanProgress }
  * "which three", and the view is the answer. The views are search parameters
  * rather than state so that "the ready steps" is something you can keep.
  */
-function SummaryStrip({ summary, view }: { summary: PlanSummary; view: View }) {
+/**
+ * The queue, sent.
+ *
+ * Beside the count of what is Claude's, because that number is the question
+ * this button answers: you have spent a while going down the plan handing
+ * things over, and what you want at the end of it is not to press Send on each
+ * of them. Absent when nothing is handed over, since there would be nothing to
+ * send and an always-present button that usually refuses teaches people not to
+ * press it.
+ */
+function SendTheQueue({ count }: { count: number }) {
+  const [state, action, pending] = useActionState(sendPlanQueueToClaude, {} as PlanActionState);
+
+  if (count === 0) return null;
+
+  return (
+    <>
+      <form action={action}>
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          pending={pending}
+          title="Hand the whole queue to one routine, worked in order"
+        >
+          <Play className="size-3.5" aria-hidden />
+          {pending ? 'Sending…' : `Send all ${count} to Claude`}
+        </Button>
+      </form>
+      {(state.error ?? state.message) && (
+        <p className="basis-full text-small">
+          <FieldError>{state.error}</FieldError>
+          {!state.error && <span className="text-ink-muted">{state.message}</span>}
+        </p>
+      )}
+    </>
+  );
+}
+
+function SummaryStrip({
+  summary,
+  view,
+  queued,
+}: {
+  summary: PlanSummary;
+  view: View;
+  /** What the send-all button would actually send: not every step marked as
+      Claude's, since an unanswered question is nobody's to build. */
+  queued: number;
+}) {
   const facts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
     { view: 'ready', value: summary.ready, noun: 'ready' },
@@ -270,6 +320,7 @@ function SummaryStrip({ summary, view }: { summary: PlanSummary; view: View }) {
           ),
         )}
       </p>
+      <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
         {PLAN_VIEWS.map((candidate) => (
           <Link
@@ -644,6 +695,227 @@ function AnswerDecision({
           {node.resolution ? 'Record the new answer' : 'Answer'}
         </Button>
       </form>
+    </div>
+  );
+}
+
+/**
+ * Raise a question against a step, from the step.
+ *
+ * One field, because a question is one sentence. It becomes a decision beneath
+ * the step -- the same row kind the shaping sessions write -- so a question
+ * asked here and a question proposed by a session are the same object, answered
+ * the same way and carried into the same briefs. The options, if there turn out
+ * to be options worth writing down, go in through Edit like any other detail.
+ */
+function AskQuestion({ node, onDone }: { node: PlanNode; onDone: () => void }) {
+  const [state, action, pending] = useActionState(addPlanItem, {} as PlanActionState);
+  useSettled(state, onDone);
+
+  return (
+    <form action={action} className="space-y-2 rounded-lg bg-surface px-3 py-2.5">
+      <input type="hidden" name="module" value={node.module ?? ''} />
+      <input type="hidden" name="parent" value={node.id} />
+      <input type="hidden" name="kind" value="decision" />
+      <ComposeTitle
+        name="title"
+        autoFocus
+        aria-label="The question"
+        placeholder="What has to be decided before this can be built?"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <FieldError>{state.error}</FieldError>
+        <div className="ml-auto flex items-center gap-1">
+          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" pending={pending}>
+            {pending ? 'Asking…' : 'Ask'}
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * One question in a step's questions section.
+ *
+ * Open, it is the question with a box to close it in. Answered, it is the
+ * question with the answer under it, and changing your mind is a fresh answer
+ * rather than an edit -- the same rule `AnswerDecision` keeps, for the same
+ * reason: the record should show that a decision changed.
+ *
+ * Withdrawn is the other way out, and it is the "or close them" half of the
+ * ask. A question that stopped mattering is dropped rather than answered with
+ * something untrue, because a decision carrying an invented answer would be
+ * repeated to every session that reads the feature from then on.
+ */
+function QuestionRow({ node }: { node: PlanNode }) {
+  const [answerState, answerAction, answerPending] = useActionState(
+    answerPlanDecision,
+    {} as PlanActionState,
+  );
+  const [dropState, dropAction, dropPending] = useActionState(
+    setPlanItemStatus,
+    {} as PlanActionState,
+  );
+  const [answering, setAnswering] = useState(false);
+  useSettled(answerState, () => setAnswering(false));
+
+  const settled = isClosed(node.status);
+  const field = `question-${node.id}`;
+
+  return (
+    <li
+      className={cn(
+        'rounded-lg px-3 py-2.5',
+        node.status === 'dropped'
+          ? 'bg-sunken'
+          : settled
+            ? 'bg-positive-tint/40'
+            : 'bg-caution-tint/40',
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <span
+          aria-hidden
+          className={cn(
+            'mt-0.5 shrink-0 text-small font-semibold',
+            node.status === 'dropped'
+              ? 'text-ink-ghost'
+              : settled
+                ? 'text-positive'
+                : 'text-caution',
+          )}
+        >
+          {settled && node.status !== 'dropped' ? <Check className="size-3.5" strokeWidth={2} /> : '?'}
+        </span>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <p
+            className={cn(
+              'text-ui text-ink',
+              node.status === 'dropped' && 'text-ink-muted line-through',
+            )}
+          >
+            <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.number}</span>
+            {node.title}
+          </p>
+
+          {/* The options, where somebody wrote them down. */}
+          {node.detail && (
+            <p className="whitespace-pre-wrap text-small text-ink-muted">{node.detail}</p>
+          )}
+
+          {node.resolution && (
+            <p className="whitespace-pre-wrap text-ui text-ink">
+              <span className="font-semibold text-ink-muted">Answered: </span>
+              {node.resolution}
+            </p>
+          )}
+
+          {answering ? (
+            <form action={answerAction} className="space-y-2">
+              <input type="hidden" name="id" value={node.id} />
+              <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
+              <Textarea
+                id={field}
+                name="answer"
+                rows={2}
+                className="min-h-12"
+                autoFocus
+                placeholder="What you decided, and enough of why that a session need not ask again."
+              />
+              <div className="flex items-center gap-1">
+                <Button type="submit" size="sm" pending={answerPending}>
+                  {node.resolution ? 'Record the new answer' : 'Answer'}
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
+                {node.resolution ? 'Change the answer' : 'Answer'}
+              </Button>
+              {!settled && (
+                <form action={dropAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  <input type="hidden" name="status" value="dropped" />
+                  <Button type="submit" size="sm" variant="ghost" pending={dropPending}>
+                    Withdraw
+                  </Button>
+                </form>
+              )}
+            </div>
+          )}
+
+          <FieldError>{answerState.error ?? dropState.error}</FieldError>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * The questions hanging off a step.
+ *
+ * A question raised while a feature was being shaped used to end up as a
+ * sentence inside the detail paragraph, where it could be read and nothing
+ * else: there was no way to answer it, nothing recorded that it had been
+ * settled, and the next session read the same open question as though it were
+ * part of the description of the work. Decisions already are the app's answer
+ * to that -- a question closed by an answer rather than a commit -- but they
+ * could only be reached as rows of their own, several levels into the tree,
+ * which is not where you are standing when you read the step they are about.
+ *
+ * So this is that list, gathered on the step that raised them, with the box
+ * that closes each one. Answered questions stay, because "we already decided
+ * this" is the most useful thing a step can tell you; withdrawn ones stay too,
+ * quietly, so a question does not simply vanish.
+ */
+function Questions({ node }: { node: PlanNode }) {
+  const [asking, setAsking] = useState(false);
+  const questions = node.children.filter((child) => child.kind === 'decision');
+  const unanswered = questions.filter((question) => !isClosed(question.status)).length;
+
+  if (questions.length === 0 && isClosed(node.status)) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
+        Questions
+        {unanswered > 0 && (
+          <span className="ml-1.5 font-normal normal-case tracking-normal text-caution">
+            {unanswered} unanswered
+          </span>
+        )}
+      </p>
+
+      {questions.length > 0 && (
+        <ul className="space-y-1.5">
+          {questions.map((question) => (
+            <QuestionRow key={question.id} node={question} />
+          ))}
+        </ul>
+      )}
+
+      {asking ? (
+        <AskQuestion node={node} onDone={() => setAsking(false)} />
+      ) : (
+        !isClosed(node.status) && (
+          <button
+            type="button"
+            onClick={() => setAsking(true)}
+            className="press -ml-1.5 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui text-ink-ghost hover:bg-sunken hover:text-ink-muted"
+          >
+            <span aria-hidden>+</span>
+            {questions.length === 0 ? 'Ask a question' : 'Ask another'}
+          </button>
+        )
+      )}
     </div>
   );
 }
@@ -1091,7 +1363,16 @@ function PlanRow({
     {} as PlanActionState,
   );
 
-  const hasChildren = node.children.length > 0;
+  // A question beneath a step is that step's question, and it is read and
+  // answered in the step's own questions section. It is deliberately not also a
+  // row in the tree: the same question in two places, one of which can answer
+  // it, is how you end up answering neither. A decision at the top of a module
+  // is nobody's question but its own and stays a row.
+  const questions = node.children.filter((child) => child.kind === 'decision');
+  const substeps = node.children.filter((child) => child.kind !== 'decision');
+  const unanswered = questions.filter((question) => !isClosed(question.status)).length;
+
+  const hasChildren = substeps.length > 0;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
@@ -1238,8 +1519,8 @@ function PlanRow({
               aria-expanded={showChildren}
               title={
                 showChildren
-                  ? `Fold the ${node.children.length} sub-steps`
-                  : `Unfold the ${node.children.length} sub-steps`
+                  ? `Fold the ${substeps.length} sub-steps`
+                  : `Unfold the ${substeps.length} sub-steps`
               }
               aria-label={showChildren ? 'Hide the sub-steps' : 'Show the sub-steps'}
               className={cn(
@@ -1289,9 +1570,35 @@ function PlanRow({
               )}
             >
               <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
-              <span className={cn('min-w-0 truncate', node.status === 'dropped' && 'text-ink-muted line-through')}>
+              {/* Truncated closed, whole open. A row is a line and a long title
+                * has to give way to keep it one; but opening the step is the
+                * gesture that means "show me this one", and a name still cut
+                * off after it leaves no way to read it at all. */}
+              <span
+                className={cn(
+                  'min-w-0',
+                  open ? 'break-words' : 'truncate',
+                  node.status === 'dropped' && 'text-ink-muted line-through',
+                )}
+              >
                 {node.title}
               </span>
+              {/* A question waiting on this step, said on the row. The section
+                * that answers it is behind the fold, and a question nobody
+                * knows is there is the thing this whole section exists to
+                * stop. */}
+              {unanswered > 0 && !open && (
+                <span
+                  title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
+                  className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+                >
+                  <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+                  {unanswered}
+                  <span className="sr-only">
+                    unanswered {unanswered === 1 ? 'question' : 'questions'}
+                  </span>
+                </span>
+              )}
             </span>
             {gloss && !open && (
               <span className="block truncate text-small text-ink-muted">
@@ -1452,6 +1759,8 @@ function PlanRow({
               />
             )}
 
+            <Questions node={node} />
+
             <Dependencies node={node} catalog={catalog} />
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
@@ -1518,11 +1827,11 @@ function PlanRow({
 
       {hasChildren &&
         showChildren &&
-        node.children.map((child, index) => (
+        substeps.map((child, index) => (
           <PlanRow
             key={child.id}
             node={child}
-            trail={[...trail, index < node.children.length - 1]}
+            trail={[...trail, index < substeps.length - 1]}
             catalog={catalog}
             canSend={canSend}
           />
@@ -1582,6 +1891,7 @@ export function PlanView({
   catalog,
   empty,
   canSend,
+  queued,
 }: {
   sections: PlanSection[];
   summary: PlanSummary;
@@ -1589,6 +1899,7 @@ export function PlanView({
   catalog: PlanCatalogEntry[];
   empty: boolean;
   canSend: boolean;
+  queued: number;
 }) {
   if (empty) return <ImportTheBuildOrder />;
 
@@ -1596,7 +1907,7 @@ export function PlanView({
 
   return (
     <div className="space-y-6">
-      <SummaryStrip summary={summary} view={view} />
+      <SummaryStrip summary={summary} view={view} queued={queued} />
 
       {nothingToShow && view !== 'open' && view !== 'all' && (
         <EmptyState

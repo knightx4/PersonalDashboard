@@ -11,7 +11,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
-import { applyView, buildPlanTree, flattenSections, summarize } from '@/lib/plan/tree';
+import {
+  applyView,
+  buildPlanTree,
+  flattenSections,
+  handedToClaude,
+  summarize,
+} from '@/lib/plan/tree';
 
 // The server actions pull in the session client, which has no business in a
 // render test; the page only needs them to exist to hand to its forms.
@@ -28,6 +34,7 @@ vi.mock('@/app/dev/plan/actions', () => {
     seedPlan: noop,
     sendPlanFeatureToClaude: noop,
     sendPlanItemToClaude: noop,
+    sendPlanQueueToClaude: noop,
     setPlanItemAssignee: noop,
     setPlanItemStatus: noop,
     updatePlanItem: noop,
@@ -108,6 +115,7 @@ function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocke
       catalog={catalog}
       empty={empty}
       canSend={false}
+      queued={handedToClaude(whole).length}
     />,
   );
 }
@@ -176,6 +184,29 @@ describe('PlanView', () => {
     expect(html).toMatch(/>1<\/span> Claude/);
   });
 
+  it('offers the whole queue in one press, and only when there is one', () => {
+    // One step is handed over in the fixture, so the button says so rather
+    // than making you count.
+    expect(render('open')).toContain('Send all 1 to Claude');
+
+    const nobodys = buildPlanTree({
+      items: [item({ id: 'mine', title: 'Mine to do' })],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(nobodys, 'all')}
+        summary={summarize(nobodys)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        queued={handedToClaude(nobodys).length}
+      />,
+    );
+    expect(html).not.toContain('to Claude</button>');
+  });
+
   it('invites a step at the top of every module on the working view, and not on the narrow ones', () => {
     expect(render('open')).toContain('Add a step');
     expect(render('ready')).not.toContain('Add a step');
@@ -191,31 +222,21 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        queued={0}
       />,
     );
     expect(html).toContain('Nothing ready right now');
   });
 
   it('marks a decision as a question and never as ready work', () => {
-    // Its own tree, so the counts the other tests pin are left alone.
+    // Its own tree, so the counts the other tests pin are left alone. A
+    // decision at the top of a module is nobody's question but its own, so it
+    // is a row like any other step -- unlike one beneath a step, which is that
+    // step's question and belongs to its questions section.
     const withDecision = buildPlanTree({
       items: [
         item({ id: 'export', title: 'Export' }),
-        item({
-          id: 'question',
-          title: 'CSV or JSON?',
-          parentId: 'export',
-          kind: 'decision',
-          assignee: 'claude',
-        }),
-        item({
-          id: 'settled',
-          title: 'One file or many?',
-          parentId: 'export',
-          kind: 'decision',
-          status: 'done',
-          resolution: 'One file per month.',
-        }),
+        item({ id: 'standalone', title: 'Do we charge for this?', kind: 'decision' }),
         item({ id: 'writer', title: 'The writer', parentId: 'export' }),
       ],
       dependencies: [],
@@ -228,6 +249,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        queued={0}
       />,
     );
 
@@ -236,10 +258,51 @@ describe('PlanView', () => {
     expect(html).toContain('>Decision<');
     // Not "Ready", which on a question would read as ready to be built.
     expect(html).toContain('>Unanswered<');
-    expect(html).toContain('>Answered<');
-    // Only the two decisions carry the mark; the build step beside them does
-    // not, and nor does the feature above them.
-    expect((html.match(/>Decision</g) ?? []).length).toBe(2);
+    // Only the decision carries the mark; the build steps beside it do not.
+    expect((html.match(/>Decision</g) ?? []).length).toBe(1);
+  });
+
+  it("keeps a step's questions out of the tree and says how many are unanswered", () => {
+    const withQuestions = buildPlanTree({
+      items: [
+        item({ id: 'export', title: 'Export' }),
+        item({ id: 'csv', title: 'CSV or JSON?', parentId: 'export', kind: 'decision' }),
+        item({ id: 'split', title: 'One file or many?', parentId: 'export', kind: 'decision' }),
+        item({
+          id: 'settled',
+          title: 'Do we compress it?',
+          parentId: 'export',
+          kind: 'decision',
+          status: 'done',
+          resolution: 'No.',
+        }),
+        item({ id: 'writer', title: 'The writer', parentId: 'export' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(withQuestions, 'all')}
+        summary={summarize(withQuestions)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        queued={0}
+      />,
+    );
+
+    // The questions are answered in the step's own questions section, behind
+    // its fold. Not also rows here: the same question in two places, one of
+    // which can answer it, is how you answer neither.
+    expect(html).not.toContain('CSV or JSON?');
+    expect(html).not.toContain('Do we compress it?');
+    // The build step beneath it is still a row.
+    expect(html).toContain('The writer');
+    // And the two that are still open are counted on the row, so nothing hides
+    // behind a fold.
+    expect(html).toContain('unanswered questions');
+    expect(html).toMatch(/2<span class="sr-only">\s*unanswered questions/);
   });
 
   it('shows what a feature admits it cannot see yet, and nothing when it can', () => {
@@ -262,6 +325,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        queued={0}
       />,
     );
 

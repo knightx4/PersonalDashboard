@@ -10,6 +10,7 @@ import {
   leavesOf,
   planProgress,
   subtreeIds,
+  handedToClaude,
   summarize,
   workOrder,
 } from '@/lib/plan/tree';
@@ -400,6 +401,46 @@ describe('workOrder', () => {
       item({ id: 'nobody' }),
     ]);
     expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
+  });
+});
+
+describe('handedToClaude', () => {
+  const mine = (id: string, over: Partial<PlanItem> = {}) =>
+    item({ id, assignee: 'claude', ...over });
+
+  it('takes every open step handed over, most urgent first', () => {
+    const sections = tree([
+      mine('normal', { position: 10 }),
+      mine('someday', { priority: 3, position: 20 }),
+      mine('urgent', { priority: 1, position: 30 }),
+      item({ id: 'not-handed-over', position: 40 }),
+      item({ id: 'mine-to-do', assignee: 'me', position: 50 }),
+    ]);
+    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['urgent', 'normal', 'someday']);
+  });
+
+  it('keeps a step that is only waiting on another, unlike workOrder', () => {
+    const sections = tree(
+      [mine('first'), mine('second')],
+      [dep('second', 'first')],
+    );
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['first']);
+    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['first', 'second']);
+  });
+
+  it('leaves out what is finished, only proposed, or a question', () => {
+    const sections = tree([
+      mine('open'),
+      mine('done', { status: 'done' }),
+      mine('dropped', { status: 'dropped' }),
+      mine('proposal', { status: 'proposed' }),
+      mine('question', { kind: 'decision' }),
+    ]);
+    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['open']);
+  });
+
+  it('is empty when nothing has been handed over', () => {
+    expect(handedToClaude(tree([item({ id: 'a' }), item({ id: 'b', assignee: 'me' })]))).toEqual([]);
   });
 
   it('never hands Claude a decision, however it is assigned', () => {

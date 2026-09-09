@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { planBrief } from '@/lib/plan/brief';
+import { planBrief, planQueueBrief } from '@/lib/plan/brief';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
-import { buildPlanTree, findNode } from '@/lib/plan/tree';
+import { buildPlanTree, findNode, handedToClaude } from '@/lib/plan/tree';
 
 let counter = 0;
 
@@ -201,5 +201,45 @@ describe('planBrief with decisions and fog', () => {
     );
     // The feature's own done-when is already printed; it is not its own destination.
     expect(brief).not.toContain('## Destination');
+  });
+});
+
+describe('planQueueBrief', () => {
+  // The numbers below are asserted literally, and `counter` is shared with the
+  // describes above.
+  counter = 0;
+
+  const sections = buildPlanTree({
+    items: [
+      item({ id: 'rpc', title: 'The read RPC', priority: 1, assignee: 'claude' }),
+      item({
+        id: 'page',
+        title: 'The anonymous page',
+        detail: 'A page a person with no account can open.',
+        assignee: 'claude',
+      }),
+      item({ id: 'later', title: 'Analytics on responses', priority: 3, assignee: 'claude' }),
+    ],
+    dependencies: [dep('page', 'rpc')],
+  });
+
+  const queue = handedToClaude(sections);
+  const brief = planQueueBrief(sections, queue);
+
+  it('opens with the running order as a numbered list', () => {
+    expect(brief.startsWith('# 3 plan steps, in order\n')).toBe(true);
+    expect(brief).toContain('1. #1 The read RPC — Shopping · next');
+    expect(brief).toContain('2. #2 The anonymous page — Shopping · normal · waits on #1');
+    expect(brief).toContain('3. #3 Analytics on responses — Shopping · someday');
+  });
+
+  it('carries every step whole, not just its name', () => {
+    expect(brief).toContain('# Plan step #2 — The anonymous page');
+    expect(brief).toContain('## What it involves\n\nA page a person with no account can open.');
+    expect(brief.match(/^# Plan step /gm)).toHaveLength(3);
+  });
+
+  it('counts one step as a step', () => {
+    expect(planQueueBrief(sections, [queue[0]]).startsWith('# 1 plan step, in order\n')).toBe(true);
   });
 });
