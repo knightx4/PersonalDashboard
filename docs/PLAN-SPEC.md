@@ -140,10 +140,13 @@ found out. The test between them is not whether the question can be
 *answered* — it is whether it can be *asked*.
 
 Fog is a column rather than a table because it has no life beyond its step:
-it graduates into sub-steps and is cleared the moment they exist. It shows in
-the tree under the step it belongs to rather than behind the fold, because a
-plan's own admission that part of it is missing is no use if you have to open
-a step to find it. Empty fog renders nothing.
+it graduates into sub-steps and is cleared once they exist. What does that
+graduating is **Re-shape** (below) — until it was built, the sentence you
+just read described a person doing it by hand, and fog written at shaping
+was never read again. It shows in the tree under the step it belongs to
+rather than behind the fold, because a plan's own admission that part of it
+is missing is no use if you have to open a step to find it. Empty fog
+renders nothing.
 
 **Carried forward.** Every answered decision beneath a feature appears in the
 brief of every step under it, as *Decided so far*, one line with its answer;
@@ -290,11 +293,33 @@ same routine the notes queue uses (`fireFeatureRoutine`, with
 deployment), with the brief as the extra turn. The session that wakes up is
 told which step it is for and to follow `.claude/skills/plan`.
 
+**Re-shape.** The return trip, and the answer to a plan that goes stale the
+moment anything is learned. Shaping runs once, before anything is built;
+from then on the feature is a fixed drawing of a thing still moving —
+answering a decision recorded the answer and changed nothing else. The
+button on a feature fires the same routine with a *re-shape* turn instead
+of a build one, carrying the feature, its fog, its open steps and every
+answer settled beneath it. The session graduates fog that the answers made
+specifiable into proposed steps and clears the patch, drops a step an
+answer made pointless with the reason, and writes any question an answer
+surfaced as a fresh decision.
+
+On request rather than on every answer: several questions are usually
+settled in one sitting, and one session that has read all of them proposes
+better than three racing over the same feature. It also keeps answering
+independent — the answer is recorded by its own action, so a re-shape that
+cannot start loses nothing. Everything it writes is `proposed`, and nothing
+it proposes is started; the plan adapts continuously and still changes only
+on an approve. It refuses a proposal, which has nothing agreed to adapt,
+and a leaf step, which has nothing beneath it to re-read.
+
 **The skill.** `.claude/skills/plan/SKILL.md` is the procedure: read the
 brief, check what it waits on, claim it, break it down if it is large, build
 to the done-when, verify, commit with `(plan #n)` in the subject, close with
-a note. A step assigned to Claude is Claude's to pick up; a step named by
-the user is Claude's whoever holds it; anything else, ask. The plan must
+a note. It carries the re-shape job too, which
+writes proposals and nothing else. A step assigned to Claude is Claude's to
+pick up; a step named by the user is Claude's whoever holds it; anything
+else, ask. The plan must
 always tell the truth: a step that cannot be finished is blocked with the
 question, never left in progress and never closed to look tidy.
 

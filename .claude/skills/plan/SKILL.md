@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Two jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into proposed steps, dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -32,6 +32,7 @@ npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
+npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.
@@ -136,7 +137,7 @@ it. Never delete a step; deleting is the user's.
 
 ## Shaping an idea
 
-The other job. An idea on the ideas page is a sentence; the plan needs a
+The second job. An idea on the ideas page is a sentence; the plan needs a
 feature with steps, and writing that well takes knowing the code. So when the
 user says "shape idea …", or a routine is fired from the *Shape into a plan*
 button with an idea in its brief, the job is to write a **proposal** — and
@@ -197,6 +198,50 @@ If the idea is already in the plan (`ideas` does not list it), say so and
 stop rather than shaping it twice. If the idea is really a bug or a one-line
 request, say that it belongs in the notes queue instead, and stop.
 
+## Re-shaping a feature
+
+The third job, and the return trip. Shaping runs once, before anything is
+built; from then on the feature is a fixed drawing of a thing that is still
+moving. An answer settles a question and changes nothing else, fog written at
+shaping is never read again, and a step the answer made pointless goes on
+looking live until somebody notices.
+
+So when the user says "re-shape #95", or a routine is fired from the
+**Re-shape** button with a re-shape turn, the job is to read the feature
+against everything now known and write down what has changed — as
+**proposals**, and nothing else.
+
+1. **Read the feature.** `show <n>`: its done-when, its fog, its open steps,
+   and *Decided so far* — every question settled beneath it. Then read the
+   code those answers touch. An answer changes what is buildable only if you
+   know what is there.
+2. **Graduate the fog.** If an answer, or the code, has made the fog
+   specifiable, write those steps now: `add "…" --parent <n> --proposed
+   --done-when "…" --size s|m|l`, and clear the patch in the same breath with
+   `fog <n> --clear`. Fog that is *still* fog stays exactly as it is — a patch
+   rewritten into something vaguer is worse than one left alone. If part of it
+   has cleared and part has not, `fog <n> --note "…"` with what is left.
+3. **Say what an answer invalidated.** A step an answer made pointless is
+   `drop <n> --note "…"`, naming the answer that did it and why: "#63's answer
+   settles this on the server, so the client half is not needed." A re-shape
+   may drop, and must always say why. If you are not sure the step is dead,
+   it is not: say so in the report and leave it alone.
+4. **Write the new questions.** An answer usually surfaces the next question.
+   If it can be phrased sharply, it is a decision: `add "…?" --parent <n>
+   --kind decision --detail "<the question, the real options, what each costs,
+   your recommendation>"`. If it cannot, it is fog on the feature. Same test
+   as shaping.
+5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
+   build anything, and do not re-propose what the feature already holds —
+   read the existing steps first, including ones an earlier re-shape added.
+   Report what you proposed, what you dropped and why, what fog you cleared,
+   and anything you noticed and deliberately left alone, all **by number and
+   title**.
+
+The contract this rests on: a re-shape writes proposed rows. The plan adapts
+continuously, and nothing changes without an approve — the same review, from
+a second direction.
+
 ## When the CLI cannot run
 
 `DATABASE_URL` is not set in Claude Code on the web, so `scripts/plan.ts`
@@ -247,6 +292,10 @@ set status = 'done', resolution = '<their words>', commit_sha = null,
     comment = coalesce(comment || E'\n\n', '') || 'Answered <date>: …'
 where id = '…';
 
+-- fog: write it, or clear it once the steps that dispel it exist. Not a
+-- status change, so no dated line goes in the comment.
+update plan_items set fog = '…' where id = '…';   -- or fog = null to clear
+
 -- block: not finished, so no commit
 update plan_items
 set status = 'blocked',
@@ -282,7 +331,7 @@ Beside the status, two columns say what a step is rather than where it stands.
 | | Meaning |
 |---|---|
 | `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`. It is a kind and not a status because a decision moves through the same states — it can be not started, blocked, dropped — and differs only in what closing it means. |
-| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Cleared once the steps that dispel it exist. |
+| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. *Re-shaping a feature* above is what does that clearing. |
 
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,
