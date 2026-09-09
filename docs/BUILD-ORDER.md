@@ -229,6 +229,54 @@ gets read.
 - Step 35 after 34 because it needs somewhere to write back to, and it is the
   step that makes the module worth more than a bookmark list.
 
+## The learn module: what you know
+
+Specified in [LEARN-GRAPH-SPEC.md](LEARN-GRAPH-SPEC.md). The queue answers where
+to read something; this answers what you already know, what you are wrong about,
+and what the next thing worth learning is. One graph per subject, growing every
+time it is used, never generated once and frozen.
+
+48. **The spend ledger.** In `core`, with a screen. First, before anything that
+    spends, so every cost estimate in the spec is checkable a week later rather
+    than on a bill.
+49. **The graph store and the subject screen.** Concepts, prerequisite edges,
+    goals, state and probes, with RLS and a trigger rejecting any edge that
+    closes a cycle -- the acyclic property as a database fact rather than a
+    convention, for the same reason `locator_basis` is `not null`. Read-only
+    over a hand-seeded graph, no model calls, so the pruning rule is proven
+    before generation can hide a bad graph behind it.
+50. **Generation for a goal.** One Sonnet call, deduped against the subject it
+    joins, shown for approval before anything is taught.
+51. **Probing, and a bar that tells the truth.** One Haiku call per question,
+    written against a claim rather than a heading, the correct answer's reason
+    written at the same time and stored. The bar fills on information gained
+    rather than questions answered, so ten questions is 80% and nothing ever
+    reads 100%.
+52. **The graph grows from how you answer.** A miss pointing one level down adds
+    the prerequisite under it; a hit above marks the nodes between as
+    known-by-inference. The same wrong option twice becomes a named
+    misconception.
+53. **Joined to the queue.** A shaky concept is a better input to
+    `suggestSources` than a subject you typed. The note you already write after
+    a reading is how new concepts enter the graph.
+
+### Ordering notes worth respecting
+
+- Step 48 before all of it, and not as bookkeeping. This is the first part of
+  the app where a single screen can make many model calls in a row, and a cost
+  claim you cannot check is one you find out about on a bill.
+- Step 49 before 50 for the fourth time and the same reason: a missing policy
+  has to fail immediately, and a hand-seeded graph proves the view and the
+  pruning rule while a bad generated one would be indistinguishable from a bad
+  renderer.
+- Step 51 needs 50 only for real content. It can be developed against the
+  hand-seeded graph from 49, and should be, because a probe written against a
+  claim you wrote yourself is the clearest test of whether the question rules
+  hold.
+- Step 52 after 51 by necessity -- it grows the graph from probe results, so
+  there have to be probe results.
+- Step 53 last, and it is the one that makes both halves worth more than either.
+
 ### Ordering notes worth respecting
 
 - Step 2 before step 4, so a missing policy surfaces immediately.

@@ -1,6 +1,7 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
+import { syncPlanFromSeed } from '@/lib/plan/sync';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
@@ -24,11 +25,21 @@ export const metadata = { title: 'Plan' };
  * the steps that get you to each, and the steps beneath those, with the ones
  * that are done marked off and the ones that could be picked up next known.
  *
- * It began as `docs/BUILD-ORDER.md` and is seeded from it once. After that the
- * markdown is background reading and this is the working copy: an app deployed
- * to a server cannot write to a file in its own repository, and the ✅
- * convention has two states where the useful question has five and no room at
- * all for a note saying what a step is waiting on.
+ * It began as `docs/BUILD-ORDER.md`, and the steps that came from it live in
+ * `lib/plan/seed.ts`. The markdown is background reading and this is the
+ * working copy: an app deployed to a server cannot write to a file in its own
+ * repository, and the ✅ convention has two states where the useful question
+ * has five and no room at all for a note saying what a step is waiting on.
+ *
+ * Opening the page brings in any seed step that has never been offered. That is
+ * a write on a page load, which is normally the wrong thing -- but this one
+ * cannot surprise anybody: it adds rows the repository already declares, never
+ * touches a row that is there, and offers each step exactly once, so a step you
+ * delete stays deleted. Without it a slice planned in the seed reached the page
+ * only if somebody retyped it into a form, which is how a plan page falls
+ * behind the plan and then stops being opened. Steps written straight into the
+ * plan -- by hand here, or by a session through `scripts/plan.ts` -- never go
+ * near this and are unaffected.
  *
  * It is also the source of truth for what gets built next by anybody, Claude
  * included: `scripts/plan.ts` reads the same rows, and a step handed to Claude
@@ -50,6 +61,12 @@ export default async function DevPlanPage({
 
   const requested = Array.isArray(params.view) ? params.view[0] : params.view;
   const view: PlanView = requested && isPlanView(requested) ? requested : 'open';
+
+  // Before the load, so anything new appears on this render rather than the
+  // next one. It carries its failure back instead of throwing: a plan that
+  // could not be synced is still a plan worth reading, and the line below says
+  // so rather than the page falling over.
+  const sync = await syncPlanFromSeed(supabase, user.id);
 
   const data = await loadPlan(supabase, user.id);
   const whole = buildPlanTree(data);
@@ -74,6 +91,14 @@ export default async function DevPlanPage({
         title="Plan"
         description="Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next."
       />
+      {sync.added > 0 && (
+        <p className="text-small text-ink-muted">
+          Brought in {sync.added} new {sync.added === 1 ? 'step' : 'steps'} from the build order.
+        </p>
+      )}
+      {sync.error && (
+        <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
+      )}
       <PlanViewComponent
         sections={sections}
         summary={summary}

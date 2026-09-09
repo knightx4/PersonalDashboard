@@ -8,8 +8,17 @@ import type { PlanStatus } from './load';
  * `docs/EVIDENCE-LAYER.md` were the plan until now and remain the record of
  * why each step is where it is; what they cannot be is a plan you work, since
  * a deployed app cannot write to a file in the repository. So the rows below
- * seed the plan once and the app owns it afterwards — nothing re-reads the
+ * seed the plan and the app owns it afterwards — nothing re-reads the
  * markdown, and the two are expected to drift.
+ *
+ * The seed is re-readable, though, and that is deliberate. Planning a new slice
+ * happens here, in a file, next to the spec it comes from; the plan page is
+ * where it is then worked. A seed that could only ever be imported into an
+ * empty plan would mean every step written after the first import had to be
+ * retyped into a form, which is the sort of friction that ends with the page
+ * being out of date and ignored. So importing brings in whatever is missing and
+ * leaves everything already there alone -- statuses, comments and edits
+ * included.
  *
  * The statuses are the ones the documents assert (a ✅ against a numbered
  * step), checked against the code where the document does not say outright.
@@ -366,6 +375,54 @@ export const PLAN_SEED: readonly PlanSeedItem[] = [
     status: 'not_started',
   },
 
+  // --------------------------------------------------- learn: what you know
+  // From LEARN-GRAPH-SPEC.md. The second half of the module: the queue answers
+  // where to read something, this answers what you already know and what the
+  // next thing worth learning is. Ordered so nothing that spends money is
+  // built before the thing that measures the spending.
+  {
+    module: 'learn',
+    title: '48. The spend ledger',
+    detail:
+      'In core, with a screen: module, operation, model, input and cached-input and output tokens, cost. First, before anything that spends, so every cost estimate in the spec is checkable a week after it was written rather than on a bill.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '49. The graph store and the subject screen',
+    detail:
+      'Concepts, prerequisite edges, goals, state and probes in learn, with RLS and a trigger that rejects an edge closing a cycle — the acyclic property as a database fact, not a convention. Read-only over a graph seeded by hand, no model calls at all, so the pruning rule is proven before generation can hide a bad graph behind it.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '50. Generation for a goal',
+    detail:
+      'One Sonnet call turns a named goal into the chain of concepts leading to it, deduped against the subject it joins. Shown for approval before anything is taught: a wrong graph is worse than no graph, and approval is the cheapest check there is.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '51. Probing, and a bar that tells the truth',
+    detail:
+      'One Haiku call per question, written against a concept claim rather than a heading, with the correct answer\'s reason written at the same time and stored. Ten to start and then as many as you want. The bar fills on information gained, not questions answered, so it reaches 80% in ten and never claims 100%.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '52. The graph grows from how you answer',
+    detail:
+      'A miss that points one level down adds the prerequisite under it; a hit above marks the nodes between as known-by-inference, recorded as weaker than tested. The same wrong option twice becomes a named misconception on the node — a gap and a thing steering you wrong are not the same problem.',
+    status: 'not_started',
+  },
+  {
+    module: 'learn',
+    title: '53. Joined to the queue',
+    detail:
+      'A shaky concept is a better input to suggestSources than a subject you typed, so finding something to read becomes a button on a gap. The note you already write after a reading becomes the way new concepts enter the graph. Both halves of the module finally paying into each other.',
+    status: 'not_started',
+  },
+
   // -------------------------------------------------------------------- jobs
   // From EVIDENCE-LAYER.md, which is the job side's own plan: six slices, each
   // useless without the one above it. It has no ✅ convention, so these were
@@ -409,3 +466,32 @@ export const PLAN_SEED: readonly PlanSeedItem[] = [
     status: 'not_started',
   },
 ];
+
+/**
+ * How a seed step is matched against a step already in the plan.
+ *
+ * Module and title, because the number is part of the title and a step's title
+ * is how the documents, the commit messages and you refer to it. Editing a
+ * seeded step's title here therefore makes it a different step and it will be
+ * imported again -- which is the right trade: retitling in the seed is rare,
+ * and the alternative is an id column that would have to be kept stable by
+ * hand forever.
+ */
+export function planStepKey(step: { module: string | null; title: string }): string {
+  return `${step.module ?? 'app'}:${step.title}`;
+}
+
+/**
+ * The seed steps whose keys have never been handed over.
+ *
+ * Pure, so the sync can be tested without a Supabase client -- and so the
+ * question it answers ("what would this add?") stays separable from the write.
+ *
+ * Note what it is not asked: which steps the plan currently holds. A step you
+ * deleted is not missing, it is refused, and the difference is the only thing
+ * that makes importing on every visit bearable.
+ */
+export function seedStepsNotYetOffered(offeredKeys: Iterable<string>): PlanSeedItem[] {
+  const seen = offeredKeys instanceof Set ? offeredKeys : new Set(offeredKeys);
+  return PLAN_SEED.filter((step) => !seen.has(planStepKey(step)));
+}
