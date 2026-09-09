@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { countStates } from '@/lib/learn/graph/model';
+import { GoalForm } from './goal-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +60,7 @@ export default async function KnowPage() {
         <EmptyState
           icon={Network}
           title="No subjects yet"
-          description="A subject is the container — Economics, not the Phillips curve. Name a goal inside one and the chain of things leading to it gets mapped, probed, and kept."
+          description="A subject is the container — Economics, not the Phillips curve. Name a goal below and the chain of things leading to it gets laid out, in whichever subject it belongs to."
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -81,6 +82,11 @@ export default async function KnowPage() {
           ))}
         </ul>
       )}
+
+      {/* Naming a goal is how a subject comes into being, so the form is here
+          rather than behind a button: with no subjects yet, it is the only
+          thing on the page worth doing. */}
+      <GoalForm />
     </>
   );
 }

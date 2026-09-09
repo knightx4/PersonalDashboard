@@ -6,6 +6,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import { GoalForm } from '@/app/learn/know/goal-form';
 import {
   countStates,
   learningOrder,
@@ -22,9 +23,11 @@ export const dynamic = 'force-dynamic';
  *
  * The pruned view is the default and the whole graph is behind ?all=1, because
  * the pruned one is the useful one and the full one is what you want when you
- * suspect something is missing. It is a link rather than a control because
- * nothing on this page is stateful yet -- read-only over rows put there by
- * hand is the point of this slice.
+ * suspect something is missing. It is a link rather than a control because the
+ * page holds no state of its own -- the graph is the state.
+ *
+ * The only thing here that writes is naming another goal, and that writes
+ * nothing until the chain it proposes has been read and approved.
  *
  * Four states and three ways of establishing them, and the screen shows both.
  * "You told me you knew this" and "you answered three questions on it" are
@@ -230,6 +233,10 @@ export default async function SubjectPage({
           <GoalSection key={goal.id} graph={graph} goalName={goal.asked} conceptId={goal.conceptId!} />
         ))
       )}
+
+      {/* A second goal in a subject you already have is the cheap case: the
+          generator is told what is here and proposes only what is missing. */}
+      <GoalForm subjectId={subject.id} />
     </>
   );
 }

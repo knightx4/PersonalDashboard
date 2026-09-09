@@ -46,6 +46,7 @@ describe('the operation names', () => {
       'suggest-sources',
       'plan-topic',
       'locate-passage',
+      'generate-chain',
     ]);
   });
 });

@@ -32,6 +32,7 @@ export const LEARN_OPERATIONS = [
   'suggest-sources',
   'plan-topic',
   'locate-passage',
+  'generate-chain',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
