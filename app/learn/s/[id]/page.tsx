@@ -1,0 +1,235 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { ArrowLeft, AlertTriangle, BadgeCheck, CircleDashed, CircleDot } from 'lucide-react';
+import { PageHeader } from '@/components/shell/page-header';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
+import {
+  countStates,
+  learningOrder,
+  pruneForGoal,
+  readyNow,
+  type Concept,
+  type Graph,
+} from '@/lib/learn/graph/model';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * One subject: its goals, and the chain still standing between you and each.
+ *
+ * The pruned view is the default and the whole graph is behind ?all=1, because
+ * the pruned one is the useful one and the full one is what you want when you
+ * suspect something is missing. It is a link rather than a control because
+ * nothing on this page is stateful yet -- read-only over rows put there by
+ * hand is the point of this slice.
+ *
+ * Four states and three ways of establishing them, and the screen shows both.
+ * "You told me you knew this" and "you answered three questions on it" are
+ * different claims, and a page that rendered them identically would be
+ * overstating one of them every time.
+ */
+
+const STATE_LABEL = {
+  known: 'Known',
+  shaky: 'Shaky',
+  misconception: 'Misconception',
+  unknown: 'Not looked at',
+} as const;
+
+const ESTABLISHED_LABEL = {
+  tested: 'answered questions on it',
+  inferred: 'inferred from something above it',
+  declared: 'you said so',
+} as const;
+
+function StateMark({ concept }: { concept: Concept }) {
+  const className = 'mt-0.5 size-4 shrink-0';
+  switch (concept.state) {
+    case 'known':
+      return <BadgeCheck className={cn(className, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+    case 'misconception':
+      return <AlertTriangle className={cn(className, 'text-danger')} strokeWidth={2} aria-hidden />;
+    case 'shaky':
+      return <CircleDot className={cn(className, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+    default:
+      return <CircleDashed className={cn(className, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
+  }
+}
+
+function ConceptRow({ concept, next }: { concept: Concept; next: boolean }) {
+  return (
+    <li className="flex gap-3 px-4 py-3">
+      <StateMark concept={concept} />
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-body font-medium text-ink">{concept.name}</span>
+          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            {STATE_LABEL[concept.state]}
+          </span>
+          {next && (
+            <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
+              Start here
+            </span>
+          )}
+        </p>
+
+        {/* The claim, not a heading. This is the thing a question would be
+            written against, and reading it is how you tell a real node from a
+            chapter title that got in. */}
+        <p className="mt-0.5 text-ui text-ink">{concept.claim}</p>
+
+        {concept.misconception && (
+          <p className="mt-1 text-ui text-danger">{concept.misconception}</p>
+        )}
+
+        <p className="mt-0.5 text-small text-ink-muted">
+          {concept.state === 'unknown'
+            ? concept.basis
+            : `${STATE_LABEL[concept.state]} — ${ESTABLISHED_LABEL[concept.established]}. ${concept.basis}`}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function ConceptList({ concepts, nextId }: { concepts: Concept[]; nextId: string | null }) {
+  return (
+    <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+      {concepts.map((concept) => (
+        <ConceptRow key={concept.id} concept={concept} next={concept.id === nextId} />
+      ))}
+    </ul>
+  );
+}
+
+function GoalSection({ graph, goalName, conceptId }: { graph: Graph; goalName: string; conceptId: string }) {
+  const kept = pruneForGoal(graph, conceptId);
+  const chain = learningOrder(graph, kept);
+  const next = readyNow(graph, kept)[0] ?? null;
+
+  return (
+    <section className="mt-6">
+      <h2 className="mb-2 text-ui font-semibold text-ink-muted">{goalName}</h2>
+
+      {chain.length === 0 ? (
+        <p
+          className={cn(
+            cardVariants(),
+            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
+          )}
+        >
+          Nothing left standing between you and this one.
+        </p>
+      ) : (
+        <>
+          <p className="mb-2 text-ui text-ink-muted">
+            {chain.length === 1
+              ? 'One thing left, in the order it would be learned.'
+              : `${chain.length} things left, in the order they would be learned. What you already know is not shown.`}
+          </p>
+          <ConceptList concepts={chain} nextId={next?.id ?? null} />
+        </>
+      )}
+    </section>
+  );
+}
+
+export default async function SubjectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ all?: string }>;
+}) {
+  const { id } = await params;
+  const { all } = await searchParams;
+  const showEverything = all === '1';
+
+  const supabase = await createLearnClient();
+  const subject = await loadSubject(supabase, id);
+  if (!subject) notFound();
+
+  const [graph, goals] = await Promise.all([loadGraph(supabase, id), loadGoals(supabase, id)]);
+  const counts = countStates(graph);
+  const live = goals.filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null);
+
+  return (
+    <>
+      <p className="mb-3">
+        <Link
+          href="/learn/know"
+          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+        >
+          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          What you know
+        </Link>
+      </p>
+
+      <PageHeader
+        title={subject.name}
+        description={
+          counts.total === 0
+            ? 'Nothing in this graph yet.'
+            : `${counts.known} of ${counts.total} settled${
+                counts.misconception > 0
+                  ? ` · ${counts.misconception} ${counts.misconception === 1 ? 'misconception' : 'misconceptions'}`
+                  : ''
+              }`
+        }
+        actions={
+          counts.total > 0 ? (
+            <Link
+              href={showEverything ? `/learn/s/${id}` : `/learn/s/${id}?all=1`}
+              className="text-ui text-ink-muted hover:text-ink"
+            >
+              {showEverything ? 'Show what is left' : 'Show the whole graph'}
+            </Link>
+          ) : undefined
+        }
+      />
+
+      {subject.note && (
+        <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">{subject.note}</p>
+      )}
+
+      {counts.total === 0 ? (
+        <p
+          className={cn(
+            cardVariants(),
+            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
+          )}
+        >
+          No concepts in this subject yet. A concept is one claim you can be right or wrong about —
+          not a heading.
+        </p>
+      ) : showEverything ? (
+        <>
+          <p className="mb-2 text-ui text-ink-muted">
+            Everything in this subject, prerequisites first — including what you already know.
+          </p>
+          <ConceptList
+            concepts={learningOrder(graph, graph.concepts.map((concept) => concept.id))}
+            nextId={null}
+          />
+        </>
+      ) : live.length === 0 ? (
+        <p
+          className={cn(
+            cardVariants(),
+            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
+          )}
+        >
+          No goals in this subject yet. A goal is what you actually want to understand, and the
+          chain leading to it is what gets shown here.
+        </p>
+      ) : (
+        live.map((goal) => (
+          <GoalSection key={goal.id} graph={graph} goalName={goal.asked} conceptId={goal.conceptId!} />
+        ))
+      )}
+    </>
+  );
+}
