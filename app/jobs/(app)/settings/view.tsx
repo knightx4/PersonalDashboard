@@ -622,7 +622,9 @@ function EvidenceSection({
         // divides rather than by twenty small frames stacked down the page.
         <ul className="mt-3 divide-y divide-border">
           {evidence.map((item) => (
-            <li key={item.id} className="row-pad">
+            // Anchored, so a prep note's story links back to the item it came
+            // from rather than to the top of a page of twenty-five.
+            <li key={item.id} id={`evidence-${item.id}`} className="row-pad">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-ui font-medium text-ink">{item.title}</span>
                 <span className="tabular text-small text-ink-muted">

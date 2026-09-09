@@ -1237,3 +1237,51 @@ form[data-auto-submit] [data-fallback-submit] {
   border-top: 1px solid var(--c-border);
   margin: 2em 0;
 }
+
+/* ---------------------------------------------------------------------------
+ * Jobs prose.
+ *
+ * The generated prep note is the one thing on a role page written as prose
+ * rather than laid out by a component, and it arrives as markdown. It is not a
+ * vault note, though: it is read inside a card, a paragraph at a time, beside
+ * the app's own labels — so it borrows the rhythm of .vault-prose and none of
+ * its document scale. Its own class rather than the vault's, because the two
+ * will drift and a shared class would make that a regression in both.
+ * ------------------------------------------------------------------------ */
+.jobs-prose {
+  color: inherit;
+  font-size: inherit;
+  line-height: 1.6;
+  max-width: 64ch;
+}
+
+.jobs-prose > * + * {
+  margin-top: 0.6em;
+}
+
+.jobs-prose a {
+  color: var(--c-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.jobs-prose strong {
+  font-weight: 600;
+}
+
+.jobs-prose ul,
+.jobs-prose ol {
+  padding-left: 1.3em;
+}
+
+.jobs-prose ul { list-style: disc; }
+.jobs-prose ol { list-style: decimal; }
+.jobs-prose li + li { margin-top: 0.2em; }
+
+.jobs-prose code {
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+}
