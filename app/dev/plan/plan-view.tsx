@@ -42,6 +42,7 @@ import {
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
   ChipSelect,
@@ -670,6 +671,120 @@ function EditStep({
  * box is still the whole form when a question has no options, which is most of
  * them.
  */
+/**
+ * The heading over a part of a question: the question, the options, the answer.
+ *
+ * Three words in the same small caps in every place a question is shown, so
+ * that "which of these am I reading" is answered by the shape of the thing and
+ * not by working it out from the prose.
+ */
+function QuestionPartLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">{children}</p>
+  );
+}
+
+/**
+ * The question itself, said once and set apart.
+ *
+ * A question used to be a line of body text among the step's other lines, at
+ * the same size and weight as the description of the work -- so the one thing
+ * on the surface that is actually waiting on a person looked like reading
+ * matter. It is now labelled and set a step up the scale, which is the whole
+ * ask: when something needs an answer, the question I am answering should be
+ * the clearest thing on the surface.
+ */
+function TheQuestion({ node }: { node: PlanNode }) {
+  return (
+    <div className="space-y-0.5">
+      <QuestionPartLabel>The question</QuestionPartLabel>
+      <p className="text-ui font-medium text-ink">
+        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.number}</span>
+        {node.title}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The options, as options.
+ *
+ * They are written as prose in `detail` -- a lettered paragraph each, with
+ * what it costs and a recommendation -- and were shown as that same paragraph:
+ * a muted block of text in which the choices had to be found by reading. Where
+ * the letters are legible (see lib/plan/options.ts) each one now gets its own
+ * line and its letter in a badge, so the shape of the choice is visible before
+ * a word of it is read.
+ *
+ * `onChoose` makes each line the button that answers with it. Without it they
+ * are just the options, which is what they are while nobody is answering.
+ *
+ * The prose does not disappear: the letters carry only each option's opening
+ * sentence, and the cost and the recommendation are the rest of the paragraph.
+ * That goes under the fold, where it can be read by anybody who wants more than
+ * the choice -- law 10, and the collapsed line says what is behind it.
+ */
+function TheOptions({
+  detail,
+  onChoose,
+}: {
+  detail: string | null;
+  onChoose?: (option: PlanOption) => void;
+}) {
+  if (!detail) return null;
+  const options = planOptions(detail);
+
+  if (options.length === 0) {
+    return (
+      <div className="space-y-0.5">
+        <QuestionPartLabel>The options</QuestionPartLabel>
+        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <QuestionPartLabel>The options</QuestionPartLabel>
+      <ul className="space-y-1">
+        {options.map((option) => {
+          const body = (
+            <>
+              <span
+                aria-hidden
+                className="flex size-5 shrink-0 items-center justify-center rounded-control bg-surface text-micro font-semibold uppercase text-ink"
+              >
+                {option.letter}
+              </span>
+              <span className="min-w-0 flex-1 text-left text-small text-ink">{option.label}</span>
+            </>
+          );
+
+          return (
+            <li key={option.letter}>
+              {onChoose ? (
+                <button
+                  type="button"
+                  onClick={() => onChoose(option)}
+                  title={`Answer ${option.letter}: ${option.label}`}
+                  className="press flex w-full items-start gap-2 rounded-control px-1.5 py-1 transition-colors duration-150 hover:bg-accent-tint"
+                >
+                  {body}
+                </button>
+              ) : (
+                <span className="flex items-start gap-2 px-1.5 py-1">{body}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <Disclosure title="What each one costs" className="px-1.5">
+        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
+      </Disclosure>
+    </div>
+  );
+}
+
 function AnswerDecision({
   node,
   action,
@@ -701,31 +816,22 @@ function AnswerDecision({
        box, and the caution hairline round it was a second claim on a grouping
        the ground had already made. The tint stays -- it is the thing saying a
        question is waiting on you. Law 11. */
-    <div className="space-y-2 rounded-lg bg-caution-tint/40 px-3 py-2.5">
+    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
+      {/* The question and its options, before the box that closes them. The
+          box used to come first with the options as a row of chips above it,
+          which put the form in front of the thing the form is about. */}
+      <TheQuestion node={node} />
+      <TheOptions detail={node.detail} onChoose={choose} />
+
       {node.resolution && (
-        <div>
-          <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Answered</p>
+        <div className="space-y-0.5">
+          <QuestionPartLabel>Answered</QuestionPartLabel>
           <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
         </div>
       )}
       <form action={action} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />
         <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
-        {options.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {options.map((option) => (
-              <button
-                key={option.letter}
-                type="button"
-                onClick={() => choose(option)}
-                title={`Answer ${option.letter}: ${option.label}`}
-                className="press max-w-full truncate rounded-full bg-surface px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
-              >
-                <span className="font-semibold text-ink">{option.letter}</span> {option.label}
-              </button>
-            ))}
-          </div>
-        )}
         <Textarea
           id={field}
           ref={box}
@@ -814,6 +920,18 @@ function QuestionRow({ node }: { node: PlanNode }) {
 
   const settled = isClosed(node.status);
   const field = `question-${node.id}`;
+  const box = useRef<HTMLTextAreaElement>(null);
+
+  // Replaces rather than appends, as in AnswerDecision and for the same
+  // reason: pressing two options means you changed your mind, not that you
+  // want both written down. What you type after it is yours and is left alone.
+  const choose = (option: PlanOption) => {
+    const target = box.current;
+    if (!target) return;
+    target.value = optionAnswer(option);
+    target.focus();
+    target.setSelectionRange(target.value.length, target.value.length);
+  };
 
   return (
     <li
@@ -840,27 +958,26 @@ function QuestionRow({ node }: { node: PlanNode }) {
         >
           {settled && node.status !== 'dropped' ? <Check className="size-3.5" strokeWidth={2} /> : '?'}
         </span>
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <p
-            className={cn(
-              'text-ui text-ink',
-              node.status === 'dropped' && 'text-ink-muted line-through',
-            )}
-          >
-            <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.number}</span>
-            {node.title}
-          </p>
-
-          {/* The options, where somebody wrote them down. */}
-          {node.detail && (
-            <p className="whitespace-pre-wrap text-small text-ink-muted">{node.detail}</p>
+        <div className="min-w-0 flex-1 space-y-2">
+          {/* Withdrawn, it is a record rather than a question: struck through,
+              and none of the apparatus for answering it applies. */}
+          {node.status === 'dropped' ? (
+            <p className="text-ui text-ink-muted line-through">
+              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.number}</span>
+              {node.title}
+            </p>
+          ) : (
+            <>
+              <TheQuestion node={node} />
+              <TheOptions detail={node.detail} onChoose={answering ? choose : undefined} />
+            </>
           )}
 
           {node.resolution && (
-            <p className="whitespace-pre-wrap text-ui text-ink">
-              <span className="font-semibold text-ink-muted">Answered: </span>
-              {node.resolution}
-            </p>
+            <div className="space-y-0.5">
+              <QuestionPartLabel>Answered</QuestionPartLabel>
+              <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
+            </div>
           )}
 
           {answering ? (
@@ -869,11 +986,16 @@ function QuestionRow({ node }: { node: PlanNode }) {
               <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
               <Textarea
                 id={field}
+                ref={box}
                 name="answer"
                 rows={2}
                 className="min-h-12"
                 autoFocus
-                placeholder="What you decided, and enough of why that a session need not ask again."
+                placeholder={
+                  planOptions(node.detail).length > 0
+                    ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
+                    : 'What you decided, and enough of why that a session need not ask again.'
+                }
               />
               <div className="flex items-center gap-1">
                 <Button type="submit" size="sm" pending={answerPending}>
@@ -1979,7 +2101,12 @@ function PlanRow({
           // same shape for two different meanings.
           <li style={inset} className="pb-3 pr-3">
             <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
-            {node.detail && <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>}
+            {/* Not on a decision: there the detail is the options, and it is
+                shown as options inside the question block below rather than
+                twice -- once as a paragraph here and once as itself. */}
+            {node.detail && !isDecision && (
+              <p className="whitespace-pre-wrap text-ui text-ink-muted">{node.detail}</p>
+            )}
             {node.acceptance && (
               <div>
                 <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Done when</p>
