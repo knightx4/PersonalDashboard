@@ -11,6 +11,8 @@ import { FindSources } from './find-sources';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeFromTrack } from '../../t/[id]/actions';
 import { NoteForm } from './note-form';
+import { NoteToGraph } from './note-to-graph';
+import { loadSubjects } from '@/lib/learn/graph/load';
 import { StatusButtons } from './status-buttons';
 import { ReadNowButton } from './read-now-button';
 import { cardVariants } from '@/components/ui/card';
@@ -31,6 +33,10 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
 
   const supabase = await createLearnClient();
   const reading = await loadReading(supabase, id);
+  // For the note-to-graph offer below. A subject is the container that
+  // accumulates and nothing creates one silently, so this is a list to pick
+  // from rather than a name to invent.
+  const subjects = await loadSubjects(supabase);
   if (!reading) notFound();
 
   // Only meaningful when there is a source to have read somewhere else.
@@ -170,6 +176,10 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
       <section>
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">What you took from it</h2>
         <NoteForm readingId={reading.id} note={reading.note} />
+
+        {/* The note is written anyway, so this asks nothing new of you: it is
+            where a reading gets to change what the graph thinks you know. */}
+        {reading.note?.trim() && <NoteToGraph readingId={reading.id} subjects={subjects} />}
       </section>
 
       {/*

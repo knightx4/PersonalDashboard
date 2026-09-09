@@ -50,6 +50,7 @@ describe('the operation names', () => {
       'write-probe',
       'name-misconception',
       'propose-floor',
+      'concepts-from-note',
     ]);
   });
 });

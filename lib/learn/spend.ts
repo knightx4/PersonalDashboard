@@ -36,6 +36,7 @@ export const LEARN_OPERATIONS = [
   'write-probe',
   'name-misconception',
   'propose-floor',
+  'concepts-from-note',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
