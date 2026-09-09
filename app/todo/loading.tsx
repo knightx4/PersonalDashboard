@@ -11,9 +11,15 @@ export default function Loading() {
     <div className="mx-auto max-w-3xl">
       <PageHeaderSkeleton action={false} />
 
+      {/* The dial, not forty pixels. The bar this stands in for is a text
+          control and a button, and both take their height from the density
+          variable -- so a skeleton written at a fixed forty was eight taller
+          than the thing that replaced it at the default density, and the page
+          jumped by exactly that. Which is the one failure this file exists to
+          prevent. */}
       <Card padding="dense" className="flex items-center gap-2">
-        <Skeleton className="h-10 flex-1 rounded-lg" />
-        <Skeleton className="h-10 w-20 rounded-lg" />
+        <Skeleton className="h-(--control-h) flex-1 rounded-control" />
+        <Skeleton className="h-(--control-h) w-20 rounded-control" />
       </Card>
 
       <div className="mt-6 space-y-6">

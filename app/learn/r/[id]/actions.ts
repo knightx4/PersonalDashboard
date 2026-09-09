@@ -11,6 +11,7 @@ import { suggestSources } from '@/lib/learn/import/suggest';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
   attachSourceToReading,
+  setReadNow,
   setReadingLocation,
   setReadingNote,
   setReadingStatus,
@@ -129,6 +130,39 @@ export async function updateStatus(
   }
 
   revalidatePath(`/learn/r/${parsed.data.readingId}`);
+  revalidatePath('/learn');
+  // Finishing or giving up takes it off the shelf, so the shelf has changed.
+  revalidatePath('/learn/now');
+  return {};
+}
+
+const ReadNowInput = z.object({
+  readingId: z.string().uuid(),
+  on: z.enum(['on', 'off']),
+});
+
+/** Put this on the Read now shelf, or take it off. */
+export async function toggleReadNow(
+  _prev: ReadingActionState,
+  formData: FormData,
+): Promise<ReadingActionState> {
+  await requireUser();
+
+  const parsed = ReadNowInput.safeParse({
+    readingId: formData.get('readingId'),
+    on: formData.get('on'),
+  });
+  if (!parsed.success) return { error: 'Could not work out which one you meant.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await setReadNow(supabase, parsed.data.readingId, parsed.data.on === 'on');
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not change the shelf.' };
+  }
+
+  revalidatePath(`/learn/r/${parsed.data.readingId}`);
+  revalidatePath('/learn/now');
   revalidatePath('/learn');
   return {};
 }

@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  BookOpenCheck,
   Bookmark,
   Boxes,
   Briefcase,
@@ -20,6 +21,7 @@ import {
   MessageSquareText,
   Receipt,
   Share2,
+  Shapes,
   StickyNote,
   Tag,
   Undo2,
@@ -63,6 +65,7 @@ export const NAV_ICONS = {
   bugs: Bug,
   ideas: Lightbulb,
   plan: Map,
+  ui: Shapes,
   // Todo and vault
   agenda: ListChecks,
   calendar: CalendarDays,
@@ -71,6 +74,7 @@ export const NAV_ICONS = {
 
   // Learn
   tracks: BookOpen,
+  readNow: BookOpenCheck,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

@@ -28,8 +28,11 @@ function AccessBadge({ access, priceCents }: { access: SourceAccess; priceCents:
 
   const price = priceCents !== null ? formatMoney(priceCents, 'USD') : null;
 
+  // A recessed ground rather than a hairline. A badge is two words that want
+  // marking off, and a fill marks them off without adding a frame to a row
+  // that is already inside a card -- law 11's "a shared ground groups".
   return (
-    <span className="rounded-pill border border-border px-1.5 py-0.5 text-caption text-ink-muted">
+    <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
       {price ? `${label} · ${price}` : label}
     </span>
   );
@@ -61,20 +64,27 @@ export function LocatorLine({ reading }: { reading: ReadingRow }) {
 
   return (
     <span className="inline-flex items-center gap-1 text-ui text-ink-muted">
+      {/* Ink and a shape, not green. Law 4 spends positive on money coming
+          back; "we checked this location" is not that, and the two glyphs
+          already tell the claims apart. The caution keeps its colour because
+          it is the one of the pair you have to act on. */}
       {verified ? (
-        <BadgeCheck className="size-3.5 shrink-0 text-positive" strokeWidth={2} aria-hidden />
+        <BadgeCheck className="size-3.5 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
       ) : (
         <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={2} aria-hidden />
       )}
       <span>{where || 'Location not confirmed'}</span>
-      {!verified && where && <span className="text-caption">· unconfirmed</span>}
+      {!verified && where && <span className="text-small">· unconfirmed</span>}
     </span>
   );
 }
 
 function StatusIcon({ status }: { status: ReadingRow['status'] }) {
   if (status === 'read') {
-    return <Check className="size-4 shrink-0 text-positive" strokeWidth={2} aria-label="Read" />;
+    // Read is not a refund. The four statuses are told apart by their glyphs
+    // -- tick, slash, dashed circle, nothing -- and only the one that means
+    // "in progress" earns the accent. Law 4.
+    return <Check className="size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-label="Read" />;
   }
   if (status === 'abandoned') {
     return (
@@ -129,7 +139,7 @@ export function ReadingCard({ reading }: { reading: ReadingRow }) {
               // Written down, nothing found for it yet. Said plainly rather
               // than left blank, because a row with no source and no note
               // about it reads as a row that failed.
-              <span className="rounded-pill border border-dashed border-border px-1.5 py-0.5 text-caption text-ink-muted">
+              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-ghost">
                 No source yet
               </span>
             )}

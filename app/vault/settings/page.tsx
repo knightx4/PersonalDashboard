@@ -2,6 +2,7 @@ import { AlertTriangle, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadConnection, loadSyncRuns } from '@/lib/vault/notes/load';
 import { describeRun, syncProgress, type SyncProgress } from '@/lib/vault/sync/progress';
@@ -107,14 +108,21 @@ export default async function VaultSettingsPage() {
                 </p>
               )}
 
+              {/* The shared fold, with the count on the closed line. It was a
+                  bare <details> in its own box, with no chevron -- so it did
+                  not look like the folds everywhere else in the app, and its
+                  summary said "Recent runs" without saying how many, which is
+                  law 10's exact complaint: a fold that hides whether it is
+                  worth opening has moved the work rather than saved it. The
+                  box goes with it; this already sits inside a card. */}
               {runs.length > 0 && (
-                <details className="rounded-lg border border-border">
-                  <summary className="cursor-pointer px-3 py-2 text-ui text-ink-muted">
-                    Recent runs
-                  </summary>
-                  <ul className="divide-y divide-border border-t border-border">
+                <Disclosure
+                  title="Recent runs"
+                  meta={runs.length === 1 ? '1 run' : `${runs.length} runs`}
+                >
+                  <ul className="divide-y divide-border">
                     {runs.map((run) => (
-                      <li key={run.id} className="flex flex-wrap items-baseline gap-x-3 px-3 py-2">
+                      <li key={run.id} className="row-pad flex flex-wrap items-baseline gap-x-3">
                         <span className="w-24 text-small font-medium text-ink">
                           {run.type === 'backfill' ? 'First sync' : 'Update'}
                         </span>
@@ -133,7 +141,7 @@ export default async function VaultSettingsPage() {
                       </li>
                     ))}
                   </ul>
-                </details>
+                </Disclosure>
               )}
 
               <p className="text-ui text-ink-muted">

@@ -149,7 +149,11 @@ export function RolesList({
       </ul>
 
       {picking && selected.size >= 2 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-canvas p-2.5">
+        // The bar that appears once two roles are ticked. A ground rather than
+        // a frame: it is inside the section's card, where a border would be the
+        // card's edge said a second time, and the well is what makes it read as
+        // something that arrived rather than something that was always there.
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-card bg-canvas p-2.5">
           <Label className="mb-0" htmlFor="merge-survivor">
             Keep
           </Label>
@@ -157,7 +161,8 @@ export function RolesList({
             id="merge-survivor"
             value={survivorId ?? ''}
             onChange={(event) => setSurvivorId(event.target.value)}
-            className="h-8 w-auto"
+            // Width to the content; height off the dial, like the button beside it.
+            className="w-auto"
           >
             {[...selected].map((id) => {
               const role = roles.find((r) => r.id === id);

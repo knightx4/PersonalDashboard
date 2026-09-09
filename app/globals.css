@@ -118,8 +118,8 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* ---- The page ground, as a scope of its own -------------------------
-   * Everything above describes a sheet: a card, a table, a panel. Four of
-   * the five themes draw the page behind those sheets in the same polarity,
+   * Everything above describes a sheet: a card, a table, a panel. Three of
+   * the four themes draw the page behind those sheets in the same polarity,
    * so for them the page needs no palette of its own and these simply point
    * back at the values above -- zero difference, zero maintenance.
    *
@@ -239,81 +239,6 @@
 }
 
 /* ---------------------------------------------------------------------------
- * RISO — printed light. Cream ground, high chroma.
- * ------------------------------------------------------------------------- */
-[data-theme='riso'] {
-  color-scheme: light;
-  --c-sheet-scheme: light;
-
-  --c-canvas: #f6f2e8;
-  --c-surface: #fffdf7;
-  --c-raised: #fffdf7;
-  --c-sunken: #ece6d7;
-  --c-border: #ded5c0;
-  --c-border-strong: #c9bda0;
-
-  --c-shell: #efeadd;
-  --c-shell-ink: #191713;
-  --c-shell-muted: #655e4e;
-  --c-shell-border: #ddd3bd;
-  --c-shell-hover: #e6e0d0;
-
-  --c-ink: #191713;
-  --c-ink-muted: #6a6353;
-  --c-ink-ghost: #817967;
-  --c-border-control: #817967;
-
-  --c-accent-base: #2438b8;
-  --c-accent-hover: #1c2d98;
-  --c-accent-tint-base: #e6e9fb;
-
-  --c-w-shopping: #b3104a;
-  --c-w-shopping-tint: #fbe3ec;
-  --c-w-jobs: #6b21d6;
-  --c-w-jobs-tint: #efe7fc;
-  --c-w-todo: #03607f;
-  --c-w-todo-tint: #e0f0f7;
-  --c-w-vault: #96128f;
-  --c-w-vault-tint: #fae5f7;
-  --c-w-learn: #0a6459;
-  --c-w-learn-tint: #dff0ed;
-  --c-w-dev: #47536a;
-  --c-w-dev-tint: #e9edf3;
-
-  --c-positive: #1d6b48;
-  --c-positive-tint: #e0f0e6;
-  --c-caution: #9a4409;
-  --c-caution-fill: #ef8f33;
-  --c-caution-tint: #fbebdc;
-  --c-danger: #a3160f;
-  --c-danger-tint: #fbe3e0;
-
-  --c-status-lead: #5f584f;
-  --c-status-lead-tint: #efeade;
-  --c-status-submitted: #1642b5;
-  --c-status-submitted-tint: #e4e9f8;
-  --c-status-process: #9a4409;
-  --c-status-process-tint: #fbebdc;
-  --c-status-final: #6b21d6;
-  --c-status-final-tint: #efe7fc;
-  --c-status-offer: #1d6b48;
-  --c-status-offer-tint: #e0f0e6;
-  --c-status-rejected: #a3160f;
-  --c-status-rejected-tint: #fbe3e0;
-  --c-status-ghosted: #6d6555;
-  --c-status-ghosted-tint: #f2eee2;
-
-  /* Printed means printed: a halftone dot rather than the fractal noise the
-   * other four share. The dot is 6px on a 6px tile -- coarse enough to read
-   * as a screen, fine enough not to fight 12px text. Multiply, so it only
-   * ever darkens, and turned up from the noise's level because a dot pattern
-   * at 5% is a smudge and at 9% is a print. */
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Ccircle cx='1.4' cy='1.4' r='1.1' fill='%23000'/%3E%3C/svg%3E");
-  --grain-opacity: 0.09;
-  --grain-blend: multiply;
-}
-
-/* ---------------------------------------------------------------------------
  * LIGHTBOX — lit sheets on a black bench.
  *
  * The theme where the page and the things on it disagree on purpose. The
@@ -344,7 +269,7 @@
  * earlier version drifted warm -- a beige canvas over a beige sunken -- and
  * beige under a near-black bench reads as old paper rather than as a lit
  * sheet. Amber survives on caution and in-process because there it carries a
- * meaning rather than a mood, and it is the same amber in all five themes.
+ * meaning rather than a mood, and it is the same amber in all four themes.
  * ------------------------------------------------------------------------- */
 [data-theme='lightbox'] {
   /* The bench is black, so the scrollbar the browser draws down the side of
@@ -359,31 +284,26 @@
    * like they are floating in nothing. Lifting it to a blue-cast near-black
    * and laying a wash over it gives the light somewhere to come from.
    *
-   * Raised from #0d1219. That bench put the lit surface 16.9:1 away from it,
-   * against a theoretical maximum of 21:1 for black on white -- the glare was
-   * never the paper, it was the size of the step down to the ground. At
-   * #1e2734 the same sheet lands at 13.6:1: still the brightest thing on
-   * screen and still unmistakably a dark bench, but an edge the eye can cross
-   * without flinching. Everything drawn *on* the bench moves up with it, or
-   * it disappears into it. */
-  --c-page: #1e2734;
+   * This was briefly raised to #1e2734 to shrink the step up to a lit sheet
+   * from 16.9:1 to 13.6:1, and put back: the slate bench that bought read as
+   * a grey room rather than a dark one, and the dark is the theme. The step
+   * is softened at the edge instead -- see the outline and the bloom below,
+   * which cost the bench nothing. */
+  --c-page: #0d1219;
   --c-page-ink: #e7ebf1;
   --c-page-ink-muted: #9aa5b4;
-  --c-page-ink-ghost: #7b8695;
-  --c-page-border: #333d4c;
-  --c-page-border-strong: #414b5c;
-  --c-page-border-control: #7b8695;
+  --c-page-ink-ghost: #6d7887;
+  --c-page-border: #242c38;
+  --c-page-border-strong: #343e4c;
+  --c-page-border-control: #6d7887;
 
-  /* Three pools, held under 0.25 alpha so the bench never lightens enough to
+  /* Three pools, held under 0.3 alpha so the bench never lightens enough to
    * put the inks above out of range. Fixed to the viewport at <body>, so it
-   * reads as depth the page slides over rather than a pattern that scrolls.
-   * Pulled back with the bench: the wash was carrying the job of keeping a
-   * near-black ground from reading as a hole, and the ground no longer is
-   * one. Same shapes, less work. */
+   * reads as depth the page slides over rather than a pattern that scrolls. */
   --page-wash:
-    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.22), transparent 60%),
-    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.16), transparent 55%),
-    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.24), transparent 68%);
+    radial-gradient(110% 75% at 15% -5%, rgb(52 76 116 / 0.28), transparent 60%),
+    radial-gradient(90% 70% at 88% 6%, rgb(60 60 108 / 0.2), transparent 55%),
+    radial-gradient(130% 110% at 55% 115%, rgb(20 38 62 / 0.3), transparent 68%);
   --c-page-positive: #54d6a0;
   --c-page-caution: #f0a63f;
   --c-page-danger: #ff8b8b;
@@ -436,11 +356,11 @@
    * bench around it -- a lightbox, not a spotlight.
    *
    * The outline used to be rgb(4 7 12 / 0.75), which composited *darker than
-   * the bench*: 18.1:1 against the sheet, a worse step than the ground it was
-   * separating the sheet from, and only 1.07:1 against that ground, so it did
-   * not separate anything. Every card was a white-to-near-black-to-bench
-   * ramp. At 0.35 over the lifted bench it reads as a crisp termination and
-   * nothing more, which was always the job.
+   * the bench*: 17.8:1 against the sheet, a harder edge than the ground it
+   * was separating the sheet from, and only 1.06:1 against that ground, so it
+   * did not separate anything. Every card was a white-to-near-black-to-bench
+   * ramp. At 0.35 it composites to within a hair of the bench: the sheet
+   * still ends on a hard line, and the line stops being a second step.
    *
    * The bloom is where the softening is bought back. Wider and roughly twice
    * as strong: light spilling onto the bench raises the ground immediately
@@ -460,11 +380,11 @@
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
-  --c-shell: #1e2734;
+  --c-shell: #0d1219;
   --c-shell-ink: #e7ebf1;
   --c-shell-muted: #9aa5b4;
-  --c-shell-border: #333d4c;
-  --c-shell-hover: #28323f;
+  --c-shell-border: #242c38;
+  --c-shell-hover: #171e28;
 
   --c-ink: #10141a;
   --c-ink-muted: #464f59;
@@ -672,7 +592,7 @@
  * claim about the pursuit rather than about where you are standing.
  * ═══════════════════════════════════════════════════════════════════════════ */
 /* Each workspace names its hue twice: once for a sheet and once for the page
- * ground. In four of the five themes the two are the same value. */
+ * ground. In three of the four themes the two are the same value. */
 [data-workspace='shopping'] {
   --c-sheet-accent: var(--c-w-shopping);
   --c-page-accent: var(--c-w-shopping-lit);
@@ -791,7 +711,7 @@ body,
   --c-danger: var(--c-sheet-danger);
   --c-accent: var(--c-sheet-accent);
   --c-accent-hover: var(--c-sheet-accent-hover);
-  /* Identical to the page's scheme in four themes, so this is inert there. */
+  /* Identical to the page's scheme in three themes, so this is inert there. */
   color-scheme: var(--c-sheet-scheme);
 }
 
@@ -922,7 +842,11 @@ body,
   --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono-stack);
 
-  --radius-card: 0.75rem;
+  --radius-card: 0.5rem;
+  /* Tighter than the card that holds them. A control is a small object and a
+   * 12px radius on a 32px box is most of the way to a pill, which reads as a
+   * button even when it is a text field. */
+  --radius-control: 0.375rem;
 
   /* 150ms ease-out everywhere. Alive, never in the way. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -969,27 +893,65 @@ body::before {
 /* ---------------------------------------------------------------------------
  * Density.
  *
- * One attribute on <html>, three values, two variables. Every card's padding
- * and every list row's vertical padding derive from these, so "how much do I
- * want to see at once" is one click in the top bar rather than a rebuild.
- * Comfortable is the default and is exactly what the app measured before the
- * dial existed; the other two only take away.
+ * One attribute on <html>, three values. Card padding, row padding, control
+ * height, control inset and the gap between fields all derive from these, so
+ * "how much do I want to see at once" is one click in the top bar rather than
+ * a rebuild.
+ *
+ * Comfortable is no longer what the app measured before the dial existed. It
+ * used to be, and the result was a form that asked for four short strings and
+ * filled a screen doing it: 40px controls, 20px card padding, a labelled line
+ * above every field. The dial was the escape hatch, which meant the default
+ * was a thing you had to escape. So the whole ladder came down a step and
+ * comfortable is now what snug was. The dial still only takes away.
+ *
+ * Control height is here rather than in a utility class because it is the
+ * measurement everything else in a form is hung off -- a select next to an
+ * input next to a button all agree because they read the same variable, and
+ * none of them can drift by someone typing h-10 out of habit.
  * ------------------------------------------------------------------------- */
 :root,
 [data-density='comfortable'] {
-  --card-p: 1.25rem;
-  --card-p-dense: 1rem;
-  --row-y: 0.625rem;
-}
-[data-density='snug'] {
   --card-p: 1rem;
   --card-p-dense: 0.75rem;
   --row-y: 0.5rem;
+  --control-h: 2.25rem;
+  --control-px: 0.625rem;
+  --field-gap: 0.75rem;
 }
-[data-density='dense'] {
-  --card-p: 0.75rem;
+[data-density='snug'] {
+  --card-p: 0.875rem;
   --card-p-dense: 0.625rem;
   --row-y: 0.375rem;
+  --control-h: 2.125rem;
+  --control-px: 0.5rem;
+  --field-gap: 0.625rem;
+}
+[data-density='dense'] {
+  --card-p: 0.625rem;
+  --card-p-dense: 0.5rem;
+  --row-y: 0.25rem;
+  --control-h: 2rem;
+  --control-px: 0.5rem;
+  --field-gap: 0.5rem;
+}
+
+/* A finger needs a bigger target than a mouse does. WCAG 2.5.8 asks 24px and
+ * a thumb wants nearer 40, so the touch sizes above are the floor and the
+ * compact ones only apply once there is a pointer's worth of precision. This
+ * is the same reasoning as the `text-base sm:text-ui` on every control, and
+ * it breaks at the same width. */
+@media (min-width: 40rem) {
+  :root,
+  [data-density='comfortable'] {
+    --control-h: 2rem;
+  }
+  [data-density='snug'] {
+    --control-h: 1.875rem;
+  }
+  [data-density='dense'] {
+    --control-h: 1.75rem;
+  }
 }
 
 @utility card-pad {
@@ -1005,7 +967,7 @@ body::before {
   padding-block: var(--row-y);
 }
 
-/* A sheet: the one class every opaque card carries. Inert in four themes,
+/* A sheet: the one class every opaque card carries. Inert in three themes,
  * where the outline is the ordinary hairline and there is no edge; in
  * Lightbox it is the lit paper's edge. See the token comments in that block. */
 @utility sheet {

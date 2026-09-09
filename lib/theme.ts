@@ -32,21 +32,13 @@ export const THEMES = [
     ink: '#f7f8f8',
   },
   {
-    id: 'riso',
-    label: 'Riso',
-    mood: 'Cream and halftone',
-    scheme: 'light',
-    swatch: '#f6f2e8',
-    ink: '#191713',
-  },
-  {
     id: 'lightbox',
     label: 'Lightbox',
     mood: 'Lit sheets, blue-black bench',
     // The one theme whose page and cards disagree: the bench is dark, so the
     // picker's swatch and the scheme it reports both describe the bench.
     scheme: 'dark',
-    swatch: '#1e2734',
+    swatch: '#0d1219',
     ink: '#e7ebf1',
   },
   {

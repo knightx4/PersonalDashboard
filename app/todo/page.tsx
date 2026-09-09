@@ -2,7 +2,7 @@ import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAgenda } from '@/lib/todo/agenda/load';
-import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
+import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
@@ -37,7 +37,9 @@ export default async function TodoPage() {
         description={empty ? 'Nothing on the list.' : 'What needs you, in the order it runs out.'}
       />
 
-      <AddTask />
+      {/* The account's own today, not the browser's: Today has to mean the day
+          the list is kept in. */}
+      <AddTask today={todayIn(agenda.timezone)} />
 
       {/* A source that failed is said out loud. Silently showing a shorter
           agenda would be the worst possible failure for this page: it looks
@@ -59,7 +61,16 @@ export default async function TodoPage() {
         />
       ) : (
         <div className="mt-6 space-y-6">
-          {agenda.piles.map(({ bucket, entries, context }) => (
+          {agenda.piles.map(({ bucket, entries, context }) => {
+            // The pile in the order it is about to be drawn in, so a row can
+            // send it back with a move. Tasks only: an interview or a return
+            // deadline is not a row this account owns, so there is nowhere to
+            // write an order for it.
+            const pile = entries
+              .filter((entry) => entry.kind === 'task' && entry.task)
+              .map((entry) => entry.task!.id);
+
+            return (
             <section key={bucket}>
               <h2
                 className={cn(
@@ -119,6 +130,7 @@ export default async function TodoPage() {
                         task={entry.task}
                         timezone={agenda.timezone}
                         anchor={entry.anchor}
+                        pile={pile}
                       />
                     ) : entry.item ? (
                       <AgendaItemRow key={entry.key} item={entry.item} timezone={agenda.timezone} />
@@ -127,7 +139,8 @@ export default async function TodoPage() {
                 </Card>
               )}
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

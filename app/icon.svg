@@ -1,10 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<!--
+  The app's mark, as a file.
+
+  This is components/ui/module-mark.tsx with module={null}, drawn out by hand:
+  the same near-black tile, the same three constant nodes at 68% white, and the
+  same gradient dash in the key corner. It was a gradient-filled rounded square
+  with nothing in it for a long time, which meant the thing in the browser tab
+  and the thing in the topbar were not the same mark and never had been.
+
+  Geometry is the component's 24-unit box, scaled to 96% and centred in 32.
+  The component insets its glyph to 69% of the tile, which is right for a 44px
+  chip and wasteful at 16, where every pixel of the dash is doing work; 72% is
+  the same drawing with a tab-sized margin.
+
+  If the component changes, change this. There is no build step tying them
+  together, and there is not enough here to justify one.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <!-- Along the dash, not across it: the two hues are the point of the
+         gradient and a diagonal on a 2.8:1 bar shows neither of them. -->
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#6A82FB"/>
       <stop offset="100%" stop-color="#FF6B9D"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="8" fill="url(#g)"/>
+
+  <rect width="32" height="32" rx="8" fill="#101216"/>
+  <!-- The component draws this edge with an inset box-shadow. Without it the
+       tile disappears into a dark browser chrome. -->
+  <rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="none" stroke="#ffffff" stroke-opacity="0.09"/>
+
+  <g transform="translate(4.48 4.48) scale(0.96)">
+    <g fill="#ffffff" opacity="0.68">
+      <rect x="3" y="3" width="8.2" height="8.2" rx="1.31"/>
+      <rect x="3" y="12.8" width="8.2" height="8.2" rx="1.31"/>
+      <rect x="12.8" y="12.8" width="8.2" height="8.2" rx="1.31"/>
+    </g>
+    <rect x="12.3" y="5.35" width="9.2" height="3.5" rx="0.35" fill="url(#g)"/>
+  </g>
 </svg>

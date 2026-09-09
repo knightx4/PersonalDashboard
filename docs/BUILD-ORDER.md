@@ -55,7 +55,15 @@ at Tier 2.
 14. ✅ **Review queue.** Heuristic orders (`needs_review`) and failed /
     unmatched emails (`parse_status = needs_review`). Confirm, discard, or
     dismiss; Open in Gmail; nav badge counts both.
-15. **Account deletion** with token revocation and full cascade.
+15. ✅ **Account deletion** with token revocation and full cascade. On
+    `/account`, not inside a workspace — an account you can only delete from
+    the job search is one you cannot delete with the job search switched off.
+    Revokes every Google grant, clears this app’s storage bucket, and deletes
+    the `auth.users` row, which every table naming a user cascades from in all
+    six schemas. `tests/account-cascade.test.ts` reads the migrations and
+    refuses one that adds a table without that cascade. The vault’s GitHub
+    token is the one credential this cannot revoke — it was pasted in, so only
+    its owner can delete it, and the page says so.
 16. ✅ **Books resolution engine** — ISBN/title → canonical book via Google
     Books + Open Library, tested with fixtures.
 17. ✅ **Owned-book ingestion** — manual search, paste list, barcode scan,

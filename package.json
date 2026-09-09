@@ -11,6 +11,9 @@
     "test:watch": "vitest",
     "db:reset": "./scripts/db-reset.sh",
     "check:contrast": "tsx scripts/check-contrast.ts",
+    "check:ui": "tsx scripts/check-ui.ts",
+    "preview": "UI_PREVIEW=1 next build && UI_PREVIEW=1 next start -p ${PREVIEW_PORT:-3400}",
+    "shoot": "tsx scripts/shoot.ts",
     "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts"

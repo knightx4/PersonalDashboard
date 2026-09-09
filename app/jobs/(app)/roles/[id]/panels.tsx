@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
   CalendarClock,
   CheckCircle2,
@@ -12,13 +12,16 @@ import {
   ChevronDown,
   ListChecks,
   Mail,
+  Maximize2,
   MessageSquareText,
   Pencil,
   StickyNote,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -68,6 +71,7 @@ import {
   unlinkMessage,
   unlinkRoundMessage,
   unshareCasePage,
+  updateNote,
   updateReminder,
 } from './actions';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
@@ -484,41 +488,54 @@ function Todos({
           ))}
         </ul>
       )}
-      <div className="flex flex-wrap items-end gap-2">
-        <Field id="todo-body" label="Add a to-do" className="min-w-48 flex-1">
-          <Input
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Record a video interview"
-          />
-        </Field>
-        <Field id="todo-due" label="Done by">
-          <Input
-            type="date"
-            value={dueAt}
-            onChange={(event) => setDueAt(event.target.value)}
-            className="w-40"
-          />
-        </Field>
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || !body.trim() || !dueAt}
-          onClick={() =>
-            startTransition(async () => {
-              const result = await addReminder({ applicationId, body, dueAt });
-              setError(result.error);
-              if (!result.error) {
-                setBody('');
-                setDueAt('');
-              }
-            })
-          }
-        >
+      {/*
+        * One line, and no captions above it.
+        *
+        * This was two `Field`s and a button: "Add a to-do" printed above a box
+        * whose own placeholder read "Record a video interview", and "Done by"
+        * printed above a date picker that says what it is by being one. Three
+        * stacked rows and four pieces of chrome to collect a sentence and a
+        * day. Laws 9 and 12.
+        *
+        * It is a real `<form>` now rather than a button with an onClick, which
+        * is what makes Return submit it -- the thing you actually do after
+        * typing a to-do. The button stays for the pointer and for anyone who
+        * does not know that, and goes quiet until there is something to add.
+        */}
+      <form
+        className="flex flex-wrap items-center gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!body.trim() || !dueAt) return;
+          startTransition(async () => {
+            const result = await addReminder({ applicationId, body, dueAt });
+            setError(result.error);
+            if (!result.error) {
+              setBody('');
+              setDueAt('');
+            }
+          });
+        }}
+      >
+        <Input
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          aria-label="Add a to-do"
+          placeholder="Add a to-do…"
+          className="min-w-48 flex-1"
+        />
+        <Input
+          type="date"
+          value={dueAt}
+          onChange={(event) => setDueAt(event.target.value)}
+          aria-label="Done by"
+          className="w-36"
+        />
+        <Button type="submit" size="sm" variant="secondary" pending={pending} disabled={!body.trim() || !dueAt}>
           Add
         </Button>
         {error && <span className="text-small text-danger">{error}</span>}
-      </div>
+      </form>
     </CardSection>
   );
 }
@@ -725,13 +742,19 @@ function TodoMail({
 
 /**
  * Colour carries the verdict, so a map is readable at a glance without reading
- * every line. Gap is the same red as a rejection on purpose: it is the answer
- * that saves you the hour, not a failure state to be softened.
+ * every line. Gap is red on purpose: it is the answer that saves you the hour,
+ * not a failure state to be softened.
+ *
+ * The good/middling/bad triad, not the pipeline's stage hues -- which resolve
+ * to the same three values in every theme, and which law 4 gives to one stage
+ * each and to nothing else. A requirement is not a stage. Every line also
+ * carries a dot and a word, so the colour is what makes the gaps findable
+ * rather than what says which line is which.
  */
 const VERDICT_STYLE: Record<MatchVerdict, { dot: string; label: string; text: string }> = {
-  strong: { dot: 'bg-status-offer', label: 'Strong', text: 'text-status-offer' },
+  strong: { dot: 'bg-positive', label: 'Strong', text: 'text-positive' },
   partial: { dot: 'bg-caution-fill', label: 'Partial', text: 'text-caution' },
-  gap: { dot: 'bg-status-rejected', label: 'Gap', text: 'text-status-rejected' },
+  gap: { dot: 'bg-danger', label: 'Gap', text: 'text-danger' },
 };
 
 function Posting({
@@ -1575,7 +1598,11 @@ function AnswerCard({
       </div>
 
       {draft && (
-        <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
+        // A well, not a frame. This is the one thing on the page that is not
+        // yours yet -- a machine's suggestion waiting to be inserted or thrown
+        // away -- and a recessed ground says that without adding a second
+        // border inside the answer card. Law 11: a shared ground groups.
+        <div className="mt-3 rounded-card bg-canvas p-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h4 className="text-small font-medium text-ink">A draft, from your own stories</h4>
             <span className="text-small text-ink-muted">
@@ -1789,11 +1816,19 @@ function AddRound({ applicationId, nextRound }: { applicationId: string; nextRou
             setError(result.error);
           })
         }
-        className="press w-full rounded-card border border-dashed border-border bg-surface py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent"
+        // The empty slot at the end of the rounds, drawn in the card's own
+        // classes with the border dashed -- the same spelling AddInterview
+        // below already used for the identical affordance. It was hand-written
+        // here, which is how two buttons doing one job ended up with two
+        // radii and two edges.
+        className={cn(
+          cardVariants(),
+          'press w-full border-dashed py-2.5 text-center text-ui text-ink-muted hover:border-accent hover:text-accent',
+        )}
       >
         {pending ? 'Adding…' : 'Add a round'}
       </button>
-      {error && <p className="mt-1 text-small text-status-rejected">{error}</p>}
+      {error && <p className="mt-1 text-small text-danger">{error}</p>}
     </div>
   );
 }
@@ -1927,7 +1962,7 @@ function Interviewers({
                 }),
               )
             }
-            className="text-ink-muted hover:text-status-rejected"
+            className="text-ink-muted hover:text-danger"
           >
             ×
           </button>
@@ -1971,7 +2006,7 @@ function Interviewers({
         </button>
       )}
 
-      {error && <span className="text-status-rejected">{error}</span>}
+      {error && <span className="text-danger">{error}</span>}
     </div>
   );
 }
@@ -2126,7 +2161,7 @@ function InterviewHeading({
           Cancel
         </Button>
       </div>
-      {error && <p className="text-small text-status-rejected">{error}</p>}
+      {error && <p className="text-small text-danger">{error}</p>}
     </header>
   );
 }
@@ -2172,7 +2207,7 @@ function GroupTheseRounds({
       >
         Make them one round
       </Button>
-      {error && <span className="text-small text-status-rejected">{error}</span>}
+      {error && <span className="text-small text-danger">{error}</span>}
     </div>
   );
 }
@@ -2261,7 +2296,11 @@ function InterviewGroupCard({
     });
 
   return (
-    <section className="rounded-card border border-accent/40 bg-accent-tint/30 p-3">
+    // A card, in the app's card, rather than a rectangle that happened to look
+    // like one. The accent edge and wash stay: a round is the one container on
+    // this tab that holds other cards, and the tint is what says which
+    // interviews belong to which round without indenting them.
+    <Card padding="dense" className="border-accent/40 bg-accent-tint/30">
       <header className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -2337,7 +2376,7 @@ function InterviewGroupCard({
                 }
               });
             }}
-            className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected"
+            className="ml-auto text-small text-ink-muted underline underline-offset-2 hover:text-danger"
           >
             {removing ? 'Really remove it?' : 'Remove this round'}
           </button>
@@ -2414,7 +2453,7 @@ function InterviewGroupCard({
         </div>
         </>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -2476,7 +2515,7 @@ function RoundMail({
                     setError(result.error);
                   })
                 }
-                className="text-ink-muted hover:text-status-rejected"
+                className="text-ink-muted hover:text-danger"
               >
                 ×
               </button>
@@ -2529,7 +2568,7 @@ function RoundMail({
         </button>
       )}
 
-      {error && <p className="mt-1 text-small text-status-rejected">{error}</p>}
+      {error && <p className="mt-1 text-small text-danger">{error}</p>}
     </div>
   );
 }
@@ -2678,7 +2717,7 @@ function InterviewCard({
                     Cancel
                   </button>
                   {draftError && (
-                    <span className="text-small text-status-rejected">{draftError}</span>
+                    <span className="text-small text-danger">{draftError}</span>
                   )}
                 </div>
               </div>
@@ -2750,7 +2789,7 @@ function InterviewCard({
                 type="button"
                 disabled={pending}
                 onClick={() => startTransition(() => void deleteInterview(interview.id))}
-                className="press text-small font-medium text-status-rejected"
+                className="press text-small font-medium text-danger"
               >
                 Delete
               </button>
@@ -2766,7 +2805,7 @@ function InterviewCard({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="text-small text-ink-muted underline underline-offset-2 hover:text-status-rejected"
+              className="text-small text-ink-muted underline underline-offset-2 hover:text-danger"
             >
               Not a real round — remove it
             </button>
@@ -2777,16 +2816,18 @@ function InterviewCard({
   );
 }
 
-/** One of the kinds of note a round can be given. */
+/**
+ * One of the kinds of note a round can be given.
+ *
+ * A button, so it is drawn as one. It used to spell its own box -- a container
+ * hairline around a control, at a height nothing else on the row shared -- and
+ * three of them in a line read as three little cards rather than as a choice.
+ */
 function NoteKindButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="press rounded-lg border border-border px-2 py-0.5 text-small font-medium text-ink-muted hover:border-accent hover:text-accent"
-    >
+    <Button type="button" variant="secondary" size="sm" onClick={onClick}>
       + {label}
-    </button>
+    </Button>
   );
 }
 
@@ -2997,7 +3038,7 @@ function AddInterview({
         <button type="button" onClick={close} className="text-small text-ink-muted hover:text-ink">
           Cancel
         </button>
-        {error && <span className="text-small text-status-rejected">{error}</span>}
+        {error && <span className="text-small text-danger">{error}</span>}
       </div>
     </section>
   );
@@ -3007,6 +3048,9 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
   const [body, setBody] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [opened, setOpened] = useState<string | null>(null);
+
+  const open = notes.find((note) => note.id === opened) ?? null;
 
   return (
     <div className="space-y-3">
@@ -3032,18 +3076,176 @@ function Notes({ notes, roleId, timezone }: PanelProps) {
           >
             Add note
           </Button>
-          {error && <span className="text-small text-status-rejected">{error}</span>}
+          {error && <span className="text-small text-danger">{error}</span>}
         </div>
       </section>
 
       {notes.map((note) => (
-        <article key={note.id} className={cardVariants({ padding: 'dense' })}>
-          <p className="whitespace-pre-wrap text-ui text-ink">{note.body}</p>
+        <article key={note.id} className={cn(cardVariants({ padding: 'dense' }), 'group relative')}>
+          {/* A note longer than a couple of lines is a document, and this list
+              is not where a document is read or written. The card stays the
+              list's summary of it; the window is the note itself. */}
+          <button
+            type="button"
+            title="Open the note"
+            onClick={() => setOpened(note.id)}
+            className="press absolute right-2 top-2 flex size-7 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-opacity duration-150 hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+          >
+            <Maximize2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Open the note</span>
+          </button>
+          <p className="whitespace-pre-wrap pr-8 text-ui text-ink">{note.body}</p>
           <p className="tabular mt-1.5 text-small text-ink-muted">
             {formatDate(note.createdAt, timezone)}
           </p>
         </article>
       ))}
+
+      {open && (
+        <NoteWindow
+          key={open.id}
+          note={open}
+          roleId={roleId}
+          timezone={timezone}
+          onClose={() => setOpened(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * One note, with the page out of the way.
+ *
+ * A note that is worth writing at length was being written into a three-line
+ * box on a tab beside five other tabs, and read back as a paragraph squeezed
+ * into a card. This is the same note with nothing else on the screen: one
+ * column at reading width, the text at reading size, and a bar at the top that
+ * says when it was written and whether it is saved.
+ *
+ * It saves on the way out as well as on demand -- closing an editor is not a
+ * decision to discard what is in it, and being asked "save?" for something you
+ * plainly meant to keep is the failure this avoids.
+ */
+function NoteWindow({
+  note,
+  roleId,
+  timezone,
+  onClose,
+}: {
+  note: { id: string; body: string; createdAt: string };
+  roleId: string;
+  timezone: string;
+  onClose: () => void;
+}) {
+  const [body, setBody] = useState(note.body);
+  const [state, setState] = useState<'clean' | 'dirty' | 'saving' | 'saved'>('clean');
+  const [error, setError] = useState<string | null>(null);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  const [, startTransition] = useTransition();
+
+  const dirty = body.trim() !== note.body.trim();
+
+  const save = useCallback(
+    (then?: () => void) => {
+      // Nothing to write is not a failure to write: closing an untouched note
+      // just closes it.
+      if (!dirty || !body.trim()) {
+        then?.();
+        return;
+      }
+      setState('saving');
+      startTransition(async () => {
+        const result = await updateNote({ noteId: note.id, roleId, body });
+        setError(result.error);
+        setState(result.error ? 'dirty' : 'saved');
+        if (!result.error) then?.();
+      });
+    },
+    [body, dirty, note.id, roleId],
+  );
+
+  useEffect(() => {
+    const area = areaRef.current;
+    if (area) {
+      area.focus();
+      area.setSelectionRange(area.value.length, area.value.length);
+    }
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        save(onClose);
+      } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        save();
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose, save]);
+
+  // Read off what is actually true rather than off the last thing that
+  // happened: typing a word and deleting it again leaves nothing to save.
+  const status =
+    error !== null
+      ? null
+      : state === 'saving'
+        ? 'Saving…'
+        : dirty
+          ? 'Unsaved'
+          : state === 'saved'
+            ? 'Saved'
+            : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-canvas">
+      <div className="flex items-center gap-3 border-b border-border px-4 py-2.5">
+        <button
+          type="button"
+          onClick={() => save(onClose)}
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
+        >
+          <X className="size-4" strokeWidth={2} aria-hidden />
+          <span className="sr-only">Close the note</span>
+        </button>
+        <span className="tabular text-small text-ink-muted">
+          {formatDate(note.createdAt, timezone)}
+        </span>
+        <span className="min-w-0 flex-1" />
+        {error && <span className="text-small text-danger">{error}</span>}
+        {status && <span className="text-small text-ink-muted">{status}</span>}
+        <Button
+          type="button"
+          size="sm"
+          disabled={state === 'saving' || !dirty}
+          onClick={() => save()}
+        >
+          Save
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex h-full w-full max-w-prose px-6 py-8">
+          <textarea
+            ref={areaRef}
+            value={body}
+            onChange={(event) => {
+              setBody(event.target.value);
+              setState('dirty');
+            }}
+            aria-label="The note"
+            className="min-h-full w-full resize-none bg-transparent text-body leading-relaxed text-ink outline-none placeholder:text-ink-ghost"
+            placeholder="Write."
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -3208,32 +3410,35 @@ function MatchCandidates({
   return (
     <div className="space-y-2">
       {visible.length > 0 && (
-        <details className={cardVariants()}>
-          <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink">
-            Possible matches — {visible.length}
-          </summary>
-          <div className="space-y-2 border-t border-border p-3">
-            <p className="text-small text-ink-muted">
-              Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not a
-              match and it will not be suggested again for this pursuit.
-            </p>
-            <ul className="space-y-1.5">
-              {visible.map((candidate) => (
-                <MatchRow
-                  key={candidate.id}
-                  message={candidate}
-                  timezone={timezone}
-                  busy={pendingId === candidate.id}
-                  onDecline={() => decide(candidate.id, declineCandidateMessage)}
-                  onLink={() => decide(candidate.id, linkCandidateMessage)}
-                />
-              ))}
-            </ul>
-          </div>
-        </details>
+        // The shared fold, in the shared card. Hand-rolled until the sweep: its
+        // own summary, its own padding and no chevron, where every other fold
+        // in the app has one. The count moves to the primitive's `meta`, which
+        // is what law 10 asks the closed line to carry.
+        <Card padding="dense">
+          <Disclosure title="Possible matches" meta={`${visible.length} unlinked`}>
+            <div className="space-y-2">
+              <p className="text-small text-ink-muted">
+                Unlinked mail mentioning {companyName}. Approve what belongs here, or say it is not
+                a match and it will not be suggested again for this pursuit.
+              </p>
+              <ul className="divide-y divide-border">
+                {visible.map((candidate) => (
+                  <MatchRow
+                    key={candidate.id}
+                    message={candidate}
+                    timezone={timezone}
+                    busy={pendingId === candidate.id}
+                    onDecline={() => decide(candidate.id, declineCandidateMessage)}
+                    onLink={() => decide(candidate.id, linkCandidateMessage)}
+                  />
+                ))}
+              </ul>
+            </div>
+          </Disclosure>
+        </Card>
       )}
 
-      {error && <p className="text-small text-status-rejected">{error}</p>}
+      {error && <p className="text-small text-danger">{error}</p>}
 
       {searching ? (
         <AddOtherSearch applicationId={applicationId} timezone={timezone} onClose={() => setSearching(false)} />
@@ -3265,7 +3470,10 @@ function MatchRow({
   onLink: () => void;
 }) {
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-canvas px-2.5 py-2 text-ui">
+    // A row in a list, inside a card that is already a box: the divides on the
+    // list do the separating and this stops drawing a box per message. Six
+    // suggestions used to be six frames inside one.
+    <li className="row-pad flex flex-wrap items-center gap-x-3 gap-y-1 text-ui">
       <span className="tabular w-full text-small text-ink-muted sm:w-32">
         {formatDate(message.receivedAt, timezone)}
       </span>
@@ -3288,14 +3496,9 @@ function MatchRow({
             Not a match
           </button>
         )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onLink}
-          className="press rounded-lg border border-border bg-surface px-2 py-0.5 text-small font-medium text-ink disabled:opacity-50"
-        >
+        <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={onLink}>
           Link
-        </button>
+        </Button>
       </span>
     </li>
   );
@@ -3357,7 +3560,7 @@ function AddOtherSearch({
           Close
         </button>
       </div>
-      {error && <p className="mt-2 text-small text-status-rejected">{error}</p>}
+      {error && <p className="mt-2 text-small text-danger">{error}</p>}
       {results !== null && (
         <ul className="mt-2 space-y-1.5">
           {results.length === 0 && (

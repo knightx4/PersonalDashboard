@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   dayIn,
   groupableDays,
+  roundsOf,
   sectionInterviews,
   type GroupableInterview,
   type InterviewGroup,
@@ -179,5 +180,49 @@ describe('dayIn', () => {
   it('formats as YYYY-MM-DD in the given zone', () => {
     expect(dayIn('2026-03-12T23:00:00.000Z', 'Asia/Tokyo')).toBe('2026-03-13');
     expect(dayIn('2026-03-12T23:00:00.000Z', 'UTC')).toBe('2026-03-12');
+  });
+});
+
+describe('roundsOf', () => {
+  it('collapses a round into one row, keeping its interviews in order', () => {
+    const rows = roundsOf(
+      [
+        interview({ id: 'a', scheduledAt: '2026-03-12T09:00:00.000Z', groupId: 'g1' }),
+        interview({ id: 'b', scheduledAt: '2026-03-12T10:00:00.000Z', groupId: 'g1' }),
+        interview({ id: 'c', scheduledAt: '2026-03-12T11:00:00.000Z', groupId: 'g1' }),
+      ],
+      [SUPERDAY],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].group).toBe(SUPERDAY);
+    expect(rows[0].interviews.map((row) => row.id)).toEqual(['a', 'b', 'c']);
+    expect(rows[0].lead.id).toBe('a');
+  });
+
+  it('keeps the order it was given, per round', () => {
+    const rows = roundsOf(
+      [
+        interview({ id: 'screen', scheduledAt: '2026-03-10T09:00:00.000Z', groupId: 'g0' }),
+        interview({ id: 'day-1', scheduledAt: '2026-03-12T09:00:00.000Z', groupId: 'g1' }),
+        interview({ id: 'day-2', scheduledAt: '2026-03-12T10:00:00.000Z', groupId: 'g1' }),
+      ],
+      [SUPERDAY, SCREEN],
+    );
+    // The superday is round 2 and sorts first by number, but this list was
+    // given in date order and stays in it.
+    expect(rows.map((row) => row.lead.id)).toEqual(['screen', 'day-1']);
+  });
+
+  it('stands an interview on its own when its round is not among the groups', () => {
+    const rows = roundsOf(
+      [interview({ id: 'a', groupId: 'gone' }), interview({ id: 'b', groupId: null })],
+      [SCREEN],
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.group)).toEqual([null, null]);
+  });
+
+  it('has no row for a round with nothing in it', () => {
+    expect(roundsOf([], [SUPERDAY])).toEqual([]);
   });
 });

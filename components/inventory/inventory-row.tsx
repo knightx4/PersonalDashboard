@@ -14,6 +14,7 @@ import { displayVariant } from '@/lib/inventory/display';
 import { cn } from '@/lib/cn';
 import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
+import { UNSET_SWATCH } from '@/lib/lists/gradients';
 
 export type InventoryRowItem = {
   id: string;
@@ -56,7 +57,7 @@ export function InventoryRow({
 }) {
   const title = displayNameOf(item);
   const variant = displayVariant(item.variant);
-  const accent = item.category_color ?? '#cfcfc8';
+  const accent = item.category_color ?? UNSET_SWATCH;
   const quantity = item.quantity ?? 1;
   const low = item.unit_cost_low ?? item.cost_cents;
   const high = item.unit_cost_high ?? item.cost_cents;
@@ -80,8 +81,12 @@ export function InventoryRow({
           'focus-visible:bg-canvas focus-visible:outline-none',
         )}
       >
+        {/* The ground is the tile; there is no frame around it. A hairline
+            per row is box soup at list length, and the sell queue and the
+            item page's fallback have always drawn the same thumbnail without
+            one. Law 11. */}
         <span
-          className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-border bg-canvas"
+          className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-canvas"
           style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
         >
           {item.image_url ? (

@@ -21,6 +21,7 @@ function task(over: Partial<Task> = {}): Task {
     snoozedUntil: null,
     completedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
+    position: null,
     ...over,
   };
 }
@@ -145,6 +146,39 @@ describe('bucketTasks', () => {
       'later-today',
       'earlier-written',
       'no-clock',
+    ]);
+  });
+
+  it('puts what you placed by hand first, in the order you placed it', () => {
+    const result = bucketTasks(
+      [
+        task({ id: 'third', dueOn: '2026-03-10', position: 3 }),
+        task({ id: 'unplaced', dueAt: '2026-03-10T08:00:00.000Z' }),
+        task({ id: 'first', dueOn: '2026-03-10', position: 1 }),
+        task({ id: 'second', dueOn: '2026-03-10', position: 2 }),
+      ],
+      { timezone: 'UTC', now: NOW },
+    );
+
+    expect(result[0].tasks.map((t) => t.id)).toEqual(['first', 'second', 'third', 'unplaced']);
+  });
+
+  it('lets a hand-placed order beat a pin, and a pin still floats the unplaced', () => {
+    const result = bucketTasks(
+      [
+        task({ id: 'pinned-below', dueOn: '2026-03-10', pinned: true, position: 2 }),
+        task({ id: 'placed-above', dueOn: '2026-03-10', position: 1 }),
+        task({ id: 'unplaced-plain', dueOn: '2026-03-10', createdAt: '2026-01-01T00:00:00.000Z' }),
+        task({ id: 'unplaced-pinned', dueOn: '2026-03-10', pinned: true }),
+      ],
+      { timezone: 'UTC', now: NOW },
+    );
+
+    expect(result[0].tasks.map((t) => t.id)).toEqual([
+      'placed-above',
+      'pinned-below',
+      'unplaced-pinned',
+      'unplaced-plain',
     ]);
   });
 });

@@ -6,6 +6,7 @@ import { ExternalLink, Plus, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Group } from '@/components/ui/disclosure';
 import { Field, FieldError, Input } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -309,22 +310,24 @@ function OtherRolePicker({
   const matches = matchRoles(roles, query);
 
   return (
-    <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
-      <Field id={`other-role-${row.id}`} label="Link to another role">
-        <Input
-          id={`other-role-${row.id}`}
-          autoFocus
-          value={query}
-          disabled={pending}
-          placeholder="Company or role title"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </Field>
+    // A heading and space, not a panel. This opens inside the queue's own card,
+    // where a bordered box was the second frame in and the field's caption said
+    // the same thing the heading above it now says once. Law 11.
+    <Group title="Link to another role" className="mt-3">
+      <Input
+        id={`other-role-${row.id}`}
+        autoFocus
+        value={query}
+        disabled={pending}
+        placeholder="Company or role title"
+        aria-label="Search every role by company or title"
+        onChange={(event) => setQuery(event.target.value)}
+      />
 
       {matches.length === 0 ? (
-        <p className="mt-2 text-small text-ink-muted">No role matches that.</p>
+        <p className="text-small text-ink-muted">No role matches that.</p>
       ) : (
-        <ul className="mt-2 space-y-1">
+        <ul className="space-y-1">
           {matches.map((role) => (
             <li key={role.applicationId}>
               <button
@@ -353,10 +356,10 @@ function OtherRolePicker({
         </ul>
       )}
 
-      <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => setOpen(false)}>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
         Cancel
       </Button>
-    </div>
+    </Group>
   );
 }
 
@@ -411,9 +414,12 @@ function NewRoleForm({
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-border bg-canvas p-3">
-      <p className="text-small font-medium text-ink">Start a new role from this message</p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+    // Same call as the picker above: the line that was already acting as a
+    // heading becomes the Group's, and the frame around it comes off. The two
+    // fields keep their captions -- a multi-field create is the case law 12
+    // names as its own exception, and a bare company name is not self-describing.
+    <Group title="Start a new role from this message" className="mt-3">
+      <div className="grid gap-2 sm:grid-cols-2">
         <div>
           <Field id={`company-${row.id}`} label="Company">
             <Input
@@ -439,7 +445,7 @@ function NewRoleForm({
           />
         </Field>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" pending={pending} onClick={submit}>
           {pending ? 'Creating…' : 'Create and link'}
         </Button>
@@ -454,11 +460,11 @@ function NewRoleForm({
         </Button>
       </div>
       <FieldError>{error}</FieldError>
-      <p className="mt-2 text-small text-ink-muted">
+      <p className="text-small text-ink-muted">
         No applied date is set: this message writes the event its kind implies, and the status
         follows from that.
       </p>
-    </div>
+    </Group>
   );
 }
 

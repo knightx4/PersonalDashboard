@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_FEATURE_ROUTINE_ID, fireFeatureRoutine } from '@/lib/feedback/routine';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  DEFAULT_FEATURE_ROUTINE_ID,
+  fireFeatureRoutine,
+  notesRoutine,
+  planRoutine,
+} from '@/lib/feedback/routine';
 
 describe('fireFeatureRoutine', () => {
   it('says what is missing rather than calling with no key', async () => {
@@ -66,5 +71,65 @@ describe('fireFeatureRoutine', () => {
     });
     const result = await fireFeatureRoutine({ apiKey: 'sk-test', fetch: fetchFn as never });
     expect(result).toMatchObject({ ok: false, error: 'getaddrinfo ENOTFOUND' });
+  });
+});
+
+/**
+ * Two queues, two routines, and a token scoped to each. The bugs button sends
+ * no text of its own, so a button pointed at the wrong routine works the other
+ * queue in silence; a token left behind by a repointed id answers 401. These
+ * say neither can happen.
+ */
+describe('which routine each button fires', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('sends each queue to its own routine, with its own token', () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_ID', 'trig_notes');
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_TOKEN', 'oat_notes');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_plan');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'oat_plan');
+    expect(notesRoutine()).toEqual({ id: 'trig_notes', token: 'oat_notes' });
+    expect(planRoutine()).toEqual({ id: 'trig_plan', token: 'oat_plan' });
+  });
+
+  it('falls back to what a single shared routine used', () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_TOKEN', '');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', '');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', 'trig_shared');
+    vi.stubEnv('CLAUDE_API_KEY', 'oat_shared');
+    expect(notesRoutine()).toEqual({ id: 'trig_shared', token: 'oat_shared' });
+    expect(planRoutine()).toEqual({ id: 'trig_shared', token: 'oat_shared' });
+  });
+
+  it('answers null when nothing is set, which fireFeatureRoutine reads as the default', async () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', '');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', '');
+    expect(notesRoutine().id).toBeNull();
+
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+    await fireFeatureRoutine({ apiKey: 'sk-test', routineId: null, fetch: fetchFn as never });
+    const [url] = fetchFn.mock.calls[0] as unknown as [string];
+    expect(url).toContain(`/routines/${DEFAULT_FEATURE_ROUTINE_ID}/fire`);
+  });
+
+  it('ignores a variable set to blank rather than treating it as an answer', () => {
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', '   ');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', '   ');
+    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', 'trig_shared');
+    vi.stubEnv('CLAUDE_API_KEY', 'oat_shared');
+    expect(planRoutine()).toEqual({ id: 'trig_shared', token: 'oat_shared' });
+  });
+
+  it('does not lend one routine the other\'s token', () => {
+    vi.stubEnv('CLAUDE_NOTES_ROUTINE_TOKEN', 'oat_notes');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', '');
+    vi.stubEnv('CLAUDE_API_KEY', '');
+    expect(notesRoutine().token).toBe('oat_notes');
+    expect(planRoutine().token).toBeNull();
   });
 });

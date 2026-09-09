@@ -6,6 +6,7 @@ import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/field';
 
 /**
  * Contextual filters. Contents change per section, so each page passes its own
@@ -178,13 +179,24 @@ export function RailPicker({
       <h2 className="mb-2 px-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
         {label}
       </h2>
+      {/* The shared button, not a fifth drawing of one. This was a control
+          wearing the *container* hairline -- `border-border`, which owes no
+          contrast because a container is also identified by its fill -- at a
+          height nothing beside it shared, four pixels above the search field
+          it reveals. `secondary` brings `border-control` (3:1, WCAG 1.4.11)
+          and the dial's height, so the trigger and the field under it are the
+          same control. All the caller adds is the full width and what
+          "filtered" looks like. */}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         className={cn(
-          'press flex w-full items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-left text-ui',
-          active ? 'bg-accent-tint font-medium text-accent' : 'bg-surface text-ink-muted',
+          buttonVariants({ variant: 'secondary' }),
+          'w-full justify-between gap-2 text-left font-normal',
+          active
+            ? 'border-accent bg-accent-tint font-medium text-accent hover:border-accent hover:bg-accent-tint'
+            : 'text-ink-muted',
         )}
       >
         <span className="flex-1 truncate">{active?.label ?? anyLabel}</span>
@@ -195,21 +207,36 @@ export function RailPicker({
         />
       </button>
 
+      {/* No frame of its own, and no ground. This list drops *into* the rail
+          rather than floating over anything, so the trigger's own border and
+          a second one four pixels under it were two hairlines arguing about
+          the same grouping -- law 11's named mistake, and the one place in
+          the shell where it was visible without opening anything. Opened, it
+          is simply a RailGroup's list: the same rows, at the same left edge,
+          under the control that revealed them. */}
       {open && (
-        <div className="mt-1 rounded-lg border border-border bg-surface p-1">
-          <div className="relative mb-1">
+        <div className="mt-1.5">
+          <div className="relative mb-1.5">
             <Search
               className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-muted"
               strokeWidth={1.75}
               aria-hidden
             />
-            <input
+            {/* The shared control, not a fourth spelling of one. Three things
+                come with it that the hand-rolled version had lost: the height
+                follows the density dial instead of being nailed to 32px, the
+                focus ring matches every other field in the app, and it is
+                16px on a phone -- which matters here, because the rail is
+                also the mobile filter sheet, and a 13px field is exactly what
+                makes Safari zoom the page in when you tap it. Only the left
+                inset is ours, for the glyph. */}
+            <Input
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={placeholder}
               aria-label={`Filter ${label.toLowerCase()} options`}
-              className="h-8 w-full rounded-md border border-control bg-sunken pl-7 pr-2 text-ui text-ink placeholder:text-ink-ghost focus:border-accent focus:outline-none"
+              className="pl-7"
             />
           </div>
           <div className="max-h-64 space-y-0.5 overflow-y-auto overscroll-contain">

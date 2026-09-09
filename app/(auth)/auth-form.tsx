@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { Field, Input } from '@/components/ui/field';
 import { signIn, signInWithGoogle, signUp, type AuthState } from './actions';
 
 function Submit({ label }: { label: string }) {
@@ -13,11 +14,6 @@ function Submit({ label }: { label: string }) {
     </Button>
   );
 }
-
-const field =
-  'w-full rounded-lg border border-border bg-surface px-3 py-2 text-body text-ink ' +
-  'placeholder:text-ink-ghost transition-colors duration-150 ' +
-  'focus:border-accent focus:outline-none';
 
 export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: string }) {
   const action = mode === 'signin' ? signIn : signUp;
@@ -33,6 +29,9 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
       <form action={signInWithGoogle}>
         <input type="hidden" name="next" value={next ?? '/onboarding'} />
         <Button type="submit" variant="secondary" className="w-full">
+          {/* ui-ok-file: raw-hex — Google's brand hexes, below. A logo is
+              somebody else's object and does not follow our themes, the same
+              reason the module marks carry fixed hexes. */}
           <svg className="size-4" viewBox="0 0 24 24" aria-hidden>
             <path
               fill="#4285F4"
@@ -64,44 +63,39 @@ export function AuthForm({ mode, next }: { mode: 'signin' | 'signup'; next?: str
       <form action={formAction} className="space-y-3">
         <input type="hidden" name="next" value={next ?? '/onboarding'} />
 
-        <div>
-          <label htmlFor="email" className="mb-1 block text-ui font-medium text-ink">
-            Email
-          </label>
-          <input
+        <Field id="email" label="Email">
+          <Input
             id="email"
             name="email"
             type="email"
             autoComplete="email"
             required
-            className={field}
             placeholder="you@example.com"
           />
-        </div>
+        </Field>
 
-        <div>
-          <label htmlFor="password" className="mb-1 block text-ui font-medium text-ink">
-            Password
-          </label>
-          <input
+        <Field id="password" label="Password">
+          <Input
             id="password"
             name="password"
             type="password"
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             required
             minLength={8}
-            className={field}
             placeholder={mode === 'signup' ? 'At least 8 characters' : '••••••••'}
           />
-        </div>
+        </Field>
 
         {state.error && (
           <p role="alert" className="text-ui text-danger">
             {state.error}
           </p>
         )}
+        {/* Not `text-positive`. Green is the money-came-back colour (law 4) and
+            "check your email" is not that -- it is the system reporting what it
+            just did, which is the quietest rung of the ladder. */}
         {state.message && (
-          <p role="status" className="text-ui text-positive">
+          <p role="status" className="text-ui text-ink-muted">
             {state.message}
           </p>
         )}

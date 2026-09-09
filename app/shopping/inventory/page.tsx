@@ -14,7 +14,7 @@ import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { Input, Select } from '@/components/ui/field';
+import { ChipSelect, Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
@@ -679,50 +679,45 @@ export default async function InventoryPage({
             />
           </div>
 
+          {/* Sort and group are chips rather than two 160px bordered selects
+              with a glyph beside each. Their value is their own label -- "Most
+              recent", "By category" -- so the caption they carried was
+              sr-only already, and the glyph says which property it is. Two
+              chips are a row where two boxed selects were a bar. Laws 9
+              and 12, and the same shape as the filter chips above them. */}
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 text-small text-ink-muted">
-              <ArrowUpDown className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Sort</span>
-              <Select
-                name="sort"
-                defaultValue={sort}
-                className="h-9 w-auto min-w-40"
-                aria-label="Sort inventory"
-                disabled={Boolean(q)}
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="inline-flex items-center gap-1.5 text-small text-ink-muted">
-              <Layers className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Group</span>
-              <Select
-                name="group"
-                defaultValue={group}
-                className="h-9 w-auto min-w-40"
-                aria-label="Group inventory"
-              >
-                {GROUP_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </label>
+            <ChipSelect
+              name="sort"
+              defaultValue={sort}
+              aria-label="Sort inventory"
+              // Disabled while searching: relevance wins, and a disabled
+              // control submits nothing, so the sort falls back on its own.
+              disabled={Boolean(q)}
+              className={q ? 'opacity-50' : undefined}
+              icon={<ArrowUpDown className="size-3.5" strokeWidth={2} />}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </ChipSelect>
+            <ChipSelect
+              name="group"
+              defaultValue={group}
+              aria-label="Group inventory"
+              icon={<Layers className="size-3.5" strokeWidth={2} />}
+            >
+              {GROUP_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </ChipSelect>
             <SubmitOnChange />
             {/* Hidden once the selects submit themselves; still there, and
                 still the only way through, with JavaScript off. */}
-            <Button
-              type="submit"
-              variant="secondary"
-              size="sm"
-              data-fallback-submit
-              className="h-9"
-            >
+            <Button type="submit" variant="secondary" size="sm" data-fallback-submit>
               Apply
             </Button>
             {q && (

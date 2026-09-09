@@ -6,7 +6,9 @@ import {
   switchGameEdition,
   type GameActionState,
 } from '@/app/shopping/inventory/add/games/actions';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
+import { Disclosure, Group } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import type { GameEditionCandidate } from '@/lib/games/types';
 
@@ -69,7 +71,7 @@ function CandidateRow({
   const [state, action, pending] = useActionState(switchGameEdition, {} as GameActionState);
 
   return (
-    <li className="flex gap-3 px-3 py-3">
+    <li className="row-pad flex gap-3">
       {candidate.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- arbitrary catalog CDNs
         <img
@@ -148,8 +150,13 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
         </div>
       </dl>
 
+      {/* The gate is the app's own named shape for "something is wrong and
+          only you can fix it, and here is the action": one warn Banner where
+          there was a hand-rolled caution box holding a bordered card holding
+          a bordered list — three frames deep inside the Details card it sits
+          in. The two inner ones are a heading and space now. Law 11. */}
       {game.needsConfirmation && (
-        <div className="space-y-3 rounded-lg border border-caution/30 bg-caution-fill/5 p-3">
+        <Banner tone="warn">
           <div>
             <h3 className="text-ui font-semibold text-ink">Which box is on your shelf?</h3>
             <p className="mt-1 text-ui text-ink-muted">
@@ -159,43 +166,49 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
             </p>
           </div>
 
-          <div className="flex gap-3 rounded-lg border border-border bg-surface p-3">
-            {game.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- arbitrary catalog CDNs
-              <img
-                src={game.imageUrl}
-                alt=""
-                className="h-16 w-16 shrink-0 rounded bg-canvas object-cover"
-              />
-            ) : (
-              <div className="h-16 w-16 shrink-0 rounded bg-canvas" />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
-                Our best guess
-              </p>
-              <p className="text-body font-medium text-ink">{game.title}</p>
-              <p className="text-ui text-ink-muted">{boxLine(game)}</p>
-              {game.bggId != null && (
-                <p className="font-mono text-small text-ink-muted">BGG {game.bggId}</p>
+          <Group title="Our best guess" className="mt-3">
+            <div className="flex gap-3">
+              {game.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- arbitrary catalog CDNs
+                <img
+                  src={game.imageUrl}
+                  alt=""
+                  className="h-16 w-16 shrink-0 rounded bg-canvas object-cover"
+                />
+              ) : (
+                <div className="h-16 w-16 shrink-0 rounded bg-canvas" />
               )}
-              <form action={confirmAction} className="mt-2">
-                <input type="hidden" name="inventory_item_id" value={game.inventoryItemId} />
-                <Button type="submit" size="sm" pending={confirmPending}>
-                  {confirmPending ? 'Saving…' : 'This is the right box'}
-                </Button>
-              </form>
-              <FieldError>{confirmState.error}</FieldError>
-              {confirmState.message && (
-                <p className="mt-1 text-ui text-accent">{confirmState.message}</p>
-              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-body font-medium text-ink">{game.title}</p>
+                <p className="text-ui text-ink-muted">{boxLine(game)}</p>
+                {game.bggId != null && (
+                  <p className="font-mono text-small text-ink-muted">BGG {game.bggId}</p>
+                )}
+                <form action={confirmAction} className="mt-2">
+                  <input type="hidden" name="inventory_item_id" value={game.inventoryItemId} />
+                  <Button type="submit" size="sm" pending={confirmPending}>
+                    {confirmPending ? 'Saving…' : 'This is the right box'}
+                  </Button>
+                </form>
+                <FieldError>{confirmState.error}</FieldError>
+                {confirmState.message && (
+                  <p className="mt-1 text-ui text-accent">{confirmState.message}</p>
+                )}
+              </div>
             </div>
-          </div>
+          </Group>
 
+          {/* Folded, with the count on the closed line. The answer is almost
+              always the guess above, and five covers stacked under it is a
+              wall in front of the one button that matters; the count is what
+              makes opening it a choice rather than a check. Law 10. */}
           {game.candidates.length > 0 && (
-            <div>
-              <p className="mb-1 text-ui font-medium text-ink">Other editions we found</p>
-              <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+            <Disclosure
+              title="Other editions we found"
+              meta={`${game.candidates.length}`}
+              className="mt-3"
+            >
+              <ul className="divide-y divide-border">
                 {game.candidates.map((candidate, index) => (
                   <CandidateRow
                     key={candidate.bggId ?? `${candidate.title}-${index}`}
@@ -204,9 +217,9 @@ export function GameDetailsPanel({ game }: { game: GameDetailsView }) {
                   />
                 ))}
               </ul>
-            </div>
+            </Disclosure>
           )}
-        </div>
+        </Banner>
       )}
     </div>
   );

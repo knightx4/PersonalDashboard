@@ -1,3 +1,6 @@
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
+
 /**
  * A note's frontmatter, as properties rather than as a code fence.
  *
@@ -14,8 +17,19 @@ export function NoteProperties({ frontmatter }: { frontmatter: Record<string, un
   const entries = Object.entries(frontmatter).filter(([, value]) => !isEmpty(value));
   if (entries.length === 0) return null;
 
+  // A Card, because that is what it already was: a rounded box with the
+  // container hairline and its own hand-typed padding, on a page that is
+  // otherwise unframed prose. Saying so gets the sheet treatment under
+  // Lightbox and the padding off the density dial, and the fill goes from
+  // `canvas` -- which is the page colour in three themes, so the border was
+  // doing all of the work -- to the surface a distinct object sits on.
   return (
-    <dl className="mb-6 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 rounded-card border border-border bg-canvas px-4 py-3 text-ui">
+    <dl
+      className={cn(
+        cardVariants({ padding: 'dense' }),
+        'mb-6 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-ui',
+      )}
+    >
       {entries.map(([key, value]) => (
         <div key={key} className="contents">
           <dt className="font-medium text-ink-muted">{key}</dt>

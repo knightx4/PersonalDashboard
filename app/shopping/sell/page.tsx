@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { Tag } from 'lucide-react';
 import { loadSellQueue } from '@/lib/sell/load-for-sale';
 import { ESTIMATE_BATCH_LIMIT } from '@/lib/sell/price-run';
-import { formatMoney } from '@/lib/money';
 import { SellQueue, SellSettingsForm, TestEbayConnectionButton } from './sell-ui';
 
 export const metadata = { title: 'Sell assistant' };
@@ -40,17 +40,25 @@ export default async function SellPage() {
         }
       />
 
+      {/* The floor and the effort cost read as a sentence and are edited in
+          it. The page used to carry both a form for them and a line printing
+          them back, which is what a form standing in front of its own values
+          looks like. Law 12. */}
       <SellSettingsForm netFloorCents={netFloorCents} effortCents={effortCents} />
 
-      <p className="text-body text-ink-muted">
-        Floor {formatMoney(netFloorCents)} · Effort {formatMoney(effortCents)}
-      </p>
-
-      {PRICE_SOURCE_NOTE[priceSource] && (
-        <p className="rounded-lg border border-border bg-surface px-3 py-2 text-ui text-ink-muted">
-          {PRICE_SOURCE_NOTE[priceSource]}
-        </p>
-      )}
+      {/*
+        Where the prices come from is ordinary explanatory copy in two of the
+        three cases, and a banner only in the third — no source configured
+        means nothing on this page can be priced at all, which is the page
+        failing to do its job and owes the reader a claim rather than a note.
+        A box around the other two was decoration on a sentence. Laws 2 and 11.
+      */}
+      {PRICE_SOURCE_NOTE[priceSource] &&
+        (priceSource === 'none' ? (
+          <Banner tone="warn">{PRICE_SOURCE_NOTE[priceSource]}</Banner>
+        ) : (
+          <p className="text-ui text-ink-muted">{PRICE_SOURCE_NOTE[priceSource]}</p>
+        ))}
 
       {/* Sits under the source note because it is the note's evidence. */}
       <TestEbayConnectionButton />

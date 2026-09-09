@@ -7,6 +7,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { loadToday, INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
+import { roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
+import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
 import { ReminderActions } from './reminder-actions';
 import { WaitingActions } from './waiting-actions';
 
@@ -36,6 +38,30 @@ export default async function TodayPage() {
   const board = await loadToday(supabase, user.id, {
     senderName: (profile?.display_name as string) ?? null,
   });
+
+  /**
+   * One line per round, not per interview.
+   *
+   * A superday is one occasion with four conversations in it, and listed four
+   * times over it reads as four separate things to prepare for. The line names
+   * the round and says what is in it; the role's own tab is where each
+   * conversation is read.
+   *
+   * `board.interviews` is already in the order they run out, and `roundsOf`
+   * keeps that order, so the round sits where its first interview sat.
+   */
+  const rounds = roundsOf(
+    board.interviews,
+    board.interviews
+      .map((interview) => interview.round)
+      .filter((round): round is NonNullable<typeof round> => round !== null)
+      .map((round) => ({
+        id: round.id,
+        label: round.label,
+        roundNumber: round.roundNumber,
+        notes: round.notes,
+      })),
+  );
 
   return (
     <>
@@ -69,47 +95,63 @@ export default async function TodayPage() {
             tone="brand"
           >
             <ul className="divide-y divide-border">
-              {board.interviews.map((interview) => (
-                <li
-                  key={interview.id}
-                  className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1"
-                >
-                  <span className="tabular w-full text-ui font-medium text-ink sm:w-44">
-                    {formatInterviewWhen(interview.scheduledAt, interview.timeKnown, timezone)}
-                  </span>
-                  <Link
-                    href={`/jobs/roles/${interview.roleId}?tab=interviews&interview=${interview.id}`}
-                    className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+              {rounds.map(({ group, interviews, lead }) => {
+                // The first conversation is when the round starts, which is
+                // what a week is read against. What else is in it is said
+                // below rather than as four more lines.
+                const rest = interviews.length - 1;
+                // A round with no prep anywhere in it is the one worth
+                // flagging: notes on one of four conversations still means
+                // somebody has looked at the day.
+                const hasPrep = interviews.some((interview) => interview.hasPrep);
+                const joinable = interviews.find((interview) => interview.meetingUrl);
+                const detail = [
+                  roundLabel(group),
+                  rest > 0 ? `${interviews.length} interviews` : interviewKindLabel(lead.kind),
+                  rest === 0 && lead.durationMinutes ? `${lead.durationMinutes} min` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+
+                return (
+                  <li
+                    key={group?.id ?? lead.id}
+                    className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1"
                   >
-                    {/* The whole row opens the same place -- prep materials on
-                        the role's Interviews tab -- so this stretches to cover
-                        it rather than being the one sliver of the row that
-                        responds to a click. */}
-                    <span className="absolute inset-0" aria-hidden />
-                    {interview.companyName} · {interview.roleTitle}
-                  </Link>
-                  <span className="text-small text-ink-muted">
-                    {interview.kind.replace(/_/g, ' ')}
-                    {interview.durationMinutes ? ` · ${interview.durationMinutes} min` : ''}
-                  </span>
-                  {interview.meetingUrl && (
-                    <a
-                      href={interview.meetingUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="relative inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
-                    >
-                      <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
-                      Join
-                    </a>
-                  )}
-                  {!interview.hasPrep && (
-                    <span className="rounded-full bg-caution-tint px-1.5 py-0.5 text-micro text-ink">
-                      no prep notes
+                    <span className="tabular w-full text-ui font-medium text-ink sm:w-44">
+                      {formatInterviewWhen(lead.scheduledAt, lead.timeKnown, timezone)}
                     </span>
-                  )}
-                </li>
-              ))}
+                    <Link
+                      href={`/jobs/roles/${lead.roleId}?tab=interviews&interview=${lead.id}`}
+                      className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+                    >
+                      {/* The whole row opens the same place -- prep materials on
+                          the role's Interviews tab -- so this stretches to cover
+                          it rather than being the one sliver of the row that
+                          responds to a click. */}
+                      <span className="absolute inset-0" aria-hidden />
+                      {lead.companyName} · {lead.roleTitle}
+                    </Link>
+                    <span className="text-small text-ink-muted">{detail}</span>
+                    {joinable?.meetingUrl && (
+                      <a
+                        href={joinable.meetingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
+                      >
+                        <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
+                        Join
+                      </a>
+                    )}
+                    {!hasPrep && (
+                      <span className="rounded-full bg-caution-tint px-1.5 py-0.5 text-micro text-ink">
+                        no prep notes
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </Section>
         )}

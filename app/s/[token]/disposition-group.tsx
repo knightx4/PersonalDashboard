@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { Minus, Package, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import type { ShareGroup } from '@/lib/share/read/load-disposition';
 import { respondToShare } from './actions';
@@ -23,24 +24,37 @@ import { respondToShare } from './actions';
 
 type Choice = 'keep' | 'sell' | 'giveaway';
 
-const CHOICES: Array<{ id: Choice; label: string; tint: string; active: string }> = [
+/**
+ * Three answers, and each keeps its own hue because the hue is the answer --
+ * this is not one accent applied three times.
+ *
+ * Two paints per choice, because the two shapes below need different things.
+ * `button` goes on a real control and keeps the frame the control owns;
+ * `lane` goes on the stepper's ground, where the fill is doing the grouping
+ * and a second hairline inside the card would only argue with it (law 11).
+ */
+const CHOICES: Array<{ id: Choice; label: string; tint: string; button: string; lane: string }> = [
   {
     id: 'keep',
     label: 'Keep',
     tint: 'hover:border-accent hover:text-accent',
-    active: 'border-accent bg-accent-tint text-accent',
+    button: 'border-accent bg-accent-tint text-accent hover:border-accent hover:bg-accent-tint',
+    lane: 'bg-accent-tint text-accent',
   },
   {
     id: 'sell',
     label: 'Sell',
     tint: 'hover:border-caution hover:text-caution',
-    active: 'border-caution bg-caution-tint text-caution',
+    button: 'border-caution bg-caution-tint text-caution hover:border-caution hover:bg-caution-tint',
+    lane: 'bg-caution-tint text-caution',
   },
   {
     id: 'giveaway',
     label: 'Give away',
     tint: 'hover:border-w-shopping hover:text-w-shopping',
-    active: 'border-w-shopping bg-w-shopping-tint text-w-shopping',
+    button:
+      'border-w-shopping bg-w-shopping-tint text-w-shopping hover:border-w-shopping hover:bg-w-shopping-tint',
+    lane: 'bg-w-shopping-tint text-w-shopping',
   },
 ];
 
@@ -142,7 +156,10 @@ export function DispositionGroup({
       )}
     >
       <div className="flex gap-4">
-        <div className="size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-canvas">
+        {/* A filled tile, not an outlined one. The edge was there to stop a
+            white product shot bleeding into a white card, and a recessed
+            ground does that without drawing a frame inside a frame. */}
+        <div className="size-16 shrink-0 overflow-hidden rounded-card bg-sunken">
           {group.imageUrl ? (
             // A plain <img>, as everywhere else in this app. It also keeps the
             // promise the rest of this feature makes: next/image would have the
@@ -188,10 +205,10 @@ export function DispositionGroup({
                   onClick={() => toggle(choice.id)}
                   aria-pressed={counts[choice.id] === 1}
                   className={cn(
-                    'press h-9 rounded-lg border px-3 text-ui font-medium transition-colors duration-150',
+                    buttonVariants({ variant: 'secondary' }),
                     counts[choice.id] === 1
-                      ? choice.active
-                      : cn('border-border bg-surface text-ink-muted', choice.tint),
+                      ? choice.button
+                      : cn('text-ink-muted', choice.tint),
                   )}
                 >
                   {choice.label}
@@ -204,8 +221,8 @@ export function DispositionGroup({
                 <div
                   key={choice.id}
                   className={cn(
-                    'flex items-center justify-between rounded-lg border px-2 py-1.5',
-                    counts[choice.id] > 0 ? choice.active : 'border-border text-ink-muted',
+                    'flex items-center justify-between rounded-control px-2 py-1.5',
+                    counts[choice.id] > 0 ? choice.lane : 'bg-sunken text-ink-muted',
                   )}
                 >
                   <span className="pl-1 text-ui font-medium">{choice.label}</span>
@@ -215,7 +232,7 @@ export function DispositionGroup({
                       onClick={() => step(choice.id, -1)}
                       disabled={counts[choice.id] === 0}
                       aria-label={`One fewer to ${choice.label.toLowerCase()}`}
-                      className="press grid size-7 place-items-center rounded-md hover:bg-canvas disabled:opacity-30"
+                      className="press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30"
                     >
                       <Minus className="size-3.5" aria-hidden />
                     </button>
@@ -227,7 +244,7 @@ export function DispositionGroup({
                       onClick={() => step(choice.id, 1)}
                       disabled={undecided === 0}
                       aria-label={`One more to ${choice.label.toLowerCase()}`}
-                      className="press grid size-7 place-items-center rounded-md hover:bg-canvas disabled:opacity-30"
+                      className="press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30"
                     >
                       <Plus className="size-3.5" aria-hidden />
                     </button>

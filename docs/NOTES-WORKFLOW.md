@@ -30,3 +30,23 @@ The last three always carry a reason.
 
 1 next, 2 normal, 3 someday. Bugs outrank features at equal priority. Set it
 from `/feedback` or `npx tsx scripts/notes.ts priority <id> 1`.
+
+## The plan, as distinct from the notes
+
+Notes are what is *wrong*; the plan (`/dev/plan`) is what is *planned* — the
+features that were decided on, the steps that get you to each, and the steps
+beneath those. Say **"work the plan"** or **"do plan #12"** in a session, or
+press *Send to Claude* on a step, and `.claude/skills/plan` runs: read the
+step's brief, claim it, build it against its "done when", verify, commit with
+the step number in the subject, close it with a note. The full model is in
+[PLAN-SPEC.md](PLAN-SPEC.md).
+
+A request in the notes queue that turns out to be a body of work rather than
+a fix belongs in the plan: add it there as a *proposed* feature with its
+steps, mark the note `planned`, and say which step it became. The person
+approves it on the plan page before anything is built.
+
+The whole loop, then: small things go in as notes and get fixed; big
+thoughts go in as ideas, get shaped into proposals by pressing *Shape into a
+plan*, get approved and handed over on the plan page, and get built one step
+a night. Corrections to what was built go back in as notes.

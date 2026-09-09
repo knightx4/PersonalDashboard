@@ -33,11 +33,18 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * decided and is being built, and what is only being thought about. A thing
    * moves up this list as it acquires commitment — an idea becomes a plan step
    * when it is decided on, and a bug is filed when something built is wrong.
+   *
+   * UI sits below them because it is not a list of work; it is the standard
+   * the work is held to. It lives here rather than in a document because a
+   * document describing an interface goes stale the week after it is written,
+   * and this one renders the real components from the real tokens: if a swatch
+   * on that page is wrong, the app is wrong.
    */
   const sections: NavSection[] = [
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
+    { href: '/dev/ui', label: 'UI', icon: 'ui' },
   ];
 
   return (

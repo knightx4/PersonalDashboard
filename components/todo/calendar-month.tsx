@@ -1,118 +1,118 @@
 import Link from 'next/link';
-import { CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
 
 /**
  * A month, drawn.
  *
- * A server component with no state of its own: paging is a link, and every
- * square is already decided by lib/todo/calendar/month.ts. Nothing here can
- * disagree with the agenda about which day a thing falls on, because neither
- * page works that out for itself.
+ * A server component with no state of its own: paging, the choice of view and
+ * opening a day are all links, and every square is already decided by
+ * lib/todo/calendar/month.ts. Nothing here can disagree with the agenda about
+ * which day a thing falls on, because neither page works that out for itself.
  *
- * On a narrow screen the grid becomes a list of the days that actually hold
- * something. Seven columns on a phone is six illegible ones and a scrollbar,
- * and an empty Tuesday is worth a square only when there is room to see it.
+ * Seven columns on a phone too. It used to fall back to a list of the days
+ * that held something, which is a perfectly good list and not a calendar --
+ * and the empty Thursday, which is most of what a month is read for, was the
+ * thing the list could not show. The squares stay; what does not fit inside
+ * one at that width is the writing, so a phone gets a dot per thing and the
+ * day number opens the day.
  */
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+/** More dots than this in one square and they stop being countable anyway. */
+const MAX_DOTS = 4;
+
 export function CalendarMonthGrid({
-  weeks,
+  days,
   timezone,
 }: {
-  weeks: CalendarDay[][];
+  days: CalendarDay[];
   timezone: string;
 }) {
-  const busy = weeks.flat().filter((day) => day.entries.length > 0);
-
   return (
-    <>
-      <Card padding="none" className="mt-4 hidden overflow-hidden sm:block">
-        <div className="grid grid-cols-7 border-b border-border">
-          {WEEKDAYS.map((label) => (
-            <div key={label} className="px-2 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
-              {label}
-            </div>
-          ))}
-        </div>
+    <Card padding="none" className="mt-4 overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-border">
+        {WEEKDAYS.map((label) => (
+          <div
+            key={label}
+            className="truncate px-1.5 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-muted sm:px-2"
+          >
+            {label}
+          </div>
+        ))}
+      </div>
 
-        <div className="grid grid-cols-7">
-          {weeks.flat().map((day) => (
-            <div
-              key={day.day}
+      <div className="grid grid-cols-7">
+        {days.map((day) => (
+          <div
+            key={day.day}
+            className={cn(
+              'min-h-16 border-b border-r border-border p-1 last:border-r-0 sm:min-h-24 sm:p-1.5',
+              !day.inMonth && 'bg-canvas',
+            )}
+          >
+            {/* The number is the way into the day, at every width: a square
+                that cannot hold everything in it has to lead somewhere that
+                can. */}
+            <Link
+              href={{ pathname: '/todo/calendar', query: { view: 'day', date: day.day } }}
               className={cn(
-                'min-h-24 border-b border-r border-border p-1.5 last:border-r-0',
-                !day.inMonth && 'bg-canvas',
+                'tabular inline-flex size-5 items-center justify-center rounded-full text-small transition-colors duration-150',
+                day.isToday
+                  ? 'bg-accent font-semibold text-surface'
+                  : day.inMonth
+                    ? 'text-ink-muted hover:bg-sunken hover:text-ink'
+                    : 'text-ink-ghost hover:bg-sunken',
               )}
             >
-              <div
-                className={cn(
-                  'tabular text-small',
-                  day.isToday
-                    ? 'inline-flex size-5 items-center justify-center rounded-full bg-accent font-semibold text-surface'
-                    : day.inMonth
-                      ? 'text-ink-muted'
-                      : 'text-ink-ghost',
+              {Number(day.day.slice(8))}
+            </Link>
+
+            {/* A dot each, below sm. */}
+            {day.entries.length > 0 && (
+              <div className="mt-1 flex flex-wrap items-center gap-0.5 sm:hidden" aria-hidden>
+                {day.entries.slice(0, MAX_DOTS).map((entry) => (
+                  <span
+                    key={entry.key}
+                    className={cn(
+                      'size-1.5 rounded-full',
+                      entry.done ? 'bg-ink-ghost' : DOT[entry.kind],
+                    )}
+                  />
+                ))}
+                {day.entries.length > MAX_DOTS && (
+                  <span className="tabular text-micro leading-none text-ink-muted">
+                    +{day.entries.length - MAX_DOTS}
+                  </span>
                 )}
-              >
-                {Number(day.day.slice(8))}
               </div>
+            )}
+            <span className="sr-only sm:hidden">
+              {day.entries.length > 0 &&
+                `${day.entries.length} thing${day.entries.length === 1 ? '' : 's'}`}
+            </span>
 
-              <ul className="mt-1 space-y-0.5">
-                {day.entries.map((entry) => (
-                  <li key={entry.key}>
-                    <Pill entry={entry} timezone={timezone} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* The phone view: the days that hold something, in order. */}
-      <div className="mt-4 space-y-3 sm:hidden">
-        {busy.length === 0 ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="Nothing this month"
-            description="Anything with a date on it lands on its day here."
-            action={{ label: 'Add a task', href: '/todo' }}
-          />
-        ) : (
-          busy.map((day) => (
-            <Card key={day.day} padding="dense">
-              <p
-                className={cn(
-                  'text-ui font-semibold',
-                  day.isToday ? 'text-accent' : day.inMonth ? 'text-ink' : 'text-ink-muted',
-                )}
-              >
-                {new Intl.DateTimeFormat('en-GB', {
-                  timeZone: 'UTC',
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-                }).format(new Date(`${day.day}T00:00:00Z`))}
-              </p>
-              <ul className="mt-1.5 space-y-1">
-                {day.entries.map((entry) => (
-                  <li key={entry.key}>
-                    <Pill entry={entry} timezone={timezone} />
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ))
-        )}
+            <ul className="mt-1 hidden space-y-0.5 sm:block">
+              {day.entries.map((entry) => (
+                <li key={entry.key}>
+                  <Pill entry={entry} timezone={timezone} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
-    </>
+    </Card>
   );
 }
+
+const DOT: Record<CalendarEntry['kind'], string> = {
+  task: 'bg-ink-muted',
+  item: 'bg-accent',
+  context: 'bg-positive',
+};
 
 /**
  * One thing in a square.

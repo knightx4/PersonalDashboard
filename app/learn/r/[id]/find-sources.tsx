@@ -81,14 +81,14 @@ function Candidate({
         value={JSON.stringify(source)}
         checked={checked}
         onChange={onChoose}
-        className="mt-1 size-4 shrink-0 accent-[var(--color-accent)]"
+        className="mt-1 size-4 shrink-0 accent-accent"
       />
       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-body font-medium text-ink">{source.title}</span>
           {source.author && <span className="text-ui text-ink-muted">{source.author}</span>}
           {access && (
-            <span className="rounded-pill border border-border px-1.5 py-0.5 text-caption text-ink-muted">
+            <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
               {price ? `${access} · ${price}` : access}
             </span>
           )}
@@ -105,11 +105,11 @@ function Candidate({
         <span className="mt-0.5 block text-ui text-ink-muted">{source.locator_basis}</span>
 
         {source.canonical_url ? (
-          <span className="mt-0.5 block truncate text-caption text-ink-muted">
+          <span className="mt-0.5 block truncate text-small text-ink-muted">
             {source.canonical_url}
           </span>
         ) : (
-          <span className="mt-0.5 block text-caption text-ink-muted">
+          <span className="mt-0.5 block text-small text-ink-muted">
             No free link — you would need a copy.
           </span>
         )}
@@ -161,7 +161,7 @@ export function FindSources({ readingId }: { readingId: string }) {
         <SearchButton />
         {findState.error && <span className="text-ui text-danger">{findState.error}</span>}
       </div>
-      <p className="mt-2 text-caption text-ink-muted">
+      <p className="mt-2 text-small text-ink-muted">
         Searches for the few things worth reading on this. Takes a moment, and saves nothing until
         you choose.
       </p>

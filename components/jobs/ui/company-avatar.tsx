@@ -32,9 +32,15 @@ export function CompanyAvatar({
   const [failed, setFailed] = useState(false);
 
   return (
+    // A filled tile rather than an outlined one. The border was here to stop a
+    // logo on a white ground from bleeding into the card behind it, which is a
+    // real problem and not one a frame is the answer to: a ground solves it and
+    // does not add an eleventh hairline to a list of ten rows. `sunken` rather
+    // than `canvas` because canvas is the page colour in three of the four
+    // themes, so a canvas tile on a page was a tile you could not see.
     <span
       className={cn(
-        'relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-canvas text-micro font-semibold tracking-wide text-ink-muted',
+        'relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-control bg-sunken text-micro font-semibold tracking-wide text-ink-muted',
         className,
       )}
       aria-hidden

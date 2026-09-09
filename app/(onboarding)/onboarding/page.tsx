@@ -5,10 +5,10 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
 import { markOnboardingComplete, onboardingNeeded } from '@/lib/onboarding';
+import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
 import { FinishOnboardingForm, SkipGmailForm, WelcomeForm } from './forms';
-import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
+import { Card } from '@/components/ui/card';
 
 export const metadata = { title: 'Welcome' };
 
@@ -20,16 +20,24 @@ function parseStep(raw: string | undefined): Step {
   return 'welcome';
 }
 
-function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; text: string } | null {
+/**
+ * The tones are the Banner's own rather than a third vocabulary of our own --
+ * and `connected` is `info`, not `good`. Law 4 keeps green for money coming
+ * back; an inbox that linked is the system reporting what happened, which is
+ * exactly what `info` is for.
+ */
+function inboxBanner(
+  code: string | undefined,
+): { tone: 'info' | 'warn' | 'bad'; text: string } | null {
   switch (code) {
     case 'schema':
       return {
-        tone: 'err',
+        tone: 'bad',
         text: 'Google connected, but the inbox could not be saved: the database schema that stores it is not exposed by the API. In Supabase open Settings → API → Exposed schemas and include public, job_search and core.',
       };
     case 'connected':
       return {
-        tone: 'ok',
+        tone: 'info',
         text: 'Gmail connected. You can import order confirmations from Settings whenever you are ready.',
       };
     case 'denied':
@@ -41,14 +49,14 @@ function inboxBanner(code: string | undefined): { tone: 'ok' | 'warn' | 'err'; t
       };
     case 'unconfigured':
       return {
-        tone: 'err',
+        tone: 'bad',
         text: 'Gmail OAuth is not configured on this deployment yet. You can skip and add orders by hand.',
       };
     case 'state':
     case 'exchange':
     case 'error':
     case 'missing_code':
-      return { tone: 'err', text: 'Something went wrong connecting Gmail. Try again or skip for now.' };
+      return { tone: 'bad', text: 'Something went wrong connecting Gmail. Try again or skip for now.' };
     default:
       return null;
   }
@@ -148,21 +156,9 @@ export default async function OnboardingPage({
             </p>
           </div>
 
-          {banner && (
-            <p
-              className={
-                banner.tone === 'ok'
-                  ? 'rounded-lg border border-border bg-positive-tint px-3 py-2 text-body text-positive'
-                  : banner.tone === 'warn'
-                    ? 'rounded-lg border border-border bg-caution-tint px-3 py-2 text-body text-caution'
-                    : 'rounded-lg border border-danger bg-danger-tint px-3 py-2 text-body text-danger'
-              }
-            >
-              {banner.text}
-            </p>
-          )}
+          {banner && <Banner tone={banner.tone}>{banner.text}</Banner>}
 
-          <div className={cn(cardVariants(), 'space-y-4 px-4 py-4 text-body')}>
+          <Card padding="standard" className="space-y-4 text-body">
             <div>
               <h2 className="font-medium text-ink">What we read</h2>
               <p className="mt-1 text-ink-muted">
@@ -193,7 +189,7 @@ export default async function OnboardingPage({
               </Link>
               .
             </p>
-          </div>
+          </Card>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {configured ? (
@@ -231,9 +227,7 @@ export default async function OnboardingPage({
           </div>
 
           {banner && params.inbox === 'connected' && (
-            <p className="rounded-lg border border-border bg-positive-tint px-3 py-2 text-body text-positive">
-              {banner.text}
-            </p>
+            <Banner tone={banner.tone}>{banner.text}</Banner>
           )}
 
           <div className="flex flex-col gap-3 sm:flex-row">

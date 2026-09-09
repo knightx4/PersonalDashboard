@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { CornerDownLeft, Palette, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { popoverSurface } from '@/components/ui/popover';
+import { Kbd } from '@/components/shell/key-hints';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { THEMES } from '@/lib/theme';
@@ -185,7 +187,11 @@ export function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="relative w-full max-w-lg overflow-hidden rounded-card border border-border bg-raised shadow-2xl"
+        // The same floating surface as every panel in the shell, lifted
+        // further: this one is over a scrim at a twelfth of the way down the
+        // window rather than hanging off a button, and a shallow drop there
+        // reads as a card that has come loose rather than as a thing in front.
+        className={cn(popoverSurface, 'relative w-full max-w-lg overflow-hidden shadow-2xl')}
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
           <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
@@ -215,9 +221,12 @@ export function CommandPalette({
             aria-label="Command"
             className="h-12 w-full bg-transparent text-body text-ink outline-none placeholder:text-ink-ghost"
           />
-          <kbd className="shrink-0 rounded border border-border-strong border-b-2 px-1.5 py-0.5 font-mono text-small text-ink-muted">
-            esc
-          </kbd>
+          {/* The shell's keycap, not a second drawing of one: this was a
+              hairline bigger and a step up the type scale from every other
+              cap in the app, which is visible the moment the palette opens
+              over a row of them. `always`, because inside an open palette
+              there is no modifier being held. */}
+          <Kbd always>esc</Kbd>
         </div>
 
         <div ref={listRef} className="max-h-80 overflow-y-auto p-1">

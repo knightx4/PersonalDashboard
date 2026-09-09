@@ -6,6 +6,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import {
   createTask,
   deleteTask,
+  reorderTasks,
   setTaskPinned,
   setTaskStatus,
   snoozeTask,
@@ -116,6 +117,63 @@ export async function laterTask(id: string): Promise<void> {
 export async function bringBackTask(id: string): Promise<void> {
   const user = await requireUser();
   await unsnoozeTask(user.id, id);
+  revalidateTodo();
+}
+
+/**
+ * Move one task up or down within the pile it is in.
+ *
+ * The caller sends the pile as it is on screen, because the screen is the only
+ * place that order exists before this is called -- the pile is worked out from
+ * dates at render time, not stored. Nothing is trusted about the ids beyond
+ * their being ids: every row written is scoped to this session's user, so the
+ * worst a made-up list can do is number tasks the sender already owns.
+ */
+export async function moveTask(
+  id: string,
+  direction: 'up' | 'down',
+  pile: string[],
+): Promise<void> {
+  const from = pile.indexOf(id);
+  const to = direction === 'up' ? from - 1 : from + 1;
+  if (from === -1 || to < 0 || to >= pile.length) return;
+
+  const next = [...pile];
+  [next[from], next[to]] = [next[to], next[from]];
+
+  const user = await requireUser();
+  await reorderTasks(user.id, next);
+  revalidateTodo();
+}
+
+/**
+ * Drop a task somewhere in its pile.
+ *
+ * `before` is the task it should land above, or null for the foot of the pile.
+ * A neighbour rather than an index, because an index is only true of the list
+ * the sender was looking at: if the pile moved under them, an index silently
+ * puts the task somewhere else, while a neighbour that is no longer there is
+ * a request this can decline.
+ *
+ * The same trust story as `moveTask`: the pile is the caller's, and every row
+ * written is scoped to this session's user.
+ */
+export async function placeTask(
+  id: string,
+  before: string | null,
+  pile: string[],
+): Promise<void> {
+  if (id === before || !pile.includes(id)) return;
+
+  const rest = pile.filter((other) => other !== id);
+  const at = before === null ? rest.length : rest.indexOf(before);
+  if (at === -1) return;
+
+  const next = [...rest.slice(0, at), id, ...rest.slice(at)];
+  if (next.every((value, index) => value === pile[index])) return;
+
+  const user = await requireUser();
+  await reorderTasks(user.id, next);
   revalidateTodo();
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { createClient, getUser } from '@/lib/jobs/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
@@ -11,22 +12,40 @@ export const maxDuration = 60;
 /**
  * Delete everything.
  *
+ * An account action, not a workspace one: it is offered from /account, and the
+ * session it authenticates is the account's rather than any one module's.
+ *
  * All of it lives here rather than in a Server Action for one reason: removing
  * the auth.users row needs the service role, and the service role never belongs
  * in `app/` code that also renders. The order matters:
  *
  *   1. Revoke the Google grant. Deleting our row without revoking leaves a live
- *      grant on the user's Google account that they cannot see from here.
- *   2. Delete the storage objects, which do not cascade with database rows —
+ *      grant on the user's Google account that they cannot see from here. The
+ *      vault's GitHub token is the one credential that cannot be revoked from
+ *      this end -- it was pasted in, it belongs to their GitHub account, and
+ *      only they can delete it. The account page says so rather than implying
+ *      this reaches further than it does.
+ *   2. Delete the storage objects, which do not cascade with database rows --
  *      and only from this app's bucket, since buckets are shared project-wide.
- *   3. Delete the auth.users row. Every table in public cascades from it, which
- *      is why one delete is enough — and tests/rls.test.ts is what would notice
- *      if a table were ever added that did not.
+ *   3. Delete the auth.users row. Every table that names a user cascades from
+ *      it, in all six schemas -- public, core, job_search, obsidian, todo and
+ *      learn -- which is why one delete is enough, and why
+ *      tests/account-cascade.test.ts refuses a migration that adds a table
+ *      naming a user without `on delete cascade`.
+ *
+ * Then the session goes. supabase-js treats the 401 from a user who no longer
+ * exists as a successful sign-out and clears the cookies anyway, which is what
+ * leaves the browser on a signed-out app rather than holding a token for an
+ * account that is gone.
  *
  * The user id comes from the session. It is never read from the request.
  */
 export async function POST(request: NextRequest) {
-  const user = await getUser();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
@@ -44,7 +63,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
+  const jobs = await createJobsClient();
   const core = await createCoreClient();
 
   // 1. Revoke.
@@ -59,14 +78,17 @@ export async function POST(request: NextRequest) {
     try {
       await gmailProvider.revokeToken(decryptToken(account.oauth_refresh_token as string, key));
     } catch {
-      // A token Google has already invalidated throws here, which is fine.
+      // A token Google has already invalidated throws here, which is fine. A
+      // grant we cannot revoke must not be a reason to refuse to delete: the
+      // person asked to leave, and the row is the part we control.
     }
   }
 
-  // 2. Storage.
+  // 2. Storage. Both tables live in the job search schema, which is also the
+  //    only workspace that stores files at all -- everything else is rows.
   const [{ data: attachments }, { data: resumes }] = await Promise.all([
-    supabase.from('attachments').select('storage_path').eq('user_id', user.id),
-    supabase.from('resume_versions').select('storage_path').eq('user_id', user.id),
+    jobs.from('attachments').select('storage_path').eq('user_id', user.id),
+    jobs.from('resume_versions').select('storage_path').eq('user_id', user.id),
   ]);
 
   const paths = [
@@ -77,7 +99,7 @@ export async function POST(request: NextRequest) {
   if (paths.length > 0) {
     // This app's own bucket. Buckets are project-wide, so naming it explicitly
     // is what stops a deletion here from touching another app's files.
-    await supabase.storage.from(APP_STORAGE_BUCKET).remove(paths);
+    await jobs.storage.from(APP_STORAGE_BUCKET).remove(paths);
   }
 
   // 3. The row everything else hangs off.

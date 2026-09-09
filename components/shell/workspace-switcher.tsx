@@ -7,8 +7,9 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
+import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
-import { HOME_MARK, MODULES, moduleById, type ModuleId } from '@/lib/modules';
+import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 
 export type WorkspaceId = ModuleId;
 
@@ -41,6 +42,35 @@ function rememberPath(module: ModuleId, path: string) {
   } catch {
     /* A viewer who blocks storage simply always lands on the workspace home. */
   }
+}
+
+/**
+ * Where switching to a module should land: where you last were in it, or its
+ * home. Exported because the phone's dock offers the same list from a sheet of
+ * its own, and two rules for "where does Jobs go" is one rule too many.
+ */
+export function rememberedPath(module: ModuleId | null, fallback: string): string {
+  if (!module) return fallback;
+  return readLastPaths()[module] ?? fallback;
+}
+
+/**
+ * The modules a person may switch to: the account's switched-on ones, plus
+ * wherever they are standing.
+ *
+ * Undefined `enabled` means all of them -- a switcher rendered before the
+ * settings are known must not show an empty menu. The current module is always
+ * listed even when switched off, because you can only be here by URL and a
+ * menu that will not admit where you are is worse than one showing a module
+ * you meant to hide.
+ */
+export function visibleModules(
+  enabled: readonly ModuleId[] | undefined,
+  current: ModuleId | null,
+): readonly AppModule[] {
+  return MODULES.filter(
+    (module) => enabled === undefined || enabled.includes(module.id) || module.id === current,
+  );
 }
 
 /**
@@ -100,11 +130,9 @@ export function WorkspaceSwitcher({
 
   const visible = useMemo(
     () =>
-      MODULES.filter(
-        (module) =>
-          enabledKey === '*' ||
-          enabledKey.split(',').includes(module.id) ||
-          module.id === current,
+      visibleModules(
+        enabledKey === '*' ? undefined : (enabledKey.split(',') as ModuleId[]),
+        current,
       ),
     [enabledKey, current],
   );
@@ -134,11 +162,10 @@ export function WorkspaceSwitcher({
     if (current) rememberPath(current, pathname);
   }, [current, pathname]);
 
-  const hrefFor = useCallback((id: ModuleId | null, fallback: string) => {
-    if (!id) return fallback;
-    const remembered = readLastPaths()[id];
-    return remembered ?? fallback;
-  }, []);
+  const hrefFor = useCallback(
+    (id: ModuleId | null, fallback: string) => rememberedPath(id, fallback),
+    [],
+  );
 
   usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
 
@@ -232,13 +259,18 @@ export function WorkspaceSwitcher({
       </button>
 
       {open && (
-        <div
+        <Popover
           ref={panelRef}
           role="menu"
           tabIndex={-1}
           aria-label="Workspaces"
           onKeyDown={onMenuKeyDown}
-          className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-card border border-border bg-raised p-1 shadow-lg"
+          // Below the trigger rather than pinned to the viewport: this one
+          // lives at the top of the sidebar column, where there is room both
+          // beneath it and to its right on every width the app renders at.
+          anchor="trigger-below"
+          padding="menu"
+          className="w-72"
         >
           {rows.map((row, index) => {
             const isCurrent = row.id === current;
@@ -260,31 +292,142 @@ export function WorkspaceSwitcher({
                   isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
                 )}
               >
-                <ModuleMark module={row.id} size="sm" className="mt-0.5" />
-                <span className="min-w-0 flex-1">
-                  <span
-                    className={cn(
-                      'block text-ui font-medium',
-                      isCurrent ? 'text-accent' : 'text-ink',
-                    )}
-                  >
-                    {row.label}
-                  </span>
-                  {/* The live count, not the static description: the switcher is
-                      the only surface that can answer "is anything happening in
-                      the workspaces I am not looking at", so it should. */}
-                  <span className="tabular block text-small leading-snug text-ink-muted">
-                    {count ?? row.description}
-                  </span>
-                </span>
-                {isCurrent && (
-                  <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
-                )}
+                <WorkspaceRowBody
+                  id={row.id}
+                  label={row.label}
+                  detail={count ?? row.description}
+                  isCurrent={isCurrent}
+                />
               </Link>
             );
           })}
-        </div>
+        </Popover>
       )}
+    </div>
+  );
+}
+
+/**
+ * The inside of one workspace row. The menu on the desktop column and the
+ * sheet on the phone's dock are different containers around the same row, and
+ * a row that drifts between them is a row that stops being recognisable as the
+ * same list.
+ */
+function WorkspaceRowBody({
+  id,
+  label,
+  detail,
+  isCurrent,
+}: {
+  id: ModuleId | null;
+  label: string;
+  detail: string;
+  isCurrent: boolean;
+}) {
+  return (
+    <>
+      <ModuleMark module={id} size="sm" className="mt-0.5" />
+      <span className="min-w-0 flex-1">
+        <span className={cn('block text-ui font-medium', isCurrent ? 'text-accent' : 'text-ink')}>
+          {label}
+        </span>
+        {/* The live count, not the static description: the switcher is the only
+            surface that can answer "is anything happening in the workspaces I
+            am not looking at", so it should. */}
+        <span className="tabular block text-small leading-snug text-ink-muted">{detail}</span>
+      </span>
+      {isCurrent && (
+        <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+      )}
+    </>
+  );
+}
+
+/**
+ * The same list, as a sheet up from the foot of the phone.
+ *
+ * A dropdown anchored to a control sitting on the bottom edge opens off the
+ * screen, so the phone gets a sheet rather than the column's menu. It is the
+ * same rows in the same order for the same reason -- switching workspace
+ * should not feel like a different act depending on the width of the window.
+ */
+export function WorkspaceSheet({
+  current,
+  enabled,
+  counts = {},
+  open,
+  onClose,
+}: {
+  current: WorkspaceId | null;
+  enabled?: readonly ModuleId[];
+  counts?: SwitcherCounts;
+  open: boolean;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const rows = [
+    { id: null as ModuleId | null, href: '/home', label: 'Home', description: 'Everything, and what needs you today' },
+    ...visibleModules(enabled, current).map((module) => ({
+      id: module.id as ModuleId | null,
+      href: module.home,
+      label: module.label,
+      description: module.description,
+    })),
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      <button
+        type="button"
+        aria-label="Close the workspace list"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40"
+      />
+      <div
+        role="menu"
+        aria-label="Workspaces"
+        /* ui-ok: a sheet against the foot of the screen, not a card -- it is rounded and bordered only on the one edge that meets the page */
+        className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
+      >
+        {rows.map((row) => {
+          const isCurrent = row.id === current;
+          const count = row.id ? counts[row.id] : undefined;
+          return (
+            <Link
+              key={row.id ?? 'home'}
+              href={rememberedPath(row.id, row.href)}
+              role="menuitem"
+              aria-current={isCurrent ? 'true' : undefined}
+              onClick={onClose}
+              className={cn(
+                'flex items-start gap-2.5 rounded-lg px-2 py-3',
+                isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
+              )}
+            >
+              <WorkspaceRowBody
+                id={row.id}
+                label={row.label}
+                detail={count ?? row.description}
+                isCurrent={isCurrent}
+              />
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

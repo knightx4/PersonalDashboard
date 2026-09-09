@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import {
   createItemList,
   deleteItemList,
@@ -8,7 +8,8 @@ import {
   type ListActionState,
 } from '@/app/shopping/settings/actions';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input } from '@/components/ui/field';
+import { FieldError, InlineInput, Input } from '@/components/ui/field';
+import { Group } from '@/components/ui/disclosure';
 import { listSwatchStyle } from '@/lib/lists/gradients';
 
 const initial: ListActionState = {};
@@ -38,20 +39,19 @@ export function ListsSection({ lists }: { lists: SettingsList[] }) {
         not taxonomy like categories. Filter inventory by a list anytime.
       </p>
 
-      <div>
-        <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
-          Your lists
-        </h3>
+      <Group title="Your lists">
         {lists.length === 0 && !creating ? (
           <p className="text-body text-ink-muted">None yet — create one below.</p>
         ) : lists.length > 0 ? (
-          <ul className="divide-y divide-border rounded-lg border border-border">
+          // Divides and space, no frame: the settings card around this
+          // already said these belong together. Law 11.
+          <ul className="divide-y divide-border">
             {lists.map((list) => (
               <ListRow key={list.id} list={list} />
             ))}
           </ul>
         ) : null}
-      </div>
+      </Group>
 
       {creating ? (
         <form action={createAction} className="flex flex-wrap items-center gap-2">
@@ -92,42 +92,50 @@ export function ListsSection({ lists }: { lists: SettingsList[] }) {
   );
 }
 
+/** Renamed in place, for the reasons on CustomCategoryRow. Law 12. */
 function ListRow({ list }: { list: SettingsList }) {
   const [renameState, renameAction, renamePending] = useActionState(renameItemList, initial);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function commit(event: React.FocusEvent<HTMLInputElement>) {
+    if (event.target.value.trim() !== list.name) formRef.current?.requestSubmit();
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      event.currentTarget.value = list.name;
+      event.currentTarget.blur();
+    }
+  }
 
   return (
-    <li className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-      <form action={renameAction} className="flex min-w-0 flex-1 items-center gap-2">
+    <li className="row-pad flex flex-wrap items-center gap-2">
+      <form ref={formRef} action={renameAction} className="flex min-w-0 flex-1 items-center gap-2">
         <input type="hidden" name="id" value={list.id} />
         <span
           className="size-2.5 shrink-0 rounded-full"
           style={listSwatchStyle(list.color)}
           aria-hidden
         />
-        <Input
+        <InlineInput
           name="name"
-          required
           maxLength={40}
           defaultValue={list.name}
+          key={list.name}
           aria-label={`Rename ${list.name}`}
-          className="h-9"
+          disabled={renamePending}
+          onBlur={commit}
+          onKeyDown={onKeyDown}
+          className="min-w-0 flex-1 font-medium"
         />
-        <Button type="submit" variant="ghost" size="sm" disabled={renamePending}>
-          {renamePending ? 'Saving…' : 'Rename'}
+      </form>
+      {renameState.error && <p className="text-small text-danger">{renameState.error}</p>}
+      <form action={deleteItemList}>
+        <input type="hidden" name="id" value={list.id} />
+        <Button type="submit" variant="ghost" size="sm">
+          Delete
         </Button>
       </form>
-      <div className="flex items-center gap-2">
-        {renameState.error && <p className="text-small text-danger">{renameState.error}</p>}
-        {renameState.message && (
-          <p className="text-small text-positive">{renameState.message}</p>
-        )}
-        <form action={deleteItemList}>
-          <input type="hidden" name="id" value={list.id} />
-          <Button type="submit" variant="ghost" size="sm">
-            Delete
-          </Button>
-        </form>
-      </div>
     </li>
   );
 }

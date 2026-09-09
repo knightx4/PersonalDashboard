@@ -43,3 +43,6 @@ next-env.d.ts
 
 # local
 .env*.local
+
+# Screenshots from scripts/shoot.ts. Evidence, not artefacts.
+.preview-shots/

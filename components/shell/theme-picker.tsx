@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import { Palette } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { setTheme } from '@/app/theme-actions';
 import { setDensity } from '@/app/density-actions';
@@ -185,14 +186,15 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
       </button>
 
       {open && (
-        <div
+        <Popover
           ref={panelRef}
           role="dialog"
           aria-modal="true"
           aria-label="Theme"
           tabIndex={-1}
           onMouseLeave={() => setPreview(undefined)}
-          className="fixed inset-x-4 top-16 z-50 rounded-card border border-border bg-raised p-2 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-64"
+          padding="menu"
+          className="sm:w-64"
         >
           <p className="px-2 pb-1.5 pt-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
             Theme
@@ -210,7 +212,14 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
                 showing === theme.id ? 'bg-accent-tint' : 'hover:bg-sunken',
               )}
             >
+              {/* The swatch *is* the theme's ground, so it has no edge of its
+                  own: Paper's near-white sits on this panel's near-white and
+                  Riso's cream on Riso's cream, and a swatch you cannot find
+                  is not a preview of anything. Space and alignment cannot
+                  separate a colour from a colour, which is the case law 11
+                  keeps the border for. */}
               <span
+                // ui-ok: a user's colour against a like ground needs an edge.
                 className="size-5 shrink-0 rounded-md border border-border-strong"
                 style={{ background: theme.swatch }}
                 aria-hidden
@@ -264,7 +273,7 @@ export function ThemePicker({ value }: { value: ThemeChoice }) {
               </button>
             ))}
           </div>
-        </div>
+        </Popover>
       )}
     </div>
   );

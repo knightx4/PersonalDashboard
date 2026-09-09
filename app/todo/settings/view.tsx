@@ -56,12 +56,16 @@ export function AgendaSettingsForm({
                 <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
                   {group.moduleLabel}
                 </h3>
-                <div className="space-y-3">
+                {/* Divides rather than one box per source: the card around
+                    them has already drawn that edge once, and drawing it again
+                    per row turns a list of sources into a wall of rectangles.
+                    Law 11. */}
+                <div className="divide-y divide-border border-y border-border">
                   {group.sources.map((source) => (
                     <label
                       key={source.id}
                       className={cn(
-                        'flex items-start gap-3 rounded-lg border border-border px-3 py-2.5',
+                        'row-pad flex items-start gap-3',
                         !source.available && 'opacity-60',
                       )}
                     >
@@ -70,7 +74,7 @@ export function AgendaSettingsForm({
                         name={`source:${source.id}`}
                         defaultChecked={enabled.includes(source.id)}
                         disabled={!source.available}
-                        className="mt-1 size-4 accent-[var(--color-accent)]"
+                        className="mt-1 size-4 accent-accent"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-ui font-medium text-ink">

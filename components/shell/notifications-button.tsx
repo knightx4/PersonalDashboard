@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 
 export type Notification = {
@@ -69,17 +70,14 @@ export function NotificationsButton({
       </button>
 
       {open && (
-        <div
+        <Popover
           ref={panelRef}
           role="dialog"
           aria-modal="true"
           aria-label="Notifications"
           tabIndex={-1}
-          // Pinned to the viewport on a phone: anchored to a button this far
-          // right, the panel hangs off the left edge where nothing can scroll
-          // it back, and Safari answers a field focused out there by zooming
-          // the whole page out to reach it.
-          className="fixed inset-x-4 top-16 z-50 rounded-card border border-border bg-raised p-4 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-10 sm:w-80"
+          padding="panel"
+          className="sm:w-80"
         >
           <h2 className="text-ui font-semibold text-ink">Notifications</h2>
           <ul className="mt-2 divide-y divide-border">
@@ -102,7 +100,7 @@ export function NotificationsButton({
               </li>
             ))}
           </ul>
-        </div>
+        </Popover>
       )}
     </div>
   );

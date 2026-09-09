@@ -87,7 +87,9 @@ export function RunRoutineButton({
       <p className="text-ui text-ink-muted">
         Works the outstanding notes now instead of waiting for the schedule.
       </p>
-      {state.message && <p className="text-ui text-positive">{state.message}</p>}
+      {/* Ink, not green: law 4 keeps positive for money coming back, and this
+          is the routine saying it started. */}
+      {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
       <FieldError>{state.error}</FieldError>
     </form>
   );

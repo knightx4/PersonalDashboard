@@ -1,8 +1,11 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { addIdea, deleteIdea, updateIdea, type IdeaActionState } from './actions';
+import Link from 'next/link';
+import { Lightbulb, Sparkles } from 'lucide-react';
+import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { IdeaRow } from '@/lib/ideas/load';
@@ -71,6 +74,46 @@ function AddIdea() {
   );
 }
 
+/**
+ * The way out of the ideas list.
+ *
+ * An idea has nowhere to go on its own; this is where it goes. Claude reads
+ * it and the code and writes a proposal into the plan -- a feature with its
+ * steps, done-whens and sizes -- for the person to approve there. Once that
+ * has happened the button becomes the link to what it became, because
+ * shaping the same idea twice would put two features in the plan.
+ */
+function ShapeIdea({ idea }: { idea: IdeaRow }) {
+  const [state, action, pending] = useActionState(shapeIdea, {} as IdeaActionState);
+
+  if (idea.planItem) {
+    return (
+      <Link
+        href="/dev/plan?view=all"
+        className="inline-flex items-center gap-1.5 text-small text-accent hover:underline"
+      >
+        <Sparkles className="size-3.5" aria-hidden />
+        In the plan as #{idea.planItem.number}
+        {idea.planItem.status === 'proposed' && ' · waiting for your approval'}
+      </Link>
+    );
+  }
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={idea.id} />
+      <Button type="submit" size="sm" variant="secondary" pending={pending}>
+        <Sparkles className="size-3.5" aria-hidden />
+        {pending ? 'Sending…' : 'Shape into a plan'}
+      </Button>
+      {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"
+          is the system saying what it did. */}
+      {state.message && <span className="text-small text-ink-muted">{state.message}</span>}
+      <FieldError>{state.error}</FieldError>
+    </form>
+  );
+}
+
 function IdeaCard({ idea }: { idea: IdeaRow }) {
   const [editing, setEditing] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(
@@ -110,6 +153,7 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
         <>
           <p className="whitespace-pre-wrap text-body text-ink">{idea.body}</p>
           <div className="flex flex-wrap items-center gap-2">
+            <ShapeIdea idea={idea} />
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
               Edit
             </Button>
@@ -147,10 +191,15 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
       <AddIdea />
 
       {ideas.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border bg-surface px-4 py-10 text-center text-ui text-ink-muted">
-          Nothing written down yet. Ideas here do not become work on their own — they wait until
-          you file one as a request.
-        </p>
+        // The shared empty state rather than a hand-drawn dashed paragraph:
+        // this is the whole page when the list is empty, and law 1 says that
+        // gets a real one. The dashed edge is the same dashed edge, drawn once
+        // in the primitive.
+        <EmptyState
+          icon={Lightbulb}
+          title="Nothing written down yet"
+          description="An idea here becomes work when you have Claude shape it into the plan, and approve what it proposes there."
+        />
       ) : (
         scopes.map((scope) => {
           const rows = ideas.filter((idea) => idea.module === scope);

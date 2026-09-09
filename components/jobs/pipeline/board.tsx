@@ -5,7 +5,8 @@ import { useState, useTransition } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
@@ -24,6 +25,16 @@ import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actio
  *
  * 'ghosted' has no column. It is a view over silence rather than a place you
  * put things, and giving it a column would invite people to drag cards into it.
+ *
+ * A column is a recessed lane, not a frame. It used to be `border border-border
+ * bg-canvas` holding bordered cards -- a border inside a border, which law 11
+ * calls almost always a mistake, and worse here than usual because in three of
+ * the four themes `canvas` *is* the page colour, so the hairline was doing all
+ * of the grouping and the fill none of it. On `sunken` the ground does the
+ * grouping the law asks it to and the only edges left on the board are the ones
+ * around the cards you can pick up. Drag-over is the accent tint alone for the
+ * same reason: the lane lighting up is louder than a line around it going
+ * purple, and it is legible on a phone where the border never was.
  */
 /**
  * `submitted` and `acknowledged` share a column, labeled by the later one:
@@ -128,8 +139,8 @@ export function PipelineBoard({
             }
             onDrop={() => drop(column.setStatus)}
             className={cn(
-              'rounded-card border border-border bg-canvas transition-colors duration-150',
-              over === column.setStatus && 'border-accent bg-accent-tint',
+              'rounded-card bg-sunken transition-colors duration-150',
+              over === column.setStatus && 'bg-accent-tint',
             )}
           >
             <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
@@ -165,8 +176,8 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-64 shrink-0 rounded-card border border-border bg-canvas p-2 transition-colors duration-150',
-            over === column.setStatus && 'border-accent bg-accent-tint',
+            'w-64 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-150',
+            over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
         >
@@ -210,17 +221,20 @@ export function PipelineBoard({
         {renderColumns(view)}
       </div>
 
+      {/* The shared fold. It was a hand-rolled `<details>` with its own summary
+        * and no chevron, where every other fold in the app has one, and the
+        * count that makes opening it a choice rather than a check now sits on
+        * the closed line as the primitive's `meta`. Law 10. */}
       {closedRows.length > 0 && (
-        <details className={cn(cardVariants())}>
-          <summary className="cursor-pointer px-4 py-3 text-ui font-medium text-ink-muted">
-            Closed — {closedRows.length}
-          </summary>
-          <div className="grid gap-2 border-t border-border p-3 sm:grid-cols-2 lg:grid-cols-4">
-            {closedRows.map((row) => (
-              <PipelineCard key={row.applicationId} row={row} dragging={false} muted />
-            ))}
-          </div>
-        </details>
+        <Card padding="dense">
+          <Disclosure title="Closed" meta={`${closedRows.length} pursuit${closedRows.length === 1 ? '' : 's'}`}>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {closedRows.map((row) => (
+                <PipelineCard key={row.applicationId} row={row} dragging={false} muted />
+              ))}
+            </div>
+          </Disclosure>
+        </Card>
       )}
     </div>
   );

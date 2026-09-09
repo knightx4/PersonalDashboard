@@ -3,7 +3,9 @@ import {
   bucketFor,
   dueDay,
   isSnoozed,
+  rankOf,
   todayIn,
+  UNPLACED,
   type Bucket,
   type Task,
 } from '@/lib/todo/tasks/model';
@@ -153,13 +155,29 @@ function bucketOf(day: string | null, today: string, horizon: string): Bucket {
 }
 
 /**
- * Inside a pile: pinned first, then by day, then by clock, then by title.
+ * Inside a pile: what you placed by hand, then pinned, then by day, then by
+ * clock, then by title.
  *
  * Your own tasks come before source items on the same day and the same clock.
  * The agenda is a list of what you decided to do, with what the rest of the
  * account noticed underneath it -- not the other way round.
+ *
+ * A hand-placed order is the first key, and a source item never has one: an
+ * interview or a return deadline is not a row this account owns, so there is
+ * nothing to write an order to. That means reordering a pile lifts your tasks
+ * above what the other workspaces put in it, which is the same precedence the
+ * tie-break below already gives them, applied earlier.
+ *
+ * Placed-first has to come before every other key rather than after some of
+ * them. A comparator that consults the manual order for one pair and the clock
+ * for the next is not an order at all -- it can rank A over B, B over C and C
+ * over A, and what a sort does with that is undefined.
  */
 function compare(a: AgendaEntry, b: AgendaEntry): number {
+  const rankA = a.task ? rankOf(a.task) : UNPLACED;
+  const rankB = b.task ? rankOf(b.task) : UNPLACED;
+  if (rankA !== rankB) return rankA - rankB;
+
   const pinnedA = a.task?.pinned ?? false;
   const pinnedB = b.task?.pinned ?? false;
   if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;

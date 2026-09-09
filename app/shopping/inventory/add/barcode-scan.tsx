@@ -7,6 +7,7 @@ import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { saveOwnedBook, searchOwnedBook, type BookActionState } from './actions';
 import { AddBookManualForm } from './add-book-forms';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
 
 /**
@@ -95,9 +96,12 @@ export function BarcodeScanPanel() {
         Point your camera at the ISBN barcode on the back cover. Scanning needs
         camera permission and works best over HTTPS.
       </p>
-      <div className="overflow-hidden rounded-xl border border-border bg-black">
+      {/* The viewfinder keeps a frame, and it is the shared one: a black
+          rectangle on a dark theme has no edge of its own, and this is the
+          one thing on the page that has to look like a live surface. */}
+      <Card padding="none" className="overflow-hidden bg-black">
         <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
-      </div>
+      </Card>
       <div className="flex flex-wrap gap-2">
         {!scanning ? (
           <Button type="button" onClick={startScan}>
@@ -128,7 +132,7 @@ export function BarcodeScanPanel() {
         <AddBookManualForm compact isbn={searchState.manualIsbn ?? lastCode} />
       )}
       {searchState.book && (
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <Card padding="standard">
           <p className="font-medium text-ink">{searchState.book.title}</p>
           <p className="text-body text-ink-muted">
             {searchState.book.authors.join(', ')}
@@ -143,7 +147,7 @@ export function BarcodeScanPanel() {
           >
             Add to library
           </Button>
-        </div>
+        </Card>
       )}
     </div>
   );

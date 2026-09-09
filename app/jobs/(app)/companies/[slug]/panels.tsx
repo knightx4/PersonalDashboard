@@ -341,7 +341,11 @@ function Enrichment({ companyId }: { companyId: string }) {
       </p>
 
       {proposal && (
-        <div className="mt-3 rounded-card border border-border bg-canvas p-3">
+        // A well, not a frame. What is in here is an encyclopedia's answer and
+        // not yet yours -- a recessed ground says that, where a border inside
+        // the company card would only be the card's edge drawn twice. Law 11:
+        // a shared ground groups.
+        <div className="mt-3 rounded-card bg-canvas p-3">
           <p className="text-ui font-medium text-ink">{proposal.label}</p>
           {proposal.description && (
             <p className="text-small text-ink-muted">{proposal.description}</p>
@@ -439,7 +443,9 @@ function AiEnrichment({ companyId }: { companyId: string }) {
       </p>
 
       {proposal && (
-        <div className="mt-3 rounded-card border border-border bg-canvas p-3">
+        // Same well as the Wikidata proposal above, for the same reason: this
+        // is a search result waiting on your yes, not a fact about the company.
+        <div className="mt-3 rounded-card bg-canvas p-3">
           {proposal.website && (
             <a
               href={proposal.website}

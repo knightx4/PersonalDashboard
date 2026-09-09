@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
+import { Banner } from '@/components/ui/banner';
+import { cardVariants } from '@/components/ui/card';
 import { requestOrigin } from '@/lib/auth/origin';
 import { PageHeader } from '@/components/shell/page-header';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
@@ -302,7 +304,11 @@ export default async function RoleDetailPage({
                   'tabular rounded-full px-2 py-0.5 text-small',
                   coverage.gaps > 0
                     ? 'bg-caution-tint text-ink'
-                    : 'bg-status-offer-tint text-status-offer',
+                    // Not the offer hue: full coverage is a good answer, not a
+                    // stage of the pipeline, and law 4 gives those five colours
+                    // one meaning each. Amber still carries the gaps, where
+                    // "something is wrong and only you can fix it" is true.
+                    : 'bg-sunken text-ink-muted',
                 )}
                 title={
                   coverage.gaps > 0
@@ -332,15 +338,28 @@ export default async function RoleDetailPage({
         }
       />
 
+      {/* The shared Banner, and `warn` is exactly what it means: something is
+        * wrong with this record and only you can fix it. It was a hand-rolled
+        * tinted paragraph -- the same tint, without the glyph, the role or the
+        * live region, which is the part that matters to a screen reader. */}
       {current.needs_review && (
-        <p className="mb-4 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
+        <Banner tone="warn" className="mb-4">
           {current.created_by === 'email_inferred'
             ? 'This was created from a confirmation email nobody logged. Check the role and the date, then clear the flag from the review queue.'
             : 'Flagged for review.'}
-        </p>
+        </Banner>
       )}
 
-      <dl className="mb-6 grid gap-px overflow-hidden rounded-card border border-border bg-border text-ui sm:grid-cols-4">
+      {/* The card's own frame, with `bg-border` in place of its fill so the
+        * 1px grid gaps between the facts are the ground showing through. The
+        * same shape the activity highlights use, and hand-written in both
+        * until the sweep. */}
+      <dl
+        className={cn(
+          cardVariants(),
+          'mb-6 grid gap-px overflow-hidden bg-border text-ui sm:grid-cols-4',
+        )}
+      >
         <Fact label="Applied" value={formatDate(current.submitted_at as string | null, timezone)} />
         <Fact
           label="Confirmed"

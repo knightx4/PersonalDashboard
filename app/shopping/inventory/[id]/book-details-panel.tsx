@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import Link from 'next/link';
 import {
   confirmBookEdition,
@@ -8,8 +8,10 @@ import {
   updateBookCondition,
   type BookActionState,
 } from '@/app/shopping/inventory/add/actions';
+import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
-import { Field, FieldError, Select } from '@/components/ui/field';
+import { Disclosure, Group } from '@/components/ui/disclosure';
+import { ChipSelect, FieldError } from '@/components/ui/field';
 import type { BookEditionCandidate } from '@/lib/books/types';
 
 export type BookDetailsView = {
@@ -82,7 +84,7 @@ function CandidateRow({
   );
 
   return (
-    <li className="flex gap-3 px-3 py-3">
+    <li className="row-pad flex gap-3">
       {candidate.coverUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- arbitrary catalog CDNs
         <img
@@ -132,6 +134,7 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
     updateBookCondition,
     {} as BookActionState,
   );
+  const conditionForm = useRef<HTMLFormElement>(null);
 
   return (
     <div className="space-y-4">
@@ -160,10 +163,56 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
               : ''}
           </dd>
         </div>
+        {/*
+          * Condition is a fact about the copy, so it is a row in the same list
+          * as the rest of them — and it is the row that can be changed.
+          *
+          * It used to be a labelled full-width select in a form of its own
+          * under the catalog facts, with a "Save condition" button beside it:
+          * a form about a value, printed below the value. It is the value now,
+          * set where the other facts are set, and it commits when it changes.
+          * That is safe here for the reasons a return window's blur-commit is
+          * — one short enum, reversible from the same chip, and no
+          * half-finished state to save by accident. Laws 9 and 12.
+          */}
+        <div>
+          <dt className="text-ink-muted">Condition</dt>
+          <dd>
+            <form ref={conditionForm} action={conditionAction}>
+              <input type="hidden" name="inventory_item_id" value={book.inventoryItemId} />
+              <ChipSelect
+                name="condition"
+                aria-label="Condition"
+                // Re-keyed on the saved value, so the chip follows a save
+                // rather than holding whatever was picked last.
+                key={book.condition ?? ''}
+                defaultValue={book.condition ?? ''}
+                placeholderValue=""
+                disabled={conditionPending}
+                onChange={() => conditionForm.current?.requestSubmit()}
+                // Pulls the chip's own inset back, so its value sits on the
+                // same left edge as every other one in the grid.
+                className="-ml-1.5"
+              >
+                <option value="">Not set yet</option>
+                <option value="new">New</option>
+                <option value="like_new">Like new</option>
+                <option value="very_good">Very good</option>
+                <option value="good">Good</option>
+                <option value="acceptable">Acceptable</option>
+              </ChipSelect>
+            </form>
+            <FieldError>{conditionState.error}</FieldError>
+          </dd>
+        </div>
       </dl>
 
+      {/* The same gate the game panel draws, and for the same reason: one
+          warn Banner where there was a caution box holding a bordered card
+          holding a bordered list, three frames deep inside the Details card
+          it sits in. Law 11. */}
       {book.needsConfirmation && (
-        <div className="space-y-3 rounded-lg border border-caution/30 bg-caution-fill/5 p-3">
+        <Banner tone="warn">
           <div>
             <h3 className="text-ui font-semibold text-ink">Which edition is on your shelf?</h3>
             <p className="mt-1 text-ui text-ink-muted">
@@ -172,52 +221,56 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
             </p>
           </div>
 
-          <div className="flex gap-3 rounded-lg border border-border bg-surface p-3">
-            {book.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- arbitrary catalog CDNs
-              <img
-                src={book.imageUrl}
-                alt=""
-                className="h-16 w-11 shrink-0 rounded object-cover bg-canvas"
-              />
-            ) : (
-              <div className="h-16 w-11 shrink-0 rounded bg-canvas" />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
-                Our best guess
-              </p>
-              <p className="text-body font-medium text-ink">{book.title}</p>
-              {book.authors.length > 0 && (
-                <p className="text-ui text-ink-muted">{book.authors.join(', ')}</p>
-              )}
-              <p className="text-ui text-ink-muted">{editionLine(book)}</p>
-              {book.isbn13 && (
-                <p className="font-mono text-small text-ink-muted">ISBN {book.isbn13}</p>
-              )}
-              <form action={confirmAction} className="mt-2">
-                <input
-                  type="hidden"
-                  name="inventory_item_id"
-                  value={book.inventoryItemId}
+          <Group title="Our best guess" className="mt-3">
+            <div className="flex gap-3">
+              {book.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- arbitrary catalog CDNs
+                <img
+                  src={book.imageUrl}
+                  alt=""
+                  className="h-16 w-11 shrink-0 rounded object-cover bg-canvas"
                 />
-                <Button type="submit" size="sm" pending={confirmPending}>
-                  {confirmPending ? 'Saving…' : 'This is the right edition'}
-                </Button>
-              </form>
-              <FieldError>{confirmState.error}</FieldError>
-              {confirmState.message && (
-                <p className="mt-1 text-ui text-accent">{confirmState.message}</p>
+              ) : (
+                <div className="h-16 w-11 shrink-0 rounded bg-canvas" />
               )}
+              <div className="min-w-0 flex-1">
+                <p className="text-body font-medium text-ink">{book.title}</p>
+                {book.authors.length > 0 && (
+                  <p className="text-ui text-ink-muted">{book.authors.join(', ')}</p>
+                )}
+                <p className="text-ui text-ink-muted">{editionLine(book)}</p>
+                {book.isbn13 && (
+                  <p className="font-mono text-small text-ink-muted">ISBN {book.isbn13}</p>
+                )}
+                <form action={confirmAction} className="mt-2">
+                  <input
+                    type="hidden"
+                    name="inventory_item_id"
+                    value={book.inventoryItemId}
+                  />
+                  <Button type="submit" size="sm" pending={confirmPending}>
+                    {confirmPending ? 'Saving…' : 'This is the right edition'}
+                  </Button>
+                </form>
+                <FieldError>{confirmState.error}</FieldError>
+                {confirmState.message && (
+                  <p className="mt-1 text-ui text-accent">{confirmState.message}</p>
+                )}
+              </div>
             </div>
-          </div>
+          </Group>
 
+          {/* Folded, with the count on the closed line. The answer is almost
+              always the guess above, and five covers stacked under it is a
+              wall in front of the one button that matters; the count is what
+              makes opening it a choice rather than a check. Law 10. */}
           {book.candidates.length > 0 && (
-            <div>
-              <p className="mb-1 text-ui font-medium text-ink">
-                Other printings we found
-              </p>
-              <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+            <Disclosure
+              title="Other printings we found"
+              meta={`${book.candidates.length}`}
+              className="mt-3"
+            >
+              <ul className="divide-y divide-border">
                 {book.candidates.map((candidate, index) => (
                   <CandidateRow
                     key={candidate.isbn13 ?? `${candidate.title}-${index}`}
@@ -226,40 +279,18 @@ export function BookDetailsPanel({ book }: { book: BookDetailsView }) {
                   />
                 ))}
               </ul>
-            </div>
+            </Disclosure>
           )}
 
-          <p className="text-small text-ink-muted">
+          <p className="mt-3 text-small text-ink-muted">
             Neither one? Scan the barcode on the back cover from{' '}
             <Link href="/shopping/inventory/add/books" className="text-accent hover:underline">
               Add books
             </Link>{' '}
             — the ISBN settles it in one shot.
           </p>
-        </div>
+        </Banner>
       )}
-
-      <form action={conditionAction} className="flex flex-wrap items-end gap-3">
-        <input type="hidden" name="inventory_item_id" value={book.inventoryItemId} />
-        <Field id="condition" label="Condition" className="min-w-48 flex-1">
-          <Select
-            id="condition"
-            name="condition"
-            defaultValue={book.condition ?? ''}
-          >
-            <option value="">Not set yet</option>
-            <option value="new">New</option>
-            <option value="like_new">Like new</option>
-            <option value="very_good">Very good</option>
-            <option value="good">Good</option>
-            <option value="acceptable">Acceptable</option>
-          </Select>
-        </Field>
-        <Button type="submit" size="sm" variant="secondary" pending={conditionPending}>
-          {conditionPending ? 'Saving…' : 'Save condition'}
-        </Button>
-        <FieldError>{conditionState.error}</FieldError>
-      </form>
     </div>
   );
 }

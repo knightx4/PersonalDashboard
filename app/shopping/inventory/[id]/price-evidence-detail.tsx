@@ -1,3 +1,4 @@
+import { Disclosure } from '@/components/ui/disclosure';
 import { formatMoney } from '@/lib/money';
 import { formatRange, type PriceEvidence } from '@/lib/sell/price-evidence';
 
@@ -20,31 +21,37 @@ export function PriceEvidenceDetail({ evidence }: { evidence: PriceEvidence }) {
   const rows = isEbay ? priced : evidence.listings;
   if (rows.length === 0 && !range) return null;
 
-  return (
-    <details className="group rounded-lg border border-border bg-canvas">
-      <summary className="cursor-pointer list-none px-3 py-2 text-ui text-ink-muted">
-        <span className="text-ink">
-          {isEbay
-            ? `${evidence.sampleSize ?? priced.length} listing${
-                (evidence.sampleSize ?? priced.length) === 1 ? '' : 's'
-              }`
-            : `${rows.length} source${rows.length === 1 ? '' : 's'}`}
-        </span>
-        {range && <span className="tabular"> · {range}</span>}
-        {isEbay && evidence.medianCents != null && (
-          <span className="tabular"> · median {formatMoney(evidence.medianCents)}</span>
-        )}
-        {/* Which rule set the price, because "median of 3" is a warning and
-            "40th percentile of 20" is not. */}
-        {evidence.typicalBasis === 'median' && <span> · too few to rank, using the median</span>}
-        {isEbay && evidence.totalMatches != null && evidence.totalMatches > (evidence.sampleSize ?? 0) && (
-          <span> · {evidence.totalMatches} listed in total</span>
-        )}
-        <span className="ml-2 text-small text-accent group-open:hidden">show</span>
-        <span className="ml-2 hidden text-small text-accent group-open:inline">hide</span>
-      </summary>
+  const count = isEbay ? (evidence.sampleSize ?? priced.length) : rows.length;
 
-      <div className="border-t border-border px-3 py-2">
+  return (
+    // The shared fold, not a fifth hand-rolled <details> in a box of its own:
+    // this sits inside the Sell card, which already drew the frame, and the
+    // closed line has to carry the spread and the median for opening it to be
+    // a choice rather than a check. Laws 10 and 11.
+    <Disclosure
+      title={
+        isEbay
+          ? `${count} listing${count === 1 ? '' : 's'}`
+          : `${count} source${count === 1 ? '' : 's'}`
+      }
+      meta={
+        <>
+          {range && <span className="tabular">{range}</span>}
+          {isEbay && evidence.medianCents != null && (
+            <span className="tabular"> · median {formatMoney(evidence.medianCents)}</span>
+          )}
+          {/* Which rule set the price, because "median of 3" is a warning and
+              "40th percentile of 20" is not. */}
+          {evidence.typicalBasis === 'median' && <span> · too few to rank, using the median</span>}
+          {isEbay &&
+            evidence.totalMatches != null &&
+            evidence.totalMatches > (evidence.sampleSize ?? 0) && (
+              <span> · {evidence.totalMatches} listed in total</span>
+            )}
+        </>
+      }
+    >
+      <div>
         {evidence.note && <p className="mb-2 text-small text-ink-muted">{evidence.note}</p>}
         {evidence.query && (
           // The query is shown because a wrong price is usually a wrong search.
@@ -91,7 +98,7 @@ export function PriceEvidenceDetail({ evidence }: { evidence: PriceEvidence }) {
           ))}
         </ul>
       </div>
-    </details>
+    </Disclosure>
   );
 }
 

@@ -27,7 +27,7 @@ const SOURCE_LABEL: Record<ActivityEntry['source'], string> = {
  *
  * These are the pipeline's own status colours rather than new ones: a
  * rejection is the same red here as it is on the board, and every pair is
- * already checked by scripts/check-contrast.ts in all five themes. The chip
+ * already checked by scripts/check-contrast.ts in all four themes. The chip
  * carries a word, never a colour alone -- the colour is what makes the one
  * line you were looking for findable, not what tells you which line it is.
  */
@@ -68,7 +68,11 @@ function Highlights({ highlights }: { highlights: ActivityHighlights }) {
 
   return (
     <section aria-label={`The last ${highlights.days} days`}>
-      <div className="grid gap-px overflow-hidden rounded-card border border-border bg-border sm:grid-cols-4">
+      {/* The card's own frame, with `bg-border` standing in for its fill so the
+        * 1px grid gaps between the tiles are drawn by the ground showing
+        * through. Hand-written until the sweep, which meant four tiles in a box
+        * that was not the box every other card on the page is. */}
+      <Card padding="none" className="grid gap-px overflow-hidden bg-border sm:grid-cols-4">
         {tiles.map((tile) => (
           <div key={tile.label} className="bg-surface px-4 py-3">
             <p className="text-micro uppercase tracking-wider text-ink-muted">{tile.label}</p>
@@ -84,7 +88,7 @@ function Highlights({ highlights }: { highlights: ActivityHighlights }) {
             </p>
           </div>
         ))}
-      </div>
+      </Card>
       <p className="mt-1.5 text-small text-ink-muted">Last {highlights.days} days.</p>
     </section>
   );

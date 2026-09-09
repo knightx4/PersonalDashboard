@@ -121,6 +121,17 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_items = planItem.id;
 
+  const [planStep] = await admin<{ id: string }[]>`
+    insert into plan_items (user_id, module, title, parent_id)
+    values (${userId}, 'learn', ${`${tag} planned a sub-step`}, ${planItem.id})
+    returning id`;
+
+  const [planDependency] = await admin<{ id: string }[]>`
+    insert into plan_dependencies (user_id, item_id, depends_on_id)
+    values (${userId}, ${planStep.id}, ${planItem.id})
+    returning id`;
+  ids.plan_dependencies = planDependency.id;
+
   const [seedImport] = await admin<{ id: string }[]>`
     insert into plan_seed_imports (user_id, step_key)
     values (${userId}, ${`learn:${tag} already offered this step`})

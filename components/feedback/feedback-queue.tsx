@@ -1,4 +1,5 @@
 import { MessageSquarePlus } from 'lucide-react';
+import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FeedbackList } from '@/components/feedback/feedback-list';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
@@ -40,11 +41,19 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
         <RunRoutineButton openCount={outstanding.length} divider="bottom" />
       </div>
 
+      {/* The shared banner, and `warn` rather than danger. This was a
+          hand-drawn box in `border-danger/30 bg-danger/5` -- an alpha over the
+          surface rather than the tint token that is tuned per theme, which is
+          not the same colour in a dark one. And nothing has failed: a blocked
+          note is a question waiting on you, which is what caution means and
+          what `warn` is for. */}
       {blocked.length > 0 && (
-        <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-ui text-ink">
-          {blocked.length} note(s) blocked, waiting on an answer from you. They are listed
-          first below with the question.
-        </p>
+        <Banner tone="warn" className="mb-6">
+          {blocked.length === 1
+            ? 'One note is blocked, waiting on an answer from you.'
+            : `${blocked.length} notes are blocked, waiting on an answer from you.`}{' '}
+          They are listed first below with the question.
+        </Banner>
       )}
 
       <div className="space-y-6">

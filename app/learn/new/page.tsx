@@ -40,7 +40,7 @@ export default function NewTrackPage() {
 
         <div className="flex items-center gap-3" aria-hidden>
           <span className="h-px flex-1 bg-border" />
-          <span className="text-caption uppercase tracking-wide text-ink-muted">or</span>
+          <span className="text-small uppercase tracking-wide text-ink-muted">or</span>
           <span className="h-px flex-1 bg-border" />
         </div>
 

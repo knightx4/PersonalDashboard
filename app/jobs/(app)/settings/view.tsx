@@ -1,13 +1,15 @@
 'use client';
 
 import { useActionState, useEffect, useState, useTransition } from 'react';
-import { Copy, Mail, ShieldAlert, Trash2 } from 'lucide-react';
+import { Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Banner } from '@/components/ui/banner';
+import { Group } from '@/components/ui/disclosure';
 import { Input, Label, Select, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { backfillResumable, scanButtonLabel } from '@/lib/core/inbox/resume';
-import { syncProgress, type SyncPhase } from '@/lib/core/inbox/progress';
+import { SyncProgressBar, useInboxSync } from '@/components/jobs/inbox/sync-run';
 import { disconnectInbox, updateProfile, type SettingsState } from './actions';
 import {
   acceptEvidence,
@@ -19,6 +21,9 @@ import {
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 import { cardVariants } from '@/components/ui/card';
+
+/** The page's own three tones, in the four the Banner primitive names. */
+const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
 
 export function SettingsView(props: {
   email: string;
@@ -54,17 +59,15 @@ export function SettingsView(props: {
 }) {
   return (
     <div className="space-y-6">
+      {/* The shared Banner, which this was a fourth hand-rolled copy of.
+        *
+        * `ok` maps to `info` rather than to `good`: the good tone means money
+        * came back and nothing else, and "Gmail connected" was wearing it
+        * because green is what a success message reaches for. It is also the
+        * offer hue, which law 4 reserves for one stage of the pipeline and
+        * nowhere else -- so the same class was breaking the same law twice. */}
       {props.banner && (
-        <p
-          className={cn(
-            'rounded-lg px-3 py-2 text-ui',
-            props.banner.tone === 'ok' && 'bg-status-offer-tint text-status-offer',
-            props.banner.tone === 'warn' && 'bg-caution-tint text-ink',
-            props.banner.tone === 'err' && 'bg-status-rejected-tint text-status-rejected',
-          )}
-        >
-          {props.banner.text}
-        </p>
+        <Banner tone={BANNER_TONE[props.banner.tone]}>{props.banner.text}</Banner>
       )}
 
       <ProfileSection profile={props.profile} email={props.email} />
@@ -76,7 +79,6 @@ export function SettingsView(props: {
       <ExcludedSendersSection excludedSenders={props.excludedSenders} />
       <ResumeSection resumes={props.resumes} />
       <EvidenceSection evidence={props.evidence} resumes={props.resumes} />
-      <DangerSection />
     </div>
   );
 }
@@ -106,7 +108,7 @@ function ProfileSection({
         <a href="/account" className="font-medium text-accent underline underline-offset-2">
           Account
         </a>
-        .
+        , and so does deleting the account, which was never the job search&rsquo;s to offer.
       </p>
 
       <form action={action} className="mt-4 space-y-4">
@@ -184,11 +186,11 @@ function ProfileSection({
         </div>
 
         {state.error && (
-          <p role="alert" className="text-ui text-status-rejected">
+          <p role="alert" className="text-ui text-danger">
             {state.error}
           </p>
         )}
-        {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
+        {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
         <Button type="submit" size="sm">
           Save
@@ -224,70 +226,6 @@ function backfillStateOf(account: InboxAccount) {
   };
 }
 
-/** The shape /api/inbox/sync reports a run in. */
-type SyncJob = {
-  jobId: string;
-  type?: string;
-  status: string;
-  phase: SyncPhase | null;
-  messagesSeen: number;
-  messagesParsed: number;
-  messagesTotal: number | null;
-  done: boolean;
-  error?: string;
-};
-
-/**
- * What the check is doing, while it does it.
- *
- * Check now used to answer with one line -- "Started. Progress appears in the
- * banner at the top." -- and the banner only shows while a job is mid-flight,
- * which a short check is often past by the time the page repaints. So the
- * button read as doing nothing at all. This watches the run it started and
- * says where it is, and stays on screen with the result once it ends.
- */
-function SyncProgressBar({ accountId, job }: { accountId: string; job: SyncJob }) {
-  const view = syncProgress({
-    status: job.status,
-    phase: job.phase,
-    messagesSeen: job.messagesSeen,
-    messagesParsed: job.messagesParsed,
-    messagesTotal: job.messagesTotal,
-    error: job.error ?? null,
-  });
-
-  return (
-    <div className="mt-2" aria-live="polite" data-account={accountId}>
-      <div
-        className="h-1.5 overflow-hidden rounded-full bg-canvas"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(view.fraction * 100)}
-      >
-        <div
-          className={cn(
-            'h-full rounded-full transition-[width] duration-500 ease-out',
-            view.failed ? 'bg-status-rejected' : 'bg-accent',
-          )}
-          style={{ width: `${Math.round(view.fraction * 100)}%` }}
-        />
-      </div>
-      <p
-        className={cn(
-          'tabular mt-1.5 text-small',
-          view.failed ? 'text-status-rejected' : 'text-ink-muted',
-        )}
-      >
-        {view.detail}
-      </p>
-    </div>
-  );
-}
-
-/** While a run is live, ask how it is going. */
-const SYNC_POLL_MS = 2000;
-
 function InboxSection({
   accounts,
   gmailConfigured,
@@ -295,65 +233,8 @@ function InboxSection({
   accounts: InboxAccount[];
   gmailConfigured: boolean;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<Record<string, SyncJob>>({});
-  const [watching, setWatching] = useState<string | null>(null);
+  const { busy, note, setNote, jobs, startSync } = useInboxSync();
   const [, startTransition] = useTransition();
-
-  // Polling stops when the run does. A finished job stays on screen -- "read
-  // 4 messages, linked 1" is the answer to "did that do anything", and it is
-  // gone the moment you reload, which is the right lifetime for it.
-  useEffect(() => {
-    if (!watching) return;
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const res = await fetch(`/api/inbox/sync?accountId=${encodeURIComponent(watching!)}`);
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { job: SyncJob | null };
-        if (cancelled || !data.job) return;
-        setJobs((current) => ({ ...current, [watching!]: data.job! }));
-        if (data.job.done) setWatching(null);
-      } catch {
-        // A dropped poll is not worth saying anything about; the next one is
-        // two seconds away, and the run is unaffected either way.
-      }
-    }
-
-    void poll();
-    const id = window.setInterval(() => void poll(), SYNC_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [watching]);
-
-  async function startSync(accountId: string, mode: 'backfill' | 'incremental') {
-    setBusy(accountId);
-    setNote(null);
-    try {
-      const response = await fetch('/api/inbox/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, mode }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setNote(data.error);
-        return;
-      }
-      // The POST answers with the job row it started, so the bar has something
-      // to show before the first poll comes back.
-      if (data.jobId) setJobs((current) => ({ ...current, [accountId]: data as SyncJob }));
-      setWatching(accountId);
-    } catch {
-      setNote('Could not start the scan.');
-    } finally {
-      setBusy(null);
-    }
-  }
 
   return (
     <section id="inboxes" className={cardVariants({ padding: 'standard' })}>
@@ -382,16 +263,25 @@ function InboxSection({
           )}
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        // Divides and space, no frame: the settings card around this already
+        // said these belong together, and a bordered row inside it was the
+        // second box arguing with the first. Law 11.
+        <ul className="mt-4 divide-y divide-border">
           {accounts.map((account) => (
-            <li key={account.id} className="rounded-lg border border-border p-3">
+            <li key={account.id} className="row-pad">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-ui font-medium text-ink">{account.emailAddress}</span>
                 <span
                   className={cn(
                     'rounded-full px-1.5 py-0.5 text-micro',
                     account.status === 'active'
-                      ? 'bg-status-offer-tint text-status-offer'
+                      // Connected is the ordinary state, so it is set quietly:
+                      // it was wearing the offer hue, which law 4 gives to one
+                      // stage of the pipeline and to nothing else, and green,
+                      // which means money came back. Amber stays on the broken
+                      // one, where "something is wrong and only you can fix it"
+                      // is exactly what it means.
+                      ? 'bg-sunken text-ink-muted'
                       : 'bg-caution-tint text-ink',
                   )}
                 >
@@ -528,16 +418,24 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {href ? (
+          // A link that has to look draggable, so it is drawn as the app's own
+          // secondary button rather than as a box of its own -- same border
+          // token, same height off the dial, same press. The accent ink is the
+          // one thing kept: it is the only element on the page you are meant to
+          // grab rather than click, and it sits next to a button you do click.
           <a
             href={href}
             onClick={(event) => event.preventDefault()}
-            className="press cursor-grab rounded-lg border border-border bg-canvas px-3 py-1.5 text-ui font-medium text-accent"
+            className={cn(
+              buttonVariants({ variant: 'secondary', size: 'sm' }),
+              'cursor-grab text-accent',
+            )}
             title="Drag me to your bookmarks bar"
           >
             Capture questions
           </a>
         ) : (
-          <span className="skeleton inline-block h-8 w-40" />
+          <span className="skeleton inline-block h-7 w-40" />
         )}
         {href && (
           <Button
@@ -588,7 +486,7 @@ function ExcludedSendersSection({
               <span className="tabular text-ink">{entry.domain}</span>
               <button
                 type="button"
-                className="ml-auto text-ink-muted hover:text-status-rejected"
+                className="ml-auto text-ink-muted hover:text-danger"
                 onClick={() =>
                   startTransition(async () => {
                     await removeExcludedSender(entry.id);
@@ -612,8 +510,8 @@ function ExcludedSendersSection({
           Exclude
         </Button>
       </form>
-      {state.error && <p className="mt-2 text-ui text-status-rejected">{state.error}</p>}
-      {state.message && <p className="mt-2 text-ui text-status-offer">{state.message}</p>}
+      {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
+      {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
     </section>
   );
 }
@@ -675,8 +573,8 @@ function ResumeSection({
           </p>
         </div>
       </form>
-      {state.error && <p className="mt-2 text-ui text-status-rejected">{state.error}</p>}
-      {state.message && <p className="mt-2 text-ui text-status-offer">{state.message}</p>}
+      {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
+      {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
     </section>
   );
 }
@@ -720,9 +618,11 @@ function EvidenceSection({
       </p>
 
       {evidence.length > 0 && (
-        <ul className="mt-3 space-y-2">
+        // Same call as the inboxes above: a list inside the card, marked by its
+        // divides rather than by twenty small frames stacked down the page.
+        <ul className="mt-3 divide-y divide-border">
           {evidence.map((item) => (
-            <li key={item.id} className="rounded-lg border border-border p-3">
+            <li key={item.id} className="row-pad">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-ui font-medium text-ink">{item.title}</span>
                 <span className="tabular text-small text-ink-muted">
@@ -738,7 +638,7 @@ function EvidenceSection({
                 ))}
                 <button
                   type="button"
-                  className="ml-auto text-ink-muted hover:text-status-rejected"
+                  className="ml-auto text-ink-muted hover:text-danger"
                   onClick={() =>
                     startTransition(async () => {
                       await deleteEvidence(item.id);
@@ -804,8 +704,8 @@ function EvidenceSection({
           />
         </div>
 
-        {state.error && <p className="text-ui text-status-rejected">{state.error}</p>}
-        {state.message && <p className="text-ui text-status-offer">{state.message}</p>}
+        {state.error && <p className="text-ui text-danger">{state.error}</p>}
+        {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
         <Button type="submit" size="sm">
           Add to the bank
@@ -863,14 +763,16 @@ function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: stri
   const picked = (drafts ?? []).filter((draft) => draft.picked);
 
   return (
-    <div className="mt-4 rounded-lg border border-border bg-canvas p-3">
-      <h3 className="text-ui font-medium text-ink">Seed it from what you have written</h3>
-      <p className="mt-0.5 text-small leading-relaxed text-ink-muted">
+    // A heading and space where a second box used to be. It is the last thing
+    // in the Evidence card and it belongs to it, so the frame around it was the
+    // card's frame said twice. Law 11.
+    <Group title="Seed it from what you have written" className="mt-4 border-t border-border pt-3">
+      <p className="text-small leading-relaxed text-ink-muted">
         Read a resume, your approved behavioural answers, or your interview debriefs, and propose
         the stories in them. Nothing is added until you tick it.
       </p>
 
-      <div className="mt-2 flex flex-wrap items-end gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <div>
           <Label htmlFor="seed-kind">Read</Label>
           <Select
@@ -946,80 +848,80 @@ function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: stri
           {busy ? 'Reading…' : 'Propose'}
         </Button>
 
-        {error && <span className="text-small text-status-rejected">{error}</span>}
-        {message && <span className="text-small text-status-offer">{message}</span>}
+        {error && <span className="text-small text-danger">{error}</span>}
+        {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
 
       {drafts && drafts.length > 0 && (
-        <div className="mt-3 space-y-2 border-t border-border pt-3">
+        <div className="space-y-2 border-t border-border pt-3">
           <p className="text-small text-ink-muted">
             {drafts.length} proposed. Edit anything that is not how you would put it — this is the
             text every future draft quotes.
           </p>
 
-          {drafts.map((draft, index) => (
-            <div
-              key={index}
-              className={cn(
-                'rounded-lg border p-2',
-                draft.picked ? 'border-border-strong bg-surface' : 'border-border opacity-60',
-              )}
-            >
-              <div className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  className="mt-2"
-                  checked={draft.picked}
-                  onChange={(event) => patch(index, { picked: event.target.checked })}
-                  aria-label={`Add ${draft.title}`}
-                />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Input
-                    value={draft.title}
-                    aria-label="Short handle"
-                    onChange={(event) => patch(index, { title: event.target.value })}
+          {/* Third frame in from the page, so no frame at all: divides between
+            * the proposals, and the dimming that was already carrying "this one
+            * is not going in" carries it on its own now. A box per proposal
+            * made eight suggestions read as eight forms. */}
+          <div className="divide-y divide-border">
+            {drafts.map((draft, index) => (
+              <div key={index} className={cn('row-pad', !draft.picked && 'opacity-60')}>
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-2"
+                    checked={draft.picked}
+                    onChange={(event) => patch(index, { picked: event.target.checked })}
+                    aria-label={`Add ${draft.title}`}
                   />
-                  <Textarea
-                    rows={3}
-                    value={draft.body}
-                    aria-label="The story"
-                    onChange={(event) => patch(index, { body: event.target.value })}
-                  />
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <Input
-                      value={draft.context ?? ''}
-                      placeholder="Where and when"
-                      aria-label="Where and when"
-                      onChange={(event) => patch(index, { context: event.target.value })}
+                      value={draft.title}
+                      aria-label="Short handle"
+                      onChange={(event) => patch(index, { title: event.target.value })}
                     />
+                    <Textarea
+                      rows={3}
+                      value={draft.body}
+                      aria-label="The story"
+                      onChange={(event) => patch(index, { body: event.target.value })}
+                    />
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <Input
+                        value={draft.context ?? ''}
+                        placeholder="Where and when"
+                        aria-label="Where and when"
+                        onChange={(event) => patch(index, { context: event.target.value })}
+                      />
+                      <Input
+                        value={draft.metrics ?? ''}
+                        placeholder="The number"
+                        aria-label="The number"
+                        onChange={(event) => patch(index, { metrics: event.target.value })}
+                      />
+                      <Select
+                        value={String(draft.strength)}
+                        aria-label="How strong is it"
+                        onChange={(event) => patch(index, { strength: Number(event.target.value) })}
+                      >
+                        {[5, 4, 3, 2, 1].map((level) => (
+                          <option key={level} value={level}>
+                            {'★'.repeat(level)}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                     <Input
-                      value={draft.metrics ?? ''}
-                      placeholder="The number"
-                      aria-label="The number"
-                      onChange={(event) => patch(index, { metrics: event.target.value })}
+                      value={draft.skillsText}
+                      placeholder="Tags"
+                      aria-label="Tags"
+                      onChange={(event) => patch(index, { skillsText: event.target.value })}
                     />
-                    <Select
-                      value={String(draft.strength)}
-                      aria-label="How strong is it"
-                      onChange={(event) => patch(index, { strength: Number(event.target.value) })}
-                    >
-                      {[5, 4, 3, 2, 1].map((level) => (
-                        <option key={level} value={level}>
-                          {'★'.repeat(level)}
-                        </option>
-                      ))}
-                    </Select>
                   </div>
-                  <Input
-                    value={draft.skillsText}
-                    placeholder="Tags"
-                    aria-label="Tags"
-                    onChange={(event) => patch(index, { skillsText: event.target.value })}
-                  />
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
 
           <div className="flex items-center gap-2">
             <Button
@@ -1068,71 +970,6 @@ function SeedFromWriting({ resumes }: { resumes: Array<{ id: string; label: stri
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function DangerSection() {
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  return (
-    <section className="rounded-card border border-status-rejected/30 bg-surface p-5">
-      <h2 className="flex items-center gap-2 text-body font-semibold text-status-rejected">
-        <ShieldAlert className="size-4" strokeWidth={1.75} />
-        Delete everything
-      </h2>
-      <p className="mt-1 text-ui leading-relaxed text-ink-muted">
-        Revokes the Google grant, deletes every row and every stored file, and removes the account
-        itself. There is no undo and no export first.
-      </p>
-
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="min-w-56 flex-1">
-          <Label htmlFor="confirm">Type &ldquo;delete everything&rdquo;</Label>
-          <Input
-            id="confirm"
-            value={confirm}
-            onChange={(event) => setConfirm(event.target.value)}
-            placeholder="delete everything"
-          />
-        </div>
-        <Button
-          type="button"
-          variant="danger"
-          size="sm"
-          disabled={busy || confirm.trim().toLowerCase() !== 'delete everything'}
-          onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              const response = await fetch('/api/account/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ confirm }),
-              });
-              if (response.ok) {
-                window.location.href = '/';
-                return;
-              }
-              const data = await response.json();
-              setError(data.error ?? 'Could not delete the account.');
-            } catch {
-              setError('Could not delete the account.');
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          Delete
-        </Button>
-      </div>
-      {error && (
-        <p role="alert" className="mt-2 text-ui text-status-rejected">
-          {error}
-        </p>
-      )}
-    </section>
+    </Group>
   );
 }
