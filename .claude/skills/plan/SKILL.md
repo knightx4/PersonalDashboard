@@ -30,6 +30,7 @@ npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never your
 npx tsx scripts/plan.ts block <n> --note "…"   # cannot proceed; say what is needed
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
+                                               [--from <n>]  # stamp: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
@@ -217,8 +218,13 @@ against everything now known and write down what has changed — as
    know what is there.
 2. **Graduate the fog.** If an answer, or the code, has made the fog
    specifiable, write those steps now: `add "…" --parent <n> --proposed
-   --done-when "…" --size s|m|l`, and clear the patch in the same breath with
-   `fog <n> --clear`. Fog that is *still* fog stays exactly as it is — a patch
+   --done-when "…" --size s|m|l --from <the decision>`, and clear the patch in
+   the same breath with `fog <n> --clear`. **`--from` on every row a re-shape
+   writes**: it stamps the step with the answer that produced it, and a
+   proposed step appearing under a feature somebody approved last week is
+   confusing until it says why it is there. The gist is read off the
+   decision's own answer, so it cannot be paraphrased into something nobody
+   said. Fog that is *still* fog stays exactly as it is — a patch
    rewritten into something vaguer is worse than one left alone. If part of it
    has cleared and part has not, `fog <n> --note "…"` with what is left.
 3. **Say what an answer invalidated.** A step an answer made pointless is
@@ -228,8 +234,8 @@ against everything now known and write down what has changed — as
    it is not: say so in the report and leave it alone.
 4. **Write the new questions.** An answer usually surfaces the next question.
    If it can be phrased sharply, it is a decision: `add "…?" --parent <n>
-   --kind decision --detail "<the question, the real options, what each costs,
-   your recommendation>"`. If it cannot, it is fog on the feature. Same test
+   --kind decision --from <the decision it came out of> --detail "<the
+   question, the real options, what each costs, your recommendation>"`. If it cannot, it is fog on the feature. Same test
    as shaping.
 5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not re-propose what the feature already holds —
@@ -295,6 +301,14 @@ where id = '…';
 -- fog: write it, or clear it once the steps that dispel it exist. Not a
 -- status change, so no dated line goes in the comment.
 update plan_items set fog = '…' where id = '…';   -- or fog = null to clear
+
+-- a row a re-shape wrote, stamped with the answer that produced it. The same
+-- line `add --from` writes, and what the page and the brief read back; keep
+-- the wording exactly, including the apostrophe, or it stops being found.
+insert into plan_items (user_id, module, parent_id, title, acceptance, size,
+                        status, position, comment)
+values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
+        'From #63''s answer: <that answer, first line>');
 
 -- block: not finished, so no commit
 update plan_items

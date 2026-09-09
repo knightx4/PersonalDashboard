@@ -76,6 +76,7 @@ import {
   type PlanSummary,
   type PlanView as View,
 } from '@/lib/plan/tree';
+import { reshapeOrigin } from '@/lib/plan/origin';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
@@ -1500,8 +1501,17 @@ function PlanRow({
   const health = healthOf(node);
   const HealthIcon = health.icon;
 
-  // The line under the title: what it involves, or failing that your note.
-  const gloss = (node.detail ?? node.comment ?? '').split('\n').find((line) => line.trim()) ?? '';
+  // The answer that produced this row, on the steps a re-shape wrote and on
+  // nothing else.
+  const origin = reshapeOrigin(node.comment);
+  // The line under the title: what it involves, or failing that your note --
+  // minus the stamp, which has its own line above and should not be said
+  // twice on one row.
+  const gloss =
+    (node.detail ?? node.comment ?? '')
+      .split('\n')
+      .find((line) => line.trim() && !(origin && line.includes(`#${origin.number}'s answer:`))) ??
+    '';
 
   // A proposal's first choice is to approve it, with the proposed steps
   // beneath it; the plain statuses follow, and "proposed" is not offered on a
@@ -1768,6 +1778,15 @@ function PlanRow({
                 </span>
               )}
             </span>
+            {/* Where it came from, when it did not come from you. On the row
+                and not behind the fold, because a step that appeared under a
+                feature you approved last week is exactly the one you would
+                never think to open. */}
+            {origin && (
+              <span className="block truncate text-small text-ink-ghost">
+                From #{origin.number}&apos;s answer: {origin.gist}
+              </span>
+            )}
             {gloss && !open && (
               <span className="block truncate text-small text-ink-muted">
                 {!node.detail && 'Note: '}

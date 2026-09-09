@@ -13,7 +13,7 @@
  *                                [--priority 1|2|3] [--size s|m|l] [--claude]
  *                                [--detail "…"] [--done-when "…"] [--fog "…"]
  *                                [--proposed] [--idea <id prefix>]
- *                                [--kind decision]
+ *                                [--kind decision] [--from <n>]
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
@@ -42,6 +42,7 @@ import { execSync } from 'node:child_process';
 import postgres from 'postgres';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
+import { reshapeStamp } from '../lib/plan/origin';
 import {
   isClosed,
   isPlanKind,
@@ -343,14 +344,28 @@ async function main(): Promise<void> {
       // it is worth more enforced here than remembered at the call site.
       const assignee = kind === 'decision' ? null : has('--claude') ? 'claude' : null;
 
+      // Where the row came from, when it did not come from a person. The gist
+      // is read off the decision's own answer rather than retyped by whoever
+      // is adding the step, so a session cannot paraphrase an answer into
+      // something that was never said.
+      const fromNumber = arg('--from');
+      let comment: string | null = null;
+      if (fromNumber) {
+        const from = await byNumber(sql, userId, fromNumber);
+        if (from.kind !== 'decision') fail(`#${from.number} is not a decision.`);
+        if (!from.resolution) fail(`#${from.number} has not been answered yet.`);
+        comment = reshapeStamp(from.number, from.resolution);
+      }
+
       const [row] = await sql<{ id: string; number: number }[]>`
         insert into plan_items (user_id, module, parent_id, title, detail, acceptance,
-                                fog, kind, priority, size, assignee, status, position)
+                                fog, kind, priority, size, assignee, status, position,
+                                comment)
         values (${userId}, ${scope}, ${parent?.id ?? null}, ${title},
                 ${arg('--detail')}, ${arg('--done-when')}, ${arg('--fog')}, ${kind},
                 ${priority}, ${size}, ${assignee},
                 ${proposed ? 'proposed' : 'not_started'},
-                ${(last?.position ?? 0) + 10})
+                ${(last?.position ?? 0) + 10}, ${comment})
         returning id, number`;
 
       const ideaPrefix = arg('--idea');

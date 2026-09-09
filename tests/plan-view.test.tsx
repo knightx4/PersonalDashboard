@@ -208,6 +208,40 @@ describe('PlanView', () => {
     expect(html).not.toContain('to Claude</button>');
   });
 
+  it('says on the row which answer produced a step a re-shape wrote', () => {
+    const reshaped = buildPlanTree({
+      items: [
+        item({ id: 'f', title: 'Re-shaping' }),
+        item({
+          id: 'added',
+          title: 'The graduated step',
+          parentId: 'f',
+          status: 'proposed',
+          comment: "From #63's answer: On the server, not the client.",
+        }),
+        item({ id: 'mine', title: 'Written by hand', parentId: 'f' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(reshaped, 'all')}
+        summary={summarize(reshaped)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        queued={0}
+      />,
+    );
+
+    // Visible without opening the step, which is the whole point: a row that
+    // appeared under a feature you approved last week is the one you would
+    // never think to open.
+    expect(html).toContain('On the server, not the client.');
+    expect((html.match(/answer:/g) ?? []).length).toBe(1);
+  });
+
   it('invites a step at the top of every module on the working view, and not on the narrow ones', () => {
     expect(render('open')).toContain('Add a step');
     expect(render('ready')).not.toContain('Add a step');
