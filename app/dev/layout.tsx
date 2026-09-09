@@ -34,7 +34,12 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * moves up this list as it acquires commitment — an idea becomes a plan step
    * when it is decided on, and a bug is filed when something built is wrong.
    *
-   * UI sits below them because it is not a list of work; it is the standard
+   * The changelog sits below the three because it is the other direction: they
+   * are what is going to happen, and it is what already did. Its lines are
+   * those same lists' closed rows, so it belongs after the lists it is made of
+   * rather than above them.
+   *
+   * UI sits below that because it is not a list of work; it is the standard
    * the work is held to, and Surfaces below that because it is where the
    * standard gets checked against the thing: every surface framed at the width
    * it is read at, with a box to say what is wrong. A note written there lands
@@ -48,6 +53,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
+    { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
   ];

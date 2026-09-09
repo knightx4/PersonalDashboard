@@ -28,6 +28,8 @@ export type FeedbackRow = {
   resolutionNote: string | null;
   commitSha: string | null;
   createdAt: string;
+  /** When it closed, done or declined. Null while it is still outstanding. */
+  completedAt: string | null;
 };
 
 /** Anything not finished — including blocked, the state most easily forgotten. */
@@ -65,6 +67,26 @@ export interface FeedbackQueue {
   blocked: FeedbackRow[];
 }
 
+/** Every column the app reads off a note. Shared with the changelog. */
+export const FEEDBACK_COLUMNS =
+  'id, kind, body, page_path, status, priority, resolution_note, commit_sha, created_at, completed_at';
+
+/** A row as the app reads it. One shape leaves here, whoever selected it. */
+export function feedbackRowFrom(row: Record<string, unknown>): FeedbackRow {
+  return {
+    id: row.id as string,
+    kind: row.kind as FeedbackRow['kind'],
+    body: row.body as string,
+    pagePath: (row.page_path as string | null) ?? null,
+    status: row.status as FeedbackRow['status'],
+    priority: (row.priority as number | null) ?? 2,
+    resolutionNote: (row.resolution_note as string | null) ?? null,
+    commitSha: (row.commit_sha as string | null) ?? null,
+    createdAt: row.created_at as string,
+    completedAt: (row.completed_at as string | null) ?? null,
+  };
+}
+
 /**
  * Takes a client rather than building one, like everything else in lib/ — the
  * two pages that call this authenticate through different workspaces' helpers,
@@ -77,24 +99,12 @@ export async function loadFeedbackQueue(
 ): Promise<FeedbackQueue> {
   const { data } = await supabase
     .from('feedback_items')
-    .select(
-      'id, kind, body, page_path, status, priority, resolution_note, commit_sha, created_at',
-    )
+    .select(FEEDBACK_COLUMNS)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const rows: FeedbackRow[] = (data ?? []).map((row) => ({
-    id: row.id as string,
-    kind: row.kind as FeedbackRow['kind'],
-    body: row.body as string,
-    pagePath: (row.page_path as string | null) ?? null,
-    status: row.status as FeedbackRow['status'],
-    priority: (row.priority as number | null) ?? 2,
-    resolutionNote: (row.resolution_note as string | null) ?? null,
-    commitSha: (row.commit_sha as string | null) ?? null,
-    createdAt: row.created_at as string,
-  }));
+  const rows: FeedbackRow[] = (data ?? []).map(feedbackRowFrom);
 
   const outstanding = sortOutstanding(rows.filter(isOutstanding));
 
