@@ -1,0 +1,242 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { z } from 'zod';
+import { requireUser } from '@/lib/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { generateChain } from '@/lib/learn/graph/generate';
+import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
+import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { loadSubject } from '@/lib/learn/graph/load';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
+
+/**
+ * Naming a goal, and deciding what to do with what comes back.
+ *
+ * Two steps and a person between them. `proposeGoal` calls the model and
+ * writes nothing; `approveChain` writes what came back, and only after
+ * somebody has read it.
+ *
+ * That gap is the cheapest check available on a generated graph and the only
+ * one there is before anything gets taught. A wrong reading list is a few
+ * unticked rows; a wrong graph is what every later question is asked against.
+ */
+
+export type ProposeState = {
+  error?: string;
+  /** Proposed, not saved. Nothing reaches the graph until you approve it. */
+  chain?: ProposedChain;
+  /** The words that were typed, kept for the approval that follows. */
+  asked?: string;
+};
+
+export type ApproveState = { error?: string };
+
+const ProposeInput = z.object({
+  goal: z
+    .string()
+    .trim()
+    .min(1, 'Say what you want to understand.')
+    .max(300, 'Shorter is better here — the narrower the goal, the better this works.'),
+  subjectId: z.string().uuid().nullable(),
+});
+
+export async function proposeGoal(
+  _prev: ProposeState,
+  formData: FormData,
+): Promise<ProposeState> {
+  const user = await requireUser();
+
+  const raw = formData.get('subjectId');
+  const parsed = ProposeInput.safeParse({
+    goal: formData.get('goal') ?? '',
+    subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Could not read that goal.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Laying out a goal needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+
+  // Inside a subject, the generator is told what that subject already holds so
+  // it does not propose it again. Outside one, it names the subject itself and
+  // there is nothing yet to dedupe against.
+  const subject = parsed.data.subjectId
+    ? await loadSubject(supabase, parsed.data.subjectId)
+    : null;
+  const existing = subject ? await existingConcepts(supabase, subject.id) : [];
+
+  const spend = collectSpend();
+  const result = await generateChain({
+    goal: parsed.data.goal,
+    subject: subject?.name ?? null,
+    existing,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'generate-chain', spend.reports);
+
+  if (!result.ok) return { error: result.detail };
+  return { chain: result.chain, asked: parsed.data.goal };
+}
+
+export async function approveChain(
+  _prev: ApproveState,
+  formData: FormData,
+): Promise<ApproveState> {
+  const user = await requireUser();
+
+  const asked = z
+    .string()
+    .trim()
+    .min(1)
+    .max(300)
+    .safeParse(formData.get('asked'));
+  if (!asked.success) return { error: 'Could not work out which goal this was.' };
+
+  const raw = formData.get('chain');
+  if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return { error: 'That proposal did not survive the trip. Ask again.' };
+  }
+
+  const safe = approvedChainSchema.safeParse(payload);
+  if (!safe.success) return { error: 'That proposal did not survive the trip. Ask again.' };
+
+  const supabase = await createLearnClient();
+  let subjectId: string;
+  try {
+    const saved = await saveChain(supabase, user.id, safe.data as ProposedChain, asked.data);
+    subjectId = saved.subjectId;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that chain.' };
+  }
+
+  revalidatePath('/learn/know');
+  revalidatePath(`/learn/s/${subjectId}`);
+  redirect(`/learn/s/${subjectId}`);
+}
+
+/**
+ * What you already know, told directly.
+ *
+ * Slice 6, and the same two-step as a goal: propose, read it, approve. The gap
+ * matters more here than anywhere else in the module, because of what approval
+ * does. A concept that lands as `known` is a concept the views deliberately
+ * never show you again -- that is the pruning rule the whole graph is built on
+ * -- so a wrong one is invisible from the moment it goes in. Reading eight
+ * claims before that happens is the only check there is.
+ */
+
+export type PriorState = {
+  error?: string;
+  /** Said out loud when the paste had no claims in it. Not an error. */
+  message?: string;
+  chain?: ProposedChain;
+};
+
+const PriorInput = z.object({
+  account: z
+    .string()
+    .trim()
+    .min(1, 'Say what you already know.')
+    .max(20000, 'That is longer than this can read at once — paste the part that says what you understood.'),
+  subjectId: z.string().uuid().nullable(),
+});
+
+export async function proposePrior(
+  _prev: PriorState,
+  formData: FormData,
+): Promise<PriorState> {
+  const user = await requireUser();
+
+  const raw = formData.get('subjectId');
+  const parsed = PriorInput.safeParse({
+    account: formData.get('account') ?? '',
+    subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Could not read that.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Reading an account needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+
+  // Same rule as a goal: inside a subject it is told what is already there so
+  // it does not propose it again, outside one it names the subject itself.
+  const subject = parsed.data.subjectId
+    ? await loadSubject(supabase, parsed.data.subjectId)
+    : null;
+  const existing = subject ? await existingConcepts(supabase, subject.id) : [];
+
+  const spend = collectSpend();
+  const result = await conceptsFromPrior({
+    subject: subject?.name ?? null,
+    account: parsed.data.account,
+    existing,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'concepts-from-prior', spend.reports);
+
+  if (!result.ok) {
+    return result.reason === 'nothing-in-it'
+      ? { message: result.detail }
+      : { error: result.detail };
+  }
+  return { chain: result.chain };
+}
+
+/**
+ * Write what they approved, already known.
+ *
+ * No goal: prior learning is a floor, not something to aim at. The state is
+ * set only on the nodes this write inserted, so a concept that was already in
+ * the graph keeps whatever a probe established about it -- a paste saying "I
+ * know this" must not overwrite the one kind of evidence in the module that
+ * was collected rather than asserted.
+ */
+export async function approvePrior(
+  _prev: PriorState,
+  formData: FormData,
+): Promise<PriorState> {
+  const user = await requireUser();
+
+  const raw = formData.get('chain');
+  if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return { error: 'That proposal did not survive the trip. Try again.' };
+  }
+
+  const safe = approvedChainSchema.safeParse(payload);
+  if (!safe.success) return { error: 'That proposal did not survive the trip. Try again.' };
+
+  const supabase = await createLearnClient();
+  let saved;
+  try {
+    const chain = safe.data as ProposedChain;
+    saved = await saveChain(supabase, user.id, chain, chain.goalConcept, { goal: false });
+    await declareKnown(supabase, user.id, saved.conceptIds);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  revalidatePath('/learn/know');
+  revalidatePath(`/learn/s/${saved.subjectId}`);
+  redirect(`/learn/s/${saved.subjectId}`);
+}

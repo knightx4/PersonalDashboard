@@ -387,3 +387,73 @@ export async function setReadingLocation(
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw messageFor('Saving the location', error);
 }
+
+/** One confirmed row of a generated plan: a subject, and a source if one was found. */
+export type PlanSaveRow = {
+  subject: string;
+  why: string | null;
+  /** Null for a step the plan could not find anything to read for. */
+  resolved: ResolvedSource | null;
+};
+
+/**
+ * Write a confirmed plan onto a track that already exists.
+ *
+ * Not saveImport: there is no paste behind this and no track to create -- you
+ * typed a topic, the track has been sitting there empty, and this fills it.
+ * The rows append rather than replace, so a plan run on a track you had
+ * already added to does not silently reorder what was there.
+ *
+ * A step with no source is still written. That is the point of the whole
+ * generation path: the subject you would have to understand is worth having in
+ * the queue even when nothing was found for it, and `readings.title` with a
+ * null source is exactly the row addManualReading already writes -- you can
+ * search for it later from its own page.
+ */
+export async function savePlan(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { trackId: string; rows: PlanSaveRow[] },
+): Promise<number> {
+  const { data: last } = await supabase
+    .from('readings')
+    .select('position')
+    .eq('track_id', input.trackId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let position = (last as { position: number } | null)?.position ?? 0;
+  const readings: Record<string, unknown>[] = [];
+
+  for (const row of input.rows) {
+    const sourceId = row.resolved ? await upsertSource(supabase, userId, row.resolved) : null;
+    readings.push({
+      user_id: userId,
+      track_id: input.trackId,
+      source_id: sourceId,
+      // Your subject stays yours whether or not something was found for it,
+      // which is what keeps a sourced row explicable six weeks later.
+      title: row.subject,
+      position: (position += 10),
+      locator_kind: row.resolved?.locator_kind ?? 'whole',
+      locator_label: row.resolved?.locator_label ?? null,
+      page_from: row.resolved?.page_from ?? null,
+      page_to: row.resolved?.page_to ?? null,
+      open_url: row.resolved?.canonical_url ?? null,
+      locator_confidence: 'unverified',
+      locator_basis:
+        row.resolved?.locator_basis ??
+        'Proposed for this topic; nothing was found to read for it yet.',
+      why: row.why ?? row.resolved?.why ?? null,
+    });
+  }
+
+  if (readings.length === 0) return 0;
+
+  const { error } = await supabase.from('readings').insert(readings);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Saving the plan', error);
+
+  return readings.length;
+}

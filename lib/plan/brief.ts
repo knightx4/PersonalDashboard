@@ -1,5 +1,6 @@
 import { MODULES } from '@/lib/modules';
 import { isClosed, type PlanStatus } from './load';
+import { reshapeOrigin } from './origin';
 import { ancestorsOf, flatten, type PlanNode, type PlanSection } from './tree';
 
 /**
@@ -137,6 +138,14 @@ export function planBrief(sections: readonly PlanSection[], node: PlanNode): str
 
   if (ancestors.length > 0) {
     out.push(`Part of: ${ancestors.map((a) => `#${a.number} ${a.title}`).join(' › ')}`);
+  }
+
+  // Said at the top rather than left in the notes at the bottom: a step
+  // written by a re-shape is one nobody remembers agreeing to, and the answer
+  // that produced it is the first thing worth knowing about it.
+  const origin = reshapeOrigin(node.comment);
+  if (origin) {
+    out.push(`From #${origin.number}'s answer: ${origin.gist}`);
   }
 
   // Where the whole feature is going, above what this one step is for. A step

@@ -1,0 +1,149 @@
+import { z } from 'zod';
+
+/**
+ * What a probe question has to be before it is worth asking, and what a
+ * session's progress bar is allowed to claim.
+ *
+ * Pure, so both can be tested without a network. The rules come straight from
+ * the spec and each one is a way a generated question is bad while looking
+ * fine:
+ *
+ *   A question that tests recall of a name rather than use of an idea. Not
+ *   mechanically checkable, so the prompt carries that one.
+ *
+ *   A wrong option nobody would pick, which makes the question easier than it
+ *   looks. Also the prompt's job.
+ *
+ *   A reason that can only be written by pointing back at the question --
+ *   "because option B is the only one that fits". That one *is* mechanically
+ *   checkable, roughly, and it is the cheapest verification available: a
+ *   reason that does not stand on its own means the item was never about the
+ *   claim. Rejecting it here costs one wasted call and catches most of the bad
+ *   items, which is the trade the spec asks for.
+ */
+
+export const MIN_OPTIONS = 2;
+export const MAX_OPTIONS = 6;
+
+export const probePayloadSchema = z.object({
+  question: z.string().trim().min(1).max(1000),
+  options: z.array(z.string().trim().min(1).max(500)).min(MIN_OPTIONS).max(MAX_OPTIONS),
+  correct_index: z.number().int().min(0),
+  reason: z.string().trim().min(1).max(1000),
+  /** Said out loud when the claim cannot carry a question worth asking. */
+  unusable: z.boolean().default(false),
+});
+
+export type ProbePayload = z.infer<typeof probePayloadSchema>;
+
+export type Probe = {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  reason: string;
+};
+
+export type ProbeRejection =
+  | 'unusable'
+  | 'index-out-of-range'
+  | 'repeated-option'
+  | 'reason-points-back';
+
+/**
+ * Phrases that only mean something while you are looking at the question.
+ *
+ * A reason built out of these is a reason about the multiple-choice item
+ * rather than about the idea, which is exactly the item that teaches nothing
+ * when it is shown back to you afterwards.
+ */
+const POINTS_BACK = [
+  /\boption\s+[a-f1-6]\b/i,
+  /\bthe (first|second|third|fourth|fifth|last) (option|answer|choice)\b/i,
+  /\banswer\s+[a-f]\b/i,
+  /\b(all|none) of the (above|others)\b/i,
+  /\bas (stated|shown|written) (above|in the question)\b/i,
+  /\bthe other (options|answers|choices)\b/i,
+];
+
+/**
+ * Turn a payload into a probe, or say why it is not one.
+ *
+ * A rejected item is thrown away rather than repaired. Repairing it would mean
+ * writing the missing half here, and the missing half is the part that decides
+ * whether the question is about the claim at all.
+ */
+export function toProbe(payload: ProbePayload): { ok: true; probe: Probe } | { ok: false; reason: ProbeRejection } {
+  if (payload.unusable) return { ok: false, reason: 'unusable' };
+
+  const options = payload.options.map((option) => option.trim());
+  if (payload.correct_index >= options.length) {
+    return { ok: false, reason: 'index-out-of-range' };
+  }
+
+  const seen = new Set(options.map((option) => option.toLowerCase()));
+  if (seen.size !== options.length) return { ok: false, reason: 'repeated-option' };
+
+  if (POINTS_BACK.some((pattern) => pattern.test(payload.reason))) {
+    return { ok: false, reason: 'reason-points-back' };
+  }
+
+  return {
+    ok: true,
+    probe: {
+      question: payload.question.trim(),
+      options,
+      correctIndex: payload.correct_index,
+      reason: payload.reason.trim(),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The bar
+// ---------------------------------------------------------------------------
+
+/**
+ * What one answer told us, on the spec's scale.
+ *
+ * Weighted by information rather than by questions answered, which is what
+ * stops the bar rewarding somebody for answering ten easy questions about the
+ * same node.
+ */
+export const WEIGHT_SETTLED_NEW = 1.0;
+export const WEIGHT_REINFORCED = 0.3;
+export const WEIGHT_INCONCLUSIVE = 0;
+
+export function weightFor(input: { wasSettled: boolean; conclusive: boolean }): number {
+  if (!input.conclusive) return WEIGHT_INCONCLUSIVE;
+  return input.wasSettled ? WEIGHT_REINFORCED : WEIGHT_SETTLED_NEW;
+}
+
+/** The decay the spec picked: fast at first, then slower and slower. */
+const BASE = 0.85;
+
+/**
+ * How full the bar is, from 0 to 1.
+ *
+ * `filled = 1 − 0.85^w`, where w is total information weight. Ten clean
+ * answers is about 80%, twenty about 96%, forty about 99.8%.
+ */
+export function barFraction(totalWeight: number): number {
+  if (totalWeight <= 0) return 0;
+  return 1 - Math.pow(BASE, totalWeight);
+}
+
+/**
+ * What the bar is allowed to say, as a percentage.
+ *
+ * Capped at 99, and that is not a trick to avoid rounding. Nothing here can
+ * establish that somebody knows a subject -- the graph is never finished and
+ * the store admits it -- so a bar reading 100% would be claiming something the
+ * system cannot know. It is also floored at 1 once anything at all has been
+ * answered, because a bar that reads zero after a correct answer reads as
+ * broken.
+ */
+export function barPercent(totalWeight: number): number {
+  const fraction = barFraction(totalWeight);
+  if (fraction <= 0) return 0;
+  return Math.min(99, Math.max(1, Math.round(fraction * 100)));
+}

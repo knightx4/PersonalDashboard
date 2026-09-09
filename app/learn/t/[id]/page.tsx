@@ -8,6 +8,7 @@ import { loadTrack } from '@/lib/learn/tracks/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { AddForm } from './add-form';
+import { PlanForm } from './plan-form';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeTrack } from './actions';
 
@@ -79,9 +80,9 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
       )}
 
       {track.readings.length === 0 ? (
-        <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
-          Nothing in this track yet. Write down what you want to learn.
-        </p>
+        /* An empty track used to be a dead end: you named a topic and the
+           module had nothing to say about it. PlanForm is the way out. */
+        <PlanForm trackId={track.id} />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {track.readings.map((reading) => (

@@ -10,6 +10,7 @@ import { resolveOneReference } from '@/lib/learn/import/resolve';
 import type { ReferenceCandidate } from '@/lib/learn/import/parse-heuristic';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import { createTrack, saveImport, type SaveRow } from '@/lib/learn/tracks/save';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
 /**
  * Bringing a reading list in.
@@ -83,7 +84,7 @@ export type ParseState = { error?: string; parsed?: ParsedImport };
  * eventually cuts off, and when it does you lose all eight.
  */
 export async function parseImport(_prev: ParseState, formData: FormData): Promise<ParseState> {
-  await requireUser();
+  const user = await requireUser();
 
   const parsed = PreviewInput.safeParse({
     question: formData.get('question') ?? '',
@@ -97,7 +98,9 @@ export async function parseImport(_prev: ParseState, formData: FormData): Promis
   const { question, text, sourceHint } = parsed.data;
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
 
-  const candidates = await parseReferences(text, { anthropicApiKey: apiKey });
+  const spend = collectSpend();
+  const candidates = await parseReferences(text, { anthropicApiKey: apiKey, onSpend: spend.sink });
+  await recordLearnSpend(user.id, 'parse-references', spend.reports);
   if (candidates.length === 0) {
     return { error: 'Nothing in that paste looked like something to read.' };
   }
@@ -128,7 +131,7 @@ export async function resolveCandidate(input: {
   candidate: ReferenceCandidate;
   question: string | null;
 }): Promise<PreviewRow> {
-  await requireUser();
+  const user = await requireUser();
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -149,10 +152,13 @@ export async function resolveCandidate(input: {
     };
   }
 
+  const spend = collectSpend();
   const row = await resolveOneReference(input.candidate, {
     anthropicApiKey: apiKey,
     question: input.question,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'resolve-reference', spend.reports);
 
   return {
     raw: row.candidate.raw,

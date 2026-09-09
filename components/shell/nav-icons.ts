@@ -18,6 +18,7 @@ import {
   ListChecks,
   ListTodo,
   Map,
+  Network,
   MessageSquareText,
   Receipt,
   Share2,
@@ -75,6 +76,7 @@ export const NAV_ICONS = {
   // Learn
   tracks: BookOpen,
   readNow: BookOpenCheck,
+  know: Network,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

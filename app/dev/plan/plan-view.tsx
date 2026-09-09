@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import {
   Ban,
@@ -30,6 +30,7 @@ import {
   movePlanItem,
   removePlanDependency,
   seedPlan,
+  reshapePlanFeature,
   sendPlanFeatureToClaude,
   sendPlanItemToClaude,
   sendPlanQueueToClaude,
@@ -75,6 +76,9 @@ import {
   type PlanSummary,
   type PlanView as View,
 } from '@/lib/plan/tree';
+import { reshapeOrigin } from '@/lib/plan/origin';
+import { elapsedSince } from '@/lib/plan/elapsed';
+import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
 /** A step as the pickers know it: enough to name it and to place it. */
@@ -653,6 +657,14 @@ function EditStep({
  * told about itself. An answer already given is shown above the box rather
  * than loaded into it: changing your mind should read as a new answer, not as
  * an edit that quietly replaces the old one in the record.
+ *
+ * Where the question was written with lettered options, they sit above the box
+ * as chips. Pressing one writes that option into the box rather than recording
+ * it: an answer is read by every session that works beneath this feature from
+ * now on, so the last word before it is written down stays yours, and "b, but
+ * only for the shared lists" is the answer you most often actually want. The
+ * box is still the whole form when a question has no options, which is most of
+ * them.
  */
 function AnswerDecision({
   node,
@@ -666,6 +678,19 @@ function AnswerDecision({
   autoFocus: boolean;
 }) {
   const field = `answer-${node.id}`;
+  const box = useRef<HTMLTextAreaElement>(null);
+  const options = planOptions(node.detail);
+
+  // Replaces rather than appends: the chips are a choice between the options,
+  // and pressing two of them means you changed your mind, not that you want
+  // both written down. What you type after it is yours and is left alone.
+  const choose = (option: PlanOption) => {
+    const target = box.current;
+    if (!target) return;
+    target.value = optionAnswer(option);
+    target.focus();
+    target.setSelectionRange(target.value.length, target.value.length);
+  };
 
   return (
     /* A well, not a frame: this sits inside the open step, which is already a
@@ -682,13 +707,33 @@ function AnswerDecision({
       <form action={action} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />
         <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
+        {options.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {options.map((option) => (
+              <button
+                key={option.letter}
+                type="button"
+                onClick={() => choose(option)}
+                title={`Answer ${option.letter}: ${option.label}`}
+                className="press max-w-full truncate rounded-full bg-surface px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+              >
+                <span className="font-semibold text-ink">{option.letter}</span> {option.label}
+              </button>
+            ))}
+          </div>
+        )}
         <Textarea
           id={field}
+          ref={box}
           name="answer"
           rows={2}
           className="min-h-12"
           autoFocus={autoFocus}
-          placeholder="What you decided, and enough of why that a session need not ask again."
+          placeholder={
+            options.length > 0
+              ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
+              : 'What you decided, and enough of why that a session need not ask again.'
+          }
         />
         <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>
         <Button type="submit" size="sm" pending={pending}>
@@ -1042,6 +1087,8 @@ function SendToClaude({
   pending,
   batchAction,
   batchPending,
+  reshapeAction,
+  reshapePending,
   quiet,
 }: {
   node: PlanNode;
@@ -1051,6 +1098,9 @@ function SendToClaude({
   /** The whole subtree in one press. Only worth offering where there is one. */
   batchAction: (formData: FormData) => void;
   batchPending: boolean;
+  /** The other direction: re-read the feature against what has been settled. */
+  reshapeAction: (formData: FormData) => void;
+  reshapePending: boolean;
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
@@ -1081,6 +1131,25 @@ function SendToClaude({
             title="Hand every open step beneath this one to Claude, worked in order"
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
+          </Button>
+        </form>
+      )}
+      {/* The return trip, and the only button here that does not hand work
+          over: it asks for the feature to be re-read against what has been
+          settled beneath it, and everything that comes back is a proposal
+          waiting on the same approve as anything else. Offered wherever there
+          is something beneath to re-read. */}
+      {node.children.length > 0 && node.status !== 'proposed' && (
+        <form action={reshapeAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="ghost"
+            pending={reshapePending}
+            title="Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started."
+          >
+            {reshapePending ? 'Re-shaping…' : 'Re-shape'}
           </Button>
         </form>
       )}
@@ -1130,6 +1199,53 @@ function RowIconButton({
 
 function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
+}
+
+/**
+ * The wall clock, as something to subscribe to.
+ *
+ * One interval for the whole page rather than one per running step: a plan
+ * with six steps underway should not be six timers waking the tab up out of
+ * step with each other. It only runs while something is watching, and 30
+ * seconds is as often as a figure rounded to the minute can change.
+ *
+ * Zero until the first subscriber arrives, which is what makes it safe to
+ * render on the server: the elapsed time is the one value already different by
+ * the time the HTML lands, so both sides render the placeholder and the figure
+ * appears on the tick after mount.
+ */
+const CLOCK_TICK_MS = 30_000;
+let clockNow = 0;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+const clockWatchers = new Set<() => void>();
+
+function subscribeToClock(onTick: () => void): () => void {
+  clockWatchers.add(onTick);
+  if (clockTimer === null) {
+    clockNow = Date.now();
+    clockTimer = setInterval(() => {
+      clockNow = Date.now();
+      for (const watcher of clockWatchers) watcher();
+    }, CLOCK_TICK_MS);
+  }
+  return () => {
+    clockWatchers.delete(onTick);
+    if (clockWatchers.size === 0 && clockTimer !== null) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  };
+}
+
+/** The clock on a step that is underway. */
+function Elapsed({ startedAt }: { startedAt: string }) {
+  const now = useSyncExternalStore(
+    subscribeToClock,
+    () => clockNow,
+    () => 0,
+  );
+
+  return <>{now === 0 ? '…' : elapsedSince(startedAt, now)}</>;
 }
 
 /**
@@ -1362,6 +1478,12 @@ function PlanRow({
     answerPlanDecision,
     {} as PlanActionState,
   );
+  // The same rope pulled the other way: re-read this feature against what has
+  // been answered beneath it, and propose what has changed.
+  const [reshapeState, reshapeAction, reshapePending] = useActionState(
+    reshapePlanFeature,
+    {} as PlanActionState,
+  );
 
   // A question beneath a step is that step's question, and it is read and
   // answered in the step's own questions section. It is deliberately not also a
@@ -1379,8 +1501,17 @@ function PlanRow({
   const health = healthOf(node);
   const HealthIcon = health.icon;
 
-  // The line under the title: what it involves, or failing that your note.
-  const gloss = (node.detail ?? node.comment ?? '').split('\n').find((line) => line.trim()) ?? '';
+  // The answer that produced this row, on the steps a re-shape wrote and on
+  // nothing else.
+  const origin = reshapeOrigin(node.comment);
+  // The line under the title: what it involves, or failing that your note --
+  // minus the stamp, which has its own line above and should not be said
+  // twice on one row.
+  const gloss =
+    (node.detail ?? node.comment ?? '')
+      .split('\n')
+      .find((line) => line.trim() && !(origin && line.includes(`#${origin.number}'s answer:`))) ??
+    '';
 
   // A proposal's first choice is to approve it, with the proposed steps
   // beneath it; the plain statuses follow, and "proposed" is not offered on a
@@ -1458,6 +1589,19 @@ function PlanRow({
             formFields: { id: node.id },
           },
         ]),
+    // The return trip, beside the two hand-overs. Only on a feature: a leaf
+    // step has nothing beneath it to re-read, and the action says so if it is
+    // reached anyway.
+    ...(hasChildren && !closed && node.status !== 'proposed'
+      ? [
+          {
+            id: 'reshape',
+            label: 'Re-shape against what is decided',
+            formAction: (formData: FormData) => reshapePlanFeature({}, formData),
+            formFields: { id: node.id },
+          },
+        ]
+      : []),
     {
       id: 'add-child',
       label: 'Add a sub-step',
@@ -1599,7 +1743,50 @@ function PlanRow({
                   </span>
                 </span>
               )}
+              {/* Whose it is, on the row.
+                * The "Who" column was dropped for being a column of dashes,
+                * and it was right to go -- but with it went any way of seeing
+                * that a step is Claude's without opening it, hovering it, or
+                * switching to the Claude's view. Handing a step over is the
+                * move this page exists to make, and the page said nothing
+                * about the result. A mark, not a column: it appears only on
+                * the steps that have been handed over, which is what makes it
+                * worth reading. */}
+              {node.assignee === 'claude' && (
+                <span
+                  title="Handed to Claude"
+                  className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
+                >
+                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Handed to Claude</span>
+                </span>
+              )}
+              {/* And how long it has been going.
+                * "In progress" in the health column is a state; this is the
+                * thing you actually want to know about a step Claude is on --
+                * whether it started four minutes ago or has been sitting at
+                * "in progress" since yesterday, which is what a stuck routine
+                * looks like from here. The dot pulses because the one fact it
+                * carries is that something is happening right now. */}
+              {node.status === 'in_progress' && node.startedAt && (
+                <span
+                  title={`${node.assignee === 'claude' ? 'Claude has been on this' : 'Underway'} since ${node.startedAt.replace('T', ' ').slice(0, 16)}`}
+                  className="tabular inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-tint px-1.5 py-0.5 text-small font-medium text-accent"
+                >
+                  <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+                  <Elapsed startedAt={node.startedAt} />
+                </span>
+              )}
             </span>
+            {/* Where it came from, when it did not come from you. On the row
+                and not behind the fold, because a step that appeared under a
+                feature you approved last week is exactly the one you would
+                never think to open. */}
+            {origin && (
+              <span className="block truncate text-small text-ink-ghost">
+                From #{origin.number}&apos;s answer: {origin.gist}
+              </span>
+            )}
             {gloss && !open && (
               <span className="block truncate text-small text-ink-muted">
                 {!node.detail && 'Note: '}
@@ -1643,9 +1830,10 @@ function PlanRow({
 
         {/* No "Who" column. It was a column of dashes with the occasional
             "Claude" in it -- one fact, on a plan whose every step is yours
-            unless you hand it over, and handing it over is a button. Who has
-            it is still on the open step, in the summary's "Claude's" view,
-            and in the menu that changes it. */}
+            unless you hand it over, and handing it over is a button. The one
+            value it carried is now a mark beside the title, on the steps that
+            have it; the rest is on the open step, in the summary's "Claude's"
+            view, and in the menu that changes it. */}
         <span className="hidden sm:block">
           <Breakdown node={node} />
         </span>
@@ -1687,24 +1875,38 @@ function PlanRow({
       {(assignState.error ??
         sendState.error ??
         batchState.error ??
+        reshapeState.error ??
         answerState.error ??
         assignState.message ??
         sendState.message ??
         batchState.message ??
+        reshapeState.message ??
         answerState.message) && (
         <li style={inset} className="pb-1.5 pr-3 text-small">
           <FieldError>
-            {assignState.error ?? sendState.error ?? batchState.error ?? answerState.error}
+            {assignState.error ??
+              sendState.error ??
+              batchState.error ??
+              reshapeState.error ??
+              answerState.error}
           </FieldError>
-          {!assignState.error && !sendState.error && !batchState.error && !answerState.error && (
+          {!assignState.error &&
+            !sendState.error &&
+            !batchState.error &&
+            !reshapeState.error &&
+            !answerState.error && (
             // Ink, not green. The tones above are a status system where
             // positive means done; this is a transient "Assigned" or "Sent"
             // from the action that just ran, which is the system reporting
             // itself and is not a claim about money (law 4).
-            <span className="text-ink-muted">
-              {assignState.message ?? sendState.message ?? batchState.message ?? answerState.message}
-            </span>
-          )}
+              <span className="text-ink-muted">
+                {assignState.message ??
+                  sendState.message ??
+                  batchState.message ??
+                  reshapeState.message ??
+                  answerState.message}
+              </span>
+            )}
         </li>
       )}
 
@@ -1768,7 +1970,17 @@ function PlanRow({
               <span>{PRIORITY_LABEL[node.priority]}</span>
               {node.size && <span>{SIZE_LABEL[node.size]}</span>}
               {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
-              {when(node.startedAt) && <span>Started {when(node.startedAt)}</span>}
+              {when(node.startedAt) && (
+                <span>
+                  Started {when(node.startedAt)}
+                  {node.status === 'in_progress' && node.startedAt && (
+                    <>
+                      {' · running '}
+                      <Elapsed startedAt={node.startedAt} />
+                    </>
+                  )}
+                </span>
+              )}
               {when(node.completedAt) && (
                 <span>
                   {node.status === 'dropped' ? 'Dropped' : 'Done'} {when(node.completedAt)}
@@ -1811,6 +2023,8 @@ function PlanRow({
                   pending={sendPending}
                   batchAction={batchAction}
                   batchPending={batchPending}
+                  reshapeAction={reshapeAction}
+                  reshapePending={reshapePending}
                   quiet={
                     !sendState.error &&
                     !sendState.message &&

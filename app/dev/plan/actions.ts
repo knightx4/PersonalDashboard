@@ -639,10 +639,20 @@ export async function sendPlanItemToClaude(
   const node = findNode(sections, id.data);
   if (!node) return { error: 'That step no longer exists.' };
 
-  if (node.assignee !== 'claude') {
+  // Handed over and underway, in the one write. A step sent to Claude is being
+  // built from the moment the routine wakes, and a plan still reading "not
+  // started" while a session works it is the plan lying about itself -- the one
+  // thing it is not allowed to do. `started_at` comes from the trigger, so the
+  // page can also say how long it has been going.
+  const patch: Record<string, string> = {};
+  if (node.assignee !== 'claude') patch.assignee = 'claude';
+  // Only a step nobody has started moves. A blocked one keeps its status and
+  // its reason, and one already underway keeps the clock it started on.
+  if (node.status === 'not_started') patch.status = 'in_progress';
+  if (Object.keys(patch).length > 0) {
     const { error } = await supabase
       .from('plan_items')
-      .update({ assignee: 'claude' })
+      .update(patch)
       .eq('id', node.id)
       .eq('user_id', user.id);
     if (error) return { error: error.message };
@@ -718,6 +728,24 @@ export async function sendPlanFeatureToClaude(
     revalidatePlan();
   }
 
+  // And every one of them underway, not only the feature at the top. The whole
+  // batch has been handed over in one press, so the plan should show the whole
+  // batch as work in hand rather than one step in progress over six that still
+  // read as untouched. A decision is left alone: it is a question put to the
+  // person, and nothing is in progress on it until they answer.
+  const toStart = open
+    .filter((step) => step.status === 'not_started' && step.kind !== 'decision')
+    .map((step) => step.id);
+  if (toStart.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ status: 'in_progress' })
+      .in('id', toStart)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePlan();
+  }
+
   const steps = open.length - 1;
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
@@ -744,6 +772,95 @@ export async function sendPlanFeatureToClaude(
 }
 
 /**
+ * Re-shape a feature against what has been decided since it was written.
+ *
+ * The return trip. Shaping runs once, before anything is built, and from then
+ * on the feature is a fixed drawing of a thing that is still moving: fog is
+ * written and never read again, and an answer that makes half the plan wrong
+ * changes nothing but its own row. This is the press that re-reads the feature
+ * against everything settled beneath it.
+ *
+ * On request rather than on every answer, which is #96: you settle three
+ * questions in one sitting and then press this once, so one session reads all
+ * three together instead of three racing each other over the same feature. It
+ * is also why answering is untouched -- the answer is recorded by its own
+ * action, and a re-shape that cannot be started loses nothing, because there
+ * was never anything riding on the same request.
+ *
+ * Nothing is assigned and nothing is started, unlike the two hand-over buttons
+ * above. A re-shape does not build; it proposes, and what it proposes waits
+ * for the same approve as anything else.
+ *
+ * It refuses a proposal -- there is nothing agreed there to adapt -- and a leaf
+ * step, which has nothing beneath it to re-read.
+ */
+export async function reshapePlanFeature(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const data = await loadPlan(supabase, user.id);
+  const sections = buildPlanTree(data);
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  if (node.status === 'proposed') {
+    return {
+      error: `#${node.number} is only a proposal. There is nothing agreed here to re-shape yet.`,
+    };
+  }
+  if (node.children.length === 0) {
+    return {
+      error: `#${node.number} is a step, not a feature. A re-shape re-reads a feature against what has been settled beneath it, and nothing is beneath this one.`,
+    };
+  }
+
+  const answered = flatten([node]).filter(
+    (step) => step.kind === 'decision' && step.status === 'done' && step.resolution,
+  ).length;
+
+  const text =
+    `Re-shape plan feature #${node.number}, "${node.title}", following ` +
+    '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
+    'feature against every answer settled beneath it and against what the code now says, ' +
+    'and write what has changed.\n\n' +
+    'Three moves, and nothing else:\n' +
+    '- Fog the answers have made specifiable becomes proposed steps beneath the feature, ' +
+    'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
+    '(plan.ts fog <n> --clear).\n' +
+    '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
+    'that did it. A re-shape may drop, and must say why.\n' +
+    '- A question an answer surfaced is written as a fresh decision beneath the feature, ' +
+    'with its real options, what each costs, and your recommendation.\n\n' +
+    'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
+    'answer a decision, do not start or build a step, and do not re-propose something the ' +
+    'feature already holds. Report what you proposed, what you dropped and why, and what ' +
+    'fog you cleared.\n\nThe brief is below; it is the plan as the app holds it right ' +
+    'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
+    'beneath this feature.\n\n' +
+    planBrief(sections, node);
+
+  const routine = planRoutine();
+  const result = await fireFeatureRoutine({
+    apiKey: routine.token,
+    routineId: routine.id,
+    text,
+  });
+  if (!result.ok) return { error: result.error };
+  return {
+    message:
+      `Re-shaping #${node.number} against ` +
+      `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
+      `${node.fog ? ' and its fog' : ''}. What comes back is proposed. ${result.detail}`,
+  };
+}
+
+/**
  * Send everything handed to Claude, in one press.
  *
  * The step button is right when you are watching one step; the feature button
@@ -752,10 +869,15 @@ export async function sendPlanFeatureToClaude(
  * the state this button is for: a queue built up over a session and sent when
  * you get up from the desk.
  *
- * Nothing is assigned here and nothing changes state. Being handed over is
- * exactly what these steps already are -- that is how they got into the queue
- * -- so this is a send and only a send, and pressing it twice sends the same
- * queue again rather than dragging anything new into it.
+ * Nothing is assigned here. Being handed over is exactly what these steps
+ * already are -- that is how they got into the queue -- so nothing is dragged
+ * into the queue by pressing this, and pressing it twice sends the same queue
+ * again.
+ *
+ * What it does change is the one thing that has become true: every step in the
+ * batch is now work in hand, so the ones that had not been started are marked
+ * in progress. `handedToClaude` has already left out the decisions and the
+ * proposals, so what is left is exactly what a session will build.
  *
  * `handedToClaude` decides what is in it: open, approved, not a decision, most
  * urgent first. One routine works the lot in that order, because two sessions
@@ -773,6 +895,17 @@ export async function sendPlanQueueToClaude(
   const queue = handedToClaude(sections);
   if (queue.length === 0) {
     return { error: 'Nothing is handed to Claude right now. Hand a step over and it lands here.' };
+  }
+
+  const toStart = queue.filter((step) => step.status === 'not_started').map((step) => step.id);
+  if (toStart.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ status: 'in_progress' })
+      .in('id', toStart)
+      .eq('user_id', user.id);
+    if (error) return { error: error.message };
+    revalidatePlan();
   }
 
   const text =

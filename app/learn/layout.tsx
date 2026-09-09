@@ -61,6 +61,15 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       badge: readNow,
     },
+    // The other half of the module. A subject is reached through here, so it
+    // is alsoMatches rather than a tab of its own.
+    {
+      href: '/learn/know',
+      label: 'What you know',
+      icon: 'know',
+      exact: true,
+      alsoMatches: ['/learn/s/'],
+    },
   ];
 
   return (

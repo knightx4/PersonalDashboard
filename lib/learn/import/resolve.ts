@@ -8,6 +8,7 @@ import {
   sanitiseResolution,
   type ResolvedSource,
 } from '@/lib/learn/import/resolve-payload';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
  * Turning a citation into something you can open.
@@ -103,6 +104,7 @@ async function resolveOne(
   client: Anthropic,
   candidate: ReferenceCandidate,
   question: string | null,
+  onSpend?: SpendSink,
 ): Promise<ResolvedSource> {
   const response = await client.messages.create({
     model: MODEL,
@@ -155,6 +157,10 @@ async function resolveOne(
     messages: [{ role: 'user', content: buildPrompt(candidate, question) }],
   });
 
+  // Reported before the response is judged: a citation that could not be
+  // placed cost the same search as one that could.
+  onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
+
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {
     throw new Error('the model searched but never reported a source');
@@ -183,12 +189,23 @@ async function resolveOne(
  */
 export async function resolveOneReference(
   candidate: ReferenceCandidate,
-  options: { anthropicApiKey: string; question?: string | null; client?: Anthropic },
+  options: {
+    anthropicApiKey: string;
+    question?: string | null;
+    client?: Anthropic;
+    /** Told what the call cost, whether or not the citation could be placed. */
+    onSpend?: SpendSink;
+  },
 ): Promise<ResolutionRow> {
   const client = options.client ?? new Anthropic({ apiKey: options.anthropicApiKey });
 
   try {
-    const resolved = await resolveOne(client, candidate, options.question?.trim() || null);
+    const resolved = await resolveOne(
+      client,
+      candidate,
+      options.question?.trim() || null,
+      options.onSpend,
+    );
     if (isEmptyResolution(resolved)) {
       return { candidate, resolved, error: resolved.locator_basis || 'Could not find this one.' };
     }

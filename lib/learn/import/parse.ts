@@ -6,6 +6,7 @@ import {
   heuristicParseReferences,
   type ReferenceCandidate,
 } from '@/lib/learn/import/parse-heuristic';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
  * Reading a pasted list into references, and nothing more.
@@ -75,7 +76,11 @@ function toCandidates(parsed: z.infer<typeof parseResultSchema>): ReferenceCandi
   }));
 }
 
-async function llmParse(text: string, apiKey: string): Promise<ReferenceCandidate[]> {
+async function llmParse(
+  text: string,
+  apiKey: string,
+  onSpend?: SpendSink,
+): Promise<ReferenceCandidate[]> {
   const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
@@ -112,6 +117,10 @@ async function llmParse(text: string, apiKey: string): Promise<ReferenceCandidat
     messages: [{ role: 'user', content: text.slice(0, MAX_INPUT_CHARS) }],
   });
 
+  // Reported before the result is judged: a parse that came back empty and
+  // fell through to the heuristic still spent a call.
+  onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
+
   const block = response.content.find((c) => c.type === 'tool_use');
   if (!block || block.type !== 'tool_use') throw new Error('no tool call');
 
@@ -131,14 +140,18 @@ async function llmParse(text: string, apiKey: string): Promise<ReferenceCandidat
  */
 export async function parseReferences(
   text: string,
-  options: { anthropicApiKey?: string | null } = {},
+  options: {
+    anthropicApiKey?: string | null;
+    /** Told what the call cost, even when the heuristic ends up answering. */
+    onSpend?: SpendSink;
+  } = {},
 ): Promise<ReferenceCandidate[]> {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
   if (options.anthropicApiKey) {
     try {
-      const parsed = await llmParse(trimmed, options.anthropicApiKey);
+      const parsed = await llmParse(trimmed, options.anthropicApiKey, options.onSpend);
       // An empty result from a paste that clearly has lines in it means the
       // call went wrong in a way that did not throw. The heuristic is a better
       // answer than nothing.

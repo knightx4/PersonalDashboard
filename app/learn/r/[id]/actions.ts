@@ -8,6 +8,11 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadReading } from '@/lib/learn/tracks/load';
 import { locatePassage } from '@/lib/learn/locate/locate';
 import { suggestSources } from '@/lib/learn/import/suggest';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
+import { conceptsFromNote } from '@/lib/learn/graph/from-note';
+import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { loadSubject } from '@/lib/learn/graph/load';
+import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
   attachSourceToReading,
@@ -43,7 +48,7 @@ export type FindState = {
  * minutes at the moment you were finally going to read something.
  */
 export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
-  await requireUser();
+  const user = await requireUser();
 
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
   if (!readingId.success) return { error: 'Could not work out which one to search for.' };
@@ -55,11 +60,14 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
   const reading = await loadReading(supabase, readingId.data);
   if (!reading) return { error: 'That is not there any more.' };
 
+  const spend = collectSpend();
   const result = await suggestSources({
     subject: reading.subject,
     question: reading.trackQuestion,
     anthropicApiKey: apiKey,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'suggest-sources', spend.reports);
 
   if (!result.ok) return { error: result.detail };
   return { candidates: result.sources };
@@ -213,7 +221,7 @@ export async function updateNote(
  * sent to the top of the right page is the floor, not an error.
  */
 export async function openReading(formData: FormData): Promise<void> {
-  await requireUser();
+  const user = await requireUser();
 
   const readingId = z.string().uuid().safeParse(formData.get('readingId'));
   if (!readingId.success) redirect('/learn');
@@ -235,11 +243,14 @@ export async function openReading(formData: FormData): Promise<void> {
     redirect(url);
   }
 
+  const spend = collectSpend();
   const outcome = await locatePassage({
     url: reading.source?.canonicalUrl ?? url,
     question: reading.trackQuestion,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'locate-passage', spend.reports);
 
   await setReadingLocation(supabase, reading.id, outcome).catch(() => {});
   if (reading.status === 'queued') {
@@ -248,4 +259,105 @@ export async function openReading(formData: FormData): Promise<void> {
 
   revalidatePath(`/learn/r/${reading.id}`);
   redirect(outcome.openUrl);
+}
+
+export type NoteGraphState = {
+  error?: string;
+  message?: string;
+  /** Proposed, not saved. Nothing reaches the graph until it is approved. */
+  chain?: ProposedChain;
+  subjectId?: string;
+};
+
+/**
+ * Read the note you already wrote for the concepts it introduced.
+ *
+ * Growth trigger 4, and the half of the join that asks nothing new of you: the
+ * note is written anyway. Proposed rather than added, because a note is a
+ * rough thing written for yourself and half of what a model finds in one is
+ * phrasing rather than concepts.
+ *
+ * The subject is picked rather than guessed. A subject is the container that
+ * accumulates, and the spec is explicit that nothing auto-creates one --
+ * getting it wrong twice leaves somebody with two half-graphs.
+ */
+export async function readNoteIntoGraph(
+  _prev: NoteGraphState,
+  formData: FormData,
+): Promise<NoteGraphState> {
+  const user = await requireUser();
+
+  const readingId = z.string().uuid().safeParse(formData.get('readingId'));
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!readingId.success) return { error: 'Could not work out which reading that was.' };
+  if (!subjectId.success) return { error: 'Pick which subject this belongs to.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'This needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+  const reading = await loadReading(supabase, readingId.data);
+  if (!reading) return { error: 'That reading is not there any more.' };
+  if (!reading.note?.trim()) {
+    return { error: 'Write a note first — that is what this reads.' };
+  }
+
+  const subject = await loadSubject(supabase, subjectId.data);
+  if (!subject) return { error: 'That subject is not there any more.' };
+
+  const spend = collectSpend();
+  const result = await conceptsFromNote({
+    subject: subject.name,
+    readingTitle: reading.subject,
+    note: reading.note,
+    existing: await existingConcepts(supabase, subject.id),
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(user.id, 'concepts-from-note', spend.reports);
+
+  if (!result.ok) {
+    return result.reason === 'nothing-in-it'
+      ? { message: result.detail }
+      : { error: result.detail };
+  }
+
+  return { chain: result.chain, subjectId: subject.id };
+}
+
+/** Attach what the note taught. The same writer as any other chain, minus the goal. */
+export async function approveNoteConcepts(
+  _prev: NoteGraphState,
+  formData: FormData,
+): Promise<NoteGraphState> {
+  const user = await requireUser();
+
+  const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
+  if (!subjectId.success) return { error: 'Could not work out which subject that was.' };
+
+  const raw = formData.get('chain');
+  if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return { error: 'That proposal did not survive the trip. Try again.' };
+  }
+
+  const safe = approvedChainSchema.safeParse(payload);
+  if (!safe.success) return { error: 'That proposal did not survive the trip. Try again.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await saveChain(supabase, user.id, safe.data as ProposedChain, safe.data.goalConcept, {
+      goal: false,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  revalidatePath(`/learn/s/${subjectId.data}`);
+  revalidatePath('/learn/know');
+  return { message: 'Added to your graph.' };
 }

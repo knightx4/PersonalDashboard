@@ -243,3 +243,27 @@ describe('planQueueBrief', () => {
     expect(planQueueBrief(sections, [queue[0]]).startsWith('# 1 plan step, in order\n')).toBe(true);
   });
 });
+
+describe('planBrief on a step a re-shape wrote', () => {
+  it('names the answer that produced it, at the top rather than in the notes', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'f', title: 'Re-shaping' }),
+        item({
+          id: 'added',
+          title: 'The graduated step',
+          parentId: 'f',
+          status: 'proposed',
+          comment: "From #63's answer: On the server, not the client.",
+        }),
+      ],
+      dependencies: [],
+    });
+    const node = findNode(sections, 'added')!;
+    const brief = planBrief(sections, node);
+
+    expect(brief).toContain("From #63's answer: On the server, not the client.");
+    // Above the notes, which is where it would otherwise be buried.
+    expect(brief.indexOf("From #63's answer")).toBeLessThan(brief.indexOf('## Notes'));
+  });
+});

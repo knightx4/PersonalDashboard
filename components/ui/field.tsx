@@ -269,10 +269,12 @@ export function ChipSelect({
 
 export function Textarea({
   className,
+  ref,
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: React.ComponentProps<'textarea'>) {
   return (
     <textarea
+      ref={ref}
       className={cn(control, 'field-sizing-content max-h-64 min-h-16 px-(--control-px) py-1.5', className)}
       {...props}
     />
