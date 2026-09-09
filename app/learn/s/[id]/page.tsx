@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { GoalForm } from '@/app/learn/know/goal-form';
+import { readAboutConcept } from './actions';
 import {
   countStates,
   learningOrder,
@@ -63,7 +64,34 @@ function StateMark({ concept }: { concept: Concept }) {
   }
 }
 
-function ConceptRow({ concept, next }: { concept: Concept; next: boolean }) {
+/**
+ * A gap is a better input to a search than a subject somebody typed, so the
+ * button is here rather than on a form somewhere. Offered only where it means
+ * something: a claim you are shaky on or actively wrong about.
+ */
+function ReadAbout({ concept, subjectId }: { concept: Concept; subjectId: string }) {
+  if (concept.state !== 'shaky' && concept.state !== 'misconception') return null;
+
+  return (
+    <form action={readAboutConcept} className="mt-2">
+      <input type="hidden" name="conceptId" value={concept.id} />
+      <input type="hidden" name="subjectId" value={subjectId} />
+      <button type="submit" className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline">
+        Find something to read for this
+      </button>
+    </form>
+  );
+}
+
+function ConceptRow({
+  concept,
+  next,
+  subjectId,
+}: {
+  concept: Concept;
+  next: boolean;
+  subjectId: string;
+}) {
   return (
     <li className="flex gap-3 px-4 py-3">
       <StateMark concept={concept} />
@@ -94,22 +122,47 @@ function ConceptRow({ concept, next }: { concept: Concept; next: boolean }) {
             ? concept.basis
             : `${STATE_LABEL[concept.state]} — ${ESTABLISHED_LABEL[concept.established]}. ${concept.basis}`}
         </p>
+
+        <ReadAbout concept={concept} subjectId={subjectId} />
       </div>
     </li>
   );
 }
 
-function ConceptList({ concepts, nextId }: { concepts: Concept[]; nextId: string | null }) {
+function ConceptList({
+  concepts,
+  nextId,
+  subjectId,
+}: {
+  concepts: Concept[];
+  nextId: string | null;
+  subjectId: string;
+}) {
   return (
     <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
       {concepts.map((concept) => (
-        <ConceptRow key={concept.id} concept={concept} next={concept.id === nextId} />
+        <ConceptRow
+          key={concept.id}
+          concept={concept}
+          next={concept.id === nextId}
+          subjectId={subjectId}
+        />
       ))}
     </ul>
   );
 }
 
-function GoalSection({ graph, goalName, conceptId }: { graph: Graph; goalName: string; conceptId: string }) {
+function GoalSection({
+  graph,
+  goalName,
+  conceptId,
+  subjectId,
+}: {
+  graph: Graph;
+  goalName: string;
+  conceptId: string;
+  subjectId: string;
+}) {
   const kept = pruneForGoal(graph, conceptId);
   const chain = learningOrder(graph, kept);
   const next = readyNow(graph, kept)[0] ?? null;
@@ -134,7 +187,7 @@ function GoalSection({ graph, goalName, conceptId }: { graph: Graph; goalName: s
               ? 'One thing left, in the order it would be learned.'
               : `${chain.length} things left, in the order they would be learned. What you already know is not shown.`}
           </p>
-          <ConceptList concepts={chain} nextId={next?.id ?? null} />
+          <ConceptList concepts={chain} nextId={next?.id ?? null} subjectId={subjectId} />
         </>
       )}
     </section>
@@ -225,6 +278,7 @@ export default async function SubjectPage({
           <ConceptList
             concepts={learningOrder(graph, graph.concepts.map((concept) => concept.id))}
             nextId={null}
+            subjectId={id}
           />
         </>
       ) : live.length === 0 ? (
@@ -239,7 +293,13 @@ export default async function SubjectPage({
         </p>
       ) : (
         live.map((goal) => (
-          <GoalSection key={goal.id} graph={graph} goalName={goal.asked} conceptId={goal.conceptId!} />
+          <GoalSection
+            key={goal.id}
+            graph={graph}
+            goalName={goal.asked}
+            conceptId={goal.conceptId!}
+            subjectId={id}
+          />
         ))
       )}
 
