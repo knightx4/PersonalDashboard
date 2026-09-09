@@ -15,6 +15,8 @@
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision] [--from <n>]
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
+ *   npx tsx scripts/plan.ts idea "<body>" [--module <id>]  # file one idea
+ *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
@@ -39,6 +41,7 @@
  * page runs, so the two cannot disagree about what is next.
  */
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
@@ -211,6 +214,34 @@ function printNode(node: PlanNode, indent = ''): void {
   for (const child of node.children) printNode(child, indent + '  ');
 }
 
+/**
+ * Ideas from a markdown file, one per `## ` heading.
+ *
+ * A review that ends in fifteen ideas should not end in fifteen commands typed
+ * by hand, and a file in the repo is also a record of where the ideas came
+ * from. The heading is the idea's first line and the paragraphs under it are
+ * the rest; a line reading `module: jobs` scopes it to a workspace and is not
+ * part of the body.
+ */
+function ideasFromFile(path: string): { body: string; module: PlanItem['module'] }[] {
+  const text = readFileSync(path, 'utf8');
+  const out: { body: string; module: PlanItem['module'] }[] = [];
+  for (const chunk of text.split(/^## /m).slice(1)) {
+    const [heading, ...rest] = chunk.split('\n');
+    let scope: PlanItem['module'] = null;
+    const lines = rest.filter((line) => {
+      const match = /^module:\s*(\S+)\s*$/.exec(line);
+      if (!match) return true;
+      if (!isModuleId(match[1])) fail(`"${match[1]}" is not a module (under "${heading}").`);
+      scope = match[1];
+      return false;
+    });
+    const body = `${heading.trim()}\n\n${lines.join('\n').trim()}`.trim();
+    if (body) out.push({ body, module: scope });
+  }
+  return out;
+}
+
 function moduleLabel(module: PlanItem['module']): string {
   return module ? (MODULES.find((m) => m.id === module)?.label ?? module) : 'The app as a whole';
 }
@@ -277,6 +308,30 @@ async function main(): Promise<void> {
           `${row.id.slice(0, 8)}  ${moduleLabel(scope).padEnd(18)}  ${row.body.replace(/\s+/g, ' ').slice(0, 90)}`,
         );
       }
+      return;
+    }
+
+    if (command === 'idea') {
+      const file = arg('--file');
+      const moduleArg = arg('--module');
+      if (moduleArg && !isModuleId(moduleArg)) fail(`"${moduleArg}" is not a module.`);
+      const ideas = file
+        ? ideasFromFile(file)
+        : target?.trim()
+          ? [{ body: target.trim(), module: moduleArg && isModuleId(moduleArg) ? moduleArg : null }]
+          : [];
+      if (ideas.length === 0) {
+        fail('Give the idea: idea "…" [--module <id>], or idea --file <path> with a "## " heading per idea.');
+      }
+      for (const idea of ideas) {
+        if (idea.body.length > 4000) fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
+        const [row] = await sql<{ id: string }[]>`
+          insert into ideas (user_id, body, module)
+          values (${userId}, ${idea.body}, ${idea.module})
+          returning id`;
+        console.log(`${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${idea.body.replace(/\s+/g, ' ').slice(0, 90)}`);
+      }
+      console.log(`\n${ideas.length} filed. They are on /dev/ideas.`);
       return;
     }
 

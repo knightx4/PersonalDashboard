@@ -34,6 +34,8 @@ npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
+npx tsx scripts/plan.ts idea "…" [--module <id>]   # file an idea on /dev/ideas, unshaped
+npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.
