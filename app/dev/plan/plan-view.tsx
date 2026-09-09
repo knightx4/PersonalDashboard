@@ -841,19 +841,19 @@ function AnswerDecision({
   autoFocus: boolean;
 }) {
   const field = `answer-${node.id}`;
-  const box = useRef<HTMLTextAreaElement>(null);
   const options = planOptions(node.detail);
+  const [answer, setAnswer] = useState('');
 
-  // Replaces rather than appends: the chips are a choice between the options,
-  // and pressing two of them means you changed your mind, not that you want
-  // both written down. What you type after it is yours and is left alone.
-  const choose = (option: PlanOption) => {
-    const target = box.current;
-    if (!target) return;
-    target.value = optionAnswer(option);
-    target.focus();
-    target.setSelectionRange(target.value.length, target.value.length);
-  };
+  // Replaces rather than appends: the options are a choice between them, and
+  // pressing two means you changed your mind, not that you want both written
+  // down. What you type after it is yours and is left alone.
+  //
+  // Controlled rather than written through a ref. A ref put the text into the
+  // DOM node behind React's back, which worked here only because this box
+  // happens to always be mounted -- the same call in the questions list had
+  // nothing to write to, so the options there did nothing at all. One
+  // mechanism, in both places.
+  const choose = (option: PlanOption) => setAnswer(optionAnswer(option));
 
   return (
     /* A well, not a frame: this sits inside the open step, which is already a
@@ -878,11 +878,12 @@ function AnswerDecision({
         <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
         <Textarea
           id={field}
-          ref={box}
           name="answer"
           rows={2}
           className="min-h-12"
           autoFocus={autoFocus}
+          value={answer}
+          onChange={(event) => setAnswer(event.target.value)}
           placeholder={
             options.length > 0
               ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
@@ -960,21 +961,31 @@ function QuestionRow({ node }: { node: PlanNode }) {
     {} as PlanActionState,
   );
   const [answering, setAnswering] = useState(false);
+  const [answer, setAnswer] = useState('');
   useSettled(answerState, () => setAnswering(false));
 
   const settled = isClosed(node.status);
   const field = `question-${node.id}`;
-  const box = useRef<HTMLTextAreaElement>(null);
 
-  // Replaces rather than appends, as in AnswerDecision and for the same
-  // reason: pressing two options means you changed your mind, not that you
-  // want both written down. What you type after it is yours and is left alone.
+  /**
+   * Pressing an option opens the box with that option in it.
+   *
+   * Both halves matter. It writes rather than records, as it always has:
+   * an answer is read by every session that works beneath this feature from
+   * now on, so the last word before it is written down stays yours, and "b,
+   * but only for the shared lists" is the answer you most often actually
+   * want. And it opens the box itself, which is the half that was missing --
+   * the options were only clickable once you had already pressed Answer, so
+   * from the outside they were three things that looked like buttons and did
+   * nothing. Replaces rather than appends: pressing two of them means you
+   * changed your mind, not that you want both written down.
+   *
+   * The box is controlled rather than written through a ref, because it does
+   * not exist yet at the moment the option is pressed.
+   */
   const choose = (option: PlanOption) => {
-    const target = box.current;
-    if (!target) return;
-    target.value = optionAnswer(option);
-    target.focus();
-    target.setSelectionRange(target.value.length, target.value.length);
+    setAnswer(optionAnswer(option));
+    setAnswering(true);
   };
 
   return (
@@ -1013,7 +1024,7 @@ function QuestionRow({ node }: { node: PlanNode }) {
           ) : (
             <>
               <TheQuestion node={node} />
-              <TheOptions detail={node.detail} onChoose={answering ? choose : undefined} />
+              <TheOptions detail={node.detail} onChoose={settled ? undefined : choose} />
             </>
           )}
 
@@ -1030,11 +1041,12 @@ function QuestionRow({ node }: { node: PlanNode }) {
               <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
               <Textarea
                 id={field}
-                ref={box}
                 name="answer"
                 rows={2}
                 className="min-h-12"
                 autoFocus
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
                 placeholder={
                   planOptions(node.detail).length > 0
                     ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
@@ -1045,7 +1057,15 @@ function QuestionRow({ node }: { node: PlanNode }) {
                 <Button type="submit" size="sm" pending={answerPending}>
                   {node.resolution ? 'Record the new answer' : 'Answer'}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(false)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setAnswer('');
+                    setAnswering(false);
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
