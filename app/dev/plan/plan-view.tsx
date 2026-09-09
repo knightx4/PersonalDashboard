@@ -222,8 +222,15 @@ function Progress({ label, progress }: { label: string; progress: PlanProgress }
 
   return (
     <span className="flex items-center gap-2">
+      {/* `sunken`, not `canvas`. A progress bar is a fraction *of* something,
+          and the something is the track -- but `--c-page` is defined as
+          `var(--c-canvas)`, so a canvas track on a page is the page colour and
+          there is no track at all. What was left was a green pill of no
+          particular length floating on the background, which is a bar that
+          cannot be seen responding to anything however faithfully its width
+          follows the number. Same reason the avatar tiles are sunken. */}
       <span
-        className="h-1.5 w-24 overflow-hidden rounded-full bg-canvas"
+        className="h-1.5 w-24 overflow-hidden rounded-full bg-sunken"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={progress.live}
