@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import {
   Ban,
@@ -75,6 +75,7 @@ import {
   type PlanSummary,
   type PlanView as View,
 } from '@/lib/plan/tree';
+import { elapsedSince } from '@/lib/plan/elapsed';
 import { cn } from '@/lib/cn';
 
 /** A step as the pickers know it: enough to name it and to place it. */
@@ -1133,6 +1134,53 @@ function when(iso: string | null): string | null {
 }
 
 /**
+ * The wall clock, as something to subscribe to.
+ *
+ * One interval for the whole page rather than one per running step: a plan
+ * with six steps underway should not be six timers waking the tab up out of
+ * step with each other. It only runs while something is watching, and 30
+ * seconds is as often as a figure rounded to the minute can change.
+ *
+ * Zero until the first subscriber arrives, which is what makes it safe to
+ * render on the server: the elapsed time is the one value already different by
+ * the time the HTML lands, so both sides render the placeholder and the figure
+ * appears on the tick after mount.
+ */
+const CLOCK_TICK_MS = 30_000;
+let clockNow = 0;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+const clockWatchers = new Set<() => void>();
+
+function subscribeToClock(onTick: () => void): () => void {
+  clockWatchers.add(onTick);
+  if (clockTimer === null) {
+    clockNow = Date.now();
+    clockTimer = setInterval(() => {
+      clockNow = Date.now();
+      for (const watcher of clockWatchers) watcher();
+    }, CLOCK_TICK_MS);
+  }
+  return () => {
+    clockWatchers.delete(onTick);
+    if (clockWatchers.size === 0 && clockTimer !== null) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  };
+}
+
+/** The clock on a step that is underway. */
+function Elapsed({ startedAt }: { startedAt: string }) {
+  const now = useSyncExternalStore(
+    subscribeToClock,
+    () => clockNow,
+    () => 0,
+  );
+
+  return <>{now === 0 ? '…' : elapsedSince(startedAt, now)}</>;
+}
+
+/**
  * What the health column says about a step.
  *
  * The stored status is what you set; health is what it means right now. A
@@ -1617,6 +1665,22 @@ function PlanRow({
                   <span className="sr-only">Handed to Claude</span>
                 </span>
               )}
+              {/* And how long it has been going.
+                * "In progress" in the health column is a state; this is the
+                * thing you actually want to know about a step Claude is on --
+                * whether it started four minutes ago or has been sitting at
+                * "in progress" since yesterday, which is what a stuck routine
+                * looks like from here. The dot pulses because the one fact it
+                * carries is that something is happening right now. */}
+              {node.status === 'in_progress' && node.startedAt && (
+                <span
+                  title={`${node.assignee === 'claude' ? 'Claude has been on this' : 'Underway'} since ${node.startedAt.replace('T', ' ').slice(0, 16)}`}
+                  className="tabular inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-tint px-1.5 py-0.5 text-small font-medium text-accent"
+                >
+                  <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
+                  <Elapsed startedAt={node.startedAt} />
+                </span>
+              )}
             </span>
             {gloss && !open && (
               <span className="block truncate text-small text-ink-muted">
@@ -1787,7 +1851,17 @@ function PlanRow({
               <span>{PRIORITY_LABEL[node.priority]}</span>
               {node.size && <span>{SIZE_LABEL[node.size]}</span>}
               {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
-              {when(node.startedAt) && <span>Started {when(node.startedAt)}</span>}
+              {when(node.startedAt) && (
+                <span>
+                  Started {when(node.startedAt)}
+                  {node.status === 'in_progress' && node.startedAt && (
+                    <>
+                      {' · running '}
+                      <Elapsed startedAt={node.startedAt} />
+                    </>
+                  )}
+                </span>
+              )}
               {when(node.completedAt) && (
                 <span>
                   {node.status === 'dropped' ? 'Dropped' : 'Done'} {when(node.completedAt)}
