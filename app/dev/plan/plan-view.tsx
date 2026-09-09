@@ -30,6 +30,7 @@ import {
   movePlanItem,
   removePlanDependency,
   seedPlan,
+  reshapePlanFeature,
   sendPlanFeatureToClaude,
   sendPlanItemToClaude,
   sendPlanQueueToClaude,
@@ -1085,6 +1086,8 @@ function SendToClaude({
   pending,
   batchAction,
   batchPending,
+  reshapeAction,
+  reshapePending,
   quiet,
 }: {
   node: PlanNode;
@@ -1094,6 +1097,9 @@ function SendToClaude({
   /** The whole subtree in one press. Only worth offering where there is one. */
   batchAction: (formData: FormData) => void;
   batchPending: boolean;
+  /** The other direction: re-read the feature against what has been settled. */
+  reshapeAction: (formData: FormData) => void;
+  reshapePending: boolean;
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
@@ -1124,6 +1130,25 @@ function SendToClaude({
             title="Hand every open step beneath this one to Claude, worked in order"
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
+          </Button>
+        </form>
+      )}
+      {/* The return trip, and the only button here that does not hand work
+          over: it asks for the feature to be re-read against what has been
+          settled beneath it, and everything that comes back is a proposal
+          waiting on the same approve as anything else. Offered wherever there
+          is something beneath to re-read. */}
+      {node.children.length > 0 && node.status !== 'proposed' && (
+        <form action={reshapeAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="ghost"
+            pending={reshapePending}
+            title="Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started."
+          >
+            {reshapePending ? 'Re-shaping…' : 'Re-shape'}
           </Button>
         </form>
       )}
@@ -1452,6 +1477,12 @@ function PlanRow({
     answerPlanDecision,
     {} as PlanActionState,
   );
+  // The same rope pulled the other way: re-read this feature against what has
+  // been answered beneath it, and propose what has changed.
+  const [reshapeState, reshapeAction, reshapePending] = useActionState(
+    reshapePlanFeature,
+    {} as PlanActionState,
+  );
 
   // A question beneath a step is that step's question, and it is read and
   // answered in the step's own questions section. It is deliberately not also a
@@ -1548,6 +1579,19 @@ function PlanRow({
             formFields: { id: node.id },
           },
         ]),
+    // The return trip, beside the two hand-overs. Only on a feature: a leaf
+    // step has nothing beneath it to re-read, and the action says so if it is
+    // reached anyway.
+    ...(hasChildren && !closed && node.status !== 'proposed'
+      ? [
+          {
+            id: 'reshape',
+            label: 'Re-shape against what is decided',
+            formAction: (formData: FormData) => reshapePlanFeature({}, formData),
+            formFields: { id: node.id },
+          },
+        ]
+      : []),
     {
       id: 'add-child',
       label: 'Add a sub-step',
@@ -1812,24 +1856,38 @@ function PlanRow({
       {(assignState.error ??
         sendState.error ??
         batchState.error ??
+        reshapeState.error ??
         answerState.error ??
         assignState.message ??
         sendState.message ??
         batchState.message ??
+        reshapeState.message ??
         answerState.message) && (
         <li style={inset} className="pb-1.5 pr-3 text-small">
           <FieldError>
-            {assignState.error ?? sendState.error ?? batchState.error ?? answerState.error}
+            {assignState.error ??
+              sendState.error ??
+              batchState.error ??
+              reshapeState.error ??
+              answerState.error}
           </FieldError>
-          {!assignState.error && !sendState.error && !batchState.error && !answerState.error && (
+          {!assignState.error &&
+            !sendState.error &&
+            !batchState.error &&
+            !reshapeState.error &&
+            !answerState.error && (
             // Ink, not green. The tones above are a status system where
             // positive means done; this is a transient "Assigned" or "Sent"
             // from the action that just ran, which is the system reporting
             // itself and is not a claim about money (law 4).
-            <span className="text-ink-muted">
-              {assignState.message ?? sendState.message ?? batchState.message ?? answerState.message}
-            </span>
-          )}
+              <span className="text-ink-muted">
+                {assignState.message ??
+                  sendState.message ??
+                  batchState.message ??
+                  reshapeState.message ??
+                  answerState.message}
+              </span>
+            )}
         </li>
       )}
 
@@ -1946,6 +2004,8 @@ function PlanRow({
                   pending={sendPending}
                   batchAction={batchAction}
                   batchPending={batchPending}
+                  reshapeAction={reshapeAction}
+                  reshapePending={reshapePending}
                   quiet={
                     !sendState.error &&
                     !sendState.message &&

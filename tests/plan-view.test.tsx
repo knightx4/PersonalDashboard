@@ -31,6 +31,7 @@ vi.mock('@/app/dev/plan/actions', () => {
     deletePlanItem: noop,
     movePlanItem: noop,
     removePlanDependency: noop,
+    reshapePlanFeature: noop,
     seedPlan: noop,
     sendPlanFeatureToClaude: noop,
     sendPlanItemToClaude: noop,
