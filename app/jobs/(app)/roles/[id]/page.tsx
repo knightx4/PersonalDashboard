@@ -23,6 +23,15 @@ import {
 } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
+
+/** The columns of an interview row the prep key is computed from. */
+type PrepInterviewRow = {
+  id: string;
+  group_id: string | null;
+  scheduled_at: string | null;
+  interview_participants: { contacts: { id: string } | null }[] | null;
+};
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
@@ -115,7 +124,7 @@ export default async function RoleDetailPage({
         // that make the name worth clicking.
         .select(
           `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
-           questions_asked, group_id,
+           questions_asked, group_id, prep_note, prep_note_at, prep_note_key,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
         )
         .eq('application_id', current.id)
@@ -250,6 +259,42 @@ export default async function RoleDetailPage({
   const coverage = requirementCoverage(requirementMatches);
   const coverageLabel = formatCoverage(coverage);
   const currentMatchKey = matchKey(role.jd_hash as string | null, evidence);
+
+  /**
+   * The prep note each round would be written against right now.
+   *
+   * Computed here rather than asked of the model: the key is a fingerprint of
+   * the description, the bank, the round's conversations and who is named on
+   * them, so comparing it with the stored one says whether a note is still the
+   * note for this round without a call. Keyed per round rather than per
+   * conversation because the note belongs to the round -- a superday has one.
+   */
+  const roundConversations = new Map<string, PrepInterviewRow[]>();
+  for (const interview of (interviews ?? []) as unknown as PrepInterviewRow[]) {
+    const roundId = interview.group_id ?? interview.id;
+    const conversations = roundConversations.get(roundId) ?? [];
+    conversations.push(interview);
+    roundConversations.set(roundId, conversations);
+  }
+  const currentPrepKey = new Map<string, string>();
+  for (const conversations of roundConversations.values()) {
+    const contactIds = new Set<string>();
+    for (const conversation of conversations) {
+      for (const participant of conversation.interview_participants ?? []) {
+        if (participant.contacts) contactIds.add(participant.contacts.id);
+      }
+    }
+    const key = prepKey({
+      jdHash: role.jd_hash as string | null,
+      bank: evidence,
+      conversations: conversations.map((conversation) => ({
+        id: conversation.id,
+        scheduledAt: conversation.scheduled_at,
+      })),
+      contactIds: [...contactIds],
+    });
+    for (const conversation of conversations) currentPrepKey.set(conversation.id, key);
+  }
 
   // Timeline events name the message they came from, and the linked mail is
   // already loaded, so the same deep link can hang off both without a second
@@ -468,6 +513,14 @@ export default async function RoleDetailPage({
           customNotes: notesByInterview.get(interview.id as string) ?? [],
           groupId: (interview.group_id as string | null) ?? null,
           questionsAsked: (interview.questions_asked as string[]) ?? [],
+          prepNote: (interview.prep_note as PrepNote | null) ?? null,
+          prepNoteAt: (interview.prep_note_at as string) ?? null,
+          // Stale rather than absent, the same as the requirement map: the
+          // note still reads, it is just no longer the note for this round.
+          prepNoteStale:
+            interview.prep_note !== null &&
+            (interview.prep_note_key as string | null) !==
+              currentPrepKey.get(interview.id as string),
           participants: (
             (interview.interview_participants ?? []) as unknown as Array<{
               role: string;

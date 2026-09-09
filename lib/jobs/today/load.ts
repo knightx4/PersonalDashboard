@@ -101,6 +101,20 @@ export interface TodayBoard {
 
 type RoleJoin = { id: string; title: string; companies: { name: string } };
 
+/**
+ * Whether a round has been prepared for.
+ *
+ * Either note counts. Prep was one column -- the box you type into -- so a
+ * round the app had written a full brief for still nudged "no prep notes" on
+ * This week, which is the opposite of what the nudge is for: it asks whether
+ * anybody has looked at the day, and the generated note is somebody having
+ * looked. Presence, not content: the note is stored as sections and a row that
+ * has one has been prepared for whatever they say.
+ */
+export function isPrepped(row: { prep_notes: string | null; prep_note: unknown }): boolean {
+  return Boolean(row.prep_notes?.trim()) || row.prep_note != null;
+}
+
 export async function loadToday(
   supabase: AppSupabaseClient,
   userId: string,
@@ -118,7 +132,7 @@ export async function loadToday(
     supabase
       .from('interviews')
       .select(
-        'id, application_id, round, kind, scheduled_at, time_known, duration_minutes, format, meeting_url, location, prep_notes, group_id, interview_groups ( id, round_number, label, notes ), applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
+        'id, application_id, round, kind, scheduled_at, time_known, duration_minutes, format, meeting_url, location, prep_notes, prep_note, group_id, interview_groups ( id, round_number, label, notes ), applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
       )
       .eq('user_id', userId)
       // A day's back-reach, because a round known only by its day is stored at
@@ -181,6 +195,8 @@ export async function loadToday(
     meeting_url: string | null;
     location: string | null;
     prep_notes: string | null;
+    /** The generated note, whatever its sections are. Only its presence is read here. */
+    prep_note: unknown;
     group_id: string | null;
     interview_groups: {
       id: string;
@@ -213,7 +229,7 @@ export async function loadToday(
       durationMinutes: row.duration_minutes,
       meetingUrl: row.meeting_url,
       location: row.location,
-      hasPrep: Boolean(row.prep_notes?.trim()),
+      hasPrep: isPrepped(row),
       groupId: row.group_id,
       round: row.interview_groups
         ? {

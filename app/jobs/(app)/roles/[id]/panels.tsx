@@ -37,6 +37,8 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
+import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
+import { RoundPrep } from './prep-note';
 import {
   addQuestions,
   draftAnswerFromEvidence,
@@ -150,6 +152,15 @@ export interface PanelProps {
     /** The round it is in. Every interview is in one. */
     groupId: string | null;
     questionsAsked: string[];
+    /**
+     * The generated prep note, which belongs to the round rather than to this
+     * conversation: only the round's lead conversation carries one, and a
+     * superday reads that one note rather than four.
+     */
+    prepNote: PrepNote | null;
+    prepNoteAt: string | null;
+    /** The facts it was written against have changed since. */
+    prepNoteStale: boolean;
     /** Who is in the room, as contacts rather than as names on a string. */
     participants: Array<{
       contactId: string;
@@ -2271,6 +2282,19 @@ function InterviewGroupCard({
   const [pending, startTransition] = useTransition();
 
   /**
+   * Which conversation of the round carries the note.
+   *
+   * Whichever already has one, so a note written before a conversation was
+   * added stays where it was written; otherwise the earliest scheduled, which
+   * is the one the action writes against. Null only for a round with nothing
+   * in it yet, which has nothing to prepare from either.
+   */
+  const prepCarrier =
+    interviews.find((interview) => interview.prepNote !== null) ??
+    interviews.find((interview) => interview.scheduledAt !== null) ??
+    interviews[0];
+
+  /**
    * The round's three fields go together, because they are edited together:
    * the number and the name sit side by side in the header and the note folds
    * out under them, and one Save for all of it is what the card looks like it
@@ -2426,6 +2450,21 @@ function InterviewGroupCard({
         </div>
 
         <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />
+
+        {/* One note for the occasion. It is stored on the round's earliest
+            conversation, so the carrier is whichever of them has one and the
+            lead otherwise -- which is where the action would write it. */}
+        {prepCarrier && (
+          <RoundPrep
+            interviewId={prepCarrier.id}
+            state={{
+              note: prepCarrier.prepNote,
+              generatedAt: prepCarrier.prepNoteAt,
+              stale: prepCarrier.prepNoteStale,
+            }}
+            timezone={timezone}
+          />
+        )}
 
         <div className="mt-3 space-y-3">
           {interviews.map((interview) => (
@@ -2636,6 +2675,21 @@ function InterviewCard({
       />
 
       <Interviewers interview={interview} companyContacts={companyContacts} />
+
+      {/* A round of one conversation carries its own note. Inside a group the
+          round card holds it instead, so a superday reads one note about the
+          day rather than four about its quarters. */}
+      {!grouped && (
+        <RoundPrep
+          interviewId={interview.id}
+          state={{
+            note: interview.prepNote,
+            generatedAt: interview.prepNoteAt,
+            stale: interview.prepNoteStale,
+          }}
+          timezone={timezone}
+        />
+      )}
 
       {needsDebrief && (
         <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
