@@ -18,6 +18,7 @@ import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
 import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
+import { MAIN_BOX } from '@/components/shell/main-box';
 import {
   WorkspaceSheet,
   WorkspaceSwitcher,
@@ -638,10 +639,9 @@ export function AppShell({
         {banner}
         <main
           className={cn(
-            // `w-full` because a flex item's width comes from its content
-            // rather than from the line box: without it a narrow page would
-            // shrink-wrap instead of filling up to the max-width.
-            'mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6',
+            // The width and the gutter, shared with the anatomy surfaces on
+            // /dev/ui so a drawing of a page is made in the box a page gets.
+            MAIN_BOX,
             // Takes the leftover height, so the status line below it is held
             // against the foot of the window rather than the foot of the text.
             'flex-1',

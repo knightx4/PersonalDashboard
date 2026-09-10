@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   dayIn,
   groupableDays,
+  roundDetail,
   roundsOf,
   sectionInterviews,
   type GroupableInterview,
@@ -224,5 +225,31 @@ describe('roundsOf', () => {
 
   it('has no row for a round with nothing in it', () => {
     expect(roundsOf([], [SUPERDAY])).toEqual([]);
+  });
+});
+
+describe('roundDetail', () => {
+  it('says what is in a round instead of how long one conversation was', () => {
+    // The Galaxy afternoon: four conversations, and no honest single duration
+    // to print for the occasion as a whole.
+    expect(roundDetail('2 · In person Final Round', 'Recruiter screen', 4, 30)).toBe(
+      '2 · In person Final Round · 4 interviews',
+    );
+  });
+
+  it('says the kind and the length when the round is one conversation', () => {
+    expect(roundDetail('Round 1', 'Recruiter screen', 1, 30)).toBe(
+      'Round 1 · Recruiter screen · 30 min',
+    );
+  });
+
+  it('does not print the kind twice when the round is named after it', () => {
+    expect(roundDetail('Technical', 'Technical', 1, null)).toBe('Technical');
+    expect(roundDetail('2 · Technical screen', 'Technical', 1, null)).toBe('2 · Technical screen');
+  });
+
+  it('falls back to the kind for a round nobody has placed or named', () => {
+    expect(roundDetail(null, 'Onsite', 1, 90)).toBe('Onsite · 90 min');
+    expect(roundDetail(null, 'Onsite', 3, 90)).toBe('3 interviews');
   });
 });

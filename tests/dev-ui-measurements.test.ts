@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ANATOMY_FRAMES,
   CONTROL_H_POINTER,
   DIAL,
   ICON_STROKE,
@@ -97,6 +98,53 @@ describe('the fixed measurements on /dev/ui', () => {
       (a, b) => strokes.filter((s) => s === b).length - strokes.filter((s) => s === a).length,
     )[0];
     expect(commonest).toBe(ICON_STROKE);
+  });
+});
+
+describe('the widths the page anatomies are drawn at', () => {
+  const phone = ANATOMY_FRAMES.find((frame) => frame.id === 'phone')!;
+  const laptop = ANATOMY_FRAMES.find((frame) => frame.id === 'laptop')!;
+
+  it('the phone frame is narrower than the breakpoint that gives a control a pointer', () => {
+    // The narrowest width globals.css changes anything at -- 40rem today,
+    // where the dial test above reads the pointer control heights. Below it a
+    // control is sized for a thumb, and a phone drawing sitting above it would
+    // be showing the pointer dial under a label saying phone.
+    const widths = [...css.matchAll(/@media \(min-width:\s*([\d.]+)rem\)/g)].map((match) =>
+      px(`${match[1]}rem`),
+    );
+    if (widths.length === 0) throw new Error('no width media query in globals.css');
+    expect(phone.width).toBeLessThan(Math.min(...widths));
+  });
+
+  it('the laptop frame is at least the width the filter rail becomes a column at', () => {
+    // Tailwind's own breakpoints, which nothing here overrides -- the check
+    // below is what keeps that true.
+    expect(css).not.toContain('--breakpoint-');
+    const breakpoints: Record<string, number> = {
+      sm: 640,
+      md: 768,
+      lg: 1024,
+      xl: 1280,
+      '2xl': 1536,
+    };
+
+    // The widest thing the app's layout waits for: the rail stops being a
+    // sheet over the page and becomes a column beside it. A laptop frame
+    // narrower than that would draw a phone's rail and call it a laptop.
+    const rail = readFileSync(join(process.cwd(), 'components/shell/left-rail.tsx'), 'utf8');
+    const column = /'hidden shrink-0 ([a-z2]+):block/.exec(rail);
+    if (!column) throw new Error('the rail no longer becomes a column at a breakpoint');
+    const at = breakpoints[column[1]!];
+    expect(at).toBeGreaterThan(0);
+    expect(laptop.width).toBeGreaterThanOrEqual(at);
+  });
+
+  it('both frames scale to a whole number of pixels', () => {
+    ANATOMY_FRAMES.forEach((frame) => {
+      expect(Number.isInteger(frame.width * frame.scale)).toBe(true);
+      expect(Number.isInteger(frame.height * frame.scale)).toBe(true);
+    });
   });
 });
 

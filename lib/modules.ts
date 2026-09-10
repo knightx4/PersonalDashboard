@@ -220,3 +220,19 @@ export function isModuleId(value: string): value is ModuleId {
  * them -- `core.account_settings.enabled_modules` above all.
  */
 export const MODULE_IDS: readonly ModuleId[] = MODULES.map((module) => module.id);
+
+/**
+ * The workspace a path belongs to, or null when it belongs to none.
+ *
+ * Anything filed from the header carries the page it was filed from and not a
+ * module, because the button that files it is in the header of every
+ * workspace. The path is the only thing that says where the person was
+ * standing, and `prefix` is what turns it back into a workspace.
+ */
+export function moduleForPath(path: string | null): ModuleId | null {
+  if (!path) return null;
+  const match = MODULES.find(
+    (module) => path === module.prefix || path.startsWith(`${module.prefix}/`),
+  );
+  return match?.id ?? null;
+}

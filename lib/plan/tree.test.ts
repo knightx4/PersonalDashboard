@@ -527,6 +527,53 @@ describe('summarize', () => {
   });
 });
 
+describe('a block whose dependencies have all closed', () => {
+  // The note from /dev/plan: "still says blocked. But it looks like everything
+  // it waits on is done." The badge already read Ready -- healthOf had been
+  // taught this -- while the strip went on counting it under "waiting" and the
+  // Waiting view went on listing it, with nothing left to name as the thing it
+  // waits for. Every place the page speaks about blocked work has to agree.
+  const fixture = () =>
+    tree(
+      [
+        item({ id: 'feature' }),
+        at('blocked', 'stale', { parentId: 'feature' }),
+        at('done', 'shipped'),
+      ],
+      [dep('stale', 'shipped')],
+    );
+
+  it('is not counted among the steps waiting', () => {
+    expect(summarize(fixture()).waiting).toBe(0);
+    expect(summarize(fixture()).ready).toBe(1);
+  });
+
+  it('is not listed under the Waiting view', () => {
+    expect(flattenSections(applyView(fixture(), 'blocked')).map((n) => n.id)).toEqual([]);
+  });
+
+  it('is not a blocked dot on the feature above it', () => {
+    expect(findNode(fixture(), 'feature')!.rollup).toMatchObject({ blocked: 0, live: 1 });
+  });
+
+  it('still counts a block that is waiting on something open', () => {
+    const sections = tree(
+      [at('blocked', 'stuck'), item({ id: 'pending' })],
+      [dep('stuck', 'pending')],
+    );
+    expect(summarize(sections).waiting).toBe(1);
+    expect(flattenSections(applyView(sections, 'blocked')).map((n) => n.id)).toContain('stuck');
+  });
+
+  it('still counts a block that named nothing at all', () => {
+    // The honest use of the status: nothing about it can be worked out from
+    // the tree, so the page leaves it exactly as the person wrote it.
+    const sections = tree([at('blocked', 'stuck')]);
+    expect(summarize(sections).waiting).toBe(1);
+    expect(flattenSections(applyView(sections, 'blocked')).map((n) => n.id)).toEqual(['stuck']);
+  });
+});
+
 describe('walking the tree', () => {
   const sections = tree([
     item({ id: 'root' }),
@@ -724,6 +771,13 @@ describe('isWaitingOnThePerson', () => {
 
   it('is a blocked step, which needs something outside the repo', () => {
     expect(isWaitingOnThePerson({ kind: 'build', status: 'blocked' })).toBe(true);
+  });
+
+  it('is not a block whose every named dependency has since closed', () => {
+    // It is the plan's own record that says nothing is holding it, so handing
+    // it to Claude sends a session at a wall that is no longer there.
+    const sections = tree([at('blocked', 'stale'), at('done', 'dep')], [dep('stale', 'dep')]);
+    expect(isWaitingOnThePerson(findNode(sections, 'stale')!)).toBe(false);
   });
 
   it('is not ordinary work, and not a settled question', () => {

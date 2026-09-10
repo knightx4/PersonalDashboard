@@ -3,6 +3,7 @@ import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import DevUiPage from '@/app/dev/ui/page';
+import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewList } from '@/app/jobs/(app)/review/list';
@@ -52,8 +53,12 @@ export type Surface = {
   label: string;
   /** Which workspace it belongs to, so the gallery and the review agree. */
   module: ModuleId;
-  /** How wide the thing is meant to be read at, in the real app. */
-  width: 'narrow' | 'wide';
+  /**
+   * How wide the thing is meant to be read at, in the real app. `page` is for
+   * a whole page arrangement, which draws its own box the way a page does
+   * rather than being centred in a column this route picked for it.
+   */
+  width: 'narrow' | 'wide' | 'page';
   render: () => React.ReactNode;
 };
 
@@ -136,7 +141,9 @@ const rolePanels: PanelProps = {
       prepNote: null,
       prepNoteAt: null,
       prepNoteStale: false,
-      participants: [{ contactId: 'c1', name: 'Dana Ruiz', title: 'Engineering Manager', role: 'interviewer' }],
+      participants: [
+        { contactId: 'c1', name: 'Dana Ruiz', title: 'Engineering Manager', role: 'interviewer' },
+      ],
     },
   ],
   companyContacts: [{ id: 'c1', name: 'Dana Ruiz', title: 'Engineering Manager' }],
@@ -155,9 +162,7 @@ const rolePanels: PanelProps = {
     },
   ],
   notes: [],
-  interviewGroups: [
-    { id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] },
-  ],
+  interviewGroups: [{ id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] }],
   companyName: 'The D. E. Shaw group',
   matchCandidates: [],
   otherAttempts: [],
@@ -193,7 +198,10 @@ const rolePanels: PanelProps = {
  * is deliberately mixed: a two-word company, a very long one, a role title
  * that will not fit a card, and one attempt that is somebody's second go.
  */
-const pipelineRow = (row: Partial<PipelineRow> & Pick<PipelineRow, 'applicationId' | 'companyName' | 'roleTitle' | 'status'>): PipelineRow => ({
+const pipelineRow = (
+  row: Partial<PipelineRow> &
+    Pick<PipelineRow, 'applicationId' | 'companyName' | 'roleTitle' | 'status'>,
+): PipelineRow => ({
   roleId: `role-${row.applicationId}`,
   companyId: `co-${row.applicationId}`,
   companySlug: 'a-company',
@@ -437,8 +445,18 @@ const reviewRows: ReviewRow[] = [
     reason: 'Sent by an ATS, and no pursuit on file matches the job id.',
     gmailHref: 'https://mail.google.com/mail/u/0/#inbox/10',
     candidates: [
-      { applicationId: 'p3', label: 'Monzo · Backend Engineer, Payments', reason: 'Company and role title both match', confidence: 0.91 },
-      { applicationId: 'p5', label: 'Wise · Senior Engineer, Money Movement', reason: 'Same ATS vendor', confidence: 0.22 },
+      {
+        applicationId: 'p3',
+        label: 'Monzo · Backend Engineer, Payments',
+        reason: 'Company and role title both match',
+        confidence: 0.91,
+      },
+      {
+        applicationId: 'p5',
+        label: 'Wise · Senior Engineer, Money Movement',
+        reason: 'Same ATS vendor',
+        confidence: 0.22,
+      },
     ],
     sortAt: '2026-09-09T07:41:00.000Z',
   },
@@ -524,7 +542,13 @@ const settings = {
     },
   ],
   resumes: [
-    { id: 'cv1', label: 'Engineering — 2026', isDefault: true, notes: 'The one that goes to platform roles.', hasText: true },
+    {
+      id: 'cv1',
+      label: 'Engineering — 2026',
+      isDefault: true,
+      notes: 'The one that goes to platform roles.',
+      hasText: true,
+    },
     { id: 'cv2', label: 'Quant', isDefault: false, notes: null, hasText: false },
   ],
   excludedSenders: [
@@ -557,11 +581,61 @@ const settings = {
 
 /** Nine people on file, in every state a send to somebody can be in. */
 const contactRows: ContactListRow[] = [
-  { id: 'c1', fullName: 'Dana Ruiz', title: 'Engineering Manager, Research Platform', relationship: 'interviewer', status: 'replied', companyName: 'The D. E. Shaw group', companySlug: 'de-shaw', lastTouchAt: '2026-08-21T08:30:00.000Z', pendingReplies: 0 },
-  { id: 'c2', fullName: 'Priyanka Raghunathan', title: 'Technical Recruiter', relationship: 'recruiter', status: 'contacted', companyName: 'The D. E. Shaw group', companySlug: 'de-shaw', lastTouchAt: '2026-09-02T11:00:00.000Z', pendingReplies: 1 },
-  { id: 'c3', fullName: 'Tom Beale', title: null, relationship: 'warm_intro', status: 'not_contacted', companyName: 'Monzo', companySlug: 'monzo', lastTouchAt: null, pendingReplies: 0 },
-  { id: 'c4', fullName: 'Aoife Ní Bhraonáin', title: 'Head of Engineering', relationship: 'hiring_manager', status: 'contacted', companyName: 'Starling Bank', companySlug: 'starling-bank', lastTouchAt: '2026-08-30T09:10:00.000Z', pendingReplies: 2 },
-  { id: 'c5', fullName: 'Sam Okonjo', title: 'Staff Engineer', relationship: 'friend', status: 'replied', companyName: null, companySlug: null, lastTouchAt: '2026-07-19T20:00:00.000Z', pendingReplies: 0 },
+  {
+    id: 'c1',
+    fullName: 'Dana Ruiz',
+    title: 'Engineering Manager, Research Platform',
+    relationship: 'interviewer',
+    status: 'replied',
+    companyName: 'The D. E. Shaw group',
+    companySlug: 'de-shaw',
+    lastTouchAt: '2026-08-21T08:30:00.000Z',
+    pendingReplies: 0,
+  },
+  {
+    id: 'c2',
+    fullName: 'Priyanka Raghunathan',
+    title: 'Technical Recruiter',
+    relationship: 'recruiter',
+    status: 'contacted',
+    companyName: 'The D. E. Shaw group',
+    companySlug: 'de-shaw',
+    lastTouchAt: '2026-09-02T11:00:00.000Z',
+    pendingReplies: 1,
+  },
+  {
+    id: 'c3',
+    fullName: 'Tom Beale',
+    title: null,
+    relationship: 'warm_intro',
+    status: 'not_contacted',
+    companyName: 'Monzo',
+    companySlug: 'monzo',
+    lastTouchAt: null,
+    pendingReplies: 0,
+  },
+  {
+    id: 'c4',
+    fullName: 'Aoife Ní Bhraonáin',
+    title: 'Head of Engineering',
+    relationship: 'hiring_manager',
+    status: 'contacted',
+    companyName: 'Starling Bank',
+    companySlug: 'starling-bank',
+    lastTouchAt: '2026-08-30T09:10:00.000Z',
+    pendingReplies: 2,
+  },
+  {
+    id: 'c5',
+    fullName: 'Sam Okonjo',
+    title: 'Staff Engineer',
+    relationship: 'friend',
+    status: 'replied',
+    companyName: null,
+    companySlug: null,
+    lastTouchAt: '2026-07-19T20:00:00.000Z',
+    pendingReplies: 0,
+  },
 ];
 
 const contact: ContactRow = {
@@ -577,13 +651,36 @@ const contact: ContactRow = {
   companyName: 'Starling Bank',
   companySlug: 'starling-bank',
   touches: [
-    { id: 't1', channel: 'linkedin_dm', direction: 'outbound', sentAt: '2026-08-30T09:10:00.000Z', respondedAt: null, message: 'Asked whether the platform role is still open after the reorg.' },
-    { id: 't2', channel: 'email', direction: 'outbound', sentAt: '2026-08-12T18:00:00.000Z', respondedAt: null, message: 'Sent the write-up she asked for at the meetup.' },
-    { id: 't3', channel: 'event', direction: 'inbound', sentAt: '2026-03-04T19:30:00.000Z', respondedAt: '2026-03-04T19:30:00.000Z', message: 'Met at the London Systems meetup.' },
+    {
+      id: 't1',
+      channel: 'linkedin_dm',
+      direction: 'outbound',
+      sentAt: '2026-08-30T09:10:00.000Z',
+      respondedAt: null,
+      message: 'Asked whether the platform role is still open after the reorg.',
+    },
+    {
+      id: 't2',
+      channel: 'email',
+      direction: 'outbound',
+      sentAt: '2026-08-12T18:00:00.000Z',
+      respondedAt: null,
+      message: 'Sent the write-up she asked for at the meetup.',
+    },
+    {
+      id: 't3',
+      channel: 'event',
+      direction: 'inbound',
+      sentAt: '2026-03-04T19:30:00.000Z',
+      respondedAt: '2026-03-04T19:30:00.000Z',
+      message: 'Met at the London Systems meetup.',
+    },
   ],
 };
 
-const knownCompanies = [...new Set(pipelineRows.map((row) => row.companyName))].map((name) => ({ name }));
+const knownCompanies = [...new Set(pipelineRows.map((row) => row.companyName))].map((name) => ({
+  name,
+}));
 
 /**
  * A week with something in every section: two rounds coming up, one of them a
@@ -1024,7 +1121,11 @@ export const SURFACES: readonly Surface[] = [
           { key: 'bgg', label: 'BGG page', type: 'url', inSearch: false },
           { key: 'weight', label: 'Weight', type: 'number', inSearch: false },
         ]}
-        values={{ players: '2–4', bgg: 'https://boardgamegeek.com/boardgame/224517', weight: '3.9' }}
+        values={{
+          players: '2–4',
+          bgg: 'https://boardgamegeek.com/boardgame/224517',
+          weight: '3.9',
+        }}
         searchAvailable
       />
     ),
@@ -1211,4 +1312,16 @@ export const SURFACES: readonly Surface[] = [
       </>
     ),
   },
+
+  /* The page anatomies, framed at two widths by the anatomy section on
+   * /dev/ui. They are registered from one list rather than written out again
+   * here, and that list never holds /dev/ui itself -- an anatomy of the page
+   * doing the framing would put the gallery inside itself. */
+  ...ANATOMIES.map((anatomy) => ({
+    id: anatomy.id,
+    label: `Anatomy · ${anatomy.label}`,
+    module: 'dev' as const,
+    width: 'page' as const,
+    render: anatomy.render,
+  })),
 ];

@@ -45,6 +45,37 @@ export const CONTROL_H_POINTER: readonly [number, number, number] = [32, 30, 28]
  */
 export const ROW_HEIGHT: readonly [number, number, number] = [36, 32, 28];
 
+/**
+ * The two widths the page anatomies are drawn at, and how far each is scaled
+ * down to fit the column they are shown in.
+ *
+ * 390 is a phone held in one hand and is below every breakpoint the app
+ * writes, so the drawing gets the touch end of the density dial and whatever a
+ * component does when it has no room. 1280 is the widest breakpoint the layout
+ * waits for -- the filter rail becomes a column there -- so above it nothing
+ * further changes and a wider frame would only be more empty page.
+ *
+ * The heights are the viewports those two widths come with -- an iPhone and a
+ * laptop window -- so a drawing shows what is above the fold as well as where
+ * things sit.
+ *
+ * Scaled rather than resized. `transform: scale` keeps the layout at its real
+ * width and draws it smaller, so what is on the page is genuinely the 390px
+ * arrangement; a 195px-wide iframe would just be a narrower phone, which is
+ * the mistake the frame exists to avoid. tests/dev-ui-measurements.test.ts
+ * holds both widths against the breakpoints they claim to sit either side of.
+ */
+export const ANATOMY_FRAMES: readonly {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+  scale: number;
+}[] = [
+  { id: 'phone', label: 'Phone · 390', width: 390, height: 844, scale: 0.5 },
+  { id: 'laptop', label: 'Laptop · 1280', width: 1280, height: 900, scale: 0.4 },
+];
+
 export const RADII: readonly { name: string; px: number; where: string }[] = [
   { name: 'rounded-card', px: 8, where: 'Cards, panels, banners, popovers, the empty state.' },
   {

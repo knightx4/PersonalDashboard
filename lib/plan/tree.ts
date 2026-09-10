@@ -156,11 +156,13 @@ export type PlanSummary = {
  * the bar move when nothing shipped, which is the specific lie a progress bar
  * is worth having only if it does not tell.
  */
-export function planProgress(items: readonly { status: PlanStatus }[]): PlanProgress {
+export function planProgress(
+  items: readonly { status: PlanStatus; dependsOn?: readonly PlanLink[] }[],
+): PlanProgress {
   const live = items.filter((item) => item.status !== 'dropped' && item.status !== 'proposed');
   const done = live.filter((item) => item.status === 'done').length;
   const inProgress = live.filter((item) => item.status === 'in_progress').length;
-  const blocked = live.filter((item) => item.status === 'blocked').length;
+  const blocked = live.filter((item) => isBlocked(item)).length;
 
   return {
     done,
@@ -208,12 +210,36 @@ function bySibling(a: PlanItem, b: PlanItem): number {
  * A step blocked with no dependencies at all is untouched. That is the honest
  * use of the status, and nothing about it can be worked out from the tree.
  */
-export function isStaleBlock(node: Pick<PlanNode, 'status' | 'dependsOn'>): boolean {
+export function isStaleBlock(node: {
+  status: PlanStatus;
+  dependsOn?: readonly PlanLink[];
+}): boolean {
+  const dependsOn = node.dependsOn ?? [];
   return (
     node.status === 'blocked' &&
-    node.dependsOn.length > 0 &&
-    node.dependsOn.every((link) => isClosed(link.item.status))
+    dependsOn.length > 0 &&
+    dependsOn.every((link) => isClosed(link.item.status))
   );
+}
+
+/**
+ * Blocked, and still blocked on something.
+ *
+ * The status column on its own is not the answer to "is this held up", and
+ * every count and filter that asked it that way disagreed with the row it was
+ * counting: #20 sat with both of its dependencies closed, so its badge read
+ * "Ready" while the summary said "1 waiting" and the Waiting view listed it
+ * with nothing left to show as the thing it waits for. One of those was wrong
+ * and it was the count -- `isStaleBlock` had been taught to `healthOf` and
+ * `isReady` and to nothing else.
+ *
+ * So this is the question to ask anywhere the page speaks about blocked work.
+ * `status === 'blocked'` is still the right test for the status *column* --
+ * the dropdown says Blocked because that is what the row says, and it is the
+ * person's to change.
+ */
+export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanLink[] }): boolean {
+  return node.status === 'blocked' && !isStaleBlock(node);
 }
 
 /**
@@ -533,7 +559,7 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
         node.assignee === 'claude' && !isClosed(node.status) && !isWaitingOnThePerson(node)
       );
     case 'blocked':
-      return !isClosed(node.status) && (node.status === 'blocked' || node.waitingOn.length > 0);
+      return !isClosed(node.status) && (isBlocked(node) || node.waitingOn.length > 0);
     // Closed steps included. A finished feature still carrying fog is the
     // case worth seeing: the work stopped and the gap it admitted to did not
     // get filled. Nothing else on the page shows that.
@@ -638,8 +664,10 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
  * proposal is a suggestion nobody has agreed to rather than work stuck on
  * something, and it is excluded from a hand-over on its own grounds.
  */
-export function isWaitingOnThePerson(node: Pick<PlanNode, 'kind' | 'status'>): boolean {
-  if (node.status === 'blocked') return true;
+export function isWaitingOnThePerson(
+  node: Pick<PlanNode, 'kind' | 'status'> & { dependsOn?: readonly PlanLink[] },
+): boolean {
+  if (isBlocked(node)) return true;
   return node.kind === 'decision' && !isClosed(node.status);
 }
 
@@ -656,7 +684,7 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     onYou: outstanding.filter((node) => needsThePerson(node)).length,
     proposed: nodes.filter((node) => node.status === 'proposed').length,
     inProgress: open.filter((node) => node.status === 'in_progress').length,
-    waiting: open.filter((node) => node.status === 'blocked' || node.waitingOn.length > 0).length,
+    waiting: open.filter((node) => isBlocked(node) || node.waitingOn.length > 0).length,
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
     claude: open.filter((node) => node.assignee === 'claude' && !isWaitingOnThePerson(node))
