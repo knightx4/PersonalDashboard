@@ -5,6 +5,7 @@ import {
   bucketTasks,
   dueDay,
   isSnoozed,
+  resolveRelativeDay,
   todayIn,
   type Task,
 } from '@/lib/todo/tasks/model';
@@ -188,5 +189,24 @@ describe('addDays', () => {
     expect(addDays('2026-01-31', 1)).toBe('2026-02-01');
     expect(addDays('2024-02-28', 1)).toBe('2024-02-29');
     expect(addDays('2026-03-10', -1)).toBe('2026-03-09');
+  });
+});
+
+describe('resolveRelativeDay', () => {
+  it('turns the two words a form can send into the days they mean', () => {
+    expect(resolveRelativeDay('today', '2026-03-10')).toBe('2026-03-10');
+    expect(resolveRelativeDay('tomorrow', '2026-03-10')).toBe('2026-03-11');
+    expect(resolveRelativeDay('tomorrow', '2026-12-31')).toBe('2027-01-01');
+  });
+
+  it('leaves a date alone, so a form that knows the day still sends one', () => {
+    expect(resolveRelativeDay('2026-03-10', '2026-06-01')).toBe('2026-03-10');
+  });
+
+  it('leaves anything else alone, rather than reading it as a day', () => {
+    // Not resolving it is what sends it to the date validation, which is the
+    // one place that decides whether a due date is a due date.
+    expect(resolveRelativeDay('yesterday', '2026-03-10')).toBe('yesterday');
+    expect(resolveRelativeDay('', '2026-03-10')).toBe('');
   });
 });
