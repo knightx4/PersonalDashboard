@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EMPTY_SELECTION,
   clearSelection,
+  clickRule,
   extendRange,
   isRowSelected,
   pruneSelection,
@@ -10,6 +11,7 @@ import {
   selectedIds,
   selectedRows,
   toggleRow,
+  type SelectionClick,
   type SelectionRow,
   type SelectionState,
 } from './model';
@@ -177,5 +179,31 @@ describe('selectedRows and selectedIds', () => {
 
   it('leaves out a row that is only half selected', () => {
     expect(selectedRows(state(['c1']), rows)).toEqual([]);
+  });
+});
+
+describe('clickRule', () => {
+  const click = (held: Partial<SelectionClick> = {}): SelectionClick => ({
+    shiftKey: false,
+    metaKey: false,
+    ctrlKey: false,
+    ...held,
+  });
+
+  it('reads a plain click as ticking one row', () => {
+    expect(clickRule(click())).toBe('toggle');
+  });
+
+  it('reads a shift-click as a range', () => {
+    expect(clickRule(click({ shiftKey: true }))).toBe('range');
+  });
+
+  it('ticks one row for ⌘-click and for ctrl-click', () => {
+    expect(clickRule(click({ metaKey: true }))).toBe('toggle');
+    expect(clickRule(click({ ctrlKey: true }))).toBe('toggle');
+  });
+
+  it('takes the range when shift is held with ⌘', () => {
+    expect(clickRule(click({ shiftKey: true, metaKey: true }))).toBe('range');
   });
 });
