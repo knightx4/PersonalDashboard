@@ -10,7 +10,7 @@ import { NotificationsButton } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
-import { CaptureButton, CaptureFab, CaptureProvider } from '@/components/shell/capture';
+import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
 import { scrim } from '@/components/ui/popover';
@@ -645,8 +645,6 @@ export function AppShell({
           {children}
         </main>
         <StatusLine lines={activity} />
-
-        <CaptureFab />
 
         <nav
           // Named for what is actually in it: on home and the account page it

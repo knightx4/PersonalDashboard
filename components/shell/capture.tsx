@@ -355,18 +355,25 @@ function DayChip({
 }
 
 /**
- * The way in from the top bar, with its shortcut on it.
+ * The way in, at every width: an icon in the top bar beside the theme picker.
+ *
+ * There used to be a second one below `sm` -- an accent circle floating over
+ * the foot of every page, on the reasoning that a phone has no modifier to
+ * hold. It read as the app insisting you add a todo rather than as a way in,
+ * which is the wrong volume for a control that is available everywhere, so it
+ * is gone and this one is no longer hidden on a phone. One way in, one place,
+ * and nothing pinned over the page.
  *
  * The cap hangs under the button rather than sitting inside it: `.keyhint`
  * fades rather than unmounting, so a cap in the row would reserve its width
  * permanently and leave a gap in the header nobody could see the reason for.
- * From `sm` up -- below that the header is already six controls wide and the
- * thumb has a better way in, below.
+ * It stays an `sm`-and-up thing: there is no ⌥ to press on a phone, so the
+ * cap there would name a shortcut that does not exist.
  */
 export function CaptureButton() {
   const { open } = useCapture();
   return (
-    <span className="relative hidden shrink-0 sm:block">
+    <span className="relative block shrink-0">
       <button
         type="button"
         onClick={() => open()}
@@ -376,31 +383,9 @@ export function CaptureButton() {
         <Plus className="size-4" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Capture something</span>
       </button>
-      <Kbd className="pointer-events-none absolute left-1/2 top-full -translate-x-1/2 bg-raised">
+      <Kbd className="pointer-events-none absolute left-1/2 top-full hidden -translate-x-1/2 bg-raised sm:block">
         ⌥C
       </Kbd>
     </span>
-  );
-}
-
-/**
- * The way in on a phone, where there is no modifier to hold.
- *
- * Above the tab bar and under the thumb, rather than a seventh icon in a top
- * bar that is out of reach one-handed. Below `sm` only: from there up the
- * header control is the way in, and two of them on one screen would be two
- * answers to the same question.
- */
-export function CaptureFab() {
-  const { open } = useCapture();
-  return (
-    <button
-      type="button"
-      onClick={() => open()}
-      className="press fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-chrome flex size-12 items-center justify-center rounded-full bg-accent text-surface shadow-lg sm:hidden"
-    >
-      <Plus className="size-5" strokeWidth={2} aria-hidden />
-      <span className="sr-only">Capture something</span>
-    </button>
   );
 }
