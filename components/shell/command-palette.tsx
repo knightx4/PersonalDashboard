@@ -323,7 +323,7 @@ export function CommandPalette({
                   onClick={() => choose(row)}
                   onMouseMove={() => setActive(index)}
                   className={cn(
-                    'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
+                    'flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors',
                     index === active ? 'bg-accent-tint' : 'hover:bg-sunken',
                   )}
                 >

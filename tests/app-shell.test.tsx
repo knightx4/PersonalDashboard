@@ -73,3 +73,33 @@ describe('the bottom bar', () => {
     expect(render([{ href: '/todo', label: 'Agenda' }])).toContain('pb-24');
   });
 });
+
+/**
+ * The ways into capture.
+ *
+ * Two of them, and the point of the second one is that the first is useless
+ * without a keyboard: the header control carries the shortcut on it, and below
+ * `sm` -- where no modifier can be held and the top bar is out of a thumb's
+ * reach -- the way in is the button above the tab bar instead.
+ */
+describe('capture', () => {
+  it('offers a way in from the header, with its shortcut on it', () => {
+    const html = render([]);
+    expect(html).toContain('title="Capture something (⌥C)"');
+    expect(html).toContain('>⌥C<');
+  });
+
+  it('offers one that needs no keyboard, and only where the header one is not', () => {
+    const html = render([]);
+    // Above the tab bar rather than in it: the bar's own cells are unchanged.
+    const at = html.indexOf('bottom-[calc(4.5rem+env(safe-area-inset-bottom))]');
+    expect(at).toBeGreaterThan(-1);
+    expect(html.slice(html.lastIndexOf('<button', at), at + 400)).toContain('sm:hidden');
+  });
+
+  it('is present on a page with no workspace at all', () => {
+    // The panel mounts with the shell, not with a module, so "from anywhere"
+    // includes home and the account page.
+    expect(render([]).match(/>Capture something</g)?.length).toBe(2);
+  });
+});

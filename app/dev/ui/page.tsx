@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
 import { Card, CardSection } from '@/components/ui/card';
@@ -10,39 +11,55 @@ import {
   Input,
   Label,
 } from '@/components/ui/field';
+import { Kbd } from '@/components/shell/key-hints';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { Disclosure, Group } from '@/components/ui/disclosure';
-import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS } from './laws';
+import { MODULES } from '@/lib/modules';
+import { THEMES } from '@/lib/theme';
+import { LAW_GROUPS } from './laws';
+import * as C from './content';
+import * as M from './measurements';
 
 export const metadata = { title: 'UI' };
 
 /**
- * The standard the interface is held to.
+ * The standard the interface is held to, and the only copy of it.
  *
  * This was a static HTML file in docs/, which is the wrong place for it in
  * exactly one way that matters: a document describing an interface is a
  * *second* copy of that interface, and the copy is wrong within a month. Here
- * the swatches are the real tokens, the controls are the real components and
- * the type scale is the real scale, so the page cannot describe an app that
- * does not exist. If a row below looks wrong, the app is wrong.
+ * the swatches are the real tokens, the controls are the real components, the
+ * type scale is the real scale, and the numbers are held to globals.css by a
+ * test -- so the page cannot describe an app that does not exist. If a row
+ * below looks wrong, the app is wrong.
  *
- * It also means the standard is readable in the place the work happens,
- * beside the plan and the bug queue, rather than in a file somebody has to
- * remember to open.
+ * Two halves, one page. The first is how the interface looks: the laws, the
+ * colour, the type, the measurements, the motion. The second is how it
+ * behaves: what a keystroke does, what waits, what earns an interruption, how
+ * a row is found in five hundred. The second half is the one that decides
+ * whether a tool is good to use, and for a while it was the half that lived in
+ * the document nobody opened. It is here now, and the document is gone.
+ *
+ * It is long on purpose and it is one page on purpose: a standard split
+ * across two places is two standards. The contents row under the header is
+ * how it is skimmed.
  */
 
-/** A named row of the page. Plain <section>s, so the whole page is skimmable. */
+/** A named row of the page. Plain <section>s with ids, so the whole page is skimmable and linkable. */
 function Section({
+  id,
   title,
   lead,
   children,
 }: {
+  id: string;
   title: string;
   lead?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3">
+    <section id={id} className="scroll-mt-6 space-y-3">
       <div>
         <h2 className="text-title text-ink">{title}</h2>
         {lead ? <p className="mt-1 max-w-2xl text-body text-ink-muted">{lead}</p> : null}
@@ -52,19 +69,84 @@ function Section({
   );
 }
 
+/** A list of rules: one sentence each, on one surface. */
+function Rules({ items }: { items: readonly string[] }) {
+  return (
+    <Card padding="none">
+      <ul className="divide-y divide-border">
+        {items.map((item) => (
+          <li key={item} className="card-pad-x row-pad text-body text-ink">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/**
+ * A small table: the first cell names the thing, the rest describe it. The
+ * first description is set in ink and the others muted, so a three-column
+ * row reads as "what · the fact · the detail" rather than as three equal
+ * columns fighting for the eye.
+ */
+function Rows({
+  rows,
+  labelWidth = 'sm:grid-cols-[11rem_1fr]',
+}: {
+  rows: readonly C.Row[];
+  labelWidth?: string;
+}) {
+  return (
+    <Card padding="none">
+      <ul className="divide-y divide-border">
+        {rows.map(([label, ...rest]) => (
+          <li key={label} className={cn('card-pad-x row-pad grid gap-x-4 gap-y-0.5', labelWidth)}>
+            <p className="text-ui font-medium text-ink">{label}</p>
+            <div className="min-w-0">
+              {rest.map((cell, index) => (
+                <p
+                  key={index}
+                  className={cn('text-body', index === 0 ? 'text-ink' : 'text-ink-muted')}
+                >
+                  {cell}
+                </p>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 /**
  * Every colour below is a utility class, never `style={{ background:
  * 'var(--color-x)' }}`.
  *
- * That distinction is not cosmetic and it is worth knowing before you write
- * the next swatch. The scoped tokens -- accent above all -- are undefined at
- * :root and are given a value further down the tree, by <body>, by
- * [data-workspace], and again by any element painting a sheet. A custom
- * property *inherits its computed value*, so `var(--color-accent)` read at
- * :root computes to nothing and every descendant inherits that nothing, no
- * matter what the scope around them says. The utility resolves at the element
- * instead, which is the whole point of the scope system.
+ * The scoped tokens -- accent above all -- are undefined at :root and are given
+ * a value further down the tree, by <body>, by [data-workspace], and again by
+ * any element painting a sheet. A custom property *inherits its computed
+ * value*, so `var(--color-accent)` read at :root computes to nothing and every
+ * descendant inherits that nothing, no matter what the scope around them says.
+ * The utility resolves at the element instead, which is the whole point of the
+ * scope system.
  */
+function Swatch({ swatch, name, note }: { swatch: string; name: string; note?: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      {/* No hairline. A swatch is a solid mid-tone square on a card, and every
+          token below -- ghost included -- has an edge against the surface
+          without one being drawn. */}
+      <span aria-hidden className={cn('size-7 shrink-0 rounded-control', swatch)} />
+      <div className="min-w-0">
+        <p className="text-ui font-medium text-ink">{name}</p>
+        {note && <p className="text-small text-ink-muted">{note}</p>}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Three rows, rendered twice in "Shape, worked". Invented rather than fetched:
  * this page mirrors the design language, not the database, and an argument
@@ -73,19 +155,12 @@ function Section({
 const SHAPE_DEMO = [
   { mark: 'FG', role: 'Staff Engineer', company: 'Fieldgate', age: '2d' },
   { mark: 'NR', role: 'Platform Lead', company: 'Northrend Labs', age: '9d' },
-  {
-    mark: 'AC',
-    role: 'Senior Backend Engineer',
-    company: 'Ascent',
-    age: '21d',
-  },
+  { mark: 'AC', role: 'Senior Backend Engineer', company: 'Ascent', age: '21d' },
 ] as const;
 
 /**
  * Questions rather than rules, because a rule is obeyed by whoever already
- * agrees with it. A question has to be answered by whoever builds the thing,
- * and a wrong answer shows up in the answer rather than in a screenshot three
- * weeks later.
+ * agrees with it. A question has to be answered by whoever builds the thing.
  */
 const BUILD_QUESTIONS: ReadonlyArray<readonly [string, string]> = [
   [
@@ -109,8 +184,12 @@ const BUILD_QUESTIONS: ReadonlyArray<readonly [string, string]> = [
     'Answer it now, not last. Empty is the state a new surface spends its first weeks in, it is where the explanation belongs that law 15 takes out of the headings, and law 1 forbids the alternative of drawing the section anyway with a zero in it.',
   ],
   [
+    'Which loop is this, and which tier is each write?',
+    'Capture, triage, act or review — and instant, optimistic or pending for every write, with the optimistic failure path in the same commit. A page that cannot answer either is about to become the wrong kind of page.',
+  ],
+  [
     'Which of these can the machine check?',
-    'Boxes, control heights, hexes, font sizes and scoped tokens — check:ui settles those and holds new files to zero from their first line. Everything on this page that a grep cannot see is the part a person has to look at, at 390px, which is what /dev/surfaces is for.',
+    'Boxes, control heights, hexes, font sizes and scoped tokens — check:ui settles those. The numbers on this page are held to globals.css by a test. Everything else is the part a person has to look at, at 390px, which is what /dev/surfaces is for.',
   ],
 ];
 
@@ -127,41 +206,174 @@ const MEANINGS = [
   ['bg-danger', 'Danger', 'Something is wrong or will be destroyed.'],
 ] as const;
 
-const TYPE_SCALE = [
-  ['text-micro', '11px', 'Dense table cells. The floor.'],
-  ['text-small', '12px', 'Labels, captions, hints.'],
-  ['text-ui', '13px', 'Interface chrome: buttons, controls, nav.'],
-  ['text-body', '14px', 'Prose and content.'],
-  ['text-lead', '15px', 'A page description.'],
-  ['text-title', '20px', 'A page or section heading.'],
-  ['text-figure', '32px', 'A number the page is about.'],
+/**
+ * Literal class names, because Tailwind finds classes by reading source. A
+ * template built from the module id would compile to nothing.
+ */
+const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
+  shopping: 'bg-w-shopping',
+  jobs: 'bg-w-jobs',
+  todo: 'bg-w-todo',
+  vault: 'bg-w-vault',
+  learn: 'bg-w-learn',
+  dev: 'bg-w-dev',
+};
+
+/** The seven stage hues, each meaning one stage and appearing nowhere else. */
+const PIPELINE = [
+  ['bg-status-lead', 'bg-status-lead-tint', 'Lead', 'Seen, not yet pursued.'],
+  [
+    'bg-status-submitted',
+    'bg-status-submitted-tint',
+    'Submitted',
+    'Sent, and landed somewhere real.',
+  ],
+  ['bg-status-process', 'bg-status-process-tint', 'In process', 'Someone is talking to you.'],
+  ['bg-status-final', 'bg-status-final-tint', 'Final round', 'The last conversation.'],
+  ['bg-status-offer', 'bg-status-offer-tint', 'Offer', 'They said yes.'],
+  ['bg-status-rejected', 'bg-status-rejected-tint', 'Rejected', 'They said no.'],
+  [
+    'bg-status-ghosted',
+    'bg-status-ghosted-tint',
+    'Ghosted',
+    'Nobody said anything. Drawn as an outline.',
+  ],
 ] as const;
 
-function Swatch({ swatch, name, note }: { swatch: string; name: string; note: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      {/* No hairline. A swatch is a solid mid-tone square on a card, and every
-          token below -- ghost included -- has an edge against the surface
-          without one being drawn. The border was the page that documents law
-          11 breaking it. */}
-      <span aria-hidden className={cn('size-7 shrink-0 rounded-control', swatch)} />
-      <div className="min-w-0">
-        <p className="text-ui font-medium text-ink">{name}</p>
-        <p className="text-small text-ink-muted">{note}</p>
-      </div>
-    </div>
-  );
-}
+/**
+ * What each theme is made of, as a strip.
+ *
+ * `data-theme` on the wrapper is the real selector the layout puts on <html>,
+ * so the strip is the theme rather than a picture of it. Only tokens the theme
+ * block declares directly are shown: the scoped ones -- accent, page ink --
+ * take their value from <body> and would show the outer theme's, which is the
+ * inheritance trap the Swatch comment above describes. Lightbox shows its
+ * bench as `bg-page` because that is the one theme where the page ground and
+ * the well inside a card are different things.
+ */
+const THEME_STRIPS: Record<(typeof THEMES)[number]['id'], readonly (readonly [string, string])[]> =
+  {
+    paper: [
+      ['bg-canvas', 'ground'],
+      ['bg-surface', 'sheet'],
+      ['bg-sunken', 'well'],
+      ['bg-border', 'hairline'],
+      ['bg-ink-ghost', 'ghost'],
+      ['bg-ink-muted', 'muted'],
+      ['bg-ink', 'ink'],
+    ],
+    ink: [
+      ['bg-canvas', 'ground'],
+      ['bg-surface', 'sheet'],
+      ['bg-raised', 'raised'],
+      ['bg-border', 'hairline'],
+      ['bg-ink-ghost', 'ghost'],
+      ['bg-ink-muted', 'muted'],
+      ['bg-ink', 'ink'],
+    ],
+    lightbox: [
+      ['bg-page', 'bench'],
+      ['bg-surface', 'sheet'],
+      ['bg-canvas', 'well'],
+      ['bg-border', 'hairline'],
+      ['bg-ink-ghost', 'ghost'],
+      ['bg-ink-muted', 'muted'],
+      ['bg-ink', 'ink'],
+    ],
+    dusk: [
+      ['bg-canvas', 'ground'],
+      ['bg-surface', 'sheet'],
+      ['bg-raised', 'raised'],
+      ['bg-border', 'hairline'],
+      ['bg-ink-ghost', 'ghost'],
+      ['bg-ink-muted', 'muted'],
+      ['bg-ink', 'ink'],
+    ],
+  };
+
+const HUE_STRIP = [
+  'bg-w-shopping',
+  'bg-w-jobs',
+  'bg-w-todo',
+  'bg-w-vault',
+  'bg-w-learn',
+  'bg-w-dev',
+  'bg-positive',
+  'bg-caution',
+  'bg-danger',
+] as const;
+
+const TYPE_SCALE = [
+  ['text-micro', '11px', 'Dense table cells, badges, keycaps. The floor.'],
+  ['text-small', '12px', 'Labels, captions, hints, row metadata.'],
+  ['text-ui', '13px', 'Interface chrome: buttons, controls, nav, rows.'],
+  ['text-body', '14px', 'Prose and content.'],
+  ['text-lead', '15px', 'A page description; a compose title; the workspace label.'],
+  ['text-title', '20px', 'A page or section heading. Display face, tracking-tight.'],
+  ['text-figure', '32px', 'A number a card is about.'],
+  ['text-figure-lg', '48px', 'The one figure a page is about, on a phone.'],
+] as const;
+
+const DENSITY_LABELS = ['Comfortable', 'Snug', 'Dense'] as const;
+const DENSITY_IDS = ['comfortable', 'snug', 'dense'] as const;
+
+/** The page in order, for the contents row. */
+const CONTENTS: readonly (readonly [string, string])[] = [
+  ['tension', 'The tension'],
+  ['laws', 'The laws'],
+  ['restraint', 'Restraint, worked'],
+  ['shape', 'Shape, worked'],
+  ['before', 'Before you draw'],
+  ['colour', 'Colour'],
+  ['themes', 'Themes'],
+  ['type', 'Type'],
+  ['measurements', 'Measurements'],
+  ['elevation', 'Elevation'],
+  ['motion', 'Motion'],
+  ['loops', 'The four loops'],
+  ['wayfinding', 'Where am I'],
+  ['latency', 'Latency'],
+  ['undo', 'Undo'],
+  ['bulk', 'Bulk'],
+  ['keyboard', 'Keyboard'],
+  ['search', 'Search'],
+  ['save', 'The save model'],
+  ['cross', 'Across workspaces'],
+  ['speaks', 'Where it speaks'],
+  ['ladder', 'Attention'],
+  ['finding', 'Finding a row'],
+  ['surfaces', 'Surfaces'],
+  ['shell', 'The shell'],
+  ['states', 'States'],
+  ['first-run', 'First run'],
+  ['touch', 'Touch'],
+  ['alive', 'Alive'],
+  ['a11y', 'Accessibility'],
+  ['voice', 'Voice'],
+  ['gate', 'The gate'],
+  ['ship', 'Before you ship'],
+  ['never', 'Never'],
+];
 
 export default function DevUiPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 pb-16">
       <PageHeader
         title="UI"
-        description="The design language, rendered from the tokens it describes. Every swatch, control and size below is the real one — this page is a mirror, not a specification."
+        description="The whole standard, rendered from the tokens it describes. Every swatch, control, size and number below is the real one — this page is a mirror, not a specification, and it is the only copy."
       />
 
-      <Section title="The tension, stated plainly">
+      {/* Chrome for a long document: a row of names, muted until pointed at.
+          Not a sidebar, because the page is read in one column on purpose. */}
+      <nav aria-label="Contents" className="-mt-4 flex flex-wrap gap-x-3 gap-y-1">
+        {CONTENTS.map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="text-ui text-ink-muted hover:text-ink">
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <Section id="tension" title="The tension, stated plainly">
         <Card padding="standard" className="space-y-3 text-body text-ink-muted">
           <p>
             Most tools you admire are precise but anonymous. They are built to look correct in a
@@ -184,29 +396,43 @@ export default function DevUiPage() {
       </Section>
 
       <Section
+        id="laws"
         title="The laws"
-        lead="Everything else on this page is one of these applied to a surface. One to eight are what the interface may claim. Nine to twelve are how much of itself it shows while claiming it. Thirteen to fifteen are the shape of the page, and exist because a sweep satisfied the first twelve and the screens were unchanged."
+        lead="Fifteen, grouped by what they govern. Everything else on this page is one of these applied to a surface. The numbers are fixed for life: they are cited in code and in commits."
       >
-        {/* One surface with hairlines, not fifteen cards. It was fifteen cards
-          * until check:ui grew the law 13 rule and reported this page -- a
-          * scrolled list of cards inside the document arguing against scrolled
-          * lists of cards. */}
+        {/* One surface. The groups are told apart by a heading and air, and
+         * the laws inside each by hairlines -- law 11 and law 13 applied to
+         * the page that states them. It was five cards for a moment, and
+         * the gate said so. */}
         <Card padding="none">
-          <ol className="divide-y divide-border">
-            {[...LAWS, ...RESTRAINT_LAWS, ...SHAPE_LAWS].map((law) => (
-              <li key={law.n} className="card-pad-x row-pad flex gap-3">
-                <span className="text-ui font-semibold tabular-nums text-accent">{law.n}</span>
-                <div className="min-w-0">
-                  <p className="text-body font-medium text-ink">{law.title}</p>
-                  <p className="mt-0.5 text-body text-ink-muted">{law.body}</p>
+          <div className="divide-y divide-border">
+            {LAW_GROUPS.map((group) => (
+              <section key={group.title} className="pb-1 pt-3">
+                <div className="card-pad-x mb-1">
+                  <h3 className="text-small font-semibold text-ink-muted">{group.title}</h3>
+                  <p className="text-small text-ink-muted">{group.lead}</p>
                 </div>
-              </li>
+                <ol className="divide-y divide-border">
+                  {group.laws.map((law) => (
+                    <li key={law.n} className="card-pad-x row-pad flex gap-3">
+                      <span className="text-ui font-semibold tabular-nums text-accent">
+                        {law.n}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-body font-medium text-ink">{law.title}</p>
+                        <p className="mt-0.5 text-body text-ink-muted">{law.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
             ))}
-          </ol>
+          </div>
         </Card>
       </Section>
 
       <Section
+        id="restraint"
         title="Restraint, worked"
         lead="Laws 9 to 12 are four views of one idea: the interface should get out from in front of the thing the person came for. Here they are on one surface, which is the only honest way to show them — each is easy to obey alone and they are only hard together."
       >
@@ -230,7 +456,7 @@ export default function DevUiPage() {
             <ChipSelect
               aria-label="Status"
               defaultValue="todo"
-              icon={<Circle className="size-3.5" strokeWidth={2} />}
+              icon={<Circle className="size-3.5" strokeWidth={M.ICON_STROKE} />}
             >
               <option value="todo">Not started</option>
               <option value="doing">In progress</option>
@@ -238,7 +464,7 @@ export default function DevUiPage() {
             <ChipSelect
               aria-label="Priority"
               defaultValue="2"
-              icon={<Flag className="size-3.5" strokeWidth={2} />}
+              icon={<Flag className="size-3.5" strokeWidth={M.ICON_STROKE} />}
             >
               <option value="1">Urgent</option>
               <option value="2">Normal</option>
@@ -247,7 +473,7 @@ export default function DevUiPage() {
               aria-label="Size"
               defaultValue=""
               placeholderValue=""
-              icon={<Scale className="size-3.5" strokeWidth={2} />}
+              icon={<Scale className="size-3.5" strokeWidth={M.ICON_STROKE} />}
             >
               <option value="">Size</option>
               <option value="s">Small</option>
@@ -256,7 +482,7 @@ export default function DevUiPage() {
               aria-label="Assignee"
               defaultValue=""
               placeholderValue=""
-              icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+              icon={<CircleUser className="size-3.5" strokeWidth={M.ICON_STROKE} />}
             >
               <option value="">Nobody</option>
               <option value="me">Me</option>
@@ -279,8 +505,8 @@ export default function DevUiPage() {
           <Group title="9 — Density">
             <p className="text-body text-ink-muted">
               Every control above reads <code className="text-ui">--control-h</code> and the density
-              dial in the top bar moves them together. Comfortable is the default and is what snug
-              used to be; the dial only ever takes away.
+              dial in the top bar moves them together. Comfortable is the default; the dial only
+              ever takes away. The numbers are under Measurements.
             </p>
           </Group>
           <Group title="10 — Disclosure">
@@ -298,7 +524,7 @@ export default function DevUiPage() {
             <p className="text-body text-ink-muted">
               These four notes are groups: told apart by headings and air, not by boxes inside this
               box. A chip is the same move on a control — the value is the label, so it is the width
-              of a word instead of a row. Ninety-one places in the app still draw the second box.
+              of a word instead of a row.
             </p>
           </Group>
           <Group title="12 — InlineInput">
@@ -320,23 +546,24 @@ export default function DevUiPage() {
       </Section>
 
       <Section
+        id="shape"
         title="Shape, worked"
-        lead="Each pair is the same content twice: what the app does now, and what it should do. Both halves are real components."
+        lead="Each pair is the same content twice: the shape to avoid, and the shape to build. Both halves are real components."
       >
-        {/* The left column is not a straw man. It is what the app ships, built
-         * from the same Card everything else uses, and it breaks no law above.
-         * That is why check:ui cannot see this and a phone can. */}
+        {/* The left column is not a straw man. It is built from the same Card
+         * everything else uses, and it breaks no law above. That is why
+         * check:ui cannot see this and a phone can. */}
         <Group title="13 — The same list, twice">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <p className="text-small text-ink-muted">
-                A card per row: own border, own margin, two lines, a tile sized to the box.
-                About 95px each. Nine fit a phone screen.
+                A card per row: own border, own margin, two lines, a tile sized to the box. About
+                95px each. Nine fit a phone screen.
               </p>
               <div className="space-y-2">
                 {/* ui-ok: card-per-row -- this is the demonstration. The card
-                  * shape is the thing being argued against, and has to be
-                  * drawn in order to be argued against. */}
+                 * shape is the thing being argued against, and has to be
+                 * drawn in order to be argued against. */}
                 {SHAPE_DEMO.map((row) => (
                   <Card key={row.role} padding="dense" className="flex items-center gap-3">
                     <span className="grid size-8 shrink-0 place-items-center rounded-control bg-shell text-micro text-ink-muted">
@@ -356,8 +583,8 @@ export default function DevUiPage() {
 
             <div className="space-y-2">
               <p className="text-small text-ink">
-                A line per row: one surface, hairlines between, role and company on the same
-                line. 36px each. Twenty-five fit.
+                A line per row: one surface, hairlines between, role and company on the same line.
+                36px each. Twenty-five fit.
               </p>
               <ul className="divide-y divide-border">
                 {SHAPE_DEMO.map((row) => (
@@ -393,8 +620,7 @@ export default function DevUiPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <p className="text-small text-ink-muted">
-                A caption, a box and a button, standing by in case today is the day this
-                changes.
+                A caption, a box and a button, standing by in case today is the day this changes.
               </p>
               <Card padding="dense" className="space-y-1">
                 <Label htmlFor="ui-demo-window">Return window</Label>
@@ -406,8 +632,8 @@ export default function DevUiPage() {
             </div>
             <div className="space-y-2">
               <p className="text-small text-ink">
-                It says thirty days, which is what someone came to find out. It is also an
-                input, so changing it costs one click.
+                It says thirty days, which is what someone came to find out. It is also an input, so
+                changing it costs one click.
               </p>
               <Card padding="dense" className="flex items-center gap-2">
                 <span className="text-body text-ink">Return window</span>
@@ -420,14 +646,6 @@ export default function DevUiPage() {
               </Card>
             </div>
           </div>
-          <p className="text-body text-ink-muted">
-            46 textareas and 45 selects are written into markup across the app, most on screens
-            someone came to read. Counts rot, so re-measure rather than trust this line:{' '}
-            <code className="text-ui">
-              grep -rn &quot;&lt;Textarea|&lt;ComposeBody&quot; --include=*.tsx app components
-            </code>
-            .
-          </p>
         </Group>
 
         <Group title="14 — The box nobody is typing in">
@@ -435,8 +653,7 @@ export default function DevUiPage() {
             <div className="space-y-2">
               <p className="text-small text-ink-muted">
                 An empty composer, open on every visit. Not a value in an editor — an editor for
-                nothing, holding the height of three lines of text that do not exist. This is the
-                single biggest source of form-feel in the app.
+                nothing, holding the height of three lines of text that do not exist.
               </p>
               <Card padding="dense" className="space-y-2">
                 <Label htmlFor="ui-demo-open">Add a note</Label>
@@ -497,6 +714,7 @@ export default function DevUiPage() {
       </Section>
 
       <Section
+        id="before"
         title="Before you draw a surface"
         lead="Answer these before writing markup. Each one is cheap now and expensive once the surface exists."
       >
@@ -513,8 +731,9 @@ export default function DevUiPage() {
       </Section>
 
       <Section
+        id="colour"
         title="Colour"
-        lead="Colour is a claim. If you need one and none of these meanings is true, use ink and a shape."
+        lead="Colour is a claim. Three inks, four meanings, six workspaces and seven stages, and that is every hue the interface has. If you need one and none of these is true, use ink and a shape."
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <CardSection title="Ink">
@@ -531,13 +750,121 @@ export default function DevUiPage() {
               ))}
             </div>
           </CardSection>
+          <CardSection
+            title="Workspace accents"
+            hint="One arc through blue, violet and pink, so six differently coloured rooms read as one house. Chrome takes the accent; content keeps its own meaning."
+          >
+            <div className="space-y-3">
+              {MODULES.map((entry) => (
+                <Swatch
+                  key={entry.id}
+                  swatch={WORKSPACE_HUES[entry.id]}
+                  name={entry.label}
+                  note={entry.description}
+                />
+              ))}
+            </div>
+          </CardSection>
+          <CardSection
+            title="Pipeline stages"
+            hint="One hue per stage, the same in every theme and every workspace, and nowhere else in the app. The tint beside each is the chip it sits on."
+          >
+            <div className="space-y-3">
+              {PIPELINE.map(([hue, tint, name, note]) => (
+                <div key={name} className="flex items-center gap-3">
+                  <span aria-hidden className="flex shrink-0 overflow-hidden rounded-control">
+                    <span className={cn('size-7', hue)} />
+                    <span className={cn('size-7', tint)} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-ui font-medium text-ink">{name}</p>
+                    <p className="text-small text-ink-muted">{note}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardSection>
         </div>
+        <Card padding="standard" className="space-y-3 text-body text-ink-muted">
+          <p>
+            <span className="text-ink">A tint is a sheet.</span> An accent chip or a caution banner
+            is an opaque ground the size of a sentence, and the text on it belongs to the chip, not
+            to the page behind it — so every tint takes back the sheet&rsquo;s ink the way a card
+            does. A fractional ground is not a sheet, it is a wash: on a dark bench it comes out
+            dark and wants the ink of whatever it is washing over, which is what inheriting gives it
+            for free.
+          </p>
+          <p>
+            <span className="text-ink">Two borders, and the difference is legal.</span>{' '}
+            <code className="text-ui">border</code> is the container hairline.{' '}
+            <code className="text-ui">control</code> is the border of an input, a select or a
+            checkbox — often the only thing identifying it as a control, which makes it a user
+            interface component owing 3:1 that a hairline does not pay.
+          </p>
+          <p>
+            <span className="text-ink">Every text and ground pair clears 4.5:1 in every theme</span>
+            , and <code className="text-ui">scripts/check-contrast.ts</code> fails the build on
+            anything under. Do not hand-tune a value without re-running it.
+          </p>
+        </Card>
       </Section>
 
       <Section
-        title="Type"
-        lead="Seven sizes, named for what they are for. A size is chosen by role, never by how big it needs to look."
+        id="themes"
+        title="Themes"
+        lead="Four. Each strip is the theme itself, not a picture of it: the wrapper carries the same attribute the layout puts on the document."
       >
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            {THEMES.map((theme) => (
+              <li key={theme.id} className="card-pad-x row-pad space-y-1.5">
+                <div className="flex items-baseline gap-2">
+                  <p className="text-ui font-medium text-ink">{theme.label}</p>
+                  <p className="text-small text-ink-muted">{theme.mood}</p>
+                </div>
+                <div data-theme={theme.id} className="space-y-1">
+                  <div className="flex h-7 overflow-hidden rounded-control">
+                    {THEME_STRIPS[theme.id].map(([cls, name]) => (
+                      <span key={cls} className={cn('flex-1', cls)} title={name} />
+                    ))}
+                  </div>
+                  <div className="flex h-3 overflow-hidden rounded-control">
+                    {HUE_STRIP.map((cls) => (
+                      <span key={cls} className={cn('flex-1', cls)} />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-small text-ink-ghost">
+                  {THEME_STRIPS[theme.id].map(([, name]) => name).join(' · ')} · then the six
+                  workspace hues and the three meanings
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+        <Rules items={C.THEME_RULES} />
+      </Section>
+
+      <Section
+        id="type"
+        title="Type"
+        lead="Three families and a named scale. A size is chosen by role, never by how big it needs to look."
+      >
+        <Card padding="standard" className="space-y-2 text-body text-ink-muted">
+          <p>
+            <span className="text-ink">Inter does all the work.</span> Bricolage Grotesque is the
+            voice: page titles, the one big figure, the workspace label, and nothing else. Use it
+            big or not at all — at 13px a grotesque is a slightly odd Inter, and the difference is
+            noise rather than voice. A mono for the status line, keycaps, and anything that is
+            literally a machine talking. No serifs anywhere: this is an instrument panel, not a
+            document.
+          </p>
+          <p>
+            <span className="text-ink">Anything in a column of numbers is tabular.</span> Money,
+            counts, dates, durations. A column of proportional digits that shifts as it updates is
+            the cheapest way to make a dashboard feel unreliable.
+          </p>
+        </Card>
         <Card padding="none">
           <ul className="divide-y divide-border">
             {TYPE_SCALE.map(([cls, px, note]) => (
@@ -550,11 +877,354 @@ export default function DevUiPage() {
                 <span className="text-small text-ink-muted">{note}</span>
               </li>
             ))}
+            <li className="flex flex-wrap items-baseline gap-x-4 gap-y-1 card-pad-x row-pad">
+              <span className="min-w-40 font-display text-title text-ink">text-figure-xl</span>
+              <span className="text-small tabular-nums text-ink-ghost">72px</span>
+              <span className="text-small text-ink-muted">
+                The one figure a page is about. Nothing else is ever set this large.
+              </span>
+            </li>
           </ul>
         </Card>
       </Section>
 
       <Section
+        id="measurements"
+        title="Measurements"
+        lead="The numbers, in pixels. Each is copied from globals.css and a test fails when the two disagree, which is what lets a page of typed numbers call itself a mirror."
+      >
+        <Group title="The density dial">
+          <p className="text-small text-ink-muted">
+            One attribute on the document, three values. Below is the same row at each density,
+            rendered by the real attribute, so what the dial does is visible without turning it.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* ui-ok: card-per-row -- three densities compared side by side is
+             * a fixed set of three, which is what cards are for; the Card
+             * inside each is the same one-surface list at that density. */}
+            {DENSITY_IDS.map((density, index) => (
+              <div key={density} data-density={density} className="space-y-2">
+                <p className="text-small font-medium text-ink-muted">
+                  {DENSITY_LABELS[index]}{' '}
+                  <span className="tabular font-normal text-ink-ghost">
+                    {M.ROW_HEIGHT[index]}px row
+                  </span>
+                </p>
+                <Card padding="none">
+                  <ul className="divide-y divide-border">
+                    {SHAPE_DEMO.slice(0, 2).map((row) => (
+                      <li key={row.role} className="card-pad-x row-pad flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-ui text-ink">{row.role}</span>
+                        <span className="tabular shrink-0 text-micro text-ink-ghost">
+                          {row.age}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label={`A ${density} control`}
+                    defaultValue="Control"
+                    className="min-w-0"
+                  />
+                  <Button size="md">Save</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              <li className="card-pad-x row-pad grid grid-cols-[1fr_repeat(3,3.5rem)] gap-x-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+                <span>Variable</span>
+                {DENSITY_LABELS.map((label) => (
+                  <span key={label} className="text-right">
+                    {label.slice(0, 4)}
+                  </span>
+                ))}
+              </li>
+              {M.DIAL.map((row) => (
+                <li
+                  key={row.variable}
+                  className="card-pad-x row-pad grid grid-cols-[1fr_repeat(3,3.5rem)] items-baseline gap-x-2"
+                >
+                  <span className="min-w-0">
+                    <code className="text-ui text-ink">{row.variable}</code>
+                    <span className="block text-small text-ink-muted">{row.what}</span>
+                  </span>
+                  {row.px.map((value, index) => (
+                    <span key={index} className="tabular text-right text-ui text-ink">
+                      {value}
+                    </span>
+                  ))}
+                </li>
+              ))}
+              <li className="card-pad-x row-pad grid grid-cols-[1fr_repeat(3,3.5rem)] items-baseline gap-x-2">
+                <span className="min-w-0">
+                  <code className="text-ui text-ink">--control-h</code>
+                  <span className="block text-small text-ink-muted">
+                    Control height with a pointer, from 40rem up. A finger needs the bigger target
+                    above; a mouse does not.
+                  </span>
+                </span>
+                {M.CONTROL_H_POINTER.map((value, index) => (
+                  <span key={index} className="tabular text-right text-ui text-ink">
+                    {value}
+                  </span>
+                ))}
+              </li>
+              <li className="card-pad-x row-pad grid grid-cols-[1fr_repeat(3,3.5rem)] items-baseline gap-x-2">
+                <span className="min-w-0">
+                  <span className="text-ui text-ink">A list row</span>
+                  <span className="block text-small text-ink-muted">
+                    One line of text-ui plus the row padding. The same as a pointer control at every
+                    density, so a row and a control on one surface agree.
+                  </span>
+                </span>
+                {M.ROW_HEIGHT.map((value, index) => (
+                  <span key={index} className="tabular text-right text-ui text-ink">
+                    {value}
+                  </span>
+                ))}
+              </li>
+            </ul>
+          </Card>
+        </Group>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CardSection title="Radius">
+            <ul className="space-y-2">
+              {M.RADII.map((radius) => (
+                <li key={radius.name} className="flex items-baseline gap-3">
+                  <span className="tabular w-8 shrink-0 text-right text-ui text-ink">
+                    {radius.px ? radius.px : '∞'}
+                  </span>
+                  <span className="min-w-0">
+                    <code className="text-ui text-ink">{radius.name}</code>
+                    <span className="block text-small text-ink-muted">{radius.where}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+          <CardSection
+            title="Icons"
+            hint={`Lucide, ${M.ICON_STROKE} stroke, currentColor, never filled.`}
+          >
+            <ul className="space-y-2">
+              {M.ICONS.map((icon) => (
+                <li key={icon.px} className="flex items-baseline gap-3">
+                  <span className="tabular w-8 shrink-0 text-right text-ui text-ink">
+                    {icon.px}
+                  </span>
+                  <span className="text-small text-ink-muted">{icon.where}</span>
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+        </div>
+
+        <CardSection
+          title="Space"
+          hint="A 4px grid. The steps in use, and what each one is for — a gap not on this list is a decision, and says why."
+        >
+          <ul className="space-y-1.5">
+            {M.SPACING.map((space) => (
+              <li key={space.step} className="flex items-baseline gap-3">
+                <span className="tabular w-8 shrink-0 text-right text-ui text-ink">{space.px}</span>
+                <span className="text-small text-ink-muted">{space.where}</span>
+              </li>
+            ))}
+          </ul>
+        </CardSection>
+        <Rules items={C.ICON_RULES} />
+      </Section>
+
+      <Section
+        id="elevation"
+        title="Elevation and layering"
+        lead="Depth in three themes is a hairline. A shadow at rest belongs only to the layer that floats. Above the layers, who paints over whom is a ladder with eight rungs, and a new z-index picks one of them."
+      >
+        <Rows rows={M.ELEVATION} labelWidth="sm:grid-cols-[7rem_1fr]" />
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            {M.Z_LADDER.map((rung) => (
+              <li key={rung.z} className="card-pad-x row-pad flex items-baseline gap-4">
+                <span className="tabular w-10 shrink-0 text-right text-ui font-medium text-ink">
+                  {rung.z}
+                </span>
+                <span className="text-body text-ink-muted">{rung.what}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </Section>
+
+      <Section
+        id="motion"
+        title="Motion"
+        lead="One duration, one easing, and every animation in the app in one table. All of it drops under prefers-reduced-motion."
+      >
+        <Card padding="standard" className="flex flex-wrap items-center gap-4">
+          <Button>Press me</Button>
+          <Card interactive padding="dense" className="text-ui text-ink-muted">
+            Lift on hover
+          </Card>
+          <Skeleton className="h-4 w-32" />
+          <span className="flex items-center gap-1 text-small text-ink-muted">
+            hold <Kbd always>⌘</Kbd> for the hints
+          </span>
+        </Card>
+        <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
+        <Rules items={M.MOTION_RULES} />
+      </Section>
+
+      <Section id="loops" title="The four loops" lead={C.LOOPS_LEAD}>
+        <Rows rows={C.LOOPS} labelWidth="sm:grid-cols-[6rem_1fr]" />
+        <Rules items={C.LOOPS_RULES} />
+      </Section>
+
+      <Section id="wayfinding" title="Where am I, and how do I get back">
+        <Rules items={C.WAYFINDING} />
+      </Section>
+
+      <Section id="latency" title="Latency: what is instant, what waits" lead={C.LATENCY_LEAD}>
+        <Rows rows={C.LATENCY} labelWidth="sm:grid-cols-[7rem_1fr]" />
+      </Section>
+
+      <Section id="undo" title="Undo beats confirm" lead={C.UNDO_LEAD}>
+        <Rows rows={C.UNDO} />
+      </Section>
+
+      <Section id="bulk" title="Bulk" lead={C.BULK_LEAD}>
+        <Rules items={C.BULK} />
+      </Section>
+
+      <Section id="keyboard" title="The keyboard model" lead={C.KEYBOARD_LEAD}>
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            {C.KEYBOARD.map(([key, means]) => (
+              <li key={key} className="card-pad-x row-pad flex items-baseline gap-4">
+                <span className="w-24 shrink-0">
+                  <Kbd always>{key}</Kbd>
+                </span>
+                <span className="text-body text-ink">{means}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+        <p className="text-small text-ink-muted">
+          The model is the standard; which keys a given list answers to today is on the ideas page
+          and the plan, not here.
+        </p>
+      </Section>
+
+      <Section id="search" title="Search is one system">
+        <Rules items={C.SEARCH} />
+      </Section>
+
+      <Section id="save" title="Forms: the save model">
+        <Rules items={C.SAVE_MODEL} />
+      </Section>
+
+      <Section id="cross" title="Across workspaces" lead={C.CROSS_WORKSPACE_LEAD}>
+        <Rules items={C.CROSS_WORKSPACE} />
+      </Section>
+
+      <Section
+        id="speaks"
+        title="The three places the app speaks"
+        lead="Different surfaces answering different questions. Keeping them distinct is what stops any of them becoming noise."
+      >
+        <Rows rows={C.PLACES} />
+        <Card padding="standard" className="text-body text-ink-muted">
+          {C.TIME_AS_LENGTH}
+        </Card>
+      </Section>
+
+      <Section id="ladder" title="The attention ladder" lead={C.LADDER_LEAD}>
+        <Rows rows={C.LADDER} />
+        <Rules items={C.NOTIFICATION_RULES} />
+      </Section>
+
+      <Section id="finding" title="Finding one row in five hundred">
+        <Rules items={C.FINDING} />
+      </Section>
+
+      <Section
+        id="surfaces"
+        title="Surfaces"
+        lead="Pick the shape from the question the user is asking, and the width from how the page is read."
+      >
+        <Rows rows={C.SHAPES} labelWidth="sm:grid-cols-[6rem_1fr]" />
+        <Rows rows={C.PAGE_WIDTHS} labelWidth="sm:grid-cols-[7rem_1fr]" />
+        <Group title="Rows">
+          <Rules items={C.ROW_RULES} />
+        </Group>
+        <Group title="Tables">
+          <Rules items={C.TABLE_RULES} />
+        </Group>
+        <Group title="Filters">
+          <Rules items={C.FILTER_RULES} />
+        </Group>
+        <Group title="Banners">
+          <Rows rows={C.BANNER_TONES} labelWidth="sm:grid-cols-[4rem_1fr]" />
+        </Group>
+      </Section>
+
+      <Section id="shell" title="The shell">
+        <Rules items={C.SHELL_RULES} />
+      </Section>
+
+      <Section id="states" title="States">
+        <Rows rows={C.STATES} labelWidth="sm:grid-cols-[5rem_1fr]" />
+      </Section>
+
+      <Section id="first-run" title="First run">
+        <Rules items={C.FIRST_RUN} />
+      </Section>
+
+      <Section id="touch" title="Touch">
+        <Rules items={C.TOUCH} />
+      </Section>
+
+      <Section id="alive" title="Alive" lead={C.ALIVE_LEAD}>
+        <Rows rows={C.ALIVE} />
+      </Section>
+
+      <Section id="a11y" title="Accessibility contract">
+        <Rules items={C.A11Y} />
+      </Section>
+
+      <Section id="voice" title="Voice" lead={C.VOICE_LEAD}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CardSection title="Do">
+            <ul className="space-y-2">
+              {C.VOICE_DO.map((line) => (
+                <li key={line} className="text-body text-ink">
+                  &ldquo;{line}&rdquo;
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+          <CardSection title="Don’t">
+            <ul className="space-y-2">
+              {C.VOICE_DONT.map((line) => (
+                <li
+                  key={line}
+                  className="text-body text-ink-muted line-through decoration-danger/60"
+                >
+                  &ldquo;{line}&rdquo;
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+        </div>
+        <Rules items={C.VOICE} />
+      </Section>
+
+      <Section
+        id="gate"
         title="The gate"
         lead="The mechanical half of these laws runs on every push. It does not ask nicely."
       >
@@ -566,11 +1236,13 @@ export default function DevUiPage() {
             locked in, which is how the number only ever moves one way.
           </p>
           <p>
-            Five rules, all of them things a grep can settle: a hand-rolled box, a control height
+            Six rules, all of them things a grep can settle: a hand-rolled box, a control height
             written as a number, a scoped token read through <code className="text-ui">var()</code>,
-            a raw hex, a font size off the scale. Everything else on this page is the residue a
-            person has to read — <code className="text-ui">--list</code> shows where the machine
-            thinks the mess is, and that is where to start looking.
+            a raw hex, a font size off the scale, a card drawn per row. Contrast is a second gate in{' '}
+            <code className="text-ui">scripts/check-contrast.ts</code>, and the numbers on this page
+            are a third, in the test suite. Everything else here is the residue a person has to read
+            — <code className="text-ui">--list</code> shows where the machine thinks the mess is,
+            and that is where to start looking.
           </p>
           <p>
             If a violation is genuinely right, say so where it is:{' '}
@@ -581,28 +1253,33 @@ export default function DevUiPage() {
         </Card>
       </Section>
 
-      <Section title="Never">
+      <Section
+        id="ship"
+        title="Before you ship a surface"
+        lead="The checklist. Every line is a law or a rule above, applied; if one cannot be ticked, the surface is not done."
+      >
+        <Card padding="none">
+          <ol className="divide-y divide-border">
+            {C.CHECKLIST.map((line, index) => (
+              <li key={line} className="card-pad-x row-pad flex gap-3">
+                <span className="tabular w-5 shrink-0 text-right text-ui text-ink-ghost">
+                  {index + 1}
+                </span>
+                <span className="text-body text-ink">{line}</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      </Section>
+
+      <Section
+        id="never"
+        title="Never"
+        lead="Only the nevers that are not already a law. Each was a real bug once."
+      >
         <Card padding="standard">
           <ul className="space-y-1.5 text-body text-ink-muted">
-            {[
-              'Render an empty section, a zero, or a skeleton of nothing.',
-              'Show a short list where a source failed, without saying it failed.',
-              'Invent precision the data does not have.',
-              'Use a semantic colour for a meaning it does not carry.',
-              'Put view state in component state instead of the URL.',
-              'Write a hex, a font size, or a control height that is not a token.',
-              'Read a scoped token through var(--color-…) in an inline style or an arbitrary value. Use the utility.',
-              'Spend a label, a border and a heading on a field that needs a placeholder.',
-              'Draw a box inside a box. Give the inner group a heading and space instead.',
-              'Open a panel to edit one value that could be edited where it is read.',
-              'Fold a section behind a line that does not say what is inside it.',
-              'Draw a card per row in a list that is scrolled. One surface, hairlines, one line each.',
-              'Give an item a second line without arguing for it — it halves what fits on a phone.',
-              'Render a surface in edit mode when almost everyone arriving is reading.',
-              'Explain a heading in a sentence under it on every viewing. Name it right; teach in the empty state.',
-              'Print a caption above a box whose placeholder already says the same words.',
-              'Delay the user to be charming.',
-            ].map((line) => (
+            {C.NEVER.map((line) => (
               <li key={line} className="flex gap-2">
                 <span aria-hidden className="text-danger">
                   ·
@@ -612,6 +1289,13 @@ export default function DevUiPage() {
             ))}
           </ul>
         </Card>
+        <p className="text-small text-ink-muted">
+          Something wrong with a surface? Say so on{' '}
+          <Link href="/dev/surfaces" className="text-accent hover:underline">
+            Surfaces
+          </Link>
+          , where every one is rendered at the width it is read at.
+        </p>
       </Section>
     </div>
   );

@@ -350,6 +350,7 @@ function SummaryStrip({
     { view: 'ready', value: summary.ready, noun: 'ready' },
     { view: 'proposed', value: summary.proposed, noun: 'proposed' },
     { view: 'blocked', value: summary.waiting, noun: 'waiting' },
+    { view: 'fog', value: summary.fog, noun: 'not specified' },
     { view: null, value: summary.inProgress, noun: 'underway' },
     { view: 'claude', value: summary.claude, noun: "Claude's" },
     { view: null, value: summary.done, noun: 'done' },

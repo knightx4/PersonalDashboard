@@ -1,8 +1,11 @@
 # Design update plan
 
-The design language is [`docs/design-language.html`](design-language.html) — open it in a
-browser, and use the five theme swatches top right. This file is the migration: how the
-existing app gets there, in an order where every step ships on its own.
+The design language is `/dev/ui` in the running app (`app/dev/ui/page.tsx`, with the
+laws in `laws.ts`, the behavioural rules in `content.ts` and the numbers in
+`measurements.ts`). It is the only copy: the static HTML that used to live beside this
+file was a second description of the interface, and a second description is wrong within a
+month. This file is the migration: how the existing app got there, in an order where every
+step shipped on its own.
 
 Read the language first. This document assumes it.
 

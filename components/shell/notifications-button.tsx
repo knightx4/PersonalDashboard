@@ -30,7 +30,7 @@ export type Notification = {
  * anything the system did or noticed on its own -- a return window closing, an
  * interview tomorrow with no prep, a vault token that expired -- all of which
  * are currently shouted as full-width page banners instead. See the attention
- * ladder in docs/design-language.html.
+ * ladder on /dev/ui.
  */
 export function NotificationsButton({
   notifications = [],
