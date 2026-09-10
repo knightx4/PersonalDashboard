@@ -71,10 +71,21 @@ describe('the fixed measurements on /dev/ui', () => {
     expect(RADII.find((r) => r.name === 'rounded-control')?.px).toBe(px(control[1]));
   });
 
-  it('the grain sits at the top of the z ladder', () => {
-    const grain = /body::before\s*\{[^}]*z-index:\s*(\d+)/.exec(css);
-    if (!grain) throw new Error('grain has no z-index');
-    expect(Z_LADDER.at(-1)?.z).toBe(grain[1]);
+  it('the z ladder on the page is the one in globals.css', () => {
+    const rungs = [...css.matchAll(/^\s*--z-([a-z-]+):\s*(\d+);/gm)].map(([, name, z]) => ({
+      utility: `z-${name}`,
+      z,
+    }));
+    expect(rungs).toEqual(Z_LADDER.map(({ z, utility }) => ({ utility, z })));
+    rungs.forEach(({ utility }) => {
+      expect(css).toContain(`@utility ${utility} {`);
+    });
+  });
+
+  it('the grain sits on the top rung', () => {
+    const grain = /body::before\s*\{[^}]*z-index:\s*var\(--z-([a-z-]+)\)/.exec(css);
+    if (!grain) throw new Error('grain is not on a rung');
+    expect(Z_LADDER.at(-1)?.utility).toBe(`z-${grain[1]}`);
   });
 
   it('the icon stroke is the one the shell draws', () => {

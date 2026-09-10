@@ -1176,6 +1176,7 @@ export default function DevUiPage() {
                 <span className="tabular w-10 shrink-0 text-right text-ui font-medium text-ink">
                   {rung.z}
                 </span>
+                <code className="w-28 shrink-0 text-small text-ink">{rung.utility}</code>
                 <span className="text-body text-ink-muted">{rung.what}</span>
               </li>
             ))}

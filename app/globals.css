@@ -896,6 +896,63 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+ * The z ladder.
+ *
+ * Eight rungs, each one named, so a call site reads `z-palette` rather than a
+ * number somebody has to go and look up. Tailwind's own scale stops at 50,
+ * which is how `z-[60]` and `z-[70]` came to be written by hand; nothing
+ * outside this list is a rung.
+ *
+ * The numbers live here rather than in a TypeScript constant because the
+ * grain below needs one in a plain rule, and because a test can read a
+ * stylesheet. /dev/ui draws the same eight from app/dev/ui/measurements.ts,
+ * and tests/dev-ui-measurements.test.ts fails if the two disagree.
+ * ------------------------------------------------------------------------- */
+:root {
+  /* A control that must stay clickable above a row's stretched link. */
+  --z-over-link: 10;
+  /* A menu or listbox opened inside the page. */
+  --z-menu: 20;
+  /* The status line. */
+  --z-status: 30;
+  /* The sidebar and the top bar. */
+  --z-chrome: 40;
+  /* The drawer, popovers, action menus. */
+  --z-overlay: 50;
+  /* The command palette, which covers the drawer. */
+  --z-palette: 60;
+  /* Toasts, over everything a person can click. */
+  --z-toast: 70;
+  /* The grain, which no pointer can touch. */
+  --z-grain: 9999;
+}
+
+@utility z-over-link {
+  z-index: var(--z-over-link);
+}
+@utility z-menu {
+  z-index: var(--z-menu);
+}
+@utility z-status {
+  z-index: var(--z-status);
+}
+@utility z-chrome {
+  z-index: var(--z-chrome);
+}
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+@utility z-palette {
+  z-index: var(--z-palette);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
+@utility z-grain {
+  z-index: var(--z-grain);
+}
+
+/* ---------------------------------------------------------------------------
  * The grain.
  *
  * One fixed layer over the whole viewport. It is the difference between a
@@ -907,7 +964,7 @@ body {
  * ------------------------------------------------------------------------- */
 body::before {
   position: fixed;
-  z-index: 9999;
+  z-index: var(--z-grain);
   inset: 0;
   background-image: var(--grain);
   background-repeat: repeat;
