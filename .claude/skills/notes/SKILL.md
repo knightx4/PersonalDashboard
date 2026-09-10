@@ -208,11 +208,14 @@ against:
 
 ```
 npx tsx scripts/plan.ts raises
-npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>]
+npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>]
 ```
 
 `DATABASE_URL` is not set on the web, so the SQL for both is in
 `.claude/skills/plan/SKILL.md` under **When the CLI cannot run**.
+
+`--ask` is required: the move you want back, in one sentence the user can
+answer in one line. The detail is the evidence for it, not the ask itself.
 
 **A session never answers or dismisses a raise.** That is the user's move on
 `/dev/raised`, the same rule as never answering its own decision. A session

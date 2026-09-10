@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { elapsedSince } from './elapsed';
+import { elapsedSince, isStalledClaim, STALLED_AFTER_MINUTES } from './elapsed';
 
 const start = '2026-09-09T10:00:00.000Z';
 const at = (minutes: number) => new Date(start).getTime() + minutes * 60_000;
@@ -31,5 +31,25 @@ describe('elapsedSince', () => {
   // reads as started in the future must not read as negative.
   it('never goes backwards', () => {
     expect(elapsedSince(start, at(-5))).toBe('just now');
+  });
+});
+
+describe('isStalledClaim', () => {
+  it('calls a fresh claim live', () => {
+    expect(isStalledClaim(start, at(0))).toBe(false);
+    expect(isStalledClaim(start, at(STALLED_AFTER_MINUTES - 1))).toBe(false);
+  });
+
+  it('calls a claim nothing has touched since stalled', () => {
+    expect(isStalledClaim(start, at(STALLED_AFTER_MINUTES))).toBe(true);
+    // #144: claimed at 13:55 and reported at 18:30, still pulsing.
+    expect(isStalledClaim(start, at(60 * 7))).toBe(true);
+  });
+
+  // Zero is the clock's value before it has ticked, on the server and on the
+  // first client render. Reading it as "started in 1970" would flip every
+  // running step to stalled and then back again on mount.
+  it('says nothing before the clock has started', () => {
+    expect(isStalledClaim(start, 0)).toBe(false);
   });
 });
