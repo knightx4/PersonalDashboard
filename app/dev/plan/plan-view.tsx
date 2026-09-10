@@ -1559,9 +1559,18 @@ function healthOf(node: PlanNode): Health {
  * and a "0 blocked" is a fact nobody needed (law 1). The count is the label:
  * the word is on the dot's tooltip and in its accessible name, because eight
  * spelled-out states would be a paragraph where a glance was asked for.
+ *
+ * Answered is left out. Every other dot is either work outstanding or work
+ * that shipped; an answered question is neither -- it is a decision recorded
+ * and carried into the briefs beneath it, and it never becomes work again.
+ * Counting them said nothing about the shape of what is left in a module,
+ * which is the one thing these dots are for, and it was a dot on every
+ * heading.
  */
+const TALLY_HEALTHS = PLAN_HEALTHS.filter((health) => health !== 'answered');
+
 function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
-  const present = PLAN_HEALTHS.filter((health) => tally[health] > 0);
+  const present = TALLY_HEALTHS.filter((health) => tally[health] > 0);
   if (present.length === 0) return null;
 
   return (
