@@ -1265,6 +1265,26 @@ function Dependencies({
 }
 
 /**
+ * What pressing Send actually hands over, said before it is pressed.
+ *
+ * The brief carries the step's whole subtree under "## Steps", so Send on a
+ * feature hands over the feature and everything beneath it. The button read
+ * "Send to Claude" whichever row it sat on, so pressing it on #197 looked like
+ * sending one step and sent ten. The action already says so afterwards; this
+ * is the same count, in the label, before you commit to it.
+ *
+ * Everything beneath at any depth, closed rows included, because that is what
+ * the brief prints -- deliberately not the batch button's count, which is the
+ * open steps it would work through.
+ */
+function sendLabel(node: PlanNode): string {
+  const beneath = flatten([node]).length - 1;
+  return beneath === 0
+    ? `Send #${node.number} to Claude`
+    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Claude`;
+}
+
+/**
  * Hand it over and start the routine now.
  *
  * The button is offered whether or not the deployment can start a routine,
@@ -1308,7 +1328,7 @@ function SendToClaude({
         <input type="hidden" name="id" value={node.id} />
         <Button type="submit" size="sm" variant="secondary" pending={pending}>
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : 'Send to Claude'}
+          {pending ? 'Sending…' : sendLabel(node)}
         </Button>
       </form>
       {beneath > 0 && (
@@ -1847,7 +1867,7 @@ function PlanRow({
       : [
           {
             id: 'send',
-            label: 'Send to Claude',
+            label: sendLabel(node),
             formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
             formFields: { id: node.id },
           },
@@ -2115,7 +2135,7 @@ function PlanRow({
             {!closed && (
               <form action={sendAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <RowIconButton type="submit" label="Send to Claude" pending={sendPending}>
+                <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
                   <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                 </RowIconButton>
               </form>
