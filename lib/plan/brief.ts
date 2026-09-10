@@ -17,6 +17,31 @@ import { ancestorsOf, flatten, type PlanNode, type PlanSection } from './tree';
  * done; one that pads itself with the rest of the plan buries the step.
  */
 
+/**
+ * The one writing rule every routine that writes a plan row carries.
+ *
+ * The skill says it at length; this says it in the instruction itself, so a
+ * session has it before it has read anything. It is here rather than in either
+ * caller because shaping and re-shaping both write rows the person reads, and
+ * a rule that applied to only one of them would show up as half the plan being
+ * legible.
+ *
+ * The complaint it answers, in full: "I basically never have any idea what you
+ * are saying on any of the plan stuff." Every detail on the page opened with a
+ * file path and never said what the step gives the person who owns the app.
+ */
+export const PLAIN_ENGLISH_RULE =
+  'Write it in plain English. The person reading the plan page owns this app ' +
+  'and decides what gets built; they are not going to open a file to work out ' +
+  'what a step is. So the FIRST SENTENCE of every detail says what will be ' +
+  'different for them and names nothing from the codebase -- no file paths, no ' +
+  'table names, no type or function names -- and the rest is as technical as it ' +
+  'needs to be. Same for a title, a question, its options, and any fog. Read ' +
+  'your first sentence back and ask whether somebody who has never opened this ' +
+  'repository would know what they are getting; if not, it is not written yet. ' +
+  'No stock phrases, no metaphor for machinery, no claims about why the step ' +
+  'matters.';
+
 export const STATUS_WORD: Record<PlanStatus, string> = {
   proposed: 'proposed',
   not_started: 'not started',

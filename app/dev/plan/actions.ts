@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { fireFeatureRoutine, planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
-import { planBrief, planQueueBrief } from '@/lib/plan/brief';
+import { PLAIN_ENGLISH_RULE, planBrief, planQueueBrief } from '@/lib/plan/brief';
 import {
   PLAN_ASSIGNEES,
   PLAN_KINDS,
@@ -941,7 +941,7 @@ async function startReshape(
     'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not re-propose something the ' +
     'feature already holds. Report what you proposed, what you dropped and why, and what ' +
-    'fog you cleared.\n\nThe brief is below; it is the plan as the app holds it right ' +
+    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
     planBrief(sections, node);

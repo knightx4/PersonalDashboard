@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { PLAIN_ENGLISH_RULE } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 
 export type IdeaActionState = {
@@ -139,6 +140,7 @@ export async function shapeIdea(
     'section of .claude/skills/plan/SKILL.md. Write a proposal only: a feature with its steps, ' +
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
+    `${PLAIN_ENGLISH_RULE}\n\n` +
     `Idea ${String(idea.id)} (about ${label}):\n\n${String(idea.body)}\n`;
 
   const routine = planRoutine();
