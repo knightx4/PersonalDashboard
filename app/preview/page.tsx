@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getUser } from '@/lib/auth/server';
 import Link from 'next/link';
 import { SURFACES } from './surfaces';
+import { MAIN_BOX } from '@/components/shell/main-box';
 
 /**
  * The surface gallery: the app's own components, on the app's own ground.
@@ -45,11 +46,19 @@ export default async function PreviewPage({
     return (
       <div data-workspace={surface.module} className="bg-page min-h-screen">
         {/* The width the thing is actually read at. A surface that only looks
-          * crowded at 390px and only looks empty at 1280px has been judged at
-          * neither, which is how a form nobody would draw on a phone gets
-          * drawn on a phone. */}
+         * crowded at 390px and only looks empty at 1280px has been judged at
+         * neither, which is how a form nobody would draw on a phone gets
+         * drawn on a phone.
+         *
+         * A whole page arrangement takes the shell's own box instead, since
+         * what it is drawing is the page, and a page is not centred in a
+         * column somebody chose for it. */}
         <div
-          className={`mx-auto px-4 py-6 ${surface.width === 'narrow' ? 'max-w-2xl' : 'max-w-4xl'}`}
+          className={
+            surface.width === 'page'
+              ? MAIN_BOX
+              : `mx-auto px-4 py-6 ${surface.width === 'narrow' ? 'max-w-2xl' : 'max-w-4xl'}`
+          }
         >
           {surface.render()}
         </div>
