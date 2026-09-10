@@ -12,6 +12,7 @@ import {
   viewWindow,
 } from '@/lib/todo/calendar/range';
 import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
+import type { Event } from '@/lib/todo/events/model';
 import type { Task } from '@/lib/todo/tasks/model';
 
 const NOW = new Date('2026-03-10T09:00:00.000Z');
@@ -33,11 +34,27 @@ function task(over: Partial<Task> = {}): Task {
   };
 }
 
+function event(over: Partial<Event> = {}): Event {
+  return {
+    id: 'event-1',
+    title: 'An event',
+    body: null,
+    location: null,
+    startsOn: null,
+    endsOn: null,
+    startsAt: null,
+    endsAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...over,
+  };
+}
+
 function build(over: Partial<Parameters<typeof buildRange>[0]> = {}) {
   return buildRange({
     view: 'week',
     anchor: '2026-03-10',
     tasks: [],
+    events: [],
     items: [] as AgendaItem[],
     context: [] as DayContext[],
     dismissals: new Map(),
@@ -148,6 +165,37 @@ describe('buildRange', () => {
     const month = build({ view: 'month', anchor: '2026-03-10' });
     expect(month.days[0].inMonth).toBe(false);
     expect(month.days[21].inMonth).toBe(true);
+  });
+
+  it('spreads an event across the days of the week it covers', () => {
+    const range = build({
+      view: 'week',
+      events: [event({ title: 'Half term', startsOn: '2026-03-11', endsOn: '2026-03-13' })],
+    });
+
+    expect(range.days.map((day) => day.entries.length)).toEqual([0, 0, 1, 1, 1, 0, 0]);
+    expect(range.days[2].entries[0]).toEqual(
+      expect.objectContaining({ kind: 'event', title: 'Half term', at: null }),
+    );
+  });
+
+  it('gives a day view the hours a timed event runs', () => {
+    const range = build({
+      view: 'day',
+      anchor: '2026-03-10',
+      events: [
+        event({
+          title: 'Review',
+          startsAt: '2026-03-10T10:00:00.000Z',
+          endsAt: '2026-03-10T12:00:00.000Z',
+        }),
+      ],
+    });
+
+    expect(range.days[0].entries[0]).toEqual(
+      expect.objectContaining({ at: '2026-03-10T10:00:00.000Z', end: '2026-03-10T12:00:00.000Z' }),
+    );
+    expect(hourIn(range.days[0].entries[0].at as string, 'UTC')).toBe(10);
   });
 
   it('keeps a dateless task out of the grid and in the backlog', () => {

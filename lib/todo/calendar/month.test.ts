@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addMonths, buildMonth, isMonth, monthDays, monthWindow } from '@/lib/todo/calendar/month';
 import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
+import type { Event } from '@/lib/todo/events/model';
 import type { Task } from '@/lib/todo/tasks/model';
 
 const NOW = new Date('2026-03-10T09:00:00.000Z');
@@ -18,6 +19,21 @@ function task(over: Partial<Task> = {}): Task {
     completedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     position: null,
+    ...over,
+  };
+}
+
+function event(over: Partial<Event> = {}): Event {
+  return {
+    id: 'event-1',
+    title: 'An event',
+    body: null,
+    location: null,
+    startsOn: null,
+    endsOn: null,
+    startsAt: null,
+    endsAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
     ...over,
   };
 }
@@ -53,6 +69,7 @@ function build(over: Partial<Parameters<typeof buildMonth>[0]> = {}) {
   return buildMonth({
     month: '2026-03',
     tasks: [],
+    events: [],
     items: [],
     context: [],
     dismissals: new Map(),
@@ -199,6 +216,106 @@ describe('buildMonth', () => {
       'Acme · Staff Engineer',
       'All day mine',
       'All day theirs',
+    ]);
+  });
+
+  it('puts a timed event on its day, with the hours it runs', () => {
+    const month = build({
+      events: [
+        event({
+          title: 'Dentist',
+          startsAt: '2026-03-10T15:00:00.000Z',
+          endsAt: '2026-03-10T15:30:00.000Z',
+        }),
+      ],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries).toEqual([
+      expect.objectContaining({
+        kind: 'event',
+        title: 'Dentist',
+        at: '2026-03-10T15:00:00.000Z',
+        end: '2026-03-10T15:30:00.000Z',
+      }),
+    ]);
+    expect(dayIn(month, '2026-03-11').entries).toEqual([]);
+  });
+
+  it('puts an all-day event on its day with no clock on it', () => {
+    // No `at`, which is what puts it in the all-day row of the day and week
+    // views rather than in an hour.
+    const month = build({
+      events: [event({ title: 'Bank holiday', startsOn: '2026-03-10', endsOn: '2026-03-10' })],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries).toEqual([
+      expect.objectContaining({ kind: 'event', at: null, end: null }),
+    ]);
+  });
+
+  it('puts an event running over three days on each of them', () => {
+    const month = build({
+      events: [event({ title: 'Half term', startsOn: '2026-03-10', endsOn: '2026-03-12' })],
+    });
+
+    for (const day of ['2026-03-10', '2026-03-11', '2026-03-12']) {
+      expect(dayIn(month, day).entries.map((entry) => entry.title)).toEqual(['Half term']);
+    }
+    expect(dayIn(month, '2026-03-13').entries).toEqual([]);
+  });
+
+  it('holds each day only the part of an event that is on it', () => {
+    // A meeting that runs into the small hours is on both days, and neither
+    // day is drawn as holding the whole of it.
+    const month = build({
+      events: [
+        event({
+          title: 'Night shift',
+          startsAt: '2026-03-10T23:00:00.000Z',
+          endsAt: '2026-03-11T01:00:00.000Z',
+        }),
+      ],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries).toEqual([
+      expect.objectContaining({ at: '2026-03-10T23:00:00.000Z', end: '2026-03-11T00:00:00.000Z' }),
+    ]);
+    expect(dayIn(month, '2026-03-11').entries).toEqual([
+      expect.objectContaining({ at: '2026-03-11T00:00:00.000Z', end: '2026-03-11T01:00:00.000Z' }),
+    ]);
+  });
+
+  it('files an evening event under the day it is on for this reader', () => {
+    const evening = event({
+      title: 'Late call',
+      startsAt: '2026-03-10T23:30:00.000Z',
+      endsAt: '2026-03-10T23:45:00.000Z',
+    });
+
+    expect(dayIn(build({ events: [evening] }), '2026-03-10').entries).toHaveLength(1);
+    expect(
+      dayIn(build({ events: [evening], timezone: 'Asia/Tokyo' }), '2026-03-11').entries,
+    ).toHaveLength(1);
+    expect(
+      dayIn(build({ events: [evening], timezone: 'Asia/Tokyo' }), '2026-03-10').entries,
+    ).toEqual([]);
+  });
+
+  it('reads an event before a task at the same time', () => {
+    const month = build({
+      tasks: [task({ title: 'Nine sharp', dueAt: '2026-03-10T09:00:00.000Z' })],
+      events: [
+        event({
+          title: 'Standup',
+          startsAt: '2026-03-10T09:00:00.000Z',
+          endsAt: '2026-03-10T09:15:00.000Z',
+        }),
+      ],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries.map((entry) => entry.title)).toEqual([
+      'Standup',
+      'Nine sharp',
     ]);
   });
 

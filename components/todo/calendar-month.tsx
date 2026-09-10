@@ -109,6 +109,7 @@ export function CalendarMonthGrid({
 }
 
 const DOT: Record<CalendarEntry['kind'], string> = {
+  event: 'bg-ink',
   task: 'bg-ink-muted',
   item: 'bg-accent',
   context: 'bg-positive',
@@ -134,6 +135,7 @@ export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: stri
     <span
       className={cn(
         'flex items-baseline gap-1 truncate rounded px-1 py-0.5 text-small leading-tight',
+        entry.kind === 'event' && 'bg-accent-tint font-medium text-ink',
         entry.kind === 'context' && 'bg-accent-tint text-ink',
         entry.kind === 'item' && 'bg-canvas text-ink',
         entry.kind === 'task' && 'text-ink',
