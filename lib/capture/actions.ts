@@ -16,6 +16,7 @@
  * this file can become a second way to write a task.
  */
 
+import { score } from '@/lib/search/score';
 import type { ModuleId } from '@/lib/modules';
 
 export type CaptureActionId = 'todo';
@@ -80,4 +81,46 @@ export function captureAction(id: string): CaptureAction | null {
  */
 export function captureHaystack(action: CaptureAction): string {
   return `${action.label} ${action.keywords.join(' ')}`;
+}
+
+/** An action a typed query names, and the words it did not use up. */
+export type CaptureMatch = {
+  action: CaptureAction;
+  /** Ranked by the scorer the palette ranks everything else with. */
+  points: number;
+  /** What is left of the query: the thing to file, rather than its name. */
+  seed: string;
+};
+
+/**
+ * Which actions a query in the palette names, best first.
+ *
+ * Scored against the leading words rather than against the whole query,
+ * because everything after the name is the thing being filed: "add todo ring
+ * the dentist" names the action in two words and hands the panel the rest.
+ * Scoring the whole string instead would lose the row on the first word of
+ * the todo itself, since a subsequence match is exactly what the rest of a
+ * sentence fails.
+ *
+ * The longest leading run that still names the action wins, so the seed is
+ * what is genuinely left over rather than the first word that happened to
+ * match. An empty query names nothing: the palette with nothing typed in it
+ * is a list of places to go, and it stays one.
+ */
+export function matchCaptureActions(query: string): CaptureMatch[] {
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+
+  const matches: CaptureMatch[] = [];
+  for (const action of CAPTURE_ACTIONS) {
+    const haystack = captureHaystack(action);
+    for (let take = words.length; take > 0; take -= 1) {
+      const points = score(haystack, words.slice(0, take).join(' '));
+      if (points === null) continue;
+      matches.push({ action, points, seed: words.slice(take).join(' ') });
+      break;
+    }
+  }
+
+  return matches.sort((a, b) => b.points - a.points);
 }
