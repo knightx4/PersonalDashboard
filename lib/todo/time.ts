@@ -57,3 +57,26 @@ function offsetOf(at: Date, timezone: string): number {
 
   return local - at.getTime();
 }
+
+/**
+ * What a new event's time fields start on: the next whole hour, an hour long.
+ *
+ * The next hour rather than this one because an event you are typing at 14:20
+ * is almost never one that started at 14:00. Late in the evening there is no
+ * next hour left in the day, so the last hour of it is offered instead of
+ * rolling over into a start that would be after its own end.
+ */
+export function nextHourSlot(now: Date, timezone: string): { start: string; end: string } {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(now),
+  );
+
+  const start = Math.min(hour + 1, 23);
+  const clock = (value: number) => `${String(value).padStart(2, '0')}:00`;
+
+  return { start: clock(start), end: start === 23 ? '23:59' : clock(start + 1) };
+}

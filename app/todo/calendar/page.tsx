@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadCalendar } from '@/lib/todo/calendar/load';
 import { isMonth } from '@/lib/todo/calendar/month';
@@ -17,8 +17,10 @@ import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { nextHourSlot } from '@/lib/todo/time';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
 import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
+import { EventForm } from '@/components/todo/event-form';
 
 export const metadata = { title: 'Calendar' };
 
@@ -37,7 +39,7 @@ export const metadata = { title: 'Calendar' };
 export default async function TodoCalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; month?: string }>;
+  searchParams: Promise<{ view?: string; date?: string; month?: string; new?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -56,6 +58,16 @@ export default async function TodoCalendarPage({
 
   const calendar = await loadCalendar(user.id, view, anchor);
   const nothing = calendar.days.every((day) => day.entries.length === 0);
+
+  // `?new=<day>` opens the form on that day. It is a query param like the view
+  // and the date beside it, so the add controls are links and the page still
+  // holds no state of its own.
+  const composing = params.new && isDay(params.new) ? params.new : null;
+  // What "New event" means with nothing else said: today when you can see it,
+  // and otherwise the day the view is anchored on.
+  const defaultDay = calendar.days.find((day) => day.isToday)?.day ?? calendar.anchor;
+  const newHref = (day: string) =>
+    `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, new: day })}`;
 
   return (
     // No width of its own: a calendar is a grid, and seven columns want every
@@ -100,6 +112,11 @@ export default async function TodoCalendarPage({
           Today
         </Link>
 
+        <Link href={newHref(defaultDay)} className={buttonVariants({ size: 'sm' })}>
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+          New event
+        </Link>
+
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
         <nav aria-label="View" className="ml-auto flex items-center gap-1">
@@ -133,10 +150,27 @@ export default async function TodoCalendarPage({
         </Banner>
       )}
 
+      {composing && (
+        <EventForm
+          day={composing}
+          view={calendar.view}
+          anchor={calendar.anchor}
+          defaultTimes={nextHourSlot(new Date(), calendar.timezone)}
+        />
+      )}
+
       {calendar.view === 'month' ? (
-        <CalendarMonthGrid days={calendar.days} timezone={calendar.timezone} />
+        <CalendarMonthGrid
+          days={calendar.days}
+          timezone={calendar.timezone}
+          newEventHref={newHref}
+        />
       ) : (
-        <CalendarTimeGrid days={calendar.days} timezone={calendar.timezone} />
+        <CalendarTimeGrid
+          days={calendar.days}
+          timezone={calendar.timezone}
+          newEventHref={newHref}
+        />
       )}
 
       {/* A day or a week with nothing in it is a grid of empty hours, which
@@ -148,7 +182,8 @@ export default async function TodoCalendarPage({
           icon={CalendarDays}
           title={`Nothing this ${calendar.view}`}
           description="Anything with a date on it lands on its hour here."
-          action={{ label: 'Add a task', href: '/todo' }}
+          action={{ label: 'New event', href: newHref(defaultDay) }}
+          secondaryAction={{ label: 'Add a task', href: '/todo' }}
         />
       )}
 

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
@@ -27,9 +28,12 @@ const MAX_DOTS = 4;
 export function CalendarMonthGrid({
   days,
   timezone,
+  newEventHref,
 }: {
   days: CalendarDay[];
   timezone: string;
+  /** Where the square's add control goes. */
+  newEventHref: (day: string) => string;
 }) {
   return (
     <Card padding="none" className="mt-4 overflow-hidden">
@@ -49,10 +53,22 @@ export function CalendarMonthGrid({
           <div
             key={day.day}
             className={cn(
-              'min-h-16 border-b border-r border-border p-1 last:border-r-0 sm:min-h-24 sm:p-1.5',
+              'group relative min-h-16 border-b border-r border-border p-1 last:border-r-0 sm:min-h-24 sm:p-1.5',
               !day.inMonth && 'bg-canvas',
             )}
           >
+            {/* Adding to a square you are already looking at, without going
+                anywhere first. Not drawn on a phone: the squares are a fifth
+                of the width there and the day number is the way in. */}
+            <Link
+              href={newEventHref(day.day)}
+              aria-label={`New event on ${day.day}`}
+              title="New event"
+              className="press absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full text-ink-ghost opacity-0 transition-opacity duration-150 hover:bg-accent-tint hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
+            >
+              <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+            </Link>
+
             {/* The number is the way into the day, at every width: a square
                 that cannot hold everything in it has to lead somewhere that
                 can. */}

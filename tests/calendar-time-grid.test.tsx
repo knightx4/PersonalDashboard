@@ -29,7 +29,13 @@ function day(entries: CalendarEntry[], over: Partial<CalendarDay> = {}): Calenda
 }
 
 function render(days: CalendarDay[]) {
-  return renderToStaticMarkup(<CalendarTimeGrid days={days} timezone="UTC" />);
+  return renderToStaticMarkup(
+    <CalendarTimeGrid
+      days={days}
+      timezone="UTC"
+      newEventHref={(day) => `/todo/calendar?new=${day}`}
+    />,
+  );
 }
 
 /** The blocks in the markup, as the grid rows and lane widths they were given. */

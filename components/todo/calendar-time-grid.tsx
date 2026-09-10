@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { Pill } from '@/components/todo/calendar-month';
@@ -29,9 +30,12 @@ const HOUR_LABEL = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
 export function CalendarTimeGrid({
   days,
   timezone,
+  newEventHref,
 }: {
   days: CalendarDay[];
   timezone: string;
+  /** Where the add control at the head of each day goes. */
+  newEventHref: (day: string) => string;
 }) {
   const hours = hoursOf(hourWindow(days, timezone));
 
@@ -54,7 +58,7 @@ export function CalendarTimeGrid({
           <div className="grid border-b border-border" style={columns}>
             <span />
             {days.map((day) => (
-              <DayHeading key={day.day} day={day} />
+              <DayHeading key={day.day} day={day} newEventHref={newEventHref} />
             ))}
           </div>
 
@@ -154,31 +158,54 @@ export function CalendarTimeGrid({
   );
 }
 
-/** The day across the top: its name, its number, and the way to it on its own. */
-function DayHeading({ day }: { day: CalendarDay }) {
+/**
+ * The day across the top: its name, its number, the way to it on its own, and
+ * the way to put something in it.
+ *
+ * Two links side by side rather than one with the other inside it, which is
+ * not something a browser will render.
+ */
+function DayHeading({
+  day,
+  newEventHref,
+}: {
+  day: CalendarDay;
+  newEventHref: (day: string) => string;
+}) {
   const date = new Date(`${day.day}T00:00:00Z`);
   const weekday = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' }).format(
     date,
   );
 
   return (
-    <Link
-      href={{ pathname: '/todo/calendar', query: { view: 'day', date: day.day } }}
-      className="flex min-w-0 items-baseline gap-1.5 border-l border-border px-2 py-1.5 transition-colors duration-150 hover:bg-sunken"
-    >
-      <span className="truncate text-micro font-semibold uppercase tracking-wide text-ink-muted">
-        {weekday}
-      </span>
-      <span
-        className={cn(
-          'tabular text-ui',
-          day.isToday
-            ? 'inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-accent font-semibold text-surface'
-            : 'text-ink',
-        )}
+    <div className="group flex min-w-0 items-center gap-1 border-l border-border pr-1">
+      <Link
+        href={{ pathname: '/todo/calendar', query: { view: 'day', date: day.day } }}
+        className="flex min-w-0 flex-1 items-baseline gap-1.5 px-2 py-1.5 transition-colors duration-150 hover:bg-sunken"
       >
-        {Number(day.day.slice(8))}
-      </span>
-    </Link>
+        <span className="truncate text-micro font-semibold uppercase tracking-wide text-ink-muted">
+          {weekday}
+        </span>
+        <span
+          className={cn(
+            'tabular text-ui',
+            day.isToday
+              ? 'inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-accent font-semibold text-surface'
+              : 'text-ink',
+          )}
+        >
+          {Number(day.day.slice(8))}
+        </span>
+      </Link>
+
+      <Link
+        href={newEventHref(day.day)}
+        aria-label={`New event on ${day.day}`}
+        title="New event"
+        className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-ghost transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+      >
+        <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+      </Link>
+    </div>
   );
 }
