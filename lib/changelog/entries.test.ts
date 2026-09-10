@@ -105,6 +105,15 @@ describe('planEntries', () => {
     expect(entries.map((entry) => entry.id)).toEqual(['kept']);
   });
 
+  it('leaves out an answered decision, which changed the plan and shipped nothing', () => {
+    const entries = planEntries([
+      step({ id: 'built' }),
+      step({ id: 'answered', kind: 'decision', resolution: 'Yes, both.' }),
+    ]);
+
+    expect(entries.map((entry) => entry.id)).toEqual(['built']);
+  });
+
   it('leaves out a done step with no completion stamp', () => {
     const entries = planEntries([closedAt('stamped', '2026-03-02T09:00:00Z'), closedAt('bare', null)]);
 

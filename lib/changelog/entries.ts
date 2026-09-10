@@ -121,6 +121,12 @@ export function moduleForPath(path: string | null): ModuleId | null {
  * `completed_at` is excluded for the plainer reason that there is no day to
  * file it under — the trigger sets that column from the status, so it means a
  * row edited around the app rather than closed through it.
+ *
+ * A decision is excluded for the first reason rather than the second. Answering
+ * a question closes it `done`, but what changed is the plan, not the app: the
+ * plan page calls that state "answered" and not "done" for exactly this reason.
+ * They are also the only closed rows carrying no commit, because there is no
+ * commit to carry — which is what the line would have been read for.
  */
 export function planEntries(
   items: readonly PlanItem[],
@@ -134,7 +140,9 @@ export function planEntries(
   const byId = new Map(parents.map((row) => [row.id, row]));
 
   return items
-    .filter((item) => item.status === 'done' && item.completedAt !== null)
+    .filter(
+      (item) => item.kind !== 'decision' && item.status === 'done' && item.completedAt !== null,
+    )
     .map((item) => ({
       key: `plan-${item.id}`,
       source: 'plan' as const,
