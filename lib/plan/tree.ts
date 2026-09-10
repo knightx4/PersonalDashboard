@@ -329,9 +329,59 @@ export const PLAN_HEALTHS = [
 ] as const;
 export type PlanHealth = (typeof PLAN_HEALTHS)[number];
 
+/**
+ * Which open state speaks for a subtree, most pressing first.
+ *
+ * Only consulted for a closed row that still has open rows beneath it, and
+ * only to pick which of them to report. The order is "how much does this stop
+ * the work": a question nobody has answered, then a step that said what is
+ * holding it up, then a proposal nobody has accepted, and so on down to a step
+ * simply not reached yet.
+ */
+const OPEN_HEALTH_RANK: readonly PlanHealth[] = [
+  'unanswered',
+  'blocked',
+  'proposed',
+  'waiting',
+  'in_progress',
+  'ready',
+  'not_started',
+];
+
+/** Every row beneath this one, at any depth. */
+function descendantsOf(node: { children?: readonly PlanNode[] }): PlanNode[] {
+  return (node.children ?? []).flatMap((child) => [child, ...descendantsOf(child)]);
+}
+
 export function healthOf(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'>,
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'> & {
+    /**
+     * Optional so the callers that classify one row on its own -- the tally,
+     * which only ever sees leaves -- need not build a subtree to ask.
+     */
+    children?: readonly PlanNode[];
+  },
 ): PlanHealth {
+  // Closed on top of something open is not closed.
+  //
+  // A feature finished months ago can acquire a new row: #194, a question, was
+  // added under #152 after it shipped, and the page went on saying "Done"
+  // because that is what #152's own status column said. Health is meant to be
+  // what the row means right now, so it reports the most pressing thing still
+  // open beneath it instead -- and reports it deterministically, from the
+  // subtree, rather than from when anybody last edited the parent.
+  //
+  // Dropped as well as done: a step decided against with live work under it is
+  // the same wrong answer, and the open rows are the ones that need seeing.
+  if (isClosed(node.status)) {
+    const open = descendantsOf(node).filter((child) => !isClosed(child.status));
+    if (open.length > 0) {
+      const healths = new Set(open.map((child) => healthOf(child)));
+      const worst = OPEN_HEALTH_RANK.find((health) => healths.has(health));
+      if (worst) return worst;
+    }
+  }
+
   // A decision not yet settled is a question, whatever else is true of it.
   // "Ready" on a question would read as ready to be built, which is the one
   // thing it is not: nothing happens to it until somebody answers it.

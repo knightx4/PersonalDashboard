@@ -17,7 +17,7 @@ import {
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
-  ListChecks,
+  List,
   ListTodo,
   Map,
   Network,
@@ -72,9 +72,15 @@ export const NAV_ICONS = {
   ui: Shapes,
   surfaces: Frame,
   // Todo and vault
-  agenda: ListChecks,
+  //
+  // Agenda is the list with something still unticked -- what needs you next,
+  // which is exactly what an unticked box says. All is a plain list with no
+  // boxes at all: it is everything there is, finished included, so ticks would
+  // be claiming something about it. The two were ListChecks and ListTodo, near
+  // enough that the only way to tell the rows apart was to read the labels.
+  agenda: ListTodo,
   calendar: CalendarDays,
-  tasks: ListTodo,
+  tasks: List,
   notes: StickyNote,
 
   // Learn

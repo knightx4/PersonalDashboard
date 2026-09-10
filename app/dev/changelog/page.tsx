@@ -1,11 +1,12 @@
 import Link from 'next/link';
-import { History } from 'lucide-react';
+import { ChevronRight, History } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { loadChangelog } from '@/lib/changelog/load';
 import {
+  CHANGELOG_DEFAULT_GROUPING,
   CHANGELOG_GROUPINGS,
   CHANGELOG_GROUPING_LABEL,
   groupChangelog,
@@ -39,13 +40,13 @@ export const metadata = { title: 'Changelog' };
  * and a control that narrows a page most people will scroll to the bottom of is
  * a control nobody presses.
  *
- * It is grouped three ways, though, because the day grouping buries two things
- * worth seeing. By issue puts a feature's steps together, which is the only way
- * to see that six lines spread over three days were one piece of work. By
- * commit puts back together what one commit closed, which a batch scatters. The
- * grouping is a search parameter and not state, so "the changelog by commit" is
- * a link somebody can keep -- law 5, and it means this page still works with no
- * JavaScript at all.
+ * It is grouped three ways. By issue is what it opens on: a feature's steps
+ * gathered under the feature, one line each, because six lines spread over
+ * three days were one piece of work and the page had no way of saying so. By
+ * day is the flat record, and by commit puts back together what one commit
+ * closed, which a batch scatters. The grouping is a search parameter and not
+ * state, so "the changelog by commit" is a link somebody can keep -- law 5, and
+ * it means this page still works with no JavaScript at all.
  */
 export default async function DevChangelogPage({
   searchParams,
@@ -57,7 +58,8 @@ export default async function DevChangelogPage({
   const params = await searchParams;
 
   const asked = Array.isArray(params.group) ? params.group[0] : params.group;
-  const grouping: ChangelogGrouping = asked && isChangelogGrouping(asked) ? asked : 'day';
+  const grouping: ChangelogGrouping =
+    asked && isChangelogGrouping(asked) ? asked : CHANGELOG_DEFAULT_GROUPING;
 
   const entries = await loadChangelog(supabase, user.id);
   const groups = groupChangelog(entries, grouping);
@@ -66,7 +68,7 @@ export default async function DevChangelogPage({
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Changelog"
-        description="What has shipped, newest first — every plan step closed and every note fixed, with the commit that did it."
+        description="What has shipped, newest first — a line per feature. Open one for the steps and notes underneath it, and the commit that did each."
       />
 
       {entries.length > 0 && (
@@ -74,7 +76,11 @@ export default async function DevChangelogPage({
           {CHANGELOG_GROUPINGS.map((candidate) => (
             <Link
               key={candidate}
-              href={candidate === 'day' ? '/dev/changelog' : `/dev/changelog?group=${candidate}`}
+              href={
+                candidate === CHANGELOG_DEFAULT_GROUPING
+                  ? '/dev/changelog'
+                  : `/dev/changelog?group=${candidate}`
+              }
               aria-current={candidate === grouping ? 'page' : undefined}
               className={cn(
                 'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
@@ -102,19 +108,27 @@ export default async function DevChangelogPage({
          * list, and a card per group was a border and eight pixels of margin
          * around every day of work. */
         <div className="space-y-5">
-          {groups.map((group) => (
-            <section key={group.key}>
-              {/* A group of one whose heading is its own entry -- a note, or a
-                  feature that shipped by itself -- gets no heading: it would
-                  be the same sentence twice, which is law 15. */}
-              {!isItsOwnHeading(group) && <GroupHeading group={group} />}
-              <ul className="divide-y divide-border">
-                {group.entries.map((entry) => (
-                  <Entry key={entry.key} entry={entry} inGroup={group.kind} />
-                ))}
-              </ul>
-            </section>
-          ))}
+          {groups.map((group) =>
+            /* By issue, a feature is one line until it is asked to be more.
+               Its steps are the detail underneath. A group that is its own
+               heading -- a note, a feature that shipped by itself -- has
+               nothing to open and stays a plain line. */
+            group.kind === 'issue' && !isItsOwnHeading(group) ? (
+              <IssueSummary key={group.key} group={group} />
+            ) : (
+              <section key={group.key}>
+                {/* A group of one whose heading is its own entry -- a note, or a
+                    feature that shipped by itself -- gets no heading: it would
+                    be the same sentence twice, which is law 15. */}
+                {!isItsOwnHeading(group) && <GroupHeading group={group} />}
+                <ul className="divide-y divide-border">
+                  {group.entries.map((entry) => (
+                    <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+                  ))}
+                </ul>
+              </section>
+            ),
+          )}
         </div>
       )}
     </div>
@@ -130,6 +144,49 @@ export default async function DevChangelogPage({
  */
 function isItsOwnHeading(group: ChangelogGroup): boolean {
   return group.kind === 'issue' && group.entries.length === 1 && group.entries[0].key === group.key;
+}
+
+/**
+ * A feature, as one line you can open.
+ *
+ * The page used to list every closed step at the top level, so a feature that
+ * shipped as seven steps over three days was seven lines of "filing a todo from
+ * it" and no line anywhere saying what had actually landed. The summary is the
+ * feature's own title -- the sentence somebody was looking for -- with the
+ * count and the day it finished; the steps are underneath, one click away.
+ *
+ * `details` rather than state, so the page still opens and reads with no
+ * JavaScript at all, which is the rest of this page's bargain (law 5).
+ */
+function IssueSummary({ group }: { group: ChangelogGroup }) {
+  const newest = group.entries.reduce((at, entry) => (entry.at > at ? entry.at : at), '');
+
+  return (
+    <details className="group">
+      <summary className="row-pad -mx-2 flex cursor-pointer list-none items-baseline gap-1.5 rounded-lg px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          className="size-3.5 shrink-0 self-center text-ink-ghost transition-transform duration-150 group-open:rotate-90"
+          strokeWidth={1.75}
+          aria-hidden
+        />
+        {group.number !== null && (
+          <span className="tabular shrink-0 text-small text-ink-ghost">#{group.number}</span>
+        )}
+        <span className="min-w-0 flex-1 break-words text-ui font-medium text-ink">
+          {group.label}
+        </span>
+        <span className="shrink-0 text-micro text-ink-ghost">
+          {group.entries.length} {group.entries.length === 1 ? 'change' : 'changes'}
+          {newest && ` · ${formatDay(newest.slice(0, 10))}`}
+        </span>
+      </summary>
+      <ul className="mt-1 divide-y divide-border border-l-2 border-border pl-3">
+        {group.entries.map((entry) => (
+          <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function GroupHeading({ group }: { group: ChangelogGroup }) {
