@@ -3,6 +3,7 @@
  *
  *   npm run check:ui                  # check
  *   npm run check:ui -- --list        # check, and print every violation
+ *   npm run check:ui -- --module vault  # check one workspace's files only
  *   npm run check:ui -- --update      # re-record the baseline
  *
  * Written after an audit found eighty-six hand-rolled boxes and one bug that
@@ -40,6 +41,8 @@
  */
 import { readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { MODULE_IDS, isModuleId, type ModuleId } from '../lib/modules';
+import { scopeForFile, UI_SCOPES } from '../lib/ui-review/scope';
 
 const ROOT = process.cwd();
 const BASELINE = join(ROOT, 'scripts/ui-baseline.json');
@@ -453,12 +456,13 @@ function files(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function scan(): Hit[] {
+function scan(target: ModuleId | null): Hit[] {
   const hits: Hit[] = [];
   for (const root of ROOTS) {
     for (const path of files(join(ROOT, root))) {
       const file = relative(ROOT, path);
       if (EXEMPT.some((prefix) => file.startsWith(prefix))) continue;
+      if (target && scopeForFile(file) !== target) continue;
       const source = readFileSync(path, 'utf8');
       const lines = source.split('\n');
       const excused = new Set(
@@ -521,11 +525,37 @@ function tally(hits: Hit[]): Record<string, number> {
   return counts;
 }
 
+/**
+ * The workspace this run is about, from `--module <id>`.
+ *
+ * A run narrowed to one module scans that module's files, compares them
+ * against their own baseline entries and fails on a new violation there, so
+ * "is the vault in line" is a question with an answer rather than a share of
+ * one number for the whole app.
+ */
+function targetModule(): ModuleId | null {
+  const at = process.argv.indexOf('--module');
+  if (at === -1) return null;
+  const id = process.argv[at + 1];
+  if (!id || !isModuleId(id)) {
+    console.error(`--module takes one of: ${MODULE_IDS.join(', ')}`);
+    process.exit(1);
+  }
+  return id;
+}
+
 // -- The report -------------------------------------------------------------
-const hits = scan();
+const target = targetModule();
+const hits = scan(target);
 const counts = tally(hits);
 
 if (process.argv.includes('--update')) {
+  // A narrowed run has only looked at one module, so recording it would drop
+  // every other module's entry and quietly reset the ratchet.
+  if (target) {
+    console.error('--update records the whole baseline, so it cannot be narrowed to --module.');
+    process.exit(1);
+  }
   const ordered = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)));
   writeFileSync(BASELINE, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`Recorded ${hits.length} violations across ${Object.keys(ordered).length} file/rule pairs.`);
@@ -570,15 +600,33 @@ if (regressions.length > 0) {
   process.exit(1);
 }
 
+/** `  ·  name`, or the count if there is one. */
+function standing(n: number, name: string): string {
+  return `  ${n === 0 ? '  ·' : String(n).padStart(3)}  ${name}`;
+}
+
 // Per-rule standings, so the number that is meant to fall is visible.
 const byRule = new Map<string, number>();
 for (const hit of hits) byRule.set(hit.rule.id, (byRule.get(hit.rule.id) ?? 0) + 1);
-for (const rule of RULES) {
-  const n = byRule.get(rule.id) ?? 0;
-  console.log(`  ${n === 0 ? '  ·' : String(n).padStart(3)}  ${rule.id}`);
+for (const rule of RULES) console.log(standing(byRule.get(rule.id) ?? 0, rule.id));
+
+// Per-module standings, which is what says where the work is. Every scope is
+// listed, including the ones at zero: a module missing from the list reads as
+// a module nobody has counted.
+const byScope = new Map<string, number>();
+for (const hit of hits) {
+  const scope = scopeForFile(hit.file);
+  byScope.set(scope, (byScope.get(scope) ?? 0) + 1);
+}
+console.log('');
+for (const scope of target ? [target] : UI_SCOPES) {
+  console.log(standing(byScope.get(scope) ?? 0, scope));
 }
 
-const known = Object.values(baseline).reduce((sum, n) => sum + n, 0);
+// What the baseline says about the files this run actually looked at.
+const known = Object.entries(baseline)
+  .filter(([key]) => !target || scopeForFile(key.slice(key.indexOf(' ') + 1)) === target)
+  .reduce((sum, [, n]) => sum + n, 0);
 const fixed = known - hits.length;
 if (fixed > 0) {
   console.log(`\n✓ No new violations, and ${fixed} fewer than the baseline.`);
