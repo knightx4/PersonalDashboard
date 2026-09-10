@@ -1479,7 +1479,10 @@ const HEALTH: Record<PlanHealth, Health> = {
   in_progress: { word: 'In progress', tone: 'accent', icon: TrendingUp },
   blocked: { word: 'Blocked', tone: 'caution', icon: Ban },
   waiting: { word: 'Waiting', tone: 'caution', icon: Hourglass },
-  ready: { word: 'Ready', tone: 'positive', icon: Sparkles },
+  // Blue, not green. Ready and done were both `positive`, so the one state
+  // that is an invitation to start read at a glance as the state that needs
+  // nothing. The shape still separates it from the other accent states.
+  ready: { word: 'Ready', tone: 'accent', icon: Sparkles },
   not_started: { word: 'Not started', tone: 'quiet', icon: CircleDashed },
   done: { word: 'Done', tone: 'positive', icon: Check },
   dropped: { word: 'Dropped', tone: 'ghost', icon: X },
