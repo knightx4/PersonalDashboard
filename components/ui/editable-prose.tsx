@@ -5,6 +5,7 @@ import { Maximize2, Pencil, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
+import { popoverSurface, scrim } from '@/components/ui/popover';
 
 /**
  * A piece of writing, read until you go to edit it.
@@ -231,12 +232,12 @@ function Expanded({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-stretch justify-center p-4 sm:p-8">
+    <div className="fixed inset-0 z-modal flex items-stretch justify-center p-4 sm:p-8">
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        className={scrim}
       />
       <div
         ref={panel}
@@ -244,7 +245,10 @@ function Expanded({
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="sheet relative flex w-full max-w-3xl flex-col gap-3 overflow-y-auto rounded-card p-4 shadow-2xl outline-none sm:p-6"
+        className={cn(
+          popoverSurface,
+          'relative flex w-full max-w-3xl flex-col gap-3 overflow-y-auto p-4 shadow-2xl outline-none sm:p-6',
+        )}
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lead font-semibold text-ink">{label}</h2>

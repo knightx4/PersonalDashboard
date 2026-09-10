@@ -1166,7 +1166,7 @@ export default function DevUiPage() {
       <Section
         id="elevation"
         title="Elevation and layering"
-        lead="Depth in three themes is a hairline. A shadow at rest belongs only to the layer that floats. Above the layers, who paints over whom is a ladder with eight rungs, and a new z-index picks one of them."
+        lead="Depth in three themes is a hairline. A shadow at rest belongs only to a layer that floats, and there are two of those. Above the layers, who paints over whom is a ladder with eight rungs; each is a named utility in globals.css, and a new z-index picks one by name."
       >
         <Rows rows={M.ELEVATION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Card padding="none">
@@ -1176,6 +1176,7 @@ export default function DevUiPage() {
                 <span className="tabular w-10 shrink-0 text-right text-ui font-medium text-ink">
                   {rung.z}
                 </span>
+                <code className="w-28 shrink-0 text-small text-ink">{rung.utility}</code>
                 <span className="text-body text-ink-muted">{rung.what}</span>
               </li>
             ))}

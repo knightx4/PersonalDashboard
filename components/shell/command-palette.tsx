@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 import { score } from '@/lib/search/score';
 import { HIT_KINDS, MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { popoverSurface } from '@/components/ui/popover';
+import { popoverSurface, scrim } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
 import { useCapture } from '@/components/shell/capture';
 import { matchCaptureActions } from '@/lib/capture/actions';
@@ -275,12 +275,12 @@ export function CommandPalette({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]">
+    <div className="fixed inset-0 z-modal flex items-start justify-center px-4 pt-[12vh]">
       <button
         type="button"
         aria-label="Close"
         onClick={close}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        className={scrim}
       />
       <div
         role="dialog"

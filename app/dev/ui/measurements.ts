@@ -83,7 +83,9 @@ export const ICON_STROKE = 1.75;
 
 /**
  * The layers, from the page up. Depth in three themes is a hairline; a shadow
- * at rest belongs only to the raised layer, which is the one that floats.
+ * at rest belongs only to the two layers that float, and there are exactly
+ * two drops in the app -- shadow-lg for a thing hung off a trigger,
+ * shadow-2xl for a modal centred over the scrim.
  */
 export const ELEVATION: readonly Row4[] = [
   ['Page', 'bg-page', 'The wash and the grain, fixed to the viewport.', 'No edge.'],
@@ -103,9 +105,15 @@ export const ELEVATION: readonly Row4[] = [
     'Raised',
     'bg-raised',
     'A popover, a menu, a toast.',
-    'Hairline and shadow-lg: the only shadow at rest.',
+    'Hairline and shadow-lg: the resting shadow.',
   ],
   ['Scrim', 'bg-black/40', 'Under the drawer and the palette.', 'Blurs the page by a pixel.'],
+  [
+    'Modal',
+    'bg-raised over the scrim',
+    'The command palette, the capture panel, the lightbox editor.',
+    'Hairline and shadow-2xl: shallower and it reads as a card that has come loose.',
+  ],
   [
     'Lift',
     'lift',
@@ -116,16 +124,31 @@ export const ELEVATION: readonly Row4[] = [
 
 export type Row4 = readonly [string, string, string, string];
 
-/** Who paints over whom. */
-export const Z_LADDER: readonly { z: string; what: string }[] = [
-  { z: '10', what: 'A control that must stay clickable above a row’s stretched link.' },
-  { z: '20', what: 'A menu or listbox opened inside the page.' },
-  { z: '30', what: 'The status line.' },
-  { z: '40', what: 'The sidebar and the top bar.' },
-  { z: '50', what: 'The drawer, popovers, action menus.' },
-  { z: '60', what: 'The command palette.' },
-  { z: '70', what: 'Toasts.' },
-  { z: '9999', what: 'The grain, which no pointer can touch.' },
+/**
+ * Who paints over whom. Each rung is a named utility in app/globals.css, so a
+ * call site writes the name and never the number.
+ */
+export const Z_LADDER: readonly { z: string; utility: string; what: string }[] = [
+  {
+    z: '10',
+    utility: 'z-over-link',
+    what: 'A control that must stay clickable above a row’s stretched link.',
+  },
+  { z: '20', utility: 'z-menu', what: 'A menu or listbox opened inside the page.' },
+  { z: '30', utility: 'z-status', what: 'The status line.' },
+  {
+    z: '40',
+    utility: 'z-chrome',
+    what: 'The sidebar, the top bar, the phone dock, the capture button.',
+  },
+  { z: '50', utility: 'z-overlay', what: 'The drawer, popovers, action menus.' },
+  {
+    z: '60',
+    utility: 'z-modal',
+    what: 'A modal over a scrim: the palette, the capture panel, the lightbox editor.',
+  },
+  { z: '70', utility: 'z-toast', what: 'Toasts.' },
+  { z: '9999', utility: 'z-grain', what: 'The grain, which no pointer can touch.' },
 ];
 
 export const MOTION: readonly Row4[] = [

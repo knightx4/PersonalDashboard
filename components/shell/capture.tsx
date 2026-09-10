@@ -14,7 +14,7 @@ import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
-import { popoverSurface } from '@/components/ui/popover';
+import { popoverSurface, scrim } from '@/components/ui/popover';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
 import { usePopover } from '@/lib/use-popover';
@@ -213,12 +213,12 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
     'w-full bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]">
+    <div className="fixed inset-0 z-modal flex items-start justify-center px-4 pt-[12vh]">
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        className={scrim}
       />
       <form
         ref={panelRef}
@@ -397,7 +397,7 @@ export function CaptureFab() {
     <button
       type="button"
       onClick={() => open()}
-      className="press fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex size-12 items-center justify-center rounded-full bg-accent text-surface shadow-lg sm:hidden"
+      className="press fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-chrome flex size-12 items-center justify-center rounded-full bg-accent text-surface shadow-lg sm:hidden"
     >
       <Plus className="size-5" strokeWidth={2} aria-hidden />
       <span className="sr-only">Capture something</span>

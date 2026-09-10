@@ -193,7 +193,7 @@ export function LinkFinder({
       aria-label="What is this about?"
       className={cn(
         popoverSurface,
-        'absolute top-full z-50 mt-1.5 w-72 overflow-hidden',
+        'absolute top-full z-overlay mt-1.5 w-72 overflow-hidden',
         align === 'right' ? 'right-0' : 'left-0',
       )}
     >
