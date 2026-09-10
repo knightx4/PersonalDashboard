@@ -7,10 +7,19 @@ import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { generateChain } from '@/lib/learn/graph/generate';
 import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
+import {
+  approvedBriefSchema,
+  conceptsFromBrief,
+  MAX_BRIEFING_CHARS,
+} from '@/lib/learn/graph/from-brief';
 import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
-import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
+import {
+  approvedChainSchema,
+  keepTicked,
+  type ProposedChain,
+} from '@/lib/learn/graph/chain-payload';
 
 /**
  * Naming a goal, and deciding what to do with what comes back.
@@ -236,6 +245,147 @@ export async function approvePrior(
     const chain = safe.data as ProposedChain;
     saved = await saveChain(supabase, user.id, chain, chain.goalConcept, { goal: false });
     await declareKnown(supabase, user.id, saved.conceptIds);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  revalidatePath('/learn/know');
+  revalidatePath(`/learn/s/${saved.subjectId}`);
+  redirect(`/learn/s/${saved.subjectId}`);
+}
+
+/**
+ * A briefing somebody wrote for you, read into things to learn.
+ *
+ * The same two steps again, and the same rule: `proposeBrief` calls the model
+ * and writes nothing, `approveBrief` writes what came back. What differs is
+ * what approval means. Prior learning lands known, because you said you knew
+ * it; a briefing lands unknown, because it is a stack of claims somebody else
+ * made at you and not one of them has been checked. That is what makes them
+ * worth having in the graph at all -- an unknown concept can be probed, put in
+ * an order, and pointed at something to read.
+ *
+ * No goal, for the reason a floor writes none: a briefing is ground to cover,
+ * not a thing to aim at.
+ */
+
+export type BriefState = {
+  error?: string;
+  /** Said out loud when the paste had no claims in it. Not an error. */
+  message?: string;
+  chain?: ProposedChain;
+};
+
+const BriefInput = z.object({
+  briefing: z
+    .string()
+    .trim()
+    .min(1, 'Paste the briefing first.')
+    .max(
+      MAX_BRIEFING_CHARS,
+      'That is longer than an import reads — paste the part of the briefing worth learning.',
+    ),
+  subjectId: z.string().uuid().nullable(),
+});
+
+// latency: pending
+export async function proposeBrief(
+  _prev: BriefState,
+  formData: FormData,
+): Promise<BriefState> {
+  const user = await requireUser();
+
+  const raw = formData.get('subjectId');
+  const parsed = BriefInput.safeParse({
+    briefing: formData.get('briefing') ?? '',
+    subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Could not read that briefing.' };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Reading a briefing needs ANTHROPIC_API_KEY to be set.' };
+
+  const supabase = await createLearnClient();
+
+  // Same rule as the other two ways in: inside a subject it is told what is
+  // already there so it does not propose it again, outside one it names the
+  // subject itself.
+  const subject = parsed.data.subjectId
+    ? await loadSubject(supabase, parsed.data.subjectId)
+    : null;
+  const existing = subject ? await existingConcepts(supabase, subject.id) : [];
+
+  const spend = collectSpend();
+  const result = await conceptsFromBrief({
+    subject: subject?.name ?? null,
+    briefing: parsed.data.briefing,
+    existing,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  // Before the result is read: an import that failed on its eighth section
+  // still spent seven calls, and the ledger measures what was spent rather
+  // than what came of it.
+  await recordLearnSpend(user.id, 'concepts-from-brief', spend.reports);
+
+  if (!result.ok) {
+    return result.reason === 'nothing-in-it'
+      ? { message: result.detail }
+      : { error: result.detail };
+  }
+  return { chain: result.chain };
+}
+
+/**
+ * Write the rows they ticked, all of them still to learn.
+ *
+ * Nothing is declared known here, which is the whole difference from
+ * `approvePrior` and the reason a briefing is worth importing: every node
+ * lands unknown, so the subject page shows it as ground to cover and a probe
+ * can go at it later.
+ */
+// latency: pending
+export async function approveBrief(
+  _prev: BriefState,
+  formData: FormData,
+): Promise<BriefState> {
+  const user = await requireUser();
+
+  const raw = formData.get('chain');
+  if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return { error: 'That proposal did not survive the trip. Try again.' };
+  }
+
+  const safe = approvedBriefSchema.safeParse(payload);
+  if (!safe.success) return { error: 'That proposal did not survive the trip. Try again.' };
+
+  // The ticks arrive as names rather than as a second copy of the chain, and
+  // the same rule the screen applied is applied again here: what was ticked,
+  // the edges between what survived, and nothing left floating.
+  const ticked = new Set(
+    formData
+      .getAll('keep')
+      .flatMap((value) => (typeof value === 'string' ? [value.trim().toLowerCase()] : [])),
+  );
+  const { chain } = keepTicked(safe.data as ProposedChain, ticked);
+  if (!chain.nodes.some((node) => node.existingId === null)) {
+    return { message: 'Nothing ticked, so nothing was written.' };
+  }
+
+  const supabase = await createLearnClient();
+  let saved;
+  try {
+    saved = await saveChain(supabase, user.id, chain, chain.goalConcept, {
+      goal: false,
+      origin: 'briefing',
+    });
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not save that.' };
   }

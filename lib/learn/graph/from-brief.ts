@@ -3,6 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
+  approvedChainSchemaWith,
   chainPayloadSchema,
   normaliseChain,
   wouldCycle,
@@ -45,6 +46,25 @@ export const MAX_BRIEF_NODES = 40;
 
 /** Characters per pass when the briefing has no headings to split on. */
 const SECTION_CHARS = 6000;
+
+/** The longest paste an import will read: every pass, filled. */
+export const MAX_BRIEFING_CHARS = MAX_BRIEF_SECTIONS * SECTION_CHARS;
+
+/**
+ * The shape an import's proposal rides back in from the form.
+ *
+ * `approvedChainSchema` caps a chain at 20 nodes, which is where one call to
+ * the model is capped. Ten passes can propose forty between them, so the same
+ * shape is rebuilt at this import's own caps. The dropped list is the loose
+ * one: every pass can leave a whole chain's worth of rows behind, and a
+ * proposal refused for carrying too many of them would be refused for being
+ * too honest.
+ */
+export const approvedBriefSchema = approvedChainSchemaWith({
+  nodes: MAX_BRIEF_NODES,
+  edges: MAX_BRIEF_NODES * 2,
+  dropped: MAX_BRIEF_SECTIONS * MAX_CHAIN * 2 + MAX_BRIEF_NODES,
+});
 
 const SYSTEM = `Somebody has been handed a prepared briefing and wants it turned into things
 they can learn. You are reading one section of it.

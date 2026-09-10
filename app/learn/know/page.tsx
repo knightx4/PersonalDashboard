@@ -7,6 +7,8 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { countStates } from '@/lib/learn/graph/model';
+import { MAX_BRIEFING_CHARS } from '@/lib/learn/graph/from-brief';
+import { BriefForm } from './brief-form';
 import { GoalForm } from './goal-form';
 import { PriorForm } from './prior-form';
 
@@ -95,6 +97,16 @@ export default async function KnowPage() {
           is the rarer move -- written once for a field, not once a week. */}
       <h2 className="mt-8 text-body font-medium text-ink">Or start from what you already know</h2>
       <PriorForm />
+
+      {/* And the third way in, the only one that starts from a document
+          somebody else wrote. Last because it is the rarest: a prepared
+          briefing arrives when you are about to be examined on something, not
+          on an ordinary week. */}
+      <h2 className="mt-8 text-body font-medium text-ink">Or import a briefing you were handed</h2>
+      <BriefForm
+        subjects={subjects.map((subject) => ({ id: subject.id, name: subject.name }))}
+        maxChars={MAX_BRIEFING_CHARS}
+      />
     </>
   );
 }

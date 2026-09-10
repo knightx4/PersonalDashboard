@@ -23,6 +23,9 @@ import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
  * not there.
  */
 
+/** The `learn.concept_origin` values a chain write can set. */
+export type ConceptOrigin = 'generated' | 'briefing';
+
 export type SavedChain = {
   subjectId: string;
   /** Null when the chain was a floor rather than something new to aim at. */
@@ -94,8 +97,13 @@ export async function saveChain(
    * A floor added under a claim somebody missed is a level appearing in a
    * subject they are already working on, not a new thing to aim at, so it
    * writes no goal -- the goals already there simply grow a rung.
+   *
+   * `origin` is what each concept says about where it came from, and it is
+   * worth setting: on the day a claim turns out to be wrong, `generated` points
+   * at a model that laid out a chain and `briefing` points at a document
+   * somebody handed you.
    */
-  options: { goal?: boolean } = {},
+  options: { goal?: boolean; origin?: ConceptOrigin } = {},
 ): Promise<SavedChain> {
   const { id: subjectId } = await findOrCreateSubject(supabase, userId, chain.subject);
 
@@ -116,7 +124,7 @@ export async function saveChain(
           name: node.name,
           claim: node.claim,
           basis: node.basis,
-          origin: 'generated',
+          origin: options.origin ?? 'generated',
         })),
       )
       .select('id, name');

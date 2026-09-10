@@ -52,6 +52,7 @@ describe('the operation names', () => {
       'propose-floor',
       'concepts-from-note',
       'concepts-from-prior',
+      'concepts-from-brief',
     ]);
   });
 });

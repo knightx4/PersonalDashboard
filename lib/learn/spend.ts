@@ -38,6 +38,7 @@ export const LEARN_OPERATIONS = [
   'propose-floor',
   'concepts-from-note',
   'concepts-from-prior',
+  'concepts-from-brief',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
