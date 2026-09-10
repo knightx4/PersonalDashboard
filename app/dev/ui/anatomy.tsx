@@ -2,7 +2,9 @@ import { Search } from 'lucide-react';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
+import { DetailLayout, Property, PropertyList } from '@/components/shell/detail-layout';
+import { Group } from '@/components/ui/disclosure';
 import { Input } from '@/components/ui/field';
 import { formatMoney } from '@/lib/money';
 
@@ -127,11 +129,95 @@ function ListAnatomy() {
   );
 }
 
+const TIMELINE: readonly { when: string; what: string; note: string }[] = [
+  { when: '4 Sep', what: 'Rejected', note: 'After the take-home, no stage given.' },
+  { when: '28 Aug', what: 'Take-home sent', note: 'Two days to return it.' },
+  { when: '21 Aug', what: 'Screen with the hiring manager', note: '30 minutes, video.' },
+  { when: '14 Aug', what: 'First human reply', note: 'From the recruiter, not the portal.' },
+  { when: '11 Aug', what: 'Confirmation', note: 'Automatic, from the ATS.' },
+  { when: '11 Aug', what: 'Applied', note: 'Through the company board.' },
+];
+
+/**
+ * A detail page: what it is, its properties, then what has happened to it.
+ *
+ * Drawn from what the role page and the order page carry rather than from
+ * anywhere else, since those two are the pages moved onto it in #167 and #168.
+ * The arrangement is `DetailLayout`, which is the answer #163 settled on: the
+ * drawing and the pages are the same component, so a page cannot drift from
+ * this without the drawing moving too.
+ */
+function DetailAnatomy() {
+  return (
+    <DetailLayout
+      header={
+        <PageHeader
+          title="Quantitative Developer"
+          description="Jane Street · London · Hybrid"
+          actions={
+            <Button size="sm" variant="secondary">
+              Original posting
+            </Button>
+          }
+        />
+      }
+      properties={
+        <PropertyList>
+          <Property label="Applied" value="11 Aug 2026" />
+          <Property label="Confirmed" value="11 Aug 2026" />
+          <Property
+            label="First reply"
+            value="14 Aug 2026"
+            hint="Automatic confirmations never set this."
+          />
+          <Property label="Source" value="Company board" />
+          <Property label="Comp band" value="£120k – £160k" />
+          <Property label="Posting" value="Closed" />
+          <Property label="ATS" value="Greenhouse" />
+          <Property label="Outcome" value="Rejected at take-home" />
+        </PropertyList>
+      }
+    >
+      <div className="space-y-6">
+        <Group title="Timeline">
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {TIMELINE.map((event) => (
+                <li key={event.what} className="card-pad-x row-pad flex gap-3">
+                  <span className="tabular w-16 shrink-0 text-small text-ink-muted">
+                    {event.when}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-ui text-ink">{event.what}</span>
+                    <span className="block text-small text-ink-muted">{event.note}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Group>
+
+        <CardSection title="Notes" hint="What you wrote while reading the page.">
+          <p className="text-body text-ink-muted">
+            The take-home was a backtest harness. Ask about their data licensing next time.
+          </p>
+        </CardSection>
+      </div>
+    </DetailLayout>
+  );
+}
+
 export const ANATOMIES: readonly Anatomy[] = [
   {
     id: 'anatomy-list',
     label: 'A list page',
     note: 'From xl up the filters are a column down the left. Narrower than that they are a button above everything, and the page is one column. The rest is the same at both widths: the page header with the one action it owns, the search the list is read through, one surface of rows with hairlines between them, then the count.',
     render: () => <ListAnatomy />,
+  },
+  {
+    id: 'anatomy-detail',
+    label: 'A detail page',
+    note: 'The header, then the properties, then everything that has happened. From lg up the properties are a column on the right that stays put while the body scrolls; below that they are a grid of facts between the header and the body, because the facts are what the page was opened for.',
+    render: () => <DetailAnatomy />,
   },
 ];
