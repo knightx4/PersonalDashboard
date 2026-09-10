@@ -42,7 +42,7 @@ export function deadlineHealth(
  * Colour follows law 4. Amber is caution and red is danger, both of which are
  * true of a window about to shut or already shut. There is no meaning that is
  * true of the other two, so they are ink and nothing else: ghost while there is
- * plenty of window left, full ink once more than half of it is gone.
+ * more than a fortnight left, full ink inside the last fortnight.
  */
 export const HEALTH_STATES: Record<HealthState, { label: string; fill: string }> = {
   'on-track': { label: 'On track', fill: 'bg-ink-ghost' },
