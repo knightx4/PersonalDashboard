@@ -13,9 +13,9 @@
 -- What is stored is a citation, a location inside it, a short anchor phrase
 -- used to build a link, and whatever the account holder writes themselves.
 --
--- Applied by scripts/db-reset.sh after migrations-todo. Nothing in here points
--- outside the schema except at auth.users, so the position in the order is not
--- load-bearing -- unlike todo, which has foreign keys into three other schemas.
+-- Applied by scripts/db-reset.sh before migrations-todo. Nothing in here points
+-- outside the schema except at auth.users, so this set could go anywhere in the
+-- order; todo could not, and todo/0004 gave it foreign keys into learn.
 --
 -- `learn` was checked against what Supabase ships on every project before it
 -- was chosen. That is the lesson of `obsidian`, which is called that because

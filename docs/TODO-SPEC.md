@@ -293,9 +293,13 @@ refactor.
 
 ### `todo.task_links`
 
-What the task is about. Real foreign keys, into four schemas, because they are
-all in one database and a cross-schema foreign key costs nothing and buys the
-cascade for free: delete the role and its tasks' links go with it.
+What the task is about. Real foreign keys, into four other schemas, because
+they are all in one database and a cross-schema foreign key costs nothing and
+buys the cascade for free: delete the role and its tasks' links go with it.
+
+Six of the twelve targets arrived later, in `migrations-todo/0004`, so that
+linking from /todo could offer everything the search finds rather than only the
+things the job side and the vault happen to hold.
 
 ```sql
 create type todo.link_relation as enum ('about', 'source');
@@ -305,17 +309,25 @@ create table todo.task_links (
   task_id uuid not null references todo.tasks (id) on delete cascade,
   relation todo.link_relation not null default 'about',
 
-  application_id uuid references job_search.applications (id) on delete cascade,
-  role_id        uuid references job_search.roles (id) on delete cascade,
-  company_id     uuid references job_search.companies (id) on delete cascade,
-  contact_id     uuid references job_search.contacts (id) on delete cascade,
-  interview_id   uuid references job_search.interviews (id) on delete cascade,
-  note_id        uuid references obsidian.notes (id) on delete cascade,
+  application_id    uuid references job_search.applications (id) on delete cascade,
+  role_id           uuid references job_search.roles (id) on delete cascade,
+  company_id        uuid references job_search.companies (id) on delete cascade,
+  contact_id        uuid references job_search.contacts (id) on delete cascade,
+  interview_id      uuid references job_search.interviews (id) on delete cascade,
+  note_id           uuid references obsidian.notes (id) on delete cascade,
+  order_id          uuid references public.orders (id) on delete cascade,
+  inventory_item_id uuid references public.inventory_items (id) on delete cascade,
+  saved_item_id     uuid references public.saved_items (id) on delete cascade,
+  reading_id        uuid references learn.readings (id) on delete cascade,
+  track_id          uuid references learn.tracks (id) on delete cascade,
+  subject_id        uuid references learn.subjects (id) on delete cascade,
 
   created_at timestamptz not null default now(),
 
   constraint task_links_exactly_one_ck check (
-    num_nonnulls(application_id, role_id, company_id, contact_id, interview_id, note_id) = 1
+    num_nonnulls(application_id, role_id, company_id, contact_id, interview_id,
+                 note_id, order_id, inventory_item_id, saved_item_id, reading_id,
+                 track_id, subject_id) = 1
   )
 );
 
@@ -325,8 +337,9 @@ create unique index task_links_about_key on todo.task_links (task_id)
 ```
 
 The "exactly one parent from N" shape is lifted straight from `job_search.notes`,
-which takes one parent from five, and adding a seventh target later is one
-column and one edited check constraint.
+which takes one parent from five, and adding a thirteenth target is one column,
+one edited check constraint, one arm in the trigger below and one line in
+`lib/todo/links/model.ts`. That is what `0004` did, six times over.
 
 `relation` distinguishes *what this is about* from *where it came from*. Only
 `about` is used in v1; `source` is what a task copied out of a note will carry
@@ -352,7 +365,7 @@ create or replace function todo.task_link_target_is_owned()
 returns trigger
 language plpgsql
 security definer
-set search_path = todo, job_search, obsidian, public
+set search_path = todo, job_search, obsidian, learn, public
 as $$
 declare
   owner uuid;
@@ -361,12 +374,18 @@ begin
   select user_id into task_owner from todo.tasks where id = new.task_id;
 
   select case
-    when new.application_id is not null then (select user_id from job_search.applications where id = new.application_id)
-    when new.role_id        is not null then (select user_id from job_search.roles        where id = new.role_id)
-    when new.company_id     is not null then (select user_id from job_search.companies    where id = new.company_id)
-    when new.contact_id     is not null then (select user_id from job_search.contacts     where id = new.contact_id)
-    when new.interview_id   is not null then (select user_id from job_search.interviews   where id = new.interview_id)
-    when new.note_id        is not null then (select user_id from obsidian.notes          where id = new.note_id)
+    when new.application_id    is not null then (select user_id from job_search.applications where id = new.application_id)
+    when new.role_id           is not null then (select user_id from job_search.roles        where id = new.role_id)
+    when new.company_id        is not null then (select user_id from job_search.companies    where id = new.company_id)
+    when new.contact_id        is not null then (select user_id from job_search.contacts     where id = new.contact_id)
+    when new.interview_id      is not null then (select user_id from job_search.interviews   where id = new.interview_id)
+    when new.note_id           is not null then (select user_id from obsidian.notes          where id = new.note_id)
+    when new.order_id          is not null then (select user_id from public.orders           where id = new.order_id)
+    when new.inventory_item_id is not null then (select user_id from public.inventory_items  where id = new.inventory_item_id)
+    when new.saved_item_id     is not null then (select user_id from public.saved_items      where id = new.saved_item_id)
+    when new.reading_id        is not null then (select user_id from learn.readings          where id = new.reading_id)
+    when new.track_id          is not null then (select user_id from learn.tracks            where id = new.track_id)
+    when new.subject_id        is not null then (select user_id from learn.subjects          where id = new.subject_id)
   end into owner;
 
   if owner is null or task_owner is null or owner <> task_owner then
@@ -397,7 +416,7 @@ how it came to be written down as "not needed" in the first draft.
 
 #### Foreign keys across schemas: a decision, not an accident
 
-These keys tie `todo`, `job_search`, `obsidian` and `public` together at the
+These keys tie `todo`, `job_search`, `obsidian`, `learn` and `public` together at the
 database level. That is the point — a task about a role that survives the role
 being deleted is a dangling reference, and the database preventing that is worth
 more than any amount of application code trying to.

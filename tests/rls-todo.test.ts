@@ -172,6 +172,46 @@ describe('todo.task_links', () => {
     ).rejects.toThrow(/task_links_exactly_one_ck/);
   });
 
+  it('links a task to a saved item and a subject its owner owns', async () => {
+    // The targets migrations-todo/0004 added, one from public and one from
+    // learn. They matter here for the same reason the job_search ones do: the
+    // foreign key is satisfied by any row in the table, whoever owns it.
+    const [saved] = await admin<{ id: string }[]>`
+      insert into public.saved_items (user_id, url, title)
+      values (${userA}, 'https://example.com/desk', 'Standing desk') returning id`;
+    const [subject] = await admin<{ id: string }[]>`
+      insert into learn.subjects (user_id, name) values (${userA}, 'Price signals') returning id`;
+
+    const [shop, study] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title)
+      values (${userA}, 'Measure the alcove'), (${userA}, 'Read the Hayek essay')
+      returning id`;
+
+    await asUser(userA, async (tx) => {
+      await tx`insert into task_links (task_id, relation, saved_item_id)
+               values (${shop.id}, 'about', ${saved.id})`;
+      await tx`insert into task_links (task_id, relation, subject_id)
+               values (${study.id}, 'about', ${subject.id})`;
+    });
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from task_links where task_id in (${shop.id}, ${study.id})`;
+    expect(Number(row.n)).toBe(2);
+  });
+
+  it('REFUSES a link to another account\'s subject', async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into learn.subjects (user_id, name) values (${userB}, 'Not yours') returning id`;
+
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into task_links (task_id, relation, subject_id)
+                   values (${taskA}, 'source', ${subject.id})`,
+      ),
+    ).rejects.toThrow(/must point at something/);
+  });
+
   it('drops the link when the role goes, and keeps the task', async () => {
     await admin`delete from job_search.roles where id = ${roleA}`;
 

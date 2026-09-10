@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
 import { addDays, type Task } from '@/lib/todo/tasks/model';
 
@@ -23,12 +24,17 @@ import { addDays, type Task } from '@/lib/todo/tasks/model';
  * `today` is the account's own day, worked out on the server: the browser's
  * idea of today is a different day for anyone whose zone is not the one they
  * keep their list in.
+ *
+ * What the task is about sits on the same row, as a chip. It is optional and
+ * costs nothing when it is not used, which is the only way it could go on a
+ * form whose whole argument is that writing something down has to be cheap.
  */
 export function AddTask({ today }: { today: string }) {
   const [noting, setNoting] = useState(false);
   const [dueOn, setDueOn] = useState('');
   const [time, setTime] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [about, setAbout] = useState<LinkChoice | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +55,7 @@ export function AddTask({ today }: { today: string }) {
         setDueOn('');
         setTime('');
         setPinned(false);
+        setAbout(null);
         setNoting(false);
         titleRef.current?.focus();
       }
@@ -116,6 +123,11 @@ export function AddTask({ today }: { today: string }) {
             className="tabular rounded-full bg-transparent px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-150 focus:ring-1 focus:ring-accent/40"
           />
         )}
+
+        {/* Beside the day rather than beside the title: both answer a
+            question about the task that is not the task, and a title field
+            with a second control inside it is the shape #137 decided against. */}
+        <LinkPicker value={about} onChange={setAbout} />
 
         <button
           type="button"

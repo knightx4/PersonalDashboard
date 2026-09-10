@@ -20,6 +20,7 @@ export const vaultSearchSource: SearchSource = {
   id: 'vault',
   module: 'vault',
   label: 'Vault',
+  kinds: ['note'],
 
   async find(ctx): Promise<SearchHit[]> {
     const supabase = await createVaultClient();

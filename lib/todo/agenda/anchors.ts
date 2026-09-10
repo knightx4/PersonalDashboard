@@ -1,6 +1,8 @@
 import 'server-only';
 
+import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { createLearnClient } from '@/lib/learn/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
 
@@ -13,8 +15,10 @@ import { LINK_TARGETS, type LinkTarget, type TaskLink } from '@/lib/todo/links/m
  * task's anchor as it renders) is a query per row. It does not look slow until
  * the list is long, which is exactly when someone notices.
  *
- * So: collect the ids by target type first, ask each module once. Six queries
- * in the worst case, flat, no matter how many tasks are on the page.
+ * So: collect the ids by target type first, ask each module once. Twelve
+ * queries in the worst case, flat, no matter how many tasks are on the page,
+ * and in practice one or two -- a page's tasks are rarely about a dozen
+ * different kinds of thing at once.
  */
 
 export interface Anchor {
@@ -67,6 +71,95 @@ async function lookup(
   // expired should still see their own list, with one row reading a little
   // barer than it might.
   try {
+    if (target === 'order') {
+      const supabase = await createShoppingClient();
+      const { data } = await supabase
+        .from('orders')
+        .select('id, external_order_number, merchants ( name )')
+        .in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        const merchant = one(row.merchants)?.name as string | undefined;
+        const number = row.external_order_number as string | null;
+        into.set(`order:${row.id as string}`, {
+          // The same label the search puts on an order, for the same reason:
+          // "Amazon" alone is a merchant, an order and a saved item.
+          label: [merchant ?? 'Order', number].filter(Boolean).join(' · '),
+          href: `/shopping/orders/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
+    if (target === 'inventory') {
+      const supabase = await createShoppingClient();
+      const { data } = await supabase
+        .from('inventory_items')
+        .select('id, name, variant')
+        .in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        const variant = row.variant as string | null;
+        into.set(`inventory:${row.id as string}`, {
+          label: variant ? `${row.name as string} · ${variant}` : (row.name as string),
+          href: `/shopping/inventory/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
+    if (target === 'saved') {
+      const supabase = await createShoppingClient();
+      const { data } = await supabase.from('saved_items').select('id, title').in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        into.set(`saved:${row.id as string}`, {
+          label: row.title as string,
+          href: `/shopping/saved/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
+    if (target === 'reading') {
+      const supabase = await createLearnClient();
+      const { data } = await supabase
+        .from('readings')
+        .select('id, title, sources ( title )')
+        .in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        // A reading whose subject came from its source has a null title, the
+        // same fallback lib/learn/tracks/load.ts and the search both make.
+        const source = one(row.sources)?.title as string | undefined;
+        into.set(`reading:${row.id as string}`, {
+          label: source ?? (row.title as string | null) ?? 'Untitled',
+          href: `/learn/r/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
+    if (target === 'track') {
+      const supabase = await createLearnClient();
+      const { data } = await supabase.from('tracks').select('id, title').in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        into.set(`track:${row.id as string}`, {
+          label: row.title as string,
+          href: `/learn/t/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
+    if (target === 'subject') {
+      const supabase = await createLearnClient();
+      const { data } = await supabase.from('subjects').select('id, name').in('id', ids);
+      for (const row of (data ?? []) as Row[]) {
+        into.set(`subject:${row.id as string}`, {
+          label: row.name as string,
+          href: `/learn/s/${row.id as string}`,
+        });
+      }
+      return;
+    }
+
     if (target === 'note') {
       const supabase = await createVaultClient();
       const { data } = await supabase.from('notes').select('id, title, path').in('id', ids);

@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isLinkTarget } from '@/lib/todo/links/model';
+import { clearTaskAbout, linkTask, setTaskAbout } from '@/lib/todo/links/write';
 import { resolveRelativeDay, todayIn } from '@/lib/todo/tasks/model';
 import {
   createTask,
@@ -48,6 +50,20 @@ function parse(formData: FormData, today: string) {
   });
 }
 
+/**
+ * Add a task, and say what it is about in the same breath.
+ *
+ * The picker beside the title field submits a target and an id, or two empty
+ * strings. Empty is the ordinary case and behaves exactly as it did before any
+ * of this existed.
+ *
+ * When there is one, the task and its link are written in that order, because
+ * a link needs a task to hang off. If the link is refused -- the trigger
+ * checking that the target is yours is the reason it can be -- the task is
+ * deleted rather than left floating: it is a task you never wrote, attached to
+ * nothing, and the message you get back is the database's own words rather
+ * than "Something went wrong".
+ */
 export async function addTask(
   _prev: TaskFormState,
   formData: FormData,
@@ -58,8 +74,24 @@ export async function addTask(
   const parsed = parse(formData, todayIn(timezone));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { error } = await createTask(user.id, parsed.data, timezone);
+  const target = String(formData.get('linkTarget') ?? '');
+  const targetId = String(formData.get('linkTargetId') ?? '');
+  // Half an answer is not one. A target with no id, or an id with a target
+  // this app has no column for, is a broken request rather than a plain task.
+  if ((target || targetId) && !(isLinkTarget(target) && targetId)) {
+    return { error: 'Which thing is this about?' };
+  }
+
+  const { id, error } = await createTask(user.id, parsed.data, timezone);
   if (error) return { error };
+
+  if (isLinkTarget(target) && targetId && id) {
+    const link = await linkTask(id, target, targetId);
+    if (link.error) {
+      await deleteTask(user.id, id);
+      return { error: link.error };
+    }
+  }
 
   revalidateTodo();
   return { message: 'Added.' };
@@ -83,6 +115,42 @@ export async function editTask(
 
   revalidateTodo();
   return { message: 'Saved.' };
+}
+
+/**
+ * Point a task at something, or at nothing, from the list it is already in.
+ *
+ * Most tasks are written before anybody knows what they are about, so the
+ * anchor has to be addable afterwards. Both take the task id and re-read the
+ * user from the session; the row can only be one you own, because RLS on
+ * task_links asks who owns the task and the trigger asks who owns the target.
+ *
+ * They return the message rather than throwing it, because the one failure
+ * worth reading -- pointing at somebody else's row -- has words of its own.
+ */
+export async function pointTaskAt(
+  taskId: string,
+  target: string,
+  targetId: string,
+): Promise<{ error: string | null }> {
+  await requireUser();
+  if (!isLinkTarget(target) || !targetId) return { error: 'Which thing is this about?' };
+
+  const { error } = await setTaskAbout(taskId, target, targetId);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
+}
+
+export async function unpointTask(taskId: string): Promise<{ error: string | null }> {
+  await requireUser();
+
+  const { error } = await clearTaskAbout(taskId);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
 }
 
 /**

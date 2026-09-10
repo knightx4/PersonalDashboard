@@ -88,6 +88,7 @@ export const jobsSearchSource: SearchSource = {
   id: 'jobs',
   module: 'jobs',
   label: 'Job search',
+  kinds: ['company', 'role', 'contact'],
   async find(ctx) {
     // Three reads on one schema, together. A failure in any of them fails the
     // source, which the merge already treats as contributing nothing.

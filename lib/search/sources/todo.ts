@@ -21,6 +21,7 @@ export const todoSearchSource: SearchSource = {
   id: 'todo',
   module: 'todo',
   label: 'Todo',
+  kinds: ['task'],
 
   async find(ctx): Promise<SearchHit[]> {
     const supabase = await createTodoClient();

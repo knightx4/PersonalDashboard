@@ -84,10 +84,13 @@ apply_range migrations "$CORE_HANDOVER" after
 echo "==> migrations-vault (obsidian)"
 for f in "$ROOT/supabase/migrations-vault"/*.sql; do apply_file "$f"; done
 
-echo "==> migrations-todo (todo)"
-for f in "$ROOT/supabase/migrations-todo"/*.sql; do apply_file "$f"; done
-
+# learn before todo: todo/0004 puts foreign keys on task_links into
+# learn.readings, learn.tracks and learn.subjects, and nothing in learn points
+# back at todo.
 echo "==> migrations-learn (learn)"
 for f in "$ROOT/supabase/migrations-learn"/*.sql; do apply_file "$f"; done
+
+echo "==> migrations-todo (todo)"
+for f in "$ROOT/supabase/migrations-todo"/*.sql; do apply_file "$f"; done
 
 echo "==> done"

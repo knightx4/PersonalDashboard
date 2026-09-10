@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { rankHits, searchEverything } from './search';
-import { MIN_QUERY, type SearchHit, type SearchSource } from './sources';
+import { MIN_QUERY, type HitKind, type SearchHit, type SearchSource } from './sources';
 
 /**
  * The rules that decide what ⌘K shows.
@@ -22,12 +22,23 @@ const hit = (title: string, overrides: Partial<SearchHit> = {}): SearchHit => ({
   ...overrides,
 });
 
-function source(id: string, hits: SearchHit[], module: SearchHit['module'] = 'jobs'): SearchSource {
-  return { id, module, label: id, find: vi.fn().mockResolvedValue(hits) };
+function source(
+  id: string,
+  hits: SearchHit[],
+  module: SearchHit['module'] = 'jobs',
+  kinds: readonly HitKind[] = ['company'],
+): SearchSource {
+  return { id, module, label: id, kinds, find: vi.fn().mockResolvedValue(hits) };
 }
 
 function failingSource(id: string, module: SearchHit['module'] = 'shopping'): SearchSource {
-  return { id, module, label: id, find: vi.fn().mockRejectedValue(new Error('token expired')) };
+  return {
+    id,
+    module,
+    label: id,
+    kinds: ['company'],
+    find: vi.fn().mockRejectedValue(new Error('token expired')),
+  };
 }
 
 const ALL = ['shopping', 'jobs', 'vault', 'todo', 'learn'] as const;
@@ -140,6 +151,66 @@ describe('the caps', () => {
     });
 
     expect(only.find).toHaveBeenCalledWith({ userId: 'user-1', query: 'ac', limit: 4 });
+  });
+});
+
+describe('asking for only some kinds', () => {
+  // What the todo link picker needs: a search that offers nothing a task
+  // cannot be about. Narrowed here rather than in the browser, so the caps are
+  // spent on rows that can actually be chosen.
+  const orders = source(
+    'shopping',
+    [hit('Acme order', { module: 'shopping', kind: 'order' })],
+    'shopping',
+    ['order'],
+  );
+  const notes = source('vault', [hit('Acme note', { module: 'vault', kind: 'note' })], 'vault', [
+    'note',
+  ]);
+
+  it('never asks a source that could not answer with a wanted kind', async () => {
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [orders, notes],
+      enabledModules: ALL,
+      kinds: ['note'],
+    });
+
+    expect(orders.find).not.toHaveBeenCalled();
+    expect(result.hits.map((h) => h.title)).toEqual(['Acme note']);
+  });
+
+  it('drops a hit of a kind nobody asked for, whoever returned it', async () => {
+    // A source declares its kinds; it is not trusted to only return them.
+    const sloppy = source(
+      'jobs',
+      [hit('Acme'), hit('Acme task', { module: 'todo', kind: 'task' })],
+      'jobs',
+      ['company', 'task'],
+    );
+
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [sloppy],
+      enabledModules: ALL,
+      kinds: ['company'],
+    });
+
+    expect(result.hits.map((h) => h.kind)).toEqual(['company']);
+  });
+
+  it('asks everybody when no kinds are named, which is the palette', async () => {
+    const result = await searchEverything({
+      userId: 'user-1',
+      query: 'ac',
+      sources: [orders, notes],
+      enabledModules: ALL,
+    });
+
+    expect(orders.find).toHaveBeenCalled();
+    expect(result.hits).toHaveLength(2);
   });
 });
 

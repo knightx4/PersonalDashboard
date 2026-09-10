@@ -71,6 +71,12 @@ export interface SearchSource {
   module: ModuleId;
   /** Named in a log line when it fails, and nowhere else. */
   label: string;
+  /**
+   * Every kind this source can return. Declared rather than discovered,
+   * because a caller that wants only some kinds has to decide whether to run
+   * a source before it has seen anything the source would say.
+   */
+  kinds: readonly HitKind[];
   find(ctx: SearchContext): Promise<SearchHit[]>;
 }
 
