@@ -6,10 +6,12 @@ const raise = (over: {
   created_at: string;
   status?: string;
   module?: string | null;
+  ask?: string | null;
 }) => ({
   id: over.id,
   title: `raise ${over.id}`,
   detail: null,
+  ask: over.ask === undefined ? 'Run the gate on the merge to main? I would.' : over.ask,
   module: over.module === undefined ? 'dev' : over.module,
   source: 'the plan routine, step #199',
   status: over.status ?? 'open',
@@ -101,7 +103,20 @@ describe('a raise as the app reads it', () => {
 
     expect(selected).toContain('source');
     expect(selected).toContain('answered_at');
+    expect(selected).toContain('ask');
     expect(row.source).toBe('the plan routine, step #199');
     expect(row.answeredAt).toBeNull();
+  });
+
+  // The ask is what the page leads with, and the rows filed before there was
+  // a column for it have none -- so it reads back as null rather than as an
+  // empty string the view would render as a blank label.
+  it('carries the ask, and is null on a raise filed without one', () => {
+    expect(raisedRowFrom(raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' })).ask).toBe(
+      'Run the gate on the merge to main? I would.',
+    );
+    expect(
+      raisedRowFrom(raise({ id: 'b', created_at: '2026-09-01T09:00:00Z', ask: null })).ask,
+    ).toBeNull();
   });
 });
