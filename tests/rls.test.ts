@@ -127,6 +127,24 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.raised_comments = raisedComment.id;
 
+  const [uiReview] = await admin<{ id: string }[]>`
+    insert into ui_reviews (user_id, module, commit_sha, violations, note)
+    values (
+      ${userId}, 'vault', ${`${tag}c0ffee`}, 0,
+      ${`${tag} left the settings page alone`}
+    )
+    returning id`;
+  ids.ui_reviews = uiReview.id;
+
+  const [uiFinding] = await admin<{ id: string }[]>`
+    insert into ui_findings (user_id, review_id, file, line, law, surface, body)
+    values (
+      ${userId}, ${uiReview.id}, 'app/vault/page.tsx', 12, '11', 'vault-note',
+      ${`${tag} saw a frame around a frame`}
+    )
+    returning id`;
+  ids.ui_findings = uiFinding.id;
+
   const [planItem] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, module, title, detail, status, position)
     values (
