@@ -3,23 +3,17 @@
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import {
-  Ban,
   Bot,
   Check,
   Circle,
   CircleUser,
   Flag,
-  Lightbulb,
   ChevronDown,
   ChevronRight,
-  CircleDashed,
   HelpCircle,
-  Hourglass,
   Pencil,
   Play,
   Scale,
-  Sparkles,
-  TrendingUp,
   X,
 } from 'lucide-react';
 import {
@@ -47,6 +41,7 @@ import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Meter } from '@/components/ui/meter';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
   ChipSelect,
   ComposeBody,
@@ -84,6 +79,7 @@ import {
   type PlanTally,
   type PlanView as View,
 } from '@/lib/plan/tree';
+import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
@@ -1471,35 +1467,33 @@ function Elapsed({ startedAt }: { startedAt: string }) {
 type Health = {
   word: string;
   tone: 'quiet' | 'ghost' | 'accent' | 'info' | 'positive' | 'caution';
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   title?: string;
 };
 
 /**
- * How each state is worded and drawn.
+ * How each state is worded.
  *
- * Which state a step is in is decided in lib/plan/tree.ts, so the dots beside
- * a module heading and the health column under it cannot disagree. What is
- * left here is presentation: the word, the icon, and the fixed part of the
- * tooltip.
+ * Which state a step is in is decided in lib/plan/tree.ts, so the counts
+ * beside a module heading and the health column under it cannot disagree.
+ * Which shape it draws is in lib/status-glyphs.ts, beside the pipeline's and
+ * the todo list's, so a state here looks like the same state there. What is
+ * left is the word, the tone and the fixed part of the tooltip.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
     word: 'Unanswered',
     tone: 'caution',
-    icon: HelpCircle,
     title: 'A question waiting on you. It closes on an answer, not a commit.',
   },
-  answered: { word: 'Answered', tone: 'positive', icon: Check },
+  answered: { word: 'Answered', tone: 'positive' },
   proposed: {
     word: 'Proposed',
     tone: 'accent',
-    icon: Lightbulb,
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
-  in_progress: { word: 'In progress', tone: 'accent', icon: TrendingUp },
-  blocked: { word: 'Blocked', tone: 'caution', icon: Ban },
-  waiting: { word: 'Waiting', tone: 'caution', icon: Hourglass },
+  in_progress: { word: 'In progress', tone: 'accent' },
+  blocked: { word: 'Blocked', tone: 'caution' },
+  waiting: { word: 'Waiting', tone: 'caution' },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
   // nothing.
@@ -1510,15 +1504,15 @@ const HEALTH: Record<PlanHealth, Health> = {
   // in this comment and rendered as grey on the only page that shows it.
   // `info` is the app's own blue, themed in all five palettes, and it does
   // not move when the workspace does.
-  ready: { word: 'Ready', tone: 'info', icon: Sparkles },
-  not_started: { word: 'Not started', tone: 'quiet', icon: CircleDashed },
-  done: { word: 'Done', tone: 'positive', icon: Check },
-  dropped: { word: 'Dropped', tone: 'ghost', icon: X },
+  ready: { word: 'Ready', tone: 'info' },
+  not_started: { word: 'Not started', tone: 'quiet' },
+  done: { word: 'Done', tone: 'positive' },
+  dropped: { word: 'Dropped', tone: 'ghost' },
 };
 
-function healthOf(node: PlanNode): Health {
+function healthOf(node: PlanNode): Health & { glyph: GlyphName } {
   const health = planHealthOf(node);
-  const base = HEALTH[health];
+  const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health] };
 
   // A row closed over open work reports what is open beneath it, so the word
   // is about a step further down and the fixed tooltip would be describing the
@@ -1791,7 +1785,6 @@ function PlanRow({
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
   const health = healthOf(node);
-  const HealthIcon = health.icon;
 
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
@@ -2107,7 +2100,7 @@ function PlanRow({
           )}
           trigger={
             <span className="inline-flex items-center gap-1.5" title={health.title}>
-              <HealthIcon className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+              <StatusGlyph glyph={health.glyph} />
               <span className="truncate">{health.word}</span>
             </span>
           }
