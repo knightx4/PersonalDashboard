@@ -9,6 +9,8 @@ import { HIT_KINDS, MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { popoverSurface } from '@/components/ui/popover';
 import { Kbd } from '@/components/shell/key-hints';
+import { useCapture } from '@/components/shell/capture';
+import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { THEMES } from '@/lib/theme';
@@ -72,6 +74,7 @@ export function CommandPalette({
    */
   const [answer, setAnswer] = useState<{ query: string; hits: SearchHit[] } | null>(null);
   const router = useRouter();
+  const { open: openCapture } = useCapture();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -133,18 +136,49 @@ export function CommandPalette({
     ];
   }, [sections, module, enabledModules, router]);
 
+  /**
+   * The things you can make, when what you typed names one.
+   *
+   * This is the palette's half of capture: it is the picker, and choosing a
+   * row here files nothing at all -- it opens the capture panel with whatever
+   * else you typed already in the field, and Enter *there* is what writes the
+   * task. So "add todo" and Enter gets you an empty panel to dictate into, and
+   * "add todo ring the dentist" gets you one with the todo in it.
+   *
+   * Ranked against the action's own words rather than the whole query, for the
+   * reason in lib/capture/actions.ts, and then sorted in with everything else
+   * on the same points, so a workspace called Todo still wins on "todo".
+   */
+  const captures = useMemo(
+    () =>
+      matchCaptureActions(query).map(({ action, points, seed }) => ({
+        points,
+        command: {
+          id: `capture:${action.id}`,
+          label: action.label,
+          hint: seed || 'Capture',
+          module: action.module,
+          run: () => openCapture(action.id, seed),
+        } satisfies Command,
+      })),
+    [query, openCapture],
+  );
+
   const matches = useMemo(() => {
     if (!query.trim()) return commands.slice(0, 8);
-    return commands
-      .map((command) => ({
-        command,
-        points: score(`${command.label} ${command.hint ?? ''}`, query.trim()),
-      }))
-      .filter((entry): entry is { command: Command; points: number } => entry.points !== null)
+    return [
+      ...captures,
+      ...commands
+        .map((command) => ({
+          command,
+          points: score(`${command.label} ${command.hint ?? ''}`, query.trim()),
+        }))
+        .filter((entry): entry is { command: Command; points: number } => entry.points !== null),
+    ]
       .sort((a, b) => b.points - a.points)
       .slice(0, 8)
       .map((entry) => entry.command);
-  }, [commands, query]);
+  }, [captures, commands, query]);
 
   /**
    * Ask, once the typing settles.

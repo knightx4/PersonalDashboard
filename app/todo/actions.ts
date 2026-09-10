@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { resolveRelativeDay, todayIn } from '@/lib/todo/tasks/model';
 import {
   createTask,
   deleteTask,
@@ -30,11 +31,18 @@ function revalidateTodo(): void {
   revalidatePath('/home');
 }
 
-function parse(formData: FormData) {
+/**
+ * `today` is the account's own day. A form that the server rendered sends a
+ * date and never needs it; one that was not -- the capture panel, which is
+ * mounted in the shell -- sends the word "today" or "tomorrow" instead,
+ * because a browser cannot work out which day it is on somebody else's list.
+ * See resolveRelativeDay.
+ */
+function parse(formData: FormData, today: string) {
   return taskInput.safeParse({
     title: formData.get('title') ?? '',
     body: formData.get('body') ?? '',
-    dueOn: formData.get('dueOn') ?? '',
+    dueOn: resolveRelativeDay(String(formData.get('dueOn') ?? ''), today),
     dueTime: formData.get('dueTime') ?? '',
     pinned: formData.get('pinned') === 'on',
   });
@@ -44,11 +52,11 @@ export async function addTask(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const parsed = parse(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
   const user = await requireUser();
   const { timezone } = await loadAccountSettings(user.id);
+
+  const parsed = parse(formData, todayIn(timezone));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { error } = await createTask(user.id, parsed.data, timezone);
   if (error) return { error };
@@ -64,11 +72,11 @@ export async function editTask(
   const id = String(formData.get('id') ?? '');
   if (!id) return { error: 'Which task?' };
 
-  const parsed = parse(formData);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
   const user = await requireUser();
   const { timezone } = await loadAccountSettings(user.id);
+
+  const parsed = parse(formData, todayIn(timezone));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { error } = await updateTask(user.id, id, parsed.data, timezone);
   if (error) return { error };
