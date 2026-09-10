@@ -9,6 +9,7 @@ import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { RaisedComment, RaisedQueue, RaisedRow } from '@/lib/raised/load';
 import { cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
@@ -18,6 +19,33 @@ const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
 /** "Everything" rather than an empty label, the same as the ideas list. */
 function scopeLabel(module: ModuleId | null): string {
   return module ? MODULE_LABEL[module] : 'Everything';
+}
+
+/**
+ * What the raise wants back from you, said apart from the story that produced
+ * it. The label is there so a row reads as a request rather than as a report:
+ * a page of paragraphs is a page nobody can clear.
+ */
+function Ask({ ask }: { ask: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
+        Needs from you
+      </p>
+      <p className="whitespace-pre-wrap text-body text-ink">{ask}</p>
+    </div>
+  );
+}
+
+/**
+ * The first sentence of the detail, for the closed line of the fold — law 10
+ * wants the summary to say whether opening it is worth it.
+ */
+function lead(detail: string): string {
+  const flat = detail.replace(/\s+/g, ' ').trim();
+  const end = flat.search(/[.?!](\s|$)/);
+  const first = end === -1 ? flat : flat.slice(0, end + 1);
+  return first.length > 90 ? `${first.slice(0, 89).trimEnd()}…` : first;
 }
 
 function StatusLabel({ row }: { row: RaisedRow }) {
@@ -123,7 +151,23 @@ function RaiseCard({ row }: { row: RaisedRow }) {
       </div>
 
       <p className="text-body font-semibold text-ink">{row.title}</p>
-      {row.detail && <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>}
+
+      {/* The ask first and the story folded under it, because the reason to
+          open this page is to find out what is wanted, not what happened. A
+          raise filed before there was a column for the ask has only the story,
+          so it keeps it open rather than hiding itself behind a fold. */}
+      {row.ask ? (
+        <>
+          <Ask ask={row.ask} />
+          {row.detail && (
+            <Disclosure title="Why it came up" meta={lead(row.detail)}>
+              <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+            </Disclosure>
+          )}
+        </>
+      ) : (
+        row.detail && <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+      )}
 
       {/* Which run raised it. Without this a raise is a voice from nowhere, and
           the first thing you want to know is what it was doing at the time. */}

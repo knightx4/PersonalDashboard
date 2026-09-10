@@ -30,6 +30,12 @@ export type RaisedRow = {
   id: string;
   title: string;
   detail: string | null;
+  /**
+   * The move it wants from you: a question, an action to approve, or a choice
+   * between named options. Null on the rows filed before there was a column
+   * for it — everything raised from here carries one.
+   */
+  ask: string | null;
   /** The workspace it is about, or null for the app as a whole. */
   module: ModuleId | null;
   /** Which run raised it, and what it was doing. Free text from the session. */
@@ -55,7 +61,7 @@ export function isOpen(row: RaisedRow): boolean {
 
 /** Every column the app reads off a raise, and the thread under it. */
 export const RAISED_COLUMNS =
-  'id, title, detail, module, source, status, created_at, answered_at, ' +
+  'id, title, detail, ask, module, source, status, created_at, answered_at, ' +
   'comments:raised_comments(id, author, body, created_at)';
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
@@ -65,6 +71,7 @@ export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
     id: row.id as string,
     title: row.title as string,
     detail: (row.detail as string | null) ?? null,
+    ask: (row.ask as string | null) ?? null,
     // A module removed from lib/modules leaves a harmless string in the
     // column, and it reads back as the whole app rather than as a workspace
     // nothing can look up. Same as ideas.

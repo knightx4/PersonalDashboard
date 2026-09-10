@@ -264,6 +264,7 @@ type RaisedListRow = {
   id: string;
   title: string;
   detail: string | null;
+  ask: string | null;
   module: string | null;
   source: string | null;
   status: string;
@@ -280,6 +281,8 @@ function printRaise(row: RaisedListRow): void {
   const scope = row.module && isModuleId(row.module) ? row.module : null;
   console.log(`\n${row.id.slice(0, 8)}  ${moduleLabel(scope)}  ${row.title}`);
   if (row.source) console.log(`  raised by ${row.source}`);
+  // The ask above the story, the same order the page reads it in.
+  if (row.ask) console.log(`  asks: ${row.ask.replace(/\s+/g, ' ')}`);
   if (row.detail) console.log(`  ${row.detail.replace(/\s+/g, ' ')}`);
   for (const comment of row.comments ?? []) {
     console.log(`  ${comment.author === 'me' ? 'user' : 'claude'}: ${comment.body.replace(/\s+/g, ' ')}`);
@@ -378,7 +381,7 @@ async function main(): Promise<void> {
      */
     if (command === 'raise') {
       const title = target?.trim();
-      if (!title) fail('Give the raise: raise "…" [--detail "…"] [--module <id>] [--from <n>].');
+      if (!title) fail('Give the raise: raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>].');
       if (title.length > 200) fail('A title is at most 200 characters.');
 
       const moduleArg = arg('--module');
@@ -386,14 +389,30 @@ async function main(): Promise<void> {
       const detail = arg('--detail');
       if (detail && detail.length > 4000) fail('A detail is at most 4000 characters.');
 
+      /**
+       * The ask is required, and it is the whole point of the row. A raise
+       * without one is a session narrating: it reads as a report, the user
+       * cannot tell what is wanted, and the page fills with paragraphs nobody
+       * can clear. One sentence they can answer in one line -- a question with
+       * your recommendation, an action to approve, or a named choice.
+       */
+      const ask = arg('--ask')?.trim();
+      if (!ask) {
+        fail(
+          'A raise needs --ask: the question, action or choice, in one sentence the user can\n' +
+            'answer in one line. Say what you recommend. The detail is the evidence for it.',
+        );
+      }
+      if (ask.length > 500) fail('An ask is at most 500 characters.');
+
       const from = arg('--from');
       const step = from ? await byNumber(sql, userId, from) : null;
       const source = arg('--source') ?? (step ? `plan #${step.number}` : null);
 
       const [row] = await sql<{ id: string }[]>`
-        insert into raised_items (user_id, module, title, detail, source)
+        insert into raised_items (user_id, module, title, detail, ask, source)
         values (${userId}, ${moduleArg && isModuleId(moduleArg) ? moduleArg : null}, ${title},
-                ${detail}, ${source})
+                ${detail}, ${ask}, ${source})
         returning id`;
       console.log(`${row.id.slice(0, 8)}  raised: ${title}`);
       console.log('It is on /dev/raised, and in the bell until it is answered or dismissed.');
@@ -408,7 +427,7 @@ async function main(): Promise<void> {
      */
     if (command === 'raises') {
       const rows = await sql<RaisedListRow[]>`
-        select r.id, r.title, r.detail, r.module, r.source, r.status, r.created_at,
+        select r.id, r.title, r.detail, r.ask, r.module, r.source, r.status, r.created_at,
                (
                  select json_agg(
                           json_build_object('author', c.author, 'body', c.body)
