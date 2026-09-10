@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
+import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { cn } from '@/lib/cn';
 import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
@@ -215,6 +216,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             defaultValue={row.status}
             className="w-32"
             aria-label="Status"
+            disabled={statusPending}
           >
             <option value="open">Open</option>
             <option value="in_progress">In progress</option>
@@ -223,9 +225,21 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             <option value="done">Done</option>
             <option value="declined">Declined</option>
           </Select>
-          <Button type="submit" size="sm" variant="secondary" pending={statusPending}>
+          {/* Picking a status is the whole decision; a Set button after it just
+              asks you to confirm what you already said. Same treatment the
+              inventory filters got: the select submits itself, and the button
+              stays in the markup as the way through with JavaScript off. */}
+          <SubmitOnChange />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            pending={statusPending}
+            data-fallback-submit
+          >
             {statusPending ? 'Saving…' : 'Set'}
           </Button>
+          {statusPending && <span className="text-small text-ink-muted">Saving…</span>}
         </form>
         {canAnswer && !answering && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setAnswering(true)}>
