@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { HEALTH_STATES, deadlineHealth } from '@/lib/health';
 import { deadlineLabel } from '@/lib/returns/deadline';
 
 /**
@@ -12,10 +13,12 @@ import { deadlineLabel } from '@/lib/returns/deadline';
  * The denominator is the merchant's real window, not a fixed horizon: a fuse
  * against an invented length would be a picture of a number nobody has. Where
  * the window is unknown there is no bar at all, for the same reason -- the
- * app does not draw precision it does not have.
+ * app does not draw precision it does not have, and `deadlineHealth` returns
+ * no state for exactly that case.
  *
- * Colour follows the same three states the row's text already uses, so the
- * bar and the words never disagree.
+ * Colour comes from the health states in `lib/health.ts`, which is also where
+ * the row's words and the "Due soon" filter get their thresholds, so the bar
+ * and the text beside it cannot disagree.
  */
 export function ReturnFuse({
   daysLeft,
@@ -29,13 +32,13 @@ export function ReturnFuse({
   deadline: string | null;
   className?: string;
 }) {
-  if (daysLeft === null || windowDays === null || windowDays <= 0) return null;
+  const health = deadlineHealth(daysLeft, windowDays);
+  if (health === null || daysLeft === null || windowDays === null) return null;
 
-  const overdue = daysLeft < 0;
-  const urgent = !overdue && daysLeft <= 7;
   // Burnt out reads as full-and-wrong rather than empty-and-absent: an empty
   // track looks like a bar that has not loaded.
-  const fraction = overdue ? 1 : Math.min(1, Math.max(0, daysLeft / windowDays));
+  const fraction =
+    health === 'overdue' ? 1 : Math.min(1, Math.max(0, daysLeft / windowDays));
 
   return (
     <span
@@ -46,7 +49,7 @@ export function ReturnFuse({
       <span
         className={cn(
           'block h-full rounded-full transition-[width] duration-500',
-          overdue ? 'bg-danger' : urgent ? 'bg-caution' : 'bg-ink-ghost',
+          HEALTH_STATES[health].fill,
         )}
         style={{ width: `${Math.round(fraction * 100)}%` }}
       />
