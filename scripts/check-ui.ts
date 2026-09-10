@@ -99,6 +99,16 @@ type Rule = {
   law: string;
   says: string;
   instead: string;
+  /**
+   * Paths this one rule does not ask about. Absent means everywhere under
+   * ROOTS, which is what nearly every rule wants.
+   *
+   * Separate from EXEMPT above, which excuses the primitives from every rule
+   * at once. This is for a rule whose subject has a home: the place the thing
+   * is *defined* has to be allowed to write it, or there is nothing for
+   * everywhere else to use instead.
+   */
+  skip?: RegExp;
   /** Every offending span on this line, or nothing. */
   find: (line: string, context: RuleContext) => string[];
 };
@@ -317,6 +327,29 @@ const RULES: Rule[] = [
     },
   },
   {
+    id: 'stage-tint-without-glyph',
+    law: '4',
+    says: 'a stage tint painted as the ground of a chip, where the shape should be saying the state',
+    instead: 'StatusGlyph in the stage ink, which still says the state in a greyscale screenshot',
+    /**
+     * `bg-status-*-tint`, anywhere but where the stage chip is drawn.
+     *
+     * Eleven statuses were told apart by hue alone until the glyphs landed,
+     * which meant anybody who cannot separate amber from red read the same
+     * chip for "in process" and "rejected". The glyph is what carries the
+     * state now, and StatusBadge is the only thing that draws it — so a tint
+     * appearing anywhere else is a surface that copied a class list from an
+     * older one and left the shape behind.
+     *
+     * Three places are allowed to write it: components/ui, which is exempt
+     * from every rule and is where the glyph itself lives; the badge, which is
+     * the one map from a status to a colour; and /dev/ui, which is the page
+     * showing the reader what the tints are.
+     */
+    skip: /^(?:components\/jobs\/ui\/status-badge\.tsx|app\/dev\/ui\/)/,
+    find: (line) => [...line.matchAll(/\bbg-status-[\w-]+-tint\b/g)].map((m) => m[0]),
+  },
+  {
     id: 'composer-always-open',
     law: '14',
     says: 'a compose box standing open in a section that lists what is already there',
@@ -418,6 +451,7 @@ function scan(): Hit[] {
         }
         for (const rule of RULES) {
           if (excused.has(rule.id)) continue;
+          if (rule.skip?.test(file)) continue;
           const context: RuleContext = {
             after: lines.slice(index + 1, index + 7),
             before: lines.slice(0, index),
@@ -480,7 +514,9 @@ if (regressions.length > 0) {
     console.error(`    ${hit.text}`);
     if (!explained.has(hit.rule.id)) {
       explained.add(hit.rule.id);
-      console.error(`    law ${hit.rule.law}: ${hit.rule.says}`);
+      // The id as well as the law, because the id is what a file-wide
+      // exemption has to name and there is nowhere else to read it off.
+      console.error(`    law ${hit.rule.law} · ${hit.rule.id}: ${hit.rule.says}`);
       console.error(`    use ${hit.rule.instead}`);
     }
     console.error('');
