@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import {
   deleteFeedback,
   editFeedback,
+  respondToFeedback,
   updateFeedbackStatus,
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
@@ -72,6 +73,27 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
   if (editState.message && editState !== settled) {
     setSettled(editState);
     setEditing(false);
+  }
+
+  /**
+   * Answering a note that came back with a question.
+   *
+   * Only where there is a question to answer: blocked and planned are the two
+   * states waiting on the person rather than on a run. Behind a button rather
+   * than always open, so a queue of twenty notes is not twenty text boxes --
+   * the same reason Edit is behind one.
+   */
+  const [answering, setAnswering] = useState(false);
+  const [respondState, respondAction, respondPending] = useActionState(
+    respondToFeedback,
+    {} as FeedbackActionState,
+  );
+  const canAnswer = row.status === 'blocked' || row.status === 'planned';
+
+  const [answered, setAnswered] = useState<FeedbackActionState | null>(null);
+  if (respondState.message && respondState !== answered) {
+    setAnswered(respondState);
+    setAnswering(false);
   }
 
   return (
@@ -161,6 +183,30 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         </p>
       )}
 
+      {/* Directly under the question, which is where an answer goes. Putting it
+          down among Set, Edit and Delete would make replying to a question look
+          like another way of triaging the note. */}
+      {canAnswer && answering && (
+        <form action={respondAction} className="flex flex-col gap-2">
+          <input type="hidden" name="id" value={row.id} />
+          <Textarea
+            name="response"
+            rows={3}
+            autoFocus
+            placeholder="Answer the question above. It goes on the note and the next run reads it."
+            aria-label="Your answer"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" size="sm" pending={respondPending}>
+              {respondPending ? 'Sending…' : 'Answer and reopen'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <form action={statusAction} className="flex items-center gap-2">
           <input type="hidden" name="id" value={row.id} />
@@ -181,6 +227,11 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             {statusPending ? 'Saving…' : 'Set'}
           </Button>
         </form>
+        {canAnswer && !answering && (
+          <Button type="button" size="sm" variant="secondary" onClick={() => setAnswering(true)}>
+            Answer
+          </Button>
+        )}
         {canEdit && !editing && (
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
             Edit
@@ -192,7 +243,9 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             Delete
           </Button>
         </form>
-        <FieldError>{statusState.error ?? deleteState.error ?? editState.error}</FieldError>
+        <FieldError>
+          {statusState.error ?? deleteState.error ?? editState.error ?? respondState.error}
+        </FieldError>
       </div>
     </li>
   );
