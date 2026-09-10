@@ -126,6 +126,28 @@ export function hourIn(iso: string, timezone: string): number {
 }
 
 /**
+ * The hours a thing with a duration covers, both ends inclusive.
+ *
+ * Only an event has one; everything else on the calendar is a moment and gets
+ * null. An end exactly on the hour stops at the row before it, so a meeting
+ * from 10:00 to 12:00 covers 10 and 11 rather than reaching into a third hour
+ * it does not use.
+ *
+ * Each entry is already clamped to the day it is drawn on, so both ends are
+ * hours of the same day.
+ */
+export function hourSpan(
+  entry: Pick<CalendarEntry, 'at' | 'end'>,
+  timezone: string,
+): { from: number; to: number } | null {
+  if (!entry.at || !entry.end) return null;
+
+  const from = hourIn(entry.at, timezone);
+  const lastMoment = new Date(new Date(entry.end).getTime() - 1).toISOString();
+  return { from, to: Math.max(from, hourIn(lastMoment, timezone)) };
+}
+
+/**
  * The band of hours a day or week draws: 08:00 to 18:00, widened to hold
  * whatever is actually there.
  *
@@ -149,7 +171,10 @@ export function hourWindow(
       if (!entry.at) continue;
       const hour = hourIn(entry.at, timezone);
       if (hour < from) from = hour;
-      if (hour > to) to = hour;
+      // An event is widened to by its end as well, or a meeting running to
+      // 22:00 would be drawn as a block reaching past the bottom of the grid.
+      const last = hourSpan(entry, timezone)?.to ?? hour;
+      if (last > to) to = last;
     }
   }
 
@@ -159,4 +184,62 @@ export function hourWindow(
 /** The hours the grid draws, inclusive of both ends. */
 export function hoursOf(window: { from: number; to: number }): number[] {
   return Array.from({ length: window.to - window.from + 1 }, (_, index) => window.from + index);
+}
+
+/** A thing with a duration, and where it sits among the ones it overlaps. */
+export interface CalendarBlock {
+  entry: CalendarEntry;
+  /** The first and last hour row it covers. */
+  from: number;
+  to: number;
+  /** Which side-by-side lane it takes, and how many the day's grid is wide there. */
+  lane: number;
+  lanes: number;
+}
+
+/**
+ * The blocks of one day, laid out so that none of them hides another.
+ *
+ * Two meetings at the same time are drawn side by side rather than stacked, so
+ * a clash looks like a clash. The lanes are counted per run of overlapping
+ * events rather than across the whole day: a single afternoon appointment is
+ * full width even when the morning had three people booking over each other.
+ *
+ * Greedy, taking the earliest start first and reusing the first lane that has
+ * finished. That is not the tightest packing possible, and a personal calendar
+ * has nowhere near enough at once for the difference to show.
+ */
+export function blocksFor(entries: readonly CalendarEntry[], timezone: string): CalendarBlock[] {
+  const spans = entries
+    .map((entry) => ({ entry, span: hourSpan(entry, timezone) }))
+    .filter((row): row is { entry: CalendarEntry; span: { from: number; to: number } } =>
+      row.span !== null,
+    )
+    .sort((a, b) => a.span.from - b.span.from || b.span.to - a.span.to);
+
+  const blocks: CalendarBlock[] = [];
+  let cluster: CalendarBlock[] = [];
+  let laneEnds: number[] = [];
+
+  const flush = () => {
+    for (const block of cluster) block.lanes = laneEnds.length;
+    blocks.push(...cluster);
+    cluster = [];
+    laneEnds = [];
+  };
+
+  for (const { entry, span } of spans) {
+    // A gap with nothing running through it ends the run, and the next one
+    // starts again at full width.
+    if (laneEnds.length > 0 && span.from > Math.max(...laneEnds)) flush();
+
+    let lane = laneEnds.findIndex((end) => end < span.from);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = span.to;
+
+    cluster.push({ entry, from: span.from, to: span.to, lane, lanes: 1 });
+  }
+
+  flush();
+  return blocks;
 }

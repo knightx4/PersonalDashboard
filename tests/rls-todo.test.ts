@@ -14,6 +14,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createRole, createUser, truncateAll } from './helpers/db-todo';
+import { resolveSpan } from '@/lib/todo/events/write';
 
 let userA = '';
 let userB = '';
@@ -225,6 +226,116 @@ describe('todo.task_links', () => {
   });
 });
 
+describe('todo.events', () => {
+  it('shows a user only their own, and refuses one written on somebody else', async () => {
+    await admin`insert into events (user_id, title, starts_on, ends_on)
+                values (${userA}, 'Dentist', date '2026-03-10', date '2026-03-10')`;
+    await admin`insert into events (user_id, title, starts_on, ends_on)
+                values (${userB}, 'Their holiday', date '2026-03-10', date '2026-03-14')`;
+
+    const mine = await asUser(userA, (tx) => tx<{ title: string }[]>`select title from events`);
+    expect(mine.map((r) => r.title)).toEqual(['Dentist']);
+
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into events (user_id, title, starts_on, ends_on)
+                   values (${userA}, 'Not yours', date '2026-03-11', date '2026-03-11')`,
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('does not let a user edit or delete another user\'s event', async () => {
+    const [event] = await admin<{ id: string }[]>`
+      insert into events (user_id, title, starts_at, ends_at)
+      values (${userA}, 'Standup', timestamptz '2026-03-10 09:00+00', timestamptz '2026-03-10 09:15+00')
+      returning id`;
+
+    await asUser(userB, async (tx) => {
+      const updated = await tx`update events set title = 'Hijacked' where id = ${event.id}`;
+      const deleted = await tx`delete from events where id = ${event.id}`;
+      expect(updated.count).toBe(0);
+      expect(deleted.count).toBe(0);
+    });
+
+    const [row] = await admin<{ title: string }[]>`select title from events where id = ${event.id}`;
+    expect(row.title).toBe('Standup');
+  });
+
+  it('refuses an event that is both all day and timed, and one that is neither', async () => {
+    await expect(
+      admin`insert into events (user_id, title, starts_on, ends_on, starts_at, ends_at)
+            values (${userA}, 'Both', date '2026-03-10', date '2026-03-10',
+                    timestamptz '2026-03-10 09:00+00', timestamptz '2026-03-10 10:00+00')`,
+    ).rejects.toThrow(/events_one_span_ck/);
+
+    await expect(
+      admin`insert into events (user_id, title) values (${userA}, 'Whenever')`,
+    ).rejects.toThrow(/events_one_span_ck/);
+
+    // Half a pair is not a pair: an event that starts and never ends cannot be
+    // drawn, so it is not stored either.
+    await expect(
+      admin`insert into events (user_id, title, starts_at)
+            values (${userA}, 'Open ended', timestamptz '2026-03-10 09:00+00')`,
+    ).rejects.toThrow(/events_one_span_ck/);
+  });
+
+  it('refuses an end before its start, on either pair', async () => {
+    await expect(
+      admin`insert into events (user_id, title, starts_on, ends_on)
+            values (${userA}, 'Backwards', date '2026-03-10', date '2026-03-09')`,
+    ).rejects.toThrow(/events_span_order_ck/);
+
+    await expect(
+      admin`insert into events (user_id, title, starts_at, ends_at)
+            values (${userA}, 'Backwards', timestamptz '2026-03-10 10:00+00',
+                    timestamptz '2026-03-10 09:00+00')`,
+    ).rejects.toThrow(/events_span_order_ck/);
+  });
+
+  it('refuses a blank title, whitespace included', async () => {
+    await expect(
+      admin`insert into events (user_id, title, starts_on, ends_on)
+            values (${userA}, '   ', date '2026-03-10', date '2026-03-10')`,
+    ).rejects.toThrow(/events_title_ck/);
+  });
+
+  it('accepts what the write layer resolves, both ways round', async () => {
+    // resolveSpan is where a form's answer about when becomes four columns,
+    // and the table is where that answer has to be legal. Testing them apart
+    // leaves the join between them untested, which is where a span shape gets
+    // quietly wrong.
+    const timed = resolveSpan(
+      {
+        allDay: false,
+        startDay: '2026-03-10',
+        endDay: '2026-03-11',
+        startTime: '23:00',
+        endTime: '01:00',
+      },
+      'Europe/London',
+    ).span;
+    const allDay = resolveSpan(
+      { allDay: true, startDay: '2026-03-10', endDay: '2026-03-14', startTime: null, endTime: null },
+      'Europe/London',
+    ).span;
+
+    await asUser(userA, async (tx) => {
+      for (const [title, span] of [['Night shift', timed], ['Half term', allDay]] as const) {
+        await tx`insert into events ${tx({ user_id: userA, title, ...span })}`;
+      }
+    });
+
+    const rows = await asUser(userA, (tx) => tx<{ title: string; starts_at: Date | null }[]>`
+      select title, starts_at from events where title in ('Night shift', 'Half term')
+      order by title`);
+    expect(rows.map((r) => r.title)).toEqual(['Half term', 'Night shift']);
+    expect(rows[0].starts_at).toBeNull();
+    expect(rows[1].starts_at?.toISOString()).toBe('2026-03-10T23:00:00.000Z');
+  });
+});
+
 describe('todo.dismissals', () => {
   it('is one row per user, source and key', async () => {
     await admin`insert into dismissals (user_id, source, source_key)
@@ -255,6 +366,8 @@ describe('everything cascades out with the account', () => {
     await admin`insert into task_links (task_id, relation, role_id) values (${task.id}, 'about', ${role})`;
     await admin`insert into dismissals (user_id, source, source_key)
                 values (${doomed}, 'return_deadline', 'order-gone')`;
+    await admin`insert into events (user_id, title, starts_on, ends_on)
+                values (${doomed}, 'Leaving drinks', date '2026-03-10', date '2026-03-10')`;
 
     await admin`delete from auth.users where id = ${doomed}`;
 
@@ -264,7 +377,9 @@ describe('everything cascades out with the account', () => {
       select count(*) as n from task_links where task_id = ${task.id}`;
     const [dismissals] = await admin<{ n: string }[]>`
       select count(*) as n from dismissals where user_id = ${doomed}`;
+    const [events] = await admin<{ n: string }[]>`
+      select count(*) as n from events where user_id = ${doomed}`;
 
-    expect([tasks.n, links.n, dismissals.n].map(Number)).toEqual([0, 0, 0]);
+    expect([tasks.n, links.n, dismissals.n, events.n].map(Number)).toEqual([0, 0, 0, 0]);
   });
 });

@@ -1,5 +1,7 @@
-import { dueDay, todayIn, type Task } from '@/lib/todo/tasks/model';
+import { addDays, dueDay, todayIn, type Task } from '@/lib/todo/tasks/model';
 import { stillHidden } from '@/lib/todo/agenda/merge';
+import { eventDays, isAllDay, type Event } from '@/lib/todo/events/model';
+import { wallClockToInstant } from '@/lib/todo/time';
 import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
 
 /**
@@ -20,9 +22,25 @@ import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
 /** One thing drawn in a day's cell. */
 export interface CalendarEntry {
   key: string;
-  kind: 'task' | 'item' | 'context';
+  kind: 'event' | 'task' | 'item' | 'context';
   /** An instant, when the thing has a clock. Formatted by the caller. */
   at: string | null;
+  /**
+   * When it stops. Only an event has one: a task due at 14:00 and a return
+   * deadline are moments, and inventing a length for them would be the
+   * calendar claiming something nobody typed.
+   *
+   * On a day an event only passes through, this is the end of that day rather
+   * than the end of the event -- each day holds the part of the event that is
+   * actually on it.
+   */
+  end: string | null;
+  /**
+   * The row an event was drawn from, which is what opens it. Null for
+   * everything else: a task, an interview and a return deadline are opened
+   * where they live, not here.
+   */
+  eventId: string | null;
   title: string;
   /** Where clicking it goes, when there is anywhere to go. */
   href: string | null;
@@ -99,6 +117,7 @@ export function monthWindow(month: string): { from: string; to: string } {
 export interface BuildInput {
   month: string;
   tasks: Task[];
+  events: Event[];
   items: AgendaItem[];
   context: DayContext[];
   /** Keys of source items deferred or dismissed, and until when. */
@@ -145,9 +164,46 @@ export function collectEntries(
       key: `task:${task.id}`,
       kind: 'task',
       at: task.dueAt,
+      end: null,
+      eventId: null,
       title: task.title,
       href: null,
       done: task.status === 'done',
+    });
+  }
+
+  // An event is on every day it covers, as a pill on each of them rather than
+  // a bar stretched across the grid: a month is six fixed weeks of squares, and
+  // a bar would have to be laid out over that rather than inside a square.
+  for (const event of input.events) {
+    const days = eventDays(event, timezone);
+    const last = days.length - 1;
+
+    days.forEach((day, index) => {
+      // What of the event is on this day. The first day starts when the event
+      // does and the last day ends when it does; a day in between is covered
+      // from midnight to midnight, so nothing is drawn outside the day it is on.
+      const at = isAllDay(event)
+        ? null
+        : index === 0
+          ? event.startsAt
+          : wallClockToInstant(day, '00:00', timezone);
+      const end = isAllDay(event)
+        ? null
+        : index === last
+          ? event.endsAt
+          : wallClockToInstant(addDays(day, 1), '00:00', timezone);
+
+      push(day, {
+        key: `event:${event.id}`,
+        kind: 'event',
+        at,
+        end,
+        eventId: event.id,
+        title: event.title,
+        href: null,
+        done: false,
+      });
     });
   }
 
@@ -158,6 +214,8 @@ export function collectEntries(
       key: `item:${item.key}`,
       kind: 'item',
       at: item.at,
+      end: null,
+      eventId: null,
       title: item.title,
       href: item.link?.href ?? null,
       done: false,
@@ -169,6 +227,8 @@ export function collectEntries(
       key: `context:${entry.key}`,
       kind: 'context',
       at: entry.at,
+      end: null,
+      eventId: null,
       title: entry.label,
       href: entry.link?.href ?? null,
       done: false,
@@ -197,10 +257,15 @@ export function buildMonth(input: BuildInput): CalendarMonth {
 
 /**
  * Inside a square: what has a clock, in clock order, then what merely happens
- * that day. Your own tasks before what another workspace noticed, which is the
- * order the agenda already puts them in.
+ * that day. What you typed -- an event, then a task -- before what another
+ * workspace noticed, which is the order the agenda already puts them in.
  */
-const KIND_ORDER: Record<CalendarEntry['kind'], number> = { task: 0, item: 1, context: 2 };
+const KIND_ORDER: Record<CalendarEntry['kind'], number> = {
+  event: 0,
+  task: 1,
+  item: 2,
+  context: 3,
+};
 
 export function compareEntries(a: CalendarEntry, b: CalendarEntry): number {
   if ((a.at === null) !== (b.at === null)) return a.at === null ? 1 : -1;
