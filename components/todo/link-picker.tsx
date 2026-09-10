@@ -102,7 +102,7 @@ export function LinkPicker({
       )}
 
       {open && (
-        <Finder
+        <LinkFinder
           ref={panelRef}
           onPick={(choice) => {
             onChange(choice);
@@ -115,18 +115,23 @@ export function LinkPicker({
 }
 
 /**
- * The list itself.
+ * The list itself, exported for a caller that wants the search without the
+ * chip -- a task row, which already draws its anchor and only needs somewhere
+ * to pick a new one.
  *
  * A separate component so that closing it throws the query and the last answer
  * away: a picker reopened a minute later showing what you typed a minute ago
  * is showing something that may no longer exist.
  */
-function Finder({
+export function LinkFinder({
   ref,
   onPick,
+  align = 'left',
 }: {
   ref: React.Ref<HTMLDivElement>;
   onPick: (choice: LinkChoice) => void;
+  /** Which edge of the trigger it hangs from. Right, at the end of a row. */
+  align?: 'left' | 'right';
 }) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -186,7 +191,11 @@ function Finder({
       tabIndex={-1}
       role="dialog"
       aria-label="What is this about?"
-      className={cn(popoverSurface, 'absolute left-0 top-full z-50 mt-1.5 w-72 overflow-hidden')}
+      className={cn(
+        popoverSurface,
+        'absolute top-full z-50 mt-1.5 w-72 overflow-hidden',
+        align === 'right' ? 'right-0' : 'left-0',
+      )}
     >
       <div className="flex items-center gap-2 border-b border-border px-2.5">
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />

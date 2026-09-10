@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isLinkTarget } from '@/lib/todo/links/model';
-import { linkTask } from '@/lib/todo/links/write';
+import { clearTaskAbout, linkTask, setTaskAbout } from '@/lib/todo/links/write';
 import {
   createTask,
   deleteTask,
@@ -107,6 +107,42 @@ export async function editTask(
 
   revalidateTodo();
   return { message: 'Saved.' };
+}
+
+/**
+ * Point a task at something, or at nothing, from the list it is already in.
+ *
+ * Most tasks are written before anybody knows what they are about, so the
+ * anchor has to be addable afterwards. Both take the task id and re-read the
+ * user from the session; the row can only be one you own, because RLS on
+ * task_links asks who owns the task and the trigger asks who owns the target.
+ *
+ * They return the message rather than throwing it, because the one failure
+ * worth reading -- pointing at somebody else's row -- has words of its own.
+ */
+export async function pointTaskAt(
+  taskId: string,
+  target: string,
+  targetId: string,
+): Promise<{ error: string | null }> {
+  await requireUser();
+  if (!isLinkTarget(target) || !targetId) return { error: 'Which thing is this about?' };
+
+  const { error } = await setTaskAbout(taskId, target, targetId);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
+}
+
+export async function unpointTask(taskId: string): Promise<{ error: string | null }> {
+  await requireUser();
+
+  const { error } = await clearTaskAbout(taskId);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
 }
 
 /**

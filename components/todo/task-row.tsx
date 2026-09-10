@@ -28,6 +28,7 @@ import {
   reopenTask,
 } from '@/app/todo/actions';
 import type { Task } from '@/lib/todo/tasks/model';
+import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
 
 /**
@@ -295,6 +296,11 @@ export function TaskRow({
             <IconButton label="Drop" onClick={drop}>
               <X className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
+            {/* Last in the group, because it is the one action here that opens
+                something rather than doing something. `anchor` is what the
+                page resolved, so the unlink half only appears where there is
+                a link to remove. */}
+            <TaskAbout taskId={task.id} linked={Boolean(anchor)} />
           </>
         )}
 
