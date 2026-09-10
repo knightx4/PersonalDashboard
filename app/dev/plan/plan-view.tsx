@@ -1492,6 +1492,20 @@ function healthOf(node: PlanNode): Health {
   const health = planHealthOf(node);
   const base = HEALTH[health];
 
+  // A row closed over open work reports what is open beneath it, so the word
+  // is about a step further down and the fixed tooltip would be describing the
+  // wrong row. Naming the rows is the whole answer to "why does this say that".
+  if (isClosed(node.status) && health !== 'done' && health !== 'dropped' && health !== 'answered') {
+    const open = flatten(node.children).filter((child) => !isClosed(child.status));
+    return {
+      ...base,
+      title: `Closed, but still open beneath it: ${open
+        .slice(0, 3)
+        .map((child) => `#${child.number} ${child.title}`)
+        .join(', ')}${open.length > 3 ? `, and ${open.length - 3} more` : ''}`,
+    };
+  }
+
   // The three tooltips that can only be written with the step in hand.
   if (health === 'answered') return { ...base, title: node.resolution ?? undefined };
   if (health === 'blocked') return { ...base, title: node.comment ?? undefined };
