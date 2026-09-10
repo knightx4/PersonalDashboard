@@ -16,6 +16,15 @@ import { RolesTable } from '@/app/jobs/(app)/roles/roles-table';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/today/lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
+import type { ModuleId } from '@/lib/modules';
+import { CalendarMonthGrid } from '@/components/todo/calendar-month';
+import { monthDays, monthOf, type CalendarDay, type CalendarEntry } from '@/lib/todo/calendar/month';
+import { NoteProperties } from '@/components/vault/note-properties';
+import { NoteBody } from '@/components/vault/note-body';
+import { ReadingCard } from '@/components/learn/reading-card';
+import type { ReadingRow } from '@/lib/learn/tracks/load';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -41,7 +50,8 @@ import type { TodayBoard } from '@/lib/jobs/today/load';
 export type Surface = {
   id: string;
   label: string;
-  module: 'jobs' | 'shopping' | 'todo' | 'vault' | 'learn' | 'dev';
+  /** Which workspace it belongs to, so the gallery and the review agree. */
+  module: ModuleId;
   /** How wide the thing is meant to be read at, in the real app. */
   width: 'narrow' | 'wide';
   render: () => React.ReactNode;
@@ -729,6 +739,231 @@ const interviewRounds: RoundView[] = [
   },
 ];
 
+/**
+ * A month with an ordinary amount in it: a week carrying three things, one
+ * square over the dot limit, a couple of finished tasks and a long run of
+ * empty days.
+ *
+ * The empty days are half the reason this surface exists. A calendar is read
+ * for the Thursday with nothing on it as much as for the Tuesday with four,
+ * and a fixture that fills every square would hide which of the two is drawn
+ * badly.
+ */
+const CALENDAR_MONTH = '2026-09';
+const CALENDAR_TODAY = '2026-09-10';
+
+const calendarEntries: Record<string, CalendarEntry[]> = {
+  '2026-09-03': [
+    { key: 'task:c1', kind: 'task', at: null, title: 'Renew the travel insurance', href: null, done: true },
+  ],
+  '2026-09-09': [
+    { key: 'item:c2', kind: 'item', at: '2026-09-09T08:30:00.000Z', title: 'Return window closes — Sony WH-1000XM5', href: '/shopping/returns', done: false },
+  ],
+  '2026-09-10': [
+    { key: 'task:c3', kind: 'task', at: '2026-09-10T09:00:00.000Z', title: 'Send the reconciliation write-up to Dana', href: null, done: false },
+    { key: 'context:c4', kind: 'context', at: '2026-09-10T13:30:00.000Z', title: 'Dentist', href: null, done: false },
+    { key: 'task:c5', kind: 'task', at: null, title: 'Book the flights', href: null, done: false },
+  ],
+  '2026-09-11': [
+    { key: 'item:c6', kind: 'item', at: '2026-09-11T13:30:00.000Z', title: 'Marshall Wace · Technical', href: '/jobs/roles/role-p1', done: false },
+  ],
+  '2026-09-16': [
+    { key: 'item:c7', kind: 'item', at: '2026-09-16T08:00:00.000Z', title: 'The D. E. Shaw group · Final', href: '/jobs/roles/role-p2', done: false },
+    { key: 'task:c8', kind: 'task', at: null, title: 'Write the prep note', href: null, done: false },
+    { key: 'task:c9', kind: 'task', at: null, title: 'Chase the take-home feedback', href: null, done: false },
+    { key: 'task:c10', kind: 'task', at: null, title: 'Cancel the trial', href: null, done: false },
+    // Five in one square, which is where the phone stops drawing dots and says
+    // how many are left. A state no tidy fixture would ever produce.
+    { key: 'task:c11', kind: 'task', at: null, title: 'Order the bike part', href: null, done: false },
+  ],
+  '2026-09-24': [
+    { key: 'task:c12', kind: 'task', at: null, title: 'Quarterly tax payment', href: null, done: false },
+  ],
+  '2026-10-01': [
+    { key: 'task:c13', kind: 'task', at: null, title: 'Rent', href: null, done: false },
+  ],
+};
+
+const calendarDays: CalendarDay[] = monthDays(CALENDAR_MONTH).map((day) => ({
+  day,
+  inMonth: monthOf(day) === CALENDAR_MONTH,
+  isToday: day === CALENDAR_TODAY,
+  entries: calendarEntries[day] ?? [],
+}));
+
+/**
+ * A note somebody actually wrote: frontmatter, headings, a list, a table, a
+ * quote, a fenced block and a link.
+ *
+ * Every one of those is a different rule in the vault's prose styles, and the
+ * styles are the whole surface -- there is no chrome here to look at. A note
+ * of three paragraphs would say nothing about the ones that carry structure.
+ */
+const noteFrontmatter: Record<string, unknown> = {
+  tags: ['postgres', 'ops'],
+  status: 'in progress',
+  updated: '2026-08-30',
+  source: 'https://www.postgresql.org/docs/16/routine-vacuuming.html',
+};
+
+const noteMarkdown = `The nightly close was six hours and most of it was one query. Writing down
+what actually fixed it, because I will not remember in a year.
+
+## What was slow
+
+The reconciliation join scanned the whole ledger every night, and the ledger
+grows. Nothing was wrong with the plan — there was just more of it each week.
+
+- The join key was indexed, and the index was being used.
+- The table had not been vacuumed since the bulk load in March.
+- Autovacuum was running, and giving up: \`autovacuum_vacuum_cost_limit\` was
+  still at the default.
+
+## What it costs now
+
+| Step | Before | After |
+| --- | --- | --- |
+| Extract | 40m | 38m |
+| Reconcile | 4h 50m | 22m |
+| Publish | 30m | 28m |
+
+> Do not tune the query before you have looked at whether the table is a
+> swamp. I lost a day to a rewrite that changed nothing.
+
+The incremental version keeps a watermark per source and only reads what moved:
+
+\`\`\`sql
+select *
+from ledger
+where updated_at > (select watermark from sync_state where source = 'bank')
+order by updated_at;
+\`\`\`
+
+Next: work out whether the same trick applies to the settlement file, which is
+[the other slow one](https://example.com/runbooks/settlement).
+`;
+
+/**
+ * A track part way through: two read, one on the shelf now, one queued with a
+ * verified chapter, one the app has only guessed at, and one with no source
+ * found at all.
+ *
+ * The guessed locator and the missing source are the point. They are what this
+ * module is for and the two states a hand-drawn fixture never includes.
+ */
+const readingRow = (
+  row: Partial<ReadingRow> & Pick<ReadingRow, 'id' | 'position' | 'status' | 'subject'>,
+): ReadingRow => ({
+  title: null,
+  why: null,
+  note: null,
+  locatorKind: 'chapter',
+  locatorLabel: null,
+  locatorBasis: 'stated',
+  locatorConfidence: 'verified',
+  openUrl: null,
+  textAnchor: null,
+  pageFrom: null,
+  pageTo: null,
+  finishedAt: null,
+  readNowAt: null,
+  source: null,
+  ...row,
+});
+
+const trackReadings: ReadingRow[] = [
+  readingRow({
+    id: 'rd1',
+    position: 1,
+    status: 'read',
+    subject: 'Designing Data-Intensive Applications',
+    locatorLabel: 'Chapter 5, Replication',
+    pageFrom: 151,
+    pageTo: 197,
+    finishedAt: '2026-08-18T20:10:00.000Z',
+    openUrl: 'https://dataintensive.net',
+    source: {
+      id: 's1',
+      title: 'Designing Data-Intensive Applications',
+      author: 'Martin Kleppmann',
+      kind: 'book',
+      year: 2017,
+      canonicalUrl: 'https://dataintensive.net',
+      access: 'purchase',
+      priceCents: 4199,
+      pageCount: 616,
+    },
+  }),
+  readingRow({
+    id: 'rd2',
+    position: 2,
+    status: 'reading',
+    subject: 'Jepsen: PostgreSQL 12.3',
+    why: 'The failure modes are the part nobody writes down.',
+    readNowAt: '2026-09-09T19:00:00.000Z',
+    openUrl: 'https://jepsen.io/analyses/postgresql-12.3',
+    locatorKind: 'section',
+    locatorLabel: 'Serializable snapshot isolation',
+    source: {
+      id: 's2',
+      title: 'PostgreSQL 12.3',
+      author: 'Kyle Kingsbury',
+      kind: 'report',
+      year: 2020,
+      canonicalUrl: 'https://jepsen.io/analyses/postgresql-12.3',
+      access: 'open',
+      priceCents: null,
+      pageCount: null,
+    },
+  }),
+  readingRow({
+    id: 'rd3',
+    position: 3,
+    status: 'queued',
+    subject: 'Routine vacuuming',
+    locatorLabel: 'Chapter 25.1',
+    locatorBasis: 'inferred',
+    locatorConfidence: 'unverified',
+    openUrl: 'https://www.postgresql.org/docs/16/routine-vacuuming.html',
+    source: {
+      id: 's3',
+      title: 'PostgreSQL 16 documentation',
+      author: null,
+      kind: 'documentation',
+      year: 2023,
+      canonicalUrl: 'https://www.postgresql.org/docs/16/',
+      access: 'open',
+      priceCents: null,
+      pageCount: null,
+    },
+  }),
+  readingRow({
+    id: 'rd4',
+    position: 4,
+    status: 'queued',
+    subject: 'The paper about hybrid logical clocks somebody mentioned at the meetup',
+    why: 'Came up twice in a week. Find out whether it is the same thing as a vector clock.',
+  }),
+  readingRow({
+    id: 'rd5',
+    position: 5,
+    status: 'abandoned',
+    subject: 'Transaction Processing: Concepts and Techniques',
+    note: 'Too much of it is about hardware nobody runs. Kept chapter 7 and gave up on the rest.',
+    source: {
+      id: 's5',
+      title: 'Transaction Processing: Concepts and Techniques',
+      author: 'Jim Gray and Andreas Reuter',
+      kind: 'book',
+      year: 1992,
+      canonicalUrl: null,
+      access: 'library',
+      priceCents: null,
+      pageCount: 1070,
+    },
+  }),
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -925,6 +1160,44 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <TodayLists board={todayBoard} timezone="Europe/London" />,
+  },
+  {
+    /* The month grid, which is the todo module's densest surface and the one
+     * with a phone layout of its own. */
+    id: 'todo-calendar-month',
+    label: 'Calendar · A month',
+    module: 'todo',
+    width: 'wide',
+    render: () => <CalendarMonthGrid days={calendarDays} timezone="Europe/London" />,
+  },
+  {
+    /* A note, read. The vault has almost no chrome, so what there is to judge
+     * is the prose styles and the properties table above them. */
+    id: 'vault-note',
+    label: 'Note · Properties and body',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <>
+        <NoteProperties frontmatter={noteFrontmatter} />
+        <NoteBody markdown={noteMarkdown} />
+      </>
+    ),
+  },
+  {
+    /* A track's readings, in the one surface the module is read on. The list
+     * is the page: everything else on /learn/t/[id] is a header and a form. */
+    id: 'learn-track-readings',
+    label: 'Track · The readings',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+        {trackReadings.map((reading) => (
+          <ReadingCard key={reading.id} reading={reading} />
+        ))}
+      </ul>
+    ),
   },
   {
     id: 'jobs-interviews',
