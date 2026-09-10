@@ -1,9 +1,9 @@
 'use server';
 
-import { timingSafeEqual } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { codeMatches } from '@/lib/feedback/code';
 import { fireFeatureRoutine, notesRoutine } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
 
@@ -16,23 +16,6 @@ export type FeedbackActionState = {
   error?: string;
   message?: string;
 };
-
-/**
- * Shared submit code. Overridable with FEEDBACK_CODE so the value can live in
- * the environment rather than the repository; the fallback keeps the button
- * working out of the box.
- */
-function expectedCode(): string {
-  return process.env.FEEDBACK_CODE ?? '1612*';
-}
-
-/** Constant-time compare so the check cannot be probed character by character. */
-function codeMatches(given: string): boolean {
-  const a = Buffer.from(given);
-  const b = Buffer.from(expectedCode());
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
 
 const submitSchema = z.object({
   kind: z.enum(['bug', 'feature']),

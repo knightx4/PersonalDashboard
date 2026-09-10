@@ -6,7 +6,6 @@ import {
   changelogEntries,
   filterChangelog,
   groupChangelog,
-  moduleForPath,
   noteEntries,
   planEntries,
 } from '@/lib/changelog/entries';
@@ -167,22 +166,6 @@ describe('noteEntries', () => {
     const entries = noteEntries([note({ id: 'bare', completedAt: null })]);
 
     expect(entries).toEqual([]);
-  });
-});
-
-describe('moduleForPath', () => {
-  it('reads the workspace off the path', () => {
-    expect(moduleForPath('/jobs/today')).toBe('jobs');
-    expect(moduleForPath('/dev')).toBe('dev');
-  });
-
-  it('is null for a path outside every workspace, and for no path at all', () => {
-    expect(moduleForPath('/account/settings')).toBeNull();
-    expect(moduleForPath(null)).toBeNull();
-  });
-
-  it('does not mistake a longer segment for a prefix', () => {
-    expect(moduleForPath('/todoist')).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-import { MODULES, type ModuleId } from '@/lib/modules';
+import { moduleForPath, type ModuleId } from '@/lib/modules';
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { PlanItem } from '@/lib/plan/load';
 
@@ -109,21 +109,6 @@ export type ChangelogGroup = {
   number: number | null;
   entries: ChangelogEntry[];
 };
-
-/**
- * The workspace a path belongs to, or null when it belongs to none.
- *
- * A note carries the page it was filed from and not a module, because the
- * button that files it is in the header of every workspace. The path is the
- * only thing that says where the person was standing.
- */
-export function moduleForPath(path: string | null): ModuleId | null {
-  if (!path) return null;
-  const match = MODULES.find(
-    (module) => path === module.prefix || path.startsWith(`${module.prefix}/`),
-  );
-  return match?.id ?? null;
-}
 
 /**
  * A closed plan step is a line; anything else is not.
