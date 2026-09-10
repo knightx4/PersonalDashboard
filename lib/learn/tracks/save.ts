@@ -193,11 +193,16 @@ export async function createTrack(
  * either way. The basis says plainly where this came from, which keeps the
  * module's rule intact: a location is never claimed without saying how it is
  * known, and "you typed it" is a perfectly good how.
+ *
+ * `conceptId` is set when the row came from a gap in a subject graph rather
+ * than from you typing. It is what lets the source search read that subject's
+ * graph later, when you open the row and ask it to find something -- without
+ * it the search has the claim and nothing else about where you stand.
  */
 export async function addManualReading(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { trackId: string; title: string; why: string | null },
+  input: { trackId: string; title: string; why: string | null; conceptId?: string | null },
 ): Promise<string> {
   // Append. One query for the current end of the list beats a sequence, and a
   // personal track is tens of rows.
@@ -220,8 +225,11 @@ export async function addManualReading(
       title: input.title,
       why: input.why,
       position,
+      concept_id: input.conceptId ?? null,
       locator_kind: 'whole',
-      locator_basis: 'You wrote this down yourself. Nothing has been looked up for it.',
+      locator_basis: input.conceptId
+        ? 'A gap in your graph, put in the queue. Nothing has been looked up for it yet.'
+        : 'You wrote this down yourself. Nothing has been looked up for it.',
       locator_confidence: 'unverified',
     })
     .select('id')

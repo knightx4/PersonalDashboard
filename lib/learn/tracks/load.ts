@@ -64,6 +64,12 @@ export type ReadingRow = {
   /** When it was put on the Read now shelf. Null means it is not on it. */
   readNowAt: string | null;
   /**
+   * The concept this row was queued to close, when it came from a gap in a
+   * subject graph. Null for a reading you wrote down yourself, which is most
+   * of them and not a defect.
+   */
+  conceptId: string | null;
+  /**
    * Null when you wrote down a subject and no source has been found for it
    * yet. That is a normal state, not a broken row.
    */
@@ -121,6 +127,7 @@ type ReadingRecord = {
   page_to: number | null;
   finished_at: string | null;
   read_now_at: string | null;
+  concept_id: string | null;
   sources: {
     id: string;
     title: string;
@@ -159,6 +166,7 @@ function toReading(row: ReadingRecord): ReadingRow {
     pageTo: row.page_to,
     finishedAt: row.finished_at,
     readNowAt: row.read_now_at,
+    conceptId: row.concept_id,
     source: row.sources
       ? {
           id: row.sources.id,
@@ -178,6 +186,7 @@ function toReading(row: ReadingRecord): ReadingRow {
 const READING_COLUMNS =
   'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
   'locator_confidence, open_url, text_anchor, page_from, page_to, finished_at, read_now_at, ' +
+  'concept_id, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 
 /**

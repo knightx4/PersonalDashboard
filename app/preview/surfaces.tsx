@@ -964,6 +964,7 @@ const readingRow = (
   pageTo: null,
   finishedAt: null,
   readNowAt: null,
+  conceptId: null,
   source: null,
   ...row,
 });

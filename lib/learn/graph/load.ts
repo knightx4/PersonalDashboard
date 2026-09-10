@@ -80,6 +80,28 @@ export async function loadSubject(
   };
 }
 
+/**
+ * Which subject a concept belongs to.
+ *
+ * One column, because the caller already has the concept id and wants the
+ * graph around it. Null when the concept has been deleted, which is a normal
+ * thing for a reading queued months ago to run into.
+ */
+export async function subjectIdOfConcept(
+  supabase: LearnSupabaseClient,
+  conceptId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('concepts')
+    .select('subject_id')
+    .eq('id', conceptId)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading that concept', error);
+  return data ? (data as { subject_id: string }).subject_id : null;
+}
+
 type ConceptRow = {
   id: string;
   name: string;

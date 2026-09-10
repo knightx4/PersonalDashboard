@@ -103,5 +103,10 @@ export async function queueConcept(
     why: input.concept.misconception
       ? `A gap worth closing: ${input.concept.misconception}`
       : `Shaky: ${input.concept.claim}`,
+    // Which gap this was. The reading is still an ordinary row -- everything
+    // the queue does works on it unchanged -- but it can now find its way back
+    // to the graph, which is what lets the source search know where you stand
+    // rather than only what you are missing.
+    conceptId: input.concept.id,
   });
 }

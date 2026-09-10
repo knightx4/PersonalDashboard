@@ -7,6 +7,7 @@ import {
   sanitiseResolution,
   type ResolvedSource,
 } from '@/lib/learn/import/resolve-payload';
+import { isRooted, type Rooting } from '@/lib/learn/graph/rooting';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
@@ -75,18 +76,73 @@ FOR EACH ONE
 
 IF THE SUBJECT IS TOO VAGUE to search usefully -- "business", "history" -- set
 too_vague true and return no sources. Guessing at what somebody meant and
-handing back a reading list for it wastes more of their time than saying so.`;
+handing back a reading list for it wastes more of their time than saying so.
+
+WHEN YOU ARE TOLD WHAT THEY ALREADY KNOW
+Some of these searches come with two lists: the claims this person has settled
+in the subject, and the claims they are ready to take on next. When they are
+there, two more rules apply and they are the point of the lists.
+
+Nothing whose whole content is a settled claim. An introduction to something
+they have already got is a wasted evening, and "it never hurts to revise" is
+how a reading queue fills up with things nobody opens. A source that covers
+settled ground on the way somewhere new is fine; one that only covers it is
+not.
+
+Nothing that opens by assuming a claim that is not settled. Anything absent
+from the settled list is not established, whatever the field usually takes for
+granted -- so a paper that starts three steps past where they are goes back on
+the shelf, however good it is. Say in the why field what the source builds on that
+they already have.
+
+The lists are what this subject's graph holds, not the whole of what they know,
+so treat them as evidence rather than as a complete account.`;
 
 export type SuggestResult =
   | { ok: true; sources: ResolvedSource[] }
   | { ok: false; reason: 'too-vague' | 'nothing-good' | 'error'; detail: string };
 
-function buildPrompt(subject: string, question: string | null): string {
+/**
+ * The two lists, when there are two lists.
+ *
+ * Left out entirely when nothing is settled. An empty "already settled"
+ * heading reads as a claim that they know nothing, which is a different and
+ * much stronger statement than the graph is making -- it holds no evidence
+ * either way.
+ */
+function rootingLines(rooting: Rooting): string[] {
+  if (!isRooted(rooting)) return [];
+
+  const lines = ['', 'What they have already settled in this subject:'];
+  for (const claim of rooting.settled) lines.push(`- ${claim}`);
+  if (rooting.settledOmitted > 0) {
+    lines.push(`- …and ${rooting.settledOmitted} more, left out to keep this short.`);
+  }
+
+  if (rooting.frontier.length > 0) {
+    lines.push('', 'What they are ready to take on next:');
+    for (const claim of rooting.frontier) lines.push(`- ${claim}`);
+  }
+
+  lines.push(
+    '',
+    'Apply the two rules for this: nothing whose whole content is a settled',
+    'claim, and nothing that opens by assuming a claim that is not on that list.',
+  );
+  return lines;
+}
+
+function buildPrompt(
+  subject: string,
+  question: string | null,
+  rooting: Rooting | null,
+): string {
   const lines = [`Subject: ${subject}`];
   if (question) {
     lines.push('', `The larger question they are working on: ${question}`);
     lines.push('Aim these at that, not at the subject in general.');
   }
+  if (rooting) lines.push(...rootingLines(rooting));
   lines.push('', `Search, then call ${TOOL_NAME}.`);
   return lines.join('\n');
 }
@@ -101,6 +157,11 @@ function buildPrompt(subject: string, question: string | null): string {
 export async function suggestSources(input: {
   subject: string;
   question?: string | null;
+  /**
+   * What the subject's graph holds, when this search came from a gap in one.
+   * Null for a subject you typed, which has no graph behind it.
+   */
+  rooting?: Rooting | null;
   anthropicApiKey: string;
   client?: Anthropic;
   /** Told what the call cost, before anything is made of what it returned. */
@@ -164,7 +225,12 @@ export async function suggestSources(input: {
           },
         },
       ],
-      messages: [{ role: 'user', content: buildPrompt(input.subject, input.question ?? null) }],
+      messages: [
+        {
+          role: 'user',
+          content: buildPrompt(input.subject, input.question ?? null, input.rooting ?? null),
+        },
+      ],
     });
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) {
