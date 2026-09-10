@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Circle, CircleUser, Flag, Scale } from 'lucide-react';
 import { Card, CardSection } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   ChipSelect,
   ComposeBody,
@@ -459,6 +459,14 @@ export default function DevUiPage() {
       <PageHeader
         title="UI"
         description="The whole standard, rendered from the tokens it describes. Every swatch, control, size and number below is the real one — this page is a mirror, not a specification, and it is the only copy."
+        actions={
+          /* Where the standard gets held against the app, one module at a
+             time. It is a different question from what the standard is, which
+             is why it is a page rather than a section here. */
+          <Link href="/dev/ui/review" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+            Review
+          </Link>
+        }
       />
 
       {/* Chrome for a long document: a row of names, muted until pointed at.

@@ -61,6 +61,23 @@ export function planRoutine(): RoutineTarget {
   };
 }
 
+/**
+ * The routine that reviews one module's interface -- the button on
+ * /dev/ui/review.
+ *
+ * No fallback to the shared id, unlike the two above. A review pass is a
+ * different job from working the notes queue and from building the plan, and a
+ * button pointed at either of those would not fail: it would quietly work the
+ * wrong queue, which is the failure the split ids exist to prevent. With no id
+ * set the page says so and starts nothing.
+ */
+export function reviewRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_REVIEW_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_REVIEW_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
+  };
+}
+
 /** The beta header the routine API requires, as documented. */
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';
 const ANTHROPIC_VERSION = '2023-06-01';

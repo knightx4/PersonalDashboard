@@ -58,8 +58,10 @@ export function SurfaceReview({ surfaces }: { surfaces: ReviewSurface[] }) {
         </p>
       </div>
 
+      {/* The sections are named so /dev/ui/review can send you straight to one
+          module's surfaces rather than to the top of a page of six modules'. */}
       {modules.map((module) => (
-        <section key={module} className="space-y-3">
+        <section key={module} id={`surfaces-${module}`} className="space-y-3">
           <h2 className="text-ui font-semibold text-ink capitalize">{module}</h2>
           {surfaces
             .filter((surface) => surface.module === module)

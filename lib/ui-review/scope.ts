@@ -20,6 +20,11 @@ export type UiScope = ModuleId | 'shared';
 /** Every scope, modules in their usual order and shared last. */
 export const UI_SCOPES: readonly UiScope[] = [...MODULE_IDS, 'shared'];
 
+/** Whether a string is one of these, for a query parameter or a form field. */
+export function isUiScope(value: string): value is UiScope {
+  return (UI_SCOPES as readonly string[]).includes(value);
+}
+
 /**
  * Directories that belong to a module but are not named after it.
  *
