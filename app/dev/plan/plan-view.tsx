@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState, useSyncExternalStore } fro
 import Link from 'next/link';
 import {
   Ban,
+  Bot,
   Check,
   Circle,
   CircleUser,
@@ -2019,7 +2020,12 @@ function PlanRow({
                   title="Handed to Claude"
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
-                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  {/* A bot and not a person. This mark said "handed over" with
+                      the same head-and-shoulders the assignee picker uses for
+                      anybody at all, so the one thing it had to say -- that it
+                      went to Claude rather than onto your own list -- was the
+                      one thing it did not. */}
+                  <Bot className="size-3" strokeWidth={2} aria-hidden />
                   <span className="sr-only">Handed to Claude</span>
                 </span>
               )}
@@ -2118,7 +2124,9 @@ function PlanRow({
               <input type="hidden" name="id" value={node.id} />
               <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
               <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
-                <CircleUser
+                {/* The same bot as the mark: this button is specifically the
+                    hand-to-Claude toggle, not a general "who is on it". */}
+                <Bot
                   className={cn('size-3.5', !handOver && 'text-accent')}
                   strokeWidth={1.75}
                   aria-hidden
