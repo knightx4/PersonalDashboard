@@ -24,7 +24,7 @@ import {
   type CaptureAction,
   type CaptureActionId,
 } from '@/lib/capture/actions';
-import { todoCaptureForm } from '@/lib/capture/todo';
+import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { addTask, type TaskFormState } from '@/app/todo/actions';
 import type { RelativeDay } from '@/lib/todo/tasks/model';
 
@@ -139,7 +139,7 @@ export function CaptureProvider({ children }: { children: React.ReactNode }) {
 async function file(
   action: CaptureAction,
   text: string,
-  day: RelativeDay | '',
+  day: CaptureDay,
 ): Promise<TaskFormState> {
   switch (action.id) {
     case 'todo':
@@ -150,7 +150,15 @@ async function file(
 function CapturePanel({ session, onClose }: { session: Session; onClose: () => void }) {
   const { action, seed } = session;
   const [text, setText] = useState(seed);
-  const [day, setDay] = useState<RelativeDay | ''>('');
+  /**
+   * Today, until it is told otherwise.
+   *
+   * Nearly everything written down in a hurry is for today -- that is what
+   * writing it down in a hurry means -- and starting blank charged one press
+   * for the common answer and none for the rare one. Today is still a toggle,
+   * so "no day at all" costs the same one press it always did.
+   */
+  const [day, setDay] = useState<CaptureDay>('today');
   const [state, setState] = useState<TaskFormState>({});
   const [pending, start] = useTransition();
   const panelRef = useRef<HTMLFormElement>(null);
@@ -198,7 +206,9 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
       setState(result);
       if (!result.message) return;
       setText('');
-      setDay('');
+      // Back to the default rather than to blank: the panel stays open for
+      // the next thing, and the next thing is a fresh answer to "when".
+      setDay('today');
       fieldRef.current?.focus();
     });
   }
@@ -283,15 +293,32 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
         )}
 
         {/* The two days that are most of what anyone ever answers "when" with,
-            one press each, exactly as they are on /todo. The word rather than
-            the date, because the shell is not handed the account's today; see
-            lib/capture/todo.ts. Any other day is a date field on /todo, which
-            is where a task that needs one is worth opening. */}
-        <div className="flex items-center gap-1.5 border-t border-border px-3 py-2">
+            one press each, and the same question asked in full beside them --
+            the shape the add form on /todo already uses, so "when" is answered
+            the same way in both places. The chips send the word rather than a
+            date, because the shell is not handed the account's today; see
+            lib/capture/todo.ts. */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2">
           {action.dated && (
             <>
               <DayChip label="Today" day="today" picked={day} onPick={setDay} />
               <DayChip label="Tomorrow" day="tomorrow" picked={day} onPick={setDay} />
+
+              {/* Unframed and quiet, so a row of chips stays a row of chips
+                  rather than growing a boxed field in the middle of it. It
+                  shows a date only when a date is what is picked: with Today
+                  on, the answer is on the chip. */}
+              <input
+                type="date"
+                aria-label="A specific day"
+                value={isCalendarDay(day) ? day : ''}
+                onChange={(event) => setDay(event.target.value)}
+                className={cn(
+                  'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-150',
+                  'focus:ring-1 focus:ring-accent/40',
+                  isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',
+                )}
+              />
             </>
           )}
 
@@ -334,8 +361,8 @@ function DayChip({
 }: {
   label: string;
   day: RelativeDay;
-  picked: RelativeDay | '';
-  onPick: (day: RelativeDay | '') => void;
+  picked: CaptureDay;
+  onPick: (day: CaptureDay) => void;
 }) {
   const on = picked === day;
 

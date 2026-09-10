@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { codeMatches } from '@/lib/feedback/code';
 import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
 import { PLAIN_ENGLISH_RULE } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
@@ -49,6 +50,33 @@ export async function addIdea(
 
   revalidatePath('/dev/ideas');
   return { message: 'Idea saved.' };
+}
+
+/**
+ * The same, from the header panel, wherever you were standing.
+ *
+ * A separate action rather than a third `kind` on `submitFeedback`, because
+ * an idea is a different row in a different table with a different reason to
+ * exist: the notes queue is worked, and an idea is a thing that might be worth
+ * doing one day. Folding them into one writer would be the first step towards
+ * a queue that quietly contains both.
+ *
+ * What it does share is the panel's submit code, which is why that check now
+ * lives in `lib/feedback/code.ts` rather than beside one of the two actions.
+ *
+ * The page path comes over so the panel can propose the workspace the person
+ * was in; the module that is actually filed is whatever the select says, which
+ * may be neither.
+ */
+// latency: pending
+export async function submitIdea(
+  _prev: IdeaActionState,
+  formData: FormData,
+): Promise<IdeaActionState> {
+  if (!codeMatches(String(formData.get('code') ?? ''))) {
+    return { error: 'That code is not right.' };
+  }
+  return addIdea(_prev, formData);
 }
 
 /**

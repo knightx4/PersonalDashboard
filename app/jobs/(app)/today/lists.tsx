@@ -4,7 +4,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { INTERVIEW_HORIZON_DAYS, type TodayBoard } from '@/lib/jobs/today/load';
-import { roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
+import { roundDetail, roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
 import { ReminderActions } from './reminder-actions';
 import { WaitingActions } from './waiting-actions';
@@ -53,31 +53,21 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
           <ul className="divide-y divide-border">
             {rounds.map(({ group, interviews, lead }) => {
               // The first conversation is when the round starts, which is
-              // what a week is read against. What else is in it is said
-              // below rather than as four more lines.
-              const rest = interviews.length - 1;
+              // what a week is read against. What else is in it is said in the
+              // detail line rather than as four more rows.
+              //
               // A round with no prep anywhere in it is the one worth
               // flagging: notes on one of four conversations still means
               // somebody has looked at the day.
               const hasPrep = interviews.some((interview) => interview.hasPrep);
               const joinable = interviews.find((interview) => interview.meetingUrl);
               const round = roundLabel(group);
-              const kind = interviewKindLabel(lead.kind);
-              const detail = [
+              const detail = roundDetail(
                 round,
-                // A round is usually named after the kind of thing in it, so
-                // printing both said "Technical · Technical" more often than
-                // not. The kind still earns its place where the round has no
-                // name, or is called something else.
-                rest > 0
-                  ? `${interviews.length} interviews`
-                  : round?.toLowerCase().includes(kind.toLowerCase())
-                    ? null
-                    : kind,
-                rest === 0 && lead.durationMinutes ? `${lead.durationMinutes} min` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ');
+                interviewKindLabel(lead.kind),
+                interviews.length,
+                lead.durationMinutes,
+              );
 
               return (
                 <li

@@ -225,3 +225,39 @@ export function roundLabel(
   if (number !== null) return `Round ${number}`;
   return null;
 }
+
+/**
+ * The quiet line beside a round: what it is, and what is in it.
+ *
+ * The rule lives here rather than in one list, because every list that shows
+ * rounds instead of interviews needs the same one and they were not agreeing:
+ * this week's list said "In person Final Round · 4 interviews" while the
+ * to-do agenda printed the same afternoon four times over as four identical
+ * "Recruiter screen · 30 min" rows.
+ *
+ * A round is usually named after the kind of thing in it, so printing both
+ * said "Technical · Technical" more often than not. The kind earns its place
+ * only where the round has no name, or is called something else.
+ *
+ * The duration belongs to one conversation, so it is said only when the round
+ * is one conversation. How long a superday runs is not the sum of its parts,
+ * and adding them up would be inventing a number.
+ */
+export function roundDetail(
+  round: string | null,
+  kindLabel: string,
+  count: number,
+  durationMinutes: number | null,
+): string {
+  return [
+    round,
+    count > 1
+      ? `${count} interviews`
+      : round?.toLowerCase().includes(kindLabel.toLowerCase())
+        ? null
+        : kindLabel,
+    count === 1 && durationMinutes ? `${durationMinutes} min` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
