@@ -6,11 +6,14 @@ import {
   useContext,
   useMemo,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from 'react';
+import { cn } from '@/lib/cn';
 import {
   EMPTY_SELECTION,
   clearSelection,
+  clickRule,
   extendRange,
   isRowSelected,
   pruneSelection,
@@ -121,4 +124,73 @@ export function SelectionProvider({
   }, [state, rows, focused, toggle, extendTo, selectAll, clear]);
 
   return <SelectionContext.Provider value={value}>{children}</SelectionContext.Provider>;
+}
+
+/**
+ * The class a row carries so its tick box can see the hover.
+ *
+ * The box is hidden until the pointer is somewhere on the row, not just on the
+ * box itself — a checkbox you have to find before you can hover it is worse
+ * than a column of them. Tailwind names that relationship with a group, so the
+ * row element and the box have to agree on the name; this is the name.
+ */
+export const selectionRowClass = 'group/select';
+
+/**
+ * A row's tick box, drawn at its left edge and invisible until it is wanted.
+ *
+ * A permanently visible checkbox column taxes every ordinary read of the list,
+ * so the box only appears when the row is hovered, when it is focused, or when
+ * it is already selected. Under a coarse pointer there is no hover to wait
+ * for, so it is always there. Nothing shifts when it appears: it is opacity,
+ * not display, and the space is held either way.
+ */
+export function SelectionCheckbox({
+  rowKey,
+  label,
+  className,
+}: {
+  /** The row this box ticks: the same key the provider was given. */
+  rowKey: string;
+  /** What the row is, for the screen reader: "Select <label>". */
+  label: string;
+  className?: string;
+}) {
+  const selection = useSelection();
+  if (!selection) return null;
+
+  const checked = selection.isSelected(rowKey);
+
+  const click = (event: MouseEvent<HTMLInputElement>) => {
+    // The box draws what the provider holds, so the browser's own toggle would
+    // only be undone on the next render. Pressing space fires a click too,
+    // with no modifiers, which is why there is no onChange beside this.
+    event.preventDefault();
+    if (clickRule(event.nativeEvent) === 'range') selection.extendTo(rowKey);
+    else selection.toggle(rowKey);
+  };
+
+  return (
+    <label className={cn('flex shrink-0 cursor-pointer items-center', className)}>
+      <input
+        type="checkbox"
+        checked={checked}
+        readOnly
+        aria-label={`Select ${label}`}
+        onClick={click}
+        // Shift-clicking anything in a document selects the text between it and
+        // the last click, which on a list of rows is the whole list going blue.
+        onMouseDown={(event) => {
+          if (event.shiftKey) event.preventDefault();
+        }}
+        className={cn(
+          'size-4 rounded border-border text-accent focus:ring-accent/30',
+          'transition-opacity duration-150 focus-visible:opacity-100',
+          'group-hover/select:opacity-100 group-focus-within/select:opacity-100',
+          'pointer-coarse:opacity-100',
+          checked ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+    </label>
+  );
 }

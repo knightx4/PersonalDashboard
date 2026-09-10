@@ -166,3 +166,23 @@ export function selectedIds(
 ): string[] {
   return selectedRows(state, rows).flatMap((row) => [...rowIds(row)]);
 }
+
+/** The modifier keys a click carried. A MouseEvent satisfies it. */
+export type SelectionClick = {
+  shiftKey: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+};
+
+/**
+ * Which rule a click on a row's tick box runs.
+ *
+ * Shift asks for a range and wins when several modifiers are held, since it is
+ * the more specific ask. Everything else ticks the one row: ⌘-click and
+ * ctrl-click mean "this one as well" on a row you click to open, and the box
+ * has no such second meaning to suppress, so they land on the same rule as a
+ * plain click rather than on one of their own.
+ */
+export function clickRule(click: SelectionClick): 'range' | 'toggle' {
+  return click.shiftKey ? 'range' : 'toggle';
+}
