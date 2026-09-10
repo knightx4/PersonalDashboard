@@ -2144,8 +2144,15 @@ function PlanRow({
           that is admittedly not a plan yet, and one that only showed on a step
           you thought to open would be a gap nobody found. Quiet and dashed, so
           it does not read as detail. Nothing at all when there is none, which
-          is most steps most of the time. */}
-      {node.fog && (
+          is most steps most of the time.
+
+          It does fold with the group, though. Fog belongs to what is beneath
+          the row -- it is the part of it that is not a plan yet -- so a
+          collapsed feature leaving its fog behind was one block outliving the
+          thing it described. Only where there is an arrow to fold: on a leaf
+          `showChildren` is a state with no control, and gating on it alone
+          would hide fog on every closed step with no way back. */}
+      {node.fog && (!hasChildren || showChildren) && (
         <li style={inset} className="pb-1.5 pr-3">
           <div className="border-l-2 border-dashed border-border-strong pl-2.5">
             <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
