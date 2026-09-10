@@ -241,7 +241,7 @@ describe('dependencies', () => {
 });
 
 describe('isReady', () => {
-  const bare = { waitingOn: [], children: [] };
+  const bare = { waitingOn: [], children: [], dependsOn: [] };
 
   it('is a step not yet started, waiting on nothing, with nothing open beneath it', () => {
     expect(isReady({ status: 'not_started', ...bare }, [])).toBe(true);
@@ -251,6 +251,26 @@ describe('isReady', () => {
     for (const status of ['proposed', 'in_progress', 'blocked', 'done', 'dropped'] as const) {
       expect(isReady({ status, ...bare }, [])).toBe(false);
     }
+  });
+
+  it('is a blocked step whose every named dependency has since closed', () => {
+    // #20 sat blocked on #127 for a day after #127 shipped. A block that
+    // records dependencies has told the plan what it was waiting for, and once
+    // those are closed there is nothing on record holding it.
+    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(true);
+  });
+
+  it('is not a blocked step with a dependency still open', () => {
+    const sections = tree([item({ id: 'a' }), at('blocked', 'b')], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
+  it('is not a blocked step that named no dependency at all', () => {
+    // The honest use of the status: it needs a credential, or an answer, and
+    // no amount of other work produces one.
+    const sections = tree([at('blocked', 'b')]);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
   });
 
   it('is not a step still waiting on another', () => {
@@ -568,6 +588,23 @@ describe('healthOf', () => {
     expect(healthOf(byId.get('c')!)).toBe('ready');
     expect(healthOf(byId.get('b')!)).toBe('waiting');
     expect(healthOf(byId.get('a')!)).toBe('not_started');
+  });
+
+  it('stops saying blocked once every dependency the block named is closed', () => {
+    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('b')!)).toBe('ready');
+  });
+
+  it('goes on saying blocked while a dependency is open, or when none was named', () => {
+    const sections = tree([at('not_started', 'a'), at('blocked', 'b'), at('blocked', 'c')], [
+      dep('b', 'a'),
+    ]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('b')!)).toBe('blocked');
+    expect(healthOf(byId.get('c')!)).toBe('blocked');
   });
 });
 

@@ -191,10 +191,37 @@ function bySibling(a: PlanItem, b: PlanItem): number {
 }
 
 /**
+ * A block that has outlived the thing it named.
+ *
+ * `blocked` means "needs an answer, or something outside the repo", and it is
+ * deliberately a status that nothing clears on its own: no amount of other
+ * work produces the credential. Waiting on another *step* is meant to be a row
+ * in `plan_dependencies` instead, precisely because that does clear itself.
+ *
+ * A step marked `blocked` that also records dependencies has been given both,
+ * and those rows are the only account the plan holds of what it was waiting
+ * for. Once every one of them is closed, nothing recorded is holding the step
+ * and the status column is simply out of date -- #20 sat blocked on #127 for a
+ * day after #127 shipped, and the page went on saying "Waiting" with nothing
+ * left to wait on, which is the bug this answers.
+ *
+ * A step blocked with no dependencies at all is untouched. That is the honest
+ * use of the status, and nothing about it can be worked out from the tree.
+ */
+export function isStaleBlock(node: Pick<PlanNode, 'status' | 'dependsOn'>): boolean {
+  return (
+    node.status === 'blocked' &&
+    node.dependsOn.length > 0 &&
+    node.dependsOn.every((link) => isClosed(link.item.status))
+  );
+}
+
+/**
  * Whether a step could be picked up now.
  *
  *  - It has not been started. A step underway is being worked, not waiting
- *    to be, and a blocked one has said why it cannot be.
+ *    to be, and a blocked one has said why it cannot be -- unless every
+ *    dependency it named has since closed, which is `isStaleBlock`.
  *  - Nothing it waits on, its own or inherited, is still open.
  *  - None of its own steps are still open. A feature with steps outstanding
  *    is worked through those steps; the feature itself is what you close when
@@ -204,10 +231,10 @@ function bySibling(a: PlanItem, b: PlanItem): number {
  *    feature waits with it, and one under a proposal has not been agreed to.
  */
 export function isReady(
-  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children'>,
+  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn'>,
   ancestors: readonly Pick<PlanItem, 'status'>[],
 ): boolean {
-  if (node.status !== 'not_started') return false;
+  if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
   if (node.waitingOn.length > 0) return false;
   if (node.children.some((child) => !isClosed(child.status))) return false;
   if (ancestors.some((a) => ['blocked', 'dropped', 'proposed'].includes(a.status))) return false;
@@ -354,7 +381,7 @@ function descendantsOf(node: { children?: readonly PlanNode[] }): PlanNode[] {
 }
 
 export function healthOf(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'> & {
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
     /**
      * Optional so the callers that classify one row on its own -- the tally,
      * which only ever sees leaves -- need not build a subtree to ask.
@@ -389,6 +416,14 @@ export function healthOf(
     return 'unanswered';
   }
   if (node.kind === 'decision' && node.status === 'done') return 'answered';
+
+  // A block whose every named dependency has closed is reported as the step it
+  // now is, not as the block it used to be. See `isStaleBlock`: leaving it as
+  // "Waiting" is the page claiming something is holding the step up when the
+  // plan has no record of anything that is.
+  if (isStaleBlock(node)) {
+    return node.ready ? 'ready' : 'not_started';
+  }
 
   switch (node.status) {
     case 'proposed':
@@ -473,7 +508,9 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
  * cannot clear in an evening -- which is how a list like this stops being
  * opened.
  */
-export function needsThePerson(node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'>) {
+export function needsThePerson(
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'>,
+) {
   if (isClosed(node.status)) return false;
   const health = healthOf(node);
   return health === 'unanswered' || health === 'proposed' || health === 'blocked';
