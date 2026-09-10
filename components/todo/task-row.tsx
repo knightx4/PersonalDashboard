@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowUp,
-  Check,
   Clock,
   GripVertical,
   Pin,
@@ -15,6 +14,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ConfirmStep } from '@/components/ui/confirm-step';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { useToast } from '@/components/ui/toast';
 import {
   bringBackTask,
@@ -200,18 +201,25 @@ export function TaskRow({
         )}
       </span>
 
+      {/* The glyph is the state and the button is the hit area, which is why
+          the bordered box went: a border round a shape that already says open
+          is the same claim twice. A dropped task gets the struck hexagon here
+          rather than nothing at all -- it used to be findable only by reading
+          the title's strike-through. */}
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
         onClick={() => (done ? start(() => reopenTask(task.id)) : complete())}
         className={cn(
-          'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border transition-colors duration-150',
+          'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
           done
-            ? 'border-status-offer bg-status-offer text-surface'
-            : 'border-control hover:border-accent',
+            ? 'text-status-offer'
+            : dropped
+              ? 'text-ink-muted'
+              : 'text-ink-muted hover:text-accent',
         )}
       >
-        {done && <Check className="size-3" strokeWidth={2} aria-hidden />}
+        <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
       </button>
 
       <div className="min-w-0 flex-1">
