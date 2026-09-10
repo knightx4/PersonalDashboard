@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatMoney, type CurrencyCode, type MerchantSpendSlice } from '@/lib/money';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
+import { Meter } from '@/components/ui/meter';
 import { Sparkline } from '@/components/ui/sparkline';
 
 export function MerchantBreakdown({
@@ -27,7 +28,6 @@ export function MerchantBreakdown({
         ) : (
           <ul className="space-y-3">
             {top.map((slice) => {
-              const width = max === 0 ? 0 : Math.round((slice.cents / max) * 100);
               const series = trend?.get(slice.merchantId ?? '__unknown__');
               return (
                 <li key={slice.merchantId ?? slice.name}>
@@ -48,12 +48,11 @@ export function MerchantBreakdown({
                       {formatMoney(slice.cents, currency)}
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-canvas">
-                    <div
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${width}%` }}
-                    />
-                  </div>
+                  <Meter
+                    value={slice.cents}
+                    max={max}
+                    label={`${slice.name}: ${formatMoney(slice.cents, currency)} of ${formatMoney(max, currency)}, the most spent at one merchant`}
+                  />
                 </li>
               );
             })}
