@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { Pill } from '@/components/todo/calendar-month';
-import { hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
+import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
 
 /**
@@ -13,12 +13,15 @@ import type { CalendarDay } from '@/lib/todo/calendar/month';
  * component with no state, like the month grid beside it -- paging and the
  * choice of view are links.
  *
- * Things land in their hour rather than at their minute, and nothing is drawn
- * as a block with a height. Almost nothing here has a duration: a task due at
- * 14:00, a return deadline, an interview whose end nobody recorded. Drawing a
- * half-hour box around an instant would be the calendar inventing a fact, and
- * the one thing this page cannot do is disagree with the list about when
- * something is.
+ * An event has a duration, so it is drawn over the hours it runs: a tinted
+ * block behind the grid, from its first hour row to its last. Nothing else
+ * here has one. A task due at 14:00, a return deadline, an interview whose end
+ * nobody recorded -- those stay a line in their hour, because drawing a box
+ * around an instant would be the calendar inventing a fact, and the one thing
+ * this page cannot do is disagree with the list about when something is.
+ *
+ * The hours are one grid rather than a grid per hour, which is what lets a
+ * block span rows and still line up with every column beside it.
  */
 
 const HOUR_LABEL = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
@@ -77,31 +80,74 @@ export function CalendarTimeGrid({
             </div>
           )}
 
-          {hours.map((hour) => (
-            <div key={hour} className="grid border-b border-border last:border-b-0" style={columns}>
-              <span className="tabular px-2 py-1.5 text-right text-small text-ink-ghost">
+          <div
+            className="grid"
+            style={{
+              ...columns,
+              gridTemplateRows: `repeat(${hours.length}, minmax(2.25rem, auto))`,
+            }}
+          >
+            {hours.map((hour, row) => (
+              <span
+                key={`label-${hour}`}
+                style={{ gridRow: row + 1, gridColumn: 1 }}
+                className="tabular px-2 py-1.5 text-right text-small text-ink-ghost"
+              >
                 {HOUR_LABEL(hour)}
               </span>
-              {days.map((day) => {
-                const entries = day.entries.filter(
-                  (entry) => entry.at && hourIn(entry.at, timezone) === hour,
-                );
+            ))}
+
+            {/* The blocks go in before the cells and are not positioned, so
+                the cells paint over them and a task due inside a meeting stays
+                readable on top of it. No z-index: the painting order is the
+                DOM order, and a rung on the ladder would be claiming this is
+                a layer of the app rather than two lines of one grid.
+
+                A block carries no text. The title is the pill in the hour the
+                event starts, which is already in the entries -- the block is
+                the extent. */}
+            {days.flatMap((day, column) =>
+              blocksFor(day.entries, timezone).map((block) => {
+                const from = hours.indexOf(block.from);
+                const to = hours.indexOf(block.to);
+                if (from === -1 || to === -1) return null;
+
                 return (
                   <div
-                    key={day.day}
-                    className={cn(
-                      'min-h-9 min-w-0 space-y-0.5 border-l border-border p-1.5',
-                      day.isToday && 'bg-accent-tint/30',
-                    )}
-                  >
-                    {entries.map((entry) => (
+                    key={`block-${day.day}-${block.entry.key}`}
+                    aria-hidden
+                    style={{
+                      gridRow: `${from + 1} / ${to + 2}`,
+                      gridColumn: column + 2,
+                      marginLeft: `${(block.lane / block.lanes) * 100}%`,
+                      width: `${(1 / block.lanes) * 100}%`,
+                    }}
+                    className="pointer-events-none my-px rounded-md border-l-2 border-accent bg-accent-tint"
+                  />
+                );
+              }),
+            )}
+
+            {hours.map((hour, row) =>
+              days.map((day, column) => (
+                <div
+                  key={`${day.day}-${hour}`}
+                  style={{ gridRow: row + 1, gridColumn: column + 2 }}
+                  className={cn(
+                    'relative min-w-0 space-y-0.5 border-l border-border p-1.5',
+                    row < hours.length - 1 && 'border-b',
+                    day.isToday && 'bg-accent-tint/30',
+                  )}
+                >
+                  {day.entries
+                    .filter((entry) => entry.at && hourIn(entry.at, timezone) === hour)
+                    .map((entry) => (
                       <Pill key={entry.key} entry={entry} timezone={timezone} />
                     ))}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                </div>
+              )),
+            )}
+          </div>
         </div>
       </div>
     </Card>
