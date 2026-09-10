@@ -231,7 +231,7 @@ function Expanded({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-stretch justify-center p-4 sm:p-8">
+    <div className="fixed inset-0 z-modal flex items-stretch justify-center p-4 sm:p-8">
       <button
         type="button"
         aria-label="Close"

@@ -368,7 +368,7 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
             role="listbox"
             className={cn(
               popoverSurface,
-              'absolute z-20 mt-1 max-h-64 w-full overflow-auto',
+              'absolute z-menu mt-1 max-h-64 w-full overflow-auto',
             )}
           >
             {matches.length === 0 && !canAdd ? (

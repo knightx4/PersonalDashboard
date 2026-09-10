@@ -436,7 +436,7 @@ export function AppShell({
     >
       {/* The column, from lg up.
 
-          z-40 rather than nothing: `sticky` makes this element a stacking
+          z-chrome rather than nothing: `sticky` makes this element a stacking
           context, so the workspace switcher's menu cannot escape it however
           high its own z-index goes. Without a z-index here the column lands in
           the auto layer, which every positioned element in the page column --
@@ -444,7 +444,7 @@ export function AppShell({
           how a company logo and a filter chip ended up in front of an open
           switcher menu. Level with the top bar, below the palette and the
           sheets that are meant to cover the whole shell. */}
-      <aside className="sticky top-0 z-40 hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
+      <aside className="sticky top-0 z-chrome hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
         {sidebarInner(collapsed)}
 
         {/* Narrow it when the page needs the width, without losing the way
@@ -477,7 +477,7 @@ export function AppShell({
 
       {/* The drawer, below lg. */}
       {drawer && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-overlay lg:hidden">
           <button
             type="button"
             aria-label="Close navigation"
@@ -518,7 +518,7 @@ export function AppShell({
             this reads as the bar picking up its own sidebar's tone. In
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
-        <header className="sticky top-0 z-40 border-b border-shell-border bg-shell/85 backdrop-blur">
+        <header className="sticky top-0 z-chrome border-b border-shell-border bg-shell/85 backdrop-blur">
           <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
             <button
               type="button"
@@ -652,7 +652,7 @@ export function AppShell({
           // holds no sections at all, and a landmark called "Sections" that
           // contains one workspace switcher is a lie to anyone listing them.
           aria-label={tabs.length > 0 ? 'Sections' : 'Workspace'}
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+          className="fixed inset-x-0 bottom-0 z-chrome border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
         >
           {/* With no sections the switcher is the only cell, so it takes the
               width. Its contents are centred either way, which is what "in the

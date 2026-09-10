@@ -114,12 +114,12 @@ export function RolesTable({
               )}
             </TD>
             <TD label="Company">
-              {/* `relative z-10`: the primary cell's link stretches over the
+              {/* `relative z-over-link`: the primary cell's link stretches over the
                   whole row, so anything that is its own destination has to be
                   lifted out from under it. */}
               <Link
                 href={`/jobs/companies/${row.companySlug}`}
-                className="relative z-10 flex items-center gap-2 text-ink-muted transition-colors duration-150 hover:text-accent max-md:justify-end"
+                className="relative z-over-link flex items-center gap-2 text-ink-muted transition-colors duration-150 hover:text-accent max-md:justify-end"
               >
                 <CompanyAvatar
                   company={{

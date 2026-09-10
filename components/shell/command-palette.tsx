@@ -275,7 +275,7 @@ export function CommandPalette({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]">
+    <div className="fixed inset-0 z-modal flex items-start justify-center px-4 pt-[12vh]">
       <button
         type="button"
         aria-label="Close"

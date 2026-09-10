@@ -43,7 +43,7 @@ import { cn } from '@/lib/cn';
  */
 export const popoverSurface = 'rounded-card border border-border bg-raised shadow-lg';
 
-const popover = cva(`${popoverSurface} z-50`, {
+const popover = cva(`${popoverSurface} z-overlay`, {
   variants: {
     /**
      * Where it hangs.

@@ -128,9 +128,17 @@ export const Z_LADDER: readonly { z: string; utility: string; what: string }[] =
   },
   { z: '20', utility: 'z-menu', what: 'A menu or listbox opened inside the page.' },
   { z: '30', utility: 'z-status', what: 'The status line.' },
-  { z: '40', utility: 'z-chrome', what: 'The sidebar and the top bar.' },
+  {
+    z: '40',
+    utility: 'z-chrome',
+    what: 'The sidebar, the top bar, the phone dock, the capture button.',
+  },
   { z: '50', utility: 'z-overlay', what: 'The drawer, popovers, action menus.' },
-  { z: '60', utility: 'z-palette', what: 'The command palette.' },
+  {
+    z: '60',
+    utility: 'z-modal',
+    what: 'A modal over a scrim: the palette, the capture panel, the lightbox editor.',
+  },
   { z: '70', utility: 'z-toast', what: 'Toasts.' },
   { z: '9999', utility: 'z-grain', what: 'The grain, which no pointer can touch.' },
 ];

@@ -68,7 +68,7 @@ export function LeftRail({
 
       {/* Rendered only when open, so it costs nothing at rest. */}
       {open && (
-        <div className="fixed inset-0 z-50 xl:hidden">
+        <div className="fixed inset-0 z-overlay xl:hidden">
           <button
             type="button"
             aria-label="Close filters"

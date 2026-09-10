@@ -898,7 +898,7 @@ body {
 /* ---------------------------------------------------------------------------
  * The z ladder.
  *
- * Eight rungs, each one named, so a call site reads `z-palette` rather than a
+ * Eight rungs, each one named, so a call site reads `z-modal` rather than a
  * number somebody has to go and look up. Tailwind's own scale stops at 50,
  * which is how `z-[60]` and `z-[70]` came to be written by hand; nothing
  * outside this list is a rung.
@@ -915,12 +915,14 @@ body {
   --z-menu: 20;
   /* The status line. */
   --z-status: 30;
-  /* The sidebar and the top bar. */
+  /* The shell's own fixed furniture: the sidebar, the top bar, the bottom
+   * bar on a phone, the capture button that floats over the page. */
   --z-chrome: 40;
   /* The drawer, popovers, action menus. */
   --z-overlay: 50;
-  /* The command palette, which covers the drawer. */
-  --z-palette: 60;
+  /* A modal over a scrim: the command palette, the capture panel, the
+   * lightbox prose editor. Covers the drawer. */
+  --z-modal: 60;
   /* Toasts, over everything a person can click. */
   --z-toast: 70;
   /* The grain, which no pointer can touch. */
@@ -942,8 +944,8 @@ body {
 @utility z-overlay {
   z-index: var(--z-overlay);
 }
-@utility z-palette {
-  z-index: var(--z-palette);
+@utility z-modal {
+  z-index: var(--z-modal);
 }
 @utility z-toast {
   z-index: var(--z-toast);

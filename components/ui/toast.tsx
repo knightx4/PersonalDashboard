@@ -93,7 +93,7 @@ function Toaster({
   // the shell, above anything with a transform, so `fixed` means the viewport.
   return (
     <div
-      className="pointer-events-none fixed inset-x-4 bottom-20 z-[70] flex flex-col items-start gap-2 sm:left-6 sm:right-auto lg:bottom-10"
+      className="pointer-events-none fixed inset-x-4 bottom-20 z-toast flex flex-col items-start gap-2 sm:left-6 sm:right-auto lg:bottom-10"
       role="status"
       aria-live="polite"
     >

@@ -390,7 +390,7 @@ export function WorkspaceSheet({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
+    <div className="fixed inset-0 z-overlay lg:hidden">
       <button
         type="button"
         aria-label="Close the workspace list"

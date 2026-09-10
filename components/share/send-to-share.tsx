@@ -78,7 +78,7 @@ export function SendToShare({
           only one that is a lit sheet under Lightbox; `bg-surface` here was
           the same colour as the card underneath it in every theme. */}
       {open && (
-        <ul className={cn(popoverSurface, 'absolute right-0 z-20 mt-1 min-w-48 p-1')}>
+        <ul className={cn(popoverSurface, 'absolute right-0 z-menu mt-1 min-w-48 p-1')}>
           {shares.map((share) => (
             <li key={share.id}>
               <button
