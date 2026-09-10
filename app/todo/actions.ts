@@ -64,6 +64,7 @@ function parse(formData: FormData, today: string) {
  * nothing, and the message you get back is the database's own words rather
  * than "Something went wrong".
  */
+// latency: pending
 export async function addTask(
   _prev: TaskFormState,
   formData: FormData,
@@ -97,6 +98,7 @@ export async function addTask(
   return { message: 'Added.' };
 }
 
+// latency: pending
 export async function editTask(
   _prev: TaskFormState,
   formData: FormData,
@@ -128,6 +130,7 @@ export async function editTask(
  * They return the message rather than throwing it, because the one failure
  * worth reading -- pointing at somebody else's row -- has words of its own.
  */
+// latency: pending
 export async function pointTaskAt(
   taskId: string,
   target: string,
@@ -143,6 +146,7 @@ export async function pointTaskAt(
   return { error: null };
 }
 
+// latency: pending
 export async function unpointTask(taskId: string): Promise<{ error: string | null }> {
   await requireUser();
 
@@ -164,6 +168,7 @@ export async function unpointTask(taskId: string): Promise<{ error: string | nul
  * that drew the change before the round trip finished needs the error to put
  * itself back; a caller that does not draw ahead can ignore it.
  */
+// latency: optimistic -- the checkbox fills before the write returns
 export async function completeTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await setTaskStatus(user.id, id, 'done');
@@ -173,6 +178,7 @@ export async function completeTask(id: string): Promise<{ error: string | null }
   return { error: null };
 }
 
+// latency: optimistic -- the same checkbox, the other way
 export async function reopenTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await setTaskStatus(user.id, id, 'open');
@@ -182,6 +188,7 @@ export async function reopenTask(id: string): Promise<{ error: string | null }> 
   return { error: null };
 }
 
+// latency: optimistic -- the row strikes through before the write returns
 export async function dropTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await setTaskStatus(user.id, id, 'dropped');
@@ -191,6 +198,7 @@ export async function dropTask(id: string): Promise<{ error: string | null }> {
   return { error: null };
 }
 
+// latency: optimistic -- the pin appears before the write returns
 export async function pinTask(id: string, pinned: boolean): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await setTaskPinned(user.id, id, pinned);
@@ -200,6 +208,7 @@ export async function pinTask(id: string, pinned: boolean): Promise<{ error: str
   return { error: null };
 }
 
+// latency: optimistic -- the row offers "bring back" before the write returns
 export async function laterTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await snoozeTask(user.id, id);
@@ -209,6 +218,7 @@ export async function laterTask(id: string): Promise<{ error: string | null }> {
   return { error: null };
 }
 
+// latency: optimistic -- the same button, the other way
 export async function bringBackTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await unsnoozeTask(user.id, id);
@@ -227,6 +237,7 @@ export async function bringBackTask(id: string): Promise<{ error: string | null 
  * their being ids: every row written is scoped to this session's user, so the
  * worst a made-up list can do is number tasks the sender already owns.
  */
+// latency: pending
 export async function moveTask(
   id: string,
   direction: 'up' | 'down',
@@ -262,6 +273,7 @@ export async function moveTask(
  * The same trust story as `moveTask`: the pile is the caller's, and every row
  * written is scoped to this session's user.
  */
+// latency: pending
 export async function placeTask(
   id: string,
   before: string | null,
@@ -287,6 +299,7 @@ export async function placeTask(
   return { error: null };
 }
 
+// latency: pending
 export async function removeTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const { error } = await deleteTask(user.id, id);

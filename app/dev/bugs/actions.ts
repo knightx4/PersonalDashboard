@@ -40,6 +40,7 @@ const submitSchema = z.object({
   pagePath: z.string().max(300).nullable(),
 });
 
+// latency: pending
 export async function submitFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -86,6 +87,7 @@ const statusSchema = z.enum([
 ]);
 
 /** Triage from the list page. */
+// latency: pending
 export async function updateFeedbackStatus(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -133,6 +135,7 @@ const editSchema = z.object({
  * check is here rather than only in the list, because it is the rule and not
  * merely the presentation of it.
  */
+// latency: pending
 export async function editFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -170,6 +173,7 @@ export async function editFeedback(
   return { message: 'Saved.' };
 }
 
+// latency: pending
 export async function deleteFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -198,6 +202,7 @@ export async function deleteFeedback(
  * Signed-in only, and it carries no input from the browser: the routine has
  * its own instructions, and the button is a "go", not a prompt box.
  */
+// latency: pending
 export async function runFeatureRoutine(
   // Signature is fixed by useActionState; the button sends nothing.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -222,6 +227,7 @@ export async function runFeatureRoutine(
  * baked into a cached layout would be wrong at exactly the moment someone is
  * deciding whether to press "Run Feature Routine".
  */
+// latency: instant -- a read for the header badge, fetched without anything waiting
 export async function openFeedbackCount(): Promise<number> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -235,6 +241,7 @@ export async function openFeedbackCount(): Promise<number> {
 }
 
 /** Reorder the queue by hand: 1 next, 2 normal, 3 someday. */
+// latency: pending
 export async function setFeedbackPriority(
   _prev: FeedbackActionState,
   formData: FormData,

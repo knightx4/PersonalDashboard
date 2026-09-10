@@ -15,6 +15,7 @@ import { queueConcept } from '@/lib/learn/graph/to-queue';
  * in an ordinary track -- the queue is the same queue, and everything it
  * already does works on the row because the row is not special.
  */
+// latency: pending
 export async function readAboutConcept(formData: FormData): Promise<void> {
   const user = await requireUser();
 

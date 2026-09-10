@@ -19,6 +19,7 @@ import { isThemeId, THEME_COOKIE, THEME_COOKIE_MAX_AGE, type ThemeChoice } from 
  * Null clears both, which is not the same as choosing light: it means follow
  * the system again.
  */
+// latency: instant -- the picker recolours the page itself and does not wait for the write
 export async function setTheme(next: string | null): Promise<void> {
   const theme: ThemeChoice = isThemeId(next) ? next : null;
 

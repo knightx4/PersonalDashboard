@@ -56,6 +56,7 @@ export type AskState = {
 
 const MODEL_FOR_PROBES = 'claude-haiku-4-5';
 
+// latency: pending
 export async function askQuestion(_prev: AskState, formData: FormData): Promise<AskState> {
   const user = await requireUser();
 
@@ -123,6 +124,7 @@ const AnswerInput = z.object({
   chosenIndex: z.coerce.number().int().min(0).max(5),
 });
 
+// latency: pending
 export async function answerQuestion(prev: AskState, formData: FormData): Promise<AskState> {
   const user = await requireUser();
 
@@ -237,6 +239,7 @@ export type FloorState = {
  * somebody has just got something wrong, which is exactly when they are least
  * likely to push back on being told what they are missing.
  */
+// latency: pending
 export async function findFloor(_prev: FloorState, formData: FormData): Promise<FloorState> {
   const user = await requireUser();
 
@@ -289,6 +292,7 @@ export async function findFloor(_prev: FloorState, formData: FormData): Promise<
  * level to a subject somebody is already working on, not starting something
  * new, so no goal row is created and the existing ones simply grow a rung.
  */
+// latency: pending
 export async function approveFloor(_prev: FloorState, formData: FormData): Promise<FloorState> {
   const user = await requireUser();
 

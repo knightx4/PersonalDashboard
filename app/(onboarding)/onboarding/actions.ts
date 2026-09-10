@@ -25,6 +25,7 @@ const completeSchema = z.object({
     .or(z.literal('').transform(() => undefined)),
 });
 
+// latency: pending
 export async function completeOnboarding(
   _prev: OnboardingState,
   formData: FormData,
@@ -56,6 +57,7 @@ export async function completeOnboarding(
 }
 
 /** Finish onboarding then send the user into Gmail connect. */
+// latency: pending
 export async function continueToGmailConnect(
   _prev: OnboardingState,
   formData: FormData,

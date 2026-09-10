@@ -54,6 +54,7 @@ function refuse(sourceId: string, verb: string): { error: string } {
   return { error: `${source.label}: nothing here can ${verb} that.` };
 }
 
+// latency: optimistic -- the agenda row ticks and strikes through at once
 export async function completeItem(
   sourceId: string,
   key: string,
@@ -66,6 +67,7 @@ export async function completeItem(
   return { error: null };
 }
 
+// latency: optimistic -- the agenda row fades at once
 export async function deferItem(sourceId: string, key: string): Promise<{ error: string | null }> {
   const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
   if (!source?.defer) return refuse(sourceId, 'put off');
@@ -75,6 +77,7 @@ export async function deferItem(sourceId: string, key: string): Promise<{ error:
   return { error: null };
 }
 
+// latency: optimistic -- the agenda row fades at once
 export async function dismissItem(sourceId: string, key: string): Promise<{ error: string | null }> {
   const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
   if (!source?.dismiss) return refuse(sourceId, 'dismiss');

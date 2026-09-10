@@ -83,6 +83,7 @@ export type ParseState = { error?: string; parsed?: ParsedImport };
  * that resolved eight citations end to end is one long request that a platform
  * eventually cuts off, and when it does you lose all eight.
  */
+// latency: pending
 export async function parseImport(_prev: ParseState, formData: FormData): Promise<ParseState> {
   const user = await requireUser();
 
@@ -127,6 +128,7 @@ export async function parseImport(_prev: ParseState, formData: FormData): Promis
  * that cannot be placed comes back carrying its reason, because one line
  * saying so is what stops you assuming the list was complete.
  */
+// latency: pending
 export async function resolveCandidate(input: {
   candidate: ReferenceCandidate;
   question: string | null;
@@ -185,6 +187,7 @@ const NewTrackInput = z.object({
   question: z.string().trim().max(2000),
 });
 
+// latency: pending
 export async function startTrack(
   _prev: NewTrackState,
   formData: FormData,
@@ -221,6 +224,7 @@ const ConfirmInput = z.object({
   sourceHint: z.string().trim().max(100),
 });
 
+// latency: pending
 export async function confirmImport(
   _prev: NewTrackState,
   formData: FormData,

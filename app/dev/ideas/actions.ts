@@ -26,6 +26,7 @@ const moduleSchema = z
 
 const bodySchema = z.string().trim().min(3, 'Write a sentence.').max(4000);
 
+// latency: pending
 export async function addIdea(
   _prev: IdeaActionState,
   formData: FormData,
@@ -53,6 +54,7 @@ export async function addIdea(
  * Rewriting one, because an idea captured in a hurry is usually half of the
  * thought and the other half turns up later.
  */
+// latency: pending
 export async function updateIdea(
   _prev: IdeaActionState,
   formData: FormData,
@@ -78,6 +80,7 @@ export async function updateIdea(
   return { message: 'Saved.' };
 }
 
+// latency: pending
 export async function deleteIdea(
   _prev: IdeaActionState,
   formData: FormData,
@@ -108,6 +111,7 @@ export async function deleteIdea(
  * started until a person says so there. The same routine the notes queue
  * fires, with a different job in the extra turn.
  */
+// latency: pending
 export async function shapeIdea(
   _prev: IdeaActionState,
   formData: FormData,
