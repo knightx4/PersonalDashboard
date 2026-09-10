@@ -16,6 +16,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { MODULES } from '@/lib/modules';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { APPLICATION_STATUS_GLYPHS, TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
+import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { THEMES } from '@/lib/theme';
 import { LAW_GROUPS } from './laws';
 import * as C from './content';
@@ -219,26 +223,69 @@ const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
   dev: 'bg-w-dev',
 };
 
-/** The seven stage hues, each meaning one stage and appearing nowhere else. */
+/**
+ * Seven stage hues, and the nine statuses drawn in them.
+ *
+ * The last two borrow a hue -- withdrawn takes the lead one, role closed takes
+ * the ghosted one -- and are told apart by their glyph alone, which is the
+ * argument for the glyphs in one line. The status id is here rather than a
+ * glyph name so the shape comes from lib/status-glyphs.ts and this page cannot
+ * drift from what the app draws.
+ */
 const PIPELINE = [
-  ['bg-status-lead', 'bg-status-lead-tint', 'Lead', 'Seen, not yet pursued.'],
+  ['bg-status-lead', 'bg-status-lead-tint', 'lead', 'Lead', 'Seen, not yet pursued.'],
   [
     'bg-status-submitted',
     'bg-status-submitted-tint',
+    'submitted',
     'Submitted',
     'Sent, and landed somewhere real.',
   ],
-  ['bg-status-process', 'bg-status-process-tint', 'In process', 'Someone is talking to you.'],
-  ['bg-status-final', 'bg-status-final-tint', 'Final round', 'The last conversation.'],
-  ['bg-status-offer', 'bg-status-offer-tint', 'Offer', 'They said yes.'],
-  ['bg-status-rejected', 'bg-status-rejected-tint', 'Rejected', 'They said no.'],
+  [
+    'bg-status-process',
+    'bg-status-process-tint',
+    'in_process',
+    'In process',
+    'Someone is talking to you.',
+  ],
+  [
+    'bg-status-final',
+    'bg-status-final-tint',
+    'final_round',
+    'Final round',
+    'The last conversation.',
+  ],
+  ['bg-status-offer', 'bg-status-offer-tint', 'offer', 'Offer', 'They said yes.'],
+  ['bg-status-rejected', 'bg-status-rejected-tint', 'rejected', 'Rejected', 'They said no.'],
   [
     'bg-status-ghosted',
     'bg-status-ghosted-tint',
+    'ghosted',
     'Ghosted',
     'Nobody said anything. Drawn as an outline.',
   ],
-] as const;
+  [
+    'bg-status-lead',
+    'bg-status-lead-tint',
+    'withdrawn',
+    'Withdrawn',
+    'You pulled out. The lead hue, struck through.',
+  ],
+  [
+    'bg-status-ghosted',
+    'bg-status-ghosted-tint',
+    'role_closed',
+    'Role closed',
+    'The job went away. The ghosted hue, barred.',
+  ],
+] as const satisfies readonly (readonly [string, string, ApplicationStatus, string, string])[];
+
+/** The other ladder the glyphs carry: a task on /todo. */
+const TASK_STATES = [
+  ['open', 'Open', 'Nothing has happened to it yet. The same shape as a lead.'],
+  ['done', 'Done', 'Finished. The one glyph that is a tick, because it is also the toggle.'],
+  ['dropped', 'Dropped', 'You decided against it. The same shape as a withdrawal.'],
+] as const satisfies readonly (readonly [TaskStatus, string, string])[];
 
 /**
  * What each theme is made of, as a strip.
@@ -767,15 +814,40 @@ export default function DevUiPage() {
           </CardSection>
           <CardSection
             title="Pipeline stages"
-            hint="One hue per stage, the same in every theme and every workspace, and nowhere else in the app. The tint beside each is the chip it sits on."
+            hint="One hue per stage, the same in every theme and every workspace, and nowhere else in the app. The tint beside each is the ground it used to sit on; the glyph after it is what the row says with the colour taken away."
           >
             <div className="space-y-3">
-              {PIPELINE.map(([hue, tint, name, note]) => (
-                <div key={name} className="flex items-center gap-3">
+              {PIPELINE.map(([hue, tint, status, name, note]) => (
+                <div key={status} className="flex items-center gap-3">
                   <span aria-hidden className="flex shrink-0 overflow-hidden rounded-control">
                     <span className={cn('size-7', hue)} />
                     <span className={cn('size-7', tint)} />
                   </span>
+                  {/* Plain ink, not the stage hue the badge draws it in. The
+                      two swatches beside it are the colour; this column is the
+                      shape, and withdrawn against lead is only readable when
+                      the hue is not helping. */}
+                  <StatusGlyph
+                    glyph={APPLICATION_STATUS_GLYPHS[status]}
+                    size={20}
+                    className="text-ink"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-ui font-medium text-ink">{name}</p>
+                    <p className="text-small text-ink-muted">{note}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardSection>
+          <CardSection
+            title="Task states"
+            hint="The second ladder. A task is not a pipeline, so it takes three of the same shapes rather than a hue of its own."
+          >
+            <div className="space-y-3">
+              {TASK_STATES.map(([status, name, note]) => (
+                <div key={status} className="flex items-center gap-3">
+                  <StatusGlyph glyph={TASK_STATUS_GLYPHS[status]} size={20} className="text-ink" />
                   <div className="min-w-0">
                     <p className="text-ui font-medium text-ink">{name}</p>
                     <p className="text-small text-ink-muted">{note}</p>
