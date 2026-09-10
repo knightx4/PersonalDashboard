@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
 import { addDays, type Task } from '@/lib/todo/tasks/model';
@@ -240,15 +241,34 @@ function DueFields({
   );
 }
 
+/**
+ * Pin, ticked with the same hexagon a task is.
+ *
+ * The browser's square box sat a few pixels from the row glyphs on /todo: one
+ * page, one gesture, two shapes. The native input is still the control -- it
+ * keeps the label, the focus and the form value -- and is only taken out of
+ * sight, with the glyph drawn beside it and swapped on `:checked`. Nothing here
+ * is JavaScript, so it ticks before the form hydrates.
+ */
 function PinnedField({ id, defaultChecked = false }: { id: string; defaultChecked?: boolean }) {
   return (
-    <label htmlFor={id} className="flex items-center gap-2 text-ui text-ink">
+    <label htmlFor={id} className="group flex w-fit cursor-pointer items-center gap-2 text-ui text-ink">
       <input
         id={id}
         type="checkbox"
         name="pinned"
         defaultChecked={defaultChecked}
-        className="size-4 accent-accent"
+        className="peer sr-only"
+      />
+      <StatusGlyph
+        glyph="empty"
+        size={16}
+        className="text-ink-muted transition-colors duration-150 group-hover:text-accent peer-checked:hidden peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
+      />
+      <StatusGlyph
+        glyph="check"
+        size={16}
+        className="hidden text-accent peer-checked:block peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
       />
       Pin to the top
     </label>
