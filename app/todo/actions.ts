@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isLinkTarget } from '@/lib/todo/links/model';
+import { linkTask } from '@/lib/todo/links/write';
 import {
   createTask,
   deleteTask,
@@ -40,6 +42,20 @@ function parse(formData: FormData) {
   });
 }
 
+/**
+ * Add a task, and say what it is about in the same breath.
+ *
+ * The picker beside the title field submits a target and an id, or two empty
+ * strings. Empty is the ordinary case and behaves exactly as it did before any
+ * of this existed.
+ *
+ * When there is one, the task and its link are written in that order, because
+ * a link needs a task to hang off. If the link is refused -- the trigger
+ * checking that the target is yours is the reason it can be -- the task is
+ * deleted rather than left floating: it is a task you never wrote, attached to
+ * nothing, and the message you get back is the database's own words rather
+ * than "Something went wrong".
+ */
 export async function addTask(
   _prev: TaskFormState,
   formData: FormData,
@@ -47,11 +63,27 @@ export async function addTask(
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
+  const target = String(formData.get('linkTarget') ?? '');
+  const targetId = String(formData.get('linkTargetId') ?? '');
+  // Half an answer is not one. A target with no id, or an id with a target
+  // this app has no column for, is a broken request rather than a plain task.
+  if ((target || targetId) && !(isLinkTarget(target) && targetId)) {
+    return { error: 'Which thing is this about?' };
+  }
+
   const user = await requireUser();
   const { timezone } = await loadAccountSettings(user.id);
 
-  const { error } = await createTask(user.id, parsed.data, timezone);
+  const { id, error } = await createTask(user.id, parsed.data, timezone);
   if (error) return { error };
+
+  if (isLinkTarget(target) && targetId && id) {
+    const link = await linkTask(id, target, targetId);
+    if (link.error) {
+      await deleteTask(user.id, id);
+      return { error: link.error };
+    }
+  }
 
   revalidateTodo();
   return { message: 'Added.' };
