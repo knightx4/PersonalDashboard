@@ -345,6 +345,8 @@ export function AddBookPasteForm() {
       <form action={previewAction} className="flex flex-col gap-3">
         <div>
           <Label htmlFor="paste">Paste a list</Label>
+          {/* ui-ok: composer-always-open -- the create. Pasting is the action
+            * the page exists for. */}
           <Textarea
             id="paste"
             name="paste"

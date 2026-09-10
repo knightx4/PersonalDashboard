@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ComposeBody, FieldError } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Banner } from '@/components/ui/banner';
 import { cn } from '@/lib/cn';
 import { noteOnSurface, type SurfaceNoteState } from './actions';
@@ -73,6 +74,7 @@ export function SurfaceReview({ surfaces }: { surfaces: ReviewSurface[] }) {
 
 function SurfaceCard({ surface, width }: { surface: ReviewSurface; width: 'phone' | 'laptop' }) {
   const [state, action, pending] = useActionState(noteOnSurface, {} as SurfaceNoteState);
+  const [composing, setComposing] = useState(false);
   const open = surface.notes.filter((note) => note.status !== 'done' && note.status !== 'declined');
 
   return (
@@ -149,19 +151,27 @@ function SurfaceCard({ surface, width }: { surface: ReviewSurface; width: 'phone
         </div>
       </div>
 
-      <form action={action} className="flex items-end gap-2">
-        <input type="hidden" name="surface" value={surface.id} />
-        <ComposeBody
-          name="body"
-          rows={1}
-          aria-label={`What is wrong with ${surface.label}`}
-          placeholder="What is wrong with this?"
-          className="flex-1"
-        />
-        <Button type="submit" size="sm" variant="secondary" pending={pending}>
-          Note
-        </Button>
-      </form>
+      {/* Closed until asked for. Nineteen surface cards each carrying an open
+        * box is the fault this page exists to catch, and it was on the page
+        * doing the catching until check:ui grew the law 14 rule. */}
+      {composing ? (
+        <form action={action} className="flex items-end gap-2">
+          <input type="hidden" name="surface" value={surface.id} />
+          <ComposeBody
+            name="body"
+            rows={1}
+            autoFocus
+            aria-label={`What is wrong with ${surface.label}`}
+            placeholder="What is wrong with this?"
+            className="flex-1"
+          />
+          <Button type="submit" size="sm" variant="secondary" pending={pending}>
+            Note
+          </Button>
+        </form>
+      ) : (
+        <AddTrigger label="Note something" onClick={() => setComposing(true)} />
+      )}
       <FieldError>{state.error}</FieldError>
       {state.message && <Banner tone="info">{state.message}</Banner>}
     </Card>

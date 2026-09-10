@@ -55,6 +55,8 @@ export function AddItemForm({ categories }: { categories: readonly CategoryOptio
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="item_notes">Notes</Label>
+          {/* ui-ok: composer-always-open -- a field of the create form, not a
+            * composer on a surface someone came to read. */}
           <Textarea id="item_notes" name="notes" rows={3} />
         </div>
       </div>

@@ -99,14 +99,27 @@ type Rule = {
   law: string;
   says: string;
   instead: string;
-  /**
-   * Every offending span on this line, or nothing.
-   *
-   * `after` is the handful of lines below it, for the one rule that cannot be
-   * settled by a single line: a card drawn per row opens on the `.map(` and
-   * names `<Card` two or three lines later. Rules that do not need it ignore it.
-   */
-  find: (line: string, after: string[]) => string[];
+  /** Every offending span on this line, or nothing. */
+  find: (line: string, context: RuleContext) => string[];
+};
+
+/**
+ * What a rule can see besides the line it is on.
+ *
+ * Most rules need nothing here: a hex or an off-scale size is settled by the
+ * line it is written on. The shape rules are not. A card drawn per row opens on
+ * the `.map(` and names `<Card` three lines down; a composer left open is
+ * recognised by what is *not* above it. Both are still line-anchored -- the hit
+ * is reported where the offending markup starts -- they just need to look
+ * around before deciding.
+ */
+type RuleContext = {
+  /** The six lines below, for a shape that opens on one line and lands on another. */
+  after: string[];
+  /** The fourteen lines above, for asking what encloses this one. */
+  before: string[];
+  /** The whole file, for asking what kind of surface this is. */
+  source: string;
 };
 
 /**
@@ -264,9 +277,40 @@ const RULES: Rule[] = [
      * the valve are for: a chooser of four cards side by side is law 13 obeyed,
      * not broken, and says so on the line.
      */
-    find: (line, after) => {
+    find: (line, { after }) => {
       if (!/\{\s*[\w.[\]()\s,...]*\.map\(/.test(line)) return [];
       return after.some((next) => /<Card\b/.test(next)) ? ['<Card> per mapped row'] : [];
+    },
+  },
+  {
+    id: 'composer-always-open',
+    law: '14',
+    says: 'a compose box standing open in a section that lists what is already there',
+    instead: 'AddTrigger, and render the composer when it is pressed',
+    /**
+     * A `Textarea` or `ComposeBody` with nothing above it that could be hiding
+     * it, in a component that also renders a list.
+     *
+     * The list is what makes this checkable. A create form is allowed to open
+     * in edit mode -- law 14 says so, and a new-role page is nothing but a
+     * form -- so a rule that only asked "is this composer ungated" reported 27
+     * sites of which a third were creates doing the right thing. Requiring the
+     * component to also render existing items narrows it to the case AddTrigger
+     * was written for: a section whose job is to show what you have written,
+     * leading with an empty box for writing more. That is 19, of which about
+     * four are still creates that happen to list something, and those say so on
+     * the line.
+     *
+     * "Nothing above it that could be hiding it" is a heuristic, not a parse:
+     * fourteen lines up, looking for a `&&`, a ternary, or a state name this
+     * codebase uses for open-ness. A composer revealed some other way will
+     * report and should be excused where it stands.
+     */
+    find: (line, { before, source }) => {
+      if (!/<(?:Textarea|ComposeBody)\b/.test(line)) return [];
+      if (!/\{\s*[\w.[\]()]*\.map\(/.test(source)) return [];
+      const gate = /\{\s*\w[\w.]*\s*&&|\?\s*\(|\{editing|\{open|\{isOpen|\{show/;
+      return before.some((previous) => gate.test(previous)) ? [] : ['composer open on arrival'];
     },
   },
 ];
@@ -324,8 +368,12 @@ function scan(): Hit[] {
         }
         for (const rule of RULES) {
           if (excused.has(rule.id)) continue;
-          const after = lines.slice(index + 1, index + 7);
-          for (const text of rule.find(line, after)) {
+          const context: RuleContext = {
+            after: lines.slice(index + 1, index + 7),
+            before: lines.slice(Math.max(0, index - 14), index),
+            source,
+          };
+          for (const text of rule.find(line, context)) {
             hits.push({ file, line: index + 1, rule, text });
           }
         }

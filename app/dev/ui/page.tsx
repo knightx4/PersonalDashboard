@@ -222,6 +222,9 @@ export default function DevUiPage() {
             placeholder="What has to happen"
             aria-label="Demonstration title"
           />
+          {/* ui-ok: composer-always-open -- the compose surface being
+            * demonstrated. It is one line until typed into, which is the
+            * shape law 14 asks for, and the rule cannot see the difference. */}
           <ComposeBody rows={1} placeholder="What it involves…" aria-label="Demonstration body" />
           <div className="flex flex-wrap items-center gap-1">
             <ChipSelect
@@ -437,7 +440,14 @@ export default function DevUiPage() {
               </p>
               <Card padding="dense" className="space-y-2">
                 <Label htmlFor="ui-demo-open">Add a note</Label>
-                <ComposeBody id="ui-demo-open" rows={3} placeholder="Add a note…" aria-label="Demonstration always-open composer" />
+                {/* ui-ok: composer-always-open -- this is the demonstration of
+                  * the fault. Drawn on purpose so it can be argued against. */}
+                <ComposeBody
+                  id="ui-demo-open"
+                  rows={3}
+                  placeholder="Add a note…"
+                  aria-label="Demonstration always-open composer"
+                />
                 <div className="flex justify-end">
                   <Button size="sm">Save</Button>
                 </div>
