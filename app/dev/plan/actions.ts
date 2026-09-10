@@ -23,6 +23,7 @@ import {
   findNode,
   flatten,
   handedToClaude,
+  isWaitingOnThePerson,
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
@@ -351,15 +352,24 @@ export async function setPlanItemStatus(
     }
   }
 
+  // Blocking a step takes it back off Claude in the same write.
+  //
+  // A block says the step needs something outside the repo, so nothing a
+  // session does will move it -- and a row left assigned sits in the Claude's
+  // view carrying the reason it cannot be worked. Whoever blocks it should not
+  // have to remember to unhand it as a second step.
+  const patch: Record<string, string | null> = { status: status.data };
+  if (status.data === 'blocked') patch.assignee = null;
+
   const { error } = await supabase
     .from('plan_items')
-    .update({ status: status.data })
+    .update(patch)
     .eq('id', id.data)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: 'Updated.' };
+  return { message: status.data === 'blocked' ? 'Blocked, and taken back off Claude.' : 'Updated.' };
 }
 
 /**
@@ -432,12 +442,30 @@ export async function setPlanItemAssignee(
 
   // The step itself whatever state it is in -- you asked for this one -- and
   // the open ones beneath it.
-  const ids = [
-    node.id,
-    ...flatten([node])
-      .filter((step) => step.id !== node.id && !isClosed(step.status))
-      .map((step) => step.id),
+  const candidates = [
+    node,
+    ...flatten([node]).filter((step) => step.id !== node.id && !isClosed(step.status)),
   ];
+
+  // Nothing waiting on you goes to Claude. An unanswered question is yours to
+  // settle and a blocked step needs something outside the repo, so handing
+  // either over puts a session in front of the same wall -- and fills the
+  // Claude's view with rows nobody can work.
+  //
+  // Only when handing over. Taking work back is always allowed, whatever state
+  // it is in, because that is how a row that should never have been handed
+  // over gets unhanded.
+  const skipped =
+    assignee.data === 'claude' ? candidates.filter((step) => isWaitingOnThePerson(step)) : [];
+  const ids = candidates
+    .filter((step) => !skipped.some((other) => other.id === step.id))
+    .map((step) => step.id);
+
+  if (ids.length === 0) {
+    return {
+      error: `#${node.number} is ${node.status === 'blocked' ? 'blocked' : 'a question nobody has answered'}, so it is waiting on you rather than on Claude.`,
+    };
+  }
 
   const { error } = await supabase
     .from('plan_items')
@@ -450,8 +478,11 @@ export async function setPlanItemAssignee(
   if (assignee.data !== 'claude') {
     return { message: ids.length === 1 ? 'Taken back.' : `Took back ${ids.length} steps.` };
   }
+
+  const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;
   return {
-    message: ids.length === 1 ? 'Handed to Claude.' : `Handed ${ids.length} steps to Claude.`,
+    message:
+      (ids.length === 1 ? 'Handed to Claude.' : `Handed ${ids.length} steps to Claude.`) + left,
   };
 }
 
@@ -713,6 +744,18 @@ export async function sendPlanItemToClaude(
   const node = findNode(sections, id.data);
   if (!node) return { error: 'That step no longer exists.' };
 
+  // Same rule as the hand-over: a question you have not answered and a step
+  // blocked on something outside the repo are both waiting on you, and starting
+  // a session on either sends it at a wall it cannot get past.
+  if (isWaitingOnThePerson(node)) {
+    return {
+      error:
+        node.status === 'blocked'
+          ? `#${node.number} is blocked on something outside the repo. Clear what it is waiting on first -- its note says what.`
+          : `#${node.number} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
+    };
+  }
+
   // Handed over and underway, in the one write. A step sent to Claude is being
   // built from the moment the routine wakes, and a plan still reading "not
   // started" while a session works it is the plan lying about itself -- the one
@@ -801,10 +844,16 @@ export async function sendPlanFeatureToClaude(
 
   // Itself included: a feature is closed when its steps are, and the session
   // needs it to be its own to close.
+  //
+  // Minus whatever is waiting on the person. A batch that swept up the
+  // feature's unanswered questions and its blocked steps handed a session rows
+  // it could do nothing with, and left them sitting in the Claude's view saying
+  // why they could not be worked.
   const open = flatten([node]).filter(
-    (step) => !isClosed(step.status) && step.status !== 'proposed',
+    (step) =>
+      !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
   );
-  if (open.length === 0) return { error: 'Nothing open under that step.' };
+  if (open.length === 0) return { error: 'Nothing open under that step that is not waiting on you.' };
 
   const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
   if (toHandOver.length > 0) {

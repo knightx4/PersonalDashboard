@@ -7,6 +7,7 @@ import {
   findNode,
   flattenSections,
   isReady,
+  isWaitingOnThePerson,
   leavesOf,
   healthOf,
   planProgress,
@@ -449,15 +450,26 @@ describe('handedToClaude', () => {
     expect(handedToClaude(sections).map((n) => n.id)).toEqual(['first', 'second']);
   });
 
-  it('leaves out what is finished, only proposed, or a question', () => {
+  it('leaves out what is finished, only proposed, or waiting on the person', () => {
     const sections = tree([
       mine('open'),
       mine('done', { status: 'done' }),
       mine('dropped', { status: 'dropped' }),
       mine('proposal', { status: 'proposed' }),
       mine('question', { kind: 'decision' }),
+      // A block names something outside the repo, so a session sent at it
+      // meets the same wall -- and it sat in the Claude's view saying so.
+      mine('stuck', { status: 'blocked' }),
     ]);
     expect(handedToClaude(sections).map((n) => n.id)).toEqual(['open']);
+  });
+
+  it('takes an answered decision back, since nothing is waiting on the person now', () => {
+    const sections = tree([mine('settled', { kind: 'decision', status: 'done' })]);
+    // Closed, so still not work -- but for being closed, not for being a
+    // question.
+    expect(handedToClaude(sections)).toEqual([]);
+    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
   });
 
   it('is empty when nothing has been handed over', () => {
@@ -700,5 +712,30 @@ describe('fog on the frontier', () => {
     });
     const shown = flattenSections(applyView(sections, 'fog'));
     expect(shown.map((node) => node.number)).toEqual([1]);
+  });
+});
+
+describe('isWaitingOnThePerson', () => {
+  it('is an unanswered question, whatever state it is otherwise in', () => {
+    for (const status of ['not_started', 'in_progress', 'blocked', 'proposed'] as const) {
+      expect(isWaitingOnThePerson({ kind: 'decision', status })).toBe(true);
+    }
+  });
+
+  it('is a blocked step, which needs something outside the repo', () => {
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'blocked' })).toBe(true);
+  });
+
+  it('is not ordinary work, and not a settled question', () => {
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'not_started' })).toBe(false);
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'in_progress' })).toBe(false);
+    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
+    expect(isWaitingOnThePerson({ kind: 'decision', status: 'dropped' })).toBe(false);
+  });
+
+  it('is not a proposal, which waits on approval rather than on an answer', () => {
+    // needsThePerson counts one; this does not. A proposal is excluded from a
+    // hand-over on its own grounds.
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'proposed' })).toBe(false);
   });
 });

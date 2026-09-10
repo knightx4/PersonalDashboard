@@ -529,7 +529,9 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     case 'proposed':
       return node.status === 'proposed';
     case 'claude':
-      return node.assignee === 'claude' && !isClosed(node.status);
+      return (
+        node.assignee === 'claude' && !isClosed(node.status) && !isWaitingOnThePerson(node)
+      );
     case 'blocked':
       return !isClosed(node.status) && (node.status === 'blocked' || node.waitingOn.length > 0);
     // Closed steps included. A finished feature still carrying fog is the
@@ -613,8 +615,32 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
   return flattenSections(sections)
     .filter((node) => node.assignee === 'claude')
     .filter((node) => !isClosed(node.status) && node.status !== 'proposed')
-    .filter((node) => node.kind !== 'decision')
+    .filter((node) => !isWaitingOnThePerson(node))
     .sort((a, b) => a.priority - b.priority);
+}
+
+/**
+ * A step that is waiting on the person, and so cannot be Claude's.
+ *
+ * Two states, and both mean the same thing: nothing a session does moves this.
+ * An unanswered decision is a question put to the person, and a session that
+ * picked one up would be answering its own question. A blocked step said what
+ * it needs and it is outside the repo -- a credential, an account, a choice --
+ * so handing it over sends a session to sit in front of the same wall.
+ *
+ * This is why a hand-over skips them and why they are unhanded when they get
+ * there: a queue that lists work nobody can do is a queue that stops being
+ * read. It supersedes the old "not a decision" exclusion, which caught half of
+ * it -- a blocked step went on sitting in Claude's list with a reason written
+ * on it saying why it could not be worked.
+ *
+ * Not the same set as `needsThePerson`, which also counts a proposal. A
+ * proposal is a suggestion nobody has agreed to rather than work stuck on
+ * something, and it is excluded from a hand-over on its own grounds.
+ */
+export function isWaitingOnThePerson(node: Pick<PlanNode, 'kind' | 'status'>): boolean {
+  if (node.status === 'blocked') return true;
+  return node.kind === 'decision' && !isClosed(node.status);
 }
 
 export function summarize(sections: readonly PlanSection[]): PlanSummary {
@@ -633,7 +659,8 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     waiting: open.filter((node) => node.status === 'blocked' || node.waitingOn.length > 0).length,
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
-    claude: open.filter((node) => node.assignee === 'claude').length,
+    claude: open.filter((node) => node.assignee === 'claude' && !isWaitingOnThePerson(node))
+      .length,
     fog: nodes.filter((node) => node.fog !== null).length,
   };
 }
