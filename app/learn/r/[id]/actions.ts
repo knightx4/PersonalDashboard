@@ -11,7 +11,8 @@ import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { conceptsFromNote } from '@/lib/learn/graph/from-note';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
-import { loadSubject } from '@/lib/learn/graph/load';
+import { loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
+import { isRooted, rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
@@ -33,11 +34,57 @@ import {
 
 export type ReadingActionState = { error?: string };
 
+/**
+ * What the search was told about you, said out loud beside the results.
+ *
+ * Absent for a reading you typed, which has no graph behind it and nothing to
+ * claim. Present for one queued from a gap, and then it is either the number
+ * of settled claims the search was given or an admission that there were
+ * none -- a suggestion that says it is rooted in what you know, when the graph
+ * holds nothing, is the guess this was built to replace.
+ */
+export type RootingNote =
+  | { rooted: true; settled: number; subject: string }
+  | { rooted: false; subject: string };
+
 export type FindState = {
   error?: string;
   /** Proposed, not saved. Nothing reaches the row until you pick one. */
   candidates?: ResolvedSource[];
+  rooting?: RootingNote;
 };
+
+/**
+ * What the subject's graph knows, when this reading came from a gap in one.
+ *
+ * Everything here can be missing without it being a fault: a reading you typed
+ * has no concept, and a concept whose subject was deleted since has no graph.
+ * Both end with no rooting rather than an error, because the search still
+ * works -- it just works the way it did before.
+ */
+async function rootingForReading(
+  supabase: Awaited<ReturnType<typeof createLearnClient>>,
+  conceptId: string | null,
+): Promise<{ rooting: Rooting; note: RootingNote } | null> {
+  if (!conceptId) return null;
+
+  const subjectId = await subjectIdOfConcept(supabase, conceptId);
+  if (!subjectId) return null;
+
+  const [subject, graph] = await Promise.all([
+    loadSubject(supabase, subjectId),
+    loadGraph(supabase, subjectId),
+  ]);
+  if (!subject) return null;
+
+  const rooting = rootingFor(graph, conceptId);
+  return {
+    rooting,
+    note: isRooted(rooting)
+      ? { rooted: true, settled: rooting.settled.length, subject: subject.name }
+      : { rooted: false, subject: subject.name },
+  };
+}
 
 /**
  * Find something to read about a subject you wrote down.
@@ -46,6 +93,11 @@ export type FindState = {
  * and matters more here: a search given only a subject has far more room to be
  * wrong than one given a citation, and a bad source in a queue costs twenty
  * minutes at the moment you were finally going to read something.
+ *
+ * A reading queued from a gap searches with its subject's graph behind it --
+ * what you have settled, and what you are ready for -- so the results skip the
+ * introduction you do not need and the paper that starts three steps past you.
+ * Which of those two happened is reported back rather than assumed.
  */
 // latency: pending
 export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
@@ -61,17 +113,20 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
   const reading = await loadReading(supabase, readingId.data);
   if (!reading) return { error: 'That is not there any more.' };
 
+  const rooted = await rootingForReading(supabase, reading.conceptId);
+
   const spend = collectSpend();
   const result = await suggestSources({
     subject: reading.subject,
     question: reading.trackQuestion,
+    rooting: rooted?.rooting ?? null,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
   await recordLearnSpend(user.id, 'suggest-sources', spend.reports);
 
-  if (!result.ok) return { error: result.detail };
-  return { candidates: result.sources };
+  if (!result.ok) return { error: result.detail, rooting: rooted?.note };
+  return { candidates: result.sources, rooting: rooted?.note };
 }
 
 /**

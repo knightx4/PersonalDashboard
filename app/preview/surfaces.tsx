@@ -851,33 +851,33 @@ const CALENDAR_TODAY = '2026-09-10';
 
 const calendarEntries: Record<string, CalendarEntry[]> = {
   '2026-09-03': [
-    { key: 'task:c1', kind: 'task', at: null, title: 'Renew the travel insurance', href: null, done: true },
+    { key: 'task:c1', kind: 'task', at: null, end: null, eventId: null, title: 'Renew the travel insurance', href: null, done: true },
   ],
   '2026-09-09': [
-    { key: 'item:c2', kind: 'item', at: '2026-09-09T08:30:00.000Z', title: 'Return window closes — Sony WH-1000XM5', href: '/shopping/returns', done: false },
+    { key: 'item:c2', kind: 'item', at: '2026-09-09T08:30:00.000Z', end: null, eventId: null, title: 'Return window closes — Sony WH-1000XM5', href: '/shopping/returns', done: false },
   ],
   '2026-09-10': [
-    { key: 'task:c3', kind: 'task', at: '2026-09-10T09:00:00.000Z', title: 'Send the reconciliation write-up to Dana', href: null, done: false },
-    { key: 'context:c4', kind: 'context', at: '2026-09-10T13:30:00.000Z', title: 'Dentist', href: null, done: false },
-    { key: 'task:c5', kind: 'task', at: null, title: 'Book the flights', href: null, done: false },
+    { key: 'task:c3', kind: 'task', at: '2026-09-10T09:00:00.000Z', end: null, eventId: null, title: 'Send the reconciliation write-up to Dana', href: null, done: false },
+    { key: 'context:c4', kind: 'context', at: '2026-09-10T13:30:00.000Z', end: null, eventId: null, title: 'Dentist', href: null, done: false },
+    { key: 'task:c5', kind: 'task', at: null, end: null, eventId: null, title: 'Book the flights', href: null, done: false },
   ],
   '2026-09-11': [
-    { key: 'item:c6', kind: 'item', at: '2026-09-11T13:30:00.000Z', title: 'Marshall Wace · Technical', href: '/jobs/roles/role-p1', done: false },
+    { key: 'item:c6', kind: 'item', at: '2026-09-11T13:30:00.000Z', end: null, eventId: null, title: 'Marshall Wace · Technical', href: '/jobs/roles/role-p1', done: false },
   ],
   '2026-09-16': [
-    { key: 'item:c7', kind: 'item', at: '2026-09-16T08:00:00.000Z', title: 'The D. E. Shaw group · Final', href: '/jobs/roles/role-p2', done: false },
-    { key: 'task:c8', kind: 'task', at: null, title: 'Write the prep note', href: null, done: false },
-    { key: 'task:c9', kind: 'task', at: null, title: 'Chase the take-home feedback', href: null, done: false },
-    { key: 'task:c10', kind: 'task', at: null, title: 'Cancel the trial', href: null, done: false },
+    { key: 'item:c7', kind: 'item', at: '2026-09-16T08:00:00.000Z', end: null, eventId: null, title: 'The D. E. Shaw group · Final', href: '/jobs/roles/role-p2', done: false },
+    { key: 'task:c8', kind: 'task', at: null, end: null, eventId: null, title: 'Write the prep note', href: null, done: false },
+    { key: 'task:c9', kind: 'task', at: null, end: null, eventId: null, title: 'Chase the take-home feedback', href: null, done: false },
+    { key: 'task:c10', kind: 'task', at: null, end: null, eventId: null, title: 'Cancel the trial', href: null, done: false },
     // Five in one square, which is where the phone stops drawing dots and says
     // how many are left. A state no tidy fixture would ever produce.
-    { key: 'task:c11', kind: 'task', at: null, title: 'Order the bike part', href: null, done: false },
+    { key: 'task:c11', kind: 'task', at: null, end: null, eventId: null, title: 'Order the bike part', href: null, done: false },
   ],
   '2026-09-24': [
-    { key: 'task:c12', kind: 'task', at: null, title: 'Quarterly tax payment', href: null, done: false },
+    { key: 'task:c12', kind: 'task', at: null, end: null, eventId: null, title: 'Quarterly tax payment', href: null, done: false },
   ],
   '2026-10-01': [
-    { key: 'task:c13', kind: 'task', at: null, title: 'Rent', href: null, done: false },
+    { key: 'task:c13', kind: 'task', at: null, end: null, eventId: null, title: 'Rent', href: null, done: false },
   ],
 };
 
@@ -964,6 +964,7 @@ const readingRow = (
   pageTo: null,
   finishedAt: null,
   readNowAt: null,
+  conceptId: null,
   source: null,
   ...row,
 });
@@ -1269,7 +1270,14 @@ export const SURFACES: readonly Surface[] = [
     label: 'Calendar · A month',
     module: 'todo',
     width: 'wide',
-    render: () => <CalendarMonthGrid days={calendarDays} timezone="Europe/London" />,
+    render: () => (
+      <CalendarMonthGrid
+        days={calendarDays}
+        timezone="Europe/London"
+        newEventHref={(day) => `/todo/calendar?new=${day}`}
+        eventHref={(id) => `/todo/calendar?event=${id}`}
+      />
+    ),
   },
   {
     /* A note, read. The vault has almost no chrome, so what there is to judge

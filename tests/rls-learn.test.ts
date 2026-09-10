@@ -414,6 +414,58 @@ describe('the rules the schema itself enforces', () => {
   });
 });
 
+/**
+ * The link a gap-queued reading carries back to the concept it came from.
+ *
+ * It is what lets the source search read that subject's graph, so it is worth
+ * the same scrutiny as the other two parents: keyed on (concept_id, user_id),
+ * because a plain foreign key bypasses RLS and would take another account's
+ * concept without complaint.
+ */
+describe('a reading queued from a gap', () => {
+  async function seedConcept(userId: string, name: string): Promise<string> {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userId}, ${`${name} subject`})
+      returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userId}, ${subject.id}, ${name}, 'A claim you can be wrong about.',
+              'Written by hand for this test.')
+      returning id`;
+    return concept.id;
+  }
+
+  it('refuses a concept belonging to somebody else', async () => {
+    const conceptB = await seedConcept(userB, 'bob concept');
+
+    await expect(
+      admin`insert into readings (user_id, track_id, source_id, locator_basis, concept_id)
+            values (${userA}, ${trackA}, ${sourceA}, 'from a gap', ${conceptB})`,
+    ).rejects.toThrow();
+  });
+
+  it('survives the concept being deleted, with the link cleared', async () => {
+    // A reading lives in a track and is yours to read whatever happens to the
+    // graph it came from. Losing the rooting is the cost; losing the row would
+    // be the queue tidying itself away behind you.
+    const conceptA = await seedConcept(userA, 'alice concept');
+
+    const [row] = await admin<{ id: string }[]>`
+      insert into readings (user_id, track_id, source_id, locator_basis, concept_id)
+      values (${userA}, ${trackA}, ${sourceA}, 'from a gap', ${conceptA})
+      returning id`;
+
+    await admin`delete from concepts where id = ${conceptA}`;
+
+    const [after] = await admin<{ concept_id: string | null }[]>`
+      select concept_id from readings where id = ${row.id}`;
+    expect(after).toBeDefined();
+    expect(after.concept_id).toBeNull();
+
+    await admin`delete from readings where id = ${row.id}`;
+  });
+});
+
 describe('account deletion', () => {
   it('takes the whole module with it, on the foreign keys', async () => {
     // The delete-account route ends at auth.admin.deleteUser(). Four more

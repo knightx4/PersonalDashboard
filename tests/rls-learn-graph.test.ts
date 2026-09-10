@@ -77,12 +77,15 @@ beforeAll(async () => {
   await seedEdge(userA, subjectA, conceptA1, conceptA2);
   await seedEdge(userA, subjectA, conceptA2, conceptA3);
 
+  // tested_at goes in the insert, not an update after it. The constraint the
+  // suite below checks -- established = 'tested' needs a time it was tested --
+  // refuses the two-step version outright, and it refuses it in beforeAll,
+  // where vitest reports the whole file as skipped rather than as failing.
   await admin`
-    insert into concept_state (concept_id, user_id, state, established, misconception)
+    insert into concept_state (concept_id, user_id, state, established, misconception, tested_at)
     values (${conceptA2}, ${userA}, 'misconception', 'tested',
-            'Believes the tradeoff is permanent rather than expectations-dependent.')`;
-
-  await admin`update concept_state set tested_at = now() where concept_id = ${conceptA2}`;
+            'Believes the tradeoff is permanent rather than expectations-dependent.',
+            now())`;
 
   await admin`
     insert into goals (user_id, subject_id, asked, concept_id, status)

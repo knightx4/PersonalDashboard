@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_SUGGESTIONS, suggestSources } from './suggest';
+import type { Rooting } from '@/lib/learn/graph/rooting';
 
 /**
  * What comes back when you ask for something to read about a subject.
@@ -157,5 +158,72 @@ describe('when it does not', () => {
     const result = await ask(client);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('error');
+  });
+});
+
+/**
+ * What the call is actually told about you.
+ *
+ * The rooting is the difference between a suggestion and a guess, and it is
+ * invisible from the result -- the sources come back looking the same either
+ * way. So it is checked where it exists: in the message the call was made
+ * with. The case that matters most is the empty one. A graph with nothing
+ * settled must add nothing, because an "already settled:" heading with no
+ * claims under it asserts that this person knows nothing, which is a much
+ * stronger claim than the graph is making.
+ */
+describe('rooting the search in what you know', () => {
+  function promptFrom(client: { messages: { create: ReturnType<typeof vi.fn> } }): string {
+    const call = client.messages.create.mock.calls[0][0] as {
+      messages: Array<{ content: string }>;
+    };
+    return call.messages[0].content;
+  }
+
+  const rooting = (over: Partial<Rooting> = {}): Rooting => ({
+    settled: ['Prices carry information about scarcity.'],
+    frontier: ['A central bank sets one rate and the rest follow it.'],
+    settledOmitted: 0,
+    ...over,
+  });
+
+  async function search(rooted: Rooting | null) {
+    const client = {
+      messages: {
+        create: vi.fn().mockResolvedValue({
+          content: [{ type: 'tool_use', name: 'report_sources', input: { sources: [HAYEK] } }],
+        }),
+      },
+    };
+    await suggestSources({
+      subject: 'how central banks set rates',
+      rooting: rooted,
+      anthropicApiKey: 'test',
+      client: client as never,
+    });
+    return promptFrom(client);
+  }
+
+  it('sends the settled claims and where they are', async () => {
+    const prompt = await search(rooting());
+    expect(prompt).toContain('Prices carry information about scarcity.');
+    expect(prompt).toContain('A central bank sets one rate and the rest follow it.');
+  });
+
+  it('says nothing about what they know when nothing is settled', async () => {
+    const prompt = await search(rooting({ settled: [], frontier: [] }));
+    expect(prompt).not.toMatch(/settled/i);
+    expect(prompt).not.toMatch(/ready to take on/i);
+  });
+
+  it('says how many settled claims it left out rather than dropping them silently', async () => {
+    const prompt = await search(rooting({ settledOmitted: 12 }));
+    expect(prompt).toContain('12 more');
+  });
+
+  it('searches on the subject alone when there is no graph behind the reading', async () => {
+    const prompt = await search(null);
+    expect(prompt).toContain('how central banks set rates');
+    expect(prompt).not.toMatch(/settled/i);
   });
 });
