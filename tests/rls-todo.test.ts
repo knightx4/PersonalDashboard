@@ -14,6 +14,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createRole, createUser, truncateAll } from './helpers/db-todo';
+import { resolveSpan } from '@/lib/todo/events/write';
 
 let userA = '';
 let userB = '';
@@ -298,6 +299,40 @@ describe('todo.events', () => {
       admin`insert into events (user_id, title, starts_on, ends_on)
             values (${userA}, '   ', date '2026-03-10', date '2026-03-10')`,
     ).rejects.toThrow(/events_title_ck/);
+  });
+
+  it('accepts what the write layer resolves, both ways round', async () => {
+    // resolveSpan is where a form's answer about when becomes four columns,
+    // and the table is where that answer has to be legal. Testing them apart
+    // leaves the join between them untested, which is where a span shape gets
+    // quietly wrong.
+    const timed = resolveSpan(
+      {
+        allDay: false,
+        startDay: '2026-03-10',
+        endDay: '2026-03-11',
+        startTime: '23:00',
+        endTime: '01:00',
+      },
+      'Europe/London',
+    ).span;
+    const allDay = resolveSpan(
+      { allDay: true, startDay: '2026-03-10', endDay: '2026-03-14', startTime: null, endTime: null },
+      'Europe/London',
+    ).span;
+
+    await asUser(userA, async (tx) => {
+      for (const [title, span] of [['Night shift', timed], ['Half term', allDay]] as const) {
+        await tx`insert into events ${tx({ user_id: userA, title, ...span })}`;
+      }
+    });
+
+    const rows = await asUser(userA, (tx) => tx<{ title: string; starts_at: Date | null }[]>`
+      select title, starts_at from events where title in ('Night shift', 'Half term')
+      order by title`);
+    expect(rows.map((r) => r.title)).toEqual(['Half term', 'Night shift']);
+    expect(rows[0].starts_at).toBeNull();
+    expect(rows[1].starts_at?.toISOString()).toBe('2026-03-10T23:00:00.000Z');
   });
 });
 
