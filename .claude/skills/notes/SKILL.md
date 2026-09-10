@@ -184,6 +184,45 @@ in one line:
 
 Never mark a note `done` with the fix unverified, and never silently drop one.
 
+## When something belongs to nobody's note
+
+Three places take something a session has to say, and they are not
+interchangeable:
+
+- **The notes queue** — `feedback_items`, this skill. What the user reported as
+  wrong, or asked for.
+- **A plan decision** — a `decision` step under one feature, in
+  `.claude/skills/plan`. A question about that feature, answered before it is
+  built.
+- **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
+  that belongs to no note and no one feature: a risk found in code it was only
+  passing through, a question of taste, a thing it will not decide alone.
+
+Without the third, that last kind goes in the transcript, where it is only
+read by somebody who opens Claude.
+
+**Read the raises at the start of a run**, before claiming a note. Open ones
+say what the user is still waiting to be asked about; answered ones carry a
+reply written while nothing was awake, and the answer is what to build
+against:
+
+```
+npx tsx scripts/plan.ts raises
+npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>]
+```
+
+`DATABASE_URL` is not set on the web, so the SQL for both is in
+`.claude/skills/plan/SKILL.md` under **When the CLI cannot run**.
+
+**A session never answers or dismisses a raise.** That is the user's move on
+`/dev/raised`, the same rule as never answering its own decision. A session
+that answers its own question has no questions, only guesses with a paper
+trail. Replying to an answer the user has written is the exception, and it is
+a `claude` comment on the thread, not a close.
+
+A raise is not a way to avoid finishing a note. A note that cannot be finished
+is still `blocked` with the question, in the queue where the user works it.
+
 ## Closing report
 
 **Always end a run with a table**, one row per note touched, whatever the
@@ -206,6 +245,8 @@ Then, below the table:
 
 - **Blocked** — one line each: the question, phrased so a one-line answer
   unblocks it.
+- **Raised** — anything written to `/dev/raised` during the run, by title, so
+  the user knows a question is waiting there.
 - **Still open** — anything not reached, and why the batch stopped there.
 - The queue count after the run.
 - Anything the user has to do themselves — a migration to apply, a setting to
