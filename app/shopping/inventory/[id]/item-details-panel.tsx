@@ -5,6 +5,7 @@ import { lookupItemAttributes, saveCategoryTemplate } from './attribute-actions'
 import type { AttributeActionState } from './attribute-actions';
 import { updateInventoryItem, type ActionState } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { CardSection, cardVariants } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -79,11 +80,17 @@ export function ItemDetailsPanel({
   catalogAnsweredLabels?: string[];
 }) {
   const [saveState, saveAction, savePending] = useActionState(updateInventoryItem, initialSave);
-  const [lookupState, lookupAction, lookupPending] = useActionState(
-    lookupItemAttributes,
-    initial,
-  );
+  const [lookupState, lookupAction, lookupPending] = useActionState(lookupItemAttributes, initial);
   const [editingTemplate, setEditingTemplate] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  // Close once the save lands. Adjusted during render rather than in an effect,
+  // which is React's own pattern and the one the lint rule leaves standing.
+  const [seenSave, setSeenSave] = useState<string | undefined>(undefined);
+  if (saveState.message !== seenSave) {
+    setSeenSave(saveState.message);
+    if (saveState.message && !saveState.error) setEditing(false);
+  }
 
   return (
     <CardSection
@@ -98,134 +105,187 @@ export function ItemDetailsPanel({
       }
     >
       <div className="space-y-4">
-      <p className="text-ui text-ink-muted">
-        {categoryName
-          ? `What this is, and the fields ${categoryName} items carry. Change those for every item in the category below.`
-          : 'What this is. Give it a category to get a set of fields for its kind.'}
-      </p>
+        {!searchAvailable && (
+          <p className="text-ui text-ink-muted">
+            Search is not set up for the {categoryName ?? 'uncategorized'} category yet — board
+            games look themselves up on BoardGameGeek.
+          </p>
+        )}
+        {lookupState.message && <p className="text-body text-positive">{lookupState.message}</p>}
+        <FieldError>{lookupState.error}</FieldError>
 
-      {!searchAvailable && (
-        <p className="text-ui text-ink-muted">
-          Search is not set up for the {categoryName ?? 'uncategorized'} category yet — board
-          games look themselves up on BoardGameGeek.
-        </p>
-      )}
-      {lookupState.message && <p className="text-body text-positive">{lookupState.message}</p>}
-      <FieldError>{lookupState.error}</FieldError>
+        {catalog && <div className="border-t border-border pt-4">{catalog}</div>}
 
-      {catalog && <div className="border-t border-border pt-4">{catalog}</div>}
-
-      <form action={saveAction} className="space-y-4 border-t border-border pt-4">
-        <input type="hidden" name="id" value={itemId} />
-
-        <Field id="name" label="Name">
-          <Input id="name" name="name" required defaultValue={item.name} />
-        </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field id="variant" label="Variant">
-            <Input id="variant" name="variant" defaultValue={item.variant ?? ''} />
-          </Field>
-          <Field id="category_id" label="Category">
-            <Select id="category_id" name="category_id" defaultValue={categoryId ?? ''}>
-              <option value="">Uncategorized</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <Field id="notes" label="Notes">
-          <Textarea
-            id="notes"
-            name="notes"
-            defaultValue={item.notes ?? ''}
-            placeholder="Where it lives, warranty info, anything useful…"
-          />
-        </Field>
-
-        {fields.length > 0 ? (
-          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-            {fields.map((field) => (
-              <Field
-                key={field.key}
-                id={`attr_${field.key}`}
-                label={field.label}
-                // A saved link is offered under its own field, in the hint slot.
-                hint={
-                  field.type === 'url' && values[field.key] ? (
-                    <a
-                      href={values[field.key]}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-accent hover:underline"
-                    >
-                      Open link
-                    </a>
-                  ) : undefined
-                }
-              >
-                <Input
-                  id={`attr_${field.key}`}
-                  name={`attr_${field.key}`}
-                  defaultValue={values[field.key] ?? ''}
-                  inputMode={field.type === 'number' ? 'decimal' : undefined}
-                  type={field.type === 'url' ? 'url' : 'text'}
-                  placeholder={field.type === 'url' ? 'https://…' : undefined}
+        {/* Read first (law 14).
+         *
+         * The item page arrived as a form: name, variant, category, notes and
+         * every category field sitting in its own box with a Save at the
+         * bottom, on a page visited to find out where a thing is or what it
+         * cost. The details are shown now, and editing is somewhere you go.
+         *
+         * The captions go with the form, which is the only place they teach
+         * anything; the read-out is the answers (law 15). */}
+        {!editing ? (
+          <div className="space-y-3 border-t border-border pt-4">
+            <ValueList>
+              <ValueRow label="Name" value={item.name} />
+              <ValueRow label="Variant" value={item.variant ?? ''} />
+              <ValueRow label="Category" value={categoryName ?? 'Uncategorized'} />
+              <ValueRow label="Notes" value={item.notes ?? ''} />
+              {fields.map((field) => (
+                <ValueRow
+                  key={field.key}
+                  label={field.label}
+                  value={
+                    field.type === 'url' && values[field.key] ? (
+                      <a
+                        href={values[field.key]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-accent hover:underline"
+                      >
+                        Open link
+                      </a>
+                    ) : (
+                      (values[field.key] ?? '')
+                    )
+                  }
                 />
-              </Field>
-            ))}
+              ))}
+            </ValueList>
+            {saveState.message && <p className="text-body text-positive">{saveState.message}</p>}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                Edit details
+              </Button>
+              {categoryId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingTemplate((open) => !open)}
+                >
+                  {editingTemplate
+                    ? 'Hide template'
+                    : `Edit ${categoryName ?? 'category'} template`}
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
-          <p className="border-t border-border pt-4 text-ui text-ink-muted">
-            No category fields yet. Add one below, or set up the template for this category.
-          </p>
+          <form action={saveAction} className="space-y-4 border-t border-border pt-4">
+            {/* The explanation lives with the form, which is the only place it
+             * teaches anything. Above the read-out it was a sentence under a
+             * heading restating the heading, on every visit forever (law 15). */}
+            <p className="text-ui text-ink-muted">
+              {categoryName
+                ? `What this is, and the fields ${categoryName} items carry. Change those for every item in the category below.`
+                : 'What this is. Give it a category to get a set of fields for its kind.'}
+            </p>
+            <input type="hidden" name="id" value={itemId} />
+
+            <Field id="name" label="Name">
+              <Input id="name" name="name" required defaultValue={item.name} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field id="variant" label="Variant">
+                <Input id="variant" name="variant" defaultValue={item.variant ?? ''} />
+              </Field>
+              <Field id="category_id" label="Category">
+                <Select id="category_id" name="category_id" defaultValue={categoryId ?? ''}>
+                  <option value="">Uncategorized</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Field id="notes" label="Notes">
+              <Textarea
+                id="notes"
+                name="notes"
+                defaultValue={item.notes ?? ''}
+                placeholder="Where it lives, warranty info, anything useful…"
+              />
+            </Field>
+
+            {fields.length > 0 ? (
+              <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+                {fields.map((field) => (
+                  <Field
+                    key={field.key}
+                    id={`attr_${field.key}`}
+                    label={field.label}
+                    // A saved link is offered under its own field, in the hint slot.
+                    hint={
+                      field.type === 'url' && values[field.key] ? (
+                        <a
+                          href={values[field.key]}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-accent hover:underline"
+                        >
+                          Open link
+                        </a>
+                      ) : undefined
+                    }
+                  >
+                    <Input
+                      id={`attr_${field.key}`}
+                      name={`attr_${field.key}`}
+                      defaultValue={values[field.key] ?? ''}
+                      inputMode={field.type === 'number' ? 'decimal' : undefined}
+                      type={field.type === 'url' ? 'url' : 'text'}
+                      placeholder={field.type === 'url' ? 'https://…' : undefined}
+                    />
+                  </Field>
+                ))}
+              </div>
+            ) : (
+              <p className="border-t border-border pt-4 text-ui text-ink-muted">
+                No category fields yet. Add one below, or set up the template for this category.
+              </p>
+            )}
+
+            {catalogAnsweredLabels.length > 0 && (
+              <p className="text-ui text-ink-muted">
+                {catalogAnsweredLabels.join(' and ')}{' '}
+                {catalogAnsweredLabels.length === 1 ? 'comes' : 'come'} from the catalog above, so{' '}
+                {catalogAnsweredLabels.length === 1 ? 'it is' : 'they are'} not repeated here.
+              </p>
+            )}
+
+            <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+              <Field id="new_label" label="Add a field (this item only)">
+                <Input id="new_label" name="new_label" placeholder="Expansion, condition…" />
+              </Field>
+              <Field id="new_value" label="Value">
+                <Input id="new_value" name="new_value" />
+              </Field>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" size="sm" pending={savePending}>
+                {savePending ? 'Saving…' : 'Save details'}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+              {saveState.message && <p className="text-body text-positive">{saveState.message}</p>}
+            </div>
+            <FieldError>{saveState.error}</FieldError>
+          </form>
         )}
 
-        {catalogAnsweredLabels.length > 0 && (
-          <p className="text-ui text-ink-muted">
-            {catalogAnsweredLabels.join(' and ')}{' '}
-            {catalogAnsweredLabels.length === 1 ? 'comes' : 'come'} from the catalog above, so{' '}
-            {catalogAnsweredLabels.length === 1 ? 'it is' : 'they are'} not repeated here.
-          </p>
+        {editingTemplate && categoryId && (
+          <CategoryTemplateForm
+            categoryId={categoryId}
+            categoryName={categoryName}
+            template={template}
+          />
         )}
-
-        <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-          <Field id="new_label" label="Add a field (this item only)">
-            <Input id="new_label" name="new_label" placeholder="Expansion, condition…" />
-          </Field>
-          <Field id="new_value" label="Value">
-            <Input id="new_value" name="new_value" />
-          </Field>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" size="sm" pending={savePending}>
-            {savePending ? 'Saving…' : 'Save details'}
-          </Button>
-          {categoryId && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setEditingTemplate((open) => !open)}
-            >
-              {editingTemplate ? 'Hide template' : `Edit ${categoryName ?? 'category'} template`}
-            </Button>
-          )}
-          {saveState.message && <p className="text-body text-positive">{saveState.message}</p>}
-        </div>
-        <FieldError>{saveState.error}</FieldError>
-      </form>
-
-      {editingTemplate && categoryId && (
-        <CategoryTemplateForm
-          categoryId={categoryId}
-          categoryName={categoryName}
-          template={template}
-        />
-      )}
       </div>
     </CardSection>
   );
@@ -249,14 +309,12 @@ function CategoryTemplateForm({
     <form action={action} className={cn(cardVariants({ padding: 'dense' }), 'space-y-3 bg-canvas')}>
       <input type="hidden" name="category_id" value={categoryId} />
       <div>
-        <h3 className="text-ui font-semibold text-ink">
-          {categoryName ?? 'Category'} template
-        </h3>
+        <h3 className="text-ui font-semibold text-ink">{categoryName ?? 'Category'} template</h3>
         <p className="mt-1 text-ui text-ink-muted">
-          Every item in this category shows these fields. Clearing a name removes the field;
-          values already recorded under it stay on their items. Tick “In eBay search” for a
-          detail that decides which listing is the right one — an edition, a pressing, a model
-          number — and it joins the search alongside the title.
+          Every item in this category shows these fields. Clearing a name removes the field; values
+          already recorded under it stay on their items. Tick “In eBay search” for a detail that
+          decides which listing is the right one — an edition, a pressing, a model number — and it
+          joins the search alongside the title.
         </p>
       </div>
 

@@ -277,6 +277,9 @@ function ContactEditForm({
         />
       </Field>
       <Field id={`notes-${contact.id}`} label="Notes">
+        {/* ui-ok: composer-always-open -- ContactEditForm renders only when
+          * `editing`, and that gate is in the parent component, which the rule
+          * cannot see across. Law 14 is obeyed. */}
         <Textarea
           id={`notes-${contact.id}`}
           value={notes}

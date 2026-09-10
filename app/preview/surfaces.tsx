@@ -3,6 +3,7 @@ import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import DevUiPage from '@/app/dev/ui/page';
+import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewList } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
@@ -756,6 +757,42 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelineBoard rows={pipelineRows} view="board" />,
+  },
+  {
+    /* The shopping item page's main panel, which arrived as a form until law
+     * 14 reached it. Here so the read-first state can be looked at: it needs a
+     * session and a row otherwise, which means nobody looks. */
+    id: 'shopping-item-details',
+    label: 'Inventory · Item details',
+    module: 'shopping',
+    width: 'wide',
+    render: () => (
+      <ItemDetailsPanel
+        itemId="i1"
+        item={{
+          name: 'Brass Birmingham',
+          variant: 'Deluxe edition',
+          notes: 'Shelf C, second row. Insert is 3D printed; the box is a tight fit with it in.',
+        }}
+        categories={[
+          { id: 'c1', name: 'Board games' },
+          { id: 'c2', name: 'Books' },
+        ]}
+        categoryId="c1"
+        categoryName="Board games"
+        template={[
+          { key: 'players', label: 'Players', type: 'text', inSearch: false },
+          { key: 'bgg', label: 'BGG page', type: 'url', inSearch: false },
+        ]}
+        fields={[
+          { key: 'players', label: 'Players', type: 'text', inSearch: false },
+          { key: 'bgg', label: 'BGG page', type: 'url', inSearch: false },
+          { key: 'weight', label: 'Weight', type: 'number', inSearch: false },
+        ]}
+        values={{ players: '2–4', bgg: 'https://boardgamegeek.com/boardgame/224517', weight: '3.9' }}
+        searchAvailable
+      />
+    ),
   },
   {
     /* The design language, held to itself. It is the one surface where being

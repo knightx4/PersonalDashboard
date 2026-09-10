@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/field';
+import { EditableProse } from '@/components/ui/editable-prose';
 import { promoteToCanonical } from '@/app/jobs/(app)/roles/actions';
 
 export function AnswerBank({
@@ -44,7 +43,6 @@ function QuestionCard({
 }) {
   const [text, setText] = useState(question.canonicalAnswer ?? '');
   const [saved, setSaved] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const suggestion = !question.canonicalAnswer && question.approvedAnswer;
 
@@ -67,29 +65,25 @@ function QuestionCard({
         </p>
       )}
 
-      <Textarea
-        rows={5}
-        value={text || (suggestion ? question.approvedAnswer! : '')}
-        onChange={(event) => setText(event.target.value)}
+      {/* The answer, read. This was a five-row box standing open on every
+        * question in the bank, so a page whose job is to show what you have
+        * already written arrived as a column of empty editors (law 14). */}
+      <EditableProse
         className="mt-2"
+        label={`Your answer to: ${question.text}`}
+        value={text || (suggestion ? (question.approvedAnswer ?? '') : '')}
+        empty="No default answer yet."
+        editLabel={question.canonicalAnswer ? 'Edit the default' : 'Write the default'}
         placeholder="Your reusable answer to this question."
+        onSave={async (next) => {
+          const result = await promoteToCanonical(question.id, next);
+          if (result.error) return result.error;
+          setText(next);
+          setSaved('Saved as your default answer.');
+        }}
       />
 
       <div className="mt-2 flex items-center gap-3">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              const value = text || question.approvedAnswer || '';
-              const result = await promoteToCanonical(question.id, value);
-              setSaved(result.error ?? 'Saved as your default answer.');
-            })
-          }
-        >
-          {question.canonicalAnswer ? 'Update default' : 'Set as default'}
-        </Button>
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {question.usedIn > 0 && (
           <span className="ml-auto text-small text-ink-muted">

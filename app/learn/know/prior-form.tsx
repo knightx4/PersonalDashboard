@@ -119,6 +119,9 @@ export function PriorForm({ subjectId }: { subjectId?: string }) {
         id="account"
         hint="An essay, a syllabus you can say something about, a write-up of work you cannot paste. Say what you understood, not what you attended — a list of course titles has nothing in it to read."
       >
+        {/* ui-ok: composer-always-open -- the create. This page is the form:
+          * writing the account of what you know is the only thing it does, and
+          * there is nothing to read before it exists. */}
         <Textarea
           id="account"
           name="account"
