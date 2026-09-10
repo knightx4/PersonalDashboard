@@ -71,7 +71,19 @@ export type ChangelogDay = {
  * How the page is grouped. In the URL, so a grouping is a link somebody can
  * keep -- law 5.
  */
-export const CHANGELOG_GROUPINGS = ['day', 'issue', 'commit'] as const;
+export const CHANGELOG_GROUPINGS = ['issue', 'day', 'commit'] as const;
+
+/**
+ * What the page opens on.
+ *
+ * By issue, because the other two are lists of every line there is. A feature
+ * ships as six or seven steps over three days, and by day that is six lines
+ * saying six small things where the reader wanted one saying "capture from
+ * anywhere". By issue those six sit under the feature they belong to, which is
+ * the sentence somebody scanning this page is actually looking for -- and the
+ * six are still one click underneath it.
+ */
+export const CHANGELOG_DEFAULT_GROUPING: ChangelogGrouping = 'issue';
 export type ChangelogGrouping = (typeof CHANGELOG_GROUPINGS)[number];
 
 export function isChangelogGrouping(value: string): value is ChangelogGrouping {
@@ -79,8 +91,8 @@ export function isChangelogGrouping(value: string): value is ChangelogGrouping {
 }
 
 export const CHANGELOG_GROUPING_LABEL: Record<ChangelogGrouping, string> = {
-  day: 'By day',
   issue: 'By issue',
+  day: 'By day',
   commit: 'By commit',
 };
 
