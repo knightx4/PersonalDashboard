@@ -75,12 +75,13 @@ describe('the bottom bar', () => {
 });
 
 /**
- * The ways into capture.
+ * The way into capture.
  *
- * Two of them, and the point of the second one is that the first is useless
- * without a keyboard: the header control carries the shortcut on it, and below
- * `sm` -- where no modifier can be held and the top bar is out of a thumb's
- * reach -- the way in is the button above the tab bar instead.
+ * One of them, in the header beside the theme picker, at every width. There
+ * was a second below `sm` -- an accent circle floating over the foot of every
+ * page -- and it read as the app insisting rather than offering, so it went.
+ * Nothing is pinned over the page now, and the header control is no longer
+ * hidden on a phone.
  */
 describe('capture', () => {
   it('offers a way in from the header, with its shortcut on it', () => {
@@ -89,17 +90,13 @@ describe('capture', () => {
     expect(html).toContain('>⌥C<');
   });
 
-  it('offers one that needs no keyboard, and only where the header one is not', () => {
-    const html = render([]);
-    // Above the tab bar rather than in it: the bar's own cells are unchanged.
-    const at = html.indexOf('bottom-[calc(4.5rem+env(safe-area-inset-bottom))]');
-    expect(at).toBeGreaterThan(-1);
-    expect(html.slice(html.lastIndexOf('<button', at), at + 400)).toContain('sm:hidden');
+  it('pins nothing over the page', () => {
+    expect(render([])).not.toContain('bottom-[calc(4.5rem+env(safe-area-inset-bottom))]');
   });
 
   it('is present on a page with no workspace at all', () => {
     // The panel mounts with the shell, not with a module, so "from anywhere"
     // includes home and the account page.
-    expect(render([]).match(/>Capture something</g)?.length).toBe(2);
+    expect(render([]).match(/>Capture something</g)?.length).toBe(1);
   });
 });

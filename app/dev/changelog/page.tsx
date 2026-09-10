@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { ChevronRight, History } from 'lucide-react';
+import { ChevronRight, History, SearchX } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { loadChangelog } from '@/lib/changelog/load';
 import {
   CHANGELOG_DEFAULT_GROUPING,
   CHANGELOG_GROUPINGS,
   CHANGELOG_GROUPING_LABEL,
+  filterChangelog,
   groupChangelog,
   isChangelogGrouping,
   type ChangelogEntry,
@@ -51,7 +53,7 @@ export const metadata = { title: 'Changelog' };
 export default async function DevChangelogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string | string[] }>;
+  searchParams: Promise<{ group?: string | string[]; q?: string | string[] }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -61,8 +63,26 @@ export default async function DevChangelogPage({
   const grouping: ChangelogGrouping =
     asked && isChangelogGrouping(asked) ? asked : CHANGELOG_DEFAULT_GROUPING;
 
+  const query = (Array.isArray(params.q) ? params.q[0] : params.q)?.trim() ?? '';
+
   const entries = await loadChangelog(supabase, user.id);
-  const groups = groupChangelog(entries, grouping);
+  const matched = filterChangelog(entries, query);
+  const groups = groupChangelog(matched, grouping);
+
+  /**
+   * Both parameters travel together.
+   *
+   * A grouping link that dropped the search would throw away what you typed the
+   * moment you asked to see it by day, and the form has to carry the grouping
+   * for the same reason in reverse.
+   */
+  function href(candidate: ChangelogGrouping): string {
+    const search = new URLSearchParams();
+    if (candidate !== CHANGELOG_DEFAULT_GROUPING) search.set('group', candidate);
+    if (query) search.set('q', query);
+    const rest = search.toString();
+    return rest ? `/dev/changelog?${rest}` : '/dev/changelog';
+  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -72,30 +92,52 @@ export default async function DevChangelogPage({
       />
 
       {entries.length > 0 && (
-        <nav aria-label="Grouping" className="mb-4 flex flex-wrap items-center gap-1">
-          {CHANGELOG_GROUPINGS.map((candidate) => (
-            <Link
-              key={candidate}
-              href={
-                candidate === CHANGELOG_DEFAULT_GROUPING
-                  ? '/dev/changelog'
-                  : `/dev/changelog?group=${candidate}`
-              }
-              aria-current={candidate === grouping ? 'page' : undefined}
-              className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-                candidate === grouping
-                  ? 'bg-accent text-surface'
-                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-              )}
-            >
-              {CHANGELOG_GROUPING_LABEL[candidate]}
-            </Link>
-          ))}
-        </nav>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <nav aria-label="Grouping" className="flex flex-wrap items-center gap-1">
+            {CHANGELOG_GROUPINGS.map((candidate) => (
+              <Link
+                key={candidate}
+                href={href(candidate)}
+                aria-current={candidate === grouping ? 'page' : undefined}
+                className={cn(
+                  'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
+                  candidate === grouping
+                    ? 'bg-accent text-surface'
+                    : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+                )}
+              >
+                {CHANGELOG_GROUPING_LABEL[candidate]}
+              </Link>
+            ))}
+          </nav>
+
+          {/* A plain GET form, like the rest of this page: the search is in the
+              URL, so a search is a link somebody can keep and the page still
+              works with no JavaScript at all (law 5). */}
+          <form action="/dev/changelog" className="ml-auto flex items-center gap-2">
+            {grouping !== CHANGELOG_DEFAULT_GROUPING && (
+              <input type="hidden" name="group" value={grouping} />
+            )}
+            <Input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder="Search what shipped"
+              aria-label="Search what shipped"
+              className="w-48"
+            />
+          </form>
+        </div>
       )}
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && query ? (
+        <EmptyState
+          icon={SearchX}
+          title={`Nothing shipped matching “${query}”`}
+          description="Searches the title, what was written about it, the commit, and the feature it shipped under."
+          action={{ label: 'Clear the search', href: href(grouping) }}
+        />
+      ) : groups.length === 0 ? (
         <EmptyState
           icon={History}
           title="Nothing has shipped yet"
@@ -143,7 +185,25 @@ export default async function DevChangelogPage({
  * sets one, which is where the reader has seen it before.
  */
 function isItsOwnHeading(group: ChangelogGroup): boolean {
-  return group.kind === 'issue' && group.entries.length === 1 && group.entries[0].key === group.key;
+  return (
+    group.kind === 'issue' && group.entries.length === 1 && group.entries[0].issue === null
+  );
+}
+
+/**
+ * The feature's own closed row, and the steps that shipped under it.
+ *
+ * A feature and its steps are one group now, so the group holds up to two
+ * kinds of row: the feature's own line, which carries nothing above it, and
+ * the steps, which name it. The feature is the summary; only the steps go
+ * underneath. Listing the feature's row again beneath its own title was the
+ * page showing the top level and the underneath separately.
+ */
+function splitIssue(group: ChangelogGroup): { self: ChangelogEntry | null; steps: ChangelogEntry[] } {
+  return {
+    self: group.entries.find((entry) => entry.issue === null) ?? null,
+    steps: group.entries.filter((entry) => entry.issue !== null),
+  };
 }
 
 /**
@@ -160,6 +220,7 @@ function isItsOwnHeading(group: ChangelogGroup): boolean {
  */
 function IssueSummary({ group }: { group: ChangelogGroup }) {
   const newest = group.entries.reduce((at, entry) => (entry.at > at ? entry.at : at), '');
+  const { self, steps } = splitIssue(group);
 
   return (
     <details className="group">
@@ -172,19 +233,29 @@ function IssueSummary({ group }: { group: ChangelogGroup }) {
         {group.number !== null && (
           <span className="tabular shrink-0 text-small text-ink-ghost">#{group.number}</span>
         )}
-        <span className="min-w-0 flex-1 break-words text-ui font-medium text-ink">
-          {group.label}
-        </span>
+        {/* One line, like every row under it. */}
+        <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{group.label}</span>
         <span className="shrink-0 text-micro text-ink-ghost">
-          {group.entries.length} {group.entries.length === 1 ? 'change' : 'changes'}
+          {steps.length} {steps.length === 1 ? 'change' : 'changes'}
           {newest && ` · ${formatDay(newest.slice(0, 10))}`}
         </span>
       </summary>
-      <ul className="mt-1 divide-y divide-border border-l-2 border-border pl-3">
-        {group.entries.map((entry) => (
-          <Entry key={entry.key} entry={entry} inGroup={group.kind} />
-        ))}
-      </ul>
+      <div className="mt-1 border-l-2 border-border pl-3">
+        {/* What the feature itself said, and the commit that closed it. Its
+            title is the line above, so the row is not drawn again -- only the
+            part of it the summary had no room for. */}
+        {self?.detail && <p className="row-pad text-small text-ink-muted">{self.detail}</p>}
+        {self?.commitSha && (
+          <p className="row-pad font-mono break-all text-micro text-ink-ghost">
+            {self.commitSha}
+          </p>
+        )}
+        <ul className="divide-y divide-border">
+          {steps.map((entry) => (
+            <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+          ))}
+        </ul>
+      </div>
     </details>
   );
 }
@@ -227,37 +298,52 @@ function Entry({
   const workspace = moduleById(entry.module)?.label ?? 'The app as a whole';
 
   return (
-    <li className="row-pad flex gap-3">
-      <ModuleMark module={entry.module} size="sm" className="mt-0.5" />
-      <div className="min-w-0 flex-1">
-        <p className="flex min-w-0 items-baseline gap-1.5 text-ui text-ink">
+    <li>
+      <details className="group/entry">
+        <summary className="row-pad flex cursor-pointer list-none items-baseline gap-3 hover:bg-sunken [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            className="size-3 shrink-0 self-center text-ink-ghost transition-transform duration-150 group-open/entry:rotate-90"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <ModuleMark module={entry.module} size="sm" className="shrink-0 self-center" />
           {entry.number !== null && (
             <span className="tabular shrink-0 text-small text-ink-ghost">#{entry.number}</span>
           )}
-          <span className="min-w-0 break-words">{entry.title}</span>
-        </p>
-        {entry.detail && <p className="mt-0.5 text-small text-ink-muted">{entry.detail}</p>}
-        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-micro text-ink-ghost">
-          {/* The plan opens on the open steps, so a link to a step that is done
-              has to ask for the view that shows it. Neither page can be linked
-              any deeper than itself: a step is opened by a click rather than by
-              a URL, and a note has no anchor of its own either. */}
-          <Link
-            href={entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs'}
-            className="transition-colors duration-150 hover:text-accent"
-          >
-            {entry.source === 'plan' ? `${workspace} · plan` : `${workspace} · note`}
-          </Link>
-          {/* Whole, and in mono, which is how the plan page shows one. A
-              changelog is where somebody goes to find the commit, and a
-              shortened sha is one more step before they can paste it. */}
-          {/* Not under a commit heading: the sha is already the heading, and
-              printing it again on every line under it is furniture (law 15). */}
-          {entry.commitSha && inGroup !== 'commit' && (
-            <span className="font-mono break-all">{entry.commitSha}</span>
-          )}
-        </p>
-      </div>
+          {/* One line, truncated. A note's title is the whole thing somebody
+              typed on a phone, so the untruncated version is three lines and
+              the list stops being scannable. What was cut is one click away. */}
+          <span className="min-w-0 flex-1 truncate text-ui text-ink">{entry.title}</span>
+        </summary>
+
+        <div className="row-pad flex flex-col gap-1 pt-0 pl-9">
+          {/* The title again, whole. The line above is cut to keep the list one
+              row per thing, and the first job of opening a row is to read the
+              part that did not fit. */}
+          <p className="break-words text-ui text-ink">{entry.title}</p>
+          {entry.detail && <p className="text-small text-ink-muted">{entry.detail}</p>}
+          <p className="flex flex-wrap items-baseline gap-x-2 text-micro text-ink-ghost">
+            {/* The plan opens on the open steps, so a link to a step that is done
+                has to ask for the view that shows it. Neither page can be linked
+                any deeper than itself: a step is opened by a click rather than by
+                a URL, and a note has no anchor of its own either. */}
+            <Link
+              href={entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs'}
+              className="transition-colors duration-150 hover:text-accent"
+            >
+              {entry.source === 'plan' ? `${workspace} · plan` : `${workspace} · note`}
+            </Link>
+            {/* Whole, and in mono, which is how the plan page shows one. A
+                changelog is where somebody goes to find the commit, and a
+                shortened sha is one more step before they can paste it. */}
+            {/* Not under a commit heading: the sha is already the heading, and
+                printing it again on every line under it is furniture (law 15). */}
+            {entry.commitSha && inGroup !== 'commit' && (
+              <span className="font-mono break-all">{entry.commitSha}</span>
+            )}
+          </p>
+        </div>
+      </details>
     </li>
   );
 }

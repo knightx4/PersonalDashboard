@@ -251,6 +251,46 @@ export function changelogEntries(input: {
   );
 }
 
+/**
+ * The entries a search matches.
+ *
+ * Over the fields somebody would actually search this page for: what shipped
+ * (the title), what was said about it (the detail), the commit, the plan
+ * number, and the feature it shipped under -- so searching a feature's name
+ * finds its steps as well as the feature itself, which is the whole reason to
+ * search a page grouped by feature.
+ *
+ * Every word has to match, in any field and in any order. Matching on the
+ * whole string would mean "capture todo" finds nothing when the title reads
+ * "Capture a todo from anywhere"; matching on any word would put half the page
+ * back on screen for a two-word search.
+ *
+ * Filtering happens before grouping, so a group only appears if something in
+ * it matched, and its count is the count of what matched.
+ */
+export function filterChangelog(
+  entries: readonly ChangelogEntry[],
+  query: string,
+): ChangelogEntry[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [...entries];
+
+  return entries.filter((entry) => {
+    const haystack = [
+      entry.title,
+      entry.detail ?? '',
+      entry.commitSha ?? '',
+      entry.number === null ? '' : `#${entry.number}`,
+      entry.issue?.title ?? '',
+      entry.issue === null ? '' : `#${entry.issue.number}`,
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    return words.every((word) => haystack.includes(word));
+  });
+}
+
 export function buildChangelog(input: {
   plan: readonly PlanItem[];
   planParents?: readonly PlanParentRow[];
@@ -336,6 +376,19 @@ function groupOf(
     };
   }
 
-  // A feature, or a note: it is the issue, so it heads its own group of one.
+  // A feature is the issue, so it keys on itself the same way its steps key on
+  // it -- `issue-<the feature's id>` either way -- and the two land in one
+  // group.
+  //
+  // They used to land in two. A feature's own closed row carries no `issue`,
+  // because there is nothing above it, so it grouped under its own entry key
+  // while its steps grouped under `issue-<its id>`: the page showed the
+  // feature once as a line of its own and again as the heading over its steps,
+  // with no way to tell they were the same thing.
+  if (entry.source === 'plan') {
+    return { key: `issue-${entry.id}`, kind: 'issue', label: entry.title, number: entry.number };
+  }
+
+  // A note belongs to nothing above it and is its own small issue.
   return { key: entry.key, kind: 'issue', label: entry.title, number: entry.number };
 }

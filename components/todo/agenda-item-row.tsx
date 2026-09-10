@@ -1,7 +1,8 @@
 'use client';
 
-import { Check, Clock, ExternalLink, X } from 'lucide-react';
+import { Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem } from '@/lib/todo/agenda/sources';
@@ -57,29 +58,33 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           pointer. */}
       <span className="-ml-1 mt-0.5 hidden w-3 shrink-0 [@media(hover:hover)]:block" aria-hidden />
 
+      {/* The same hexagon a task draws, for the same reason a task stopped
+          drawing a bordered box: the shape is the state, and a rounded square
+          beside a row of hexagons reads as a different kind of thing rather
+          than as the same list. An item you can tick takes the task ladder --
+          empty until it is done, then the tick. One you cannot takes the
+          dashed hexagon, which is the glyph for a state that is not on a
+          ladder at all: an interview or a return deadline is an appointment,
+          not something you finish. */}
       {item.completable ? (
         <button
           type="button"
           aria-label="Mark done"
-          onClick={() =>
-            run({ state: 'done', write: () => completeItem(item.source, item.key) })
-          }
-          className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-control transition-colors duration-150 hover:border-accent"
+          onClick={() => run({ state: 'done', write: () => completeItem(item.source, item.key) })}
+          className={cn(
+            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
+            shown === 'done' ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
+          )}
         >
-          <Check
-            className={cn(
-              'size-3 transition-opacity duration-150',
-              shown === 'done' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40',
-            )}
-            strokeWidth={2}
-            aria-hidden
-          />
+          <StatusGlyph glyph={shown === 'done' ? 'check' : 'empty'} size={16} />
         </button>
       ) : (
         <span
-          className="mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-dashed border-border"
+          className="mt-0.5 flex size-[18px] shrink-0 items-center justify-center text-ink-muted"
           aria-hidden
-        />
+        >
+          <StatusGlyph glyph="dashed" size={16} />
+        </span>
       )}
 
       <div className="min-w-0 flex-1">

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState, useSyncExternalStore } fro
 import Link from 'next/link';
 import {
   Ban,
+  Bot,
   Check,
   Circle,
   CircleUser,
@@ -1264,6 +1265,26 @@ function Dependencies({
 }
 
 /**
+ * What pressing Send actually hands over, said before it is pressed.
+ *
+ * The brief carries the step's whole subtree under "## Steps", so Send on a
+ * feature hands over the feature and everything beneath it. The button read
+ * "Send to Claude" whichever row it sat on, so pressing it on #197 looked like
+ * sending one step and sent ten. The action already says so afterwards; this
+ * is the same count, in the label, before you commit to it.
+ *
+ * Everything beneath at any depth, closed rows included, because that is what
+ * the brief prints -- deliberately not the batch button's count, which is the
+ * open steps it would work through.
+ */
+function sendLabel(node: PlanNode): string {
+  const beneath = flatten([node]).length - 1;
+  return beneath === 0
+    ? `Send #${node.number} to Claude`
+    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Claude`;
+}
+
+/**
  * Hand it over and start the routine now.
  *
  * The button is offered whether or not the deployment can start a routine,
@@ -1307,7 +1328,7 @@ function SendToClaude({
         <input type="hidden" name="id" value={node.id} />
         <Button type="submit" size="sm" variant="secondary" pending={pending}>
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : 'Send to Claude'}
+          {pending ? 'Sending…' : sendLabel(node)}
         </Button>
       </form>
       {beneath > 0 && (
@@ -1449,7 +1470,7 @@ function Elapsed({ startedAt }: { startedAt: string }) {
  */
 type Health = {
   word: string;
-  tone: 'quiet' | 'ghost' | 'accent' | 'positive' | 'caution';
+  tone: 'quiet' | 'ghost' | 'accent' | 'info' | 'positive' | 'caution';
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   title?: string;
 };
@@ -1481,8 +1502,15 @@ const HEALTH: Record<PlanHealth, Health> = {
   waiting: { word: 'Waiting', tone: 'caution', icon: Hourglass },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
-  // nothing. The shape still separates it from the other accent states.
-  ready: { word: 'Ready', tone: 'accent', icon: Sparkles },
+  // nothing.
+  //
+  // `info` and not `accent`, which is what it used to be and which was not
+  // blue anywhere it was read: the accent is the workspace's hue, and this
+  // page lives in the dev workspace, whose hue is slate. "Blue" was written
+  // in this comment and rendered as grey on the only page that shows it.
+  // `info` is the app's own blue, themed in all five palettes, and it does
+  // not move when the workspace does.
+  ready: { word: 'Ready', tone: 'info', icon: Sparkles },
   not_started: { word: 'Not started', tone: 'quiet', icon: CircleDashed },
   done: { word: 'Done', tone: 'positive', icon: Check },
   dropped: { word: 'Dropped', tone: 'ghost', icon: X },
@@ -1531,9 +1559,18 @@ function healthOf(node: PlanNode): Health {
  * and a "0 blocked" is a fact nobody needed (law 1). The count is the label:
  * the word is on the dot's tooltip and in its accessible name, because eight
  * spelled-out states would be a paragraph where a glance was asked for.
+ *
+ * Answered is left out. Every other dot is either work outstanding or work
+ * that shipped; an answered question is neither -- it is a decision recorded
+ * and carried into the briefs beneath it, and it never becomes work again.
+ * Counting them said nothing about the shape of what is left in a module,
+ * which is the one thing these dots are for, and it was a dot on every
+ * heading.
  */
+const TALLY_HEALTHS = PLAN_HEALTHS.filter((health) => health !== 'answered');
+
 function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
-  const present = PLAN_HEALTHS.filter((health) => tally[health] > 0);
+  const present = TALLY_HEALTHS.filter((health) => tally[health] > 0);
   if (present.length === 0) return null;
 
   return (
@@ -1553,10 +1590,21 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
   );
 }
 
+/**
+ * `info` is the app's blue, and it is deliberately not `accent`.
+ *
+ * The accent is whichever hue the workspace you are standing in owns, so an
+ * accent-toned state is a different colour on every page and slate on this
+ * one. A state that means the same thing everywhere needs a hue that does
+ * too. `status-submitted` is that blue: defined in all five palettes, and
+ * already read as a general "info" outside the pipeline it is named for --
+ * see the jobs activity feed, which tones its info lines with it.
+ */
 const TONE_TEXT: Record<Health['tone'], string> = {
   quiet: 'text-ink-muted',
   ghost: 'text-ink-ghost',
   accent: 'text-accent',
+  info: 'text-status-submitted',
   positive: 'text-positive',
   caution: 'text-caution',
 };
@@ -1565,6 +1613,7 @@ const TONE_DOT: Record<Health['tone'], string> = {
   quiet: 'bg-ink-ghost',
   ghost: 'bg-ink-ghost',
   accent: 'bg-accent',
+  info: 'bg-status-submitted',
   positive: 'bg-positive',
   caution: 'bg-caution',
 };
@@ -1827,7 +1876,7 @@ function PlanRow({
       : [
           {
             id: 'send',
-            label: 'Send to Claude',
+            label: sendLabel(node),
             formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
             formFields: { id: node.id },
           },
@@ -2000,7 +2049,12 @@ function PlanRow({
                   title="Handed to Claude"
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
-                  <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                  {/* A bot and not a person. This mark said "handed over" with
+                      the same head-and-shoulders the assignee picker uses for
+                      anybody at all, so the one thing it had to say -- that it
+                      went to Claude rather than onto your own list -- was the
+                      one thing it did not. */}
+                  <Bot className="size-3" strokeWidth={2} aria-hidden />
                   <span className="sr-only">Handed to Claude</span>
                 </span>
               )}
@@ -2090,7 +2144,7 @@ function PlanRow({
             {!closed && (
               <form action={sendAction}>
                 <input type="hidden" name="id" value={node.id} />
-                <RowIconButton type="submit" label="Send to Claude" pending={sendPending}>
+                <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
                   <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                 </RowIconButton>
               </form>
@@ -2099,7 +2153,9 @@ function PlanRow({
               <input type="hidden" name="id" value={node.id} />
               <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
               <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
-                <CircleUser
+                {/* The same bot as the mark: this button is specifically the
+                    hand-to-Claude toggle, not a general "who is on it". */}
+                <Bot
                   className={cn('size-3.5', !handOver && 'text-accent')}
                   strokeWidth={1.75}
                   aria-hidden

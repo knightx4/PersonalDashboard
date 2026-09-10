@@ -244,8 +244,32 @@ yet.
 | Re-shaping: the plan adapts as decisions land | Re-shape a feature after its questions are answered |
 
 **The detail says what the work involves.** Which files, which tables, what
-already exists, what has to be added. Two to five sentences. Write it for
-somebody who knows the codebase but has not thought about this step.
+already exists, what has to be added. Two to five sentences.
+
+**But the first sentence is for the person, not for the next session.** They
+own the app and read this page to decide what gets built; they are not going
+to open `lib/ideas/load.ts` to find out what a step is. So:
+
+> **Sentence one says what will be different for the person, and names
+> nothing from the codebase** — no file paths, no table names, no type or
+> function names. Then the rest of the detail is as technical as it needs to
+> be.
+
+This is the rule the plan kept failing. Details like *"lib/raised/load.ts,
+following lib/ideas/load.ts and lib/feedback/load.ts: a RaisedRow type in the
+app's own shape, a loader that takes a client and a user id…"* are accurate
+and tell the person nothing. That step's first sentence is *"The dev pages can
+show what Claude has raised, open ones first."* Then the paths.
+
+| Instead of opening with | Open with |
+|---|---|
+| `app/dev/raised/page.tsx` with a PageHeader and a client view, plus actions.ts holding… | A new Raised tab lists what Claude needs from you, and you can dismiss a row or bring it back. |
+| A section in `.claude/skills/plan/SKILL.md` naming the three homes and the difference… | Sessions learn when to raise something to you instead of burying it in a transcript. |
+| `scripts/plan.ts` gains two commands using the `connect()` and `resolveUser()` it already has… | A session can write something down for you and read your answer back later. |
+
+A quick check before writing the row: read your first sentence back and ask
+whether somebody who has never opened this repository would know what they
+are getting. If not, it is not written yet.
 
 **Do not write:**
 
@@ -356,6 +380,16 @@ against everything now known and write down what has changed — as
    and *Decided so far* — every question settled beneath it. Then read the
    code those answers touch. An answer changes what is buildable only if you
    know what is there.
+
+   **A feature that is already `done` or `dropped` takes no new rows.** Its
+   status says it is finished, and a proposal appearing inside it reads as the
+   feature having re-opened itself. Re-shaping one is still legitimate — an
+   answer can land under it long after it closed — but everything the re-shape
+   turns up there is *new work*, so it goes at the top level:
+   `add "…"` with no `--parent`, a detail that opens by saying it came out of
+   `#<n>`, and the steps and questions under **that**. The one write a
+   re-shape may still make to the closed feature is `fog <n> --clear`, and
+   only once the new feature that dispels the fog exists.
 2. **Graduate the fog.** If an answer, or the code, has made the fog
    specifiable, write those steps now: `add "…" --parent <n> --proposed
    --done-when "…" --size s|m|l --from <the decision>`, and clear the patch in

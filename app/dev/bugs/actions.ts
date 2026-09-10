@@ -173,6 +173,77 @@ export async function editFeedback(
   return { message: 'Saved.' };
 }
 
+const respondSchema = z.object({
+  id: z.string().uuid(),
+  response: z
+    .string()
+    .trim()
+    .min(1, 'Write your answer first.')
+    .max(4000),
+});
+
+/**
+ * Answer a note that came back with a question.
+ *
+ * A run that cannot finish a note blocks it and writes the question in the
+ * resolution note, often with lettered options and a recommendation. Until now
+ * there was nowhere to reply: the only way through was to notice the question,
+ * edit the note's body to append an answer, and remember to set the status back
+ * to open -- three steps, two of them easy to forget, and a blocked note whose
+ * answer never reaches a run is a note that stays blocked forever.
+ *
+ * This is those three steps as one. The answer is appended to the body rather
+ * than replacing it, dated and labelled, because the next run reads the body:
+ * the ask and the answer belong together, and an answer written anywhere else
+ * would need the run to know to look for it. The question stays in the
+ * resolution note as the record of what was actually asked.
+ *
+ * Blocked and planned only. Those are the two pending states -- the ones that
+ * are waiting on the person rather than on a run -- and answering anything else
+ * would either race a run that has the note claimed or reopen something already
+ * settled.
+ */
+// latency: pending
+export async function respondToFeedback(
+  _prev: FeedbackActionState,
+  formData: FormData,
+): Promise<FeedbackActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const parsed = respondSchema.safeParse({
+    id: formData.get('id'),
+    response: String(formData.get('response') ?? ''),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { data: existing } = await supabase
+    .from('feedback_items')
+    .select('body, status')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!existing) return { error: 'That note no longer exists.' };
+  const status = existing.status as string;
+  if (status !== 'blocked' && status !== 'planned') {
+    return { error: 'Only a blocked or planned note is waiting on an answer from you.' };
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const body = `${existing.body as string}\n\nAnswered ${stamp}: ${parsed.data.response}`;
+
+  const { error } = await supabase
+    .from('feedback_items')
+    .update({ body, status: 'open', completed_at: null })
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidateFeedback();
+  return { message: 'Answered, and back in the queue.' };
+}
+
 // latency: pending
 export async function deleteFeedback(
   _prev: FeedbackActionState,

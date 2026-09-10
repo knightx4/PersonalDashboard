@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { fireFeatureRoutine, planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
-import { planBrief, planQueueBrief } from '@/lib/plan/brief';
+import { PLAIN_ENGLISH_RULE, planBrief, planQueueBrief } from '@/lib/plan/brief';
 import {
   PLAN_ASSIGNEES,
   PLAN_KINDS,
@@ -23,6 +23,7 @@ import {
   findNode,
   flatten,
   handedToClaude,
+  isWaitingOnThePerson,
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
@@ -351,15 +352,24 @@ export async function setPlanItemStatus(
     }
   }
 
+  // Blocking a step takes it back off Claude in the same write.
+  //
+  // A block says the step needs something outside the repo, so nothing a
+  // session does will move it -- and a row left assigned sits in the Claude's
+  // view carrying the reason it cannot be worked. Whoever blocks it should not
+  // have to remember to unhand it as a second step.
+  const patch: Record<string, string | null> = { status: status.data };
+  if (status.data === 'blocked') patch.assignee = null;
+
   const { error } = await supabase
     .from('plan_items')
-    .update({ status: status.data })
+    .update(patch)
     .eq('id', id.data)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: 'Updated.' };
+  return { message: status.data === 'blocked' ? 'Blocked, and taken back off Claude.' : 'Updated.' };
 }
 
 /**
@@ -432,12 +442,30 @@ export async function setPlanItemAssignee(
 
   // The step itself whatever state it is in -- you asked for this one -- and
   // the open ones beneath it.
-  const ids = [
-    node.id,
-    ...flatten([node])
-      .filter((step) => step.id !== node.id && !isClosed(step.status))
-      .map((step) => step.id),
+  const candidates = [
+    node,
+    ...flatten([node]).filter((step) => step.id !== node.id && !isClosed(step.status)),
   ];
+
+  // Nothing waiting on you goes to Claude. An unanswered question is yours to
+  // settle and a blocked step needs something outside the repo, so handing
+  // either over puts a session in front of the same wall -- and fills the
+  // Claude's view with rows nobody can work.
+  //
+  // Only when handing over. Taking work back is always allowed, whatever state
+  // it is in, because that is how a row that should never have been handed
+  // over gets unhanded.
+  const skipped =
+    assignee.data === 'claude' ? candidates.filter((step) => isWaitingOnThePerson(step)) : [];
+  const ids = candidates
+    .filter((step) => !skipped.some((other) => other.id === step.id))
+    .map((step) => step.id);
+
+  if (ids.length === 0) {
+    return {
+      error: `#${node.number} is ${node.status === 'blocked' ? 'blocked' : 'a question nobody has answered'}, so it is waiting on you rather than on Claude.`,
+    };
+  }
 
   const { error } = await supabase
     .from('plan_items')
@@ -450,8 +478,11 @@ export async function setPlanItemAssignee(
   if (assignee.data !== 'claude') {
     return { message: ids.length === 1 ? 'Taken back.' : `Took back ${ids.length} steps.` };
   }
+
+  const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;
   return {
-    message: ids.length === 1 ? 'Handed to Claude.' : `Handed ${ids.length} steps to Claude.`,
+    message:
+      (ids.length === 1 ? 'Handed to Claude.' : `Handed ${ids.length} steps to Claude.`) + left,
   };
 }
 
@@ -713,6 +744,18 @@ export async function sendPlanItemToClaude(
   const node = findNode(sections, id.data);
   if (!node) return { error: 'That step no longer exists.' };
 
+  // Same rule as the hand-over: a question you have not answered and a step
+  // blocked on something outside the repo are both waiting on you, and starting
+  // a session on either sends it at a wall it cannot get past.
+  if (isWaitingOnThePerson(node)) {
+    return {
+      error:
+        node.status === 'blocked'
+          ? `#${node.number} is blocked on something outside the repo. Clear what it is waiting on first -- its note says what.`
+          : `#${node.number} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
+    };
+  }
+
   // Handed over and underway, in the one write. A step sent to Claude is being
   // built from the moment the routine wakes, and a plan still reading "not
   // started" while a session works it is the plan lying about itself -- the one
@@ -801,10 +844,16 @@ export async function sendPlanFeatureToClaude(
 
   // Itself included: a feature is closed when its steps are, and the session
   // needs it to be its own to close.
+  //
+  // Minus whatever is waiting on the person. A batch that swept up the
+  // feature's unanswered questions and its blocked steps handed a session rows
+  // it could do nothing with, and left them sitting in the Claude's view saying
+  // why they could not be worked.
   const open = flatten([node]).filter(
-    (step) => !isClosed(step.status) && step.status !== 'proposed',
+    (step) =>
+      !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
   );
-  if (open.length === 0) return { error: 'Nothing open under that step.' };
+  if (open.length === 0) return { error: 'Nothing open under that step that is not waiting on you.' };
 
   const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
   if (toHandOver.length > 0) {
@@ -904,23 +953,44 @@ async function startReshape(
   sections: readonly PlanSection[],
   node: PlanNode,
 ): Promise<FireRoutineResult> {
+  // A feature that has already shipped does not take new rows. Re-shaping one
+  // is legitimate -- an answer can land under it long after it closed -- but
+  // everything the re-shape finds is new work, not an amendment to a closed
+  // feature, so it goes at the top level with a line back to where it came
+  // from. Nesting it was the bug: a feature reading "Done" quietly grew a
+  // proposal inside it, which reads as the feature having re-opened itself.
+  const closed = isClosed(node.status);
+  const where = closed
+    ? 'as a NEW top-level feature (no --parent), because ' +
+      `#${node.number} has already shipped and a closed feature takes no new rows`
+    : 'beneath the feature';
+
   const text =
     `Re-shape plan feature #${node.number}, "${node.title}", following ` +
     '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
     'feature against every answer settled beneath it and against what the code now says, ' +
     'and write what has changed.\n\n' +
+    (closed
+      ? `#${node.number} is ${node.status}. It is finished, and nothing new may be added ` +
+        'inside it -- not a step, not a decision, not a graduated fog step. Anything this ' +
+        're-shape turns up is new work: raise it as its own top-level feature whose detail ' +
+        `opens by saying it came out of #${node.number}, and put the steps and questions ` +
+        'under that. The only write this re-shape makes to the closed feature itself is ' +
+        `clearing its fog patch (plan.ts fog ${node.number} --clear), and only once the new ` +
+        'feature that dispels it exists. If nothing has changed, say so and write nothing.\n\n'
+      : '') +
     'Three moves, and nothing else:\n' +
-    '- Fog the answers have made specifiable becomes proposed steps beneath the feature, ' +
+    `- Fog the answers have made specifiable becomes proposed steps ${where}, ` +
     'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
     '(plan.ts fog <n> --clear).\n' +
     '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
     'that did it. A re-shape may drop, and must say why.\n' +
-    '- A question an answer surfaced is written as a fresh decision beneath the feature, ' +
+    `- A question an answer surfaced is written as a fresh decision ${where}, ` +
     'with its real options, what each costs, and your recommendation.\n\n' +
     'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not re-propose something the ' +
     'feature already holds. Report what you proposed, what you dropped and why, and what ' +
-    'fog you cleared.\n\nThe brief is below; it is the plan as the app holds it right ' +
+    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
     planBrief(sections, node);

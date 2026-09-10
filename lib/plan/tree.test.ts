@@ -7,6 +7,7 @@ import {
   findNode,
   flattenSections,
   isReady,
+  isWaitingOnThePerson,
   leavesOf,
   healthOf,
   planProgress,
@@ -241,7 +242,7 @@ describe('dependencies', () => {
 });
 
 describe('isReady', () => {
-  const bare = { waitingOn: [], children: [] };
+  const bare = { waitingOn: [], children: [], dependsOn: [] };
 
   it('is a step not yet started, waiting on nothing, with nothing open beneath it', () => {
     expect(isReady({ status: 'not_started', ...bare }, [])).toBe(true);
@@ -251,6 +252,26 @@ describe('isReady', () => {
     for (const status of ['proposed', 'in_progress', 'blocked', 'done', 'dropped'] as const) {
       expect(isReady({ status, ...bare }, [])).toBe(false);
     }
+  });
+
+  it('is a blocked step whose every named dependency has since closed', () => {
+    // #20 sat blocked on #127 for a day after #127 shipped. A block that
+    // records dependencies has told the plan what it was waiting for, and once
+    // those are closed there is nothing on record holding it.
+    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(true);
+  });
+
+  it('is not a blocked step with a dependency still open', () => {
+    const sections = tree([item({ id: 'a' }), at('blocked', 'b')], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
+  it('is not a blocked step that named no dependency at all', () => {
+    // The honest use of the status: it needs a credential, or an answer, and
+    // no amount of other work produces one.
+    const sections = tree([at('blocked', 'b')]);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
   });
 
   it('is not a step still waiting on another', () => {
@@ -429,15 +450,26 @@ describe('handedToClaude', () => {
     expect(handedToClaude(sections).map((n) => n.id)).toEqual(['first', 'second']);
   });
 
-  it('leaves out what is finished, only proposed, or a question', () => {
+  it('leaves out what is finished, only proposed, or waiting on the person', () => {
     const sections = tree([
       mine('open'),
       mine('done', { status: 'done' }),
       mine('dropped', { status: 'dropped' }),
       mine('proposal', { status: 'proposed' }),
       mine('question', { kind: 'decision' }),
+      // A block names something outside the repo, so a session sent at it
+      // meets the same wall -- and it sat in the Claude's view saying so.
+      mine('stuck', { status: 'blocked' }),
     ]);
     expect(handedToClaude(sections).map((n) => n.id)).toEqual(['open']);
+  });
+
+  it('takes an answered decision back, since nothing is waiting on the person now', () => {
+    const sections = tree([mine('settled', { kind: 'decision', status: 'done' })]);
+    // Closed, so still not work -- but for being closed, not for being a
+    // question.
+    expect(handedToClaude(sections)).toEqual([]);
+    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
   });
 
   it('is empty when nothing has been handed over', () => {
@@ -569,6 +601,23 @@ describe('healthOf', () => {
     expect(healthOf(byId.get('b')!)).toBe('waiting');
     expect(healthOf(byId.get('a')!)).toBe('not_started');
   });
+
+  it('stops saying blocked once every dependency the block named is closed', () => {
+    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('b')!)).toBe('ready');
+  });
+
+  it('goes on saying blocked while a dependency is open, or when none was named', () => {
+    const sections = tree([at('not_started', 'a'), at('blocked', 'b'), at('blocked', 'c')], [
+      dep('b', 'a'),
+    ]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('b')!)).toBe('blocked');
+    expect(healthOf(byId.get('c')!)).toBe('blocked');
+  });
 });
 
 describe('tallyHealth', () => {
@@ -663,5 +712,30 @@ describe('fog on the frontier', () => {
     });
     const shown = flattenSections(applyView(sections, 'fog'));
     expect(shown.map((node) => node.number)).toEqual([1]);
+  });
+});
+
+describe('isWaitingOnThePerson', () => {
+  it('is an unanswered question, whatever state it is otherwise in', () => {
+    for (const status of ['not_started', 'in_progress', 'blocked', 'proposed'] as const) {
+      expect(isWaitingOnThePerson({ kind: 'decision', status })).toBe(true);
+    }
+  });
+
+  it('is a blocked step, which needs something outside the repo', () => {
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'blocked' })).toBe(true);
+  });
+
+  it('is not ordinary work, and not a settled question', () => {
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'not_started' })).toBe(false);
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'in_progress' })).toBe(false);
+    expect(isWaitingOnThePerson({ kind: 'decision', status: 'done' })).toBe(false);
+    expect(isWaitingOnThePerson({ kind: 'decision', status: 'dropped' })).toBe(false);
+  });
+
+  it('is not a proposal, which waits on approval rather than on an answer', () => {
+    // needsThePerson counts one; this does not. A proposal is excluded from a
+    // hand-over on its own grounds.
+    expect(isWaitingOnThePerson({ kind: 'build', status: 'proposed' })).toBe(false);
   });
 });

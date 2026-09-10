@@ -191,10 +191,37 @@ function bySibling(a: PlanItem, b: PlanItem): number {
 }
 
 /**
+ * A block that has outlived the thing it named.
+ *
+ * `blocked` means "needs an answer, or something outside the repo", and it is
+ * deliberately a status that nothing clears on its own: no amount of other
+ * work produces the credential. Waiting on another *step* is meant to be a row
+ * in `plan_dependencies` instead, precisely because that does clear itself.
+ *
+ * A step marked `blocked` that also records dependencies has been given both,
+ * and those rows are the only account the plan holds of what it was waiting
+ * for. Once every one of them is closed, nothing recorded is holding the step
+ * and the status column is simply out of date -- #20 sat blocked on #127 for a
+ * day after #127 shipped, and the page went on saying "Waiting" with nothing
+ * left to wait on, which is the bug this answers.
+ *
+ * A step blocked with no dependencies at all is untouched. That is the honest
+ * use of the status, and nothing about it can be worked out from the tree.
+ */
+export function isStaleBlock(node: Pick<PlanNode, 'status' | 'dependsOn'>): boolean {
+  return (
+    node.status === 'blocked' &&
+    node.dependsOn.length > 0 &&
+    node.dependsOn.every((link) => isClosed(link.item.status))
+  );
+}
+
+/**
  * Whether a step could be picked up now.
  *
  *  - It has not been started. A step underway is being worked, not waiting
- *    to be, and a blocked one has said why it cannot be.
+ *    to be, and a blocked one has said why it cannot be -- unless every
+ *    dependency it named has since closed, which is `isStaleBlock`.
  *  - Nothing it waits on, its own or inherited, is still open.
  *  - None of its own steps are still open. A feature with steps outstanding
  *    is worked through those steps; the feature itself is what you close when
@@ -204,10 +231,10 @@ function bySibling(a: PlanItem, b: PlanItem): number {
  *    feature waits with it, and one under a proposal has not been agreed to.
  */
 export function isReady(
-  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children'>,
+  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn'>,
   ancestors: readonly Pick<PlanItem, 'status'>[],
 ): boolean {
-  if (node.status !== 'not_started') return false;
+  if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
   if (node.waitingOn.length > 0) return false;
   if (node.children.some((child) => !isClosed(child.status))) return false;
   if (ancestors.some((a) => ['blocked', 'dropped', 'proposed'].includes(a.status))) return false;
@@ -354,7 +381,7 @@ function descendantsOf(node: { children?: readonly PlanNode[] }): PlanNode[] {
 }
 
 export function healthOf(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'> & {
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
     /**
      * Optional so the callers that classify one row on its own -- the tally,
      * which only ever sees leaves -- need not build a subtree to ask.
@@ -389,6 +416,14 @@ export function healthOf(
     return 'unanswered';
   }
   if (node.kind === 'decision' && node.status === 'done') return 'answered';
+
+  // A block whose every named dependency has closed is reported as the step it
+  // now is, not as the block it used to be. See `isStaleBlock`: leaving it as
+  // "Waiting" is the page claiming something is holding the step up when the
+  // plan has no record of anything that is.
+  if (isStaleBlock(node)) {
+    return node.ready ? 'ready' : 'not_started';
+  }
 
   switch (node.status) {
     case 'proposed':
@@ -473,7 +508,9 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
  * cannot clear in an evening -- which is how a list like this stops being
  * opened.
  */
-export function needsThePerson(node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready'>) {
+export function needsThePerson(
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'>,
+) {
   if (isClosed(node.status)) return false;
   const health = healthOf(node);
   return health === 'unanswered' || health === 'proposed' || health === 'blocked';
@@ -492,7 +529,9 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     case 'proposed':
       return node.status === 'proposed';
     case 'claude':
-      return node.assignee === 'claude' && !isClosed(node.status);
+      return (
+        node.assignee === 'claude' && !isClosed(node.status) && !isWaitingOnThePerson(node)
+      );
     case 'blocked':
       return !isClosed(node.status) && (node.status === 'blocked' || node.waitingOn.length > 0);
     // Closed steps included. A finished feature still carrying fog is the
@@ -576,8 +615,32 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
   return flattenSections(sections)
     .filter((node) => node.assignee === 'claude')
     .filter((node) => !isClosed(node.status) && node.status !== 'proposed')
-    .filter((node) => node.kind !== 'decision')
+    .filter((node) => !isWaitingOnThePerson(node))
     .sort((a, b) => a.priority - b.priority);
+}
+
+/**
+ * A step that is waiting on the person, and so cannot be Claude's.
+ *
+ * Two states, and both mean the same thing: nothing a session does moves this.
+ * An unanswered decision is a question put to the person, and a session that
+ * picked one up would be answering its own question. A blocked step said what
+ * it needs and it is outside the repo -- a credential, an account, a choice --
+ * so handing it over sends a session to sit in front of the same wall.
+ *
+ * This is why a hand-over skips them and why they are unhanded when they get
+ * there: a queue that lists work nobody can do is a queue that stops being
+ * read. It supersedes the old "not a decision" exclusion, which caught half of
+ * it -- a blocked step went on sitting in Claude's list with a reason written
+ * on it saying why it could not be worked.
+ *
+ * Not the same set as `needsThePerson`, which also counts a proposal. A
+ * proposal is a suggestion nobody has agreed to rather than work stuck on
+ * something, and it is excluded from a hand-over on its own grounds.
+ */
+export function isWaitingOnThePerson(node: Pick<PlanNode, 'kind' | 'status'>): boolean {
+  if (node.status === 'blocked') return true;
+  return node.kind === 'decision' && !isClosed(node.status);
 }
 
 export function summarize(sections: readonly PlanSection[]): PlanSummary {
@@ -596,7 +659,8 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     waiting: open.filter((node) => node.status === 'blocked' || node.waitingOn.length > 0).length,
     ready: open.filter((node) => node.ready).length,
     done: nodes.filter((node) => node.status === 'done').length,
-    claude: open.filter((node) => node.assignee === 'claude').length,
+    claude: open.filter((node) => node.assignee === 'claude' && !isWaitingOnThePerson(node))
+      .length,
     fog: nodes.filter((node) => node.fog !== null).length,
   };
 }
