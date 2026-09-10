@@ -233,9 +233,8 @@ function IssueSummary({ group }: { group: ChangelogGroup }) {
         {group.number !== null && (
           <span className="tabular shrink-0 text-small text-ink-ghost">#{group.number}</span>
         )}
-        <span className="min-w-0 flex-1 break-words text-ui font-medium text-ink">
-          {group.label}
-        </span>
+        {/* One line, like every row under it. */}
+        <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{group.label}</span>
         <span className="shrink-0 text-micro text-ink-ghost">
           {steps.length} {steps.length === 1 ? 'change' : 'changes'}
           {newest && ` · ${formatDay(newest.slice(0, 10))}`}
@@ -299,37 +298,52 @@ function Entry({
   const workspace = moduleById(entry.module)?.label ?? 'The app as a whole';
 
   return (
-    <li className="row-pad flex gap-3">
-      <ModuleMark module={entry.module} size="sm" className="mt-0.5" />
-      <div className="min-w-0 flex-1">
-        <p className="flex min-w-0 items-baseline gap-1.5 text-ui text-ink">
+    <li>
+      <details className="group/entry">
+        <summary className="row-pad flex cursor-pointer list-none items-baseline gap-3 hover:bg-sunken [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            className="size-3 shrink-0 self-center text-ink-ghost transition-transform duration-150 group-open/entry:rotate-90"
+            strokeWidth={1.75}
+            aria-hidden
+          />
+          <ModuleMark module={entry.module} size="sm" className="shrink-0 self-center" />
           {entry.number !== null && (
             <span className="tabular shrink-0 text-small text-ink-ghost">#{entry.number}</span>
           )}
-          <span className="min-w-0 break-words">{entry.title}</span>
-        </p>
-        {entry.detail && <p className="mt-0.5 text-small text-ink-muted">{entry.detail}</p>}
-        <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-micro text-ink-ghost">
-          {/* The plan opens on the open steps, so a link to a step that is done
-              has to ask for the view that shows it. Neither page can be linked
-              any deeper than itself: a step is opened by a click rather than by
-              a URL, and a note has no anchor of its own either. */}
-          <Link
-            href={entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs'}
-            className="transition-colors duration-150 hover:text-accent"
-          >
-            {entry.source === 'plan' ? `${workspace} · plan` : `${workspace} · note`}
-          </Link>
-          {/* Whole, and in mono, which is how the plan page shows one. A
-              changelog is where somebody goes to find the commit, and a
-              shortened sha is one more step before they can paste it. */}
-          {/* Not under a commit heading: the sha is already the heading, and
-              printing it again on every line under it is furniture (law 15). */}
-          {entry.commitSha && inGroup !== 'commit' && (
-            <span className="font-mono break-all">{entry.commitSha}</span>
-          )}
-        </p>
-      </div>
+          {/* One line, truncated. A note's title is the whole thing somebody
+              typed on a phone, so the untruncated version is three lines and
+              the list stops being scannable. What was cut is one click away. */}
+          <span className="min-w-0 flex-1 truncate text-ui text-ink">{entry.title}</span>
+        </summary>
+
+        <div className="row-pad flex flex-col gap-1 pt-0 pl-9">
+          {/* The title again, whole. The line above is cut to keep the list one
+              row per thing, and the first job of opening a row is to read the
+              part that did not fit. */}
+          <p className="break-words text-ui text-ink">{entry.title}</p>
+          {entry.detail && <p className="text-small text-ink-muted">{entry.detail}</p>}
+          <p className="flex flex-wrap items-baseline gap-x-2 text-micro text-ink-ghost">
+            {/* The plan opens on the open steps, so a link to a step that is done
+                has to ask for the view that shows it. Neither page can be linked
+                any deeper than itself: a step is opened by a click rather than by
+                a URL, and a note has no anchor of its own either. */}
+            <Link
+              href={entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs'}
+              className="transition-colors duration-150 hover:text-accent"
+            >
+              {entry.source === 'plan' ? `${workspace} · plan` : `${workspace} · note`}
+            </Link>
+            {/* Whole, and in mono, which is how the plan page shows one. A
+                changelog is where somebody goes to find the commit, and a
+                shortened sha is one more step before they can paste it. */}
+            {/* Not under a commit heading: the sha is already the heading, and
+                printing it again on every line under it is furniture (law 15). */}
+            {entry.commitSha && inGroup !== 'commit' && (
+              <span className="font-mono break-all">{entry.commitSha}</span>
+            )}
+          </p>
+        </div>
+      </details>
     </li>
   );
 }
