@@ -3,6 +3,7 @@ import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
@@ -24,11 +25,12 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity] = await Promise.all([
+  const [{ data: profile }, settings, counts, activity, raised] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
+    loadRaisedNotifications(user.id),
   ]);
 
   const brief = await loadLearnBrief();
@@ -82,6 +84,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
         activity={activity}
         brief={brief}
       >

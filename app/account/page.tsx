@@ -2,6 +2,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { AccountView } from './view';
 
@@ -25,9 +26,10 @@ export const metadata = { title: 'Account' };
  */
 export default async function AccountPage() {
   const user = await requireUser();
-  const [settings, counts] = await Promise.all([
+  const [settings, counts, raised] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
+    loadRaisedNotifications(user.id),
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function AccountPage() {
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
       >
         <div className="mx-auto max-w-3xl">
           <p className="text-body text-ink-muted">
