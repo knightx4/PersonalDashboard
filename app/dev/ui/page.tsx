@@ -13,6 +13,18 @@ import {
 } from '@/components/ui/field';
 import { Kbd } from '@/components/shell/key-hints';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Figure, FigureDelta } from '@/components/ui/figure';
+import { Meter } from '@/components/ui/meter';
+import { Sparkline } from '@/components/ui/sparkline';
+import { ReturnFuse } from '@/components/ui/return-fuse';
+import { formatMoney } from '@/lib/money';
+import {
+  CLOSING_DAYS,
+  HEALTH_ORDER,
+  HEALTH_STATES,
+  type HealthState,
+} from '@/lib/health';
+import { DUE_SOON_DAYS } from '@/lib/returns/deadline';
 import { cn } from '@/lib/cn';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { MODULES } from '@/lib/modules';
@@ -343,6 +355,7 @@ const CONTENTS: readonly (readonly [string, string])[] = [
   ['ladder', 'Attention'],
   ['finding', 'Finding a row'],
   ['surfaces', 'Surfaces'],
+  ['data', 'Numbers'],
   ['shell', 'The shell'],
   ['states', 'States'],
   ['first-run', 'First run'],
@@ -354,6 +367,44 @@ const CONTENTS: readonly (readonly [string, string])[] = [
   ['ship', 'Before you ship'],
   ['never', 'Never'],
 ];
+
+/**
+ * The specimens for the data display section.
+ *
+ * Sample values rather than real rows: a design page that queries the database
+ * shows whatever this month happens to look like, and a month with one order
+ * demonstrates nothing. The shapes are the ones the dashboard and the returns
+ * tracker actually draw.
+ */
+const DEMO_MERCHANTS: readonly { name: string; cents: number; trend: number[] }[] = [
+  { name: 'Amazon', cents: 184_300, trend: [40, 62, 51, 88, 74, 96, 120, 105, 143, 131, 168, 184] },
+  { name: 'Uniqlo', cents: 42_000, trend: [0, 0, 0, 12, 8, 0, 0, 24, 18, 31, 26, 42] },
+  { name: 'Etsy', cents: 8_600, trend: [6, 4, 9, 5, 7, 3, 8, 6, 4, 9, 7, 8] },
+];
+
+/** Whole dollars, the way the dashboard sets a figure. */
+const dollars = (cents: number) => formatMoney(cents, 'USD', { showCents: false });
+
+/** Thirty days, so the four fuses below are four lengths of the same window. */
+const DEMO_WINDOW_DAYS = 30;
+
+const DEMO_DAYS_LEFT: Record<HealthState, number> = {
+  'on-track': 26,
+  'at-risk': 12,
+  closing: 4,
+  overdue: -2,
+};
+
+/**
+ * Read off the thresholds rather than typed out, so the page cannot describe
+ * bands the code stopped using.
+ */
+const HEALTH_BANDS: Record<HealthState, string> = {
+  'on-track': `More than ${DUE_SOON_DAYS} days left`,
+  'at-risk': `${CLOSING_DAYS + 1} to ${DUE_SOON_DAYS} days left`,
+  closing: `${CLOSING_DAYS} days left or fewer`,
+  overdue: 'Past the deadline',
+};
 
 export default function DevUiPage() {
   return (
@@ -1170,6 +1221,85 @@ export default function DevUiPage() {
         <Group title="Banners">
           <Rows rows={C.BANNER_TONES} labelWidth="sm:grid-cols-[4rem_1fr]" />
         </Group>
+      </Section>
+
+      <Section id="data" title="Numbers, and how they are drawn" lead={C.DATA_LEAD}>
+        <Rows rows={C.DATA_DISPLAY} labelWidth="sm:grid-cols-[7rem_1fr]" />
+
+        {/* On the page ground and not in a card, which is the Figure rule
+            above. Putting the specimen in a card would be the page breaking
+            its own law in the act of stating it. */}
+        <Figure
+          label="Spent this month"
+          meta="1–30 Sept"
+          value={dollars(184_300)}
+          aside={<FigureDelta label="12% less" direction="down" suffix="than August" />}
+          caption={`${dollars(196_300)} gross, less ${dollars(12_000)} refunded`}
+          secondary={[
+            { value: dollars(41_200), label: 'still returnable' },
+            { value: '9', label: 'orders' },
+          ]}
+        />
+
+        <Group title="A delta, both ways">
+          <Card padding="standard" className="flex flex-wrap gap-x-8 gap-y-1 text-ui text-ink-muted">
+            <FigureDelta label="12% less" direction="down" suffix="than August" />
+            <FigureDelta label="8% more" direction="up" suffix="than August" />
+            <FigureDelta label={null} direction={null} />
+          </Card>
+        </Group>
+
+        <Group title="A share, and whether it is new">
+          <Card padding="standard">
+            <ul className="space-y-3">
+              {DEMO_MERCHANTS.map((merchant) => (
+                <li key={merchant.name}>
+                  <div className="mb-1 flex items-baseline justify-between gap-3 text-ui">
+                    <span className="font-medium text-ink">{merchant.name}</span>
+                    <span className="ml-auto mr-1 self-center">
+                      <Sparkline
+                        values={merchant.trend}
+                        label={`${merchant.name}: twelve months of spending`}
+                      />
+                    </span>
+                    <span className="tabular text-ink">{dollars(merchant.cents)}</span>
+                  </div>
+                  <Meter
+                    value={merchant.cents}
+                    max={DEMO_MERCHANTS[0].cents}
+                    label={`${merchant.name}: ${dollars(merchant.cents)} of ${dollars(DEMO_MERCHANTS[0].cents)}, the most spent at one merchant`}
+                  />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Group>
+
+        <Group title="A window closing, in four states">
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {HEALTH_ORDER.map((state) => (
+                <li
+                  key={state}
+                  className="card-pad-x row-pad grid gap-x-4 gap-y-1 sm:grid-cols-[7rem_9rem_1fr] sm:items-center"
+                >
+                  <p className="text-ui font-medium text-ink">{HEALTH_STATES[state].label}</p>
+                  <ReturnFuse
+                    daysLeft={DEMO_DAYS_LEFT[state]}
+                    windowDays={DEMO_WINDOW_DAYS}
+                    deadline="2026-10-01"
+                  />
+                  <p className="text-body text-ink-muted">{HEALTH_BANDS[state]}</p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Group>
+
+        <Card padding="standard" className="text-body text-ink-muted">
+          {C.TIME_AS_LENGTH}
+        </Card>
+        <Rules items={C.DATA_RULES} />
       </Section>
 
       <Section id="shell" title="The shell">

@@ -229,9 +229,6 @@ export const PLACES: readonly Row[] = [
   ],
 ];
 
-export const TIME_AS_LENGTH =
-  'Time is drawn as a length wherever it is running out. "Returns by 14 Sept" asks you to subtract today from a date every time you scan the row; a bar that empties as the window closes is the same fact without the arithmetic. The denominator is always the real window — a fuse against an invented length is a picture of a number nobody has — and where the window is unknown there is no bar at all.';
-
 // ---------------------------------------------------------------------------
 // The attention ladder
 // ---------------------------------------------------------------------------
@@ -369,6 +366,50 @@ export const BANNER_TONES: readonly Row[] = [
   ],
   ['bad', 'A source failed. This page is incomplete and says so. Law 2.', 'danger tint'],
   ['good', 'Money came back. Nothing else.', 'positive tint'],
+];
+
+// ---------------------------------------------------------------------------
+// Data display
+// ---------------------------------------------------------------------------
+
+export const DATA_LEAD =
+  'Five components draw every number in the app. Law 7 governs the ink — plain, tabular, no colour, no motion beyond a count-up. These govern the arithmetic: what each one is allowed to claim, and what it has to say when it cannot claim it.';
+
+export const DATA_DISPLAY: readonly Row[] = [
+  [
+    'Figure',
+    'One per page, and it is the reason the page exists.',
+    'Not in a card, because a card says “one of several things here”. It stands on the page ground at the top of the type scale, with the line that makes it reconcile hung underneath and the numbers that would each have taken a card in the quiet row below the rule.',
+  ],
+  [
+    'FigureDelta',
+    'Names the period it compares against, or says there is none.',
+    'Green only where money came back, so a falling spend is the only delta that earns it; a rising one is plain ink, a fact rather than an alarm. With nothing to compare against it reads “No prior period to compare”.',
+  ],
+  [
+    'Sparkline',
+    'A shape rather than a chart. Its accessible name carries the window.',
+    'Fifty-two pixels wide, unlabelled and unaxed: rising, falling, spiky, flat. A flat series sits on the baseline, because one purchase must not draw the line that steady spending draws.',
+  ],
+  [
+    'Meter',
+    'One quantity against the quantity it is part of.',
+    'The exact value is read from the figure beside it; the length is for comparing rows in a single pass. Where a row must stay visible however small it is — one application in four hundred — the caller sets a floor and a non-zero value draws a sliver. The accessible name says both halves of the claim.',
+  ],
+  [
+    'ReturnFuse',
+    'A window emptying, against the real length of that window.',
+    'Colour and thresholds come from the four deadline states in lib/health.ts, and the fourteen days that put a return in “Due soon” are the same fourteen that put the fuse in its at-risk state. The bar and the filter cannot drift apart, because there is one copy of each number.',
+  ],
+];
+
+export const TIME_AS_LENGTH =
+  'Time is drawn as a length wherever it is running out. "Returns by 14 Sept" asks you to subtract today from a date every time you scan the row; a bar that empties as the window closes is the same fact without the arithmetic. The denominator is always the real window — a fuse against an invented length is a picture of a number nobody has — and where the window is unknown there is no bar at all.';
+
+export const DATA_RULES: readonly string[] = [
+  'A statistic too young to mean anything is not drawn as a number. FigureDelta reads “No prior period to compare” instead of 0%, and a month in the jobs cohort table reads “too early” until its newest applications are past the response window, rather than printing a rate that would make recent effort look like failure.',
+  'A denominator that does not exist is never invented. No window, no fuse; no prior period, no delta; nothing above zero, no percentage.',
+  'Where none of the colour meanings is true, a bar is ink and a length. The fuse spends its two calm states that way — ghost while there is more than a fortnight left, full ink inside the last fortnight — because getting on with it is not a warning.',
 ];
 
 export const STATES: readonly Row[] = [

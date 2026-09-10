@@ -45,6 +45,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Meter } from '@/components/ui/meter';
 import {
   ChipSelect,
   ComposeBody,
@@ -230,19 +231,14 @@ function Progress({ label, progress }: { label: string; progress: PlanProgress }
           particular length floating on the background, which is a bar that
           cannot be seen responding to anything however faithfully its width
           follows the number. Same reason the avatar tiles are sunken. */}
-      <span
-        className="h-1.5 w-24 overflow-hidden rounded-full bg-sunken"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={progress.live}
-        aria-valuenow={progress.done}
-        aria-label={`${label}: ${progress.done} of ${progress.live} done`}
-      >
-        <span
-          className="block h-full rounded-full bg-positive"
-          style={{ width: `${Math.round(progress.fraction * 100)}%` }}
-        />
-      </span>
+      <Meter
+        value={progress.done}
+        max={progress.live}
+        fill="bg-positive"
+        track="sunken"
+        className="w-24"
+        label={`${label}: ${progress.done} of ${progress.live} done`}
+      />
       <span className="tabular text-small text-ink-muted">
         {progress.done} of {progress.live}
         {progress.inProgress > 0 && ` · ${progress.inProgress} underway`}

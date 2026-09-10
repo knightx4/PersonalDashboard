@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Figure } from '@/components/ui/figure';
+import { Meter } from '@/components/ui/meter';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { loadPipeline, toFunnelApplications } from '@/lib/jobs/applications/load';
 import {
@@ -121,12 +122,14 @@ export default async function AnalyticsPage() {
                       <span className="ml-2 text-ink-muted">{formatRate(share)}</span>
                     </span>
                   </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
-                    <div
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${Math.max(share * 100, count > 0 ? 2 : 0)}%` }}
-                    />
-                  </div>
+                  <Meter
+                    value={count}
+                    max={overall.applicationsSent}
+                    height="md"
+                    minFraction={0.02}
+                    className="mt-1"
+                    label={`${rung.label}: ${count} of ${overall.applicationsSent} applications`}
+                  />
                   {advance !== null && (
                     <p className="tabular mt-0.5 text-small text-ink-muted">
                       {formatRate(advance)} advanced from {LADDER[index - 1].label.toLowerCase()}
@@ -227,19 +230,21 @@ export default async function AnalyticsPage() {
             <ul className="mt-3 space-y-2">
               {rejections.map((entry) => {
                 const total = rejections.reduce((sum, e) => sum + e.count, 0);
-                const share = entry.count / total;
                 return (
                   <li key={entry.stage}>
                     <div className="flex items-baseline justify-between gap-2 text-ui">
                       <span className="text-ink">{STAGE_LABELS[entry.stage] ?? entry.stage}</span>
                       <span className="tabular text-ink-muted">{entry.count}</span>
                     </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-canvas">
-                      <div
-                        className="h-full rounded-full bg-status-rejected"
-                        style={{ width: `${Math.max(share * 100, 2)}%` }}
-                      />
-                    </div>
+                    <Meter
+                      value={entry.count}
+                      max={total}
+                      fill="bg-status-rejected"
+                      height="md"
+                      minFraction={0.02}
+                      className="mt-1"
+                      label={`${STAGE_LABELS[entry.stage] ?? entry.stage}: ${entry.count} of ${total} rejections`}
+                    />
                   </li>
                 );
               })}
