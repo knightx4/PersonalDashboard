@@ -3,6 +3,8 @@ import { ListChecks, Search } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks } from '@/lib/todo/tasks/load';
+import { loadLinksForTasks } from '@/lib/todo/links/load';
+import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
@@ -54,6 +56,14 @@ export default async function AllTasksPage({
       search,
     }),
   ]);
+
+  // What each task is about, in one pass for the page. The naive shape resolves
+  // a row's anchor as it renders, which is a query per row and does not look
+  // slow until the archive is long -- which is the only state this page is ever
+  // in. A workspace that cannot be read costs its labels and nothing else;
+  // resolveAnchors swallows that per target.
+  const links = await loadLinksForTasks(tasks.map((task) => task.id));
+  const anchors = await resolveAnchors(links);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -115,7 +125,11 @@ export default async function AllTasksPage({
                 task.id === focus && 'animate-[pulse_1.2s_ease-in-out_2] rounded-lg bg-accent-tint',
               )}
             >
-              <TaskRow task={task} timezone={settings.timezone} />
+              <TaskRow
+                task={task}
+                timezone={settings.timezone}
+                anchor={anchors.get(task.id) ?? null}
+              />
             </div>
           ))}
         </Card>
