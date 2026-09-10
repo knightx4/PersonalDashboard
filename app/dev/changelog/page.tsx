@@ -185,7 +185,25 @@ export default async function DevChangelogPage({
  * sets one, which is where the reader has seen it before.
  */
 function isItsOwnHeading(group: ChangelogGroup): boolean {
-  return group.kind === 'issue' && group.entries.length === 1 && group.entries[0].key === group.key;
+  return (
+    group.kind === 'issue' && group.entries.length === 1 && group.entries[0].issue === null
+  );
+}
+
+/**
+ * The feature's own closed row, and the steps that shipped under it.
+ *
+ * A feature and its steps are one group now, so the group holds up to two
+ * kinds of row: the feature's own line, which carries nothing above it, and
+ * the steps, which name it. The feature is the summary; only the steps go
+ * underneath. Listing the feature's row again beneath its own title was the
+ * page showing the top level and the underneath separately.
+ */
+function splitIssue(group: ChangelogGroup): { self: ChangelogEntry | null; steps: ChangelogEntry[] } {
+  return {
+    self: group.entries.find((entry) => entry.issue === null) ?? null,
+    steps: group.entries.filter((entry) => entry.issue !== null),
+  };
 }
 
 /**
@@ -202,6 +220,7 @@ function isItsOwnHeading(group: ChangelogGroup): boolean {
  */
 function IssueSummary({ group }: { group: ChangelogGroup }) {
   const newest = group.entries.reduce((at, entry) => (entry.at > at ? entry.at : at), '');
+  const { self, steps } = splitIssue(group);
 
   return (
     <details className="group">
@@ -218,15 +237,26 @@ function IssueSummary({ group }: { group: ChangelogGroup }) {
           {group.label}
         </span>
         <span className="shrink-0 text-micro text-ink-ghost">
-          {group.entries.length} {group.entries.length === 1 ? 'change' : 'changes'}
+          {steps.length} {steps.length === 1 ? 'change' : 'changes'}
           {newest && ` · ${formatDay(newest.slice(0, 10))}`}
         </span>
       </summary>
-      <ul className="mt-1 divide-y divide-border border-l-2 border-border pl-3">
-        {group.entries.map((entry) => (
-          <Entry key={entry.key} entry={entry} inGroup={group.kind} />
-        ))}
-      </ul>
+      <div className="mt-1 border-l-2 border-border pl-3">
+        {/* What the feature itself said, and the commit that closed it. Its
+            title is the line above, so the row is not drawn again -- only the
+            part of it the summary had no room for. */}
+        {self?.detail && <p className="row-pad text-small text-ink-muted">{self.detail}</p>}
+        {self?.commitSha && (
+          <p className="row-pad font-mono break-all text-micro text-ink-ghost">
+            {self.commitSha}
+          </p>
+        )}
+        <ul className="divide-y divide-border">
+          {steps.map((entry) => (
+            <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+          ))}
+        </ul>
+      </div>
     </details>
   );
 }

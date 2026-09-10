@@ -298,7 +298,35 @@ describe('groupChangelog', () => {
 
   it('lets a step with no feature above it head its own group', () => {
     const groups = groupChangelog(entries, 'issue');
-    expect(groups.some((group) => group.key === 'plan-lone')).toBe(true);
+    expect(groups.some((group) => group.key === 'issue-lone')).toBe(true);
+  });
+
+  it('puts a feature’s own closed row in the same group as its steps', () => {
+    // The page used to show a shipped feature twice: once as a line of its
+    // own, and again as the heading over its steps, with nothing saying they
+    // were the same thing.
+    const withFeature = changelogEntries({
+      plan: [
+        step({ id: 'feature', parentId: null, title: 'The share page', number: 10 }),
+        step({ id: 's1', parentId: 'feature' }),
+      ],
+      planParents: parents,
+      notes: [],
+    });
+    const groups = groupChangelog(withFeature, 'issue');
+    const share = groups.filter((group) => group.label === 'The share page');
+
+    expect(share).toHaveLength(1);
+    expect(share[0].key).toBe('issue-feature');
+    expect(share[0].entries.map((entry) => entry.id).sort()).toEqual(['feature', 's1']);
+  });
+
+  it('leaves a note as its own group, since nothing shipped under it', () => {
+    const groups = groupChangelog(
+      changelogEntries({ plan: [], notes: [note({ id: 'n1' })] }),
+      'issue',
+    );
+    expect(groups[0].key).toBe('note-n1');
   });
 
   it('puts back together what one commit closed', () => {

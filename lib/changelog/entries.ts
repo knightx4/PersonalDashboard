@@ -376,6 +376,19 @@ function groupOf(
     };
   }
 
-  // A feature, or a note: it is the issue, so it heads its own group of one.
+  // A feature is the issue, so it keys on itself the same way its steps key on
+  // it -- `issue-<the feature's id>` either way -- and the two land in one
+  // group.
+  //
+  // They used to land in two. A feature's own closed row carries no `issue`,
+  // because there is nothing above it, so it grouped under its own entry key
+  // while its steps grouped under `issue-<its id>`: the page showed the
+  // feature once as a line of its own and again as the heading over its steps,
+  // with no way to tell they were the same thing.
+  if (entry.source === 'plan') {
+    return { key: `issue-${entry.id}`, kind: 'issue', label: entry.title, number: entry.number };
+  }
+
+  // A note belongs to nothing above it and is its own small issue.
   return { key: entry.key, kind: 'issue', label: entry.title, number: entry.number };
 }
