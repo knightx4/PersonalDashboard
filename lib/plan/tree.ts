@@ -363,10 +363,11 @@ export function leavesOf(nodes: readonly PlanNode[]): PlanNode[] {
  * and what sits beneath it.
  *
  * It lives here rather than in the page because the page is no longer the only
- * thing asking. The dots beside a module heading count these, and a tally that
- * classified steps by its own slightly different rules would disagree with the
- * health column directly beneath it, on the same screen, about the same step.
- * The page keeps the wording, the icon and the tooltip; the rule is here.
+ * thing asking. The counts beside a module heading count these, and a tally
+ * that classified steps by its own slightly different rules would disagree
+ * with the health column directly beneath it, on the same screen, about the
+ * same step. The page keeps the wording and the tooltip, lib/status-glyphs.ts
+ * keeps the shape; the rule is here.
  */
 export const PLAN_HEALTHS = [
   'unanswered',

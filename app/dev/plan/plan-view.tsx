@@ -1541,17 +1541,23 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName } {
 }
 
 /**
- * A module's steps, counted by state, as dots beside its heading.
+ * A module's steps, counted by state, beside its heading.
  *
  * The progress bar next to this answers "how far through", which is one
  * number and hides the shape of what is left: eleven not-started steps and
  * eleven unanswered questions are the same bar and are not the same module.
- * A dot per state with its count says which, without the section being
- * opened -- and it survives the fold, which is the point (law 10).
+ * A count per state says which, without the section being opened -- and it
+ * survives the fold, which is the point (law 10).
  *
- * Only states that are actually present get a dot. A row of zeroes is noise,
+ * Each count is marked with the state's hexagon rather than a round dot, so
+ * "four blocked, two ready" is readable without telling the tones apart. Same
+ * shape as the health column under it and the same size, because the two are
+ * on screen together and a state that changed shape between them would read
+ * as two states.
+ *
+ * Only states that are actually present are counted. A row of zeroes is noise,
  * and a "0 blocked" is a fact nobody needed (law 1). The count is the label:
- * the word is on the dot's tooltip and in its accessible name, because eight
+ * the word is on the tooltip and in the accessible name, because eight
  * spelled-out states would be a paragraph where a glance was asked for.
  *
  * Answered is left out. Every other dot is either work outstanding or work
@@ -1575,7 +1581,10 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
           className="flex items-center gap-1"
           title={`${tally[health]} ${HEALTH[health].word.toLowerCase()}`}
         >
-          <span className={cn('size-2 shrink-0 rounded-full', TONE_DOT[HEALTH[health].tone])} aria-hidden />
+          <StatusGlyph
+            glyph={PLAN_HEALTH_GLYPHS[health]}
+            className={TONE_TEXT[HEALTH[health].tone]}
+          />
           <span className="tabular text-small text-ink-muted">{tally[health]}</span>
           <span className="sr-only">{HEALTH[health].word}</span>
         </span>
