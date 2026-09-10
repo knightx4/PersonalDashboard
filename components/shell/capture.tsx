@@ -8,9 +8,12 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from 'react';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { FieldError } from '@/components/ui/field';
 import { popoverSurface } from '@/components/ui/popover';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
@@ -21,6 +24,9 @@ import {
   type CaptureAction,
   type CaptureActionId,
 } from '@/lib/capture/actions';
+import { todoCaptureForm } from '@/lib/capture/todo';
+import { addTask, type TaskFormState } from '@/app/todo/actions';
+import type { RelativeDay } from '@/lib/todo/tasks/model';
 
 /**
  * Write it down here, wherever you are.
@@ -121,10 +127,34 @@ export function CaptureProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * What the panel does with what you wrote.
+ *
+ * Filing is the module's own server action -- `addTask` is the one the add
+ * form on /todo submits -- so nothing here is a second way to write a task.
+ * The switch is exhaustive on purpose: the next action in the registry, note
+ * creation or whatever follows it, will not compile until it says where what
+ * you typed goes.
+ */
+async function file(
+  action: CaptureAction,
+  text: string,
+  day: RelativeDay | '',
+): Promise<TaskFormState> {
+  switch (action.id) {
+    case 'todo':
+      return addTask({}, todoCaptureForm(text, day));
+  }
+}
+
 function CapturePanel({ session, onClose }: { session: Session; onClose: () => void }) {
   const { action, seed } = session;
   const [text, setText] = useState(seed);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [day, setDay] = useState<RelativeDay | ''>('');
+  const [state, setState] = useState<TaskFormState>({});
+  const [pending, start] = useTransition();
+  const panelRef = useRef<HTMLFormElement>(null);
+  const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   /**
    * Back where you were, on close.
@@ -146,6 +176,39 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
   // and the line above already knows which.
   usePopover({ open: true, onClose, panelRef });
 
+  /**
+   * File it, and stay open with an empty field.
+   *
+   * Staying is the whole point of a capture surface: the second thing you
+   * think of arrives about a second after the first, and closing on every
+   * save means reopening to write it. Escape is how you leave.
+   *
+   * A failure keeps the text exactly where it is -- the error is nearly
+   * always the title, and clearing the box would delete the thing the person
+   * came to write down.
+   */
+  function submit() {
+    if (pending) return;
+    // An empty box is nothing to file, not a failed save: Enter on it should
+    // say nothing rather than answer "Give it a title."
+    if (!text.trim()) return;
+
+    start(async () => {
+      const result = await file(action, text, day);
+      setState(result);
+      if (!result.message) return;
+      setText('');
+      setDay('');
+      fieldRef.current?.focus();
+    });
+  }
+
+  function retype(value: string) {
+    setText(value);
+    // The last result was about the last thing typed.
+    if (state.error || state.message) setState({});
+  }
+
   const field =
     'w-full bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost';
 
@@ -157,8 +220,12 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
         onClick={onClose}
         className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
       />
-      <div
+      <form
         ref={panelRef}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={action.label}
@@ -176,14 +243,22 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
           <Kbd always>esc</Kbd>
         </div>
 
-        {/* Nothing is filed from here yet -- the writer is the module's own
-            server action and arrives with the step that wires it. What the
-            field is, though, is the action's own answer: a todo is a title,
-            a note will be prose. */}
+        {/* What the field is, is the action's own answer: a todo is a title,
+            a note will be prose. Which is also what decides what Enter does --
+            it files a line, and in prose it is a line break, where ⌘↵ files. */}
         {action.field === 'prose' ? (
           <textarea
+            ref={(node) => {
+              fieldRef.current = node;
+            }}
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => retype(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                submit();
+              }
+            }}
             placeholder={action.placeholder}
             aria-label={action.label}
             rows={4}
@@ -195,16 +270,87 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
           />
         ) : (
           <input
+            ref={(node) => {
+              fieldRef.current = node;
+            }}
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => retype(event.target.value)}
             placeholder={action.placeholder}
             aria-label={action.label}
             data-focus-ring="none"
             className={field}
           />
         )}
-      </div>
+
+        {/* The two days that are most of what anyone ever answers "when" with,
+            one press each, exactly as they are on /todo. The word rather than
+            the date, because the shell is not handed the account's today; see
+            lib/capture/todo.ts. Any other day is a date field on /todo, which
+            is where a task that needs one is worth opening. */}
+        <div className="flex items-center gap-1.5 border-t border-border px-3 py-2">
+          {action.dated && (
+            <>
+              <DayChip label="Today" day="today" picked={day} onPick={setDay} />
+              <DayChip label="Tomorrow" day="tomorrow" picked={day} onPick={setDay} />
+            </>
+          )}
+
+          {/* Said here rather than in a toast: this is where the person is
+              looking, and an empty field with nothing said about it reads as
+              a field that lost what was in it. */}
+          <span className="ml-auto flex items-center gap-2">
+            <span role="status" aria-live="polite" className="text-small text-ink-muted">
+              {state.message}
+            </span>
+            <Button type="submit" size="sm" pending={pending}>
+              <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pending ? 'Filing…' : 'File it'}
+            </Button>
+          </span>
+        </div>
+
+        {state.error && (
+          <div className="px-3 pb-2">
+            <FieldError>{state.error}</FieldError>
+          </div>
+        )}
+      </form>
     </div>
+  );
+}
+
+/**
+ * A day, picked or unpicked in one press.
+ *
+ * A toggle rather than a pair of radios, the same as the chips on /todo:
+ * picking Today and changing your mind has to cost one press, not a trip to a
+ * date field to clear it.
+ */
+function DayChip({
+  label,
+  day,
+  picked,
+  onPick,
+}: {
+  label: string;
+  day: RelativeDay;
+  picked: RelativeDay | '';
+  onPick: (day: RelativeDay | '') => void;
+}) {
+  const on = picked === day;
+
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onPick(on ? '' : day)}
+      className={cn(
+        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
+        on ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
