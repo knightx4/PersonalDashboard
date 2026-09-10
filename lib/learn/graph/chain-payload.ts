@@ -86,7 +86,7 @@ const key = (name: string) => name.trim().toLowerCase();
  * that way, the edge would complete a cycle. The same question the database
  * asks, asked earlier so nobody is shown a chain that cannot be saved.
  */
-function wouldCycle(edges: ChainEdge[], candidate: ChainEdge): boolean {
+export function wouldCycle(edges: ChainEdge[], candidate: ChainEdge): boolean {
   if (key(candidate.prerequisite) === key(candidate.dependent)) return true;
 
   const forward = new Map<string, string[]>();
