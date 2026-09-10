@@ -26,6 +26,7 @@ const domainSchema = z
       .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, 'That does not look like a domain.'),
   );
 
+// latency: pending
 export async function addExcludedSender(
   _prev: { error?: string; message?: string },
   formData: FormData,
@@ -52,6 +53,7 @@ export async function addExcludedSender(
   return { message: `Mail from ${parsed.data} will no longer become a lead or a pursuit.` };
 }
 
+// latency: pending
 export async function removeExcludedSender(id: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(id);
   if (!parsed.success) return { error: 'That is not an exclusion.' };

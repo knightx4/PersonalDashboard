@@ -30,6 +30,7 @@ const updateSchema = z.object({
   website: z.string().optional(),
 });
 
+// latency: pending
 export async function updateCompany(
   input: z.input<typeof updateSchema>,
 ): Promise<{ error: string | null }> {
@@ -86,6 +87,7 @@ const renameSchema = z.object({
  * database; it is checked first so the answer is a sentence rather than a
  * constraint violation.
  */
+// latency: pending
 export async function renameCompany(
   companyId: string,
   name: string,
@@ -145,6 +147,7 @@ export interface EnrichmentProposal {
  * because you did not type it. The website check catches most of that, and the
  * confirm step catches the rest.
  */
+// latency: pending
 export async function proposeCompanyEnrichment(
   input: z.input<typeof lookupSchema>,
 ): Promise<{ proposal: EnrichmentProposal | null; error: string | null }> {
@@ -213,6 +216,7 @@ const applySchema = lookupSchema.extend({ wikidataId: z.string().regex(/^Q\d+$/)
  * the client sends an entity id, and everything written is derived here from
  * that entity and from what the row currently holds.
  */
+// latency: pending
 export async function applyCompanyEnrichment(
   input: z.input<typeof applySchema>,
 ): Promise<{ applied: string[]; error: string | null }> {
@@ -280,6 +284,7 @@ export interface AiEnrichmentProposal {
  * too new to have an encyclopedia entry. Same propose-then-apply shape: a
  * search result is shown before it lands, and only ever fills blanks.
  */
+// latency: pending
 export async function proposeAiCompanyEnrichment(
   input: z.input<typeof lookupSchema>,
 ): Promise<{ proposal: AiEnrichmentProposal | null; error: string | null }> {
@@ -341,6 +346,7 @@ const aiApplySchema = lookupSchema.extend({
  * the row's current state rather than the proposal, in case it changed by
  * hand between propose and apply.
  */
+// latency: pending
 export async function applyAiCompanyEnrichment(
   input: z.input<typeof aiApplySchema>,
 ): Promise<{ applied: string[]; error: string | null }> {
@@ -481,6 +487,7 @@ async function consolidateApplications(
  * posting, so their applications are consolidated into one rather than piled
  * up as separate attempts — see consolidateApplications.
  */
+// latency: pending
 export async function mergeRoles(
   input: z.input<typeof mergeRolesSchema>,
 ): Promise<{ error: string | null }> {

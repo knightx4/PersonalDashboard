@@ -34,6 +34,7 @@ const evidenceSchema = z.object({
   strength: z.coerce.number().int().min(1).max(5).default(3),
 });
 
+// latency: pending
 export async function addEvidence(
   _prev: { error?: string; message?: string },
   formData: FormData,
@@ -70,6 +71,7 @@ export async function addEvidence(
   return { message: 'Added.' };
 }
 
+// latency: pending
 export async function deleteEvidence(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -89,6 +91,7 @@ const resumeSchema = z.object({
   textContent: z.string().trim().optional(),
 });
 
+// latency: pending
 export async function addResumeVersion(
   _prev: { error?: string; message?: string },
   formData: FormData,
@@ -138,6 +141,7 @@ const proposeSchema = z.object({
   resumeVersionId: z.string().uuid().optional(),
 });
 
+// latency: pending
 export async function proposeEvidence(
   input: z.input<typeof proposeSchema>,
 ): Promise<{
@@ -257,6 +261,7 @@ const acceptSchema = z.object({
  * trusted from the proposal, because the list travelled through a form the
  * user could edit — which is the point of showing it.
  */
+// latency: pending
 export async function acceptEvidence(
   input: z.input<typeof acceptSchema>,
 ): Promise<{ added: number; error: string | null }> {

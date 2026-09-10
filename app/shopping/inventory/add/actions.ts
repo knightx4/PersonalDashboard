@@ -110,6 +110,7 @@ function lookupFailureMessage(failures: ProviderFailure[]): string | null {
   return 'The book catalogs did not answer just now. Try again, or add the details by hand.';
 }
 
+// latency: pending
 export async function searchOwnedBook(
   _prev: BookActionState,
   formData: FormData,
@@ -159,6 +160,7 @@ export async function searchOwnedBook(
   };
 }
 
+// latency: pending
 export async function saveOwnedBook(
   _prev: BookActionState,
   formData: FormData,
@@ -254,6 +256,7 @@ export async function saveOwnedBook(
   };
 }
 
+// latency: pending
 export async function previewPasteBookList(
   _prev: BookActionState,
   formData: FormData,
@@ -270,6 +273,7 @@ export async function previewPasteBookList(
   return { results, message: `Resolved ${results.filter((r) => r.book).length} of ${results.length}.` };
 }
 
+// latency: pending
 export async function savePasteBookList(
   _prev: BookActionState,
   formData: FormData,
@@ -375,6 +379,7 @@ export async function savePasteBookList(
   };
 }
 
+// latency: pending
 export async function confirmBookEdition(
   _prev: BookActionState,
   formData: FormData,
@@ -408,6 +413,7 @@ export async function confirmBookEdition(
   return { message: 'Edition confirmed — ready for sell decisions.' };
 }
 
+// latency: pending
 export async function updateBookCondition(
   _prev: BookActionState,
   formData: FormData,
@@ -449,6 +455,7 @@ export async function updateBookCondition(
  * Re-looks-up by ISBN when the candidate has one so the row gets full detail,
  * then clears the confirm prompt — the user has now told us the edition.
  */
+// latency: pending
 export async function switchBookEdition(
   _prev: BookActionState,
   formData: FormData,
@@ -562,6 +569,7 @@ export async function switchBookEdition(
  * scanned ISBN make a sell-ready unit: buyback and eBay both quote by ISBN,
  * so pricing works even with no catalog record behind it.
  */
+// latency: pending
 export async function saveManualBook(
   _prev: BookActionState,
   formData: FormData,
