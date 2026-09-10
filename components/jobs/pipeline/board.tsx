@@ -7,12 +7,12 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
-import { FieldError } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
@@ -81,14 +81,31 @@ export function PipelineBoard({
   rows: PipelineRow[];
   view?: PipelineView;
 }) {
-  const [optimistic, setOptimistic] = useState<Record<string, ApplicationStatus>>({});
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<ApplicationStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
 
-  const statusOf = (row: PipelineRow): ApplicationStatus =>
-    optimistic[row.applicationId] ?? row.status;
+  /**
+   * The moved card, drawn in its new column before the server agrees.
+   *
+   * The change is written into a copy of the rows rather than kept in a map
+   * beside them, so everything on the board -- the columns, the counts, the
+   * closed fold, the badge on a card -- reads one status per pursuit. A refused
+   * move leaves the rows the server rendered, which is the card back in the
+   * column it came from, and the hook's toast says why: there is no second
+   * sentence on the board itself, because the card that moved back is what the
+   * person is looking at.
+   */
+  const { shown, run } = useOptimisticWrite<
+    PipelineRow[],
+    { applicationId: string; status: ApplicationStatus }
+  >({
+    value: rows,
+    apply: (current, change) =>
+      current.map((row) =>
+        row.applicationId === change.applicationId ? { ...row, status: change.status } : row,
+      ),
+    write: (change) => moveApplication(change.applicationId, change.status),
+  });
 
   function drop(status: ApplicationStatus) {
     const applicationId = dragging;
@@ -96,26 +113,13 @@ export function PipelineBoard({
     setDragging(null);
     if (!applicationId) return;
 
-    const row = rows.find((r) => r.applicationId === applicationId);
-    if (!row || statusOf(row) === status) return;
+    const row = shown.find((r) => r.applicationId === applicationId);
+    if (!row || row.status === status) return;
 
-    setOptimistic((prev) => ({ ...prev, [applicationId]: status }));
-    setError(null);
-
-    startTransition(async () => {
-      const result = await moveApplication(applicationId, status);
-      if (result.error) {
-        setError(result.error);
-        setOptimistic((prev) => {
-          const next = { ...prev };
-          delete next[applicationId];
-          return next;
-        });
-      }
-    });
+    run({ applicationId, status });
   }
 
-  const closedRows = rows.filter((row) => CLOSED.includes(statusOf(row)));
+  const closedRows = shown.filter((row) => CLOSED.includes(row.status));
 
   // The kanban board is a horizontal scroll through one and a half columns
   // on a phone, whatever view the user picked for desktop — so a phone
@@ -123,7 +127,7 @@ export function PipelineBoard({
   // decides what sm-and-up sees.
   const renderColumns = (mode: PipelineView) =>
     COLUMNS.map((column) => {
-      const columnRows = rows.filter((row) => column.statuses.includes(statusOf(row)));
+      const columnRows = shown.filter((row) => column.statuses.includes(row.status));
 
       if (mode === 'list') {
         return (
@@ -209,8 +213,6 @@ export function PipelineBoard({
 
   return (
     <div className="space-y-4">
-      <FieldError>{error}</FieldError>
-
       <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
       <div
         className={cn(
