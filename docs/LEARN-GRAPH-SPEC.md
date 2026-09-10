@@ -229,6 +229,7 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/know` | your subjects, each with a line on how much is settled |
 | `/learn/s/[id]` | one subject: the graph, its goals, what you know and what is shaky |
 | `/learn/s/[id]/probe` | a probe session: one question, the bar, the reason afterwards |
+| `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
 
 Same shell and design system as the other four workspaces. The graph view shows
 the pruned graph by default with a toggle for everything, because the pruned one

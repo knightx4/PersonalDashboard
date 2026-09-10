@@ -81,7 +81,7 @@ import {
 } from '@/lib/plan/tree';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
-import { elapsedSince } from '@/lib/plan/elapsed';
+import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
@@ -1444,15 +1444,84 @@ function subscribeToClock(onTick: () => void): () => void {
   };
 }
 
-/** The clock on a step that is underway. */
-function Elapsed({ startedAt }: { startedAt: string }) {
-  const now = useSyncExternalStore(
+/** The wall clock as a number. Zero until the first tick after mount. */
+function useClockNow(): number {
+  return useSyncExternalStore(
     subscribeToClock,
     () => clockNow,
     () => 0,
   );
+}
+
+/** The clock on a step that is underway. */
+function Elapsed({ startedAt }: { startedAt: string }) {
+  const now = useClockNow();
 
   return <>{now === 0 ? '…' : elapsedSince(startedAt, now)}</>;
+}
+
+/**
+ * The same fact in the opened row's meta line, where there is room for the
+ * word. "Running 7h" and "stalled for 7h, nothing on it" are the two things a
+ * step underway can mean, and the line said only the first.
+ */
+function RunningFor({ startedAt }: { startedAt: string }) {
+  const now = useClockNow();
+
+  if (!isStalledClaim(startedAt, now)) {
+    return (
+      <>
+        {' · running '}
+        <Elapsed startedAt={startedAt} />
+      </>
+    );
+  }
+
+  return (
+    <span className="text-caution">
+      {' · stalled for '}
+      <Elapsed startedAt={startedAt} />, nothing on it
+    </span>
+  );
+}
+
+/**
+ * The badge on a step that is underway, and the one place the page admits a
+ * claim can go stale.
+ *
+ * Nothing releases a claim when the session holding it dies, so an abandoned
+ * step sat here pulsing at the same accent as one being worked this minute --
+ * the state was seven hours old and the badge said "live". Past
+ * `STALLED_AFTER_MINUTES` the dot stops pulsing and the pill turns caution:
+ * the row is still `in_progress`, because only you can say whether the work
+ * happened, but the page stops claiming somebody is on it. Putting it back or
+ * closing it is one press in the row's own menu.
+ */
+function Underway({ startedAt, assignee }: { startedAt: string; assignee: string | null }) {
+  const now = useClockNow();
+  const stalled = isStalledClaim(startedAt, now);
+  const since = startedAt.replace('T', ' ').slice(0, 16);
+
+  return (
+    <span
+      title={
+        stalled
+          ? `Claimed ${since} and untouched since. A session that stops without closing its step leaves it here — close it or put it back.`
+          : `${assignee === 'claude' ? 'Claude has been on this' : 'Underway'} since ${since}`
+      }
+      className={cn(
+        'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
+        stalled ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
+      )}
+    >
+      <span
+        className={cn('size-1.5 rounded-full', stalled ? 'bg-caution' : 'animate-pulse bg-accent')}
+        aria-hidden
+      />
+      <Elapsed startedAt={startedAt} />
+      {stalled && <span className="sr-only"> with no session on it</span>}
+    </span>
+  );
 }
 
 /**
@@ -2068,13 +2137,7 @@ function PlanRow({
                 * looks like from here. The dot pulses because the one fact it
                 * carries is that something is happening right now. */}
               {node.status === 'in_progress' && node.startedAt && (
-                <span
-                  title={`${node.assignee === 'claude' ? 'Claude has been on this' : 'Underway'} since ${node.startedAt.replace('T', ' ').slice(0, 16)}`}
-                  className="tabular inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-tint px-1.5 py-0.5 text-small font-medium text-accent"
-                >
-                  <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-                  <Elapsed startedAt={node.startedAt} />
-                </span>
+                <Underway startedAt={node.startedAt} assignee={node.assignee} />
               )}
             </span>
             {/* Where it came from, when it did not come from you. On the row
@@ -2287,10 +2350,7 @@ function PlanRow({
                 <span>
                   Started {when(node.startedAt)}
                   {node.status === 'in_progress' && node.startedAt && (
-                    <>
-                      {' · running '}
-                      <Elapsed startedAt={node.startedAt} />
-                    </>
+                    <RunningFor startedAt={node.startedAt} />
                   )}
                 </span>
               )}

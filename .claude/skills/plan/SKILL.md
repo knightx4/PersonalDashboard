@@ -36,7 +36,7 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
 npx tsx scripts/plan.ts idea "…" [--module <id>]   # file an idea on /dev/ideas, unshaped
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
-npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>] [--from <n>]
+npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>]
                                                # ask the person something. Never answered by you.
 npx tsx scripts/plan.ts raises                 # open raises, and answers no session has replied to
 ```
@@ -206,13 +206,22 @@ is a raise.
 
 ```
 npx tsx scripts/plan.ts raises      # open ones, and answers no session has replied to
-npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>] [--from <n>]
+npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>]
 ```
 
 An open raise is the person still waiting to be asked; an answered one carries
 a reply written while nothing was awake, and that answer is what to build
 against from then on. `--from <n>` stamps the step you were on, which is what
 makes a raise legible a week later.
+
+**`--ask` is required, and it is the row.** The title says what it is about and
+the detail is the evidence; the ask is the move you want back, in one sentence
+the person can answer in one line — a question with your recommendation, an
+action to approve, or a choice between named options. Without it a raise reads
+as a session narrating, the page fills with paragraphs nobody can clear, and
+the person cannot tell what is being asked. "Should the merge to main run tsc
+and next build before it lands? I would; it costs a minute and catches a broken
+main." — not "worth deciding whether the merge should run the gate."
 
 **A session never answers or dismisses a raise**, the same rule as never
 answering its own decision. Replying to an answer the person wrote is the
@@ -495,14 +504,17 @@ where id = '…';
 -- says which run raised it and what it was doing; `module` is null for the app
 -- as a whole. Never answer or dismiss one -- that is the person's move on
 -- /dev/raised, the same as a decision.
-insert into raised_items (user_id, module, title, detail, source, status)
-values ('…', 'dev', '…', '…', 'plan #<n>', 'open')
+-- `ask` is the move you want back, in one sentence answerable in one line;
+-- the CLI refuses a raise without one and doing the insert by hand does not
+-- make it optional.
+insert into raised_items (user_id, module, title, detail, ask, source, status)
+values ('…', 'dev', '…', '…', '…', 'plan #<n>', 'open')
 returning id;
 
 -- what is outstanding in both directions: what the person has not answered,
 -- and what they answered that no session has replied to. Read at the start of
 -- a run.
-select r.id, r.title, r.detail, r.module, r.source, r.status, r.created_at,
+select r.id, r.title, r.detail, r.ask, r.module, r.source, r.status, r.created_at,
        (
          select json_agg(json_build_object('author', c.author, 'body', c.body)
                          order by c.created_at)

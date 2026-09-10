@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, AlertTriangle, BadgeCheck, CircleDashed, CircleDot } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { GoalForm } from '@/app/learn/know/goal-form';
-import { readAboutConcept } from './actions';
+import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
+import { ReadAbout } from './read-about';
 import {
   countStates,
   learningOrder,
@@ -37,52 +38,6 @@ export const dynamic = 'force-dynamic';
  * overstating one of them every time.
  */
 
-const STATE_LABEL = {
-  known: 'Known',
-  shaky: 'Shaky',
-  misconception: 'Misconception',
-  unknown: 'Not looked at',
-} as const;
-
-const ESTABLISHED_LABEL = {
-  tested: 'answered questions on it',
-  inferred: 'inferred from something above it',
-  declared: 'you said so',
-} as const;
-
-function StateMark({ concept }: { concept: Concept }) {
-  const className = 'mt-0.5 size-4 shrink-0';
-  switch (concept.state) {
-    case 'known':
-      return <BadgeCheck className={cn(className, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
-    case 'misconception':
-      return <AlertTriangle className={cn(className, 'text-danger')} strokeWidth={2} aria-hidden />;
-    case 'shaky':
-      return <CircleDot className={cn(className, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
-    default:
-      return <CircleDashed className={cn(className, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
-  }
-}
-
-/**
- * A gap is a better input to a search than a subject somebody typed, so the
- * button is here rather than on a form somewhere. Offered only where it means
- * something: a claim you are shaky on or actively wrong about.
- */
-function ReadAbout({ concept, subjectId }: { concept: Concept; subjectId: string }) {
-  if (concept.state !== 'shaky' && concept.state !== 'misconception') return null;
-
-  return (
-    <form action={readAboutConcept} className="mt-2">
-      <input type="hidden" name="conceptId" value={concept.id} />
-      <input type="hidden" name="subjectId" value={subjectId} />
-      <button type="submit" className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline">
-        Find something to read for this
-      </button>
-    </form>
-  );
-}
-
 function ConceptRow({
   concept,
   next,
@@ -94,10 +49,15 @@ function ConceptRow({
 }) {
   return (
     <li className="flex gap-3 px-4 py-3">
-      <StateMark concept={concept} />
+      <StateMark concept={concept} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-body font-medium text-ink">{concept.name}</span>
+          <Link
+            href={`/learn/c/${concept.id}`}
+            className="text-body font-medium text-ink hover:text-accent"
+          >
+            {concept.name}
+          </Link>
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
             {STATE_LABEL[concept.state]}
           </span>
@@ -123,7 +83,9 @@ function ConceptRow({
             : `${STATE_LABEL[concept.state]} — ${ESTABLISHED_LABEL[concept.established]}. ${concept.basis}`}
         </p>
 
-        <ReadAbout concept={concept} subjectId={subjectId} />
+        <div className="mt-2">
+          <ReadAbout concept={concept} subjectId={subjectId} />
+        </div>
       </div>
     </li>
   );
