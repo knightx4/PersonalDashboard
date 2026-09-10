@@ -40,6 +40,14 @@ export type CaptureAction = {
    */
   field: 'line' | 'prose';
   /**
+   * Whether what you file can be given a day. True for a todo, where "today"
+   * and "tomorrow" are most of what anyone ever answers "when" with; false
+   * for anything that is not due -- a note is written, not scheduled -- and
+   * the panel draws the day chips only where it is true, so an action that
+   * has no use for a date does not get two controls that do nothing.
+   */
+  dated: boolean;
+  /**
    * What should find it, beyond its own label: "add todo" and "new task" are
    * both what somebody types when they mean this one.
    */
@@ -53,6 +61,7 @@ export const CAPTURE_ACTIONS: readonly CaptureAction[] = [
     module: 'todo',
     placeholder: 'What needs doing?',
     field: 'line',
+    dated: true,
     keywords: ['add todo', 'new todo', 'add task', 'new task', 'capture'],
   },
 ];

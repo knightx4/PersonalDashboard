@@ -87,6 +87,28 @@ export function addDays(day: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** The days a form can name in words rather than as a date. */
+export const RELATIVE_DAYS = ['today', 'tomorrow'] as const;
+
+export type RelativeDay = (typeof RELATIVE_DAYS)[number];
+
+/**
+ * A day named in words, as the date it means.
+ *
+ * The add form on /todo is rendered by the server and handed the account's
+ * today, so its chips send real dates. The capture panel is mounted in the
+ * shell, which is not handed one, and the browser's own today is a different
+ * day for anyone whose list lives in another zone -- so its chips send the
+ * word and this turns it into a date on the server, where the zone is known.
+ * Anything else comes back as it went in, so a real date passes straight
+ * through to the date validation and so does a wrong one.
+ */
+export function resolveRelativeDay(value: string, today: string): string {
+  if (value === 'today') return today;
+  if (value === 'tomorrow') return addDays(today, 1);
+  return value;
+}
+
 /**
  * The calendar day a task is due on, in the reader's zone.
  *

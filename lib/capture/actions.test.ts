@@ -19,6 +19,7 @@ describe('the capture actions', () => {
       expect(action.label.length).toBeGreaterThan(0);
       expect(action.placeholder.length).toBeGreaterThan(0);
       expect(['line', 'prose']).toContain(action.field);
+      expect(typeof action.dated).toBe('boolean');
       expect(action.keywords.length).toBeGreaterThan(0);
     }
   });
