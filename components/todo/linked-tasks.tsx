@@ -2,9 +2,11 @@
 
 import { useActionState, useRef, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Check, ListChecks, Plus, Unlink } from 'lucide-react';
+import { ListChecks, Plus, Unlink } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Input } from '@/components/ui/field';
 import { completeTask, reopenTask } from '@/app/todo/actions';
@@ -74,12 +76,7 @@ export function LinkedTasks({
             <span className="tabular text-small font-normal text-ink-muted">{tasks.length}</span>
           )}
         </h3>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setAdding((open) => !open)}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={() => setAdding((open) => !open)}>
           <Plus className="size-3.5" strokeWidth={2} aria-hidden />
           {adding ? 'Cancel' : 'Add'}
         </Button>
@@ -90,7 +87,13 @@ export function LinkedTasks({
           <input type="hidden" name="target" value={target} />
           <input type="hidden" name="targetId" value={targetId} />
           <input type="hidden" name="returnTo" value={returnTo} />
-          <Input name="title" placeholder="What has to happen?" aria-label="Task" required autoFocus />
+          <Input
+            name="title"
+            placeholder="What has to happen?"
+            aria-label="Task"
+            required
+            autoFocus
+          />
           <div className="flex items-center gap-2">
             <Input name="dueOn" type="date" aria-label="Due" className="w-40" />
             <Button type="submit" size="sm" disabled={pending}>
@@ -102,9 +105,7 @@ export function LinkedTasks({
       )}
 
       {tasks.length === 0 ? (
-        !adding && !extra && (
-          <p className="mt-2 text-ui text-ink-muted">Nothing outstanding.</p>
-        )
+        !adding && !extra && <p className="mt-2 text-ui text-ink-muted">Nothing outstanding.</p>
       ) : (
         <ul className="mt-2 divide-y divide-border">
           {tasks.map((task) => (
@@ -140,24 +141,34 @@ function LinkedRow({
 }) {
   const [pending, start] = useTransition();
   const done = task.status === 'done';
+  const dropped = task.status === 'dropped';
 
   return (
     <li className={cn('group flex items-center gap-2 py-1.5', pending && 'opacity-50')}>
+      {/* The same toggle as a row on /todo: the glyph is the state, the
+          button is the hit area. */}
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
         onClick={() => start(() => (done ? reopenTask(task.id) : completeTask(task.id)))}
         className={cn(
-          'press flex size-4 shrink-0 items-center justify-center rounded border transition-colors duration-150',
+          'press flex size-4 shrink-0 items-center justify-center transition-colors duration-150',
           done
-            ? 'border-status-offer bg-status-offer text-surface'
-            : 'border-control hover:border-accent',
+            ? 'text-status-offer'
+            : dropped
+              ? 'text-ink-muted'
+              : 'text-ink-muted hover:text-accent',
         )}
       >
-        {done && <Check className="size-2.5" strokeWidth={2} aria-hidden />}
+        <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={14} />
       </button>
 
-      <span className={cn('min-w-0 flex-1 truncate text-ui text-ink', done && 'text-ink-muted line-through')}>
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate text-ui text-ink',
+          (done || dropped) && 'text-ink-muted line-through',
+        )}
+      >
         {task.title}
       </span>
 

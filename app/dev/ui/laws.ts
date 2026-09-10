@@ -35,7 +35,7 @@ export const LAWS: readonly Law[] = [
   {
     n: 4,
     title: 'Colour is a claim.',
-    body: 'Green means money came back — never spending, never generic success. The pipeline hues mean one stage each and appear nowhere else. Workspace accent means "you are here". If you need a colour and none of the meanings is true, use ink and a shape.',
+    body: 'Green means money came back — never spending, never generic success. The pipeline hues mean one stage each and appear nowhere else. Workspace accent means "you are here". If you need a colour and none of the meanings is true, use ink and a shape. The shapes for a state are the status glyphs — one hexagon per stage in lib/status-glyphs.ts, drawn under Colour on /dev/ui — and no state is ever a coloured chip with no shape in it.',
   },
   {
     n: 5,
