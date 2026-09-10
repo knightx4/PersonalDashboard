@@ -13,6 +13,7 @@ import { CommandPalette } from '@/components/shell/command-palette';
 import { CaptureButton, CaptureFab, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
+import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
 import {
   WorkspaceSheet,
@@ -482,7 +483,7 @@ export function AppShell({
             type="button"
             aria-label="Close navigation"
             onClick={() => setDrawer(false)}
-            className="absolute inset-0 bg-black/40"
+            className={scrim}
           />
           <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
             <div className="flex justify-end px-2 pt-2">

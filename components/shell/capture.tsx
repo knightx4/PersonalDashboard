@@ -14,7 +14,7 @@ import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
-import { popoverSurface } from '@/components/ui/popover';
+import { popoverSurface, scrim } from '@/components/ui/popover';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
 import { usePopover } from '@/lib/use-popover';
@@ -218,7 +218,7 @@ function CapturePanel({ session, onClose }: { session: Session; onClose: () => v
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        className={scrim}
       />
       <form
         ref={panelRef}

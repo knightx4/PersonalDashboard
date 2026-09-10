@@ -7,7 +7,7 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
-import { Popover } from '@/components/ui/popover';
+import { Popover, scrim } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 
@@ -395,7 +395,7 @@ export function WorkspaceSheet({
         type="button"
         aria-label="Close the workspace list"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40"
+        className={scrim}
       />
       <div
         role="menu"

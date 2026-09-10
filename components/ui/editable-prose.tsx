@@ -5,7 +5,7 @@ import { Maximize2, Pencil, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
-import { popoverSurface } from '@/components/ui/popover';
+import { popoverSurface, scrim } from '@/components/ui/popover';
 
 /**
  * A piece of writing, read until you go to edit it.
@@ -237,7 +237,7 @@ function Expanded({
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+        className={scrim}
       />
       <div
         ref={panel}
