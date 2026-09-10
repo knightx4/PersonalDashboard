@@ -29,11 +29,14 @@ export function CalendarMonthGrid({
   days,
   timezone,
   newEventHref,
+  eventHref,
 }: {
   days: CalendarDay[];
   timezone: string;
   /** Where the square's add control goes. */
   newEventHref: (day: string) => string;
+  /** Where an event you wrote opens. */
+  eventHref: (id: string) => string;
 }) {
   return (
     <Card padding="none" className="mt-4 overflow-hidden">
@@ -113,7 +116,7 @@ export function CalendarMonthGrid({
             <ul className="mt-1 hidden space-y-0.5 sm:block">
               {day.entries.map((entry) => (
                 <li key={entry.key}>
-                  <Pill entry={entry} timezone={timezone} />
+                  <Pill entry={opensAt(entry, eventHref)} timezone={timezone} />
                 </li>
               ))}
             </ul>
@@ -122,6 +125,19 @@ export function CalendarMonthGrid({
       </div>
     </Card>
   );
+}
+
+/**
+ * Where an entry goes when it is clicked.
+ *
+ * Only an event gains one here: a task, an interview and a return deadline
+ * keep the link they already had, which goes to the page that owns them.
+ */
+export function opensAt(
+  entry: CalendarEntry,
+  eventHref: (id: string) => string,
+): CalendarEntry {
+  return entry.eventId ? { ...entry, href: eventHref(entry.eventId) } : entry;
 }
 
 const DOT: Record<CalendarEntry['kind'], string> = {

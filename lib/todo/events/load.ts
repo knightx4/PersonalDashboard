@@ -70,3 +70,30 @@ export async function loadEventsInWindow(
 
   return (data ?? []).map(toEvent);
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * One event, if it is yours. Null when it is not, or is not there at all.
+ *
+ * The id comes off a query string, so it is checked for being an id before it
+ * is asked about: Postgres refuses a malformed uuid outright, and that would
+ * reach the page as an error rather than as the nothing it actually is.
+ */
+export async function loadEvent(userId: string, id: string): Promise<Event | null> {
+  if (!UUID.test(id)) return null;
+
+  const supabase = await createTodoClient();
+
+  const { data, error } = await supabase
+    .from('events')
+    .select(COLUMNS)
+    .eq('user_id', userId)
+    .eq('id', id)
+    .maybeSingle();
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error) throw new Error(error.message);
+
+  return data ? toEvent(data) : null;
+}

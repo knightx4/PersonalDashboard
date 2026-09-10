@@ -35,6 +35,12 @@ export interface CalendarEntry {
    * actually on it.
    */
   end: string | null;
+  /**
+   * The row an event was drawn from, which is what opens it. Null for
+   * everything else: a task, an interview and a return deadline are opened
+   * where they live, not here.
+   */
+  eventId: string | null;
   title: string;
   /** Where clicking it goes, when there is anywhere to go. */
   href: string | null;
@@ -159,6 +165,7 @@ export function collectEntries(
       kind: 'task',
       at: task.dueAt,
       end: null,
+      eventId: null,
       title: task.title,
       href: null,
       done: task.status === 'done',
@@ -192,6 +199,7 @@ export function collectEntries(
         kind: 'event',
         at,
         end,
+        eventId: event.id,
         title: event.title,
         href: null,
         done: false,
@@ -207,6 +215,7 @@ export function collectEntries(
       kind: 'item',
       at: item.at,
       end: null,
+      eventId: null,
       title: item.title,
       href: item.link?.href ?? null,
       done: false,
@@ -219,6 +228,7 @@ export function collectEntries(
       kind: 'context',
       at: entry.at,
       end: null,
+      eventId: null,
       title: entry.label,
       href: entry.link?.href ?? null,
       done: false,

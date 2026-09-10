@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
-import { Pill } from '@/components/todo/calendar-month';
+import { Pill, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
 
@@ -31,11 +31,14 @@ export function CalendarTimeGrid({
   days,
   timezone,
   newEventHref,
+  eventHref,
 }: {
   days: CalendarDay[];
   timezone: string;
   /** Where the add control at the head of each day goes. */
   newEventHref: (day: string) => string;
+  /** Where an event you wrote opens. */
+  eventHref: (id: string) => string;
 }) {
   const hours = hoursOf(hourWindow(days, timezone));
 
@@ -77,7 +80,7 @@ export function CalendarTimeGrid({
                   className="min-w-0 space-y-0.5 border-l border-border p-1.5"
                 >
                   {allDay[index].map((entry) => (
-                    <Pill key={entry.key} entry={entry} timezone={timezone} />
+                    <Pill key={entry.key} entry={opensAt(entry, eventHref)} timezone={timezone} />
                   ))}
                 </div>
               ))}
@@ -146,7 +149,7 @@ export function CalendarTimeGrid({
                   {day.entries
                     .filter((entry) => entry.at && hourIn(entry.at, timezone) === hour)
                     .map((entry) => (
-                      <Pill key={entry.key} entry={entry} timezone={timezone} />
+                      <Pill key={entry.key} entry={opensAt(entry, eventHref)} timezone={timezone} />
                     ))}
                 </div>
               )),

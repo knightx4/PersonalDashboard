@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { eventFields, type Event } from '@/lib/todo/events/model';
 import { eventInput, resolveSpan } from '@/lib/todo/events/write';
 
 const when = {
@@ -119,5 +120,95 @@ describe('eventInput', () => {
       endTime: '',
     });
     expect(nonsense.success).toBe(false);
+  });
+});
+
+describe('eventFields and resolveSpan together', () => {
+  function stored(over: Partial<Event>): Event {
+    return {
+      id: 'e1',
+      title: 'Something',
+      body: null,
+      location: null,
+      startsOn: null,
+      endsOn: null,
+      startsAt: null,
+      endsAt: null,
+      createdAt: '2026-03-01T00:00:00.000Z',
+      ...over,
+    };
+  }
+
+  /**
+   * Opening an event and saving it without touching anything has to leave the
+   * same row. That is one function reading what the other wrote, and the two
+   * are only correct together.
+   */
+  function roundTrip(event: Event, timezone: string) {
+    const fields = eventFields(event, timezone);
+    return resolveSpan(fields, timezone).span;
+  }
+
+  it('leaves a timed event exactly as it was', () => {
+    const meeting = stored({
+      startsAt: '2026-03-10T15:00:00.000Z',
+      endsAt: '2026-03-10T15:30:00.000Z',
+    });
+
+    expect(roundTrip(meeting, 'Europe/London')).toEqual({
+      starts_on: null,
+      ends_on: null,
+      starts_at: '2026-03-10T15:00:00.000Z',
+      ends_at: '2026-03-10T15:30:00.000Z',
+    });
+  });
+
+  it('leaves one that runs past midnight as it was', () => {
+    const night = stored({
+      startsAt: '2026-03-10T23:00:00.000Z',
+      endsAt: '2026-03-11T01:00:00.000Z',
+    });
+    const fields = eventFields(night, 'UTC');
+
+    expect(fields.startDay).toBe('2026-03-10');
+    expect(fields.endDay).toBe('2026-03-11');
+    expect(roundTrip(night, 'UTC')).toEqual({
+      starts_on: null,
+      ends_on: null,
+      starts_at: '2026-03-10T23:00:00.000Z',
+      ends_at: '2026-03-11T01:00:00.000Z',
+    });
+  });
+
+  it('leaves an all-day event over several days as it was', () => {
+    const holiday = stored({ startsOn: '2026-03-10', endsOn: '2026-03-14' });
+    const fields = eventFields(holiday, 'Asia/Tokyo');
+
+    expect(fields.allDay).toBe(true);
+    expect(roundTrip(holiday, 'Asia/Tokyo')).toEqual({
+      starts_on: '2026-03-10',
+      ends_on: '2026-03-14',
+      starts_at: null,
+      ends_at: null,
+    });
+  });
+
+  it('reads a timed event in the reader s own zone', () => {
+    // 15:00 UTC is midnight in Tokyo, on the following day.
+    const fields = eventFields(
+      stored({ startsAt: '2026-03-10T15:00:00.000Z', endsAt: '2026-03-10T16:00:00.000Z' }),
+      'Asia/Tokyo',
+    );
+
+    expect(fields.startDay).toBe('2026-03-11');
+    expect(fields.startTime).toBe('00:00');
+    expect(fields.endTime).toBe('01:00');
+    expect(fields.endDay).toBe('');
+  });
+
+  it('leaves the end day empty when there is only one day', () => {
+    expect(eventFields(stored({ startsOn: '2026-03-10', endsOn: '2026-03-10' }), 'UTC').endDay).toBe(
+      '',
+    );
   });
 });

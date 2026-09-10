@@ -9,17 +9,22 @@
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { EventForm } from '@/components/todo/event-form';
+import { EventForm, type EventDraft } from '@/components/todo/event-form';
 
-function render() {
-  return renderToStaticMarkup(
-    <EventForm
-      day="2026-03-10"
-      view="week"
-      anchor="2026-03-09"
-      defaultTimes={{ start: '15:00', end: '16:00' }}
-    />,
-  );
+const NEW: EventDraft = {
+  id: null,
+  title: '',
+  body: '',
+  location: '',
+  allDay: false,
+  startDay: '2026-03-10',
+  endDay: '',
+  startTime: '15:00',
+  endTime: '16:00',
+};
+
+function render(draft: EventDraft = NEW) {
+  return renderToStaticMarkup(<EventForm draft={draft} view="week" anchor="2026-03-09" />);
 }
 
 describe('EventForm', () => {
@@ -59,5 +64,33 @@ describe('EventForm', () => {
     const html = render();
     expect(html).toContain('name="allDay"');
     expect(html).not.toContain('sm:grid-cols-2 hidden');
+  });
+
+  it('offers no delete for an event that does not exist yet', () => {
+    expect(render()).not.toContain('Delete');
+    expect(render()).not.toContain('name="id"');
+  });
+
+  it('fills itself in from a stored event, and offers to delete it', () => {
+    const html = render({
+      id: 'e-1',
+      title: 'Half term',
+      body: 'Ferry booked.',
+      location: 'Whitstable',
+      allDay: true,
+      startDay: '2026-03-10',
+      endDay: '2026-03-14',
+      startTime: '',
+      endTime: '',
+    });
+
+    expect(html).toContain('name="id" value="e-1"');
+    expect(html).toContain('value="Half term"');
+    expect(html).toContain('name="endDay" value="2026-03-14"');
+    expect(html).toContain('value="Whitstable"');
+    expect(html).toContain('Ferry booked.');
+    expect(html).toContain('Delete');
+    // Ticked, so the time fields are out of the way.
+    expect(html).toContain('sm:grid-cols-2 hidden');
   });
 });

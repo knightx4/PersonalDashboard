@@ -17,10 +17,12 @@ import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { loadEvent } from '@/lib/todo/events/load';
+import { eventFields } from '@/lib/todo/events/model';
 import { nextHourSlot } from '@/lib/todo/time';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
 import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
-import { EventForm } from '@/components/todo/event-form';
+import { EventForm, type EventDraft } from '@/components/todo/event-form';
 
 export const metadata = { title: 'Calendar' };
 
@@ -39,7 +41,13 @@ export const metadata = { title: 'Calendar' };
 export default async function TodoCalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; month?: string; new?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    date?: string;
+    month?: string;
+    new?: string;
+    event?: string;
+  }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -59,15 +67,45 @@ export default async function TodoCalendarPage({
   const calendar = await loadCalendar(user.id, view, anchor);
   const nothing = calendar.days.every((day) => day.entries.length === 0);
 
-  // `?new=<day>` opens the form on that day. It is a query param like the view
-  // and the date beside it, so the add controls are links and the page still
-  // holds no state of its own.
+  // `?new=<day>` opens an empty form on that day and `?event=<id>` opens a
+  // stored one. Both are query params like the view and the date beside them,
+  // so every control that opens the form is a link and the page still holds no
+  // state of its own.
   const composing = params.new && isDay(params.new) ? params.new : null;
+  // An id that is not yours, or is not there, comes back null and the page is
+  // simply the calendar. Nothing was found, which is not an error.
+  const editing = params.event ? await loadEvent(user.id, params.event) : null;
+
   // What "New event" means with nothing else said: today when you can see it,
   // and otherwise the day the view is anchored on.
   const defaultDay = calendar.days.find((day) => day.isToday)?.day ?? calendar.anchor;
   const newHref = (day: string) =>
     `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, new: day })}`;
+  const eventHref = (id: string) =>
+    `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, event: id })}`;
+
+  const slot = nextHourSlot(new Date(), calendar.timezone);
+  const draft: EventDraft | null = editing
+    ? {
+        id: editing.id,
+        title: editing.title,
+        body: editing.body ?? '',
+        location: editing.location ?? '',
+        ...eventFields(editing, calendar.timezone),
+      }
+    : composing
+      ? {
+          id: null,
+          title: '',
+          body: '',
+          location: '',
+          allDay: false,
+          startDay: composing,
+          endDay: '',
+          startTime: slot.start,
+          endTime: slot.end,
+        }
+      : null;
 
   return (
     // No width of its own: a calendar is a grid, and seven columns want every
@@ -150,26 +188,21 @@ export default async function TodoCalendarPage({
         </Banner>
       )}
 
-      {composing && (
-        <EventForm
-          day={composing}
-          view={calendar.view}
-          anchor={calendar.anchor}
-          defaultTimes={nextHourSlot(new Date(), calendar.timezone)}
-        />
-      )}
+      {draft && <EventForm draft={draft} view={calendar.view} anchor={calendar.anchor} />}
 
       {calendar.view === 'month' ? (
         <CalendarMonthGrid
           days={calendar.days}
           timezone={calendar.timezone}
           newEventHref={newHref}
+          eventHref={eventHref}
         />
       ) : (
         <CalendarTimeGrid
           days={calendar.days}
           timezone={calendar.timezone}
           newEventHref={newHref}
+          eventHref={eventHref}
         />
       )}
 

@@ -74,7 +74,9 @@ export function resolveSpan(
   input: Omit<EventInput, 'title' | 'body' | 'location'>,
   timezone: string,
 ): { span: EventSpan | null; error: string | null } {
-  const ends = input.endDay ?? input.startDay;
+  // Blank as well as absent: the field arrives as '' from a form and as null
+  // once Zod has read it, and both mean "the day it starts on".
+  const ends = input.endDay || input.startDay;
 
   if (input.allDay) {
     if (ends < input.startDay) return { span: null, error: 'It cannot end before it starts.' };

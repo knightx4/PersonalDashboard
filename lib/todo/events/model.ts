@@ -96,3 +96,59 @@ export function compareEvents(a: Event, b: Event, timezone: string): number {
 
   return a.title.localeCompare(b.title);
 }
+
+/** The wall clock of an instant, where the reader is standing. */
+function clockIn(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(iso));
+}
+
+/** What the form shows when an event is opened to be changed. */
+export interface EventFields {
+  allDay: boolean;
+  startDay: string;
+  /** Blank when the event begins and ends on the same day. */
+  endDay: string;
+  startTime: string;
+  endTime: string;
+}
+
+/**
+ * A stored event, as the fields of the form that wrote it.
+ *
+ * The reverse of resolveSpan in write.ts, and it has to be its exact reverse:
+ * opening an event and saving it again without touching anything must leave
+ * the same row. So a timed event is read back in the reader's own zone, and an
+ * end at midnight keeps the next day's date with 00:00 on it rather than being
+ * tidied into 24:00 of a day that has no such hour.
+ */
+export function eventFields(event: Event, timezone: string): EventFields {
+  if (isAllDay(event)) {
+    const start = event.startsOn as string;
+    const end = event.endsOn as string;
+    return {
+      allDay: true,
+      startDay: start,
+      endDay: end === start ? '' : end,
+      startTime: '',
+      endTime: '',
+    };
+  }
+
+  const startsAt = event.startsAt as string;
+  const endsAt = event.endsAt as string;
+  const start = todayIn(timezone, new Date(startsAt));
+  const end = todayIn(timezone, new Date(endsAt));
+
+  return {
+    allDay: false,
+    startDay: start,
+    endDay: end === start ? '' : end,
+    startTime: clockIn(startsAt, timezone),
+    endTime: clockIn(endsAt, timezone),
+  };
+}

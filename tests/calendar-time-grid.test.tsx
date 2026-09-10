@@ -17,6 +17,7 @@ function entry(over: Partial<CalendarEntry> = {}): CalendarEntry {
     kind: 'event',
     at: null,
     end: null,
+    eventId: 'e1',
     title: 'An event',
     href: null,
     done: false,
@@ -34,6 +35,7 @@ function render(days: CalendarDay[]) {
       days={days}
       timezone="UTC"
       newEventHref={(day) => `/todo/calendar?new=${day}`}
+      eventHref={(id) => `/todo/calendar?event=${id}`}
     />,
   );
 }

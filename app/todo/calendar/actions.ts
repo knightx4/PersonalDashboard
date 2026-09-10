@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { createEvent, eventInput } from '@/lib/todo/events/write';
+import { createEvent, deleteEvent, eventInput, updateEvent } from '@/lib/todo/events/write';
 import { isCalendarView, isDay } from '@/lib/todo/calendar/range';
 
 /**
@@ -59,6 +59,53 @@ export async function addEvent(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { error } = await createEvent(user.id, parsed.data, timezone);
+  if (error) return { error };
+
+  revalidatePath('/todo/calendar');
+  redirect(backTo(formData));
+}
+
+// latency: pending
+export async function editEvent(
+  _prev: EventFormState,
+  formData: FormData,
+): Promise<EventFormState> {
+  const user = await requireUser();
+  const { timezone } = await loadAccountSettings(user.id);
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: 'Which event is this?' };
+
+  const parsed = parse(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { error } = await updateEvent(user.id, id, parsed.data, timezone);
+  if (error) return { error };
+
+  revalidatePath('/todo/calendar');
+  redirect(backTo(formData));
+}
+
+/**
+ * Delete, from its own form under the one that edits.
+ *
+ * Its own form rather than a second button inside the first, because a button
+ * that submits somewhere else has no way of showing what came back when it
+ * fails. The write is scoped to the account, so an id belonging to somebody
+ * else deletes nothing rather than being refused -- there is nothing to tell
+ * you about a row you cannot see.
+ */
+// latency: pending
+export async function removeEvent(
+  _prev: EventFormState,
+  formData: FormData,
+): Promise<EventFormState> {
+  const user = await requireUser();
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: 'Which event is this?' };
+
+  const { error } = await deleteEvent(user.id, id);
   if (error) return { error };
 
   revalidatePath('/todo/calendar');
