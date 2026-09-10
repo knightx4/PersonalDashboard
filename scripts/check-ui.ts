@@ -116,11 +116,45 @@ type Rule = {
 type RuleContext = {
   /** The six lines below, for a shape that opens on one line and lands on another. */
   after: string[];
-  /** The fourteen lines above, for asking what encloses this one. */
+  /** Every line above, for walking out to what encloses this one. */
   before: string[];
   /** The whole file, for asking what kind of surface this is. */
   source: string;
 };
+
+/** A condition that can keep the markup beneath it off the screen. */
+const GATE = /\{\s*\w[\w.]*\s*&&|\?\s*\(|\)\s*:\s*\(|\{editing|\{open|\{isOpen|\{show/;
+
+/** `if (!composing) return …` -- a guard beside the JSX rather than around it. */
+const EARLY_RETURN = /\bif\s*\(![\w.]+\)\s*(?:\{|return)/;
+
+/** Where a block ends, for the walk below: the function this line lives in. */
+const FUNCTION_START = /^\s*(?:export\s+)?(?:default\s+)?function\s|^\s*const\s+\w+\s*=\s*\(/;
+
+/** How deep a line is indented, which stands in for how deeply it is nested. */
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+/**
+ * Whether any block enclosing this line matches `pattern`.
+ *
+ * Walks outward by indentation: each successively shallower line above is an
+ * ancestor of this one, near enough, in a codebase formatted this consistently.
+ * Stops at the enclosing function, because past that the question is about a
+ * different component and the answer would be a coincidence.
+ */
+function encloses(line: string, before: string[], pattern: RegExp): boolean {
+  let level = indentOf(line);
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    const candidate = before[i]!;
+    if (!candidate.trim() || indentOf(candidate) >= level) continue;
+    level = indentOf(candidate);
+    if (pattern.test(candidate)) return true;
+    if (FUNCTION_START.test(candidate)) return false;
+  }
+  return false;
+}
 
 /**
  * Whether a trimmed line is comment text.
@@ -301,24 +335,31 @@ const RULES: Rule[] = [
      * four are still creates that happen to list something, and those say so on
      * the line.
      *
-     * "Nothing above it that could be hiding it" is a heuristic, not a parse.
-     * Fourteen lines up, looking for the four shapes that hide a composer here:
-     * a `&&`, a ternary, a state name this codebase uses for open-ness, and an
-     * early return -- `if (!composing) return <AddTrigger …>`, which is the
-     * cleanest of the four and was missed until this rule failed to notice its
-     * own author fixing a page with it.
+     * "Nothing above it that could be hiding it" walks the enclosing blocks by
+     * indentation rather than reading a fixed window, which is the difference
+     * between a rule worth having and one worth ignoring. The window version
+     * read fourteen lines up and was wrong seven times out of nine: the settings
+     * page hides five composers behind one `{!editing ? (` fifty lines above
+     * them, and a rule that cannot see that reports the page every time it is
+     * already right.
      *
-     * It still cannot see across a component boundary. A composer inside a form
-     * component that is only rendered when editing looks bare from here, and
-     * the plan view has two of those. They are excused where they stand.
+     * Two signals, because a composer is hidden in two different shapes:
+     *
+     *   - An ancestor holds a condition -- `&&`, either half of a ternary, or a
+     *     state name this codebase uses for open-ness. Found by walking out to
+     *     each successively shallower line until the enclosing function.
+     *   - The function returns early -- `if (!composing) return <AddTrigger …>`.
+     *     That guard is a sibling of the JSX, not an ancestor of it, so the walk
+     *     steps straight past. Scanned for separately.
+     *
+     * Still not a parse. It cannot see across a component boundary: a form
+     * component rendered only when editing looks bare from inside, which is
+     * what the plan view's two are. Excuse those where they stand.
      */
     find: (line, { before, source }) => {
       if (!/<(?:Textarea|ComposeBody)\b/.test(line)) return [];
       if (!/\{\s*[\w.[\]()]*\.map\(/.test(source)) return [];
-      const gate = /\{\s*\w[\w.]*\s*&&|\?\s*\(|\{editing|\{open|\{isOpen|\{show/;
-      const guarded = before.some((previous) => /\bif\s*\(!\w/.test(previous));
-      const returnsEarly = guarded && before.some((previous) => /\breturn\b/.test(previous));
-      if (returnsEarly || before.some((previous) => gate.test(previous))) return [];
+      if (encloses(line, before, GATE) || before.some((l) => EARLY_RETURN.test(l))) return [];
       return ['composer open on arrival'];
     },
   },
@@ -379,7 +420,7 @@ function scan(): Hit[] {
           if (excused.has(rule.id)) continue;
           const context: RuleContext = {
             after: lines.slice(index + 1, index + 7),
-            before: lines.slice(Math.max(0, index - 14), index),
+            before: lines.slice(0, index),
             source,
           };
           for (const text of rule.find(line, context)) {
