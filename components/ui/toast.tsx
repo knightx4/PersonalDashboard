@@ -151,7 +151,7 @@ function ToastItem({
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       className={cn(
-        'toast-in sheet pointer-events-auto flex w-full sm:w-auto sm:max-w-md items-center gap-3 rounded-lg border bg-raised py-2 pl-3 pr-1.5 font-mono text-micro text-ink shadow-lg',
+        'toast-in pointer-events-auto flex w-full sm:w-auto sm:max-w-md items-center gap-3 rounded-lg border border-border bg-raised py-2 pl-3 pr-1.5 font-mono text-micro text-ink shadow-lg',
         toast.state === 'failed' && 'text-danger',
       )}
     >
