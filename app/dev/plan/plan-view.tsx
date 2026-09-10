@@ -1479,7 +1479,10 @@ const HEALTH: Record<PlanHealth, Health> = {
   in_progress: { word: 'In progress', tone: 'accent', icon: TrendingUp },
   blocked: { word: 'Blocked', tone: 'caution', icon: Ban },
   waiting: { word: 'Waiting', tone: 'caution', icon: Hourglass },
-  ready: { word: 'Ready', tone: 'positive', icon: Sparkles },
+  // Blue, not green. Ready and done were both `positive`, so the one state
+  // that is an invitation to start read at a glance as the state that needs
+  // nothing. The shape still separates it from the other accent states.
+  ready: { word: 'Ready', tone: 'accent', icon: Sparkles },
   not_started: { word: 'Not started', tone: 'quiet', icon: CircleDashed },
   done: { word: 'Done', tone: 'positive', icon: Check },
   dropped: { word: 'Dropped', tone: 'ghost', icon: X },
@@ -1488,6 +1491,20 @@ const HEALTH: Record<PlanHealth, Health> = {
 function healthOf(node: PlanNode): Health {
   const health = planHealthOf(node);
   const base = HEALTH[health];
+
+  // A row closed over open work reports what is open beneath it, so the word
+  // is about a step further down and the fixed tooltip would be describing the
+  // wrong row. Naming the rows is the whole answer to "why does this say that".
+  if (isClosed(node.status) && health !== 'done' && health !== 'dropped' && health !== 'answered') {
+    const open = flatten(node.children).filter((child) => !isClosed(child.status));
+    return {
+      ...base,
+      title: `Closed, but still open beneath it: ${open
+        .slice(0, 3)
+        .map((child) => `#${child.number} ${child.title}`)
+        .join(', ')}${open.length > 3 ? `, and ${open.length - 3} more` : ''}`,
+    };
+  }
 
   // The three tooltips that can only be written with the step in hand.
   if (health === 'answered') return { ...base, title: node.resolution ?? undefined };
@@ -2141,8 +2158,15 @@ function PlanRow({
           that is admittedly not a plan yet, and one that only showed on a step
           you thought to open would be a gap nobody found. Quiet and dashed, so
           it does not read as detail. Nothing at all when there is none, which
-          is most steps most of the time. */}
-      {node.fog && (
+          is most steps most of the time.
+
+          It does fold with the group, though. Fog belongs to what is beneath
+          the row -- it is the part of it that is not a plan yet -- so a
+          collapsed feature leaving its fog behind was one block outliving the
+          thing it described. Only where there is an arrow to fold: on a leaf
+          `showChildren` is a state with no control, and gating on it alone
+          would hide fog on every closed step with no way back. */}
+      {node.fog && (!hasChildren || showChildren) && (
         <li style={inset} className="pb-1.5 pr-3">
           <div className="border-l-2 border-dashed border-border-strong pl-2.5">
             <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">

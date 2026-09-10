@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Lightbulb, Sparkles } from 'lucide-react';
+import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
 import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -205,20 +205,29 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
  * Grouped rather than filtered: the list is short enough to read whole, and
  * the question it answers -- "what did I think of for the job search" -- is
  * answered by a heading without anyone having to work a control first.
+ *
+ * An idea that has been shaped into the plan is out of that grouping entirely
+ * and in its own section at the bottom, folded shut. It is finished as an idea
+ * -- the thing to do about it now lives on the plan -- and left among the rest
+ * it grew the list it was supposed to be leaving, until the page read as
+ * mostly-done and the two or three still worth thinking about were the hard
+ * part to find. Kept rather than hidden, because "did I already write that
+ * down" is a question this page has to answer.
  */
 export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
+  const open = ideas.filter((idea) => !idea.planItem);
+  const shaped = ideas.filter((idea) => idea.planItem);
+
   const scopes: Array<ModuleId | null> = [
     null,
-    ...MODULES.map((module) => module.id).filter((id) =>
-      ideas.some((idea) => idea.module === id),
-    ),
+    ...MODULES.map((module) => module.id).filter((id) => open.some((idea) => idea.module === id)),
   ];
 
   return (
     <div className="space-y-6">
       <AddIdea />
 
-      {ideas.length === 0 ? (
+      {ideas.length === 0 && (
         // The shared empty state rather than a hand-drawn dashed paragraph:
         // this is the whole page when the list is empty, and law 1 says that
         // gets a real one. The dashed edge is the same dashed edge, drawn once
@@ -228,24 +237,53 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
           title="Nothing written down yet"
           description="An idea here becomes work when you have Claude shape it into the plan, and approve what it proposes there."
         />
-      ) : (
-        scopes.map((scope) => {
-          const rows = ideas.filter((idea) => idea.module === scope);
-          if (rows.length === 0) return null;
-          return (
-            <section key={scope ?? 'everything'} className="space-y-2">
-              <h2 className="text-body font-semibold text-ink">
-                {scopeLabel(scope)}{' '}
-                <span className="font-normal text-ink-muted">({rows.length})</span>
-              </h2>
-              <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-                {rows.map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} />
-                ))}
-              </ul>
-            </section>
-          );
-        })
+      )}
+
+      {/* Everything written down has been shaped. Not the empty state above:
+          nothing is missing here, the list has simply been worked to the end,
+          and an empty-handed illustration would be saying the opposite. */}
+      {ideas.length > 0 && open.length === 0 && (
+        <p className="text-ui text-ink-muted">
+          Every idea written down has been shaped into the plan. The ones below are kept for
+          the record.
+        </p>
+      )}
+
+      {scopes.map((scope) => {
+        const rows = open.filter((idea) => idea.module === scope);
+        if (rows.length === 0) return null;
+        return (
+          <section key={scope ?? 'everything'} className="space-y-2">
+            <h2 className="text-body font-semibold text-ink">
+              {scopeLabel(scope)}{' '}
+              <span className="font-normal text-ink-muted">({rows.length})</span>
+            </h2>
+            <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+              {rows.map((idea) => (
+                <IdeaCard key={idea.id} idea={idea} />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+
+      {shaped.length > 0 && (
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            Already in the plan{' '}
+            <span className="font-normal text-ink-muted">({shaped.length})</span>
+          </summary>
+          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {shaped.map((idea) => (
+              <IdeaCard key={idea.id} idea={idea} />
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

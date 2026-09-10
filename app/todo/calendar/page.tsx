@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/cn';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
@@ -63,9 +64,14 @@ export default async function TodoCalendarPage({
       <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-body font-semibold text-ink">{title(calendar.view, calendar.days)}</h2>
-
-        <nav className="flex items-center gap-1" aria-label={`Change ${calendar.view}`}>
+        {/* The arrows sit either side of the thing they move, the way every
+            calendar sets this: they step the month, so they bracket the month.
+            Around "Today" they read as stepping through todays. */}
+        <div
+          role="group"
+          aria-label={`Change ${calendar.view}`}
+          className="flex items-center gap-1"
+        >
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, -1)}
@@ -73,12 +79,9 @@ export default async function TodoCalendarPage({
           >
             <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
           </StepLink>
-          <Link
-            href={{ pathname: '/todo/calendar', query: { view: calendar.view } }}
-            className="rounded-lg px-3 py-1.5 text-ui font-medium text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
-          >
-            Today
-          </Link>
+          <h2 className="px-1 text-body font-semibold whitespace-nowrap text-ink">
+            {title(calendar.view, calendar.days)}
+          </h2>
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, 1)}
@@ -86,7 +89,16 @@ export default async function TodoCalendarPage({
           >
             <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
           </StepLink>
-        </nav>
+        </div>
+
+        {/* Its own control, not the middle of the stepper. It is a jump rather
+            than a step -- the one place in this row that ignores where you are. */}
+        <Link
+          href={{ pathname: '/todo/calendar', query: { view: calendar.view } }}
+          className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+        >
+          Today
+        </Link>
 
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
