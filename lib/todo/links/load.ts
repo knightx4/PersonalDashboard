@@ -96,14 +96,14 @@ export async function loadLinksForTasks(taskIds: string[]): Promise<TaskLink[]> 
 
   const { data, error } = await supabase
     .from('task_links')
-    // Written out rather than built from TARGET_COLUMNS: supabase-js parses
-    // this string at the type level, and a computed one degrades the whole
+    // Written out rather than built from TARGET_COLUMNS, and on one line
+    // rather than concatenated: supabase-js parses this string at the type
+    // level, and anything that is not a single literal degrades the whole
     // result to an error type. The list is checked against TARGET_COLUMNS by
     // lib/todo/links/load.test.ts instead, so the two cannot drift apart
     // silently.
-    .select(
-      'task_id, relation, application_id, role_id, company_id, contact_id, interview_id, note_id',
-    )
+    // prettier-ignore
+    .select('task_id, relation, application_id, role_id, company_id, contact_id, interview_id, note_id, order_id, inventory_item_id, saved_item_id, reading_id, track_id, subject_id')
     .in('task_id', taskIds);
 
   assertSchemaExposed(error, TODO_SCHEMA);

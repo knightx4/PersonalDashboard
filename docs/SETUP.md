@@ -96,20 +96,21 @@ called Vault and lives in `obsidian` for exactly this reason.
 
 ### Migrations
 
-Four directories, and the order is **not** directory by directory:
+Five directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
 | `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0037` |
 | `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
 | `supabase/migrations-vault` | `obsidian` | `0001` |
-| `supabase/migrations-todo` | `todo` | `0001`–`0002` |
+| `supabase/migrations-learn` | `learn` | `0001`–`0005` |
+| `supabase/migrations-todo` | `todo` | `0001`–`0004` |
 
-`migrations-todo` goes **last**, after all three of the others. Its
-`task_links` table carries foreign keys into `job_search` and `obsidian`, so
-applying it earlier fails on a table that does not exist yet.
-`scripts/db-reset.sh` already sequences the directories this way; a fresh
-project must be migrated in the same order.
+`migrations-todo` goes **last**, after all four of the others. Its
+`task_links` table carries foreign keys into `job_search` and `obsidian` from
+`0001`, and into `public` and `learn` from `0004`, so applying it earlier fails
+on a table that does not exist yet. `scripts/db-reset.sh` already sequences the
+directories this way; a fresh project must be migrated in the same order.
 
 They are separate because the sets were numbered independently from `0001`, and
 the `job_search` versions are already recorded remotely under exactly those
