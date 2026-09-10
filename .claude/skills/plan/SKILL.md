@@ -36,6 +36,9 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
 npx tsx scripts/plan.ts idea "…" [--module <id>]   # file an idea on /dev/ideas, unshaped
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
+npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>] [--from <n>]
+                                               # ask the person something. Never answered by you.
+npx tsx scripts/plan.ts raises                 # open raises, and answers no session has replied to
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.
@@ -120,8 +123,9 @@ One step at a time. Do not start the next until the current one is closed.
    is recorded from HEAD, so close after committing. The output names any
    steps that became ready as a result — mention them in the report.
 10. **Push once per batch**, then report: every step closed **by number and
-   title**, what became ready, and what is blocked and on what. A report that
-   says "closed four steps" makes the person go and look.
+   title**, what became ready, what is blocked and on what, and anything you
+   raised on `/dev/raised`, by title. A report that says "closed four steps"
+   makes the person go and look.
 
 ### When you reach something you should not decide
 
@@ -178,6 +182,48 @@ account, a thing outside the repo — is `block <n> --note "the question"`, with
 the exact question. A step that should not be done is `drop <n> --note "why"`;
 say "out of scope: …" when that is the reason, since there is no status for
 it. Never delete a step; deleting is the user's.
+
+## Raising something that belongs to no step
+
+Three places take something a session has to say, and they are not
+interchangeable:
+
+- **A plan decision** — a `decision` step under one feature. A question about
+  that feature, answered before it is built.
+- **The notes queue** — `feedback_items`, `.claude/skills/notes`. What the user
+  reported as wrong, or asked for.
+- **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
+  that belongs to neither: a risk found in code it was only passing through, a
+  question of taste, a thing it will not decide alone. Without it, that goes in
+  the transcript, where it is only read by somebody who opens Claude.
+
+The test is what the answer would change. If it changes how one feature gets
+built, it is a decision under that feature. If it is something already shipped
+being wrong, it is a note. If it is neither and it still needs the person, it
+is a raise.
+
+**Read the raises at the start of a run**, before claiming a step:
+
+```
+npx tsx scripts/plan.ts raises      # open ones, and answers no session has replied to
+npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>] [--from <n>]
+```
+
+An open raise is the person still waiting to be asked; an answered one carries
+a reply written while nothing was awake, and that answer is what to build
+against from then on. `--from <n>` stamps the step you were on, which is what
+makes a raise legible a week later.
+
+**A session never answers or dismisses a raise**, the same rule as never
+answering its own decision. Replying to an answer the person wrote is the
+exception, and it is a `claude` comment on the thread, not a close.
+
+A raise is not a way past a step that needs a decision. A step blocked on a
+question about the feature it belongs to gets that decision written under the
+feature, per **When you reach something you should not decide** above.
+
+Say in the report, by title, anything raised during the run — a question
+nobody knows is waiting is the failure this exists to prevent.
 
 ## How to write a title and a detail
 
@@ -444,6 +490,31 @@ update plan_items
 set status = 'blocked',
     comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <the question>'
 where id = '…';
+
+-- raise: what you need from the person, when it belongs to no step. `source`
+-- says which run raised it and what it was doing; `module` is null for the app
+-- as a whole. Never answer or dismiss one -- that is the person's move on
+-- /dev/raised, the same as a decision.
+insert into raised_items (user_id, module, title, detail, source, status)
+values ('…', 'dev', '…', '…', 'plan #<n>', 'open')
+returning id;
+
+-- what is outstanding in both directions: what the person has not answered,
+-- and what they answered that no session has replied to. Read at the start of
+-- a run.
+select r.id, r.title, r.detail, r.module, r.source, r.status, r.created_at,
+       (
+         select json_agg(json_build_object('author', c.author, 'body', c.body)
+                         order by c.created_at)
+         from raised_comments c where c.raised_item_id = r.id
+       ) as comments
+from raised_items r
+where r.user_id = '…' and r.status in ('open', 'answered')
+order by r.created_at desc;
+
+-- replying to an answer, which is how a raise takes a second round.
+insert into raised_comments (user_id, raised_item_id, author, body)
+values ('…', '<the raise>', 'claude', '…');
 ```
 
 `started_at` and `completed_at` are kept by a trigger from the status; do not

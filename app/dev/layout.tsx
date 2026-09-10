@@ -3,6 +3,7 @@ import { getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 
@@ -22,14 +23,19 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const user = await getUser();
   if (!user) redirect('/login');
 
-  const [settings, counts, activity] = await Promise.all([
+  const [settings, counts, activity, raised] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
+    loadRaisedNotifications(user.id),
   ]);
 
   /**
-   * Three lists, and the order is the point: what is wrong now, what was
+   * Raised is first because it is the only list that is waiting on you. A
+   * session writes there when it needs an answer it will not give itself, and
+   * a question nobody reads is a session that guessed.
+   *
+   * Then three lists, and the order is the point: what is wrong now, what was
    * decided and is being built, and what is only being thought about. A thing
    * moves up this list as it acquires commitment — an idea becomes a plan step
    * when it is decided on, and a bug is filed when something built is wrong.
@@ -51,6 +57,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * than in the middle of the things that still want doing.
    */
   const sections: NavSection[] = [
+    { href: '/dev/raised', label: 'Raised', icon: 'raised', badge: raised.length },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
@@ -70,6 +77,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
         activity={activity}
       >
         {children}
