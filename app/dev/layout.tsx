@@ -34,28 +34,29 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * moves up this list as it acquires commitment — an idea becomes a plan step
    * when it is decided on, and a bug is filed when something built is wrong.
    *
-   * The changelog sits below the three because it is the other direction: they
-   * are what is going to happen, and it is what already did. Its lines are
-   * those same lists' closed rows, so it belongs after the lists it is made of
-   * rather than above them.
-   *
-   * UI sits below that because it is not a list of work; it is the standard
-   * the work is held to, and Surfaces below that because it is where the
-   * standard gets checked against the thing: every surface framed at the width
+   * UI sits below the three because it is not a list of work; it is the
+   * standard the work is held to, and Surfaces below that because it is where
+   * the standard gets checked against the thing: every surface framed at the width
    * it is read at, with a box to say what is wrong. A note written there lands
    * in the same queue as Bugs and requests, which is the point -- one inbox,
    * not two. It lives here rather than in a document because a
    * document describing an interface goes stale the week after it is written,
    * and this one renders the real components from the real tokens: if a swatch
    * on that page is wrong, the app is wrong.
+   *
+   * The changelog is last, at the bottom of the list. Everything above it is
+   * something you go there to do; it is the one page you go to to look
+   * something up, and its lines are the closed rows of the three lists at the
+   * top. Finished work is consulted, not worked, so it sits at the end rather
+   * than in the middle of the things that still want doing.
    */
   const sections: NavSection[] = [
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
-    { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
+    { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
   ];
 
   return (

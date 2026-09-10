@@ -523,6 +523,40 @@ describe('healthOf', () => {
     );
   });
 
+  it('does not call a done step done while something under it is open', () => {
+    // #152 shipped, then acquired a question. The row's own status column
+    // still says done, and the health has to say what is actually true.
+    const sections = tree([
+      at('done', 'shipped'),
+      at('proposed', 'later', { parentId: 'shipped', kind: 'decision' }),
+    ]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('shipped')!)).toBe('unanswered');
+  });
+
+  it('reports the most pressing of several open rows beneath a closed one', () => {
+    const sections = tree([
+      at('done', 'shipped'),
+      at('not_started', 'todo', { parentId: 'shipped' }),
+      at('blocked', 'stuck', { parentId: 'shipped' }),
+    ]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('shipped')!)).toBe('blocked');
+  });
+
+  it('still calls a done step done when everything beneath it is closed', () => {
+    const sections = tree([
+      at('done', 'shipped'),
+      at('done', 'step', { parentId: 'shipped' }),
+      at('dropped', 'cut', { parentId: 'shipped' }),
+    ]);
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    expect(healthOf(byId.get('shipped')!)).toBe('done');
+  });
+
   it('separates ready, waiting and not started among not_started steps', () => {
     const sections = tree(
       [at('not_started', 'a'), at('not_started', 'b'), at('not_started', 'c', { parentId: 'a' })],

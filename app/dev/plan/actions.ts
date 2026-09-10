@@ -747,7 +747,21 @@ export async function sendPlanItemToClaude(
     text,
   });
   if (!result.ok) return { error: result.error };
-  return { message: `Sent. ${result.detail}` };
+
+  // What went with it, when something did.
+  //
+  // This button sends one step, but the brief carries that step's whole
+  // subtree under "## Steps" -- so pressing it on a higher-level row hands over
+  // rather more than the row you clicked, and "Sent." was the only thing said
+  // about it. The count is every row beneath, at any depth, because that is
+  // what the brief prints.
+  const beneath = flatten([node]).length - 1;
+  return {
+    message:
+      beneath === 0
+        ? `Sent #${node.number}. ${result.detail}`
+        : `Sent #${node.number}, with ${beneath} ${beneath === 1 ? 'step' : 'steps'} beneath it. ${result.detail}`,
+  };
 }
 
 /**

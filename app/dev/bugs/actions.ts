@@ -220,6 +220,56 @@ export async function runFeatureRoutine(
 }
 
 /**
+ * Whether a run is working the queue right now, and since when.
+ *
+ * There is no run table to ask, and there does not need to be: the queue
+ * already records this. A run claims exactly one note at a time and sets it
+ * `in_progress` before it starts, so an in-progress note is a run in flight and
+ * the row's `updated_at` is when it claimed it. Reading the state off the work
+ * itself means nothing to keep in step -- a run that dies cannot leave a
+ * "running" flag set behind it.
+ *
+ * What it can leave behind is the claimed note, which is why staleness is part
+ * of the answer rather than left for the reader to infer. Past the cutoff the
+ * honest reading flips: not "a run has been going for nine hours" but "a run
+ * stopped without closing this". A batch is minutes, so two hours is well clear
+ * of a slow one and well short of overnight.
+ */
+export type RoutineRun = {
+  /** The note being worked, trimmed for a single line. */
+  note: string;
+  /** When it was claimed. ISO. */
+  since: string;
+  /** Long enough that a run is likelier to have died than to still be going. */
+  stale: boolean;
+};
+
+const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
+
+export async function routineRun(): Promise<RoutineRun | null> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('feedback_items')
+    .select('body, updated_at')
+    .eq('user_id', user.id)
+    .eq('status', 'in_progress')
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  const row = data?.[0];
+  if (!row) return null;
+
+  const since = row.updated_at as string;
+  return {
+    note: row.body as string,
+    since,
+    stale: Date.now() - new Date(since).getTime() > STALE_AFTER_MS,
+  };
+}
+
+/**
  * How many notes are still outstanding — open, in progress, blocked or planned.
  *
  * Read when the capture panel opens rather than threaded down through the
