@@ -18,12 +18,7 @@ import { Meter } from '@/components/ui/meter';
 import { Sparkline } from '@/components/ui/sparkline';
 import { ReturnFuse } from '@/components/ui/return-fuse';
 import { formatMoney } from '@/lib/money';
-import {
-  CLOSING_DAYS,
-  HEALTH_ORDER,
-  HEALTH_STATES,
-  type HealthState,
-} from '@/lib/health';
+import { CLOSING_DAYS, HEALTH_ORDER, HEALTH_STATES, type HealthState } from '@/lib/health';
 import { DUE_SOON_DAYS } from '@/lib/returns/deadline';
 import { cn } from '@/lib/cn';
 import { Disclosure, Group } from '@/components/ui/disclosure';
@@ -34,6 +29,7 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { THEMES } from '@/lib/theme';
 import { LAW_GROUPS } from './laws';
+import { ANATOMIES } from './anatomy';
 import * as C from './content';
 import * as M from './measurements';
 
@@ -382,6 +378,7 @@ const CONTENTS: readonly (readonly [string, string])[] = [
   ['laws', 'The laws'],
   ['restraint', 'Restraint, worked'],
   ['shape', 'Shape, worked'],
+  ['anatomy', 'Page anatomy'],
   ['before', 'Before you draw'],
   ['colour', 'Colour'],
   ['themes', 'Themes'],
@@ -452,6 +449,56 @@ const HEALTH_BANDS: Record<HealthState, string> = {
   closing: `${CLOSING_DAYS} days left or fewer`,
   overdue: 'Past the deadline',
 };
+
+/**
+ * One page arrangement, at both widths.
+ *
+ * The arrangement is an `<iframe>` of `/preview?s=<id>` rather than the
+ * components rendered here, and that is the whole reason the drawing is worth
+ * anything: rendered inline it would sit in this page's 768px column and
+ * respond to the reader's window, so a phone arrangement would never be seen
+ * on a phone. A frame has its own viewport, and `sm:` and `xl:` fire inside it
+ * exactly as they do in the app.
+ *
+ * Both widths at once rather than a toggle, so the two can be compared without
+ * pressing anything -- and so this page stays a server component.
+ */
+function AnatomyFrames({ id, label }: { id: string; label: string }) {
+  return (
+    // The laptop frame is 512px drawn and the page's column is narrower than
+    // that on a phone, so the pair scrolls sideways in its own box rather than
+    // taking the page with it. Wrapping instead would put a 512px figure in a
+    // 358px column, which is the same overflow one line lower.
+    <div className="overflow-x-auto">
+      <div className="flex w-max items-start gap-3">
+        {M.ANATOMY_FRAMES.map((frame) => (
+          // The label above the frame, not under it: the two frames are
+          // different heights, so captions beneath them would sit at two
+          // different levels with nothing to line up against.
+          <figure key={frame.id} className="space-y-1">
+            <figcaption className="text-small text-ink-muted">{frame.label}</figcaption>
+            <div
+              className="overflow-hidden rounded-control bg-canvas"
+              style={{ width: frame.width * frame.scale, height: frame.height * frame.scale }}
+            >
+              <iframe
+                src={`/preview?s=${id}`}
+                title={`${label} at ${frame.width}px`}
+                loading="lazy"
+                className="origin-top-left border-0"
+                style={{
+                  width: frame.width,
+                  height: frame.height,
+                  transform: `scale(${frame.scale})`,
+                }}
+              />
+            </div>
+          </figure>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function DevUiPage() {
   return (
@@ -547,8 +594,8 @@ export default function DevUiPage() {
             aria-label="Demonstration title"
           />
           {/* ui-ok: composer-always-open -- the compose surface being
-            * demonstrated. It is one line until typed into, which is the
-            * shape law 14 asks for, and the rule cannot see the difference. */}
+           * demonstrated. It is one line until typed into, which is the
+           * shape law 14 asks for, and the rule cannot see the difference. */}
           <ComposeBody rows={1} placeholder="What it involves…" aria-label="Demonstration body" />
           <div className="flex flex-wrap items-center gap-1">
             <ChipSelect
@@ -756,7 +803,7 @@ export default function DevUiPage() {
               <Card padding="dense" className="space-y-2">
                 <Label htmlFor="ui-demo-open">Add a note</Label>
                 {/* ui-ok: composer-always-open -- this is the demonstration of
-                  * the fault. Drawn on purpose so it can be argued against. */}
+                 * the fault. Drawn on purpose so it can be argued against. */}
                 <ComposeBody
                   id="ui-demo-open"
                   rows={3}
@@ -809,6 +856,32 @@ export default function DevUiPage() {
             </div>
           </div>
         </Group>
+      </Section>
+
+      <Section
+        id="anatomy"
+        title="Page anatomy"
+        lead="Where the parts of a whole page sit, and what moves when the window is a phone. Each one is a real arrangement in a frame of its own — 390 wide, then 1280 — rendered from the same components the pages use."
+      >
+        {ANATOMIES.map((anatomy) => (
+          <Group
+            key={anatomy.id}
+            title={anatomy.label}
+            action={
+              <a
+                href={`/preview?s=${anatomy.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-small text-ink-muted hover:text-accent"
+              >
+                Open alone
+              </a>
+            }
+          >
+            <p className="text-body text-ink-muted">{anatomy.note}</p>
+            <AnatomyFrames id={anatomy.id} label={anatomy.label} />
+          </Group>
+        ))}
       </Section>
 
       <Section
@@ -1315,7 +1388,10 @@ export default function DevUiPage() {
         />
 
         <Group title="A delta, both ways">
-          <Card padding="standard" className="flex flex-wrap gap-x-8 gap-y-1 text-ui text-ink-muted">
+          <Card
+            padding="standard"
+            className="flex flex-wrap gap-x-8 gap-y-1 text-ui text-ink-muted"
+          >
             <FigureDelta label="12% less" direction="down" suffix="than August" />
             <FigureDelta label="8% more" direction="up" suffix="than August" />
             <FigureDelta label={null} direction={null} />
