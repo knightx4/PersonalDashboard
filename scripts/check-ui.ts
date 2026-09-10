@@ -301,16 +301,25 @@ const RULES: Rule[] = [
      * four are still creates that happen to list something, and those say so on
      * the line.
      *
-     * "Nothing above it that could be hiding it" is a heuristic, not a parse:
-     * fourteen lines up, looking for a `&&`, a ternary, or a state name this
-     * codebase uses for open-ness. A composer revealed some other way will
-     * report and should be excused where it stands.
+     * "Nothing above it that could be hiding it" is a heuristic, not a parse.
+     * Fourteen lines up, looking for the four shapes that hide a composer here:
+     * a `&&`, a ternary, a state name this codebase uses for open-ness, and an
+     * early return -- `if (!composing) return <AddTrigger …>`, which is the
+     * cleanest of the four and was missed until this rule failed to notice its
+     * own author fixing a page with it.
+     *
+     * It still cannot see across a component boundary. A composer inside a form
+     * component that is only rendered when editing looks bare from here, and
+     * the plan view has two of those. They are excused where they stand.
      */
     find: (line, { before, source }) => {
       if (!/<(?:Textarea|ComposeBody)\b/.test(line)) return [];
       if (!/\{\s*[\w.[\]()]*\.map\(/.test(source)) return [];
       const gate = /\{\s*\w[\w.]*\s*&&|\?\s*\(|\{editing|\{open|\{isOpen|\{show/;
-      return before.some((previous) => gate.test(previous)) ? [] : ['composer open on arrival'];
+      const guarded = before.some((previous) => /\bif\s*\(!\w/.test(previous));
+      const returnsEarly = guarded && before.some((previous) => /\breturn\b/.test(previous));
+      if (returnsEarly || before.some((previous) => gate.test(previous))) return [];
+      return ['composer open on arrival'];
     },
   },
 ];

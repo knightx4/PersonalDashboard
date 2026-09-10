@@ -6,10 +6,11 @@ import { Lightbulb, Sparkles } from 'lucide-react';
 import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { IdeaRow } from '@/lib/ideas/load';
 import { cardVariants } from '@/components/ui/card';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
@@ -47,23 +48,50 @@ function ModuleSelect({
  *
  * Deliberately two fields and a button. An idea that needs a form to describe
  * it is a request, and requests have a queue of their own next door.
+ *
+ * Closed until asked for (law 14). This page is read far more often than it is
+ * written to -- the list of ideas is the point of visiting -- and a three-row
+ * box standing open above that list was the first thing on the page.
+ *
+ * The label goes with it: the placeholder already says what to type, and a
+ * caption above a box repeating it is law 15.
  */
 function AddIdea() {
   const [state, action, pending] = useActionState(addIdea, {} as IdeaActionState);
+  const [composing, setComposing] = useState(false);
+
+  // Close once it has saved. The new idea appearing in the list below is the
+  // confirmation; leaving the box open would put the fault straight back.
+  //
+  // Adjusted during render rather than in an effect: this is React's own
+  // pattern for reacting to a changed value, and an effect here is a second
+  // render for nothing -- which the lint rule says out loud.
+  const [seen, setSeen] = useState<string | undefined>(undefined);
+  if (state.message !== seen) {
+    setSeen(state.message);
+    if (state.message && !state.error) setComposing(false);
+  }
+
+  if (!composing) {
+    return <AddTrigger label="Add an idea" onClick={() => setComposing(true)} />;
+  }
 
   return (
     <form action={action} className={cardVariants({ padding: 'dense' })}>
-      <Label htmlFor="idea-body">The idea</Label>
       <Textarea
         id="idea-body"
         name="body"
         rows={3}
+        autoFocus
         placeholder="Something worth doing one day. It will sit here until it is."
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <ModuleSelect name="module" defaultValue={null} />
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? 'Saving…' : 'Add idea'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setComposing(false)}>
+          Cancel
         </Button>
         <FieldError>{state.error}</FieldError>
         {state.message && !state.error && (

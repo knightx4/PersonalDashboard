@@ -41,6 +41,7 @@ import {
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -548,15 +549,13 @@ function AddStep({
   const prefix = `new-${parentId ?? module ?? 'app'}`;
 
   if (!open) {
+    // This was a hand-rolled version of AddTrigger, written before there was
+    // one. Same behaviour, one copy.
     return (
-      <button
-        type="button"
+      <AddTrigger
+        label={parentId ? 'Add a sub-step' : 'Add a step'}
         onClick={() => setOpen(true)}
-        className="press inline-flex items-center gap-1.5 rounded-control px-2 py-1 text-ui text-ink-muted hover:bg-shell-hover hover:text-accent"
-      >
-        <span aria-hidden className="text-body leading-none">+</span>
-        {parentId ? 'Add a sub-step' : 'Add a step'}
-      </button>
+      />
     );
   }
 
@@ -620,6 +619,9 @@ function EditStep({
         * half of it will not resolve into steps. */}
       <div>
         <Label htmlFor={`${prefix}-fog`}>Not yet specified</Label>
+        {/* ui-ok: composer-always-open -- EditStep only renders when a step is
+          * being edited, and the gate is at the call site rather than above
+          * this line, so the rule cannot see it. Law 14 is obeyed. */}
         <Textarea
           id={`${prefix}-fog`}
           name="fog"
@@ -635,6 +637,7 @@ function EditStep({
       </div>
       <div>
         <Label htmlFor={`${prefix}-comment`}>Your note</Label>
+        {/* ui-ok: composer-always-open -- same edit form as the field above. */}
         <Textarea
           id={`${prefix}-comment`}
           name="comment"

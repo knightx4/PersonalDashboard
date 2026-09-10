@@ -4,8 +4,6 @@
   "card-per-row app/shopping/orders/new/order-form.tsx": 1,
   "card-per-row app/shopping/share/[id]/page.tsx": 1,
   "card-per-row app/shopping/share/families/page.tsx": 1,
-  "composer-always-open app/dev/ideas/ideas-view.tsx": 1,
-  "composer-always-open app/dev/plan/plan-view.tsx": 2,
   "composer-always-open app/jobs/(app)/contacts/[id]/contact-detail.tsx": 1,
   "composer-always-open app/jobs/(app)/roles/[id]/panels.tsx": 3,
   "composer-always-open app/jobs/(app)/settings/view.tsx": 4,
