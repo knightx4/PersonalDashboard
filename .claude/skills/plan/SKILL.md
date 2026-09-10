@@ -310,6 +310,16 @@ against everything now known and write down what has changed — as
    and *Decided so far* — every question settled beneath it. Then read the
    code those answers touch. An answer changes what is buildable only if you
    know what is there.
+
+   **A feature that is already `done` or `dropped` takes no new rows.** Its
+   status says it is finished, and a proposal appearing inside it reads as the
+   feature having re-opened itself. Re-shaping one is still legitimate — an
+   answer can land under it long after it closed — but everything the re-shape
+   turns up there is *new work*, so it goes at the top level:
+   `add "…"` with no `--parent`, a detail that opens by saying it came out of
+   `#<n>`, and the steps and questions under **that**. The one write a
+   re-shape may still make to the closed feature is `fog <n> --clear`, and
+   only once the new feature that dispels the fog exists.
 2. **Graduate the fog.** If an answer, or the code, has made the fog
    specifiable, write those steps now: `add "…" --parent <n> --proposed
    --done-when "…" --size s|m|l --from <the decision>`, and clear the patch in

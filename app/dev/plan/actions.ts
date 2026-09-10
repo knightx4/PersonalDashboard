@@ -904,18 +904,39 @@ async function startReshape(
   sections: readonly PlanSection[],
   node: PlanNode,
 ): Promise<FireRoutineResult> {
+  // A feature that has already shipped does not take new rows. Re-shaping one
+  // is legitimate -- an answer can land under it long after it closed -- but
+  // everything the re-shape finds is new work, not an amendment to a closed
+  // feature, so it goes at the top level with a line back to where it came
+  // from. Nesting it was the bug: a feature reading "Done" quietly grew a
+  // proposal inside it, which reads as the feature having re-opened itself.
+  const closed = isClosed(node.status);
+  const where = closed
+    ? 'as a NEW top-level feature (no --parent), because ' +
+      `#${node.number} has already shipped and a closed feature takes no new rows`
+    : 'beneath the feature';
+
   const text =
     `Re-shape plan feature #${node.number}, "${node.title}", following ` +
     '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
     'feature against every answer settled beneath it and against what the code now says, ' +
     'and write what has changed.\n\n' +
+    (closed
+      ? `#${node.number} is ${node.status}. It is finished, and nothing new may be added ` +
+        'inside it -- not a step, not a decision, not a graduated fog step. Anything this ' +
+        're-shape turns up is new work: raise it as its own top-level feature whose detail ' +
+        `opens by saying it came out of #${node.number}, and put the steps and questions ` +
+        'under that. The only write this re-shape makes to the closed feature itself is ' +
+        `clearing its fog patch (plan.ts fog ${node.number} --clear), and only once the new ` +
+        'feature that dispels it exists. If nothing has changed, say so and write nothing.\n\n'
+      : '') +
     'Three moves, and nothing else:\n' +
-    '- Fog the answers have made specifiable becomes proposed steps beneath the feature, ' +
+    `- Fog the answers have made specifiable becomes proposed steps ${where}, ` +
     'each with a done-when and a size, and the fog patch is cleared in the same breath ' +
     '(plan.ts fog <n> --clear).\n' +
     '- A step an answer has made pointless is dropped with the reason, naming the answer ' +
     'that did it. A re-shape may drop, and must say why.\n' +
-    '- A question an answer surfaced is written as a fresh decision beneath the feature, ' +
+    `- A question an answer surfaced is written as a fresh decision ${where}, ` +
     'with its real options, what each costs, and your recommendation.\n\n' +
     'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not re-propose something the ' +
