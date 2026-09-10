@@ -6,7 +6,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
-import { NotificationsButton } from '@/components/shell/notifications-button';
+import {
+  NotificationsButton,
+  type Notification,
+} from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
@@ -47,7 +50,8 @@ export type NavSection = {
   /**
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
-   * wrong. Nothing else in this app has.
+   * wrong -- and Raised has, because an unread question is a session that
+   * guessed and built on the guess. Nothing else in this app has.
    */
   badge?: number;
 };
@@ -83,6 +87,7 @@ export function AppShell({
   banner,
   brief,
   activity = [],
+  notifications = [],
   children,
 }: {
   module: ModuleId | null;
@@ -101,6 +106,8 @@ export function AppShell({
   brief?: Brief | null;
   /** What the system did while nobody was looking. */
   activity?: ActivityLine[];
+  /** What is waiting on you, wherever you are standing. Today: open raises. */
+  notifications?: Notification[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -593,7 +600,7 @@ export function AppShell({
             <div className="flex shrink-0 items-center gap-0.5">
               <CaptureButton />
               <ThemePicker value={theme} />
-              <NotificationsButton />
+              <NotificationsButton notifications={notifications} />
               <FeedbackButton allHref={feedbackHref} />
 
               <Link
