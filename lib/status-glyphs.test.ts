@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { APPLICATION_STATUSES } from './jobs/pipeline';
+import { PLAN_HEALTHS } from './plan/tree';
 import {
   APPLICATION_STATUS_GLYPHS,
+  PLAN_HEALTH_GLYPHS,
   STATUS_GLYPHS,
   TASK_STATUS_GLYPHS,
   type StatusGlyph,
@@ -54,5 +56,67 @@ describe('status glyphs', () => {
     expect(TASK_STATUS_GLYPHS.open).toBe(APPLICATION_STATUS_GLYPHS.lead);
     expect(TASK_STATUS_GLYPHS.dropped).toBe(APPLICATION_STATUS_GLYPHS.withdrawn);
     expect(TASK_STATUS_GLYPHS.done).toBe('check');
+  });
+
+  it('gives every plan state a glyph from the set', () => {
+    for (const health of PLAN_HEALTHS) {
+      expect(STATUS_GLYPHS).toContain(PLAN_HEALTH_GLYPHS[health]);
+    }
+  });
+
+  /**
+   * The plan draws all ten of its states in one column, so unlike the pipeline
+   * it can share nothing with itself: two states on one shape would be two
+   * rows the column cannot tell apart.
+   */
+  it('gives the plan ten shapes nobody else on the page has', () => {
+    expect(sharedBy(PLAN_HEALTH_GLYPHS)).toEqual({});
+  });
+
+  it('fills the plan ladder in the order the work runs', () => {
+    expect(
+      (['proposed', 'not_started', 'ready', 'in_progress', 'done'] as const).map(
+        (health) => PLAN_HEALTH_GLYPHS[health],
+      ),
+    ).toEqual(['empty', 'quarter', 'half', 'three-quarters', 'full']);
+  });
+
+  /**
+   * What each plan state borrows from the other two ladders, written down.
+   *
+   * Sharing across the ladders is the point -- somebody who has learned the
+   * pipeline fills reads the plan for free -- but it is only free while it
+   * means the same thing on both. This is the table of what it currently
+   * means, so moving a shape has to be argued for here first.
+   */
+  it('borrows from the pipeline and the todo list only where the meaning carries', () => {
+    const borrowed = Object.fromEntries(
+      PLAN_HEALTHS.map((health) => [
+        health,
+        [
+          ...APPLICATION_STATUSES.filter(
+            (status) => APPLICATION_STATUS_GLYPHS[status] === PLAN_HEALTH_GLYPHS[health],
+          ),
+          ...(['open', 'done', 'dropped'] as const)
+            .filter((status) => TASK_STATUS_GLYPHS[status] === PLAN_HEALTH_GLYPHS[health])
+            .map((status) => `task ${status}`),
+        ],
+      ]),
+    );
+
+    expect(borrowed).toEqual({
+      proposed: ['lead', 'drafting', 'task open'],
+      not_started: ['submitted', 'acknowledged'],
+      ready: ['in_process'],
+      in_progress: ['final_round'],
+      done: ['offer'],
+      answered: ['task done'],
+      dropped: ['withdrawn', 'task dropped'],
+      blocked: ['role_closed'],
+      waiting: ['ghosted'],
+      // The one shape the plan brought with it. Nothing else in the app has a
+      // state that waits on the person rather than on the work.
+      unanswered: [],
+    });
   });
 });
