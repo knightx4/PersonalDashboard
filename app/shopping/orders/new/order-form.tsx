@@ -194,6 +194,10 @@ export function OrderForm({
         </div>
 
         <div className="space-y-3">
+          {/* ui-ok: card-per-row -- law 13 is about lists you read, and these
+            * are not rows of anything: each is a twelve-column editor for one
+            * order line on a create form. The card is what keeps two half-typed
+            * lines from running into each other. */}
           {lines.map((line, index) => (
             <Card key={line.key} padding="dense" className="grid gap-3 sm:grid-cols-12">
               <Field id={`line_name_${line.key}`} label="Item" className="sm:col-span-4">

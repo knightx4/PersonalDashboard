@@ -21,11 +21,7 @@ export const metadata = { title: 'Shared form' };
  * ones she must not have: the links themselves, and the ability to act on what
  * she chose.
  */
-export default async function ShareDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function ShareDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
   const supabase = await createClient();
@@ -112,15 +108,21 @@ export default async function ShareDetailPage({
               action={{ label: 'Open inventory', href: '/shopping/inventory' }}
             />
           ) : (
-            <ul className="space-y-2">
-              {groups.map((group) => {
-                const decided = group.keepQty + group.sellQty + group.giveawayQty;
-                const price = formatMoneyOrBlank(group.unitPriceCents);
-                return (
-                  <li key={group.groupKey}>
-                    <Card padding="dense" className="flex flex-wrap items-center gap-3">
+            /* One surface, hairlines between (law 13). A card per row on a
+             * form that can hold a whole household's things is the difference
+             * between seeing six of them and seeing fifteen. */
+            <Card padding="none">
+              <ul className="divide-y divide-border">
+                {groups.map((group) => {
+                  const decided = group.keepQty + group.sellQty + group.giveawayQty;
+                  const price = formatMoneyOrBlank(group.unitPriceCents);
+                  return (
+                    <li
+                      key={group.groupKey}
+                      className="card-pad-x row-pad flex flex-wrap items-center gap-3"
+                    >
                       {/* Ground, no frame: this tile is already inside the
-                          row's card. Law 11. */}
+                          row. Law 11. */}
                       <div className="size-12 shrink-0 overflow-hidden rounded-lg bg-canvas">
                         {group.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -155,9 +157,7 @@ export default async function ShareDetailPage({
                           {price && <span className="text-ink-muted"> · {price}</span>}
                         </p>
                         {group.note && (
-                          <p className="mt-1 text-ui text-ink-muted italic">
-                            “{group.note}”
-                          </p>
+                          <p className="mt-1 text-ui text-ink-muted italic">“{group.note}”</p>
                         )}
                       </div>
 
@@ -169,11 +169,11 @@ export default async function ShareDetailPage({
                           giveawayQty={group.giveawayQty}
                         />
                       )}
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
           )}
         </div>
 
@@ -194,8 +194,8 @@ export default async function ShareDetailPage({
               ))}
             </div>
             <p className="mt-3 text-small text-ink-muted">
-              Anyone holding a live link can read and change these answers. Revoke
-              one and it stops working immediately; the answers it left stay.
+              Anyone holding a live link can read and change these answers. Revoke one and it stops
+              working immediately; the answers it left stay.
             </p>
           </CardSection>
 

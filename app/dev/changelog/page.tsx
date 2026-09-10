@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { History } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { loadChangelog } from '@/lib/changelog/load';
@@ -98,9 +97,13 @@ export default async function DevChangelogPage({
           action={{ label: 'The plan', href: '/dev/plan' }}
         />
       ) : (
-        <div className="space-y-4">
+        /* A heading and its entries, not a card per day. The changelog is
+         * scrolled by definition -- it only grows -- so law 13 makes it a
+         * list, and a card per group was a border and eight pixels of margin
+         * around every day of work. */
+        <div className="space-y-5">
           {groups.map((group) => (
-            <Card key={group.key} padding="dense">
+            <section key={group.key}>
               {/* A group of one whose heading is its own entry -- a note, or a
                   feature that shipped by itself -- gets no heading: it would
                   be the same sentence twice, which is law 15. */}
@@ -110,7 +113,7 @@ export default async function DevChangelogPage({
                   <Entry key={entry.key} entry={entry} inGroup={group.kind} />
                 ))}
               </ul>
-            </Card>
+            </section>
           ))}
         </div>
       )}

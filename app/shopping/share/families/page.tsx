@@ -45,15 +45,17 @@ export default async function FamiliesPage() {
           secondaryAction={{ label: 'Shared forms', href: '/shopping/share' }}
         />
       ) : (
-        <ul className="max-w-2xl space-y-3">
-          {suggestions.map((family) => (
-            <li key={family.slug}>
-              <Card padding="dense">
+        /* One surface, hairlines between (law 13). A card per suggestion gave
+         * each row its own border and margin in a list that is scrolled. */
+        <Card padding="none" className="max-w-2xl">
+          <ul className="divide-y divide-border">
+            {suggestions.map((family) => (
+              <li key={family.slug} className="card-pad-x row-pad">
                 <FamilySuggestionCard family={family} />
-              </Card>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </>
   );

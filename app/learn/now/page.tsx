@@ -50,13 +50,16 @@ export default async function ReadNowPage() {
           className="mt-6"
         />
       ) : (
-        <ul className="mt-6 space-y-3">
-          {readings.map((reading) => {
-            const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
+        /* One surface with hairlines, not a card per reading. Law 13: the
+         * shelf is scrolled, so it is a list, and a card each cost every row
+         * its own border and eight pixels of margin for nothing. */
+        <Card padding="none" className="mt-6">
+          <ul className="divide-y divide-border">
+            {readings.map((reading) => {
+              const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
 
-            return (
-              <li key={reading.id}>
-                <Card padding="dense">
+              return (
+                <li key={reading.id} className="card-pad-x row-pad">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                     <h2 className="text-body font-medium text-ink">{reading.subject}</h2>
                     <Link
@@ -100,11 +103,11 @@ export default async function ReadNowPage() {
                       Everything about it
                     </Link>
                   </div>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
       )}
     </div>
   );
