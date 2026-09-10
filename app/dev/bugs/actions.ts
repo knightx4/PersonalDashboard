@@ -246,6 +246,7 @@ export type RoutineRun = {
 
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 
+// latency: instant -- a read for the button's badge, fetched without anything waiting
 export async function routineRun(): Promise<RoutineRun | null> {
   const user = await requireUser();
   const supabase = await createClient();
