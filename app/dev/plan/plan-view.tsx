@@ -1449,7 +1449,7 @@ function Elapsed({ startedAt }: { startedAt: string }) {
  */
 type Health = {
   word: string;
-  tone: 'quiet' | 'ghost' | 'accent' | 'positive' | 'caution';
+  tone: 'quiet' | 'ghost' | 'accent' | 'info' | 'positive' | 'caution';
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   title?: string;
 };
@@ -1481,8 +1481,15 @@ const HEALTH: Record<PlanHealth, Health> = {
   waiting: { word: 'Waiting', tone: 'caution', icon: Hourglass },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
-  // nothing. The shape still separates it from the other accent states.
-  ready: { word: 'Ready', tone: 'accent', icon: Sparkles },
+  // nothing.
+  //
+  // `info` and not `accent`, which is what it used to be and which was not
+  // blue anywhere it was read: the accent is the workspace's hue, and this
+  // page lives in the dev workspace, whose hue is slate. "Blue" was written
+  // in this comment and rendered as grey on the only page that shows it.
+  // `info` is the app's own blue, themed in all five palettes, and it does
+  // not move when the workspace does.
+  ready: { word: 'Ready', tone: 'info', icon: Sparkles },
   not_started: { word: 'Not started', tone: 'quiet', icon: CircleDashed },
   done: { word: 'Done', tone: 'positive', icon: Check },
   dropped: { word: 'Dropped', tone: 'ghost', icon: X },
@@ -1553,10 +1560,21 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
   );
 }
 
+/**
+ * `info` is the app's blue, and it is deliberately not `accent`.
+ *
+ * The accent is whichever hue the workspace you are standing in owns, so an
+ * accent-toned state is a different colour on every page and slate on this
+ * one. A state that means the same thing everywhere needs a hue that does
+ * too. `status-submitted` is that blue: defined in all five palettes, and
+ * already read as a general "info" outside the pipeline it is named for --
+ * see the jobs activity feed, which tones its info lines with it.
+ */
 const TONE_TEXT: Record<Health['tone'], string> = {
   quiet: 'text-ink-muted',
   ghost: 'text-ink-ghost',
   accent: 'text-accent',
+  info: 'text-status-submitted',
   positive: 'text-positive',
   caution: 'text-caution',
 };
@@ -1565,6 +1583,7 @@ const TONE_DOT: Record<Health['tone'], string> = {
   quiet: 'bg-ink-ghost',
   ghost: 'bg-ink-ghost',
   accent: 'bg-accent',
+  info: 'bg-status-submitted',
   positive: 'bg-positive',
   caution: 'bg-caution',
 };
