@@ -29,6 +29,7 @@ const welcomeSchema = z.object({
   searchStartedOn: z.string().optional(),
 });
 
+// latency: pending
 export async function saveWelcome(
   _prev: OnboardingState,
   formData: FormData,
@@ -71,6 +72,7 @@ export async function saveWelcome(
  * the first backfill has something to match against instead of holding
  * everything for review.
  */
+// latency: pending
 export async function saveCompanies(
   _prev: OnboardingState,
   formData: FormData,
@@ -102,6 +104,7 @@ export async function saveCompanies(
   redirect('/jobs/onboarding?step=gmail');
 }
 
+// latency: pending
 export async function finishOnboarding(): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();

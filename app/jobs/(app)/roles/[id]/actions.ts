@@ -38,6 +38,7 @@ const noteSchema = z
     { message: 'A note attaches to exactly one thing.' },
   );
 
+// latency: pending
 export async function addNote(input: {
   body: string;
   companyId?: string;
@@ -91,6 +92,7 @@ export async function addNote(input: {
  * is being written on, it already knows which role it is, and a note that is
  * saved but does not reappear until a hard reload is a note you write twice.
  */
+// latency: pending
 export async function updateNote(input: {
   noteId: string;
   roleId: string;
@@ -129,6 +131,7 @@ const renameRoleSchema = z.object({
  * not read at all are left as "Role from email" -- both are worth overriding
  * by hand rather than living with.
  */
+// latency: pending
 export async function renameRole(roleId: string, title: string): Promise<{ error: string | null }> {
   const parsed = renameRoleSchema.safeParse({ roleId, title });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -168,6 +171,7 @@ const moveRoleSchema = z.object({
  * The company is resolved by name the same way creating a role resolves it, so
  * a company that is not on file yet is created rather than blocking the move.
  */
+// latency: pending
 export async function moveRoleToCompany(
   roleId: string,
   companyName: string,
@@ -227,6 +231,7 @@ const unlinkSchema = z.object({
  * status derived from mail this role no longer claims. The pair is remembered
  * as declined so the same suggestion does not immediately offer itself again.
  */
+// latency: pending
 export async function unlinkMessage(
   messageId: string,
   applicationId: string,
@@ -299,6 +304,7 @@ const reminderSchema = z.object({
  * ones — `rule_key` stays null, which is what tells the sweep this one is
  * not its to manage, so it will not touch or re-fire it.
  */
+// latency: pending
 export async function addReminder(input: {
   applicationId: string;
   body: string;
@@ -344,6 +350,7 @@ const reminderPatchSchema = z.object({
  * The sweep's own reminders are edited here as freely as hand-written ones:
  * `rule_key` is what stops it re-firing, and it is not touched.
  */
+// latency: pending
 export async function updateReminder(input: {
   reminderId: string;
   body: string;
@@ -387,6 +394,7 @@ const reminderMessageSchema = z.object({
  * usually arrives first and the to-do is written from it -- and because the
  * one you want is often not the one you were looking at.
  */
+// latency: pending
 export async function linkReminderMessage(input: {
   reminderId: string;
   messageId: string | null;
@@ -456,6 +464,7 @@ const interviewPatchSchema = z.object({
  * The round number is not here. It belongs to the round now, and is set
  * through `saveInterviewGroup`.
  */
+// latency: pending
 export async function saveInterview(
   interviewId: string,
   patch: {
@@ -570,6 +579,7 @@ async function positionInRound(
  * follow" is a real round worth putting on the board, and so is a day agreed
  * without an hour. Either can be filled in later through `saveInterview`.
  */
+// latency: pending
 export async function addInterview(input: {
   applicationId: string;
   kind: string;
@@ -626,6 +636,7 @@ const participantSchema = z.object({
  * one on the contacts page -- so it carries the title, the LinkedIn and every
  * touch, instead of being a second, unlinked copy of a person.
  */
+// latency: pending
 export async function addInterviewer(input: {
   interviewId: string;
   contactId: string;
@@ -681,6 +692,7 @@ const newInterviewerSchema = z.object({
  * They land on the company the pursuit is at, so the name on the round is a
  * real contact record with a page of its own rather than a loose string.
  */
+// latency: pending
 export async function addInterviewerByName(input: {
   interviewId: string;
   name: string;
@@ -754,6 +766,7 @@ export async function addInterviewerByName(input: {
   return { error: null };
 }
 
+// latency: pending
 export async function removeInterviewer(input: {
   interviewId: string;
   contactId: string;
@@ -794,6 +807,7 @@ const groupSchema = z.object({
  * behind are swept up: an empty round the user never made and cannot see the
  * purpose of is litter, and the next visit would offer to gather it again.
  */
+// latency: pending
 export async function groupInterviews(input: {
   applicationId: string;
   interviewIds: string[];
@@ -898,6 +912,7 @@ const newRoundSchema = z.object({
  * the inbox and some by hand. So the container comes first and fills up, which
  * is the way round the user actually works.
  */
+// latency: pending
 export async function createInterviewRound(input: {
   applicationId: string;
   label?: string;
@@ -949,6 +964,7 @@ export async function createInterviewRound(input: {
  * empty" a rule with teeth behind it rather than a nicety, and it is enforced
  * below as well as in the card.
  */
+// latency: pending
 export async function deleteInterviewRound(groupId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(groupId);
   if (!parsed.success) return { error: 'That is not a round.' };
@@ -993,6 +1009,7 @@ const groupPatchSchema = z.object({
  * that is first or second or final, and the four conversations of a superday
  * are all the same round however they are ordered within the day.
  */
+// latency: pending
 export async function saveInterviewGroup(
   groupId: string,
   patch: { label?: string; notes?: string; roundNumber?: number | null },
@@ -1037,6 +1054,7 @@ const roundMessageSchema = z.object({
  * never reaches across pursuits — it is only ever saying which of the emails
  * on this role belong to which round of it.
  */
+// latency: pending
 export async function linkRoundMessage(input: {
   groupId: string;
   messageId: string;
@@ -1078,6 +1096,7 @@ export async function linkRoundMessage(input: {
  * linked to the pursuit and keeps its place on the timeline — this is the
  * round being corrected, not the mail being unlinked.
  */
+// latency: pending
 export async function unlinkRoundMessage(input: {
   groupId: string;
   messageId: string;
@@ -1110,6 +1129,7 @@ export async function unlinkRoundMessage(input: {
  * because an empty round is a real state; `deleteInterviewRound` is how one
  * goes.
  */
+// latency: pending
 export async function ungroupInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);
   if (!parsed.success) return { error: 'That is not an interview.' };
@@ -1146,6 +1166,7 @@ export async function ungroupInterview(interviewId: string): Promise<{ error: st
 }
 
 /** The inbox read one scheduling thread as two rounds; this is how you say so. */
+// latency: pending
 export async function deleteInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);
   if (!parsed.success) return { error: 'That is not an interview.' };
@@ -1167,6 +1188,7 @@ export async function deleteInterview(interviewId: string): Promise<{ error: str
 }
 
 /** Approve a suggested match, or one found through "add other": the same manual link the review queue writes. */
+// latency: pending
 export async function linkCandidateMessage(
   messageId: string,
   applicationId: string,
@@ -1186,6 +1208,7 @@ const declineSchema = z.object({
  * coming back — the message itself is untouched and can still be linked
  * elsewhere, or found again through "add other" if this was a mistake.
  */
+// latency: pending
 export async function declineCandidateMessage(
   messageId: string,
   applicationId: string,
@@ -1211,6 +1234,7 @@ export async function declineCandidateMessage(
 }
 
 /** The "add other" search: any unlinked mail naming the search term, not just the company. */
+// latency: pending
 export async function searchUnlinkedMessages(
   applicationId: string,
   term: string,
@@ -1242,6 +1266,7 @@ export async function searchUnlinkedMessages(
  */
 const matchSchema = z.object({ roleId: z.string().uuid() });
 
+// latency: pending
 export async function matchRoleRequirements(
   input: z.input<typeof matchSchema>,
 ): Promise<{ matches: RequirementMatch[] | null; error: string | null }> {
@@ -1344,6 +1369,7 @@ const shareSchema = z.object({
   body: z.string().trim().max(8000).optional(),
 });
 
+// latency: pending
 export async function shareCasePage(
   input: z.input<typeof shareSchema>,
 ): Promise<{ slug: string | null; expiresAt: string | null; error: string | null }> {
@@ -1419,6 +1445,7 @@ export async function shareCasePage(
  * both and a row with a live expiry and no slug is a row one careless update
  * away from being public again.
  */
+// latency: pending
 export async function unshareCasePage(
   applicationId: string,
 ): Promise<{ error: string | null }> {
@@ -1502,6 +1529,7 @@ const prepNoteSchema = z.object({
  * button on a page anybody visits twice is a model call anybody pays for
  * twice.
  */
+// latency: pending
 export async function writeRoundPrepNote(
   input: z.input<typeof prepNoteSchema>,
 ): Promise<{ note: PrepNote | null; error: string | null }> {

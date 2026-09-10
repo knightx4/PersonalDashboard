@@ -164,6 +164,7 @@ const addSchema = z.object({
  * because a sub-step of a shopping feature that claimed to be a jobs step
  * would show up in neither place anyone looked for it.
  */
+// latency: pending
 export async function addPlanItem(
   _prev: PlanActionState,
   formData: FormData,
@@ -237,6 +238,7 @@ const updateSchema = z.object({
  * database refuses a parent that is the step's own descendant, and that
  * refusal is shown rather than swallowed.
  */
+// latency: pending
 export async function updatePlanItem(
   _prev: PlanActionState,
   formData: FormData,
@@ -319,6 +321,7 @@ export async function updatePlanItem(
  * answer is one click from the list rather than a form you have to open, fill
  * and submit.
  */
+// latency: pending
 export async function setPlanItemStatus(
   _prev: PlanActionState,
   formData: FormData,
@@ -368,6 +371,7 @@ export async function setPlanItemStatus(
  * happens. Steps beneath it that are already decided on are left alone.
  * This is the one move a session never makes.
  */
+// latency: pending
 export async function approvePlanItem(
   _prev: PlanActionState,
   formData: FormData,
@@ -410,6 +414,7 @@ export async function approvePlanItem(
  * that it has been agreed to, and nothing picks up a proposal: `next --claude`
  * lists approved steps only.
  */
+// latency: pending
 export async function setPlanItemAssignee(
   _prev: PlanActionState,
   formData: FormData,
@@ -459,6 +464,7 @@ export async function setPlanItemAssignee(
  * numbers moves nothing. Re-dealing costs a handful of writes on a list that
  * is a handful long.
  */
+// latency: pending
 export async function movePlanItem(
   _prev: PlanActionState,
   formData: FormData,
@@ -533,6 +539,7 @@ export async function movePlanItem(
  * The dated line on the comment is the same one the CLI writes, so a decision
  * answered on the page and one answered from a terminal read the same.
  */
+// latency: pending
 export async function answerPlanDecision(
   _prev: PlanActionState,
   formData: FormData,
@@ -611,6 +618,7 @@ export async function answerPlanDecision(
 }
 
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
+// latency: pending
 export async function deletePlanItem(
   _prev: PlanActionState,
   formData: FormData,
@@ -633,6 +641,7 @@ export async function deletePlanItem(
 }
 
 /** "Cannot start until that one is done." */
+// latency: pending
 export async function addPlanDependency(
   _prev: PlanActionState,
   formData: FormData,
@@ -656,6 +665,7 @@ export async function addPlanDependency(
   return { message: 'Added.' };
 }
 
+// latency: pending
 export async function removePlanDependency(
   _prev: PlanActionState,
   formData: FormData,
@@ -687,6 +697,7 @@ export async function removePlanDependency(
  * fails to start is a thing to retry, and the plan should already say who it
  * was meant for.
  */
+// latency: pending
 export async function sendPlanItemToClaude(
   _prev: PlanActionState,
   formData: FormData,
@@ -768,6 +779,7 @@ export async function sendPlanItemToClaude(
  * Proposed steps beneath an approved feature are left alone rather than swept
  * in: a step nobody has said yes to is not part of the batch.
  */
+// latency: pending
 export async function sendPlanFeatureToClaude(
   _prev: PlanActionState,
   formData: FormData,
@@ -917,6 +929,7 @@ async function startReshape(
   return fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text });
 }
 
+// latency: pending
 export async function reshapePlanFeature(
   _prev: PlanActionState,
   formData: FormData,
@@ -980,6 +993,7 @@ export async function reshapePlanFeature(
  * urgent first. One routine works the lot in that order, because two sessions
  * on one plan would take the same step twice.
  */
+// latency: pending
 export async function sendPlanQueueToClaude(
   // Signature is fixed by useActionState; the button sends nothing.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1046,6 +1060,7 @@ export async function sendPlanQueueToClaude(
  * written flat, and nesting it is a judgement the page exists to let you make
  * afterwards, one move at a time.
  */
+// latency: pending
 export async function seedPlan(
   // Signature is fixed by useActionState; the button sends nothing.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

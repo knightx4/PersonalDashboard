@@ -50,6 +50,7 @@ const createSchema = z.object({
   excitement: z.coerce.number().min(1).max(5).optional(),
 });
 
+// latency: pending
 export async function createRole(
   _prev: RoleFormState,
   formData: FormData,
@@ -151,6 +152,7 @@ export async function createRole(
 }
 
 /** Fetch a posting so the form can be filled in from a pasted link. */
+// latency: pending
 export async function fetchJobDescription(
   _prev: RoleFormState,
   formData: FormData,
@@ -185,6 +187,7 @@ export async function fetchJobDescription(
   };
 }
 
+// latency: pending
 export async function updateRole(
   roleId: string,
   patch: {
@@ -254,6 +257,7 @@ export async function updateRole(
 }
 
 /** Paste a block of questions. The path that always works. */
+// latency: pending
 export async function addQuestions(
   applicationId: string,
   block: string,
@@ -309,6 +313,7 @@ export async function addQuestions(
   return { error: null, added };
 }
 
+// latency: pending
 export async function saveAnswer(
   answerId: string,
   answer: string,
@@ -332,6 +337,7 @@ export async function saveAnswer(
  * This is the loop that compounds: after twenty applications the common
  * questions are answered and the work per application drops to tailoring.
  */
+// latency: pending
 export async function promoteToCanonical(
   questionId: string,
   answer: string,
@@ -372,6 +378,7 @@ export interface JdLookupResult {
  * an empty one, but the rule that automated work never overwrites what a person
  * wrote belongs here, where it cannot be got round by a stale page.
  */
+// latency: pending
 export async function lookUpJobDescription(roleId: string): Promise<JdLookupResult> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -471,6 +478,7 @@ export async function lookUpJobDescription(roleId: string): Promise<JdLookupResu
  */
 const draftSchema = z.object({ answerId: z.string().uuid() });
 
+// latency: pending
 export async function draftAnswerFromEvidence(
   input: z.input<typeof draftSchema>,
 ): Promise<{ draft: AnswerDraft | null; error: string | null }> {
@@ -588,6 +596,7 @@ const acceptDraftSchema = z.object({
  * used counters go up here rather than at draft time, so a draft you discarded
  * does not make a story look worn out.
  */
+// latency: pending
 export async function saveDraftedAnswer(
   input: z.input<typeof acceptDraftSchema>,
 ): Promise<{ error: string | null }> {

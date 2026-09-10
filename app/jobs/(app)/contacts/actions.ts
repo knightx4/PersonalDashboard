@@ -24,6 +24,7 @@ const contactSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+// latency: pending
 export async function createContact(
   _prev: { error?: string; message?: string },
   formData: FormData,
@@ -75,6 +76,7 @@ const contactEditSchema = z.object({
  * inbox can give you, so title, LinkedIn and how you actually know them stay
  * blank until you add them by hand.
  */
+// latency: pending
 export async function updateContact(
   contactId: string,
   input: {
@@ -112,6 +114,7 @@ export async function updateContact(
   return { error: null };
 }
 
+// latency: pending
 export async function logTouch(input: {
   contactId: string;
   channel: 'linkedin_dm' | 'linkedin_connect' | 'email' | 'intro' | 'event' | 'other';
@@ -149,6 +152,7 @@ export async function logTouch(input: {
   return { error: null };
 }
 
+// latency: pending
 export async function markTouchAnswered(
   touchId: string,
   summary: string,

@@ -32,6 +32,7 @@ const inputSchema = z.object({
 export type RespondInput = z.infer<typeof inputSchema>;
 
 /** `null` means the link itself is no longer good -- revoked, expired, or wrong. */
+// latency: pending
 export async function respondToShare(raw: RespondInput): Promise<RespondResult | null> {
   const parsed = inputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'negative' };

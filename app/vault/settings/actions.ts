@@ -30,6 +30,7 @@ const ConnectInput = z.object({
   token: z.string().trim().min(1, 'Paste a fine-grained access token.'),
 });
 
+// latency: pending
 export async function connectVault(
   _prev: VaultActionState,
   formData: FormData,
@@ -86,6 +87,7 @@ export async function connectVault(
  * mirror of someone's private notes around after they asked to disconnect
  * would be the wrong default by a wide margin.
  */
+// latency: pending
 export async function disconnectVault(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
@@ -110,6 +112,7 @@ export async function disconnectVault(formData: FormData): Promise<void> {
  * actually differs. On an unchanged vault this costs one tree listing and no
  * note fetches at all.
  */
+// latency: pending
 export async function rescanVault(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });

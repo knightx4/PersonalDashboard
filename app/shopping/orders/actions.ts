@@ -85,6 +85,7 @@ function slugify(name: string): string {
     .slice(0, 60);
 }
 
+// latency: pending
 export async function createManualOrder(
   _prev: ActionState,
   formData: FormData,
@@ -259,6 +260,7 @@ export async function createManualOrder(
  * Mute a merchant forever + remove their existing orders.
  * One click from order detail: clear the noise and don't bring it back on import.
  */
+// latency: pending
 export async function excludeMerchantFromOrder(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -346,6 +348,7 @@ export async function excludeMerchantFromOrder(formData: FormData): Promise<void
   redirect('/shopping/orders');
 }
 
+// latency: pending
 export async function restoreMerchantExclusion(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -373,6 +376,7 @@ export async function restoreMerchantExclusion(formData: FormData): Promise<void
  * Returns `{ ok: true }` on success so client callers can navigate/refresh.
  * Throws only for unexpected failures; returns `{ error }` for expected ones.
  */
+// latency: pending
 export async function softDeleteOrder(
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -410,6 +414,7 @@ export async function softDeleteOrder(
   return { ok: true };
 }
 
+// latency: pending
 export async function restoreDeletedOrder(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -438,6 +443,7 @@ export async function restoreDeletedOrder(formData: FormData): Promise<void> {
 }
 
 /** Permanently remove a soft-deleted order (cascades items + inventory). */
+// latency: pending
 export async function permanentlyDeleteOrder(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -474,6 +480,7 @@ export async function permanentlyDeleteOrder(formData: FormData): Promise<void> 
   revalidatePath('/shopping/settings');
 }
 
+// latency: pending
 export async function addOrderItemTag(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z
@@ -508,6 +515,7 @@ export async function addOrderItemTag(formData: FormData): Promise<void> {
   revalidatePath('/shopping/settings');
 }
 
+// latency: pending
 export async function removeOrderItemTag(input: {
   orderId: string;
   orderItemId: string;

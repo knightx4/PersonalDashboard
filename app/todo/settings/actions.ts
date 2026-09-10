@@ -17,6 +17,7 @@ const horizonSchema = z.coerce
   .min(1, 'A horizon of less than a day is not a horizon.')
   .max(90, 'Ninety days is the most the agenda will look ahead.');
 
+// latency: pending
 export async function updateAgendaSettings(
   _prev: AgendaSettingsState,
   formData: FormData,

@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { cardVariants } from '@/components/ui/card';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { FieldError, Input } from '@/components/ui/field';
 import { completeTask, reopenTask } from '@/app/todo/actions';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import type { LinkTarget } from '@/lib/todo/links/model';
-import type { Task } from '@/lib/todo/tasks/model';
+import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
 
 /**
  * The tasks attached to one thing, wherever that thing is rendered.
@@ -140,17 +141,32 @@ function LinkedRow({
   returnTo: string;
 }) {
   const [pending, start] = useTransition();
-  const done = task.status === 'done';
-  const dropped = task.status === 'dropped';
+
+  // The same checkbox as a row on /todo, and drawn the same way: filled the
+  // moment it is clicked, back on the server's status if the write is refused.
+  const { shown, run, failed } = useOptimisticWrite<TaskStatus, TaskStatus>({
+    value: task.status,
+    apply: (_current, next) => next,
+    write: (next) => (next === 'done' ? completeTask(task.id) : reopenTask(task.id)),
+  });
+
+  const done = shown === 'done';
+  const dropped = shown === 'dropped';
 
   return (
-    <li className={cn('group flex items-center gap-2 py-1.5', pending && 'opacity-50')}>
+    <li
+      className={cn(
+        'group flex items-center gap-2 py-1.5',
+        pending && 'opacity-50',
+        failed && 'bg-danger-tint',
+      )}
+    >
       {/* The same toggle as a row on /todo: the glyph is the state, the
           button is the hit area. */}
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() => start(() => (done ? reopenTask(task.id) : completeTask(task.id)))}
+        onClick={() => run(done ? 'open' : 'done')}
         className={cn(
           'press flex size-4 shrink-0 items-center justify-center transition-colors duration-150',
           done
@@ -160,7 +176,7 @@ function LinkedRow({
               : 'text-ink-muted hover:text-accent',
         )}
       >
-        <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={14} />
+        <StatusGlyph glyph={TASK_STATUS_GLYPHS[shown]} size={14} />
       </button>
 
       <span

@@ -64,6 +64,7 @@ function parse(formData: FormData, today: string) {
  * nothing, and the message you get back is the database's own words rather
  * than "Something went wrong".
  */
+// latency: pending
 export async function addTask(
   _prev: TaskFormState,
   formData: FormData,
@@ -97,6 +98,7 @@ export async function addTask(
   return { message: 'Added.' };
 }
 
+// latency: pending
 export async function editTask(
   _prev: TaskFormState,
   formData: FormData,
@@ -128,6 +130,7 @@ export async function editTask(
  * They return the message rather than throwing it, because the one failure
  * worth reading -- pointing at somebody else's row -- has words of its own.
  */
+// latency: pending
 export async function pointTaskAt(
   taskId: string,
   target: string,
@@ -143,6 +146,7 @@ export async function pointTaskAt(
   return { error: null };
 }
 
+// latency: pending
 export async function unpointTask(taskId: string): Promise<{ error: string | null }> {
   await requireUser();
 
@@ -159,41 +163,69 @@ export async function unpointTask(taskId: string): Promise<{ error: string | nul
  * Each takes the id and nothing else, and each re-reads the user from the
  * session. Never from the form: an id in a request body is a request, and the
  * account it belongs to is not something a request gets to assert.
+ *
+ * Each returns the write's error, the same shape as `pointTaskAt` above. A row
+ * that drew the change before the round trip finished needs the error to put
+ * itself back; a caller that does not draw ahead can ignore it.
  */
-export async function completeTask(id: string): Promise<void> {
+// latency: optimistic -- the checkbox fills before the write returns
+export async function completeTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await setTaskStatus(user.id, id, 'done');
+  const { error } = await setTaskStatus(user.id, id, 'done');
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
-export async function reopenTask(id: string): Promise<void> {
+// latency: optimistic -- the same checkbox, the other way
+export async function reopenTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await setTaskStatus(user.id, id, 'open');
+  const { error } = await setTaskStatus(user.id, id, 'open');
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
-export async function dropTask(id: string): Promise<void> {
+// latency: optimistic -- the row strikes through before the write returns
+export async function dropTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await setTaskStatus(user.id, id, 'dropped');
+  const { error } = await setTaskStatus(user.id, id, 'dropped');
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
-export async function pinTask(id: string, pinned: boolean): Promise<void> {
+// latency: optimistic -- the pin appears before the write returns
+export async function pinTask(id: string, pinned: boolean): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await setTaskPinned(user.id, id, pinned);
+  const { error } = await setTaskPinned(user.id, id, pinned);
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
-export async function laterTask(id: string): Promise<void> {
+// latency: optimistic -- the row offers "bring back" before the write returns
+export async function laterTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await snoozeTask(user.id, id);
+  const { error } = await snoozeTask(user.id, id);
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
-export async function bringBackTask(id: string): Promise<void> {
+// latency: optimistic -- the same button, the other way
+export async function bringBackTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await unsnoozeTask(user.id, id);
+  const { error } = await unsnoozeTask(user.id, id);
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
 /**
@@ -205,21 +237,28 @@ export async function bringBackTask(id: string): Promise<void> {
  * their being ids: every row written is scoped to this session's user, so the
  * worst a made-up list can do is number tasks the sender already owns.
  */
+// latency: pending
 export async function moveTask(
   id: string,
   direction: 'up' | 'down',
   pile: string[],
-): Promise<void> {
+): Promise<{ error: string | null }> {
   const from = pile.indexOf(id);
+  if (from === -1) return { error: 'That task is not in this list.' };
+
+  // Already at the top or the bottom. Nothing to write, and nothing wrong.
   const to = direction === 'up' ? from - 1 : from + 1;
-  if (from === -1 || to < 0 || to >= pile.length) return;
+  if (to < 0 || to >= pile.length) return { error: null };
 
   const next = [...pile];
   [next[from], next[to]] = [next[to], next[from]];
 
   const user = await requireUser();
-  await reorderTasks(user.id, next);
+  const { error } = await reorderTasks(user.id, next);
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
 /**
@@ -234,27 +273,38 @@ export async function moveTask(
  * The same trust story as `moveTask`: the pile is the caller's, and every row
  * written is scoped to this session's user.
  */
+// latency: pending
 export async function placeTask(
   id: string,
   before: string | null,
   pile: string[],
-): Promise<void> {
-  if (id === before || !pile.includes(id)) return;
+): Promise<{ error: string | null }> {
+  if (id === before) return { error: null };
+  if (!pile.includes(id)) return { error: 'That task is not in this list.' };
 
   const rest = pile.filter((other) => other !== id);
   const at = before === null ? rest.length : rest.indexOf(before);
-  if (at === -1) return;
+  // The neighbour it was dropped above has gone, so the pile is not the one
+  // the sender was looking at and where they meant is no longer knowable.
+  if (at === -1) return { error: 'This list has changed. Try that again.' };
 
   const next = [...rest.slice(0, at), id, ...rest.slice(at)];
-  if (next.every((value, index) => value === pile[index])) return;
+  if (next.every((value, index) => value === pile[index])) return { error: null };
 
   const user = await requireUser();
-  await reorderTasks(user.id, next);
+  const { error } = await reorderTasks(user.id, next);
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }
 
-export async function removeTask(id: string): Promise<void> {
+// latency: pending
+export async function removeTask(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  await deleteTask(user.id, id);
+  const { error } = await deleteTask(user.id, id);
+  if (error) return { error };
+
   revalidateTodo();
+  return { error: null };
 }

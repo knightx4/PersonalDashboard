@@ -41,6 +41,7 @@ const schema = z.object({
  * cannot end up disagreeing -- which is what they did for months, because only
  * the job side had a screen that edited one.
  */
+// latency: pending
 export async function updateAccountSettings(
   _prev: AccountState,
   formData: FormData,
@@ -79,6 +80,7 @@ export async function updateAccountSettings(
  * switcher and stops contributing to the agenda. Nothing is deleted, no link
  * breaks, and turning it back on restores exactly what was there.
  */
+// latency: pending
 export async function updateEnabledModules(
   _prev: AccountState,
   formData: FormData,

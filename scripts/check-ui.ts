@@ -109,6 +109,15 @@ type Rule = {
    * everywhere else to use instead.
    */
   skip?: RegExp;
+  /**
+   * Paths this rule asks about, and no others. Absent means everywhere under
+   * ROOTS.
+   *
+   * The inverse of `skip`, for a rule whose subject only exists in one kind of
+   * file: a server action lives in an actions file, and a rule about actions
+   * asked of every component would be a rule about nothing.
+   */
+  only?: RegExp;
   /** Every offending span on this line, or nothing. */
   find: (line: string, context: RuleContext) => string[];
 };
@@ -396,6 +405,40 @@ const RULES: Rule[] = [
       return ['composer open on arrival'];
     },
   },
+  {
+    id: 'action-without-tier',
+    law: '-',
+    says: 'an action with no latency tier',
+    instead: '// latency: instant | optimistic | pending directly above it',
+    /**
+     * An exported action with no `// latency:` line above it.
+     *
+     * /dev/ui gives every write one of three tiers and the app predated the
+     * table, so a tier that lives anywhere but beside the action drifts from it
+     * -- which is why it is a comment on the function (#171) and why this is
+     * what makes somebody write one. The gate can only see that a tier is
+     * there; whether it is the right one is a reading, not a grep.
+     *
+     * The tag has to be in the comment block directly above, which is where
+     * the eye looks and the only place that cannot end up describing a
+     * different function. A blank line between the tag and the export breaks
+     * the block, so the tag has to be the line above -- after any doc comment,
+     * not before it.
+     */
+    only: /actions\.tsx?$/,
+    find: (line, { before }) => {
+      const declared = /^export async function (\w+)\(/.exec(line);
+      if (!declared) return [];
+
+      for (let above = before.length - 1; above >= 0; above -= 1) {
+        const previous = before[above]!.trim();
+        if (!isCommentLine(previous)) break;
+        if (/^\/\/\s*latency:\s*(?:instant|optimistic|pending)\b/.test(previous)) return [];
+      }
+
+      return [`${declared[1]}() has no tier`];
+    },
+  },
 ];
 
 // -- The walk ---------------------------------------------------------------
@@ -452,6 +495,7 @@ function scan(): Hit[] {
         for (const rule of RULES) {
           if (excused.has(rule.id)) continue;
           if (rule.skip?.test(file)) continue;
+          if (rule.only && !rule.only.test(file)) continue;
           const context: RuleContext = {
             after: lines.slice(index + 1, index + 7),
             before: lines.slice(0, index),

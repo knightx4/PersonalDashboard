@@ -29,6 +29,7 @@ const schema = z.object({
   body: z.string().trim().min(3).max(4000),
 });
 
+// latency: pending
 export async function noteOnSurface(
   _prev: SurfaceNoteState,
   formData: FormData,

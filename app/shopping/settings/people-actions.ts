@@ -33,6 +33,7 @@ const addSchema = z.object({
   colour: z.enum(PERSON_COLOURS).default('brand'),
 });
 
+// latency: pending
 export async function addPerson(_prev: PeopleState, formData: FormData): Promise<PeopleState> {
   const parsed = addSchema.safeParse({
     name: formData.get('name') ?? '',
@@ -74,6 +75,7 @@ const updateSchema = z.object({
   colour: z.enum(PERSON_COLOURS).optional(),
 });
 
+// latency: pending
 export async function updatePerson(
   input: z.input<typeof updateSchema>,
 ): Promise<{ error: string | null }> {
@@ -110,6 +112,7 @@ export async function updatePerson(
  * happened still happened, and deleting somebody's purchase history because a
  * label was wrong would be the worst possible reading of this button.
  */
+// latency: pending
 export async function removePerson(personId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(personId);
   if (!parsed.success) return { error: 'That is not a person.' };
@@ -142,6 +145,7 @@ const assignSchema = z.object({
  * from here inherits it, which is what makes the split happen without anybody
  * tagging anything by hand.
  */
+// latency: pending
 export async function assignInboxToPerson(
   input: z.input<typeof assignSchema>,
 ): Promise<{ error: string | null }> {

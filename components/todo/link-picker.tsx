@@ -222,7 +222,7 @@ export function LinkFinder({
           placeholder="What is this about?"
           aria-label="What is this about?"
           data-focus-ring="none"
-          className="h-10 w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-ghost"
+          className="h-(--control-h) w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-ghost"
         />
       </div>
 

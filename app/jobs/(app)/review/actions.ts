@@ -21,6 +21,7 @@ const linkSchema = z.object({
   applicationId: z.string().uuid(),
 });
 
+// latency: pending
 export async function linkMessage(
   messageId: string,
   applicationId: string,
@@ -108,6 +109,7 @@ const newRoleSchema = z.object({
  * a rejection lands as rejected and an interview invite as in process without
  * this having to guess.
  */
+// latency: pending
 export async function createRoleFromMessage(input: {
   messageId: string;
   companyName: string;
@@ -187,6 +189,7 @@ export async function createRoleFromMessage(input: {
  * in the schema cache" error: they stopped existing on this table at the
  * ingestion unification.
  */
+// latency: pending
 export async function dismissMessage(messageId: string): Promise<{ error: string | null }> {
   await requireUser();
   const supabase = await createClient();
@@ -208,6 +211,7 @@ export async function dismissMessage(messageId: string): Promise<{ error: string
   return { error: null };
 }
 
+// latency: pending
 export async function confirmApplication(
   applicationId: string,
 ): Promise<{ error: string | null }> {
@@ -226,6 +230,7 @@ export async function confirmApplication(
   return { error: null };
 }
 
+// latency: pending
 export async function deleteInferredApplication(
   applicationId: string,
 ): Promise<{ error: string | null }> {
@@ -282,6 +287,7 @@ export async function deleteInferredApplication(
  * lib/jobs/review/exclusions.ts, which is also what decides whether this
  * button is offered at all.
  */
+// latency: pending
 export async function excludeCompanyForApplication(
   applicationId: string,
 ): Promise<{ error: string | null; message?: string }> {
@@ -355,6 +361,7 @@ export async function excludeCompanyForApplication(
  * record that a person answered it, the flag came straight back and the button
  * did nothing at all.
  */
+// latency: pending
 export async function acknowledgeEvent(eventId: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -376,6 +383,7 @@ export async function acknowledgeEvent(eventId: string): Promise<{ error: string
  * A stray email never does this on its own. When a recruiter genuinely does
  * come back after a rejection, this is the explicit action that says so.
  */
+// latency: pending
 export async function reopenApplication(
   applicationId: string,
   status: 'in_process' | 'final_round',

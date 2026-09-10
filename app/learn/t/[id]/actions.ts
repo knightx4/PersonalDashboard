@@ -43,6 +43,7 @@ const AddInput = z.object({
   why: z.string().trim().max(500),
 });
 
+// latency: pending
 export async function addToTrack(
   _prev: TrackActionState,
   formData: FormData,
@@ -86,6 +87,7 @@ const RemoveInput = z.object({
  * rejected promise says and a message returned quietly would leave the button
  * looking like it worked.
  */
+// latency: pending
 export async function removeFromTrack(formData: FormData): Promise<void> {
   await requireUser();
 
@@ -109,6 +111,7 @@ export async function removeFromTrack(formData: FormData): Promise<void> {
  * not: they are shared across tracks, and deleting one track must not take a
  * work another track still points at.
  */
+// latency: pending
 export async function removeTrack(formData: FormData): Promise<void> {
   await requireUser();
 
@@ -136,6 +139,7 @@ export type PlanState = {
  * topic, so it has the most room to be wrong, and a generated plan saved
  * without a look is a queue of things somebody else decided you should read.
  */
+// latency: pending
 export async function planTrack(_prev: PlanState, formData: FormData): Promise<PlanState> {
   const user = await requireUser();
 
@@ -170,6 +174,7 @@ export async function planTrack(_prev: PlanState, formData: FormData): Promise<P
  * and a row that does not survive validation is dropped rather than saved
  * half-formed.
  */
+// latency: pending
 export async function confirmPlan(
   _prev: TrackActionState,
   formData: FormData,

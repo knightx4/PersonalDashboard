@@ -92,6 +92,7 @@ const displayName = (row: UnitRow) => row.short_name?.trim() || row.name.trim();
  * absorbing. Nothing about the copies themselves is rewritten, so ungrouping
  * puts everything back exactly as it was.
  */
+// latency: pending
 export async function groupItemsTogether(
   _prev: ActionState,
   formData: FormData,
@@ -157,6 +158,7 @@ export async function groupItemsTogether(
  * split stick: with no key nothing is ever drawn back into it, and the copy
  * cannot re-stack with the siblings it was just taken from.
  */
+// latency: pending
 export async function separateCopy(
   _prev: ActionState,
   formData: FormData,
@@ -203,6 +205,7 @@ export async function separateCopy(
  * clearing first means the copies are never briefly pointing at a group that
  * is on its way out.
  */
+// latency: pending
 export async function ungroupItems(
   _prev: ActionState,
   formData: FormData,
@@ -244,6 +247,7 @@ export async function ungroupItems(
 }
 
 /** Rename the item a stack of copies represents. */
+// latency: pending
 export async function renameItemGroup(
   _prev: ActionState,
   formData: FormData,

@@ -43,6 +43,7 @@ const ProposeInput = z.object({
   subjectId: z.string().uuid().nullable(),
 });
 
+// latency: pending
 export async function proposeGoal(
   _prev: ProposeState,
   formData: FormData,
@@ -85,6 +86,7 @@ export async function proposeGoal(
   return { chain: result.chain, asked: parsed.data.goal };
 }
 
+// latency: pending
 export async function approveChain(
   _prev: ApproveState,
   formData: FormData,
@@ -153,6 +155,7 @@ const PriorInput = z.object({
   subjectId: z.string().uuid().nullable(),
 });
 
+// latency: pending
 export async function proposePrior(
   _prev: PriorState,
   formData: FormData,
@@ -207,6 +210,7 @@ export async function proposePrior(
  * know this" must not overwrite the one kind of evidence in the module that
  * was collected rather than asserted.
  */
+// latency: pending
 export async function approvePrior(
   _prev: PriorState,
   formData: FormData,

@@ -16,6 +16,7 @@ const moveSchema = z.object({
   status: z.enum(APPLICATION_STATUSES),
 });
 
+// latency: optimistic -- the board draws the card in its new column, the picker the new status
 export async function moveApplication(
   applicationId: string,
   status: ApplicationStatus,
@@ -63,6 +64,7 @@ export async function moveApplication(
   return { error: null };
 }
 
+// latency: pending -- nothing calls this yet
 export async function setExcitement(
   applicationId: string,
   excitement: number | null,
@@ -82,6 +84,7 @@ export async function setExcitement(
   return { error: null };
 }
 
+// latency: pending -- nothing calls this yet
 export async function setNextAction(
   applicationId: string,
   nextAction: string | null,
@@ -117,6 +120,7 @@ export async function setNextAction(
  * make it again. So the mail is disclaimed at the same time: this is the
  * user's answer to "is this real", and it should stick.
  */
+// latency: pending
 export async function dismissPursuit(
   applicationId: string,
 ): Promise<{ error: string | null; removed?: string }> {
@@ -225,6 +229,7 @@ async function deleteCompanyIfOrphaned(
  * from another page, so a query parameter would forget the choice every time,
  * and this is a standing preference rather than a filter.
  */
+// latency: optimistic -- the segment presses at once, the write returns by revalidation
 export async function setPipelineView(
   view: 'board' | 'list',
 ): Promise<{ error: string | null }> {

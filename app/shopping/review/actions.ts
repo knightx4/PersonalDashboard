@@ -24,6 +24,7 @@ function revalidateReviewSurfaces(): void {
 /**
  * Heuristic import looked right — keep the order and stop nagging.
  */
+// latency: pending
 export async function confirmOrderReview(
   _prev: ActionState,
   formData: FormData,
@@ -62,6 +63,7 @@ export async function confirmOrderReview(
  * Bad import — remove the order (cascades inventory) and skip the source email
  * so a re-scan does not recreate it as needs_review without a mute.
  */
+// latency: pending
 export async function discardOrderReview(
   _prev: ActionState,
   formData: FormData,
@@ -112,6 +114,7 @@ export async function discardOrderReview(
  * Email was not a useful order / update — leave the ledger row but stop
  * showing it in Review.
  */
+// latency: pending
 export async function dismissEmailReview(
   _prev: ActionState,
   formData: FormData,

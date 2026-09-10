@@ -38,6 +38,7 @@ async function userTimezone(supabase: Awaited<ReturnType<typeof createClient>>, 
  * way to tell which one you had actually pressed. They are one form now, so
  * this action carries the `attr_<key>` fields as well as the core columns.
  */
+// latency: pending
 export async function updateInventoryItem(
   _prev: ActionState,
   formData: FormData,
@@ -145,6 +146,7 @@ export async function updateInventoryItem(
   };
 }
 
+// latency: pending
 export async function disposeInventoryItem(
   _prev: ActionState,
   formData: FormData,
@@ -200,6 +202,7 @@ export async function disposeInventoryItem(
  * Never writes inventory_items.status = 'returned' — the trigger-owned
  * sync_order_state() function does that from the return.
  */
+// latency: pending
 export async function markInventoryReturned(
   _prev: ActionState,
   formData: FormData,
@@ -267,6 +270,7 @@ export async function markInventoryReturned(
 }
 
 /** Replace list memberships for one inventory item with the submitted checklist. */
+// latency: pending
 export async function updateInventoryItemLists(
   _prev: ActionState,
   formData: FormData,
@@ -319,6 +323,7 @@ export async function updateInventoryItemLists(
 }
 
 /** Create a list from an inventory item page and add this item to it. */
+// latency: pending
 export async function createItemListAndAssign(
   _prev: ActionState,
   formData: FormData,
@@ -391,6 +396,7 @@ export async function createItemListAndAssign(
 }
 
 /** One-click dispose from a list row (defaults to trashed). */
+// latency: pending
 export async function quickDisposeInventoryItem(formData: FormData): Promise<void> {
   const next = new FormData();
   next.set('id', String(formData.get('id') ?? ''));
@@ -401,6 +407,7 @@ export async function quickDisposeInventoryItem(formData: FormData): Promise<voi
 }
 
 /** Add or remove one list membership without replacing the rest. */
+// latency: pending -- should be optimistic: a checkbox that waits for the round trip
 export async function toggleInventoryItemList(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -465,6 +472,7 @@ export async function toggleInventoryItemList(formData: FormData): Promise<void>
  * Remove an inventory unit. Order line / spend history stay; the unit leaves
  * owned inventory. Restoring is not supported — use dispose when you want a record.
  */
+// latency: pending
 export async function deleteInventoryItem(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -512,6 +520,7 @@ function revalidateSellSurfaces(itemIds: string[]): void {
  * Takes a list because the inventory page selects rows — one item is the same
  * call with one id.
  */
+// latency: pending
 export async function setItemsForSale(
   _prev: ActionState,
   formData: FormData,
@@ -564,6 +573,7 @@ export async function setItemsForSale(
  * spend history stay, the unit leaves inventory, and there is no undo — which
  * is why the bar asks a second time before calling this.
  */
+// latency: pending
 export async function deleteInventoryItems(
   _prev: ActionState,
   formData: FormData,
@@ -604,6 +614,7 @@ export async function deleteInventoryItems(
 }
 
 /** Form-action friendly wrapper for list-row icon buttons. */
+// latency: pending -- should be optimistic: a toggle that waits for the round trip
 export async function toggleItemForSaleForm(formData: FormData): Promise<void> {
   const result = await setItemsForSale({}, formData);
   if (result.error) throw new Error(result.error);

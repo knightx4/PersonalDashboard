@@ -47,6 +47,7 @@ export type FindState = {
  * wrong than one given a citation, and a bad source in a queue costs twenty
  * minutes at the moment you were finally going to read something.
  */
+// latency: pending
 export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
   const user = await requireUser();
 
@@ -79,6 +80,7 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
  * The payload rides back through a hidden field, so it is re-validated here
  * rather than trusted -- a form field is user input whoever wrote the form.
  */
+// latency: pending
 export async function attachSource(
   _prev: ReadingActionState,
   formData: FormData,
@@ -118,6 +120,7 @@ const StatusInput = z.object({
   status: z.enum(['queued', 'reading', 'read', 'abandoned']),
 });
 
+// latency: pending
 export async function updateStatus(
   _prev: ReadingActionState,
   formData: FormData,
@@ -150,6 +153,7 @@ const ReadNowInput = z.object({
 });
 
 /** Put this on the Read now shelf, or take it off. */
+// latency: pending -- should be optimistic: a toggle that waits for the round trip
 export async function toggleReadNow(
   _prev: ReadingActionState,
   formData: FormData,
@@ -180,6 +184,7 @@ const NoteInput = z.object({
   note: z.string().max(20_000),
 });
 
+// latency: pending
 export async function updateNote(
   _prev: ReadingActionState,
   formData: FormData,
@@ -220,6 +225,7 @@ export async function updateNote(
  * already had and a basis recorded saying why it could not be narrowed. Being
  * sent to the top of the right page is the floor, not an error.
  */
+// latency: pending
 export async function openReading(formData: FormData): Promise<void> {
   const user = await requireUser();
 
@@ -281,6 +287,7 @@ export type NoteGraphState = {
  * accumulates, and the spec is explicit that nothing auto-creates one --
  * getting it wrong twice leaves somebody with two half-graphs.
  */
+// latency: pending
 export async function readNoteIntoGraph(
   _prev: NoteGraphState,
   formData: FormData,
@@ -326,6 +333,7 @@ export async function readNoteIntoGraph(
 }
 
 /** Attach what the note taught. The same writer as any other chain, minus the goal. */
+// latency: pending
 export async function approveNoteConcepts(
   _prev: NoteGraphState,
   formData: FormData,
