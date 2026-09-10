@@ -16,7 +16,7 @@ import { cn } from '@/lib/cn';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
-import { useToast } from '@/components/ui/toast';
+import { useToast, type ToastInput } from '@/components/ui/toast';
 import {
   bringBackTask,
   completeTask,
@@ -28,7 +28,8 @@ import {
   removeTask,
   reopenTask,
 } from '@/app/todo/actions';
-import type { Task } from '@/lib/todo/tasks/model';
+import { SNOOZE_DAYS, type Task } from '@/lib/todo/tasks/model';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
 
@@ -54,6 +55,28 @@ import { EditTask } from './task-form';
 let dragging: string | null = null;
 
 /**
+ * One row action: how the row should look at once, and the write behind it.
+ *
+ * The patch and the write are handed over together because they are the same
+ * decision -- "this task is done now" is both a checkbox that fills and a call
+ * to completeTask -- and holding them apart is how a row ends up drawing a
+ * change it never sent.
+ */
+type RowWrite = {
+  patch: Partial<Task>;
+  write: () => Promise<{ error: string | null }>;
+  /** Said once the write is through, with the way back in it. */
+  toast?: ToastInput;
+};
+
+/** What "later" does to the row until the server says when. Only the button
+ * reads it: a snoozed task shows "Bring back" where an open one shows "Later".
+ */
+function snoozedFrom(now: number): string {
+  return new Date(now + SNOOZE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
  * The way back, as the toast wants it.
  *
  * The toast reads a thrown error as "could not undo that", and the actions
@@ -68,7 +91,7 @@ function undoWith(write: () => Promise<{ error: string | null }>): () => Promise
 }
 
 export function TaskRow({
-  task,
+  task: serverTask,
   timezone,
   anchor,
   pile,
@@ -94,6 +117,27 @@ export function TaskRow({
   const [edge, setEdge] = useState<'top' | 'bottom' | null>(null);
   const toast = useToast();
 
+  /**
+   * The checkbox, the pin and the snooze, drawn before the round trip.
+   *
+   * All three used to wait for the write and the revalidation that follows it,
+   * which is a fifth of a second of a checkbox that does not fill. `task` below
+   * is the row as it should look now; a refused write leaves the task the
+   * server rendered, so the row goes back on its own.
+   */
+  const {
+    shown: task,
+    run,
+    failed,
+  } = useOptimisticWrite<Task, RowWrite>({
+    value: serverTask,
+    apply: (current, change) => ({ ...current, ...change.patch }),
+    write: (change) => change.write(),
+    onDone: (change) => {
+      if (change.toast) toast(change.toast);
+    },
+  });
+
   // A pile of one has no order to change.
   const siblings = pile && pile.length > 1 ? pile : [];
   const index = siblings.indexOf(task.id);
@@ -104,10 +148,9 @@ export function TaskRow({
   const dropped = task.status === 'dropped';
 
   /**
-   * Run one of the row's writes, and say so if it comes back refused.
-   *
-   * Every action in app/todo/actions.ts returns its error rather than throwing
-   * it, and a row that ignored that would look like the write had worked.
+   * Run one of the writes the row does not draw ahead of: a move, a place, a
+   * delete. Each returns its error rather than throwing, and a row that
+   * ignored that would look like the write had worked.
    */
   function act(write: () => Promise<{ error: string | null }>) {
     start(async () => {
@@ -117,44 +160,35 @@ export function TaskRow({
   }
 
   function complete() {
-    start(async () => {
-      const { error } = await completeTask(task.id);
-      if (error) {
-        toast({ text: error });
-        return;
-      }
-      toast({ text: 'done', undo: undoWith(() => reopenTask(task.id)), undone: 'reopened' });
+    run({
+      patch: { status: 'done' },
+      write: () => completeTask(task.id),
+      toast: { text: 'done', undo: undoWith(() => reopenTask(task.id)), undone: 'reopened' },
     });
   }
 
   function drop() {
-    start(async () => {
-      const { error } = await dropTask(task.id);
-      if (error) {
-        toast({ text: error });
-        return;
-      }
+    run({
+      patch: { status: 'dropped' },
+      write: () => dropTask(task.id),
       // reopenTask is the inverse of a drop: bringBackTask undoes a snooze.
-      toast({
+      toast: {
         text: 'dropped',
         undo: undoWith(() => reopenTask(task.id)),
         undone: 'back on the list',
-      });
+      },
     });
   }
 
   function later() {
-    start(async () => {
-      const { error } = await laterTask(task.id);
-      if (error) {
-        toast({ text: error });
-        return;
-      }
-      toast({
+    run({
+      patch: { snoozedUntil: snoozedFrom(Date.now()) },
+      write: () => laterTask(task.id),
+      toast: {
         text: 'until later',
         undo: undoWith(() => bringBackTask(task.id)),
         undone: 'brought back',
-      });
+      },
     });
   }
 
@@ -198,8 +232,11 @@ export function TaskRow({
       id={`task-${task.id}`}
       className={cn(
         'group row-pad relative flex scroll-mt-24 items-start gap-3',
+        // Only the writes the row waits on dim it. An optimistic one is drawn
+        // as though it were already true, so dimming it would say the opposite.
         pending && 'opacity-50',
         grabbed && 'opacity-40',
+        failed && 'bg-danger-tint',
       )}
       draggable={grabbed}
       onDragStart={(event) => {
@@ -256,7 +293,9 @@ export function TaskRow({
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() => (done ? act(() => reopenTask(task.id)) : complete())}
+        onClick={() =>
+          done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
+        }
         className={cn(
           'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
           done
@@ -335,12 +374,20 @@ export function TaskRow({
             </span>
             <IconButton
               label={task.pinned ? 'Unpin' : 'Pin'}
-              onClick={() => act(() => pinTask(task.id, !task.pinned))}
+              onClick={() =>
+                run({
+                  patch: { pinned: !task.pinned },
+                  write: () => pinTask(task.id, !task.pinned),
+                })
+              }
             >
               <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
             {task.snoozedUntil ? (
-              <IconButton label="Bring back" onClick={() => act(() => bringBackTask(task.id))}>
+              <IconButton
+                label="Bring back"
+                onClick={() => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) })}
+              >
                 <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
             ) : (
@@ -361,7 +408,10 @@ export function TaskRow({
 
         {(done || dropped) && (
           <>
-            <IconButton label="Reopen" onClick={() => act(() => reopenTask(task.id))}>
+            <IconButton
+              label="Reopen"
+              onClick={() => run({ patch: { status: 'open' }, write: () => reopenTask(task.id) })}
+            >
               <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
             <ConfirmStep

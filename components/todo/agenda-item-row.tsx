@@ -1,11 +1,13 @@
 'use client';
 
-import { useTransition } from 'react';
 import { Check, Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useToast } from '@/components/ui/toast';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem } from '@/lib/todo/agenda/sources';
+
+/** What the row has been asked to do, until the page is rebuilt without it. */
+type ItemState = 'open' | 'done' | 'deferred' | 'dismissed';
 
 /**
  * One thing the agenda found somewhere else.
@@ -16,25 +18,35 @@ import type { AgendaItem } from '@/lib/todo/agenda/sources';
  * a date is not a task.
  */
 export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: string }) {
-  const [pending, start] = useTransition();
-  const toast = useToast();
-
   /**
-   * Ask the source to do something, and say so if it will not.
+   * What has been done to this item, before the source has confirmed it.
    *
-   * A source can refuse -- it may have no "done" at all, and the page may be
-   * showing an item from a source that has since been switched off -- so the
-   * message it hands back is shown rather than dropped.
+   * The row cannot take itself off the list -- the page rebuilds the agenda
+   * from the sources -- so the immediate answer is the row marking itself:
+   * ticked and struck through for a finish, faded for a "later" or a "not this
+   * one". It is drawn against a fixed 'open', because an item is on the agenda
+   * exactly while it is outstanding, so a refused write leaves the row as it
+   * was and the hook's toast says which source refused it and why.
    */
-  function act(write: () => Promise<{ error: string | null }>) {
-    start(async () => {
-      const { error } = await write();
-      if (error) toast({ text: error });
-    });
-  }
+  const { shown, run, failed } = useOptimisticWrite<
+    ItemState,
+    { state: ItemState; write: () => Promise<{ error: string | null }> }
+  >({
+    value: 'open',
+    apply: (_current, change) => change.state,
+    write: (change) => change.write(),
+  });
+
+  const acted = shown !== 'open';
 
   return (
-    <div className={cn('group row-pad flex items-start gap-3', pending && 'opacity-50')}>
+    <div
+      className={cn(
+        'group row-pad flex items-start gap-3',
+        acted && 'opacity-60',
+        failed && 'bg-danger-tint',
+      )}
+    >
       {/* The grip gutter, empty. A task row keeps a 12px margin here for its
           drag handle; an agenda item cannot be reordered and so has no handle
           to put in it. Leaving the gutter out moved the checkbox 20px left,
@@ -49,10 +61,19 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           aria-label="Mark done"
-          onClick={() => act(() => completeItem(item.source, item.key))}
+          onClick={() =>
+            run({ state: 'done', write: () => completeItem(item.source, item.key) })
+          }
           className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-control transition-colors duration-150 hover:border-accent"
         >
-          <Check className="size-3 opacity-0 group-hover:opacity-40" strokeWidth={2} aria-hidden />
+          <Check
+            className={cn(
+              'size-3 transition-opacity duration-150',
+              shown === 'done' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40',
+            )}
+            strokeWidth={2}
+            aria-hidden
+          />
         </button>
       ) : (
         <span
@@ -66,12 +87,17 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           {item.link ? (
             <a
               href={item.link.href}
-              className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+              className={cn(
+                'text-ui font-medium text-ink transition-colors duration-150 hover:text-accent',
+                shown === 'done' && 'line-through',
+              )}
             >
               {item.title}
             </a>
           ) : (
-            <span className="text-ui font-medium text-ink">{item.title}</span>
+            <span className={cn('text-ui font-medium text-ink', shown === 'done' && 'line-through')}>
+              {item.title}
+            </span>
           )}
 
           {item.at && (
@@ -118,7 +144,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Later"
-          onClick={() => act(() => deferItem(item.source, item.key))}
+          onClick={() =>
+            run({ state: 'deferred', write: () => deferItem(item.source, item.key) })
+          }
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -127,7 +155,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Not this one"
-          onClick={() => act(() => dismissItem(item.source, item.key))}
+          onClick={() =>
+            run({ state: 'dismissed', write: () => dismissItem(item.source, item.key) })
+          }
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={1.75} aria-hidden />

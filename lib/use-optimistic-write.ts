@@ -53,12 +53,20 @@ export function useOptimisticWrite<Value, Change>({
   value,
   apply,
   write,
+  onDone,
 }: {
   /** What the server rendered. What the control falls back to. */
   value: Value;
   /** The same change, drawn locally. Pure: it is run again on every render. */
   apply: (current: Value, change: Change) => Value;
   write: (change: Change) => Promise<WriteResult>;
+  /**
+   * Run once the write is through, and never when it is refused.
+   *
+   * What an undo toast hangs off: offering the way back from something that
+   * did not happen is worse than offering nothing.
+   */
+  onDone?: (change: Change) => void;
 }): {
   /** What to draw: the change if one is in flight, the server's value if not. */
   shown: Value;
@@ -87,12 +95,16 @@ export function useOptimisticWrite<Value, Change>({
           message = WRITE_FAILED;
         }
 
-        if (!message) return;
+        if (!message) {
+          onDone?.(change);
+          return;
+        }
+
         setFailed(true);
         toast({ text: message });
       });
     },
-    [addChange, write, toast],
+    [addChange, write, onDone, toast],
   );
 
   return { shown, run, pending, failed };
