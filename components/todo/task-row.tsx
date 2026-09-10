@@ -53,6 +53,20 @@ import { EditTask } from './task-form';
  */
 let dragging: string | null = null;
 
+/**
+ * The way back, as the toast wants it.
+ *
+ * The toast reads a thrown error as "could not undo that", and the actions
+ * hand their error back instead of throwing, so it is turned back into one
+ * here rather than the undo quietly reporting success.
+ */
+function undoWith(write: () => Promise<{ error: string | null }>): () => Promise<void> {
+  return async () => {
+    const { error } = await write();
+    if (error) throw new Error(error);
+  };
+}
+
 export function TaskRow({
   task,
   timezone,
@@ -89,30 +103,63 @@ export function TaskRow({
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
 
+  /**
+   * Run one of the row's writes, and say so if it comes back refused.
+   *
+   * Every action in app/todo/actions.ts returns its error rather than throwing
+   * it, and a row that ignored that would look like the write had worked.
+   */
+  function act(write: () => Promise<{ error: string | null }>) {
+    start(async () => {
+      const { error } = await write();
+      if (error) toast({ text: error });
+    });
+  }
+
   function complete() {
     start(async () => {
-      await completeTask(task.id);
-      toast({ text: 'done', undo: () => reopenTask(task.id), undone: 'reopened' });
+      const { error } = await completeTask(task.id);
+      if (error) {
+        toast({ text: error });
+        return;
+      }
+      toast({ text: 'done', undo: undoWith(() => reopenTask(task.id)), undone: 'reopened' });
     });
   }
 
   function drop() {
     start(async () => {
-      await dropTask(task.id);
+      const { error } = await dropTask(task.id);
+      if (error) {
+        toast({ text: error });
+        return;
+      }
       // reopenTask is the inverse of a drop: bringBackTask undoes a snooze.
-      toast({ text: 'dropped', undo: () => reopenTask(task.id), undone: 'back on the list' });
+      toast({
+        text: 'dropped',
+        undo: undoWith(() => reopenTask(task.id)),
+        undone: 'back on the list',
+      });
     });
   }
 
   function later() {
     start(async () => {
-      await laterTask(task.id);
-      toast({ text: 'until later', undo: () => bringBackTask(task.id), undone: 'brought back' });
+      const { error } = await laterTask(task.id);
+      if (error) {
+        toast({ text: error });
+        return;
+      }
+      toast({
+        text: 'until later',
+        undo: undoWith(() => bringBackTask(task.id)),
+        undone: 'brought back',
+      });
     });
   }
 
   function move(direction: 'up' | 'down') {
-    start(() => moveTask(task.id, direction, [...siblings]));
+    act(() => moveTask(task.id, direction, [...siblings]));
   }
 
   /** A row can be reordered when it is in a pile and still on the list. */
@@ -139,7 +186,7 @@ export function TaskRow({
     // where there is nothing to be above.
     const before = edge === 'top' ? task.id : (siblings[index + 1] ?? null);
     if (before === moved) return;
-    start(() => placeTask(moved, before, [...siblings]));
+    act(() => placeTask(moved, before, [...siblings]));
   }
 
   return (
@@ -209,7 +256,7 @@ export function TaskRow({
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() => (done ? start(() => reopenTask(task.id)) : complete())}
+        onClick={() => (done ? act(() => reopenTask(task.id)) : complete())}
         className={cn(
           'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
           done
@@ -288,12 +335,12 @@ export function TaskRow({
             </span>
             <IconButton
               label={task.pinned ? 'Unpin' : 'Pin'}
-              onClick={() => start(() => pinTask(task.id, !task.pinned))}
+              onClick={() => act(() => pinTask(task.id, !task.pinned))}
             >
               <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
             {task.snoozedUntil ? (
-              <IconButton label="Bring back" onClick={() => start(() => bringBackTask(task.id))}>
+              <IconButton label="Bring back" onClick={() => act(() => bringBackTask(task.id))}>
                 <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
             ) : (
@@ -314,14 +361,17 @@ export function TaskRow({
 
         {(done || dropped) && (
           <>
-            <IconButton label="Reopen" onClick={() => start(() => reopenTask(task.id))}>
+            <IconButton label="Reopen" onClick={() => act(() => reopenTask(task.id))}>
               <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
             </IconButton>
             <ConfirmStep
               prompt="Deletes this task for good. Dropping it keeps it in the archive."
               confirmLabel="Delete"
               pendingLabel="Deleting…"
-              onConfirm={() => removeTask(task.id)}
+              onConfirm={async () => {
+                const { error } = await removeTask(task.id);
+                if (error) toast({ text: error });
+              }}
               className="size-8 px-0 text-ink-muted hover:bg-sunken hover:text-ink"
             >
               <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />

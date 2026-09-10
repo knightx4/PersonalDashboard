@@ -3,6 +3,7 @@
 import { useTransition } from 'react';
 import { Check, Clock, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useToast } from '@/components/ui/toast';
 import { completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem } from '@/lib/todo/agenda/sources';
 
@@ -16,6 +17,21 @@ import type { AgendaItem } from '@/lib/todo/agenda/sources';
  */
 export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: string }) {
   const [pending, start] = useTransition();
+  const toast = useToast();
+
+  /**
+   * Ask the source to do something, and say so if it will not.
+   *
+   * A source can refuse -- it may have no "done" at all, and the page may be
+   * showing an item from a source that has since been switched off -- so the
+   * message it hands back is shown rather than dropped.
+   */
+  function act(write: () => Promise<{ error: string | null }>) {
+    start(async () => {
+      const { error } = await write();
+      if (error) toast({ text: error });
+    });
+  }
 
   return (
     <div className={cn('group row-pad flex items-start gap-3', pending && 'opacity-50')}>
@@ -33,7 +49,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           aria-label="Mark done"
-          onClick={() => start(() => completeItem(item.source, item.key))}
+          onClick={() => act(() => completeItem(item.source, item.key))}
           className="press mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded border border-control transition-colors duration-150 hover:border-accent"
         >
           <Check className="size-3 opacity-0 group-hover:opacity-40" strokeWidth={2} aria-hidden />
@@ -102,7 +118,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Later"
-          onClick={() => start(() => deferItem(item.source, item.key))}
+          onClick={() => act(() => deferItem(item.source, item.key))}
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -111,7 +127,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Not this one"
-          onClick={() => start(() => dismissItem(item.source, item.key))}
+          onClick={() => act(() => dismissItem(item.source, item.key))}
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={1.75} aria-hidden />

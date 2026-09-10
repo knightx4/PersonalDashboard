@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { cardVariants } from '@/components/ui/card';
+import { useToast } from '@/components/ui/toast';
 import { FieldError, Input } from '@/components/ui/field';
 import { completeTask, reopenTask } from '@/app/todo/actions';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
@@ -140,6 +141,7 @@ function LinkedRow({
   returnTo: string;
 }) {
   const [pending, start] = useTransition();
+  const toast = useToast();
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
 
@@ -150,7 +152,12 @@ function LinkedRow({
       <button
         type="button"
         aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() => start(() => (done ? reopenTask(task.id) : completeTask(task.id)))}
+        onClick={() =>
+          start(async () => {
+            const { error } = await (done ? reopenTask(task.id) : completeTask(task.id));
+            if (error) toast({ text: error });
+          })
+        }
         className={cn(
           'press flex size-4 shrink-0 items-center justify-center transition-colors duration-150',
           done
