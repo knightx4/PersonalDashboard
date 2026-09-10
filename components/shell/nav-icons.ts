@@ -21,6 +21,7 @@ import {
   ListTodo,
   Map,
   Network,
+  MessageCircleQuestion,
   MessageSquareText,
   Receipt,
   Share2,
@@ -66,6 +67,7 @@ export const NAV_ICONS = {
   activity: Activity,
   // Dev
   bugs: Bug,
+  raised: MessageCircleQuestion,
   ideas: Lightbulb,
   plan: Map,
   changelog: History,
