@@ -60,6 +60,27 @@ describe('the raised queue', () => {
   });
 });
 
+describe('the thread under a raise', () => {
+  it('reads oldest first, whatever order the embedded select returned', () => {
+    const row = raisedRowFrom({
+      ...raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' }),
+      comments: [
+        { id: 'c2', author: 'claude', body: 'Then B it is.', created_at: '2026-09-02T09:00:00Z' },
+        { id: 'c1', author: 'me', body: 'Do B.', created_at: '2026-09-01T18:00:00Z' },
+      ],
+    });
+
+    expect(row.comments.map((comment) => comment.id)).toEqual(['c1', 'c2']);
+    expect(row.comments.map((comment) => comment.author)).toEqual(['me', 'claude']);
+  });
+
+  it('is an empty list when nobody has said anything', () => {
+    expect(raisedRowFrom(raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' })).comments).toEqual(
+      [],
+    );
+  });
+});
+
 describe('a raise as the app reads it', () => {
   it('keeps a module the app knows and drops one it does not', () => {
     expect(raisedRowFrom(raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' })).module).toBe(

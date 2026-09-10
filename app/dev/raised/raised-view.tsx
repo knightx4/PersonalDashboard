@@ -1,13 +1,13 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
-import { dismissRaise, reopenRaise, type RaisedActionState } from './actions';
+import { answerRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FieldError } from '@/components/ui/field';
+import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
+import type { RaisedComment, RaisedQueue, RaisedRow } from '@/lib/raised/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -26,6 +26,79 @@ function StatusLabel({ row }: { row: RaisedRow }) {
     <span className="text-small text-ink-muted">
       {row.status === 'answered' ? 'Answered' : 'Dismissed'}
     </span>
+  );
+}
+
+/**
+ * The thread, oldest first. Your answers and the session's replies to them,
+ * told apart by who wrote each one rather than by where it sits.
+ */
+function Thread({ comments }: { comments: RaisedComment[] }) {
+  if (comments.length === 0) return null;
+
+  return (
+    <ul className="space-y-2 border-l border-border pl-3">
+      {comments.map((comment) => (
+        <li key={comment.id} className="space-y-0.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-small font-semibold text-ink">
+              {comment.author === 'me' ? 'You' : 'Claude'}
+            </span>
+            <span className="tabular text-small text-ink-muted">
+              {comment.createdAt.slice(0, 10)}
+            </span>
+          </div>
+          <p className="whitespace-pre-wrap text-body text-ink">{comment.body}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Writing an answer. Closed until asked for (law 14): the reason to open this
+ * page is to read what is waiting, and a box under every raise would be the
+ * page.
+ */
+function AnswerRaise({ row }: { row: RaisedRow }) {
+  const [state, action, pending] = useActionState(answerRaise, {} as RaisedActionState);
+  const [writing, setWriting] = useState(false);
+
+  // Close once it has saved, the same as the ideas composer: the answer
+  // appearing in the thread is the confirmation.
+  const [seen, setSeen] = useState<string | undefined>(undefined);
+  if (state.message !== seen) {
+    setSeen(state.message);
+    if (state.message && !state.error) setWriting(false);
+  }
+
+  if (!writing) {
+    return (
+      <Button type="button" size="sm" variant="secondary" onClick={() => setWriting(true)}>
+        {row.comments.length === 0 ? 'Answer' : 'Reply'}
+      </Button>
+    );
+  }
+
+  return (
+    <form action={action} className="w-full space-y-2">
+      <input type="hidden" name="id" value={row.id} />
+      <Textarea
+        name="body"
+        rows={3}
+        autoFocus
+        placeholder="What you want done about it. The next session reads this before it starts."
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" size="sm" pending={pending}>
+          {row.comments.length === 0 ? 'Answer' : 'Reply'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setWriting(false)}>
+          Cancel
+        </Button>
+        <FieldError>{state.error}</FieldError>
+      </div>
+    </form>
   );
 }
 
@@ -56,7 +129,10 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           the first thing you want to know is what it was doing at the time. */}
       {row.source && <p className="text-small text-ink-muted">Raised by {row.source}</p>}
 
+      <Thread comments={row.comments} />
+
       <div className="flex flex-wrap items-center gap-2">
+        {row.status !== 'dismissed' && <AnswerRaise row={row} />}
         {row.status === 'open' ? (
           <form action={dismissAction}>
             <input type="hidden" name="id" value={row.id} />
