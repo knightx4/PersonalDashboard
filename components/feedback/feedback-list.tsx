@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { Bot } from 'lucide-react';
 import {
   deleteFeedback,
   editFeedback,
@@ -29,6 +30,24 @@ const STATUS_STYLE: Record<FeedbackStatus, string> = {
   planned: 'bg-canvas text-ink-muted',
   done: 'bg-positive-tint text-positive',
   declined: 'bg-canvas text-ink-muted',
+};
+
+/**
+ * What each status is called on the row.
+ *
+ * Every one is its own word except `in_progress`, which is the interesting
+ * one: a note is only ever in progress because a run claimed it, so the honest
+ * label is who has it rather than the column's name. It carries the same bot
+ * the plan page marks a handed-over step with -- the page said nothing about
+ * work going to Claude beyond a status word that reads like any other.
+ */
+const STATUS_LABEL: Record<FeedbackStatus, string> = {
+  open: 'open',
+  in_progress: 'Claude is on this',
+  blocked: 'blocked',
+  planned: 'planned',
+  done: 'done',
+  declined: 'declined',
 };
 
 const PRIORITY_LABEL: Record<number, string> = {
@@ -112,11 +131,14 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         </span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-micro font-medium',
+            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-micro font-medium',
             STATUS_STYLE[row.status],
           )}
         >
-          {row.status}
+          {row.status === 'in_progress' && (
+            <Bot className="size-3 shrink-0" strokeWidth={2} aria-hidden />
+          )}
+          {STATUS_LABEL[row.status]}
         </span>
         <span className="text-small text-ink-muted">
           {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
