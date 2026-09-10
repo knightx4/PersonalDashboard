@@ -3,9 +3,10 @@
  *
  * Law 4 tells whoever draws the next surface to use "ink and a shape" and
  * never says anywhere what the shapes are. These are them: a glyph for each of
- * the eleven application statuses and each of the three task states. The names
- * are shapes rather than statuses, because components/ui/status-glyph.tsx
- * draws them and knows nothing about pipelines or todo lists.
+ * the eleven application statuses, each of the three task states, and each of
+ * the ten states a plan step can be in. The names are shapes rather than
+ * statuses, because components/ui/status-glyph.tsx draws them and knows
+ * nothing about pipelines, todo lists or plans.
  *
  * The vocabulary is Linear's — an outline at the start of a ladder, the shape
  * filled further as it advances, solid at the top, struck when it ended badly
@@ -14,14 +15,20 @@
  * set of rings would have been the only round shapes in the app.
  *
  * This lives at the root of lib/ beside modules.ts and density.ts because it
- * crosses two workspaces. Neither lib/jobs nor lib/todo owns it.
+ * crosses three workspaces. Neither lib/jobs, lib/todo nor lib/plan owns it.
  */
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import type { PlanHealth } from '@/lib/plan/tree';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 
 /**
- * The whole vocabulary. Five fill levels for a rung on a ladder, and five
+ * The whole vocabulary. Five fill levels for a rung on a ladder, and six
  * marks for a state that is not on one.
+ *
+ * `question` is the one letterform in the set. It was added for a plan step
+ * nobody has answered yet, which is a state no geometric mark said: the empty
+ * hexagon already means "nothing has happened to this", and a question waiting
+ * on you is the opposite of that.
  */
 export const STATUS_GLYPHS = [
   'empty',
@@ -34,6 +41,7 @@ export const STATUS_GLYPHS = [
   'slash',
   'bar',
   'dashed',
+  'question',
 ] as const;
 
 export type StatusGlyph = (typeof STATUS_GLYPHS)[number];
@@ -81,4 +89,31 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, StatusGlyph> = {
   open: 'empty',
   done: 'check',
   dropped: 'slash',
+};
+
+/**
+ * The ten states a plan step can be in, as read by lib/plan/tree.ts.
+ *
+ * Five of them are a ladder and take the five fills: a proposal nobody has
+ * accepted is the empty hexagon, and each step after it fills further round
+ * until a finished step is solid. The other five are not positions on that
+ * ladder, so they take marks -- an answered question a tick, a step decided
+ * against the same struck hexagon a withdrawal takes, a blocked step the
+ * barred one, a step waiting on another the dashed one, and a question nobody
+ * has answered the question mark.
+ *
+ * A `Record`, like the two above, so an eleventh health added to PLAN_HEALTHS
+ * fails the typecheck here rather than drawing itself as a proposal.
+ */
+export const PLAN_HEALTH_GLYPHS: Record<PlanHealth, StatusGlyph> = {
+  proposed: 'empty',
+  not_started: 'quarter',
+  ready: 'half',
+  in_progress: 'three-quarters',
+  done: 'full',
+  answered: 'check',
+  dropped: 'slash',
+  blocked: 'bar',
+  waiting: 'dashed',
+  unanswered: 'question',
 };

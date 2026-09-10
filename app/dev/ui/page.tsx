@@ -24,8 +24,13 @@ import { cn } from '@/lib/cn';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
-import { APPLICATION_STATUS_GLYPHS, TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
+import {
+  APPLICATION_STATUS_GLYPHS,
+  PLAN_HEALTH_GLYPHS,
+  TASK_STATUS_GLYPHS,
+} from '@/lib/status-glyphs';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import type { PlanHealth } from '@/lib/plan/tree';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { THEMES } from '@/lib/theme';
 import { LAW_GROUPS } from './laws';
@@ -294,6 +299,30 @@ const TASK_STATES = [
   ['done', 'Done', 'Finished. The one glyph that is a tick, because it is also the toggle.'],
   ['dropped', 'Dropped', 'You decided against it. The same shape as a withdrawal.'],
 ] as const satisfies readonly (readonly [TaskStatus, string, string])[];
+
+/**
+ * The third ladder: a step on /dev/plan. The five fills first, then the marks.
+ *
+ * Which state a step is in is worked out in lib/plan/tree.ts and is not its
+ * status column -- a question nobody has answered is not "not started", and
+ * "ready" is read off what the step waits on.
+ */
+const PLAN_STATES = [
+  ['proposed', 'Proposed', 'Written by a session and waiting on you. The empty hexagon a lead is.'],
+  ['not_started', 'Not started', 'You accepted it. Nobody has picked it up.'],
+  ['ready', 'Ready', 'Nothing it waits on is still open, so it can be started now.'],
+  ['in_progress', 'In progress', 'Claimed by a session right now.'],
+  ['done', 'Done', 'Built and verified. The row carries the commit that did it.'],
+  [
+    'unanswered',
+    'Unanswered',
+    'A question waiting on you. The one letterform in the set, because no fill said it.',
+  ],
+  ['answered', 'Answered', 'You answered it, and every step beneath is built against it.'],
+  ['blocked', 'Blocked', 'Stopped on something outside the step. Barred, like a closed role.'],
+  ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
+  ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],
+] as const satisfies readonly (readonly [PlanHealth, string, string])[];
 
 /**
  * What each theme is made of, as a strip.
@@ -980,6 +1009,22 @@ export default function DevUiPage() {
               {TASK_STATES.map(([status, name, note]) => (
                 <div key={status} className="flex items-center gap-3">
                   <StatusGlyph glyph={TASK_STATUS_GLYPHS[status]} size={20} className="text-ink" />
+                  <div className="min-w-0">
+                    <p className="text-ui font-medium text-ink">{name}</p>
+                    <p className="text-small text-ink-muted">{note}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardSection>
+          <CardSection
+            title="Plan states"
+            hint="The third ladder, and the one that borrows most: five fills from a proposal to a finished step, and marks for the five states that are not on that ladder. The question mark is the only shape the plan brought with it."
+          >
+            <div className="space-y-3">
+              {PLAN_STATES.map(([health, name, note]) => (
+                <div key={health} className="flex items-center gap-3">
+                  <StatusGlyph glyph={PLAN_HEALTH_GLYPHS[health]} size={20} className="text-ink" />
                   <div className="min-w-0">
                     <p className="text-ui font-medium text-ink">{name}</p>
                     <p className="text-small text-ink-muted">{note}</p>

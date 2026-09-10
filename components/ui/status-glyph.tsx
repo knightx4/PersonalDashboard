@@ -4,7 +4,7 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 /**
  * The status glyphs, drawn.
  *
- * One hexagon, ten ways. A ladder is the hexagon filled further round from
+ * One hexagon, eleven ways. A ladder is the hexagon filled further round from
  * twelve o'clock as it advances — empty, a quarter, a half, three quarters,
  * solid — and everything that is not on a ladder is the same hexagon with a
  * mark struck through or set inside it. Which glyph a status gets is in
@@ -114,6 +114,18 @@ function Marks({ glyph }: { glyph: GlyphName }) {
         <g strokeWidth={MARK_STROKE} strokeLinecap="square">
           <line x1={8.2} y1={8.2} x2={15.8} y2={15.8} />
           <line x1={15.8} y1={8.2} x2={8.2} y2={15.8} />
+        </g>
+      );
+    case 'question':
+      // The one letterform in the set, and it curves where nothing else does.
+      // A question mark is read as a shape rather than assembled from strokes,
+      // so a straight-edged one would be a puzzle at 12px and a question mark
+      // at 20px. The dot is a square of the same weight as the hook, which is
+      // what keeps it from reading as a circle in a set that has none.
+      return (
+        <g strokeWidth={MARK_STROKE} strokeLinecap="square">
+          <path d="M9.4 9.8 Q9.4 6.9 12 6.9 Q14.6 6.9 14.6 9.7 Q14.6 11.7 12 12.9 L12 14.1" />
+          <rect x={10.8} y={15.9} width={2.4} height={2.4} fill="currentColor" stroke="none" />
         </g>
       );
     case 'slash':
