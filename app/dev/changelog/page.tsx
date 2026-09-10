@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { ChevronRight, History } from 'lucide-react';
+import { ChevronRight, History, SearchX } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { loadChangelog } from '@/lib/changelog/load';
 import {
   CHANGELOG_DEFAULT_GROUPING,
   CHANGELOG_GROUPINGS,
   CHANGELOG_GROUPING_LABEL,
+  filterChangelog,
   groupChangelog,
   isChangelogGrouping,
   type ChangelogEntry,
@@ -51,7 +53,7 @@ export const metadata = { title: 'Changelog' };
 export default async function DevChangelogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string | string[] }>;
+  searchParams: Promise<{ group?: string | string[]; q?: string | string[] }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -61,8 +63,26 @@ export default async function DevChangelogPage({
   const grouping: ChangelogGrouping =
     asked && isChangelogGrouping(asked) ? asked : CHANGELOG_DEFAULT_GROUPING;
 
+  const query = (Array.isArray(params.q) ? params.q[0] : params.q)?.trim() ?? '';
+
   const entries = await loadChangelog(supabase, user.id);
-  const groups = groupChangelog(entries, grouping);
+  const matched = filterChangelog(entries, query);
+  const groups = groupChangelog(matched, grouping);
+
+  /**
+   * Both parameters travel together.
+   *
+   * A grouping link that dropped the search would throw away what you typed the
+   * moment you asked to see it by day, and the form has to carry the grouping
+   * for the same reason in reverse.
+   */
+  function href(candidate: ChangelogGrouping): string {
+    const search = new URLSearchParams();
+    if (candidate !== CHANGELOG_DEFAULT_GROUPING) search.set('group', candidate);
+    if (query) search.set('q', query);
+    const rest = search.toString();
+    return rest ? `/dev/changelog?${rest}` : '/dev/changelog';
+  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -72,30 +92,52 @@ export default async function DevChangelogPage({
       />
 
       {entries.length > 0 && (
-        <nav aria-label="Grouping" className="mb-4 flex flex-wrap items-center gap-1">
-          {CHANGELOG_GROUPINGS.map((candidate) => (
-            <Link
-              key={candidate}
-              href={
-                candidate === CHANGELOG_DEFAULT_GROUPING
-                  ? '/dev/changelog'
-                  : `/dev/changelog?group=${candidate}`
-              }
-              aria-current={candidate === grouping ? 'page' : undefined}
-              className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-                candidate === grouping
-                  ? 'bg-accent text-surface'
-                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-              )}
-            >
-              {CHANGELOG_GROUPING_LABEL[candidate]}
-            </Link>
-          ))}
-        </nav>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <nav aria-label="Grouping" className="flex flex-wrap items-center gap-1">
+            {CHANGELOG_GROUPINGS.map((candidate) => (
+              <Link
+                key={candidate}
+                href={href(candidate)}
+                aria-current={candidate === grouping ? 'page' : undefined}
+                className={cn(
+                  'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
+                  candidate === grouping
+                    ? 'bg-accent text-surface'
+                    : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+                )}
+              >
+                {CHANGELOG_GROUPING_LABEL[candidate]}
+              </Link>
+            ))}
+          </nav>
+
+          {/* A plain GET form, like the rest of this page: the search is in the
+              URL, so a search is a link somebody can keep and the page still
+              works with no JavaScript at all (law 5). */}
+          <form action="/dev/changelog" className="ml-auto flex items-center gap-2">
+            {grouping !== CHANGELOG_DEFAULT_GROUPING && (
+              <input type="hidden" name="group" value={grouping} />
+            )}
+            <Input
+              type="search"
+              name="q"
+              defaultValue={query}
+              placeholder="Search what shipped"
+              aria-label="Search what shipped"
+              className="w-48"
+            />
+          </form>
+        </div>
       )}
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && query ? (
+        <EmptyState
+          icon={SearchX}
+          title={`Nothing shipped matching “${query}”`}
+          description="Searches the title, what was written about it, the commit, and the feature it shipped under."
+          action={{ label: 'Clear the search', href: href(grouping) }}
+        />
+      ) : groups.length === 0 ? (
         <EmptyState
           icon={History}
           title="Nothing has shipped yet"

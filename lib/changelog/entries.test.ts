@@ -4,6 +4,7 @@ import type { PlanItem, PlanStatus } from '@/lib/plan/load';
 import {
   buildChangelog,
   changelogEntries,
+  filterChangelog,
   groupChangelog,
   moduleForPath,
   noteEntries,
@@ -327,5 +328,61 @@ describe('groupChangelog', () => {
     const groups = groupChangelog(entries, 'day');
     expect(groups.map((group) => group.label)).toEqual(['2026-03-04', '2026-03-03', '2026-03-02']);
     expect(groups.every((group) => group.kind === 'day')).toBe(true);
+  });
+});
+
+describe('filterChangelog', () => {
+  const parents = [{ id: 'feature', number: 10, title: 'The share page', parentId: null }];
+
+  const entries = changelogEntries({
+    plan: [
+      step({
+        id: 's1',
+        parentId: 'feature',
+        title: 'Anonymous share links',
+        detail: 'A token per link, revocable.',
+        commitSha: 'abc1234',
+      }),
+      step({ id: 'other', parentId: null, title: 'Barcode scanning', commitSha: 'def5678' }),
+    ],
+    planParents: parents,
+    notes: [note({ id: 'n1', body: 'The dock scrolls past the bottom' })],
+  });
+
+  const idsFor = (query: string) =>
+    filterChangelog(entries, query)
+      .map((entry) => entry.id)
+      .sort();
+
+  it('returns everything when nothing was typed', () => {
+    expect(filterChangelog(entries, '')).toHaveLength(entries.length);
+    expect(filterChangelog(entries, '   ')).toHaveLength(entries.length);
+  });
+
+  it('matches the title, whatever the case', () => {
+    expect(idsFor('BARCODE')).toEqual(['other']);
+  });
+
+  it('matches what was written about it', () => {
+    expect(idsFor('revocable')).toEqual(['s1']);
+  });
+
+  it('matches a commit', () => {
+    expect(idsFor('def5678')).toEqual(['other']);
+  });
+
+  it('matches a step by the feature it shipped under', () => {
+    // The reason to search a page grouped by feature: the feature's name is
+    // not in the step's own title.
+    expect(idsFor('share page')).toEqual(['s1']);
+  });
+
+  it('needs every word, in any field and any order', () => {
+    expect(idsFor('share anonymous')).toEqual(['s1']);
+    expect(idsFor('share barcode')).toEqual([]);
+  });
+
+  it('searches notes as well as plan steps', () => {
+    expect(idsFor('dock')).toEqual(['n1']);
   });
 });

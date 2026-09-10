@@ -251,6 +251,46 @@ export function changelogEntries(input: {
   );
 }
 
+/**
+ * The entries a search matches.
+ *
+ * Over the fields somebody would actually search this page for: what shipped
+ * (the title), what was said about it (the detail), the commit, the plan
+ * number, and the feature it shipped under -- so searching a feature's name
+ * finds its steps as well as the feature itself, which is the whole reason to
+ * search a page grouped by feature.
+ *
+ * Every word has to match, in any field and in any order. Matching on the
+ * whole string would mean "capture todo" finds nothing when the title reads
+ * "Capture a todo from anywhere"; matching on any word would put half the page
+ * back on screen for a two-word search.
+ *
+ * Filtering happens before grouping, so a group only appears if something in
+ * it matched, and its count is the count of what matched.
+ */
+export function filterChangelog(
+  entries: readonly ChangelogEntry[],
+  query: string,
+): ChangelogEntry[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [...entries];
+
+  return entries.filter((entry) => {
+    const haystack = [
+      entry.title,
+      entry.detail ?? '',
+      entry.commitSha ?? '',
+      entry.number === null ? '' : `#${entry.number}`,
+      entry.issue?.title ?? '',
+      entry.issue === null ? '' : `#${entry.issue.number}`,
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    return words.every((word) => haystack.includes(word));
+  });
+}
+
 export function buildChangelog(input: {
   plan: readonly PlanItem[];
   planParents?: readonly PlanParentRow[];
