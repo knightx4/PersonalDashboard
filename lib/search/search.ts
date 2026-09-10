@@ -3,6 +3,7 @@ import {
   MIN_QUERY,
   PER_SOURCE_LIMIT,
   TOTAL_LIMIT,
+  type HitKind,
   type SearchHit,
   type SearchSource,
 } from '@/lib/search/sources';
@@ -28,6 +29,13 @@ import type { ModuleId } from '@/lib/modules';
  *
  *   **Caps per source and overall.** One workspace with four hundred orders
  *   would otherwise fill a list that is meant to be read at a glance.
+ *
+ *   **A caller may ask for only some kinds.** The palette wants everything;
+ *   the todo link picker wants only what a task can be about. Narrowing here
+ *   rather than in the caller means a source that could not contribute a
+ *   wanted kind is never asked, and the caps are spent on rows that can
+ *   actually be chosen -- filtering afterwards would leave a picker empty on a
+ *   workspace full of the wrong kind of thing.
  */
 
 export type SearchOutcome = {
@@ -63,6 +71,8 @@ export async function searchEverything(input: {
   sources: SearchSource[];
   /** Which workspaces are on. A source outside this never runs. */
   enabledModules: readonly ModuleId[];
+  /** Only these kinds. Left out means every kind, which is the palette. */
+  kinds?: readonly HitKind[];
   perSourceLimit?: number;
   totalLimit?: number;
 }): Promise<SearchOutcome> {
@@ -71,8 +81,13 @@ export async function searchEverything(input: {
 
   const perSource = input.perSourceLimit ?? PER_SOURCE_LIMIT;
   const total = input.totalLimit ?? TOTAL_LIMIT;
+  const wanted = input.kinds;
 
-  const active = input.sources.filter((source) => input.enabledModules.includes(source.module));
+  const active = input.sources.filter(
+    (source) =>
+      input.enabledModules.includes(source.module) &&
+      (!wanted || source.kinds.some((kind) => wanted.includes(kind))),
+  );
 
   const settled = await Promise.allSettled(
     active.map((source) => source.find({ userId: input.userId, query, limit: perSource })),
@@ -83,9 +98,13 @@ export async function searchEverything(input: {
 
   settled.forEach((result, index) => {
     if (result.status === 'fulfilled') {
-      // Capped again here rather than trusted: a source is a file somebody
-      // else writes, and the promise the palette makes is about the list.
-      hits.push(...result.value.slice(0, perSource));
+      // Capped and filtered again here rather than trusted: a source is a file
+      // somebody else writes, and the promise this makes is about the list. A
+      // source that answers with a kind nobody asked for has it dropped.
+      const answered = wanted
+        ? result.value.filter((hit) => wanted.includes(hit.kind))
+        : result.value;
+      hits.push(...answered.slice(0, perSource));
     } else {
       failed.push(active[index].label);
     }

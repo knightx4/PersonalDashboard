@@ -16,6 +16,7 @@ export const learnSearchSource: SearchSource = {
   id: 'learn',
   module: 'learn',
   label: 'Learn',
+  kinds: ['reading', 'track'],
 
   async find(ctx): Promise<SearchHit[]> {
     const supabase = await createLearnClient();

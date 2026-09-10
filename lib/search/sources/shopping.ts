@@ -117,6 +117,7 @@ export const shoppingSearchSource: SearchSource = {
   id: 'shopping',
   module: 'shopping',
   label: 'Shopping',
+  kinds: ['order', 'inventory', 'saved'],
   async find(ctx) {
     const [orders, inventory, saved] = await Promise.all([
       findOrders(ctx),
