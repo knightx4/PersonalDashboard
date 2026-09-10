@@ -238,23 +238,97 @@ export function normaliseChain(
  * rows are written. Shared by both approval paths -- a goal's chain and a
  * floor added under a missed claim are the same thing arriving.
  */
-export const approvedChainSchema = z.object({
-  subject: z.string().trim().min(1).max(200),
-  goalConcept: z.string().trim().min(1).max(200),
-  nodes: z
-    .array(
-      z.object({
-        name: z.string().trim().min(1).max(200),
-        // Empty only for a node the chain pulled in to stay readable; that one
-        // already has its claim and basis in its own row.
-        claim: z.string().trim().max(1000),
-        basis: z.string().trim().max(500),
-        existingId: z.string().uuid().nullable(),
-      }),
-    )
-    .min(1)
-    .max(20),
-  edges: z.array(proposedEdgeSchema).max(40),
-  joined: z.number().int().min(0),
-  dropped: z.array(z.object({ name: z.string(), reason: z.string() })).max(40),
+export function approvedChainSchemaWith(limits: { nodes: number; edges: number; dropped: number }) {
+  return z.object({
+    subject: z.string().trim().min(1).max(200),
+    goalConcept: z.string().trim().min(1).max(200),
+    nodes: z
+      .array(
+        z.object({
+          name: z.string().trim().min(1).max(200),
+          // Empty only for a node the chain pulled in to stay readable; that one
+          // already has its claim and basis in its own row.
+          claim: z.string().trim().max(1000),
+          basis: z.string().trim().max(500),
+          existingId: z.string().uuid().nullable(),
+        }),
+      )
+      .min(1)
+      .max(limits.nodes),
+    edges: z.array(proposedEdgeSchema).max(limits.edges),
+    joined: z.number().int().min(0),
+    dropped: z.array(z.object({ name: z.string(), reason: z.string() })).max(limits.dropped),
+  });
+}
+
+/**
+ * A goal's chain and a floor, both capped where a single call is capped. An
+ * import reads a whole document and proposes more than either, so it carries
+ * its own caps rather than loosening these -- see `approvedBriefSchema`.
+ */
+export const approvedChainSchema = approvedChainSchemaWith({
+  nodes: 20,
+  edges: 40,
+  dropped: 40,
 });
+
+/**
+ * Keep only the rows somebody ticked.
+ *
+ * The tick is on new nodes: a node the chain matched against the subject is
+ * already in the graph, nothing is written for it, and its edges are how the
+ * new claims join what is there. So untickable, and always kept.
+ *
+ * Removing a node removes the edges at either end of it, and that can leave
+ * another node with nothing holding it in place. Those go into `dropped` with
+ * the reason, rather than being written as the floating nodes the graph does
+ * not take. The screen shows that list, so unticking one row and losing two is
+ * something you see before you approve rather than after.
+ */
+export const UNPLACED_BY_TICKS = 'nothing you kept says what it sits under or on top of';
+
+export function keepTicked(
+  chain: ProposedChain,
+  ticked: ReadonlySet<string>,
+): { chain: ProposedChain; unplaced: ChainNode[] } {
+  const dropped = [...chain.dropped];
+
+  const kept = chain.nodes.filter((node) => {
+    if (node.existingId || ticked.has(key(node.name))) return true;
+    dropped.push({ name: node.name, reason: 'you left it out' });
+    return false;
+  });
+
+  const names = new Set(kept.map((node) => key(node.name)));
+  const edges = chain.edges.filter(
+    (edge) => names.has(key(edge.prerequisite)) && names.has(key(edge.dependent)),
+  );
+
+  const attached = new Set<string>();
+  for (const edge of edges) {
+    attached.add(key(edge.prerequisite));
+    attached.add(key(edge.dependent));
+  }
+
+  const unplaced: ChainNode[] = [];
+  const placed = kept.filter((node) => {
+    if (node.existingId || attached.has(key(node.name))) return true;
+    unplaced.push(node);
+    dropped.push({ name: node.name, reason: UNPLACED_BY_TICKS });
+    return false;
+  });
+
+  const survived = new Set(placed.map((node) => key(node.name)));
+
+  return {
+    chain: {
+      ...chain,
+      nodes: placed,
+      edges: edges.filter(
+        (edge) => survived.has(key(edge.prerequisite)) && survived.has(key(edge.dependent)),
+      ),
+      dropped,
+    },
+    unplaced,
+  };
+}

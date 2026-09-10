@@ -103,7 +103,7 @@ Five directories, and the order is **not** directory by directory:
 | `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0037` |
 | `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
 | `supabase/migrations-vault` | `obsidian` | `0001` |
-| `supabase/migrations-learn` | `learn` | `0001`–`0006` |
+| `supabase/migrations-learn` | `learn` | `0001`–`0007` |
 | `supabase/migrations-todo` | `todo` | `0001`–`0004` |
 
 `migrations-todo` goes **last**, after all four of the others. Its

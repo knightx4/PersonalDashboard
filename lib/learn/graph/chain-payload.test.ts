@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { chainPayloadSchema, MAX_CHAIN, normaliseChain, type ExistingConcept } from './chain-payload';
+import {
+  chainPayloadSchema,
+  keepTicked,
+  MAX_CHAIN,
+  normaliseChain,
+  type ChainNode,
+  type ExistingConcept,
+  type ProposedChain,
+} from './chain-payload';
 
 /**
  * What a generated chain has to survive before anybody sees it.
@@ -239,5 +247,82 @@ describe('when there is nothing to propose', () => {
         nothingExists,
       ),
     ).toBeNull();
+  });
+});
+
+describe('keeping only what was ticked', () => {
+  const chained = (names: string[], existing: string[] = []): ProposedChain => ({
+    subject: 'Crypto',
+    goalConcept: names[0],
+    nodes: names.map(
+      (name): ChainNode => ({
+        name,
+        claim: `${name} is the case.`,
+        basis: 'The briefing says so.',
+        existingId: existing.includes(name) ? `id-${name}` : null,
+      }),
+    ),
+    edges: names.slice(1).map((name, i) => edge(names[i], name)),
+    joined: existing.length,
+    dropped: [],
+  });
+
+  const ticks = (...names: string[]) => new Set(names.map((name) => name.toLowerCase()));
+
+  it('writes the ticked rows and no others', () => {
+    const { chain } = keepTicked(chained(['A', 'B', 'C']), ticks('A', 'B'));
+
+    expect(chain.nodes.map((node) => node.name)).toEqual(['A', 'B']);
+    expect(chain.edges).toEqual([edge('A', 'B')]);
+    expect(chain.dropped).toContainEqual({ name: 'C', reason: 'you left it out' });
+  });
+
+  it('keeps a concept the subject already has, ticked or not', () => {
+    // Nothing is written for it and its edges are how the new claims join what
+    // is there, so it is not the tick's to remove.
+    const { chain } = keepTicked(chained(['A', 'B'], ['A']), ticks('B'));
+
+    expect(chain.nodes.map((node) => node.name)).toEqual(['A', 'B']);
+    expect(chain.edges).toEqual([edge('A', 'B')]);
+  });
+
+  it('names what a tick left with nothing to hang on', () => {
+    // C was the only thing holding D in the graph, and a node with no edge is
+    // the one thing the graph does not take. A and B are untouched: unticking
+    // a row takes out the edges at either end of it and nothing else.
+    const branched = chained(['A', 'B', 'C', 'D']);
+    branched.edges = [edge('A', 'B'), edge('A', 'C'), edge('C', 'D')];
+
+    const { chain, unplaced } = keepTicked(branched, ticks('A', 'B', 'D'));
+
+    expect(unplaced.map((node) => node.name)).toEqual(['D']);
+    expect(chain.nodes.map((node) => node.name)).toEqual(['A', 'B']);
+    expect(chain.edges).toEqual([edge('A', 'B')]);
+  });
+
+  it('takes the whole run down when a rung in the middle goes', () => {
+    // A -> B -> C with B unticked leaves both ends holding nothing, and the
+    // screen says so rather than writing two floating concepts.
+    const { chain, unplaced } = keepTicked(chained(['A', 'B', 'C']), ticks('A', 'C'));
+
+    expect(unplaced.map((node) => node.name)).toEqual(['A', 'C']);
+    expect(chain.nodes).toEqual([]);
+  });
+
+  it('leaves nothing to save when nothing is ticked', () => {
+    const { chain } = keepTicked(chained(['A', 'B']), ticks());
+
+    expect(chain.nodes).toEqual([]);
+    expect(chain.edges).toEqual([]);
+  });
+
+  it('keeps what the import already said it left out', () => {
+    const original = chained(['A', 'B']);
+    original.dropped.push({ name: 'The fee table', reason: 'no claim in it' });
+
+    const { chain } = keepTicked(original, ticks('A', 'B'));
+
+    expect(chain.dropped).toEqual([{ name: 'The fee table', reason: 'no claim in it' }]);
+    expect(chain.nodes).toHaveLength(2);
   });
 });
