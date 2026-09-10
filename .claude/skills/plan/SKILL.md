@@ -36,6 +36,9 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
 npx tsx scripts/plan.ts idea "…" [--module <id>]   # file an idea on /dev/ideas, unshaped
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
+npx tsx scripts/plan.ts raise "…" [--detail "…"] [--module <id>] [--from <n>]
+                                               # ask the person something. Never answered by you.
+npx tsx scripts/plan.ts raises                 # open raises, and answers no session has replied to
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.
@@ -410,6 +413,31 @@ update plan_items
 set status = 'blocked',
     comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <the question>'
 where id = '…';
+
+-- raise: what you need from the person, when it belongs to no step. `source`
+-- says which run raised it and what it was doing; `module` is null for the app
+-- as a whole. Never answer or dismiss one -- that is the person's move on
+-- /dev/raised, the same as a decision.
+insert into raised_items (user_id, module, title, detail, source, status)
+values ('…', 'dev', '…', '…', 'plan #<n>', 'open')
+returning id;
+
+-- what is outstanding in both directions: what the person has not answered,
+-- and what they answered that no session has replied to. Read at the start of
+-- a run.
+select r.id, r.title, r.detail, r.module, r.source, r.status, r.created_at,
+       (
+         select json_agg(json_build_object('author', c.author, 'body', c.body)
+                         order by c.created_at)
+         from raised_comments c where c.raised_item_id = r.id
+       ) as comments
+from raised_items r
+where r.user_id = '…' and r.status in ('open', 'answered')
+order by r.created_at desc;
+
+-- replying to an answer, which is how a raise takes a second round.
+insert into raised_comments (user_id, raised_item_id, author, body)
+values ('…', '<the raise>', 'claude', '…');
 ```
 
 `started_at` and `completed_at` are kept by a trigger from the status; do not

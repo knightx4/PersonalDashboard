@@ -17,6 +17,9 @@
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
  *   npx tsx scripts/plan.ts idea "<body>" [--module <id>]  # file one idea
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
+ *   npx tsx scripts/plan.ts raise "<title>" [--detail "…"] [--module <id>]
+ *                                [--from <n>] [--source "…"]   # ask the person something
+ *   npx tsx scripts/plan.ts raises                      # open raises, and answers not replied to
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
@@ -255,6 +258,34 @@ function keep(nodes: PlanNode[], want: (node: PlanNode) => boolean): PlanNode[] 
   });
 }
 
+type RaisedComment = { author: 'me' | 'claude'; body: string };
+
+type RaisedListRow = {
+  id: string;
+  title: string;
+  detail: string | null;
+  module: string | null;
+  source: string | null;
+  status: string;
+  created_at: Date;
+  comments: RaisedComment[] | null;
+};
+
+function lastAuthor(row: RaisedListRow): string | null {
+  const comments = row.comments ?? [];
+  return comments.length === 0 ? null : comments[comments.length - 1].author;
+}
+
+function printRaise(row: RaisedListRow): void {
+  const scope = row.module && isModuleId(row.module) ? row.module : null;
+  console.log(`\n${row.id.slice(0, 8)}  ${moduleLabel(scope)}  ${row.title}`);
+  if (row.source) console.log(`  raised by ${row.source}`);
+  if (row.detail) console.log(`  ${row.detail.replace(/\s+/g, ' ')}`);
+  for (const comment of row.comments ?? []) {
+    console.log(`  ${comment.author === 'me' ? 'user' : 'claude'}: ${comment.body.replace(/\s+/g, ' ')}`);
+  }
+}
+
 async function main(): Promise<void> {
   const [command = 'list', target, extra] = positional();
   const sql = connect();
@@ -332,6 +363,81 @@ async function main(): Promise<void> {
         console.log(`${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${idea.body.replace(/\s+/g, ' ').slice(0, 90)}`);
       }
       console.log(`\n${ideas.length} filed. They are on /dev/ideas.`);
+      return;
+    }
+
+    /**
+     * Raising something, which is a session asking you for what belongs to no
+     * step: a risk it found in code it was only passing through, a question of
+     * taste, a thing it will not decide alone. A decision belongs to one
+     * feature and the notes queue is what you report as wrong; this is the
+     * third home, and it is read on /dev/raised.
+     *
+     * A session never answers or dismisses its own raise, the same rule as
+     * never answering its own decision, so there is no command for either.
+     */
+    if (command === 'raise') {
+      const title = target?.trim();
+      if (!title) fail('Give the raise: raise "…" [--detail "…"] [--module <id>] [--from <n>].');
+      if (title.length > 200) fail('A title is at most 200 characters.');
+
+      const moduleArg = arg('--module');
+      if (moduleArg && !isModuleId(moduleArg)) fail(`"${moduleArg}" is not a module.`);
+      const detail = arg('--detail');
+      if (detail && detail.length > 4000) fail('A detail is at most 4000 characters.');
+
+      const from = arg('--from');
+      const step = from ? await byNumber(sql, userId, from) : null;
+      const source = arg('--source') ?? (step ? `plan #${step.number}` : null);
+
+      const [row] = await sql<{ id: string }[]>`
+        insert into raised_items (user_id, module, title, detail, source)
+        values (${userId}, ${moduleArg && isModuleId(moduleArg) ? moduleArg : null}, ${title},
+                ${detail}, ${source})
+        returning id`;
+      console.log(`${row.id.slice(0, 8)}  raised: ${title}`);
+      console.log('It is on /dev/raised, and in the bell until it is answered or dismissed.');
+      return;
+    }
+
+    /**
+     * What is outstanding in both directions: what you have not answered, and
+     * what you answered that no session has replied to. The second half is
+     * what a run reads at the start, since an answer written while nothing was
+     * awake is otherwise never picked up.
+     */
+    if (command === 'raises') {
+      const rows = await sql<RaisedListRow[]>`
+        select r.id, r.title, r.detail, r.module, r.source, r.status, r.created_at,
+               (
+                 select json_agg(
+                          json_build_object('author', c.author, 'body', c.body)
+                          order by c.created_at
+                        )
+                 from raised_comments c where c.raised_item_id = r.id
+               ) as comments
+        from raised_items r
+        where r.user_id = ${userId} and r.status in ('open', 'answered')
+        order by r.created_at desc`;
+
+      const open = rows.filter((row) => row.status === 'open');
+      const answered = rows.filter(
+        (row) => row.status === 'answered' && lastAuthor(row) === 'me',
+      );
+
+      if (open.length === 0 && answered.length === 0) {
+        console.log('Nothing raised is waiting, and every answer has been replied to.');
+        return;
+      }
+
+      if (open.length > 0) {
+        console.log('\n== Waiting on the user');
+        for (const row of open) printRaise(row);
+      }
+      if (answered.length > 0) {
+        console.log('\n== Answered, not yet replied to');
+        for (const row of answered) printRaise(row);
+      }
       return;
     }
 
