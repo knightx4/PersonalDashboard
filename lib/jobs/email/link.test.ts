@@ -12,6 +12,7 @@ import {
   AUTO_LINK_THRESHOLD,
   decideLink,
   isDatePlausible,
+  mentionsRoleTitle,
   normalizeCompanyName,
   scoreCandidate,
   titleSimilarity,
@@ -247,7 +248,13 @@ describe('the acceptance criteria', () => {
 
   it('holds rather than guessing when two applications match about equally', () => {
     const decision = decideLink(
-      message({ threadId: null, extractedRole: null }),
+      // Names no role anywhere: the sender's domain is the only signal, and it
+      // is equally true of both pursuits.
+      message({
+        threadId: null,
+        extractedRole: null,
+        bodyPreview: 'We have decided to move forward with other candidates.',
+      }),
       [
         candidate({ applicationId: 'a-1', roleId: 'r-1', atsJobId: null }),
         candidate({ applicationId: 'a-2', roleId: 'r-2', roleTitle: 'Finance Manager', atsJobId: null }),
@@ -260,6 +267,95 @@ describe('the acceptance criteria', () => {
       // The review row must explain itself, or the queue is unusable.
       expect(decision.candidates[0].reasons.length).toBeGreaterThan(0);
     }
+  });
+
+  /**
+   * The real one: "Update from Figma", five open pursuits at Figma, and a
+   * rejection whose subject names no role at all. Every candidate scored the
+   * same on the sender's domain, so the lot went to review asking which role
+   * it was — while the body said so in as many words.
+   */
+  describe('a role the message names word for word', () => {
+    const figma = (title: string, id: string) =>
+      candidate({
+        applicationId: id,
+        roleId: `r-${id}`,
+        companyId: 'c-figma',
+        companyName: 'Figma',
+        companyDomains: ['figma.com'],
+        roleTitle: title,
+        atsJobId: null,
+        status: 'acknowledged',
+      });
+
+    const update = (body: string): LinkInput =>
+      message({
+        threadId: null,
+        fromAddress: 'no-reply@figma.com',
+        replyToAddress: null,
+        subject: 'Update from Figma',
+        bodyPreview: body,
+        classification: 'rejection',
+        extractedCompany: 'Figma',
+        extractedRole: null,
+        extractedAtsJobId: null,
+      });
+
+    const pursuits = [
+      figma('Senior Accountant', 'a-acct'),
+      figma('Senior Revenue Analyst', 'a-rev'),
+      figma('Strategic Finance', 'a-fin'),
+    ];
+
+    it('breaks the tie the extractor could not, without the extractor', () => {
+      const decision = decideLink(
+        update('Thank you for your interest in the Senior Revenue Analyst position at Figma.'),
+        pursuits,
+        { companies: COMPANIES, now: new Date('2026-09-12T10:00:00Z') },
+      );
+      expect(decision.action).toBe('link');
+      if (decision.action === 'link') {
+        expect(decision.candidate.applicationId).toBe('a-rev');
+      }
+    });
+
+    it('still holds when the body names none of them', () => {
+      const decision = decideLink(
+        update('We have decided to move forward with other candidates at this time.'),
+        pursuits,
+        { companies: COMPANIES, now: new Date('2026-09-12T10:00:00Z') },
+      );
+      expect(decision.action).toBe('review');
+    });
+
+    it('still holds when the body names two of them', () => {
+      const decision = decideLink(
+        update('Regarding your applications for Senior Accountant and Strategic Finance.'),
+        pursuits,
+        { companies: COMPANIES, now: new Date('2026-09-12T10:00:00Z') },
+      );
+      expect(decision.action).toBe('review');
+    });
+
+    it('reads through a seniority prefix the role title does not carry', () => {
+      const decision = decideLink(
+        update('An update on your application for the Senior Strategic Finance role.'),
+        pursuits,
+        { companies: COMPANIES, now: new Date('2026-09-12T10:00:00Z') },
+      );
+      expect(decision.action).toBe('link');
+      if (decision.action === 'link') {
+        expect(decision.candidate.applicationId).toBe('a-fin');
+      }
+    });
+
+    it('ignores a title too short to be anything but a common word', () => {
+      // "Finance" normalises to seven characters and appears in the footer of
+      // half the mail an employer sends; matching on it is noise, not evidence.
+      expect(
+        mentionsRoleTitle(update('Questions? Ask the finance team.'), figma('Finance', 'a-x')),
+      ).toBe(false);
+    });
   });
 
   it('prefers the more recent attempt when a role has been applied to twice', () => {

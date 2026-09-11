@@ -102,6 +102,15 @@ export type LinkDecision =
 
 /** Auto-link only above this, and only with exactly one candidate. */
 export const AUTO_LINK_THRESHOLD = 0.85;
+/**
+ * How close two different roles have to score before the match is a coin toss.
+ *
+ * Named because the scores are floating point and the comparison sits exactly
+ * on the boundary: a candidate the message names outright saturates at 1 while
+ * its siblings sit at 0.9, and whether that reads as a tie should not depend on
+ * which way the last bit rounded. The rule below decides it explicitly instead.
+ */
+const TIE_MARGIN = 0.1;
 /** Below this a message is not offered as a link at all. */
 export const REVIEW_FLOOR = 0.5;
 /**
@@ -179,6 +188,44 @@ export function titleSimilarity(a: string, b: string): number {
   let shared = 0;
   for (const gram of left) if (right.has(gram)) shared += 1;
   return shared / (left.size + right.size - shared);
+}
+
+/**
+ * Below this a title is a common word before it is a role.
+ *
+ * "Finance" appears in the footer of half the mail an employer sends, and
+ * matching on it would make the signal below noise rather than evidence.
+ */
+const MIN_VERBATIM_TITLE_LENGTH = 8;
+
+/**
+ * Does the message name this candidate's role, word for word?
+ *
+ * Every other title signal reads a role out of the message first and compares
+ * it second, which works only when the extractor found one. A terse "Update
+ * from Figma" rejection names the role in its second paragraph and nowhere
+ * else, so the model returns no title at all -- and then every pursuit at
+ * Figma scores identically on the sender's domain, five of them tie, and the
+ * lot arrives in the review queue asking which role it was. The answer was in
+ * the body the whole time.
+ *
+ * Asking the question the other way round needs no extractor: the candidate
+ * titles are a short known list, so look for each of them in the text instead.
+ * A title that appears verbatim is about as strong as evidence gets short of a
+ * job id.
+ */
+export function mentionsRoleTitle(input: LinkInput, candidate: LinkCandidate): boolean {
+  const needle = normalizeTitle(candidate.roleTitle);
+  if (needle.length < MIN_VERBATIM_TITLE_LENGTH) return false;
+
+  for (const text of [input.subject, input.bodyPreview]) {
+    if (!text) continue;
+    // Both sides go through the same normaliser, so seniority prefixes and
+    // punctuation cannot come between "Senior Accountant" in the body and
+    // "Accountant" on the role.
+    if (normalizeTitle(text).includes(needle)) return true;
+  }
+  return false;
 }
 
 function domainHit(candidate: LinkCandidate, domains: readonly (string | null)[]): boolean {
@@ -274,9 +321,19 @@ export function scoreCandidate(input: LinkInput, candidate: LinkCandidate): Scor
     }
   }
 
-  // 6. Role title similarity. Disambiguates between several roles at one
-  //    company rather than establishing the company in the first place.
-  if (input.extractedRole) {
+  // 6. Role title. Disambiguates between several roles at one company rather
+  //    than establishing the company in the first place.
+  //
+  //    The verbatim mention is checked first and on its own terms: it does not
+  //    need the extractor to have found a role, which is precisely the case
+  //    the similarity comparison below cannot cover. Where it hits, the
+  //    extracted title is not consulted at all -- a role the message names
+  //    outright is not made less likely by a model that read a different one.
+  if (mentionsRoleTitle(input, candidate)) {
+    score += 0.25;
+    if (method === 'none') method = 'role_title';
+    reasons.push(`The message names "${candidate.roleTitle}" word for word`);
+  } else if (input.extractedRole) {
     const similarity = titleSimilarity(input.extractedRole, candidate.roleTitle);
     if (similarity >= 0.75) {
       score += 0.25;
@@ -531,7 +588,7 @@ export function decideLink(
     // sort has already put it first. An ambiguity is two DIFFERENT roles
     // scoring the same, and that is what goes to review.
     const sameRole = runnerUp && runnerUp.candidate.roleId === best.candidate.roleId;
-    const tied = runnerUp && !sameRole && best.confidence - runnerUp.confidence < 0.1;
+    const tied = runnerUp && !sameRole && best.confidence - runnerUp.confidence < TIE_MARGIN;
     if (!tied) {
       return {
         action: 'link',
@@ -541,6 +598,22 @@ export function decideLink(
         reasons: best.reasons,
       };
     }
+
+    // A tie the message itself settles. Several pursuits at one company match
+    // the sender's domain equally well, and that is a genuine ambiguity right
+    // up until the body names one of them — at which point handing it back and
+    // asking which role it was is asking a question the message answered.
+    const named = soleNamedCandidate(input, scored);
+    if (named) {
+      return {
+        action: 'link',
+        candidate: named.candidate,
+        confidence: named.confidence,
+        method: 'role_title',
+        reasons: named.reasons,
+      };
+    }
+
     return {
       action: 'review',
       candidates: scored.slice(0, 3),
@@ -612,6 +685,26 @@ export function decideLink(
       ? `This looks like it is from ${company.name}, but not enough to open a pursuit from.`
       : `Recognised ${company.name} but could not match this to an application.`,
   };
+}
+
+/**
+ * The one tied candidate the message names, or null.
+ *
+ * Only the candidates actually in the tie are considered: a role named in the
+ * body is evidence about which pursuit the mail belongs to, not a reason to
+ * reach past the ones the rest of the signals already picked out. Two named
+ * titles is the same ambiguity one level down, and goes to review as before.
+ */
+function soleNamedCandidate(
+  input: LinkInput,
+  scored: readonly ScoredCandidate[],
+): ScoredCandidate | null {
+  if (scored.length === 0) return null;
+  const contenders = scored.filter(
+    (entry) => scored[0].confidence - entry.confidence < TIE_MARGIN,
+  );
+  const named = contenders.filter((entry) => mentionsRoleTitle(input, entry.candidate));
+  return named.length === 1 ? named[0] : null;
 }
 
 function domainOwnedBy(domain: string, domains: readonly string[]): boolean {
