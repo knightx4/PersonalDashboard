@@ -306,6 +306,80 @@ describe('when the briefing states claims', () => {
   });
 });
 
+describe('one claim referring to another', () => {
+  /**
+   * A pass places its own mentions against its own claims, the same as its
+   * edges. What only this file can see is what happens between passes: two
+   * sections reporting the same pair, and one reporting as a mention what
+   * another draws as an edge. Both are settled once, at the end, over
+   * everything that survived.
+   */
+  const claim = (name: string) => ({
+    name,
+    claim: `${name} is the case, for a reason the briefing gives.`,
+    basis: "The briefing's section states this outright.",
+  });
+
+  const joins = (prerequisite: string, dependent: string) => ({
+    prerequisite,
+    dependent,
+    basis: 'The second claim is the first one carried further.',
+  });
+
+  const refers = (source: string, target: string) => ({
+    source,
+    target,
+    basis: 'The section brings the two up together.',
+  });
+
+  const FIRST = {
+    subject: 'Crypto',
+    goal_concept: 'C',
+    concepts: [claim('A'), claim('B'), claim('C')],
+    edges: [joins('A', 'B'), joins('B', 'C')],
+    mentions: [refers('A', 'C'), refers('C', 'A')],
+  };
+
+  it('keeps both directions a section reported', async () => {
+    const client = clientReturning({ input: FIRST });
+    const result = await ask(client, { briefing: ONE_PASS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.chain.mentions.map((row) => [row.source, row.target])).toEqual([
+      ['A', 'C'],
+      ['C', 'A'],
+    ]);
+  });
+
+  it('drops one another section turned into a prerequisite', async () => {
+    // The second pass says A is needed for C. An edge puts both claims on each
+    // other's page already, so the mention the first pass reported is a second
+    // line saying less.
+    const second = {
+      subject: 'Crypto',
+      goal_concept: 'C',
+      concepts: [claim('A'), claim('C')],
+      edges: [joins('A', 'C')],
+    };
+    const client = clientReturning({ input: FIRST }, { input: second });
+    const result = await ask(client, { briefing: TWO_SECTIONS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.chain.mentions).toEqual([]);
+  });
+
+  it('counts a pair two sections both reported once', async () => {
+    const client = clientReturning({ input: FIRST }, { input: FIRST });
+    const result = await ask(client, { briefing: TWO_SECTIONS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.chain.mentions).toHaveLength(2);
+  });
+});
+
 describe('when the briefing has no claims in it', () => {
   it('comes back as a reason rather than an empty chain', async () => {
     const result = await ask(clientReturning({ input: { ...BITCOIN, too_vague: true } }));

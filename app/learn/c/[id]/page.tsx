@@ -8,7 +8,7 @@ import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/co
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
-import type { Concept } from '@/lib/learn/graph/model';
+import type { Concept, Mentioned } from '@/lib/learn/graph/model';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +37,34 @@ function ConceptLink({ concept }: { concept: Concept }) {
         </Link>
         <span className="ml-2 text-small text-ink-muted">{STATE_LABEL[concept.state]}</span>
         <p className="text-small text-ink-muted">{concept.claim}</p>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * The same row, plus the sentence saying why the link is there.
+ *
+ * A mention is the one link on this page that is not a prerequisite, so it
+ * carries its basis where an edge does not: "this is mentioned by that" is
+ * worth nothing without the reason, and the reason is what stops a link from
+ * quietly becoming a claim about learning order.
+ */
+function MentionLink({ mention }: { mention: Mentioned }) {
+  return (
+    <li className="flex gap-2">
+      <StateMark concept={mention.concept} className="mt-1" />
+      <div className="min-w-0">
+        <Link
+          href={`/learn/c/${mention.concept.id}`}
+          className="text-ui text-ink hover:text-accent"
+        >
+          {mention.concept.name}
+        </Link>
+        <span className="ml-2 text-small text-ink-muted">
+          {STATE_LABEL[mention.concept.state]}
+        </span>
+        <p className="text-small text-ink-muted">{mention.basis}</p>
       </div>
     </li>
   );
@@ -78,8 +106,14 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
   const view = await loadConceptView(supabase, id);
   if (!view) notFound();
 
-  const { concept, subject, prerequisites, dependents } = view;
+  const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
   const probes = await probesFor(supabase, concept.id);
+
+  const connected =
+    prerequisites.length > 0 ||
+    dependents.length > 0 ||
+    refersTo.length > 0 ||
+    referredToBy.length > 0;
 
   return (
     <>
@@ -119,7 +153,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         </div>
       </CardSection>
 
-      {(prerequisites.length > 0 || dependents.length > 0) && (
+      {connected && (
         <CardSection title="How it connects" className="mb-5">
           <div className="space-y-4">
             {prerequisites.length > 0 && (
@@ -137,6 +171,30 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
                 <ul className="space-y-2">
                   {dependents.map((row) => (
                     <ConceptLink key={row.id} concept={row} />
+                  ))}
+                </ul>
+              </Group>
+            )}
+
+            {/* Below the prerequisites, and separately, because they are a
+                different claim: these say the briefing brought the two up
+                together, not that either has to be learned first. A concept
+                with none of them shows neither heading. */}
+            {refersTo.length > 0 && (
+              <Group title="It refers to">
+                <ul className="space-y-2">
+                  {refersTo.map((row) => (
+                    <MentionLink key={row.concept.id} mention={row} />
+                  ))}
+                </ul>
+              </Group>
+            )}
+
+            {referredToBy.length > 0 && (
+              <Group title="Refers to it">
+                <ul className="space-y-2">
+                  {referredToBy.map((row) => (
+                    <MentionLink key={row.concept.id} mention={row} />
                   ))}
                 </ul>
               </Group>

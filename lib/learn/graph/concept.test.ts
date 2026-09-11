@@ -16,7 +16,7 @@ import { loadConceptView } from './concept';
 type Row = Record<string, unknown>;
 
 /**
- * Enough of the query builder for three plain reads: a filter, an ordering,
+ * Enough of the query builder for four plain reads: a filter, an ordering,
  * and either one row or all of them. Every step returns the same object, so
  * `.eq(...).order(...)` and `.eq(...).maybeSingle()` both work and awaiting
  * it directly gives the rows that survived the filters.
@@ -25,6 +25,7 @@ function clientHolding(tables: {
   subjects?: Row[];
   concepts?: Row[];
   concept_edges?: Row[];
+  concept_mentions?: Row[];
   concept_state?: Row[];
 }) {
   return {
@@ -63,6 +64,11 @@ const GRAPH = {
     { prerequisite_id: 'money', dependent_id: 'prices', subject_id: 'subject-1' },
     { prerequisite_id: 'prices', dependent_id: 'inflation', subject_id: 'subject-1' },
   ],
+  concept_mentions: [
+    // Both directions between the same pair, which an edge could not carry.
+    { source_id: 'money', target_id: 'inflation', basis: 'The money section names inflation.', subject_id: 'subject-1' },
+    { source_id: 'inflation', target_id: 'money', basis: 'The inflation section argues back at it.', subject_id: 'subject-1' },
+  ],
   concept_state: [
     {
       concept_id: 'prices',
@@ -97,6 +103,23 @@ describe('one concept, with what sits either side of it', () => {
 
     expect(view?.prerequisites).toEqual([]);
     expect(view?.dependents.map((row) => row.id)).toEqual(['prices']);
+  });
+
+  it('names what it refers to and what refers to it', async () => {
+    const view = await loadConceptView(clientHolding(GRAPH), 'money');
+
+    expect(view?.refersTo.map((row) => row.concept.id)).toEqual(['inflation']);
+    expect(view?.refersTo[0].basis).toBe('The money section names inflation.');
+    expect(view?.referredToBy.map((row) => row.concept.id)).toEqual(['inflation']);
+  });
+
+  it('gives a concept nobody mentions empty lists, not an absence', async () => {
+    // The page reads the length to decide whether to show a heading at all, so
+    // the lists are always there and sometimes empty.
+    const view = await loadConceptView(clientHolding(GRAPH), 'prices');
+
+    expect(view?.refersTo).toEqual([]);
+    expect(view?.referredToBy).toEqual([]);
   });
 
   it('has nothing to show for a concept belonging to somebody else', async () => {

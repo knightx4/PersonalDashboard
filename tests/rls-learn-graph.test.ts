@@ -2,7 +2,7 @@
  * Cross-user isolation for the graph half of the learn module, and the one
  * property the whole thing rests on: no cycles.
  *
- * The isolation half is the same rule as everywhere else, applied to six new
+ * The isolation half is the same rule as everywhere else, applied to seven new
  * tables. What is worth more than "can B read A's rows" here is what a leak
  * would actually be. A concept graph is a map of what somebody does not
  * understand, and `concept_state.misconception` is the sharpest sentence this
@@ -59,6 +59,17 @@ async function seedEdge(
     values (${userId}, ${subjectId}, ${prerequisite}, ${dependent}, 'Seeded by the test.')`;
 }
 
+async function seedMention(
+  userId: string,
+  subjectId: string,
+  source: string,
+  target: string,
+): Promise<void> {
+  await admin`
+    insert into concept_mentions (user_id, subject_id, source_id, target_id, basis)
+    values (${userId}, ${subjectId}, ${source}, ${target}, 'Seeded by the test.')`;
+}
+
 beforeAll(async () => {
   await truncateAll();
   userA = await createUser('learn-graph-a@example.com');
@@ -76,6 +87,11 @@ beforeAll(async () => {
 
   await seedEdge(userA, subjectA, conceptA1, conceptA2);
   await seedEdge(userA, subjectA, conceptA2, conceptA3);
+
+  // Both directions between the same pair, which is what an edge could never
+  // be: the cycle trigger below refuses exactly that shape.
+  await seedMention(userA, subjectA, conceptA1, conceptA3);
+  await seedMention(userA, subjectA, conceptA3, conceptA1);
 
   // tested_at goes in the insert, not an update after it. The constraint the
   // suite below checks -- established = 'tested' needs a time it was tested --
@@ -121,6 +137,7 @@ describe('RLS coverage', () => {
       select 'subjects' as table_name, count(*)::int as rows from subjects
       union all select 'concepts', count(*)::int from concepts
       union all select 'concept_edges', count(*)::int from concept_edges
+      union all select 'concept_mentions', count(*)::int from concept_mentions
       union all select 'goals', count(*)::int from goals
       union all select 'concept_state', count(*)::int from concept_state
       union all select 'probes', count(*)::int from probes
@@ -135,11 +152,20 @@ describe('cross-user reads', () => {
       subjects: (await tx`select id from subjects`).length,
       concepts: (await tx`select id from concepts`).length,
       edges: (await tx`select id from concept_edges`).length,
+      mentions: (await tx`select id from concept_mentions`).length,
       goals: (await tx`select id from goals`).length,
       state: (await tx`select concept_id from concept_state`).length,
       probes: (await tx`select id from probes`).length,
     }));
-    expect(seen).toEqual({ subjects: 1, concepts: 3, edges: 2, goals: 1, state: 1, probes: 1 });
+    expect(seen).toEqual({
+      subjects: 1,
+      concepts: 3,
+      edges: 2,
+      mentions: 2,
+      goals: 1,
+      state: 1,
+      probes: 1,
+    });
   });
 
   it('shows another user none of it', async () => {
@@ -147,11 +173,20 @@ describe('cross-user reads', () => {
       subjects: (await tx`select id from subjects where id = ${subjectA}`).length,
       concepts: (await tx`select id from concepts where subject_id = ${subjectA}`).length,
       edges: (await tx`select id from concept_edges where subject_id = ${subjectA}`).length,
+      mentions: (await tx`select id from concept_mentions where subject_id = ${subjectA}`).length,
       goals: (await tx`select id from goals where subject_id = ${subjectA}`).length,
       state: (await tx`select concept_id from concept_state where concept_id = ${conceptA2}`).length,
       probes: (await tx`select id from probes where concept_id = ${conceptA2}`).length,
     }));
-    expect(seen).toEqual({ subjects: 0, concepts: 0, edges: 0, goals: 0, state: 0, probes: 0 });
+    expect(seen).toEqual({
+      subjects: 0,
+      concepts: 0,
+      edges: 0,
+      mentions: 0,
+      goals: 0,
+      state: 0,
+      probes: 0,
+    });
   });
 
   it('never leaks a named misconception', async () => {
@@ -249,6 +284,33 @@ describe('the graph stays a graph', () => {
     // One graph per subject is a foreign key here, not a convention: both ends
     // are keyed on (id, subject_id).
     await expect(seedEdge(userA, subjectA, conceptA1, conceptB1)).rejects.toThrow();
+  });
+});
+
+describe('one claim referring to another', () => {
+  /**
+   * The second relation, and the rules that keep it from becoming the first.
+   * Both directions at once is the case an edge cannot carry -- the cycle
+   * trigger refuses it -- and it is the ordinary case here, already seeded
+   * above.
+   */
+  it('refuses the same direction twice', async () => {
+    await expect(seedMention(userA, subjectA, conceptA1, conceptA3)).rejects.toThrow();
+  });
+
+  it('refuses a claim referring to itself', async () => {
+    await expect(seedMention(userA, subjectA, conceptA1, conceptA1)).rejects.toThrow();
+  });
+
+  it('refuses one with no stated basis', async () => {
+    await expect(
+      admin`insert into concept_mentions (user_id, subject_id, source_id, target_id, basis)
+            values (${userA}, ${subjectA}, ${conceptA2}, ${conceptA3}, '')`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses one whose ends are in different subjects', async () => {
+    await expect(seedMention(userA, subjectA, conceptA1, conceptB1)).rejects.toThrow();
   });
 });
 

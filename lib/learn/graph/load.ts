@@ -8,7 +8,7 @@ import type { Concept, Graph, KnowledgeState, StateBasis } from '@/lib/learn/gra
  * Reading a subject's graph.
  *
  * Every query goes through the session client, so RLS decides what comes back
- * and nothing here filters by user id. Three plain reads rather than embedded
+ * and nothing here filters by user id. Four plain reads rather than embedded
  * ones, joined in memory: the links in this schema are composite, carrying
  * user_id so that a row from another account cannot be reached through a
  * foreign key, and that is not a thing to make PostgREST's relationship
@@ -144,6 +144,7 @@ export async function loadGraph(
   const [
     { data: conceptRows, error: conceptError },
     { data: edgeRows, error: edgeError },
+    { data: mentionRows, error: mentionError },
   ] = await Promise.all([
     supabase
       .from('concepts')
@@ -154,11 +155,16 @@ export async function loadGraph(
       .from('concept_edges')
       .select('prerequisite_id, dependent_id')
       .eq('subject_id', subjectId),
+    supabase
+      .from('concept_mentions')
+      .select('source_id, target_id, basis')
+      .eq('subject_id', subjectId),
   ]);
 
-  assertSchemaExposed(conceptError ?? edgeError, LEARN_SCHEMA);
+  assertSchemaExposed(conceptError ?? edgeError ?? mentionError, LEARN_SCHEMA);
   if (conceptError) throw fail('Reading the concepts', conceptError);
   if (edgeError) throw fail('Reading the prerequisites', edgeError);
+  if (mentionError) throw fail('Reading what refers to what', mentionError);
 
   const concepts = (conceptRows ?? []) as unknown as ConceptRow[];
 
@@ -187,6 +193,15 @@ export async function loadGraph(
     edges: ((edgeRows ?? []) as unknown as { prerequisite_id: string; dependent_id: string }[]).map(
       (row) => ({ prerequisiteId: row.prerequisite_id, dependentId: row.dependent_id }),
     ),
+    mentions: ((mentionRows ?? []) as unknown as {
+      source_id: string;
+      target_id: string;
+      basis: string;
+    }[]).map((row) => ({
+      sourceId: row.source_id,
+      targetId: row.target_id,
+      basis: row.basis,
+    })),
   };
 }
 

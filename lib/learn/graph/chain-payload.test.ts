@@ -33,6 +33,12 @@ const edge = (prerequisite: string, dependent: string) => ({
   basis: 'One rests on the other.',
 });
 
+const mention = (source: string, target: string) => ({
+  source,
+  target,
+  basis: 'The section brings the two up together.',
+});
+
 const nothingExists: ExistingConcept[] = [];
 
 describe('a straightforward chain', () => {
@@ -250,6 +256,64 @@ describe('when there is nothing to propose', () => {
   });
 });
 
+describe('one claim referring to another', () => {
+  /**
+   * A mention is the second relation, and everything here is about it not
+   * being the first. It may run both ways between a pair, it is refused when
+   * an end is not in the chain, and it is dropped where the pair is already a
+   * prerequisite -- an edge puts both claims on each other's page already,
+   * with a better sentence under it.
+   */
+  const chainWith = (mentions: ReturnType<typeof mention>[]) =>
+    normaliseChain(
+      parse({
+        subject: 'Crypto',
+        goal_concept: 'C',
+        concepts: [node('A'), node('B'), node('C')],
+        edges: [edge('A', 'B'), edge('B', 'C')],
+        mentions,
+      }),
+      nothingExists,
+    );
+
+  it('keeps both directions between the same pair', () => {
+    const chain = chainWith([mention('A', 'C'), mention('C', 'A')]);
+
+    expect(chain?.mentions.map((row) => [row.source, row.target])).toEqual([
+      ['A', 'C'],
+      ['C', 'A'],
+    ]);
+  });
+
+  it('refuses one naming something the chain does not hold', () => {
+    expect(chainWith([mention('A', 'Ghost')])?.mentions).toEqual([]);
+  });
+
+  it('refuses one where the pair is already a prerequisite', () => {
+    expect(chainWith([mention('A', 'B'), mention('B', 'A')])?.mentions).toEqual([]);
+  });
+
+  it('refuses a claim referring to itself, and the same pair twice', () => {
+    const chain = chainWith([mention('A', 'A'), mention('A', 'C'), mention('A', 'C')]);
+
+    expect(chain?.mentions).toHaveLength(1);
+  });
+
+  it('is empty for a call that never asked for them', () => {
+    const chain = normaliseChain(
+      parse({
+        subject: 'Economics',
+        goal_concept: 'B',
+        concepts: [node('A'), node('B')],
+        edges: [edge('A', 'B')],
+      }),
+      nothingExists,
+    );
+
+    expect(chain?.mentions).toEqual([]);
+  });
+});
+
 describe('keeping only what was ticked', () => {
   const chained = (names: string[], existing: string[] = []): ProposedChain => ({
     subject: 'Crypto',
@@ -263,11 +327,20 @@ describe('keeping only what was ticked', () => {
       }),
     ),
     edges: names.slice(1).map((name, i) => edge(names[i], name)),
+    mentions: [],
     joined: existing.length,
     dropped: [],
   });
 
   const ticks = (...names: string[]) => new Set(names.map((name) => name.toLowerCase()));
+
+  it('takes a mention out with the row you left out', () => {
+    const branched = chained(['A', 'B', 'C']);
+    branched.mentions = [mention('A', 'C')];
+
+    expect(keepTicked(branched, ticks('A', 'B', 'C')).chain.mentions).toHaveLength(1);
+    expect(keepTicked(branched, ticks('A', 'B')).chain.mentions).toEqual([]);
+  });
 
   it('writes the ticked rows and no others', () => {
     const { chain } = keepTicked(chained(['A', 'B', 'C']), ticks('A', 'B'));

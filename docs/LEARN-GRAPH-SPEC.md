@@ -211,9 +211,17 @@ than merely unlikely.
 | `subjects` | the container. name, one row per subject per user |
 | `concepts` | a node: name, claim, basis, how it got here |
 | `concept_edges` | prerequisite → dependent, within one subject, acyclic |
+| `concept_mentions` | one claim refers to another: source, target, why. Both directions allowed |
 | `goals` | what you typed, the concept it resolved to, and its status |
 | `concept_state` | one row per concept: state, how established, when tested, any named misconception |
 | `probes` | every question asked: options, correct index, its reason, what you chose, the weight it earned |
+
+`concept_mentions` is the one relation nothing walks. An edge says you cannot
+understand this without that first; a mention says this claim brings that one
+up, which two claims often do to each other. Nothing that decides what to show
+or what to learn next reads it — the pruning rule, the learning order and "what
+is ready now" run on `concept_edges` alone — and mixing the two would put back
+into the walk the cycles the edge trigger exists to keep out.
 
 `probes` is the evidence trail, and it is kept in full rather than collapsed
 into a score. It is what makes "you have been wrong about this three times in
