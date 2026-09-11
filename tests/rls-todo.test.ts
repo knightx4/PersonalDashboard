@@ -12,9 +12,11 @@
  * user_id column would pass with that hole wide open. It is the reason the
  * first draft of the spec said the trigger was unnecessary.
  */
+import { randomBytes } from 'crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createRole, createUser, truncateAll } from './helpers/db-todo';
 import { resolveSpan } from '@/lib/todo/events/write';
+import { decryptToken, encryptToken } from '@/lib/crypto/tokens';
 
 let userA = '';
 let userB = '';
@@ -357,6 +359,167 @@ describe('todo.dismissals', () => {
   });
 });
 
+describe('todo.calendar_feeds and todo.feed_events', () => {
+  // A throwaway key, so the test asserts what the column actually holds rather
+  // than that a string was copied in and out.
+  const key = randomBytes(32).toString('base64');
+  const privateAddress = 'https://calendar.google.com/calendar/ical/private-abc123/basic.ics';
+  let feedA = '';
+  let feedB = '';
+
+  it('keeps the address as ciphertext and reads it back', async () => {
+    const [feed] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into calendar_feeds (user_id, name, address)
+      values (${userA}, 'Work', ${encryptToken(privateAddress, key)})
+      returning id`);
+    feedA = feed.id;
+
+    const [row] = await admin<{ address: string }[]>`
+      select address from calendar_feeds where id = ${feedA}`;
+    // The whole point of encrypting it: the private part of the link is not
+    // sitting in the database for anyone reading the table.
+    expect(row.address).not.toContain('private-abc123');
+    expect(decryptToken(row.address, key)).toBe(privateAddress);
+  });
+
+  it('refuses an address written in plain text', async () => {
+    await expect(
+      admin`insert into calendar_feeds (user_id, name, address)
+            values (${userA}, 'Careless', ${privateAddress})`,
+    ).rejects.toThrow(/calendar_feeds_address_ck/);
+  });
+
+  it('refuses a blank name', async () => {
+    await expect(
+      admin`insert into calendar_feeds (user_id, name, address)
+            values (${userA}, '  ', ${encryptToken(privateAddress, key)})`,
+    ).rejects.toThrow(/calendar_feeds_name_ck/);
+  });
+
+  it('shows a user only their own subscriptions, and their appointments', async () => {
+    const [feed] = await admin<{ id: string }[]>`
+      insert into calendar_feeds (user_id, name, address)
+      values (${userB}, 'Their work', ${encryptToken('https://example.com/theirs.ics', key)})
+      returning id`;
+    feedB = feed.id;
+
+    await admin`insert into feed_events (user_id, feed_id, uid, title, starts_at, ends_at)
+                values (${userA}, ${feedA}, 'standup@acme', 'Stand-up',
+                        timestamptz '2026-03-10 09:00+00', timestamptz '2026-03-10 09:15+00')`;
+    await admin`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on)
+                values (${userB}, ${feedB}, 'offsite@umbrella', 'Their offsite',
+                        date '2026-03-10', date '2026-03-11')`;
+
+    const mine = await asUser(userA, (tx) => tx<{ name: string }[]>`
+      select name from calendar_feeds`);
+    expect(mine.map((r) => r.name)).toEqual(['Work']);
+
+    const appointments = await asUser(userA, (tx) => tx<{ title: string }[]>`
+      select title from feed_events`);
+    expect(appointments.map((r) => r.title)).toEqual(['Stand-up']);
+  });
+
+  it('refuses a subscription written on somebody else', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into calendar_feeds (user_id, name, address)
+                   values (${userA}, 'Not yours', ${encryptToken(privateAddress, key)})`,
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('does not let a user edit or delete another user\'s subscription', async () => {
+    await asUser(userB, async (tx) => {
+      const updated = await tx`update calendar_feeds set name = 'Hijacked' where id = ${feedA}`;
+      const deleted = await tx`delete from calendar_feeds where id = ${feedA}`;
+      expect(updated.count).toBe(0);
+      expect(deleted.count).toBe(0);
+    });
+
+    const [row] = await admin<{ name: string }[]>`select name from calendar_feeds where id = ${feedA}`;
+    expect(row.name).toBe('Work');
+  });
+
+  it('REFUSES an appointment hung on another account\'s subscription', async () => {
+    // The same hole todo.task_links needs a trigger for, closed by the key
+    // instead: feed_id alone would be satisfied by any feed in the table, so
+    // the foreign key is (feed_id, user_id) and the pair cannot span accounts.
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on)
+                   values (${userB}, ${feedA}, 'sneaky@umbrella', 'Reading yours',
+                           date '2026-03-10', date '2026-03-10')`,
+      ),
+    ).rejects.toThrow(/feed_events_feed_fk/);
+
+    // And claiming the other account's id to satisfy the key is what RLS is
+    // for.
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on)
+                   values (${userA}, ${feedA}, 'sneaky@umbrella', 'Writing on yours',
+                           date '2026-03-10', date '2026-03-10')`,
+      ),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  it('holds an appointment to the same date rules an event is held to', async () => {
+    await expect(
+      admin`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on, starts_at, ends_at)
+            values (${userA}, ${feedA}, 'both@acme', 'Both', date '2026-03-10', date '2026-03-10',
+                    timestamptz '2026-03-10 09:00+00', timestamptz '2026-03-10 10:00+00')`,
+    ).rejects.toThrow(/feed_events_one_span_ck/);
+
+    await expect(
+      admin`insert into feed_events (user_id, feed_id, uid, title, starts_at)
+            values (${userA}, ${feedA}, 'open@acme', 'Open ended',
+                    timestamptz '2026-03-10 09:00+00')`,
+    ).rejects.toThrow(/feed_events_one_span_ck/);
+
+    await expect(
+      admin`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on)
+            values (${userA}, ${feedA}, 'backwards@acme', 'Backwards',
+                    date '2026-03-10', date '2026-03-09')`,
+    ).rejects.toThrow(/feed_events_span_order_ck/);
+
+    await expect(
+      admin`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on)
+            values (${userA}, ${feedA}, '  ', 'No identity', date '2026-03-10', date '2026-03-10')`,
+    ).rejects.toThrow(/feed_events_uid_ck/);
+  });
+
+  it('keeps every occurrence of a repeating appointment under one uid', async () => {
+    // A weekly stand-up is one uid and several rows. Nothing in the schema
+    // may treat the uid as a key, or the second Tuesday would displace the
+    // first.
+    await admin`insert into feed_events (user_id, feed_id, uid, title, starts_at, ends_at)
+                values (${userA}, ${feedA}, 'standup@acme', 'Stand-up',
+                        timestamptz '2026-03-17 09:00+00', timestamptz '2026-03-17 09:15+00')`;
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from feed_events where feed_id = ${feedA} and uid = 'standup@acme'`;
+    expect(Number(row.n)).toBe(2);
+  });
+
+  it('takes the appointments off with the subscription and leaves your own events', async () => {
+    const [before] = await admin<{ n: string }[]>`
+      select count(*) as n from events where user_id = ${userA}`;
+
+    await asUser(userA, (tx) => tx`delete from calendar_feeds where id = ${feedA}`);
+
+    const [appointments] = await admin<{ n: string }[]>`
+      select count(*) as n from feed_events where user_id = ${userA}`;
+    const [after] = await admin<{ n: string }[]>`
+      select count(*) as n from events where user_id = ${userA}`;
+
+    expect(Number(appointments.n)).toBe(0);
+    expect(after.n).toBe(before.n);
+  });
+});
+
 describe('everything cascades out with the account', () => {
   it('leaves nothing behind', async () => {
     const doomed = await createUser('todo-gone@example.com');
@@ -368,6 +531,13 @@ describe('everything cascades out with the account', () => {
                 values (${doomed}, 'return_deadline', 'order-gone')`;
     await admin`insert into events (user_id, title, starts_on, ends_on)
                 values (${doomed}, 'Leaving drinks', date '2026-03-10', date '2026-03-10')`;
+    const [feed] = await admin<{ id: string }[]>`
+      insert into calendar_feeds (user_id, name, address)
+      values (${doomed}, 'Theirs', ${encryptToken('https://example.com/gone.ics', randomBytes(32).toString('base64'))})
+      returning id`;
+    await admin`insert into feed_events (user_id, feed_id, uid, title, starts_on, ends_on)
+                values (${doomed}, ${feed.id}, 'gone@example', 'Somebody else''s meeting',
+                        date '2026-03-10', date '2026-03-10')`;
 
     await admin`delete from auth.users where id = ${doomed}`;
 
@@ -379,7 +549,13 @@ describe('everything cascades out with the account', () => {
       select count(*) as n from dismissals where user_id = ${doomed}`;
     const [events] = await admin<{ n: string }[]>`
       select count(*) as n from events where user_id = ${doomed}`;
+    const [feeds] = await admin<{ n: string }[]>`
+      select count(*) as n from calendar_feeds where user_id = ${doomed}`;
+    const [appointments] = await admin<{ n: string }[]>`
+      select count(*) as n from feed_events where user_id = ${doomed}`;
 
-    expect([tasks.n, links.n, dismissals.n, events.n].map(Number)).toEqual([0, 0, 0, 0]);
+    expect(
+      [tasks.n, links.n, dismissals.n, events.n, feeds.n, appointments.n].map(Number),
+    ).toEqual([0, 0, 0, 0, 0, 0]);
   });
 });
