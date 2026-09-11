@@ -1308,6 +1308,17 @@ export default function DevUiPage() {
             ))}
           </ul>
         </Card>
+
+        <div className="pt-2">
+          <h3 className="text-ui font-semibold text-ink">Stacking contexts</h3>
+          <p className="mt-1 max-w-2xl text-body text-ink-muted">
+            The ladder above ranks eight rungs, which only holds where they are all in the same
+            stacking context. The shell makes several, so some pairs of rungs never meet. This is
+            every rung utility in app/ and components/ walked up its ancestors.
+          </p>
+        </div>
+        <Rows rows={M.STACKING_CONTEXTS} labelWidth="sm:grid-cols-[13rem_1fr]" />
+        <Rules items={M.STACKING_RULES} />
       </Section>
 
       <Section
