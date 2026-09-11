@@ -200,3 +200,79 @@ export const MOTION_RULES: readonly string[] = [
   'prefers-reduced-motion removes all of it, no exceptions, including the count-up on the dashboard. Any new animation is added to that block in the same commit.',
   'Never delay the user to be charming. A flourish is under a second, is chrome, and can be switched off.',
 ];
+
+/**
+ * The stacking contexts the shell makes, and which rungs each one boxes.
+ *
+ * A z-index only ranks an element against the others in its own stacking
+ * context, so two rungs in different contexts do not compare at all. The shell
+ * makes several: the sidebar and the top bar are sticky with a rung on them,
+ * the top bar, the dock and the status line carry backdrop-blur, a table that
+ * scrolls sideways carries a mask, and a card under the cursor is transformed
+ * for as long as the pointer is on it.
+ *
+ * This table is the result of walking every call site of a rung utility in
+ * app/ and components/ up its ancestors, looking for transform, filter,
+ * backdrop-filter, mask, contain and an opacity below 1. It is beside the
+ * ladder because the ladder on its own implies eight rungs that can all be
+ * compared, and they cannot.
+ */
+export const STACKING_CONTEXTS: readonly Row4[] = [
+  [
+    'The sidebar column',
+    'sticky top-0 with z-chrome on it.',
+    'Rung 40 against the page.',
+    'The workspace switcher’s popover is z-overlay inside it. That 50 counts only inside the column; against the page the whole column is 40.',
+  ],
+  [
+    'The top bar',
+    'sticky top-0 with z-chrome, plus backdrop-blur.',
+    'Rung 40 against the page.',
+    'The theme, notification and feedback popovers and the phone workspace switcher are z-overlay inside it, so against the page they are 40 too. backdrop-blur also makes the bar the containing block for their fixed positioning, so their offsets are measured from the bar rather than from the window.',
+  ],
+  [
+    'The phone dock',
+    'fixed bottom-0 with z-chrome, plus backdrop-blur.',
+    'Rung 40, and after the top bar in the document.',
+    'Nothing carrying a rung. Equal rungs are ordered by document position, so the dock paints over the top bar and over everything boxed inside it.',
+  ],
+  [
+    'The status line',
+    'sticky bottom-0 with z-status, plus backdrop-blur.',
+    'Rung 30.',
+    'Nothing carrying a rung.',
+  ],
+  [
+    'A drawer, sheet, palette or capture panel',
+    'fixed inset-0 with its own rung.',
+    'Rung 50 or 60, in the page’s outermost context.',
+    'Its own scrim and panel. Each is mounted at the top of the shell rather than inside a page, which is what keeps it comparable with the rest of the ladder.',
+  ],
+  [
+    'A table that scrolls sideways',
+    'scroll-fade-x, which is a mask.',
+    'No rung of its own.',
+    'z-over-link on a cell of the roles table, below lg. The stretched link it has to stay above is in the same box, so that pair still compares.',
+  ],
+  [
+    'An interactive card under the cursor',
+    'lift, which is a transform while hovered.',
+    'No rung of its own.',
+    'Nothing today. A panel inside one would be boxed for as long as the pointer is on the card, and a fixed child would measure from the card; ActionMenu avoids both by rendering into the body.',
+  ],
+  [
+    'A pipeline card being dragged',
+    'dragging: a transform and opacity 0.55.',
+    'No rung of its own.',
+    'Nothing carrying a rung.',
+  ],
+];
+
+/** What the trace above means for reading the ladder. */
+export const STACKING_RULES: readonly string[] = [
+  'A rung compares only with the rungs in the same stacking context. Against anything outside it, the number that counts is the one on the outermost box.',
+  'A popover opened from the top bar ranks 40 against the page rather than 50. The phone dock is 40 as well and comes later in the document, so a top-bar panel long enough to reach the foot of a phone is painted over by the dock.',
+  'The workspace switcher’s popover stands in the same relation to the top bar and misses it on geometry alone: the popover opens 62px down the column and the bar ends at 57px.',
+  'The palette, the capture panel and the toasts cover the drawer because all four are mounted at the top of the shell. Open one of them from inside a page and its rung stops meaning what the ladder says.',
+  'backdrop-blur, a transform, a mask and an opacity below 1 each make a stacking context, and the first two also make the element the containing block for a fixed child. Putting one of them above a rung changes what that rung means.',
+];
