@@ -106,6 +106,92 @@ describe('todo.tasks status', () => {
   });
 });
 
+describe('todo.tasks nesting', () => {
+  /**
+   * One level only, checked here rather than only in the app.
+   *
+   * Two of these are the same lesson the link tests teach one section down: a
+   * foreign key is satisfied by any row in the table, so `parent_id` alone
+   * lets one account file its task under another's, and lets a list grow a
+   * third level from either end -- by giving an item items, or by filing a
+   * task that already has items under something else. Only the trigger says
+   * no, so only a test against the database can say it does.
+   */
+  let parent = '';
+
+  beforeAll(async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title) values (${userA}, 'Renew the passport, properly')
+      returning id`;
+    parent = row.id;
+  });
+
+  it('puts an item under a task its owner owns', async () => {
+    await asUser(userA, async (tx) => {
+      await tx`insert into tasks (user_id, title, parent_id)
+               values (${userA}, 'Find the old one', ${parent})`;
+    });
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from tasks where parent_id = ${parent}`;
+    expect(Number(row.n)).toBe(1);
+  });
+
+  it('REFUSES an item under another account\'s task', async () => {
+    // RLS is satisfied -- userB is writing a row of their own -- and the
+    // foreign key is satisfied, because `parent` is a real task.
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into tasks (user_id, title, parent_id)
+                   values (${userB}, 'Not yours', ${parent})`,
+      ),
+    ).rejects.toThrow(/owner owns/);
+  });
+
+  it('refuses a third level under an item', async () => {
+    const [item] = await admin<{ id: string }[]>`
+      select id from tasks where parent_id = ${parent} limit 1`;
+
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into tasks (user_id, title, parent_id)
+                   values (${userA}, 'Too deep', ${item.id})`,
+      ),
+    ).rejects.toThrow(/cannot hold a list of its own/);
+  });
+
+  it('refuses filing a task that already holds a list under another one', async () => {
+    // The same third level, reached from the other end.
+    const [other] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title) values (${userA}, 'Something else') returning id`;
+
+    await expect(
+      asUser(userA, (tx) => tx`update tasks set parent_id = ${other.id} where id = ${parent}`),
+    ).rejects.toThrow(/cannot itself sit under another task/);
+  });
+
+  it('refuses a task that names itself', async () => {
+    // A task with nothing under it, so it is the constraint answering and not
+    // the trigger's other half.
+    const [alone] = await admin<{ id: string }[]>`
+      insert into tasks (user_id, title) values (${userA}, 'On its own') returning id`;
+
+    await expect(
+      asUser(userA, (tx) => tx`update tasks set parent_id = id where id = ${alone.id}`),
+    ).rejects.toThrow(/tasks_parent_not_self_ck/);
+  });
+
+  it('takes the items with it when the task is deleted', async () => {
+    await asUser(userA, (tx) => tx`delete from tasks where id = ${parent}`);
+
+    const [row] = await admin<{ n: string }[]>`
+      select count(*) as n from tasks where parent_id = ${parent}`;
+    expect(Number(row.n)).toBe(0);
+  });
+});
+
 describe('todo.task_links', () => {
   it('links a task to a role its owner owns', async () => {
     await asUser(userA, async (tx) => {

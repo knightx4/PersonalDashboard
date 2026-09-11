@@ -38,6 +38,13 @@ export interface Task {
   createdAt: string;
   /** Where you put it by hand within its pile. Null until you move one. */
   position: number | null;
+  /**
+   * The task this one sits under, or null for a task of its own.
+   *
+   * One level only, so a task carrying this never holds a list itself -- the
+   * database refuses the third level, not just the reader.
+   */
+  parentId: string | null;
 }
 
 /** The piles the list is shown in, in the order they matter. */
