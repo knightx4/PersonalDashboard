@@ -79,6 +79,39 @@ describe('when it lays out a chain', () => {
     expect(prompt).toContain('Wage stickiness');
   });
 
+  it('carries the claim a selected phrase came from, and asks for the join', async () => {
+    // Growth trigger 5. A phrase on its own is a fragment; the claim around it
+    // is what says which reading of it was meant, and naming the concept is
+    // what gets the new chain attached to it rather than left beside it.
+    const client = clientReturning(CHAIN);
+    await generateChain({
+      goal: 'wage expectations',
+      subject: 'Economics',
+      existing: [{ id: 'x', name: 'Wage stickiness' }],
+      from: { name: 'Wage stickiness', claim: 'Wages lag prices.' },
+      anthropicApiKey: 'test',
+      client: client as never,
+    });
+
+    const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
+      .messages.create;
+    const prompt = create.mock.calls[0][0].messages[0].content as string;
+    expect(prompt).toContain('wage expectations');
+    expect(prompt).toContain('Wages lag prices.');
+    expect(prompt).toContain('join the chain to "Wage stickiness"');
+  });
+
+  it('says nothing about a claim when the goal was typed', async () => {
+    const client = clientReturning(CHAIN);
+    await ask(client);
+
+    const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
+      .messages.create;
+    const prompt = create.mock.calls[0][0].messages[0].content as string;
+    expect(prompt).toContain('Goal, in their words:');
+    expect(prompt).not.toContain('join the chain to');
+  });
+
   it('reports what the call cost', async () => {
     const reports: { model: string }[] = [];
     await generateChain({
