@@ -19,8 +19,8 @@ import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
  * into a security definer function -- buys atomicity by moving the module's
  * rules into SQL. The order below is chosen so that a failure part way through
  * leaves something legible: the subject, then its concepts, then the edges
- * between them, and the goal last, so a goal never points at a node that is
- * not there.
+ * between them, then what refers to what, and the goal last, so a goal never
+ * points at a node that is not there.
  */
 
 /** The `learn.concept_origin` values a chain write can set. */
@@ -32,6 +32,7 @@ export type SavedChain = {
   goalId: string | null;
   conceptsAdded: number;
   edgesAdded: number;
+  mentionsAdded: number;
   /**
    * The ids of the nodes this write actually inserted, in the order they were
    * proposed. Only the new ones: a node the chain matched against the subject
@@ -160,12 +161,39 @@ export async function saveChain(
     if (error) throw fail('Saving the prerequisites', error);
   }
 
+  // After the edges, for the same reason the goal comes last: a mention never
+  // points at a node that is not there. Unlike an edge it is allowed to run in
+  // both directions between a pair, so there is no cycle check to fail -- the
+  // only thing the database refuses here is the same direction twice.
+  const mentions = chain.mentions
+    .map((mention) => ({
+      user_id: userId,
+      subject_id: subjectId,
+      source_id: idByName.get(mention.source.toLowerCase()),
+      target_id: idByName.get(mention.target.toLowerCase()),
+      basis: mention.basis,
+    }))
+    .filter((mention) => mention.source_id && mention.target_id);
+
+  if (mentions.length > 0) {
+    // The pair may already be there: a second briefing about the same ground
+    // reaches the same two claims and says the same thing about them. The one
+    // already stored wins, because its sentence was written while that claim
+    // was being read. A duplicate is not a reason to refuse the whole import.
+    const { error } = await supabase
+      .from('concept_mentions')
+      .upsert(mentions, { onConflict: 'source_id,target_id', ignoreDuplicates: true });
+    assertSchemaExposed(error, LEARN_SCHEMA);
+    if (error) throw fail('Saving what refers to what', error);
+  }
+
   if (options.goal === false) {
     return {
       subjectId,
       goalId: null,
       conceptsAdded: fresh.length,
       edgesAdded: edges.length,
+      mentionsAdded: mentions.length,
       conceptIds,
     };
   }
@@ -193,6 +221,7 @@ export async function saveChain(
     goalId: (goal as { id: string }).id,
     conceptsAdded: fresh.length,
     edgesAdded: edges.length,
+    mentionsAdded: mentions.length,
     conceptIds,
   };
 }

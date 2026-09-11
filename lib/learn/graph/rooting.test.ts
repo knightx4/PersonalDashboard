@@ -33,6 +33,7 @@ function graphOf(states: Record<string, KnowledgeState>, edges: string[]): Graph
       const [prerequisiteId, dependentId] = edge.split('>');
       return { prerequisiteId, dependentId };
     }),
+    mentions: [],
   };
 }
 
@@ -83,7 +84,7 @@ describe('whether it is rooted at all', () => {
   });
 
   it('is not, on an empty graph', () => {
-    expect(isRooted(rootingFor({ concepts: [], edges: [] }, null))).toBe(false);
+    expect(isRooted(rootingFor({ concepts: [], edges: [], mentions: [] }, null))).toBe(false);
   });
 
   it('is, as soon as one claim is settled', () => {

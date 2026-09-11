@@ -5,8 +5,10 @@ import { loadGraph, loadSubject, subjectIdOfConcept, type Subject } from '@/lib/
 import {
   dependentMap,
   learningOrder,
+  mentionsFor,
   prerequisiteMap,
   type Concept,
+  type Mentioned,
 } from '@/lib/learn/graph/model';
 
 /**
@@ -30,6 +32,10 @@ export type ConceptView = {
   prerequisites: Concept[];
   /** What rests on it, same order. */
   dependents: Concept[];
+  /** Other claims this one talks about. Not prerequisites, and by name. */
+  refersTo: Mentioned[];
+  /** The claims that talk about this one. */
+  referredToBy: Mentioned[];
 };
 
 export async function loadConceptView(
@@ -47,10 +53,18 @@ export async function loadConceptView(
   const concept = graph.concepts.find((row) => row.id === conceptId);
   if (!subject || !concept) return null;
 
+  // Prerequisites and dependents come back in learning order; mentions come
+  // back by name. There is no order to put them in -- one claim referring to
+  // another says nothing about which to read first, and sorting them as though
+  // it did is the mistake this whole relation exists to avoid.
+  const { refersTo, referredToBy } = mentionsFor(graph, conceptId);
+
   return {
     subject,
     concept,
     prerequisites: learningOrder(graph, prerequisiteMap(graph).get(conceptId) ?? []),
     dependents: learningOrder(graph, dependentMap(graph).get(conceptId) ?? []),
+    refersTo,
+    referredToBy,
   };
 }

@@ -34,9 +34,29 @@ export type ConceptEdge = {
   dependentId: string;
 };
 
+/**
+ * One claim referring to another. Not a prerequisite, and never treated as
+ * one.
+ */
+export type ConceptMention = {
+  sourceId: string;
+  targetId: string;
+  /** Why it is said to refer to it, in a sentence. Shown. */
+  basis: string;
+};
+
 export type Graph = {
   concepts: Concept[];
   edges: ConceptEdge[];
+  /**
+   * Which claims talk about which. Read by `mentionsFor` and by nothing else
+   * in this file: `pruneForGoal`, `learningOrder` and `readyNow` all walk
+   * `edges` alone, and a mention must never reach them. Mentions run in both
+   * directions between the same pair, which is a cycle the moment one is
+   * mistaken for an edge -- and a cycle is what every walk here assumes it
+   * will never meet.
+   */
+  mentions: ConceptMention[];
 };
 
 /**
@@ -78,6 +98,47 @@ export function dependentMap(graph: Graph): Map<string, string[]> {
     if (list && map.has(edge.dependentId)) list.push(edge.dependentId);
   }
   return map;
+}
+
+/** A concept reached by a mention, with the sentence that put it there. */
+export type Mentioned = {
+  concept: Concept;
+  basis: string;
+};
+
+/**
+ * What one claim refers to, and what refers to it.
+ *
+ * Both directions, because the link is worth as much read backwards: the claim
+ * that talks about this one is usually the one that puts it in context. Sorted
+ * by name so the page renders the same way twice, and a mention naming a
+ * concept outside this graph is skipped rather than invented, the same rule
+ * `prerequisiteMap` follows.
+ *
+ * Nothing above calls this. It is for a page showing one concept, and keeping
+ * it away from the walks is the point -- see `Graph.mentions`.
+ */
+export function mentionsFor(
+  graph: Graph,
+  conceptId: string,
+): { refersTo: Mentioned[]; referredToBy: Mentioned[] } {
+  const concepts = byId(graph);
+  const byName = (a: Mentioned, b: Mentioned) => a.concept.name.localeCompare(b.concept.name);
+
+  const refersTo: Mentioned[] = [];
+  const referredToBy: Mentioned[] = [];
+
+  for (const mention of graph.mentions) {
+    if (mention.sourceId === conceptId) {
+      const concept = concepts.get(mention.targetId);
+      if (concept) refersTo.push({ concept, basis: mention.basis });
+    } else if (mention.targetId === conceptId) {
+      const concept = concepts.get(mention.sourceId);
+      if (concept) referredToBy.push({ concept, basis: mention.basis });
+    }
+  }
+
+  return { refersTo: refersTo.sort(byName), referredToBy: referredToBy.sort(byName) };
 }
 
 /**

@@ -102,6 +102,7 @@ describe('RLS coverage', () => {
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
       'concept_edges',
+      'concept_mentions',
       'concept_state',
       'concepts',
       'goals',

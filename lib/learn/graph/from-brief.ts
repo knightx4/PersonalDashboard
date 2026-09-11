@@ -6,9 +6,11 @@ import {
   approvedChainSchemaWith,
   chainPayloadSchema,
   normaliseChain,
+  placeMentions,
   wouldCycle,
   MAX_CHAIN,
   type ChainEdge,
+  type ChainMention,
   type ChainNode,
   type ExistingConcept,
   type ProposedChain,
@@ -29,6 +31,12 @@ import {
  * across the passes in order. A paste with no headings is one pass, which is
  * the old behaviour and the cheap case. What no pass could place comes back
  * named rather than dropped in silence.
+ *
+ * #149 settled the second relation this call reports: where one claim talks
+ * about another without depending on it, that is a mention and it is stored,
+ * with its own sentence saying where the briefing made the connection. It is
+ * the one thing here that never reaches the pruning walk or the learning
+ * order.
  *
  * Nothing here writes. What it returns is a proposal, and it stays a proposal
  * until somebody ticks the rows.
@@ -63,6 +71,7 @@ export const MAX_BRIEFING_CHARS = MAX_BRIEF_SECTIONS * SECTION_CHARS;
 export const approvedBriefSchema = approvedChainSchemaWith({
   nodes: MAX_BRIEF_NODES,
   edges: MAX_BRIEF_NODES * 2,
+  mentions: MAX_BRIEF_NODES * 2,
   dropped: MAX_BRIEF_SECTIONS * MAX_CHAIN * 2 + MAX_BRIEF_NODES,
 });
 
@@ -96,6 +105,13 @@ in the graph without an edge.
 
 DO NOT REPROPOSE what the subject already has. Name it exactly as given and
 draw the edge instead.
+
+MENTIONS, WHICH ARE NOT EDGES. When one claim talks about another -- names it,
+compares itself to it, is argued against it -- report that as a mention rather
+than an edge. An edge says you cannot understand this without that first; a
+mention says this one brings the other one up. Two claims may mention each
+other, and often do. Report a mention only where the section actually makes the
+connection, and say where, in the same one short sentence a basis takes.
 
 BASIS, HONESTLY. Each node and edge carries one short sentence on how you know
 it belongs, and it is shown to the reader. Here that sentence says where in the
@@ -259,6 +275,20 @@ async function readSection(input: {
                   required: ['prerequisite', 'dependent', 'basis'],
                 },
               },
+              mentions: {
+                type: 'array',
+                description:
+                  'One claim that talks about another without depending on it. Both directions between the same pair are allowed.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    source: { type: 'string' },
+                    target: { type: 'string' },
+                    basis: { type: 'string' },
+                  },
+                  required: ['source', 'target', 'basis'],
+                },
+              },
             },
             required: ['subject', 'goal_concept', 'concepts', 'edges'],
           },
@@ -312,6 +342,7 @@ export async function conceptsFromBrief(input: {
 
   const nodes: ChainNode[] = [];
   const edges: ChainEdge[] = [];
+  const mentions: ChainMention[] = [];
   const proposed = new Set<string>();
 
   let subject = input.subject;
@@ -396,6 +427,12 @@ export async function conceptsFromBrief(input: {
       }
       edges.push(edge);
     }
+
+    // Each pass has already placed its own against its own nodes. They are
+    // placed once more at the end, against everything that survived: two
+    // sections can report the same pair, and one can report as a mention what
+    // another draws as an edge, and neither is visible from inside a pass.
+    mentions.push(...pass.chain.mentions);
   }
 
   // A node can lose its only edge to the loop check above, and an unattached
@@ -429,6 +466,7 @@ export async function conceptsFromBrief(input: {
       goalConcept,
       nodes: placed,
       edges: keptEdges,
+      mentions: placeMentions(mentions, kept, keptEdges),
       joined,
       dropped,
     },

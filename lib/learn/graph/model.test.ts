@@ -3,6 +3,7 @@ import {
   countStates,
   inferredFrom,
   learningOrder,
+  mentionsFor,
   pruneForGoal,
   readyNow,
   type Concept,
@@ -37,13 +38,21 @@ function concept(id: string, state: KnowledgeState = 'unknown'): Concept {
   };
 }
 
-/** "a>b" reads as: a is a prerequisite of b. */
-function graphOf(states: Record<string, KnowledgeState>, edges: string[]): Graph {
+/** "a>b" reads as: a is a prerequisite of b; "a~b" as: a refers to b. */
+function graphOf(
+  states: Record<string, KnowledgeState>,
+  edges: string[],
+  mentions: string[] = [],
+): Graph {
   return {
     concepts: Object.entries(states).map(([id, state]) => concept(id, state)),
     edges: edges.map((edge) => {
       const [prerequisiteId, dependentId] = edge.split('>');
       return { prerequisiteId, dependentId };
+    }),
+    mentions: mentions.map((mention) => {
+      const [sourceId, targetId] = mention.split('~');
+      return { sourceId, targetId, basis: `${sourceId} brings up ${targetId}.` };
     }),
   };
 }
@@ -173,6 +182,77 @@ describe('what could be started now', () => {
   });
 });
 
+describe('one claim referring to another', () => {
+  /**
+   * The rule a second relation lives or dies by: nothing that walks the graph
+   * may read it. A mention is a way across the graph sideways, from the claim
+   * you are reading to one it talks about, and never a claim about what has to
+   * be learned first.
+   *
+   * Asserted by giving the walks a graph carrying mentions and comparing it to
+   * the same graph without them -- including a pair that refers to each other
+   * both ways, which is the cycle every walk here assumes it will never meet.
+   * If a mention is ever folded into `prerequisiteMap`, these fail.
+   */
+  const STATES: Record<string, KnowledgeState> = {
+    a: 'unknown',
+    b: 'unknown',
+    c: 'unknown',
+    d: 'unknown',
+  };
+  const EDGES = ['a>b', 'b>c'];
+  const MENTIONS = ['c~a', 'a~c', 'd~b'];
+
+  const bare = graphOf(STATES, EDGES);
+  const withMentions = graphOf(STATES, EDGES, MENTIONS);
+
+  it('does not change what a goal prunes to', () => {
+    expect(pruneForGoal(withMentions, 'c').sort()).toEqual(pruneForGoal(bare, 'c').sort());
+    // d refers to b and is still outside the goal's view, because referring to
+    // something is not a route to it.
+    expect(pruneForGoal(withMentions, 'c').sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not change the order they would be learned in', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    expect(learningOrder(withMentions, ids).map((row) => row.id)).toEqual(
+      learningOrder(bare, ids).map((row) => row.id),
+    );
+  });
+
+  it('does not change what could be started now', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    expect(readyNow(withMentions, ids).map((row) => row.id)).toEqual(
+      readyNow(bare, ids).map((row) => row.id),
+    );
+    // d has no prerequisite and mentioning b does not give it one.
+    expect(readyNow(withMentions, ids).map((row) => row.id)).toEqual(['a', 'd']);
+  });
+
+  it('reads both directions, and carries why each link is there', () => {
+    const { refersTo, referredToBy } = mentionsFor(withMentions, 'c');
+
+    expect(refersTo.map((row) => row.concept.id)).toEqual(['a']);
+    expect(refersTo[0].basis).toBe('c brings up a.');
+    expect(referredToBy.map((row) => row.concept.id)).toEqual(['a']);
+  });
+
+  it('gives a concept nobody mentions two empty lists', () => {
+    expect(mentionsFor(withMentions, 'b')).toEqual({
+      refersTo: [],
+      referredToBy: [{ concept: concept('d', 'unknown'), basis: 'd brings up b.' }],
+    });
+    expect(mentionsFor(bare, 'b')).toEqual({ refersTo: [], referredToBy: [] });
+  });
+
+  it('skips a mention naming something outside the graph', () => {
+    // The same rule the prerequisite walk follows: a missing end is skipped
+    // rather than invented, because a phantom node breaks a page invisibly.
+    const graph = graphOf({ a: 'unknown' }, [], ['a~ghost']);
+    expect(mentionsFor(graph, 'a').refersTo).toEqual([]);
+  });
+});
+
 describe('how much of a subject is settled', () => {
   it('counts each state, and the total', () => {
     const graph = graphOf(
@@ -189,7 +269,7 @@ describe('how much of a subject is settled', () => {
   });
 
   it('is empty over an empty subject', () => {
-    expect(countStates({ concepts: [], edges: [] })).toEqual({
+    expect(countStates({ concepts: [], edges: [], mentions: [] })).toEqual({
       known: 0,
       shaky: 0,
       misconception: 0,

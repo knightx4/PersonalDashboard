@@ -36,6 +36,10 @@ function clientReturningIds(existingSubject: string | null = null) {
           }),
           eq: () => ({ order: async () => ({ data: [], error: null }) }),
         }),
+        upsert: (rows: unknown) => {
+          inserts.push({ table, rows });
+          return { then: (resolve: (v: { error: null }) => void) => resolve({ error: null }) } as never;
+        },
         insert: (rows: unknown) => {
           inserts.push({ table, rows });
           const list = (Array.isArray(rows) ? rows : [rows]) as { name?: string }[];
@@ -78,6 +82,7 @@ const CHAIN: ProposedChain = {
       basis: 'The gap opens because wages lag.',
     },
   ],
+  mentions: [],
   joined: 1,
   dropped: [],
 };
@@ -110,6 +115,44 @@ describe('saving an approved chain', () => {
     expect(edges).toHaveLength(1);
     expect(edges[0].prerequisite_id).toBe('already-here');
     expect(edges[0].dependent_id).toBe('concepts-0');
+  });
+
+  it('writes what refers to what, resolved to ids and after the edges', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    const saved = await saveChain(
+      client,
+      'user-1',
+      {
+        ...CHAIN,
+        mentions: [
+          {
+            source: 'Expectations close the gap',
+            target: 'Wage stickiness',
+            basis: 'The section on expectations brings wages up.',
+          },
+        ],
+      },
+      'a goal',
+    );
+
+    const mentions = rowsFor(inserts, 'concept_mentions') as {
+      source_id: string;
+      target_id: string;
+    }[];
+    expect(mentions).toEqual([
+      {
+        user_id: 'user-1',
+        subject_id: 'subject-1',
+        source_id: 'concepts-0',
+        target_id: 'already-here',
+        basis: 'The section on expectations brings wages up.',
+      },
+    ]);
+    expect(saved.mentionsAdded).toBe(1);
+
+    // After the edges, so a mention never points at a node that is not there.
+    const tables = inserts.map((insert) => insert.table);
+    expect(tables.indexOf('concept_mentions')).toBeGreaterThan(tables.indexOf('concept_edges'));
   });
 
   it('keeps the words the person typed as the goal', async () => {
@@ -166,5 +209,6 @@ describe('a chain that adds nothing new', () => {
 
     expect(rowsFor(inserts, 'concepts')).toHaveLength(0);
     expect(rowsFor(inserts, 'concept_edges')).toHaveLength(0);
+    expect(rowsFor(inserts, 'concept_mentions')).toHaveLength(0);
   });
 });
