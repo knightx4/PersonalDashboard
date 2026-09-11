@@ -45,6 +45,7 @@ describe('the operation names', () => {
       'resolve-reference',
       'suggest-sources',
       'plan-topic',
+      'name-areas',
       'locate-passage',
       'generate-chain',
       'write-probe',
