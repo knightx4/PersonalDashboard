@@ -31,6 +31,7 @@ export const LEARN_OPERATIONS = [
   'resolve-reference',
   'suggest-sources',
   'plan-topic',
+  'name-areas',
   'locate-passage',
   'generate-chain',
   'write-probe',
