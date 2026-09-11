@@ -39,6 +39,7 @@ export const LEARN_OPERATIONS = [
   'concepts-from-note',
   'concepts-from-prior',
   'concepts-from-brief',
+  'branch-from-selection',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

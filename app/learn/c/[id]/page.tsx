@@ -10,6 +10,7 @@ import { loadConceptView } from '@/lib/learn/graph/concept';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
+import { BranchFromClaim } from './branch-from-claim';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +24,10 @@ export const dynamic = 'force-dynamic';
  * claim that mentions this one, from a highlight somebody wants to branch off
  * -- and it computes nothing the subject page does not already compute.
  *
- * Nothing here writes except taking a gap to the reading queue, which is the
- * same action and the same two ids as the card it came from.
+ * Two things on it write, and both ask first: taking a gap to the reading
+ * queue, which is the same action and the same two ids as the card it came
+ * from, and branching a chain off a phrase selected in the claim, which is
+ * proposed and approved like any other goal.
  */
 
 function ConceptLink({ concept }: { concept: Concept }) {
@@ -129,9 +132,8 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
       <PageHeader title={concept.name} />
 
-      {/* The claim, which is the concept. Everything else on this page is
-          about it. */}
-      <p className="mb-5 text-body text-ink">{concept.claim}</p>
+      {/* The claim, and the offer to branch off a phrase in it. */}
+      <BranchFromClaim conceptId={concept.id} claim={concept.claim} />
 
       <CardSection title="Where it stands" className="mb-5">
         <p className="flex gap-2 text-ui text-ink">

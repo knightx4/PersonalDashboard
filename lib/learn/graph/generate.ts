@@ -84,17 +84,39 @@ export type GenerateResult =
   | { ok: true; chain: ProposedChain }
   | { ok: false; reason: 'too-vague' | 'nothing-new' | 'error'; detail: string };
 
+/**
+ * The claim a selected phrase was read out of.
+ *
+ * Growth trigger 5: the goal is a phrase somebody highlighted rather than a
+ * sentence they typed, and on its own it is often a fragment. The claim around
+ * it is what says which of its several meanings was meant, and naming the
+ * concept it came from is what gets the new chain joined onto it instead of
+ * left beside it.
+ */
+export type BranchFrom = { name: string; claim: string };
+
 function buildPrompt(input: {
   goal: string;
   subject: string | null;
   existing: ExistingConcept[];
+  from?: BranchFrom | null;
 }): string {
-  const lines = [`Goal, in their words: ${input.goal}`];
+  const lines = input.from
+    ? [`They selected this phrase and asked to understand it: ${input.goal}`]
+    : [`Goal, in their words: ${input.goal}`];
 
   if (input.subject) {
     lines.push('', `They are working inside the subject: ${input.subject}`);
   } else {
     lines.push('', 'They have no subject open. Name the one this belongs in.');
+  }
+
+  if (input.from) {
+    lines.push(
+      '',
+      `They selected it while reading a claim they already hold, "${input.from.name}": ${input.from.claim}`,
+      `Read the phrase in that light, and join the chain to "${input.from.name}" -- draw the edge whichever way round is right, under it or on top of it.`,
+    );
   }
 
   if (input.existing.length > 0) {
@@ -122,6 +144,8 @@ export async function generateChain(input: {
   goal: string;
   subject: string | null;
   existing: ExistingConcept[];
+  /** Set when the goal is a phrase selected in a claim rather than typed. */
+  from?: BranchFrom | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
