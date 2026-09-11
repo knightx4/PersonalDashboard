@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CalendarClock } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -130,6 +131,15 @@ export default async function HomePage() {
     .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })))
     .slice(0, 5);
 
+  // What today already holds -- an event you typed, an interview -- above the
+  // things to do, and without a checkbox for the same reason the agenda gives
+  // it none. Today only: the merge already drops anything earlier, because an
+  // appointment in the past is over rather than late.
+  const happening = (agenda?.piles ?? [])
+    .filter((pile) => pile.bucket === 'today')
+    .flatMap((pile) => pile.context)
+    .slice(0, 5);
+
   const date = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -222,7 +232,7 @@ export default async function HomePage() {
 
           {/* Nothing at all when there is nothing at all -- no "0 things due",
               no empty card. */}
-          {due.length > 0 && (
+          {(due.length > 0 || happening.length > 0) && (
             <Card padding="standard" className="mt-4">
               <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-ui font-semibold text-ink">Today</h2>
@@ -233,27 +243,63 @@ export default async function HomePage() {
                   The agenda
                 </Link>
               </div>
-              <ul className="mt-2 divide-y divide-border">
-                {due.map(({ bucket, entry }) => (
-                  <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
-                    {bucket === 'overdue' && (
-                      <span className="shrink-0 text-micro font-medium text-danger">
-                        {BUCKET_LABELS.overdue}
-                      </span>
-                    )}
-                    {/* Each line goes where the thing itself lives: a task to
-                        its own row on the agenda, a source item to whatever it
-                        is about. They were plain text, which made the list
-                        something to read and then go and find by hand. */}
-                    <Link
-                      href={agendaHref(entry)}
-                      className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent"
+              {happening.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {happening.map((entry) => (
+                    <li
+                      key={entry.key}
+                      className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
                     >
-                      {entry.task?.title ?? entry.item?.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                      <CalendarClock
+                        className="size-3.5 shrink-0 text-accent"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                      {entry.at && (
+                        <span className="tabular font-medium">
+                          {new Intl.DateTimeFormat('en-GB', {
+                            timeZone: settings.timezone,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }).format(new Date(entry.at))}
+                        </span>
+                      )}
+                      {entry.link ? (
+                        <Link href={entry.link.href} className="font-medium hover:text-accent">
+                          {entry.label}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{entry.label}</span>
+                      )}
+                      {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {due.length > 0 && (
+                <ul className="mt-2 divide-y divide-border">
+                  {due.map(({ bucket, entry }) => (
+                    <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
+                      {bucket === 'overdue' && (
+                        <span className="shrink-0 text-micro font-medium text-danger">
+                          {BUCKET_LABELS.overdue}
+                        </span>
+                      )}
+                      {/* Each line goes where the thing itself lives: a task to
+                          its own row on the agenda, a source item to whatever it
+                          is about. They were plain text, which made the list
+                          something to read and then go and find by hand. */}
+                      <Link
+                        href={agendaHref(entry)}
+                        className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent"
+                      >
+                        {entry.task?.title ?? entry.item?.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Card>
           )}
 
