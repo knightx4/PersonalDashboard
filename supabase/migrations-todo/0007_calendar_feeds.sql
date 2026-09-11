@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- 0006 -- calendar subscriptions: the appointments you keep somewhere else.
+-- 0007 -- calendar subscriptions: the appointments you keep somewhere else.
 --
 -- You paste the private address of a calendar you already keep and the
 -- appointments in it are read out and stored here, so the page draws them
