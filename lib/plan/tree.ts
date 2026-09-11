@@ -79,6 +79,8 @@ export type PlanSection = {
    * view narrows what is listed, not what is true of the module.
    */
   tally: PlanTally;
+  /** Those same states again, as the bands of the progress bar. */
+  bands: PlanBand[];
 };
 
 export const PLAN_VIEWS = [
@@ -343,6 +345,7 @@ export function buildPlanTree(data: PlanData): PlanSection[] {
         nodes,
         progress: planProgress(leavesOf(nodes)),
         tally: tallyHealth(nodes),
+        bands: planBands(nodes),
       };
     })
     .filter((section) => section.module !== null || section.nodes.length > 0);
@@ -485,6 +488,65 @@ export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
   const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
   for (const leaf of leavesOf(nodes)) tally[healthOf(leaf)] += 1;
   return tally;
+}
+
+/**
+ * The order the progress bar draws its states in, left to right.
+ *
+ * Finished at the left and untouched at the right, with everything else
+ * between them in the order work actually moves: done, an answered question,
+ * underway, ready to pick up, then the two stuck states, then not reached.
+ * A bar whose bands moved around as the counts changed would be a different
+ * picture every week, so the order is fixed here and never sorted by size.
+ *
+ * `proposed` and `dropped` are absent because they are not in the denominator
+ * -- see `planProgress`. Drawing them would put the bar and the "8 of 12"
+ * beside it into disagreement about how many steps a module has.
+ */
+export const PLAN_BAND_ORDER: readonly PlanHealth[] = [
+  'done',
+  'answered',
+  'in_progress',
+  'ready',
+  'blocked',
+  'unanswered',
+  'waiting',
+  'not_started',
+];
+
+/** One band of the progress bar: a state, and how much of the bar it owns. */
+export type PlanBand = { health: PlanHealth; count: number };
+
+/**
+ * A module's live steps by state, as the bands of one bar.
+ *
+ * The bar used to be a single green length: the done fraction, and everything
+ * else undifferentiated track. That is one number, and it hid the shape of
+ * what was left -- eleven steps nobody has started and eleven questions
+ * waiting on an answer drew exactly the same bar and are not remotely the same
+ * module. The tally beside it already said which; this makes the bar say it
+ * too, in the tones the health column under it is already using.
+ *
+ * Over the same live leaves `planProgress` measures, and classified by the
+ * same `healthOf` the tally and the health column use, so the bands sum to
+ * `progress.live` and no two things on this row can disagree. Empty states are
+ * dropped: a band of zero is nothing to draw and nothing to say (law 1).
+ */
+export function planBands(nodes: readonly PlanNode[]): PlanBand[] {
+  const live = leavesOf(nodes).filter(
+    (leaf) => leaf.status !== 'dropped' && leaf.status !== 'proposed',
+  );
+
+  const counts = new Map<PlanHealth, number>();
+  for (const leaf of live) {
+    const health = healthOf(leaf);
+    counts.set(health, (counts.get(health) ?? 0) + 1);
+  }
+
+  return PLAN_BAND_ORDER.filter((health) => (counts.get(health) ?? 0) > 0).map((health) => ({
+    health,
+    count: counts.get(health) as number,
+  }));
 }
 
 /** Every step in reading order: top to bottom, each step before its steps. */

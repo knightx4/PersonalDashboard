@@ -373,7 +373,7 @@ export const BANNER_TONES: readonly Row[] = [
 // ---------------------------------------------------------------------------
 
 export const DATA_LEAD =
-  'Five components draw every number in the app. Law 7 governs the ink — plain, tabular, no colour, no motion beyond a count-up. These govern the arithmetic: what each one is allowed to claim, and what it has to say when it cannot claim it.';
+  'Six components draw every number in the app. Law 7 governs the ink — plain, tabular, no colour, no motion beyond a count-up. These govern the arithmetic: what each one is allowed to claim, and what it has to say when it cannot claim it.';
 
 export const DATA_DISPLAY: readonly Row[] = [
   [
@@ -395,6 +395,11 @@ export const DATA_DISPLAY: readonly Row[] = [
     'Meter',
     'One quantity against the quantity it is part of.',
     'The exact value is read from the figure beside it; the length is for comparing rows in a single pass. Where a row must stay visible however small it is — one application in four hundred — the caller sets a floor and a non-zero value draws a sliver. The accessible name says both halves of the claim.',
+  ],
+  [
+    'Bands',
+    'A whole, split into the states it is in.',
+    'The question directly under a Meter’s: how far through, and into what. It spends the entire length rather than filling part of a blank track, so eleven steps nobody has started and eleven questions waiting on an answer are two different bars instead of the same one. The order of the bands is the caller’s and is never sorted by size — a picture that rearranged itself as the counts moved could not be compared to last week’s. A band too thin to see would say a state is absent, so every non-zero one has a floor.',
   ],
   [
     'ReturnFuse',

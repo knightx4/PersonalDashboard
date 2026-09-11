@@ -10,12 +10,16 @@ import {
   CHANGELOG_DEFAULT_GROUPING,
   CHANGELOG_GROUPINGS,
   CHANGELOG_GROUPING_LABEL,
+  changelogModules,
   filterChangelog,
+  filterChangelogByModule,
   groupChangelog,
   isChangelogGrouping,
+  isChangelogModuleFilter,
   type ChangelogEntry,
   type ChangelogGroup,
   type ChangelogGrouping,
+  type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
 import { cn } from '@/lib/cn';
 import { moduleById } from '@/lib/modules';
@@ -38,9 +42,12 @@ export const metadata = { title: 'Changelog' };
  * the plan and outside the notes queue — a refactor, a UI sweep — never appears
  * here, because nothing in the app ever knew about it.
  *
- * No filter by module in v1. The list is short enough to read straight through,
- * and a control that narrows a page most people will scroll to the bottom of is
- * a control nobody presses.
+ * It filters by workspace, which v1 deliberately did without: the list was
+ * short enough to read straight through, so a control that narrowed it was one
+ * nobody would press. It stopped being short. The filter is a search parameter
+ * like the grouping and the search, and it only offers workspaces something
+ * actually shipped under — the original worry, a control that leads nowhere,
+ * answered rather than dropped.
  *
  * It is grouped three ways. By issue is what it opens on: a feature's steps
  * gathered under the feature, one line each, because six lines spread over
@@ -53,7 +60,11 @@ export const metadata = { title: 'Changelog' };
 export default async function DevChangelogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string | string[]; q?: string | string[] }>;
+  searchParams: Promise<{
+    group?: string | string[];
+    q?: string | string[];
+    module?: string | string[];
+  }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -65,21 +76,42 @@ export default async function DevChangelogPage({
 
   const query = (Array.isArray(params.q) ? params.q[0] : params.q)?.trim() ?? '';
 
+  const askedModule = Array.isArray(params.module) ? params.module[0] : params.module;
+  // `workspace` rather than `module`: Next reserves the name at module scope.
+  const workspace: ChangelogModuleFilter | null =
+    askedModule && isChangelogModuleFilter(askedModule) ? askedModule : null;
+
   const entries = await loadChangelog(supabase, user.id);
-  const matched = filterChangelog(entries, query);
+  // The options are built from everything that shipped, not from what is on
+  // screen: a filter that removed every other workspace from the row would
+  // leave no way back out of itself.
+  const modules = changelogModules(entries);
+  const matched = filterChangelog(filterChangelogByModule(entries, workspace), query);
   const groups = groupChangelog(matched, grouping);
 
   /**
-   * Both parameters travel together.
+   * All three parameters travel together.
    *
    * A grouping link that dropped the search would throw away what you typed the
    * moment you asked to see it by day, and the form has to carry the grouping
-   * for the same reason in reverse.
+   * for the same reason in reverse. The workspace is the third: narrowing to
+   * the vault and then regrouping is one thought, not two.
    */
-  function href(candidate: ChangelogGrouping): string {
+  function href(
+    over: {
+      group?: ChangelogGrouping;
+      module?: ChangelogModuleFilter | null;
+      q?: string;
+    } = {},
+  ): string {
+    const nextGrouping = over.group ?? grouping;
+    const nextModule = over.module === undefined ? workspace : over.module;
+    const nextQuery = over.q ?? query;
+
     const search = new URLSearchParams();
-    if (candidate !== CHANGELOG_DEFAULT_GROUPING) search.set('group', candidate);
-    if (query) search.set('q', query);
+    if (nextGrouping !== CHANGELOG_DEFAULT_GROUPING) search.set('group', nextGrouping);
+    if (nextModule) search.set('module', nextModule);
+    if (nextQuery) search.set('q', nextQuery);
     const rest = search.toString();
     return rest ? `/dev/changelog?${rest}` : '/dev/changelog';
   }
@@ -92,50 +124,85 @@ export default async function DevChangelogPage({
       />
 
       {entries.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <nav aria-label="Grouping" className="flex flex-wrap items-center gap-1">
-            {CHANGELOG_GROUPINGS.map((candidate) => (
-              <Link
-                key={candidate}
-                href={href(candidate)}
-                aria-current={candidate === grouping ? 'page' : undefined}
-                className={cn(
-                  'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-                  candidate === grouping
-                    ? 'bg-accent text-surface'
-                    : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-                )}
-              >
-                {CHANGELOG_GROUPING_LABEL[candidate]}
-              </Link>
-            ))}
-          </nav>
+        <div className="mb-4 flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <nav aria-label="Grouping" className="flex flex-wrap items-center gap-1">
+              {CHANGELOG_GROUPINGS.map((candidate) => (
+                <Link
+                  key={candidate}
+                  href={href({ group: candidate })}
+                  aria-current={candidate === grouping ? 'page' : undefined}
+                  className={cn(
+                    'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
+                    candidate === grouping
+                      ? 'bg-accent text-surface'
+                      : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+                  )}
+                >
+                  {CHANGELOG_GROUPING_LABEL[candidate]}
+                </Link>
+              ))}
+            </nav>
 
-          {/* A plain GET form, like the rest of this page: the search is in the
-              URL, so a search is a link somebody can keep and the page still
-              works with no JavaScript at all (law 5). */}
-          <form action="/dev/changelog" className="ml-auto flex items-center gap-2">
-            {grouping !== CHANGELOG_DEFAULT_GROUPING && (
-              <input type="hidden" name="group" value={grouping} />
-            )}
-            <Input
-              type="search"
-              name="q"
-              defaultValue={query}
-              placeholder="Search what shipped"
-              aria-label="Search what shipped"
-              className="w-48"
-            />
-          </form>
+            {/* A plain GET form, like the rest of this page: the search is in the
+                URL, so a search is a link somebody can keep and the page still
+                works with no JavaScript at all (law 5). */}
+            <form action="/dev/changelog" className="ml-auto flex items-center gap-2">
+              {grouping !== CHANGELOG_DEFAULT_GROUPING && (
+                <input type="hidden" name="group" value={grouping} />
+              )}
+              {/* Searching from inside a workspace stays inside it. Without
+                  this the form would post the search alone and silently widen
+                  the page back out to everything. */}
+              {workspace && <input type="hidden" name="module" value={workspace} />}
+              <Input
+                type="search"
+                name="q"
+                defaultValue={query}
+                placeholder="Search what shipped"
+                aria-label="Search what shipped"
+                className="w-48"
+              />
+            </form>
+          </div>
+
+          {/* Only worth a row when there is more than one thing to choose
+              between: one workspace and an "Everything" beside it is two
+              controls that do the same thing (law 15). */}
+          {modules.length > 1 && (
+            <nav aria-label="Workspace" className="flex flex-wrap items-center gap-1">
+              <ModuleFilter href={href({ module: null })} current={workspace === null} label="Everything" />
+              {modules.map((candidate) => (
+                <ModuleFilter
+                  key={candidate}
+                  href={href({ module: candidate })}
+                  current={candidate === workspace}
+                  module={candidate}
+                  label={
+                    candidate === 'app'
+                      ? 'The app as a whole'
+                      : (moduleById(candidate)?.label ?? candidate)
+                  }
+                />
+              ))}
+            </nav>
+          )}
         </div>
       )}
 
       {groups.length === 0 && query ? (
         <EmptyState
           icon={SearchX}
-          title={`Nothing shipped matching “${query}”`}
+          title={
+            workspace
+              ? `Nothing shipped matching “${query}” in ${narrowedTo(workspace)}`
+              : `Nothing shipped matching “${query}”`
+          }
           description="Searches the title, what was written about it, the commit, and the feature it shipped under."
-          action={{ label: 'Clear the search', href: href(grouping) }}
+          /* Clearing the search leaves the workspace where it was: the two are
+             separate narrowings and undoing one should not undo the other.
+             Widening back out to everything is the row of chips above. */
+          action={{ label: 'Clear the search', href: href({ q: '' }) }}
         />
       ) : groups.length === 0 ? (
         <EmptyState
@@ -174,6 +241,54 @@ export default async function DevChangelogPage({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What the page is narrowed to, as a name to put in a sentence.
+ *
+ * Lower case and no "the", because it lands mid-title after "in".
+ */
+function narrowedTo(module: ChangelogModuleFilter): string {
+  return module === 'app' ? 'the app as a whole' : (moduleById(module)?.label ?? module);
+}
+
+/**
+ * One workspace to narrow to.
+ *
+ * The same chip as the grouping row above it, carrying the workspace's mark —
+ * the mark is how the lines underneath are already labelled, so the chip and
+ * the rows it leaves on screen say the same thing the same way. It is
+ * decoration to a screen reader, which reads the label beside it.
+ */
+function ModuleFilter({
+  href,
+  current,
+  module,
+  label,
+}: {
+  href: string;
+  current: boolean;
+  /** Absent on "Everything", which is no workspace rather than the app's own. */
+  module?: ChangelogModuleFilter;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={current ? 'page' : undefined}
+      className={cn(
+        'press flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium transition-colors',
+        current
+          ? 'bg-accent text-surface'
+          : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+      )}
+    >
+      {module && (
+        <ModuleMark module={module === 'app' ? null : module} size="sm" className="shrink-0" />
+      )}
+      {label}
+    </Link>
   );
 }
 

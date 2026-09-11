@@ -40,7 +40,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Meter } from '@/components/ui/meter';
+import { Bands } from '@/components/ui/meter';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
   ChipSelect,
@@ -71,6 +71,7 @@ import {
   PLAN_VIEW_LABEL,
   flatten,
   healthOf as planHealthOf,
+  type PlanBand,
   type PlanHealth,
   type PlanNode,
   type PlanProgress,
@@ -215,26 +216,46 @@ function StatusChip({ defaultValue }: { defaultValue: PlanStatus }) {
  * The numbers are there because a bar alone is a shape rather than a fact:
  * "8 of 12" survives being read at a glance in a way that four fifths of a
  * rectangle does not.
+ *
+ * The bar is banded rather than a single green length. All green said one
+ * thing -- the done fraction -- and left everything not done as blank track,
+ * so a module held up by four unanswered questions and a module nobody has
+ * got to yet drew the same picture. Each state now owns its share of the
+ * length in the tone the health column beneath it already gives it: underway
+ * in the app's blue, questions and blocks in the caution amber, not reached
+ * in ghost ink. The tally beside it was already saying this in numbers; the
+ * bar was the one thing on the row still claiming the module was simply
+ * eight twelfths of the way there.
  */
-function Progress({ label, progress }: { label: string; progress: PlanProgress }) {
+function Progress({
+  label,
+  progress,
+  bands,
+}: {
+  label: string;
+  progress: PlanProgress;
+  bands: readonly PlanBand[];
+}) {
   if (progress.fraction === null) return null;
 
   return (
     <span className="flex items-center gap-2">
-      {/* `sunken`, not `canvas`. A progress bar is a fraction *of* something,
-          and the something is the track -- but `--c-page` is defined as
-          `var(--c-canvas)`, so a canvas track on a page is the page colour and
-          there is no track at all. What was left was a green pill of no
-          particular length floating on the background, which is a bar that
-          cannot be seen responding to anything however faithfully its width
-          follows the number. Same reason the avatar tiles are sunken. */}
-      <Meter
-        value={progress.done}
-        max={progress.live}
-        fill="bg-positive"
+      {/* `sunken`, not `canvas`. The track is what the bands are drawn on --
+          but `--c-page` is defined as `var(--c-canvas)`, so a canvas track on
+          a page is the page colour and there is no track at all. It shows
+          through wherever a state is missing entirely, which on a module with
+          no ready steps and no blocks is most of the bar's own rounding.
+          Same reason the avatar tiles are sunken. */}
+      <Bands
+        bands={bands.map((band) => ({
+          key: band.health,
+          value: band.count,
+          fill: TONE_DOT[HEALTH[band.health].tone],
+          label: `${band.count} ${HEALTH[band.health].word.toLowerCase()}`,
+        }))}
         track="sunken"
         className="w-24"
-        label={`${label}: ${progress.done} of ${progress.live} done`}
+        label={label}
       />
       <span className="tabular text-small text-ink-muted">
         {progress.done} of {progress.live}
@@ -2555,7 +2576,11 @@ export function PlanView({
                 </h2>
                 <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <SectionTally tally={section.tally} label={section.label} />
-                  <Progress label={section.label} progress={section.progress} />
+                  <Progress
+                    label={section.label}
+                    progress={section.progress}
+                    bands={section.bands}
+                  />
                 </span>
               </summary>
 
