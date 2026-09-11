@@ -2508,7 +2508,8 @@ export function PlanView({
       {/* The sections as a stack of their own. They were spaced like the parts
           of the page -- a summary strip, a filter row, a plan -- which left a
           collapsed module marooned between two large gaps. Between sections
-          the right distance is smaller than that. */}
+          the right distance is smaller than that, and now that each one is a
+          card it is the gap between cards rather than between headings. */}
       <div className="space-y-3">
         {sections.map((section) => {
           // What is finished is consulted, not read -- the same call the rows
@@ -2517,24 +2518,31 @@ export function PlanView({
           // got: law 10, a fold that hides its own count has moved the work.
           const finished = section.progress.live > 0 && section.progress.fraction === 1;
 
+          const canAdd = view === 'open' || view === 'all';
+
           return (
+            // One card per module, header included, rather than a bar that
+            // turns into a heading. The fold used to swap the header's ground,
+            // its inset and its height all at once, so a module did not open so
+            // much as jump: the line you had just clicked moved out from under
+            // the pointer and changed colour doing it. The card is the drawer
+            // in both states now, and the only thing the fold animates is the
+            // chevron -- which is the whole of what changed.
             <details
               key={section.module ?? 'app'}
               open={!finished}
-              className="group/section space-y-2"
+              className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
             >
               <summary
                 className={cn(
                   'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
-                  'rounded-card [&::-webkit-details-marker]:hidden',
-                  'focus-visible:outline-2 focus-visible:outline-offset-2',
-                  // Closed, a section is a shut drawer with a ground of its own.
-                  // It was a bare line of text sitting in a large gap, which read
-                  // as a heading somebody had forgotten to put anything under.
-                  // Open, the list beneath it is the object on the page, so the
-                  // header stands back down to being a heading.
-                  'bg-sunken px-3 py-2.5',
-                  'group-open/section:bg-transparent group-open/section:px-0 group-open/section:py-1',
+                  'px-3 py-2.5 [&::-webkit-details-marker]:hidden',
+                  'transition-colors duration-150 hover:bg-sunken',
+                  'focus-visible:outline-2 focus-visible:-outline-offset-2',
+                  // The hairline belongs to the fold, not to the list: it is
+                  // what joins the header to what it opened, and a border round
+                  // the list as well would be a border inside a border (law 11).
+                  'group-open/section:border-b group-open/section:border-border',
                 )}
               >
                 <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
@@ -2551,32 +2559,44 @@ export function PlanView({
                 </span>
               </summary>
 
-              <div className="space-y-2">
-                {section.nodes.length === 0 ? (
-                  <p className={cn(cardVariants({ padding: 'standard' }), 'border-dashed text-center text-ui text-ink-muted')}>
-                    {finished
-                      ? `Everything planned for ${section.label} is done.`
-                      : `No plan for ${section.label} yet.`}
-                  </p>
-                ) : (
-                  <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
-                    <ColumnHeader />
-                    {section.nodes.map((node) => (
-                      <PlanRow
-                        key={node.id}
-                        node={node}
-                        trail={[]}
-                        catalog={catalog}
-                        canSend={canSend}
-                      />
-                    ))}
-                  </ul>
-                )}
+              {section.nodes.length > 0 && (
+                <ul className="divide-y divide-border">
+                  <ColumnHeader />
+                  {section.nodes.map((node) => (
+                    <PlanRow
+                      key={node.id}
+                      node={node}
+                      trail={[]}
+                      catalog={catalog}
+                      canSend={canSend}
+                    />
+                  ))}
+                </ul>
+              )}
 
-                {(view === 'open' || view === 'all') && (
+              {/* Unfolded onto nothing was the worst of it: a dashed box the
+                  width of the page saying "No plan for Shopping yet", with a
+                  second box under it to add one. A module with nothing in it
+                  has nothing to show -- law 1 -- and the offer to write the
+                  first step is the one line worth putting there. The finished
+                  case does say something, because "nothing here" and "all of it
+                  shipped" are different facts and only one of them is empty. */}
+              {section.nodes.length === 0 && finished && (
+                <p className="px-3 py-2.5 text-ui text-ink-muted">
+                  Everything planned for {section.label} is done.
+                </p>
+              )}
+
+              {canAdd && (
+                <div
+                  className={cn(
+                    'px-3 py-2',
+                    section.nodes.length > 0 && 'border-t border-border',
+                  )}
+                >
                   <AddStep module={section.module} parentId={null} />
-                )}
-              </div>
+                </div>
+              )}
             </details>
           );
         })}
