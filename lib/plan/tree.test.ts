@@ -793,3 +793,92 @@ describe('isWaitingOnThePerson', () => {
     expect(isWaitingOnThePerson({ kind: 'build', status: 'proposed' })).toBe(false);
   });
 });
+
+describe('planBands', () => {
+  it('splits the live leaves by state', () => {
+    const section = shopping(
+      tree([at('done', 'a'), at('done', 'b'), at('in_progress', 'c'), at('blocked', 'd')]),
+    );
+
+    expect(section.bands).toEqual([
+      { health: 'done', count: 2 },
+      { health: 'in_progress', count: 1 },
+      { health: 'blocked', count: 1 },
+    ]);
+  });
+
+  it('sums to the number printed beside the bar', () => {
+    // The whole reason this is computed here: a bar drawn over one set of
+    // steps beside "8 of 12" counted over another is two claims on one row.
+    const section = shopping(
+      tree([
+        at('done', 'a'),
+        at('in_progress', 'b'),
+        at('not_started', 'c'),
+        at('blocked', 'd'),
+        at('dropped', 'e'),
+        at('proposed', 'f'),
+        at('not_started', 'q', { kind: 'decision' }),
+      ]),
+    );
+
+    const total = section.bands.reduce((sum, band) => sum + band.count, 0);
+    expect(total).toBe(section.progress.live);
+  });
+
+  it('leaves out what the fraction leaves out', () => {
+    const section = shopping(tree([at('done', 'a'), at('dropped', 'b'), at('proposed', 'c')]));
+
+    expect(section.bands).toEqual([{ health: 'done', count: 1 }]);
+  });
+
+  it('draws no band for a state nothing is in', () => {
+    const section = shopping(tree([at('done', 'a')]));
+
+    expect(section.bands).toHaveLength(1);
+  });
+
+  it('keeps the drawing order however the steps are arranged', () => {
+    // Fixed, never sorted by size: a bar whose bands moved around as the
+    // counts changed would be a different picture every week.
+    const section = shopping(
+      tree([at('not_started', 'a'), at('done', 'b'), at('in_progress', 'c')]),
+    );
+
+    // 'a' waits on nothing, so it reads as ready rather than not started --
+    // the health column's rule, which the bar follows rather than re-deciding.
+    expect(section.bands.map((band) => band.health)).toEqual(['done', 'in_progress', 'ready']);
+  });
+
+  it('gives an unanswered question its own band, not the not-started one', () => {
+    // The complaint the banded bar exists for: a module held up by questions
+    // and a module nobody has reached drew the same bar.
+    const section = shopping(
+      tree([at('not_started', 'q', { kind: 'decision' }), at('not_started', 's')]),
+    );
+
+    expect(section.bands).toEqual([
+      { health: 'ready', count: 1 },
+      { health: 'unanswered', count: 1 },
+    ]);
+  });
+
+  it('counts a feature through its steps, not twice', () => {
+    const section = shopping(
+      tree([
+        at('in_progress', 'f'),
+        at('done', 's1', { parentId: 'f' }),
+        at('not_started', 's2', { parentId: 'f' }),
+      ]),
+    );
+
+    expect(section.bands.reduce((sum, band) => sum + band.count, 0)).toBe(2);
+  });
+
+  it('is empty for a module with nothing live in it', () => {
+    const section = shopping(tree([at('dropped', 'a'), at('proposed', 'b')]));
+
+    expect(section.bands).toEqual([]);
+    expect(section.progress.fraction).toBeNull();
+  });
+});

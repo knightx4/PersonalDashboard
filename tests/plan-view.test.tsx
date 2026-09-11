@@ -162,9 +162,17 @@ describe('PlanView', () => {
 
   it('measures each module over its leaves and says so', () => {
     const html = render('all');
-    expect(html).toContain('Shopping: 1 of 4 done');
+    expect(html).toContain('>1 of 4<');
     // The proposal does not count until it is approved.
-    expect(html).toContain('Job search: 0 of 1 done');
+    expect(html).toContain('>0 of 1<');
+  });
+
+  it('spends the whole bar on the states the steps are actually in', () => {
+    const html = render('all');
+    // Not one green length and a blank remainder: a module held up by
+    // questions and a module nobody has reached drew the same bar.
+    expect(html).toContain('aria-label="Shopping: 1 done, 2 ready, 1 waiting"');
+    expect(html).toContain('aria-label="Job search: 1 blocked"');
   });
 
   it('shows a proposal as one, and offers only proposals under that view', () => {
