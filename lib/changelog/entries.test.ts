@@ -4,10 +4,14 @@ import type { PlanItem, PlanStatus } from '@/lib/plan/load';
 import {
   buildChangelog,
   changelogEntries,
+  changelogModules,
   filterChangelog,
+  filterChangelogByModule,
   groupChangelog,
+  isChangelogModuleFilter,
   noteEntries,
   planEntries,
+  type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
 
 let counter = 0;
@@ -395,5 +399,89 @@ describe('filterChangelog', () => {
 
   it('searches notes as well as plan steps', () => {
     expect(idsFor('dock')).toEqual(['n1']);
+  });
+});
+
+describe('filterChangelogByModule', () => {
+  const entries = changelogEntries({
+    plan: [
+      step({ id: 'shop', module: 'shopping' }),
+      step({ id: 'vault', module: 'vault' }),
+      step({ id: 'shell', module: null }),
+    ],
+    // Filed from the home page, so it belongs to no workspace either.
+    notes: [note({ id: 'n1', pagePath: '/' }), note({ id: 'n2', pagePath: '/vault/items' })],
+  });
+
+  const idsFor = (module: ChangelogModuleFilter | null) =>
+    filterChangelogByModule(entries, module)
+      .map((entry) => entry.id)
+      .sort();
+
+  it('returns everything when nothing is selected', () => {
+    expect(idsFor(null)).toHaveLength(entries.length);
+  });
+
+  it('keeps only one workspace, from either list', () => {
+    expect(idsFor('vault')).toEqual(['n2', 'vault']);
+  });
+
+  it('reaches the lines that belong to no workspace', () => {
+    // Otherwise a shell refactor and a note filed from the home page are
+    // only visible with no filter on at all.
+    expect(idsFor('app')).toEqual(['n1', 'shell']);
+  });
+
+  it('is empty for a workspace nothing shipped under', () => {
+    expect(idsFor('jobs')).toEqual([]);
+  });
+});
+
+describe('changelogModules', () => {
+  it('offers only what something shipped under', () => {
+    const entries = changelogEntries({
+      plan: [step({ id: 'a', module: 'vault' })],
+      notes: [note({ id: 'n1', pagePath: '/todo' })],
+    });
+
+    expect(changelogModules(entries)).toEqual(['todo', 'vault']);
+  });
+
+  it('lists them in the order the switcher does, with the app last', () => {
+    const entries = changelogEntries({
+      plan: [
+        step({ id: 'a', module: 'dev' }),
+        step({ id: 'b', module: null }),
+        step({ id: 'c', module: 'shopping' }),
+      ],
+      notes: [],
+    });
+
+    expect(changelogModules(entries)).toEqual(['shopping', 'dev', 'app']);
+  });
+
+  it('names a workspace once however much shipped under it', () => {
+    const entries = changelogEntries({
+      plan: [step({ id: 'a', module: 'vault' }), step({ id: 'b', module: 'vault' })],
+      notes: [],
+    });
+
+    expect(changelogModules(entries)).toEqual(['vault']);
+  });
+
+  it('is empty when nothing has shipped', () => {
+    expect(changelogModules([])).toEqual([]);
+  });
+});
+
+describe('isChangelogModuleFilter', () => {
+  it('accepts a workspace and the app', () => {
+    expect(isChangelogModuleFilter('vault')).toBe(true);
+    expect(isChangelogModuleFilter('app')).toBe(true);
+  });
+
+  it('rejects anything else, so a hand-typed URL falls back to everything', () => {
+    expect(isChangelogModuleFilter('nonsense')).toBe(false);
+    expect(isChangelogModuleFilter('')).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { moduleForPath, type ModuleId } from '@/lib/modules';
+import { isModuleId, moduleForPath, MODULE_IDS, type ModuleId } from '@/lib/modules';
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { PlanItem } from '@/lib/plan/load';
 
@@ -274,6 +274,52 @@ export function filterChangelog(
 
     return words.every((word) => haystack.includes(word));
   });
+}
+
+/**
+ * What the module filter can be set to.
+ *
+ * A workspace, or `app` for the lines that belong to none of them — a refactor
+ * of the shell, a note filed from the home page. Those are real work and there
+ * is no other way to reach them once a filter is on, so they get an option
+ * rather than being stranded behind "everything".
+ *
+ * Absent from the URL means everything, which is what the page opens on.
+ */
+export type ChangelogModuleFilter = ModuleId | 'app';
+
+export function isChangelogModuleFilter(value: string): value is ChangelogModuleFilter {
+  return value === 'app' || isModuleId(value);
+}
+
+/**
+ * The entries belonging to one workspace.
+ *
+ * `null` for the filter means everything, and is the page's default. Filtering
+ * happens alongside the search and before grouping, so a group only appears if
+ * something in it survived both.
+ */
+export function filterChangelogByModule(
+  entries: readonly ChangelogEntry[],
+  module: ChangelogModuleFilter | null,
+): ChangelogEntry[] {
+  if (module === null) return [...entries];
+  if (module === 'app') return entries.filter((entry) => entry.module === null);
+  return entries.filter((entry) => entry.module === module);
+}
+
+/**
+ * The filters worth offering, in the order the switcher lists the workspaces.
+ *
+ * Built from what actually shipped rather than from `MODULES`, so the page
+ * never offers a workspace that would empty it — a control that can only lead
+ * to "nothing shipped" is the control nobody presses. `app` comes last,
+ * because it is the leftovers rather than a workspace.
+ */
+export function changelogModules(entries: readonly ChangelogEntry[]): ChangelogModuleFilter[] {
+  const present = new Set(entries.map((entry) => entry.module ?? 'app'));
+  const ordered: ChangelogModuleFilter[] = [...MODULE_IDS, 'app'];
+  return ordered.filter((candidate) => present.has(candidate));
 }
 
 export function buildChangelog(input: {
