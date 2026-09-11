@@ -10,7 +10,7 @@ import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
  */
 
 const COLUMNS =
-  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position';
+  'id, title, body, status, due_on, due_at, pinned, snoozed_until, completed_at, created_at, position, parent_id';
 
 /** PostgREST caps a response; a personal list will not reach this, but say it. */
 const LIMIT = 500;
@@ -30,6 +30,7 @@ function toTask(row: Row): Task {
     completedAt: (row.completed_at as string | null) ?? null,
     createdAt: row.created_at as string,
     position: (row.position as number | null) ?? null,
+    parentId: (row.parent_id as string | null) ?? null,
   };
 }
 
