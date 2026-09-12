@@ -345,3 +345,50 @@ describe('a node is a claim, not a heading', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('what understanding a concept looks like', () => {
+  // The checks are what a probe question gets written against, so the shape of
+  // the list is a database fact rather than a promise the model makes: one
+  // check is a restatement of the claim and five is a syllabus for it.
+  async function seedWithMastery(checks: (string | number)[]): Promise<void> {
+    await admin`
+      insert into concepts (user_id, subject_id, name, claim, basis, mastery)
+      values (${userA}, ${subjectA}, 'Wage stickiness', 'Wages lag prices.',
+              'Seeded by the test.', ${admin.json(checks)}::jsonb)`;
+  }
+
+  it('keeps a concept whose checks were never written', async () => {
+    const [row] = await admin<{ mastery: unknown }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subjectA}, 'No checks', 'A claim with nothing said about it.',
+              'Seeded by the test.')
+      returning mastery`;
+    expect(row.mastery).toBeNull();
+  });
+
+  it('reads three checks back in the order they were written', async () => {
+    const written = ['Rules out a pay freeze.', 'Applies at 4% inflation.', 'The Lucas objection.'];
+    const [row] = await admin<{ mastery: string[] }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, mastery)
+      values (${userA}, ${subjectA}, 'Three checks', 'Wages lag prices.',
+              'Seeded by the test.', ${admin.json(written)}::jsonb)
+      returning mastery`;
+    expect(row.mastery).toEqual(written);
+  });
+
+  it('refuses a single check', async () => {
+    await expect(seedWithMastery(['The only thing said about it.'])).rejects.toThrow();
+  });
+
+  it('refuses five checks', async () => {
+    await expect(seedWithMastery(['One.', 'Two.', 'Three.', 'Four.', 'Five.'])).rejects.toThrow();
+  });
+
+  it('refuses a blank check beside a real one', async () => {
+    await expect(seedWithMastery(['A real check.', '   '])).rejects.toThrow();
+  });
+
+  it('refuses a list holding something that is not a string', async () => {
+    await expect(seedWithMastery(['A real check.', 3])).rejects.toThrow();
+  });
+});

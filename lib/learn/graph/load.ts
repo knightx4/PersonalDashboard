@@ -107,7 +107,22 @@ type ConceptRow = {
   name: string;
   claim: string;
   basis: string;
+  mastery: unknown;
 };
+
+/**
+ * The checks, as a list the screens can map over.
+ *
+ * The column is a jsonb array of strings and the database refuses anything
+ * else, but it is also nullable -- a concept written before the checks existed,
+ * or one the model wrote none for, has nothing there. Both arrive here as an
+ * empty list, because "no checks" is a thing the pages say rather than a case
+ * they crash on.
+ */
+function masteryOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((check): check is string => typeof check === 'string');
+}
 
 type StateRow = {
   concept_id: string;
@@ -130,6 +145,7 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     name: row.name,
     claim: row.claim,
     basis: row.basis,
+    mastery: masteryOf(row.mastery),
     state: state?.state ?? 'unknown',
     established: state?.established ?? 'inferred',
     misconception: state?.misconception ?? null,
@@ -148,7 +164,7 @@ export async function loadGraph(
   ] = await Promise.all([
     supabase
       .from('concepts')
-      .select('id, name, claim, basis')
+      .select('id, name, claim, basis, mastery')
       .eq('subject_id', subjectId)
       .order('name'),
     supabase

@@ -17,6 +17,7 @@ function concept(id: string, state: KnowledgeState): Concept {
     name: id,
     claim: `${id} is the case.`,
     basis: 'Seeded.',
+    mastery: [],
     state,
     established: 'inferred',
     misconception: state === 'misconception' ? 'A wrong idea.' : null,
