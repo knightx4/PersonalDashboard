@@ -131,6 +131,7 @@ export default async function TodoPage() {
                         timezone={agenda.timezone}
                         anchor={entry.anchor}
                         pile={pile}
+                        items={entry.children}
                       />
                     ) : entry.item ? (
                       <AgendaItemRow key={entry.key} item={entry.item} timezone={agenda.timezone} />

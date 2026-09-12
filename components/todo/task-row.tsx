@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useOptimistic, useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   Clock,
   GripVertical,
   Pin,
+  Plus,
   RotateCcw,
   Trash2,
   Undo2,
@@ -18,6 +21,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TASK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { useToast, type ToastInput } from '@/components/ui/toast';
 import {
+  addItem,
   bringBackTask,
   completeTask,
   dropTask,
@@ -28,7 +32,7 @@ import {
   removeTask,
   reopenTask,
 } from '@/app/todo/actions';
-import { SNOOZE_DAYS, type Task } from '@/lib/todo/tasks/model';
+import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
@@ -53,6 +57,15 @@ import { EditTask } from './task-form';
  * offers to catch it. One list is dragged at a time, so one variable is enough.
  */
 let dragging: string | null = null;
+
+/**
+ * How many items are shown without being asked for.
+ *
+ * A list longer than this starts folded, because a task with twelve things
+ * under it pushes everything else on the agenda off the screen. A shorter one
+ * is already shorter than the control that would hide it.
+ */
+const SHORT_LIST = 6;
 
 /**
  * One row action: how the row should look at once, and the write behind it.
@@ -95,11 +108,19 @@ export function TaskRow({
   timezone,
   anchor,
   pile,
+  items = [],
 }: {
   task: Task;
   timezone: string;
   /** What the task is about, when the list is not already inside that thing. */
   anchor?: { label: string; href: string } | null;
+  /**
+   * The smaller todos written under this task, ticked ones included.
+   *
+   * Empty on a list that does not gather them -- the archive is a history and
+   * shows every row in its own right, so nothing is nested there.
+   */
+  items?: Task[];
   /**
    * The tasks of the pile this row is in, in the order they are on screen.
    *
@@ -111,6 +132,8 @@ export function TaskRow({
   pile?: readonly string[];
 }) {
   const [editing, setEditing] = useState(false);
+  /** Whether the box for writing the next item is open under this task. */
+  const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
   const [grabbed, setGrabbed] = useState(false);
   /** Which edge of this row the dragged task would land on, while it is over. */
@@ -238,135 +261,136 @@ export function TaskRow({
   }
 
   return (
-    <div
-      // The handle a link from elsewhere lands on: /todo#task-<id> from the
-      // front page, so "the thing due today" on home is one click from the row
-      // that can actually be ticked off. `scroll-mt` keeps it clear of the
-      // sticky top bar, which would otherwise land it just under the header.
-      id={`task-${task.id}`}
-      className={cn(
-        'group row-pad relative flex scroll-mt-24 items-start gap-3',
-        // Only the writes the row waits on dim it. An optimistic one is drawn
-        // as though it were already true, so dimming it would say the opposite.
-        pending && 'opacity-50',
-        grabbed && 'opacity-40',
-        failed && 'bg-danger-tint',
-      )}
-      draggable={grabbed}
-      onDragStart={(event) => {
-        dragging = task.id;
-        event.dataTransfer.setData('text/plain', task.id);
-        event.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragEnd={() => {
-        dragging = null;
-        setGrabbed(false);
-        setEdge(null);
-      }}
-      onDragOver={onDragOver}
-      onDragLeave={() => setEdge(null)}
-      onDrop={onDrop}
-    >
-      {/* Where it would land. A line rather than a gap, so nothing below it
-          moves while the pointer is still deciding. */}
-      {edge && (
-        <span
-          className={cn(
-            'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent',
-            edge === 'top' ? 'top-0' : 'bottom-0',
-          )}
-          aria-hidden
-        />
-      )}
-
-      {/* The grip, on the row's own margin, appearing under the pointer.
-          Hidden where there is no pointer to hover with: a touch screen
-          cannot drag this and keeps the arrows on the right instead. */}
-      <span
-        className="-ml-1 mt-0.5 hidden w-3 shrink-0 justify-center [@media(hover:hover)]:flex"
-        aria-hidden
+    <div>
+      <div
+        // The handle a link from elsewhere lands on: /todo#task-<id> from the
+        // front page, so "the thing due today" on home is one click from the row
+        // that can actually be ticked off. `scroll-mt` keeps it clear of the
+        // sticky top bar, which would otherwise land it just under the header.
+        id={`task-${task.id}`}
+        className={cn(
+          'group row-pad relative flex scroll-mt-24 items-start gap-3',
+          // Only the writes the row waits on dim it. An optimistic one is drawn
+          // as though it were already true, so dimming it would say the opposite.
+          pending && 'opacity-50',
+          grabbed && 'opacity-40',
+          failed && 'bg-danger-tint',
+        )}
+        draggable={grabbed}
+        onDragStart={(event) => {
+          dragging = task.id;
+          event.dataTransfer.setData('text/plain', task.id);
+          event.dataTransfer.effectAllowed = 'move';
+        }}
+        onDragEnd={() => {
+          dragging = null;
+          setGrabbed(false);
+          setEdge(null);
+        }}
+        onDragOver={onDragOver}
+        onDragLeave={() => setEdge(null)}
+        onDrop={onDrop}
       >
-        {sortable && (
-          <GripVertical
+        {/* Where it would land. A line rather than a gap, so nothing below it
+          moves while the pointer is still deciding. */}
+        {edge && (
+          <span
             className={cn(
-              'size-4 cursor-grab text-ink-ghost opacity-0 transition-opacity duration-150 group-hover:opacity-100',
-              grabbed && 'cursor-grabbing opacity-100',
+              'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent',
+              edge === 'top' ? 'top-0' : 'bottom-0',
             )}
-            strokeWidth={1.75}
-            onMouseDown={() => setGrabbed(true)}
-            onMouseUp={() => setGrabbed(false)}
+            aria-hidden
           />
         )}
-      </span>
 
-      {/* The glyph is the state and the button is the hit area, which is why
+        {/* The grip, on the row's own margin, appearing under the pointer.
+          Hidden where there is no pointer to hover with: a touch screen
+          cannot drag this and keeps the arrows on the right instead. */}
+        <span
+          className="-ml-1 mt-0.5 hidden w-3 shrink-0 justify-center [@media(hover:hover)]:flex"
+          aria-hidden
+        >
+          {sortable && (
+            <GripVertical
+              className={cn(
+                'size-4 cursor-grab text-ink-ghost opacity-0 transition-opacity duration-150 group-hover:opacity-100',
+                grabbed && 'cursor-grabbing opacity-100',
+              )}
+              strokeWidth={1.75}
+              onMouseDown={() => setGrabbed(true)}
+              onMouseUp={() => setGrabbed(false)}
+            />
+          )}
+        </span>
+
+        {/* The glyph is the state and the button is the hit area, which is why
           the bordered box went: a border round a shape that already says open
           is the same claim twice. A dropped task gets the struck hexagon here
           rather than nothing at all -- it used to be findable only by reading
           the title's strike-through. */}
-      <button
-        type="button"
-        aria-label={done ? 'Reopen' : 'Mark done'}
-        onClick={() =>
-          done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
-        }
-        className={cn(
-          'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
-          done
-            ? 'text-status-offer'
-            : dropped
-              ? 'text-ink-muted'
-              : 'text-ink-muted hover:text-accent',
-        )}
-      >
-        <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
-      </button>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className={cn(
-              'text-left text-ui font-medium text-ink transition-colors duration-150 hover:text-accent',
-              (done || dropped) && 'text-ink-muted line-through',
-            )}
-          >
-            {task.title}
-          </button>
-
-          {task.pinned && !done && !dropped && (
-            <Pin className="size-3 text-accent" strokeWidth={1.75} aria-label="Pinned" />
+        <button
+          type="button"
+          aria-label={done ? 'Reopen' : 'Mark done'}
+          onClick={() =>
+            done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
+          }
+          className={cn(
+            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
+            done
+              ? 'text-status-offer'
+              : dropped
+                ? 'text-ink-muted'
+                : 'text-ink-muted hover:text-accent',
           )}
+        >
+          <StatusGlyph glyph={TASK_STATUS_GLYPHS[task.status]} size={16} />
+        </button>
 
-          <DueLabel task={task} timezone={timezone} />
-
-          {anchor && (
-            <a
-              href={anchor.href}
-              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className={cn(
+                'text-left text-ui font-medium text-ink transition-colors duration-150 hover:text-accent',
+                (done || dropped) && 'text-ink-muted line-through',
+              )}
             >
-              {anchor.label}
-            </a>
-          )}
+              {task.title}
+            </button>
 
-          {dropped && <span className="text-small text-ink-muted">dropped</span>}
+            {task.pinned && !done && !dropped && (
+              <Pin className="size-3 text-accent" strokeWidth={1.75} aria-label="Pinned" />
+            )}
+
+            <DueLabel task={task} timezone={timezone} />
+
+            {anchor && (
+              <a
+                href={anchor.href}
+                className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
+              >
+                {anchor.label}
+              </a>
+            )}
+
+            {dropped && <span className="text-small text-ink-muted">dropped</span>}
+          </div>
+
+          {task.body && (
+            <p className="mt-0.5 whitespace-pre-wrap text-small leading-snug text-ink-muted">
+              {task.body}
+            </p>
+          )}
         </div>
 
-        {task.body && (
-          <p className="mt-0.5 whitespace-pre-wrap text-small leading-snug text-ink-muted">
-            {task.body}
-          </p>
-        )}
-      </div>
-
-      {/* Visible on hover on a pointer, always on a touch screen -- where there
+        {/* Visible on hover on a pointer, always on a touch screen -- where there
           is no hover and a row whose actions never appear is a row you cannot
           act on. */}
-      <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-        {!done && !dropped && (
-          <>
-            {/* The arrows are how a task moves without a pointer: a touch
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+          {!done && !dropped && (
+            <>
+              {/* The arrows are how a task moves without a pointer: a touch
                 screen cannot drag the grip, and neither can a keyboard. So
                 they stand down where there is a pointer -- but come back the
                 moment focus lands in the row, because a control that only a
@@ -374,77 +398,300 @@ export function TaskRow({
 
                 Only where there is somewhere to go: an arrow at the top of a
                 pile that does nothing is a control that lies. */}
-            <span className="contents [@media(hover:hover)]:hidden [@media(hover:hover)]:group-focus-within:contents">
-              {index > 0 && (
-                <IconButton label="Move up" onClick={() => move('up')}>
-                  <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />
-                </IconButton>
-              )}
-              {index !== -1 && index < siblings.length - 1 && (
-                <IconButton label="Move down" onClick={() => move('down')}>
-                  <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
-                </IconButton>
-              )}
-            </span>
-            <IconButton
-              label={task.pinned ? 'Unpin' : 'Pin'}
-              onClick={() =>
-                run({
-                  patch: { pinned: !task.pinned },
-                  write: () => pinTask(task.id, !task.pinned),
-                })
-              }
-            >
-              <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
-            </IconButton>
-            {task.snoozedUntil ? (
+              <span className="contents [@media(hover:hover)]:hidden [@media(hover:hover)]:group-focus-within:contents">
+                {index > 0 && (
+                  <IconButton label="Move up" onClick={() => move('up')}>
+                    <ArrowUp className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                )}
+                {index !== -1 && index < siblings.length - 1 && (
+                  <IconButton label="Move down" onClick={() => move('down')}>
+                    <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                )}
+              </span>
               <IconButton
-                label="Bring back"
-                onClick={() => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) })}
+                label={task.pinned ? 'Unpin' : 'Pin'}
+                onClick={() =>
+                  run({
+                    patch: { pinned: !task.pinned },
+                    write: () => pinTask(task.id, !task.pinned),
+                  })
+                }
               >
-                <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
-            ) : (
-              <IconButton label="Later" onClick={later}>
-                <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {task.snoozedUntil ? (
+                <IconButton
+                  label="Bring back"
+                  onClick={() =>
+                    run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) })
+                  }
+                >
+                  <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              ) : (
+                <IconButton label="Later" onClick={later}>
+                  <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              )}
+              <IconButton label="Drop" onClick={drop}>
+                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
-            )}
-            <IconButton label="Drop" onClick={drop}>
-              <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-            </IconButton>
-            {/* Last in the group, because it is the one action here that opens
+              {/* Breaking the task up: the box opens under the row, where the
+                list is. Hidden with the rest of the actions until the row is
+                pointed at, so a task with no list looks as it always did. */}
+              <IconButton label="Add an item" onClick={() => setAdding(true)}>
+                <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+              {/* Last in the group, because it is the one action here that opens
                 something rather than doing something. `anchor` is what the
                 page resolved, so the unlink half only appears where there is
                 a link to remove. */}
-            <TaskAbout taskId={task.id} linked={Boolean(anchor)} />
-          </>
-        )}
+              <TaskAbout taskId={task.id} linked={Boolean(anchor)} />
+            </>
+          )}
 
-        {(done || dropped) && (
-          <>
-            <IconButton
-              label="Reopen"
-              onClick={() => run({ patch: { status: 'open' }, write: () => reopenTask(task.id) })}
-            >
-              <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
-            </IconButton>
-            <ConfirmStep
-              prompt="Deletes this task for good. Dropping it keeps it in the archive."
-              confirmLabel="Delete"
-              pendingLabel="Deleting…"
-              onConfirm={async () => {
-                const { error } = await removeTask(task.id);
-                if (error) toast({ text: error });
-              }}
-              className="size-8 px-0 text-ink-muted hover:bg-sunken hover:text-ink"
-            >
-              <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Delete</span>
-            </ConfirmStep>
-          </>
-        )}
+          {(done || dropped) && (
+            <>
+              <IconButton
+                label="Reopen"
+                onClick={() => run({ patch: { status: 'open' }, write: () => reopenTask(task.id) })}
+              >
+                <RotateCcw className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+              <ConfirmStep
+                prompt="Deletes this task for good. Dropping it keeps it in the archive."
+                confirmLabel="Delete"
+                pendingLabel="Deleting…"
+                onConfirm={async () => {
+                  const { error } = await removeTask(task.id);
+                  if (error) toast({ text: error });
+                }}
+                className="size-8 px-0 text-ink-muted hover:bg-sunken hover:text-ink"
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Delete</span>
+              </ConfirmStep>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* The list, under the task it belongs to. Nothing at all when there is
+          none and nothing is being written, so a task without one reads
+          exactly as it did before any of this existed. */}
+      {(items.length > 0 || adding) && (
+        <TaskItems
+          parentId={task.id}
+          items={items}
+          adding={adding}
+          onDoneAdding={() => setAdding(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * The smaller todos under one task.
+ *
+ * The count and the rows are held here rather than in the row above, because
+ * ticking an item has to move the count in the same breath: a "2 of 5" that
+ * waits for the server has already told you the wrong number. The optimistic
+ * list is what both read.
+ *
+ * The rows are quieter than the task above them -- no pin, no drag, no Later.
+ * An item that can be deferred away from the thing it belongs to is a task in
+ * its own right, and writing it here was the wrong place for it.
+ */
+function TaskItems({
+  parentId,
+  items: serverItems,
+  adding,
+  onDoneAdding,
+}: {
+  parentId: string;
+  items: Task[];
+  adding: boolean;
+  onDoneAdding: () => void;
+}) {
+  const toast = useToast();
+  const [pending, start] = useTransition();
+  const [items, change] = useOptimistic(
+    serverItems,
+    (current: Task[], patch: { id: string; status: TaskStatus }) =>
+      patch.status === 'dropped'
+        ? current.filter((item) => item.id !== patch.id)
+        : current.map((item) => (item.id === patch.id ? { ...item, status: patch.status } : item)),
+  );
+  // A long list starts folded away; a short one is shorter than the control
+  // that would hide it.
+  const [open, setOpen] = useState(serverItems.length <= SHORT_LIST);
+
+  const left = openCount(items);
+  const expanded = open || adding;
+
+  function write(
+    id: string,
+    status: TaskStatus,
+    run: () => Promise<{ error: string | null }>,
+    said?: ToastInput,
+  ) {
+    start(async () => {
+      change({ id, status });
+      const { error } = await run();
+      if (error) {
+        toast({ text: error });
+        return;
+      }
+      if (said) toast(said);
+    });
+  }
+
+  return (
+    <div className={cn('pb-2 pl-9 pr-3', pending && 'opacity-50')}>
+      {items.length > 0 && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setOpen(!expanded)}
+          className="press flex items-center gap-1 rounded-lg py-0.5 text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+        >
+          {expanded ? (
+            <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
+          ) : (
+            <ChevronRight className="size-3.5" strokeWidth={1.75} aria-hidden />
+          )}
+          <span className="tabular">
+            {items.length - left} of {items.length}
+          </span>
+          <span>done</span>
+        </button>
+      )}
+
+      {expanded && items.length > 0 && (
+        <ul className="mt-0.5 space-y-0.5">
+          {items.map((item) => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              onTick={() =>
+                write(item.id, item.status === 'done' ? 'open' : 'done', () =>
+                  item.status === 'done' ? reopenTask(item.id) : completeTask(item.id),
+                )
+              }
+              onDrop={() =>
+                write(item.id, 'dropped', () => dropTask(item.id), {
+                  text: 'removed',
+                  undo: undoWith(() => reopenTask(item.id)),
+                  undone: 'back on the list',
+                })
+              }
+            />
+          ))}
+        </ul>
+      )}
+
+      {adding && <AddItem parentId={parentId} onClose={onDoneAdding} />}
+    </div>
+  );
+}
+
+/** One item: a box to tick, what it says, and the way to take it off. */
+function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onDrop: () => void }) {
+  const done = item.status === 'done';
+
+  return (
+    <li className="group/item flex items-start gap-2">
+      <button
+        type="button"
+        aria-label={done ? 'Reopen' : 'Mark done'}
+        onClick={onTick}
+        className={cn(
+          'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-150',
+          done ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
+        )}
+      >
+        <StatusGlyph glyph={TASK_STATUS_GLYPHS[item.status]} size={14} />
+      </button>
+
+      <span
+        className={cn(
+          'min-w-0 flex-1 break-words text-small text-ink',
+          done && 'text-ink-muted line-through',
+        )}
+      >
+        {item.title}
+      </span>
+
+      <button
+        type="button"
+        title="Remove"
+        onClick={onDrop}
+        className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-150 hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
+      >
+        <X className="size-3" strokeWidth={1.75} aria-hidden />
+        <span className="sr-only">Remove</span>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * The box for the next item.
+ *
+ * It stays open after a write, because items are written in threes and fours
+ * and closing it would make the second one cost another click. Escape and an
+ * empty Enter are both ways out.
+ */
+function AddItem({ parentId, onClose }: { parentId: string; onClose: () => void }) {
+  const [title, setTitle] = useState('');
+  const [pending, start] = useTransition();
+  const toast = useToast();
+
+  function submit() {
+    const text = title.trim();
+    if (!text) {
+      onClose();
+      return;
+    }
+
+    start(async () => {
+      const { error } = await addItem(parentId, text);
+      if (error) {
+        toast({ text: error });
+        return;
+      }
+      setTitle('');
+    });
+  }
+
+  return (
+    <form
+      className="mt-1 flex items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <Plus className="size-3.5 shrink-0 text-ink-ghost" strokeWidth={1.75} aria-hidden />
+      <input
+        autoFocus
+        value={title}
+        disabled={pending}
+        aria-label="Add an item"
+        placeholder="Add an item"
+        onChange={(event) => setTitle(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onClose();
+        }}
+        onBlur={() => {
+          if (!title.trim()) onClose();
+        }}
+        className="min-w-0 flex-1 border-none bg-transparent p-0 text-small text-ink outline-none placeholder:text-ink-ghost"
+      />
+    </form>
   );
 }
 
