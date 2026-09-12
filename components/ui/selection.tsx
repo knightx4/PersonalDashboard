@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent,
   type ReactNode,
@@ -19,6 +20,7 @@ import {
   clickRule,
   extendRange,
   isRowSelected,
+  isTypingTarget,
   keyRule,
   nextFocus,
   pruneSelection,
@@ -78,14 +80,28 @@ export function useSelection(): Selection | null {
 
 export function SelectionProvider({
   rows,
+  onKey,
   children,
 }: {
   /** The list as drawn, in order. A range is a question about this. */
   rows: readonly SelectionRow[];
+  /**
+   * A press none of the selection's own keys claimed, with the row the
+   * keyboard is on. A queue with its own shortcuts takes them here rather than
+   * adding a second keydown listener to the same page.
+   */
+  onKey?: (event: KeyboardEvent, focused: string | null) => void;
   children: ReactNode;
 }) {
   const [stored, setStored] = useState<SelectionState>(EMPTY_SELECTION);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
+
+  // In a ref so a page can pass an inline handler without the listener being
+  // torn down and put back on every render.
+  const onKeyRef = useRef(onKey);
+  useEffect(() => {
+    onKeyRef.current = onKey;
+  }, [onKey]);
 
   // Pruned on the way out rather than in an effect: a row that has left the
   // list stops counting on the render it leaves, with no second pass.
@@ -121,20 +137,25 @@ export function SelectionProvider({
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
-      const hasSelection = state.selected.size > 0;
-      const action = keyRule(
-        {
-          key: event.key,
-          metaKey: event.metaKey,
-          ctrlKey: event.ctrlKey,
-          altKey: event.altKey,
-          target: target
-            ? { tagName: target.tagName, isContentEditable: target.isContentEditable === true }
-            : null,
-        },
-        hasSelection,
-      );
-      if (!action) return;
+      const press = {
+        key: event.key,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        target: target
+          ? { tagName: target.tagName, isContentEditable: target.isContentEditable === true }
+          : null,
+      };
+
+      const action = keyRule(press, state.selected.size > 0);
+      if (!action) {
+        // Not one of the selection's keys. A queue with shortcuts of its own
+        // reads it here, so there is one listener on the page rather than two
+        // disagreeing about which row the keyboard is on.
+        const modified = press.metaKey || press.ctrlKey || press.altKey;
+        if (!modified && !isTypingTarget(press.target)) onKeyRef.current?.(event, focused);
+        return;
+      }
 
       event.preventDefault();
       if (action === 'down' || action === 'up') {
