@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/shell/key-hints';
 import {
   EMPTY_SELECTION,
@@ -202,6 +203,44 @@ export const selectionFocusClass = 'border-accent ring-2 ring-accent/15';
 export function useSelectionRowClass(rowKey: string, className?: string): string {
   const selection = useSelection();
   return cn(selectionRowClass, selection?.isFocused(rowKey) && selectionFocusClass, className);
+}
+
+/**
+ * The page header while rows are selected: how many, what can be done to them,
+ * and Clear.
+ *
+ * Rendered through PageHeader's `bulk` slot, into the same grid cell as the
+ * heading, which is why it carries the cell's position and the attribute the
+ * header hides itself by. Nothing at all is drawn while nothing is selected,
+ * so a page can pass this unconditionally.
+ *
+ * The verbs are the page's, because only the page knows what its rows take and
+ * how many of the selection each one covers. The count and Clear are the
+ * same everywhere, so they are here.
+ */
+export function SelectionActionBar({ children }: { children?: ReactNode }) {
+  const selection = useSelection();
+  if (!selection || selection.count === 0) return null;
+
+  return (
+    <div
+      data-selection-bar
+      role="toolbar"
+      aria-label="Actions for the selected rows"
+      className="col-start-1 row-start-1 flex flex-wrap items-center gap-2"
+    >
+      <span className="font-display text-title tracking-tight text-ink">
+        {selection.count} selected
+      </span>
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {children}
+        <Button type="button" variant="ghost" size="sm" onClick={selection.clear}>
+          Clear
+          <Kbd>Esc</Kbd>
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /**
