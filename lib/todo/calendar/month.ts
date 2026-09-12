@@ -22,7 +22,7 @@ import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
 /** One thing drawn in a day's cell. */
 export interface CalendarEntry {
   key: string;
-  kind: 'event' | 'task' | 'item' | 'context';
+  kind: 'event' | 'task' | 'item' | 'context' | 'feed';
   /** An instant, when the thing has a clock. Formatted by the caller. */
   at: string | null;
   /**
@@ -118,6 +118,13 @@ export interface BuildInput {
   month: string;
   tasks: Task[];
   events: Event[];
+  /**
+   * Appointments from a calendar you subscribe to. Kept apart from your own
+   * events rather than merged into them, because the difference is what the
+   * cell draws and what the page refuses to open: these are somebody else's
+   * rows and nothing here may edit one.
+   */
+  feedEvents?: Event[];
   items: AgendaItem[];
   context: DayContext[];
   /** Keys of source items deferred or dismissed, and until when. */
@@ -207,6 +214,38 @@ export function collectEntries(
     });
   }
 
+  // Subscribed appointments cover their days exactly as your own events do --
+  // the same first-day, middle-day, last-day split -- but carry no eventId, so
+  // nothing on the page offers to open or edit one.
+  for (const event of input.feedEvents ?? []) {
+    const days = eventDays(event, timezone);
+    const last = days.length - 1;
+
+    days.forEach((day, index) => {
+      const at = isAllDay(event)
+        ? null
+        : index === 0
+          ? event.startsAt
+          : wallClockToInstant(day, '00:00', timezone);
+      const end = isAllDay(event)
+        ? null
+        : index === last
+          ? event.endsAt
+          : wallClockToInstant(addDays(day, 1), '00:00', timezone);
+
+      push(day, {
+        key: `feed:${event.id}`,
+        kind: 'feed',
+        at,
+        end,
+        eventId: null,
+        title: event.title,
+        href: null,
+        done: false,
+      });
+    });
+  }
+
   for (const item of input.items) {
     if (stillHidden(input.dismissals.get(item.key), now)) continue;
 
@@ -258,13 +297,17 @@ export function buildMonth(input: BuildInput): CalendarMonth {
 /**
  * Inside a square: what has a clock, in clock order, then what merely happens
  * that day. What you typed -- an event, then a task -- before what another
- * workspace noticed, which is the order the agenda already puts them in.
+ * workspace noticed, which is the order the agenda already puts them in. A
+ * subscribed appointment sits between the two: somebody else scheduled it, so
+ * it is not yours, but it is a real appointment rather than something a
+ * workspace noticed.
  */
 const KIND_ORDER: Record<CalendarEntry['kind'], number> = {
   event: 0,
   task: 1,
-  item: 2,
-  context: 3,
+  feed: 2,
+  item: 3,
+  context: 4,
 };
 
 export function compareEntries(a: CalendarEntry, b: CalendarEntry): number {

@@ -324,4 +324,83 @@ describe('buildMonth', () => {
     const month = build({ tasks: [task({ dueOn: '2026-05-01' })] });
     expect(month.weeks.flat().every((cell) => cell.entries.length === 0)).toBe(true);
   });
+  it('draws a subscribed appointment beside one of your own on the same day', () => {
+    const month = build({
+      events: [
+        event({
+          id: 'mine',
+          title: 'Dentist',
+          startsAt: '2026-03-10T09:00:00.000Z',
+          endsAt: '2026-03-10T09:30:00.000Z',
+        }),
+      ],
+      feedEvents: [
+        event({
+          id: 'theirs',
+          title: 'Sprint review',
+          startsAt: '2026-03-10T14:00:00.000Z',
+          endsAt: '2026-03-10T15:00:00.000Z',
+        }),
+      ],
+    });
+
+    const cell = dayIn(month, '2026-03-10');
+    expect(cell.entries.map((entry) => [entry.kind, entry.title])).toEqual([
+      ['event', 'Dentist'],
+      ['feed', 'Sprint review'],
+    ]);
+  });
+
+  it('never offers to open a subscribed appointment', () => {
+    // eventId is what the page turns into a link to the edit form. A
+    // subscribed appointment is somebody else's row and this app writes
+    // nothing back to it, so there is nothing to open.
+    const month = build({
+      feedEvents: [
+        event({
+          id: 'theirs',
+          startsAt: '2026-03-10T14:00:00.000Z',
+          endsAt: '2026-03-10T15:00:00.000Z',
+        }),
+      ],
+    });
+
+    const [entry] = dayIn(month, '2026-03-10').entries;
+    expect(entry.eventId).toBeNull();
+    expect(entry.href).toBeNull();
+  });
+
+  it('puts a subscribed appointment that crosses midnight on both days', () => {
+    const month = build({
+      feedEvents: [
+        event({
+          id: 'theirs',
+          title: 'Night shift',
+          startsAt: '2026-03-12T23:00:00.000Z',
+          endsAt: '2026-03-13T01:00:00.000Z',
+        }),
+      ],
+    });
+
+    // The first day holds it from when it starts; the second from midnight,
+    // so neither square draws anything outside the day it is.
+    const first = dayIn(month, '2026-03-12').entries[0];
+    const second = dayIn(month, '2026-03-13').entries[0];
+
+    expect(first.at).toBe('2026-03-12T23:00:00.000Z');
+    expect(first.end).toBe('2026-03-13T00:00:00.000Z');
+    expect(second.at).toBe('2026-03-13T00:00:00.000Z');
+    expect(second.end).toBe('2026-03-13T01:00:00.000Z');
+  });
+
+  it('gives a whole-day subscribed appointment every day it covers', () => {
+    const month = build({
+      feedEvents: [event({ id: 'theirs', startsOn: '2026-03-16', endsOn: '2026-03-18' })],
+    });
+
+    for (const day of ['2026-03-16', '2026-03-17', '2026-03-18']) {
+      expect(dayIn(month, day).entries.map((entry) => entry.kind)).toEqual(['feed']);
+    }
+    expect(dayIn(month, '2026-03-19').entries).toEqual([]);
+  });
 });

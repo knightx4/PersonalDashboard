@@ -5,6 +5,9 @@ import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { TODO_SCHEMA } from '@/lib/todo/db/schema-name';
+import { addDays } from '@/lib/todo/tasks/model';
+import { wallClockToInstant } from '@/lib/todo/time';
+import type { Event } from '@/lib/todo/events/model';
 
 /**
  * Reading your subscriptions, and the appointments they brought.
@@ -77,4 +80,61 @@ export function hintFor(ciphertext: string, key: string): string {
   } catch {
     return `…${address.slice(-4)}`;
   }
+}
+
+const EVENT_COLUMNS = 'id, title, body, location, starts_on, ends_on, starts_at, ends_at, created_at';
+
+/** PostgREST caps a response; a year of subscribed appointments can reach it. */
+const EVENT_LIMIT = 2000;
+
+/**
+ * The subscribed appointments that overlap the days a view is showing.
+ *
+ * The same window question loadEventsInWindow asks of the events you typed,
+ * asked of the copy: all-day dates compare against the window's days directly
+ * and instants against the moments those days begin and end for this reader.
+ * They come back as Events because that is what they are -- everything that
+ * draws a calendar can then ask them the same date questions -- and which
+ * calendar each came from rides along, since a subscribed appointment is drawn
+ * as somebody else's.
+ */
+export interface SubscribedEvent extends Event {
+  feedId: string;
+}
+
+export async function loadFeedEventsInWindow(
+  userId: string,
+  window: { from: string; to: string },
+  timezone: string,
+): Promise<SubscribedEvent[]> {
+  const supabase = await createTodoClient();
+
+  const opens = wallClockToInstant(window.from, '00:00', timezone);
+  const closes = wallClockToInstant(addDays(window.to, 1), '00:00', timezone);
+
+  const { data, error } = await supabase
+    .from('feed_events')
+    .select(`${EVENT_COLUMNS}, feed_id`)
+    .eq('user_id', userId)
+    .or(
+      `and(starts_on.lte.${window.to},ends_on.gte.${window.from}),` +
+        `and(starts_at.lt.${closes},ends_at.gt.${opens})`,
+    )
+    .limit(EVENT_LIMIT);
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    title: row.title as string,
+    body: (row.body as string | null) ?? null,
+    location: (row.location as string | null) ?? null,
+    startsOn: (row.starts_on as string | null) ?? null,
+    endsOn: (row.ends_on as string | null) ?? null,
+    startsAt: (row.starts_at as string | null) ?? null,
+    endsAt: (row.ends_at as string | null) ?? null,
+    createdAt: row.created_at as string,
+    feedId: row.feed_id as string,
+  }));
 }
