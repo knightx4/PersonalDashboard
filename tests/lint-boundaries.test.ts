@@ -64,6 +64,10 @@ const LEARN_FETCH_IMPORT = `import { fetchDocument } from '@/lib/learn/providers
 export const fetcher = fetchDocument;
 `;
 
+const ICAL_IMPORT = `import ICAL from 'ical.js';
+export const parse = ICAL.parse;
+`;
+
 const SELL_IMPORT = `import { runPriceLookups } from '@/lib/sell/price-run';
 export const load = runPriceLookups;
 `;
@@ -222,6 +226,29 @@ describe('the learn fetch boundary', () => {
 
   it('still applies inside the exempted cron routes', () => {
     expect(lint('app/api/cron/__boundary_probe.ts', LEARN_FETCH_IMPORT)).toMatch(
+      /no-restricted-imports/,
+    );
+  });
+});
+
+/**
+ * A calendar file is read in one place.
+ *
+ * ical.js was taken on for repeating appointments, which means its bugs are
+ * this app's now. The fence is what keeps swapping it a job in one directory
+ * rather than a search, and this is what proves the fence fires.
+ */
+describe('the calendar library boundary', () => {
+  it('blocks the library from a page', () => {
+    expect(lint('app/__boundary_probe.ts', ICAL_IMPORT)).toMatch(/no-restricted-imports/);
+  });
+
+  it('blocks it from a component', () => {
+    expect(lint('components/__boundary_probe.ts', ICAL_IMPORT)).toMatch(/no-restricted-imports/);
+  });
+
+  it('still applies inside the exempted cron routes', () => {
+    expect(lint('app/api/cron/__boundary_probe.ts', ICAL_IMPORT)).toMatch(
       /no-restricted-imports/,
     );
   });
