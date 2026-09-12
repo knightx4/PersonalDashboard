@@ -2,10 +2,12 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
+import { loadFeeds } from '@/lib/todo/feeds/load';
 import { allSources } from '@/lib/todo/agenda/registry';
 import { MODULES } from '@/lib/modules';
 import { PageHeader } from '@/components/shell/page-header';
 import { AgendaSettingsForm } from './view';
+import { CalendarFeeds } from './feeds';
 
 export const metadata = { title: 'Todo settings' };
 
@@ -18,9 +20,10 @@ export const metadata = { title: 'Todo settings' };
  */
 export default async function TodoSettingsPage() {
   const user = await requireUser();
-  const [account, agenda] = await Promise.all([
+  const [account, agenda, feeds] = await Promise.all([
     loadAccountSettings(user.id),
     loadAgendaSettings(user.id),
+    loadFeeds(user.id),
   ]);
 
   // Grouped by the workspace they read, in the order the switcher lists them:
@@ -55,6 +58,10 @@ export default async function TodoSettingsPage() {
         enabled={agenda.enabledSources}
         horizonDays={agenda.horizonDays}
       />
+
+      <div className="mt-6">
+        <CalendarFeeds feeds={feeds} timezone={account.timezone} />
+      </div>
 
       <p className="mt-6 text-ui text-ink-muted">
         Your timezone decides what counts as today here, and it holds across every workspace.{' '}

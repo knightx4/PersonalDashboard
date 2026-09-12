@@ -42,6 +42,20 @@ const VAULT_PROVIDER_PATTERN = {
 };
 
 /**
+ * Which library reads a calendar file is lib/todo/feeds/'s business alone.
+ *
+ * The same fence the email and vault providers have: ical.js was chosen for
+ * repeating appointments (#276), its bugs are now this app's, and swapping it
+ * later should cost one directory rather than a search. The parser hands back
+ * plain rows, so nothing else needs the library at all.
+ */
+const ICAL_PATTERN = {
+  group: ["ical.js"],
+  message:
+    "Nothing outside lib/todo/feeds/ knows which library reads a calendar file. Go through lib/todo/feeds/parse.ts.",
+};
+
+/**
  * The learn module is the only thing here that fetches a URL somebody else
  * chose, so the guard against reaching an internal address has to be
  * unavoidable. It is worth nothing if a second call site can be written beside
@@ -106,6 +120,7 @@ const renderBoundaries = {
           ATS_PATTERN,
           VAULT_PROVIDER_PATTERN,
           LEARN_FETCH_PATTERN,
+          ICAL_PATTERN,
         ],
       },
     ],
@@ -196,7 +211,7 @@ const serviceRoleExceptions = {
   rules: {
     "no-restricted-imports": [
       "error",
-      { patterns: [ATS_PATTERN, VAULT_PROVIDER_PATTERN, LEARN_FETCH_PATTERN] },
+      { patterns: [ATS_PATTERN, VAULT_PROVIDER_PATTERN, LEARN_FETCH_PATTERN, ICAL_PATTERN] },
     ],
   },
 };

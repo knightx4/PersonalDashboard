@@ -32,6 +32,33 @@ export function eventContext(
   timezone: string,
   today: string,
 ): DayContext[] {
+  return contextFor(events, timezone, today, 'own');
+}
+
+/**
+ * The same, for an appointment out of a calendar you subscribe to.
+ *
+ * #209 settled that an event belongs on the agenda as context rather than as
+ * something to tick, and a subscribed appointment is an event -- so it follows
+ * that answer: no tick, no defer, no dismiss. The one difference is where the
+ * row goes when you press it. There is no page for an appointment this app did
+ * not write, so it opens the day on the calendar rather than a form for a row
+ * that cannot be edited.
+ */
+export function subscribedContext(
+  events: readonly Event[],
+  timezone: string,
+  today: string,
+): DayContext[] {
+  return contextFor(events, timezone, today, 'subscribed');
+}
+
+function contextFor(
+  events: readonly Event[],
+  timezone: string,
+  today: string,
+  kind: 'own' | 'subscribed',
+): DayContext[] {
   const context: DayContext[] = [];
 
   for (const event of events) {
@@ -42,16 +69,18 @@ export function eventContext(
     const day = first < today ? today : first;
     const timed = !isAllDay(event);
 
+    const query =
+      kind === 'own'
+        ? new URLSearchParams({ date: day, event: event.id })
+        : new URLSearchParams({ date: day });
+
     context.push({
-      key: `event:${event.id}`,
+      key: `${kind === 'own' ? 'event' : 'feed'}:${event.id}`,
       day,
       at: timed && day === first ? event.startsAt : null,
       label: event.title,
       detail: detailOf(event, first, last),
-      link: {
-        href: `/todo/calendar?${new URLSearchParams({ date: day, event: event.id })}`,
-        label: 'Open',
-      },
+      link: { href: `/todo/calendar?${query}`, label: 'Open' },
     });
   }
 

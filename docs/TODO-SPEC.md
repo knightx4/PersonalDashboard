@@ -135,6 +135,11 @@ Listing these because they will otherwise get invented.
 - **No writing to the vault, ever.** Not a `- [x]`, not a new note, not an
   `outbox/` folder. If app-authored notes ever happen, that is the vault's
   decision to make, in its own spec, and not a side effect of a todo list.
+- **Nothing is ever written back to a calendar you subscribe to.** The
+  subscription is read-only in the strongest sense: no appointment is created,
+  edited, cancelled or acknowledged at the other end, and an appointment that
+  arrived through one cannot be edited here either. Nor can a task point at
+  one — the next refresh may drop the row it would point at.
 - **No notifications, email or push, in v1.** The daily cron already exists and
   the agenda already exists; deciding to interrupt someone is a separate
   decision with its own failure mode.
@@ -672,6 +677,69 @@ the shopping side already derives.
 
 `saved_items.cooldown_until` belongs to the anti-spending layer on the shopping
 side ([BUILD-ORDER.md](BUILD-ORDER.md) step 19) and waits for it.
+
+## Integration: a calendar you keep somewhere else
+
+You paste the private address of a calendar you already keep — Google, Apple, a
+work one — give it a name, and its appointments appear on this calendar and in
+the agenda's day context beside your own. Built as plan #275.
+
+**It reads one way only.** Nothing typed here is ever sent to that address, an
+appointment that arrived through a subscription cannot be edited or deleted in
+this app, and no task may point at one. That last rule is not squeamishness: a
+link has to point at a row that stays put, and the next refresh can drop any of
+these.
+
+**The appointments are a copy, and are treated as one.** `todo.calendar_feeds`
+holds one row per subscription; `todo.feed_events` holds one row per occurrence
+of one appointment, with the same two pairs of when-columns and the same
+constraints `todo.events` has, so everything that draws a calendar asks a
+subscribed appointment exactly the date questions it asks one you typed. A
+refresh deletes what that subscription contributed last time and writes what
+came back — the file is the truth, and an appointment deleted in Google has to
+disappear here too.
+
+This is the one place the module's own rule — *an obligation is displayed by
+whoever needs to show it and written by whoever owns it* — is bent, and the
+reason it does not break is that nothing here is an obligation. A subscribed
+appointment is never completed, deferred or dismissed, so there is no second
+place a state about it could disagree. Reading the file while the page renders
+was the alternative, and it means the calendar waits on somebody else's server
+to draw a month.
+
+**The address is a credential.** Anyone holding a private Google link can read
+the whole calendar, so it is encrypted at rest by `lib/crypto/tokens.ts` — the
+same helper and the same key the mailbox tokens use — a check constraint
+refuses anything that did not come out of `encryptToken()`, and settings shows
+only the host and the last four characters.
+
+**What the two questions settled:**
+
+- **#276 — read the file with a library.** `ical.js` does the parsing.
+  Repeating appointments are most of a real calendar and the rules behind them
+  have thirty years of edge cases in them. Its bugs are this app's now, so the
+  library is fenced into `lib/todo/feeds/` by an eslint boundary with a case in
+  `tests/lint-boundaries.test.ts`, the same containment the email and vault
+  providers have.
+- **#277 — freshness comes from the page, not a job.** Opening the calendar
+  re-reads any subscription whose copy is more than an hour old, before it
+  draws. There is no cron entry: a calendar nobody opens costs nothing to keep
+  fresh. `refreshing_since` is the claim that stops two tabs fetching the same
+  address at once, and a page render gets a shorter fetch timeout than the
+  Refresh now button does.
+
+A failed read never empties the page. `last_read_at` moves only on a good read,
+`last_error` carries the reason, and the appointments from the last good read
+stay exactly where they are: a calendar that has quietly gone empty is a worse
+lie than one that is a day stale.
+
+The address is somebody else's URL, so it is fetched under the same rules the
+learn module's fetcher obeys — https only, the resolved host checked on every
+redirect hop against `lib/net/public-address.ts`, a ceiling on the bytes read,
+a timeout, and an HTML answer refused rather than read as a calendar with
+nothing in it. That last one is a sign-in page, and reading it as an empty
+calendar would record "no appointments" instead of "this address needs
+renewing".
 
 ## Account settings, and module settings
 

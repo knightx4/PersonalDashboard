@@ -29,6 +29,7 @@
     "drizzle-orm": "^0.45.2",
     "google-auth-library": "^9.15.1",
     "gray-matter": "^4.0.3",
+    "ical.js": "^2.2.1",
     "lucide-react": "^1.27.0",
     "next": "16.2.12",
     "postgres": "^3.4.9",

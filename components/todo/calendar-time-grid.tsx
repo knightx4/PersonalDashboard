@@ -129,7 +129,15 @@ export function CalendarTimeGrid({
                       marginLeft: `${(block.lane / block.lanes) * 100}%`,
                       width: `${(1 / block.lanes) * 100}%`,
                     }}
-                    className="pointer-events-none my-px rounded-md border-l-2 border-accent bg-accent-tint"
+                    className={cn(
+                      'pointer-events-none my-px rounded-md border-l-2',
+                      // A subscribed appointment takes up the same hours and
+                      // says so more quietly: it is on the day, but it is
+                      // somebody else's row and nothing here can move it.
+                      block.entry.kind === 'feed'
+                        ? 'border-border bg-sunken'
+                        : 'border-accent bg-accent-tint',
+                    )}
                   />
                 );
               }),
