@@ -9,6 +9,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
  * Turning a goal you typed into the chain of concepts leading to it.
@@ -64,6 +65,8 @@ this rots.
 
 NO CYCLES. Prerequisites run one way. If A is needed for B then B is never
 needed for A, however tempting the symmetry.
+
+${MASTERY_RULE}
 
 BASIS, HONESTLY. Every node and every edge carries a basis, one short sentence
 on how you know it belongs. It is shown to the reader, so never imply you
@@ -176,8 +179,9 @@ export async function generateChain(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    mastery: MASTERY_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis'],
+                  required: ['name', 'claim', 'basis', 'mastery'],
                 },
               },
               edges: {

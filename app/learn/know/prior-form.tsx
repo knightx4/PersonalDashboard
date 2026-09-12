@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { MasteryChecks } from '@/components/learn/mastery-checks';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approvePrior, proposePrior, type PriorState } from './actions';
 
@@ -67,6 +68,10 @@ function ClaimRow({ node }: { node: ChainNode }) {
 
       {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
       {node.basis && <p className="mt-0.5 text-small text-ink-muted">{node.basis}</p>}
+
+      {/* Only under a new node: a concept already in the subject is left as it
+          is, checks included. */}
+      {!node.existingId && <MasteryChecks checks={node.mastery} className="mt-1" />}
     </li>
   );
 }

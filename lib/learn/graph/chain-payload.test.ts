@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  approvedChainSchema,
   chainPayloadSchema,
   keepTicked,
   MAX_CHAIN,
@@ -323,6 +324,7 @@ describe('keeping only what was ticked', () => {
         name,
         claim: `${name} is the case.`,
         basis: 'The briefing says so.',
+        mastery: [],
         existingId: existing.includes(name) ? `id-${name}` : null,
       }),
     ),
@@ -397,5 +399,60 @@ describe('keeping only what was ticked', () => {
 
     expect(chain.dropped).toEqual([{ name: 'The fee table', reason: 'no claim in it' }]);
     expect(chain.nodes).toHaveLength(2);
+  });
+});
+
+describe('what understanding a node looks like', () => {
+  const withChecks = (name: string, mastery: string[]) => ({ ...node(name), mastery });
+
+  const chainWith = (mastery: string[]) =>
+    normaliseChain(
+      parse({
+        subject: 'Economics',
+        goal_concept: 'B',
+        concepts: [withChecks('A', mastery), node('B')],
+        edges: [edge('A', 'B')],
+      }),
+      nothingExists,
+    );
+
+  it('carries the checks through to the node', () => {
+    const chain = chainWith(['Rules out a pay freeze.', 'Applies at 4% inflation.']);
+    expect(chain!.nodes[0].mastery).toEqual([
+      'Rules out a pay freeze.',
+      'Applies at 4% inflation.',
+    ]);
+  });
+
+  it('keeps the first four when more come back', () => {
+    const chain = chainWith(['One.', 'Two.', 'Three.', 'Four.', 'Five.', 'Six.']);
+    expect(chain!.nodes[0].mastery).toEqual(['One.', 'Two.', 'Three.', 'Four.']);
+  });
+
+  it('takes a node that came back with none', () => {
+    const chain = chainWith([]);
+    expect(chain!.nodes[0].mastery).toEqual([]);
+    expect(chain!.nodes.map((n) => n.name)).toEqual(['A', 'B']);
+  });
+
+  it('empties a list left with one check', () => {
+    // The column takes two to four or nothing, and one check is a restatement
+    // of the claim rather than a test of it.
+    expect(chainWith(['The only thing said about it.', '   '])!.nodes[0].mastery).toEqual([]);
+  });
+
+  it('survives the trip out to the form and back', () => {
+    const chain = chainWith(['Rules out a pay freeze.', 'Applies at 4% inflation.']);
+    const back = approvedChainSchema.parse(JSON.parse(JSON.stringify(chain)));
+    expect(back.nodes[0].mastery).toEqual(['Rules out a pay freeze.', 'Applies at 4% inflation.']);
+  });
+
+  it('cuts a hand-edited list down again on the way back', () => {
+    const chain = chainWith(['Rules out a pay freeze.', 'Applies at 4% inflation.']);
+    const tampered = {
+      ...chain,
+      nodes: chain!.nodes.map((n, i) => (i === 0 ? { ...n, mastery: ['Only one.'] } : n)),
+    };
+    expect(approvedChainSchema.parse(tampered).nodes[0].mastery).toEqual([]);
   });
 });

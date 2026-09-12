@@ -26,6 +26,13 @@ export type Concept = {
   established: StateBasis;
   /** Named when the state is `misconception`, null otherwise. */
   misconception: string | null;
+  /**
+   * Two to four short checks saying what understanding this claim looks like,
+   * in the order they were written. A probe question is written against one of
+   * them rather than against the claim in general. Empty for a concept whose
+   * checks were never written, which is allowed and is shown as such.
+   */
+  mastery: string[];
   testedAt: string | null;
 };
 

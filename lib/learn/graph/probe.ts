@@ -47,6 +47,12 @@ that fits" teaches nothing. If you cannot write the reason without pointing
 back at the options, the question is not about the claim: set unusable true
 and write nothing.
 
+AIM AT THE CHECK YOU ARE GIVEN. When the prompt names one check of
+understanding, the question tests that check and nothing else. The claim is
+there to say what is true; the check is what the question is for. A question
+that wanders onto another part of the claim leaves the check untested and the
+next question with nowhere new to go.
+
 DO NOT REPEAT A QUESTION you are told has already been asked. Ask about a
 different consequence of the same claim.
 
@@ -60,10 +66,25 @@ export type ProbeResult =
 function buildPrompt(input: {
   concept: string;
   claim: string;
+  check: string | null;
+  otherChecks: string[];
   asked: string[];
   missedBefore: boolean;
 }): string {
-  const lines = [`Concept: ${input.concept}`, '', `The claim: ${input.claim}`];
+  const lines = [`Concept: ${input.concept}`];
+
+  // Above the claim, because it is what the question is for. The others are
+  // named so the question does not wander onto ground another question will
+  // cover.
+  if (input.check) {
+    lines.push('', `Write the question against this check of understanding: ${input.check}`);
+    if (input.otherChecks.length > 0) {
+      lines.push('', 'The other checks this claim carries, which this question is not about:');
+      for (const other of input.otherChecks) lines.push(`- ${other}`);
+    }
+  }
+
+  lines.push('', `The claim: ${input.claim}`);
 
   if (input.asked.length > 0) {
     lines.push('', 'Already asked about this claim — ask about something else:');
@@ -95,6 +116,10 @@ function buildPrompt(input: {
 export async function writeProbe(input: {
   concept: string;
   claim: string;
+  /** The check this question is for, chosen by `nextMasteryCheck`. */
+  check?: string | null;
+  /** The concept's other checks, named so the question stays off them. */
+  otherChecks?: string[];
   /** Questions already asked about this claim, so it does not repeat itself. */
   asked?: string[];
   missedBefore?: boolean;
@@ -133,6 +158,8 @@ export async function writeProbe(input: {
           content: buildPrompt({
             concept: input.concept,
             claim: input.claim,
+            check: input.check ?? null,
+            otherChecks: input.otherChecks ?? [],
             asked: input.asked ?? [],
             missedBefore: input.missedBefore ?? false,
           }),
@@ -162,7 +189,7 @@ export async function writeProbe(input: {
     return { ok: false, reason: 'rejected', detail: 'The question came back malformed.' };
   }
 
-  const result = toProbe(safe.data);
+  const result = toProbe(safe.data, input.check ?? null);
   if (!result.ok) {
     return result.reason === 'unusable'
       ? {

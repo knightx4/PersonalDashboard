@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Select, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { keepTicked, type ChainNode, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveBrief, proposeBrief, type BriefState } from './actions';
 
@@ -104,6 +105,7 @@ function ClaimRow({
             put it there. */}
         {node.claim && <span className="mt-0.5 block text-ui text-ink">{node.claim}</span>}
         {node.basis && <span className="mt-0.5 block text-small text-ink-muted">{node.basis}</span>}
+        <MasteryChecks checks={node.mastery} className="mt-1" />
       </span>
     </li>
   );

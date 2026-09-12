@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { MasteryChecks } from '@/components/learn/mastery-checks';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveChain, proposeGoal, type ApproveState, type ProposeState } from './actions';
 
@@ -66,6 +67,10 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
           names gives you nothing to check. */}
       {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
       {node.basis && <p className="mt-0.5 text-small text-ink-muted">{node.basis}</p>}
+
+      {/* Only under a new node: approving writes nothing for one the subject
+          already has, so its checks are not what will be stored. */}
+      {!node.existingId && <MasteryChecks checks={node.mastery} className="mt-1" />}
     </li>
   );
 }

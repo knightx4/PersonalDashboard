@@ -20,6 +20,45 @@ import { z } from 'zod';
 /** Longer than this and a goal has stopped being specific. */
 export const MAX_CHAIN = 12;
 
+/** Fewer than this is a restatement of the claim; more is a syllabus for it. */
+export const MASTERY_MIN = 2;
+export const MASTERY_MAX = 4;
+/** A check is a sentence. Anything longer came back as prose and is dropped. */
+const MASTERY_LENGTH = 500;
+
+/**
+ * The checks a node comes back with, cut down to what can be stored.
+ *
+ * `learn.concepts` takes two to four non-empty strings or nothing at all, so
+ * this is where a list that does not fit becomes one that does: blank and
+ * over-long checks go, the first `MASTERY_MAX` are kept, and a list left with
+ * only one is emptied. Emptied rather than padded or refused, because a node
+ * with no checks is allowed and a node dropped for the sake of its checks is a
+ * claim lost over an annotation.
+ */
+export function placeMastery(checks: readonly string[]): string[] {
+  const kept: string[] = [];
+  for (const check of checks) {
+    const trimmed = check.trim();
+    if (trimmed === '' || trimmed.length > MASTERY_LENGTH) continue;
+    kept.push(trimmed);
+    if (kept.length === MASTERY_MAX) break;
+  }
+  return kept.length < MASTERY_MIN ? [] : kept;
+}
+
+/**
+ * Loose on the way in, strict on the way out. A check the model wrote badly is
+ * dropped by `placeMastery`; it never fails the chain around it, because the
+ * claims are the thing being proposed and the checks are what is said about
+ * them.
+ */
+export const masterySchema = z
+  .array(z.string())
+  .max(20)
+  .default([])
+  .transform(placeMastery);
+
 export const proposedConceptSchema = z.object({
   /** Short, for the graph view. */
   name: z.string().trim().min(1).max(200),
@@ -27,6 +66,12 @@ export const proposedConceptSchema = z.object({
   claim: z.string().trim().min(1).max(1000),
   /** How this is known to belong here. Shown, so it may not be flattering. */
   basis: z.string().trim().min(1).max(500),
+  /**
+   * What understanding this claim looks like: what it rules out, how it
+   * applies to a case with the numbers changed, what the standard objection to
+   * it is. A probe question is written against one of these.
+   */
+  mastery: masterySchema,
 });
 
 export const proposedEdgeSchema = z.object({
@@ -69,6 +114,8 @@ export type ChainNode = {
   name: string;
   claim: string;
   basis: string;
+  /** Two to four checks, or none. Never one -- see `placeMastery`. */
+  mastery: string[];
   /** The id it matched in the subject already, or null when it is new. */
   existingId: string | null;
 };
@@ -230,7 +277,13 @@ export function normaliseChain(
     const existingId = existingByName.get(key(name)) ?? null;
     if (existingId) joined += 1;
 
-    nodes.push({ name, claim: proposed.claim.trim(), basis: proposed.basis.trim(), existingId });
+    nodes.push({
+      name,
+      claim: proposed.claim.trim(),
+      basis: proposed.basis.trim(),
+      mastery: proposed.mastery,
+      existingId,
+    });
     if (nodes.length >= MAX_CHAIN) break;
   }
 
@@ -244,6 +297,7 @@ export function normaliseChain(
         name: payload.goal_concept.trim(),
         claim: '',
         basis: '',
+        mastery: [],
         existingId,
       });
       seen.add(goalKey);
@@ -337,6 +391,9 @@ export function approvedChainSchemaWith(limits: {
           // already has its claim and basis in its own row.
           claim: z.string().trim().max(1000),
           basis: z.string().trim().max(500),
+          // Cut down again rather than trusted: the list went out to a browser
+          // and came back, and the database takes two to four or nothing.
+          mastery: masterySchema,
           existingId: z.string().uuid().nullable(),
         }),
       )
