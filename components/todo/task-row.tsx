@@ -160,10 +160,24 @@ export function TaskRow({
   }
 
   function complete() {
+    // Which items the tick took down with it, filled in by the write and read
+    // by the undo. The toast is built before the write returns, so the way
+    // back cannot be handed the ids -- it is handed the array they land in.
+    // Items already ticked are not among them and stay as they were.
+    const ticked: string[] = [];
+
     run({
       patch: { status: 'done' },
-      write: () => completeTask(task.id),
-      toast: { text: 'done', undo: undoWith(() => reopenTask(task.id)), undone: 'reopened' },
+      write: async () => {
+        const result = await completeTask(task.id);
+        ticked.push(...result.items);
+        return result;
+      },
+      toast: {
+        text: 'done',
+        undo: undoWith(() => reopenTask(task.id, ticked)),
+        undone: 'reopened',
+      },
     });
   }
 
