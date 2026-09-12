@@ -5,12 +5,11 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   chainPayloadSchema,
   normaliseChain,
-  MASTERY_MAX,
-  MASTERY_MIN,
   MAX_CHAIN,
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
  * Turning a goal you typed into the chain of concepts leading to it.
@@ -67,18 +66,7 @@ this rots.
 NO CYCLES. Prerequisites run one way. If A is needed for B then B is never
 needed for A, however tempting the symmetry.
 
-WHAT UNDERSTANDING IT LOOKS LIKE. Every node carries two to four short checks,
-each one something a person could be asked to do with the claim rather than a
-restatement of it. What it rules out, how it applies to a case with the numbers
-changed, what the standard objection to it is. A question will later be written
-against one of these, so a check that cannot be turned into a question is not a
-check.
-
-  Claim: "Wages adjust more slowly than prices, so a burst of inflation raises
-  employment until expectations catch up."
-  Checks: "Says what happens to employment when the inflation is expected in
-  advance." / "Explains why the effect is not there in the long run." / "Answers
-  the objection that workers can simply ask for more."
+${MASTERY_RULE}
 
 BASIS, HONESTLY. Every node and every edge carries a basis, one short sentence
 on how you know it belongs. It is shown to the reader, so never imply you
@@ -191,12 +179,7 @@ export async function generateChain(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
-                    mastery: {
-                      type: 'array',
-                      items: { type: 'string' },
-                      minItems: MASTERY_MIN,
-                      maxItems: MASTERY_MAX,
-                    },
+                    mastery: MASTERY_TOOL_FIELD,
                   },
                   required: ['name', 'claim', 'basis', 'mastery'],
                 },

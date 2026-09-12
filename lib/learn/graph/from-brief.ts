@@ -15,6 +15,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
  * A briefing somebody wrote for you, read into things you have yet to learn.
@@ -112,6 +113,8 @@ than an edge. An edge says you cannot understand this without that first; a
 mention says this one brings the other one up. Two claims may mention each
 other, and often do. Report a mention only where the section actually makes the
 connection, and say where, in the same one short sentence a basis takes.
+
+${MASTERY_RULE}
 
 BASIS, HONESTLY. Each node and edge carries one short sentence on how you know
 it belongs, and it is shown to the reader. Here that sentence says where in the
@@ -259,8 +262,9 @@ async function readSection(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    mastery: MASTERY_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis'],
+                  required: ['name', 'claim', 'basis', 'mastery'],
                 },
               },
               edges: {

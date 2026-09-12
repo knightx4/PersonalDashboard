@@ -8,6 +8,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
  * What a node rests on, when getting it wrong says the graph is missing a
@@ -52,6 +53,8 @@ without an edge.
 DO NOT REPROPOSE what the subject already has. You are given its concepts by
 name; when one of them is the missing floor, name it exactly as given and draw
 the edge to it -- the graph was missing a connection rather than a node.
+
+${MASTERY_RULE}
 
 BASIS. Every node and edge says in one short sentence how you know it belongs.
 It is shown to the reader.
@@ -122,8 +125,9 @@ export async function proposeFloor(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    mastery: MASTERY_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis'],
+                  required: ['name', 'claim', 'basis', 'mastery'],
                 },
               },
               edges: {

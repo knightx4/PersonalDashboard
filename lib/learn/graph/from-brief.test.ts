@@ -455,3 +455,48 @@ describe('when a pass goes wrong', () => {
     if (!result.ok) expect(result.reason).toBe('error');
   });
 });
+
+describe('what understanding a node looks like', () => {
+  const withChecks = {
+    ...BITCOIN,
+    concepts: BITCOIN.concepts.map((concept, i) =>
+      i === 0
+        ? {
+            ...concept,
+            mastery: [
+              'Says what stops a richer miner rewriting last week.',
+              'Explains why the cost is in electricity rather than in the software.',
+            ],
+          }
+        : concept,
+    ),
+  };
+
+  it('carries the checks the briefing produced', async () => {
+    const result = await ask(clientReturning({ input: withChecks }));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.chain.nodes[0].mastery).toEqual([
+        'Says what stops a richer miner rewriting last week.',
+        'Explains why the cost is in electricity rather than in the software.',
+      ]);
+    }
+  });
+
+  it('takes a pass that came back with none', async () => {
+    const result = await ask(clientReturning({ input: BITCOIN }));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.chain.nodes.map((node) => node.mastery)).toEqual([[], []]);
+    }
+  });
+
+  it('asks for them in the tool schema', async () => {
+    const client = clientReturning({ input: BITCOIN });
+    await ask(client);
+    const tool = createOf(client).mock.calls[0][0].tools[0];
+    const concept = tool.input_schema.properties.concepts.items;
+    expect(concept.required).toContain('mastery');
+    expect(concept.properties.mastery.maxItems).toBe(4);
+  });
+});
