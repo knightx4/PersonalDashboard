@@ -20,7 +20,7 @@ import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/miscon
 import { proposeFloor } from '@/lib/learn/graph/floor';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
-import { prerequisiteMap } from '@/lib/learn/graph/model';
+import { prerequisiteMap, type Concept } from '@/lib/learn/graph/model';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 
@@ -73,12 +73,31 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
     return { error: 'Nothing in this subject to ask about yet.' };
   }
 
-  const asked = new Map<string, number>();
-  for (const concept of graph.concepts) {
-    asked.set(concept.id, (await probesFor(supabase, concept.id)).length);
+  // A concept can be named, which is what the row on /learn/next does: ask
+  // about this one rather than whichever one the session would have picked.
+  // Only the first question carries it -- the form that asks for another does
+  // not -- so a session started this way goes on choosing for itself.
+  const named = formData.get('conceptId');
+  const asking = typeof named === 'string' && named.length > 0 ? named : null;
+
+  let concept: Concept | null;
+  if (asking !== null) {
+    const wanted = z.string().uuid().safeParse(asking);
+    if (!wanted.success) return { error: 'Could not work out which claim to ask about.' };
+
+    // The graph is this subject's, so a concept missing from it is a concept
+    // in somebody else's subject or none. Said rather than swallowed: asking
+    // about a different claim than the one pressed would be worse.
+    concept = graph.concepts.find((c) => c.id === wanted.data) ?? null;
+    if (!concept) return { error: 'That claim is not in this subject.' };
+  } else {
+    const asked = new Map<string, number>();
+    for (const c of graph.concepts) {
+      asked.set(c.id, (await probesFor(supabase, c.id)).length);
+    }
+    concept = nextConcept(graph.concepts, asked);
   }
 
-  const concept = nextConcept(graph.concepts, asked);
   if (!concept) return { error: 'Nothing in this subject to ask about yet.' };
 
   const previous = await probesFor(supabase, concept.id);

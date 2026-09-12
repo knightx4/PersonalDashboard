@@ -264,6 +264,38 @@ export function readyNow(graph: Graph, ids: string[]): Concept[] {
   return learningOrder(graph, ready);
 }
 
+/**
+ * What could be started anywhere in a subject.
+ *
+ * The same question `readyNow` asks of a pruned goal view, asked of a whole
+ * graph, and the difference is what a prerequisite outside the set counts as.
+ * `readyNow` treats one as satisfied, because pruning removed it on purpose;
+ * nothing has been removed here, so every prerequisite has to be settled
+ * before its dependent is ready. A shaky prerequisite holds back whatever
+ * rests on it rather than disappearing from under it.
+ *
+ * In learning order, which for this set is by name: a concept that is ready
+ * never has another ready concept underneath it.
+ */
+export function readyToLearn(graph: Graph): Concept[] {
+  const concepts = byId(graph);
+  const prerequisites = prerequisiteMap(graph);
+
+  const ready = graph.concepts
+    .filter((concept) => !isSettled(concept))
+    .filter((concept) =>
+      (prerequisites.get(concept.id) ?? []).every((id) => {
+        // prerequisiteMap has already dropped edges naming a concept outside
+        // this graph, so the lookup only misses in a graph it built itself.
+        const prerequisite = concepts.get(id);
+        return prerequisite === undefined || isSettled(prerequisite);
+      }),
+    )
+    .map((concept) => concept.id);
+
+  return learningOrder(graph, ready);
+}
+
 export type SubjectCounts = Record<KnowledgeState, number> & { total: number };
 
 /** How much of a subject is settled. One line on the subjects list. */

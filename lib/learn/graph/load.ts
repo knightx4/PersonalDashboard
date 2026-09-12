@@ -3,6 +3,12 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { Concept, Graph, KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
+import {
+  rankReady,
+  readyInSubject,
+  READY_LIMIT,
+  type ReadyConcept,
+} from '@/lib/learn/graph/ready';
 
 /**
  * Reading a subject's graph.
@@ -245,4 +251,46 @@ export async function loadGoals(
     conceptId: row.concept_id,
     status: row.status,
   }));
+}
+
+/**
+ * Everything you could start on, in every subject.
+ *
+ * One read per subject, the same four queries `/learn/know` already runs in a
+ * loop, and no model call anywhere in it. A goal counts as one you named
+ * unless you abandoned it, which is the rule the subject page uses to decide
+ * what to draw a chain for.
+ */
+async function readyEverywhere(supabase: LearnSupabaseClient): Promise<ReadyConcept[]> {
+  const subjects = await loadSubjects(supabase);
+
+  const perSubject = await Promise.all(
+    subjects.map(async (subject) => {
+      const [graph, goals] = await Promise.all([
+        loadGraph(supabase, subject.id),
+        loadGoals(supabase, subject.id),
+      ]);
+
+      const goalConceptIds = goals
+        .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
+        .map((goal) => goal.conceptId!);
+
+      return readyInSubject(graph, subject, goalConceptIds);
+    }),
+  );
+
+  return perSubject.flat();
+}
+
+/** What to learn next: the ranked few, for the screen. */
+export async function loadReadyToLearn(
+  supabase: LearnSupabaseClient,
+  limit: number = READY_LIMIT,
+): Promise<ReadyConcept[]> {
+  return rankReady(await readyEverywhere(supabase), limit);
+}
+
+/** How many are ready in total -- for the tab's badge. */
+export async function countReadyToLearn(supabase: LearnSupabaseClient): Promise<number> {
+  return (await readyEverywhere(supabase)).length;
 }
