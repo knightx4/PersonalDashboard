@@ -168,21 +168,66 @@ export async function saveImport(
  * The broad thing you want to learn about, written down before you have found
  * anything to read for it. Separate from saveImport because there is no paste,
  * no resolution and nothing to confirm -- you typed a name and meant it.
+ *
+ * `branchedFrom` is set when it came out of a track you already had: a step of
+ * a route opened up on its own. Null for a topic you typed.
  */
 export async function createTrack(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { title: string; question: string | null },
+  input: { title: string; question: string | null; branchedFrom?: string | null },
 ): Promise<string> {
   const { data, error } = await supabase
     .from('tracks')
-    .insert({ user_id: userId, title: input.title, question: input.question })
+    .insert({
+      user_id: userId,
+      title: input.title,
+      question: input.question,
+      branched_from: input.branchedFrom ?? null,
+    })
     .select('id')
     .single();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error || !data) throw messageFor('Creating the track', error ?? { message: 'no row' });
   return (data as { id: string }).id;
+}
+
+/**
+ * The areas you kept out of a topic too broad to plan.
+ *
+ * One track each, so an area has its own queue, its own progress and its own
+ * plan button rather than being a row with nothing behind it. Each remembers
+ * the topic it came out of in `branched_from`; nothing is planned and nothing
+ * is searched for here, which happens when you open one.
+ *
+ * The line the model wrote about what an area covers goes in as the question.
+ * It is not a question, but it is what the planner reads for context later,
+ * and it is the only thing distinguishing "trade between countries" from the
+ * other seven names on a list you picked from once.
+ */
+export async function saveBranchedAreas(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { fromTrackId: string; areas: Array<{ name: string; covers: string | null }> },
+): Promise<string[]> {
+  if (input.areas.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('tracks')
+    .insert(
+      input.areas.map((area) => ({
+        user_id: userId,
+        title: area.name,
+        question: area.covers,
+        branched_from: input.fromTrackId,
+      })),
+    )
+    .select('id');
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw messageFor('Keeping the areas', error ?? { message: 'no rows' });
+  return (data as Array<{ id: string }>).map((row) => row.id);
 }
 
 /**

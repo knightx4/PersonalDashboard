@@ -33,6 +33,8 @@ export type TrackSummary = {
   question: string | null;
   status: TrackStatus;
   createdAt: string;
+  /** The broader track this one was kept out of, if it was. */
+  branchedFrom: string | null;
   progress: TrackProgress;
 };
 
@@ -86,7 +88,11 @@ export type ReadingRow = {
   } | null;
 };
 
-export type TrackDetail = TrackSummary & { readings: ReadingRow[] };
+export type TrackDetail = TrackSummary & {
+  /** The title of the track this one was branched out of, for the way back. */
+  branchedFromTitle: string | null;
+  readings: ReadingRow[];
+};
 
 /**
  * Progress over a set of readings.
@@ -199,7 +205,7 @@ const READING_COLUMNS =
 export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSummary[]> {
   const { data, error } = await supabase
     .from('tracks')
-    .select('id, title, question, status, created_at')
+    .select('id, title, question, status, created_at, branched_from')
     .order('created_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
@@ -211,6 +217,7 @@ export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSu
     question: string | null;
     status: TrackStatus;
     created_at: string;
+    branched_from: string | null;
   }>;
   if (tracks.length === 0) return [];
 
@@ -234,6 +241,7 @@ export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSu
     question: track.question,
     status: track.status,
     createdAt: track.created_at,
+    branchedFrom: track.branched_from,
     progress: progressOf(byTrack.get(track.id) ?? []),
   }));
 }
@@ -244,7 +252,7 @@ export async function loadTrack(
 ): Promise<TrackDetail | null> {
   const { data, error } = await supabase
     .from('tracks')
-    .select('id, title, question, status, created_at')
+    .select('id, title, question, status, created_at, branched_from')
     .eq('id', trackId)
     .maybeSingle();
 
@@ -257,6 +265,7 @@ export async function loadTrack(
     question: string | null;
     status: TrackStatus;
     created_at: string;
+    branched_from: string | null;
   };
 
   const { data: readingRows, error: readingError } = await supabase
@@ -271,12 +280,26 @@ export async function loadTrack(
 
   const readings = ((readingRows ?? []) as unknown as ReadingRecord[]).map(toReading);
 
+  // The topic this one came out of, for the link back up. A second query
+  // rather than an embed, and only for the few tracks that have a parent.
+  let branchedFromTitle: string | null = null;
+  if (track.branched_from) {
+    const { data: parent } = await supabase
+      .from('tracks')
+      .select('title')
+      .eq('id', track.branched_from)
+      .maybeSingle();
+    branchedFromTitle = parent ? (parent as { title: string }).title : null;
+  }
+
   return {
     id: track.id,
     title: track.title,
     question: track.question,
     status: track.status,
     createdAt: track.created_at,
+    branchedFrom: track.branched_from,
+    branchedFromTitle,
     progress: progressOf(readings.map((r) => r.status)),
     readings,
   };

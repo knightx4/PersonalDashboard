@@ -35,13 +35,16 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
 
   return (
     <>
+      {/* A track that came out of another one points back at it rather than at
+          the list: you got here from economics, and that is where you are
+          going next. */}
       <p className="mb-3">
         <Link
-          href="/learn"
+          href={track.branchedFrom ? `/learn/t/${track.branchedFrom}` : '/learn'}
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Tracks
+          {track.branchedFrom ? (track.branchedFromTitle ?? 'The topic this came from') : 'Tracks'}
         </Link>
       </p>
 

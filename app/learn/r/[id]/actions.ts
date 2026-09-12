@@ -17,6 +17,7 @@ import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
   attachSourceToReading,
+  createTrack,
   setReadNow,
   setReadingLocation,
   setReadingNote,
@@ -423,4 +424,42 @@ export async function approveNoteConcepts(
   revalidatePath(`/learn/s/${subjectId.data}`);
   revalidatePath('/learn/know');
   return { message: 'Added to your graph.' };
+}
+
+/**
+ * Open one step of a route up into a route of its own.
+ *
+ * The subject goes in as a new topic remembering the track it came from, and
+ * that is all this does: nothing is planned and nothing is searched for until
+ * you press Plan this topic on the page it lands you on. Same shape as keeping
+ * an area of a topic too broad to plan, one level down.
+ *
+ * The step itself is untouched. Going deeper on "what a central bank does" is
+ * not a decision to stop reading the thing that raised it, and Find sources on
+ * this page is still the other move -- more to read about the subject as it
+ * stands, where this one breaks it into parts.
+ */
+// latency: pending
+export async function goDeeper(formData: FormData): Promise<void> {
+  const user = await requireUser();
+
+  const readingId = z.string().uuid().safeParse(formData.get('readingId'));
+  if (!readingId.success) redirect('/learn');
+
+  const supabase = await createLearnClient();
+  const reading = await loadReading(supabase, readingId.data);
+  if (!reading) redirect('/learn');
+
+  // Your own words for the step when there are any: `subject` falls back to
+  // the source's title, and "Spheres of Justice" is a book, not the thing you
+  // wanted to understand.
+  const trackId = await createTrack(supabase, user.id, {
+    title: reading.title ?? reading.subject,
+    question: reading.why,
+    branchedFrom: reading.trackId,
+  });
+
+  revalidatePath('/learn');
+  revalidatePath(`/learn/t/${reading.trackId}`);
+  redirect(`/learn/t/${trackId}`);
 }
