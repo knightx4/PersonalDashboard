@@ -34,7 +34,14 @@ function toTask(row: Row): Task {
   };
 }
 
-/** Every open task. Bucketing and ordering happen in model.ts. */
+/**
+ * Every open task, and every ticked item sitting under one.
+ *
+ * A ticked item still belongs on the list it is part of -- "2 of 5" needs the
+ * three that are done, and crossing one out in place is how you can see the
+ * list shrinking. Only items are fetched done: a whole task that is finished
+ * belongs to the archive. Bucketing and grouping happen in model.ts.
+ */
 export async function loadOpenTasks(userId: string): Promise<Task[]> {
   const supabase = await createTodoClient();
 
@@ -42,7 +49,7 @@ export async function loadOpenTasks(userId: string): Promise<Task[]> {
     .from('tasks')
     .select(COLUMNS)
     .eq('user_id', userId)
-    .eq('status', 'open')
+    .or('status.eq.open,and(status.eq.done,parent_id.not.is.null)')
     .limit(LIMIT);
 
   assertSchemaExposed(error, TODO_SCHEMA);

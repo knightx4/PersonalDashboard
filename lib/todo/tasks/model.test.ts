@@ -3,8 +3,10 @@ import {
   addDays,
   bucketFor,
   bucketTasks,
+  childrenByParent,
   dueDay,
   isSnoozed,
+  openCount,
   resolveRelativeDay,
   todayIn,
   type Task,
@@ -110,6 +112,16 @@ describe('bucketTasks', () => {
     expect(result[0].tasks.map((t) => t.id)).toEqual(['open']);
   });
 
+  it('leaves out an item that sits under a task', () => {
+    // It is shown under the task it belongs to, never as a row of its own.
+    const result = bucketTasks(
+      [task({ id: 'big', dueOn: '2026-03-10' }), task({ id: 'item', parentId: 'big', dueOn: '2026-03-10' })],
+      { timezone: 'UTC', now: NOW },
+    );
+
+    expect(result[0].tasks.map((t) => t.id)).toEqual(['big']);
+  });
+
   it('omits an empty pile rather than showing a zero', () => {
     const result = bucketTasks([task({ dueOn: '2026-03-10' })], { timezone: 'UTC', now: NOW });
     expect(result.map((r) => r.bucket)).toEqual(['today']);
@@ -182,6 +194,53 @@ describe('bucketTasks', () => {
       'unplaced-pinned',
       'unplaced-plain',
     ]);
+  });
+});
+
+describe('childrenByParent', () => {
+  it('keeps each task\u2019s items together, in the order they were written', () => {
+    const result = childrenByParent([
+      task({ id: 'a' }),
+      task({ id: 'a2', parentId: 'a', createdAt: '2026-01-02T00:00:00.000Z' }),
+      task({ id: 'b1', parentId: 'b', createdAt: '2026-01-01T00:00:00.000Z' }),
+      task({ id: 'a1', parentId: 'a', createdAt: '2026-01-01T00:00:00.000Z' }),
+    ]);
+
+    expect(result.get('a')?.map((t) => t.id)).toEqual(['a1', 'a2']);
+    expect(result.get('b')?.map((t) => t.id)).toEqual(['b1']);
+  });
+
+  it('ignores the position a drag would have written', () => {
+    // Dragging renumbers a whole pile and a list under a task is not one, so
+    // a position left over from somewhere else must not reorder the list.
+    const result = childrenByParent([
+      task({ id: 'second', parentId: 'a', position: 1, createdAt: '2026-01-02T00:00:00.000Z' }),
+      task({ id: 'first', parentId: 'a', position: 9, createdAt: '2026-01-01T00:00:00.000Z' }),
+    ]);
+
+    expect(result.get('a')?.map((t) => t.id)).toEqual(['first', 'second']);
+  });
+
+  it('keeps a ticked item and leaves out a dropped one', () => {
+    const result = childrenByParent([
+      task({ id: 'done', parentId: 'a', status: 'done' }),
+      task({ id: 'dropped', parentId: 'a', status: 'dropped' }),
+    ]);
+
+    expect(result.get('a')?.map((t) => t.id)).toEqual(['done']);
+  });
+
+  it('gives nothing for a task with no items', () => {
+    expect(childrenByParent([task({ id: 'alone' })]).get('alone')).toBeUndefined();
+  });
+});
+
+describe('openCount', () => {
+  it('counts what is still to do, not what is on the list', () => {
+    expect(
+      openCount([task({ status: 'done' }), task({ status: 'open' }), task({ status: 'open' })]),
+    ).toBe(2);
+    expect(openCount([])).toBe(0);
   });
 });
 
