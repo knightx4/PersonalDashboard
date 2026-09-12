@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
+import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
@@ -153,6 +154,13 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         <div className="mt-3">
           <ReadAbout concept={concept} subjectId={subject.id} />
         </div>
+      </CardSection>
+
+      {/* What having this claim looks like, and what the questions about it are
+          written against. Its own section rather than a line under the claim:
+          it is a list, and the card above is about where the claim stands. */}
+      <CardSection title="What understanding it looks like" className="mb-5">
+        <MasteryChecks checks={concept.mastery} />
       </CardSection>
 
       {connected && (
