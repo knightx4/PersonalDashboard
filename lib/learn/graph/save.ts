@@ -125,6 +125,10 @@ export async function saveChain(
           name: node.name,
           claim: node.claim,
           basis: node.basis,
+          // Null rather than an empty array: the column takes two to four
+          // checks or nothing, and a node whose checks the model never wrote
+          // is saved as it is rather than refused.
+          mastery: node.mastery.length > 0 ? node.mastery : null,
           origin: options.origin ?? 'generated',
         })),
       )
