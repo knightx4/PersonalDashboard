@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventContext } from '@/lib/todo/agenda/events';
+import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import type { Event } from '@/lib/todo/events/model';
 
 const TIMEZONE = 'Europe/London';
@@ -80,5 +80,50 @@ describe('eventContext', () => {
 
     expect(row.detail).toBe('Room 3');
     expect(row.link).toEqual({ href: '/todo/calendar?date=2026-03-10&event=e1', label: 'Open' });
+  });
+});
+
+describe('subscribedContext', () => {
+  it('puts an appointment from a subscribed calendar on its day, with nothing to tick', () => {
+    const [row] = subscribedContext(
+      [
+        event({
+          id: 'feed-1',
+          title: 'Sprint review',
+          startsAt: '2026-03-10T14:00:00.000Z',
+          endsAt: '2026-03-10T15:00:00.000Z',
+        }),
+      ],
+      'UTC',
+      '2026-03-10',
+    );
+
+    expect(row.day).toBe('2026-03-10');
+    expect(row.at).toBe('2026-03-10T14:00:00.000Z');
+    expect(row.label).toBe('Sprint review');
+    // A DayContext has no action and no completable flag by construction --
+    // that is what makes it context rather than something to tick.
+    expect(Object.keys(row)).not.toContain('action');
+  });
+
+  it('opens the day rather than a form for a row that cannot be edited', () => {
+    const [row] = subscribedContext(
+      [event({ id: 'feed-1', startsOn: '2026-03-12', endsOn: '2026-03-12' })],
+      'UTC',
+      '2026-03-10',
+    );
+
+    expect(row.link?.href).toBe('/todo/calendar?date=2026-03-12');
+    expect(row.key).toBe('feed:feed-1');
+  });
+
+  it('leaves out an appointment that is already over', () => {
+    expect(
+      subscribedContext(
+        [event({ id: 'feed-1', startsOn: '2026-03-09', endsOn: '2026-03-09' })],
+        'UTC',
+        '2026-03-10',
+      ),
+    ).toEqual([]);
   });
 });
