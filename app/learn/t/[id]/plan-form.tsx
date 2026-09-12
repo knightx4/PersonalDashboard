@@ -9,7 +9,13 @@ import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 import type { PlanStep } from '@/lib/learn/import/plan-payload';
 import type { Area } from '@/lib/learn/import/areas';
-import { confirmPlan, planTrack, type PlanState, type TrackActionState } from './actions';
+import {
+  confirmPlan,
+  keepAreas,
+  planTrack,
+  type PlanState,
+  type TrackActionState,
+} from './actions';
 
 /**
  * A topic with nothing in it, and a way out of that.
@@ -55,6 +61,15 @@ function SaveButton() {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? 'Saving…' : 'Add these to the track'}
+    </Button>
+  );
+}
+
+function KeepButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? 'Keeping…' : 'Keep these'}
     </Button>
   );
 }
@@ -160,16 +175,19 @@ function AreaRow({ area, index }: { area: Area; index: number }) {
 export function PlanForm({ trackId }: { trackId: string }) {
   const [planState, plan] = useActionState<PlanState, FormData>(planTrack, {});
   const [saveState, save] = useActionState<TrackActionState, FormData>(confirmPlan, {});
+  const [keepState, keep] = useActionState<TrackActionState, FormData>(keepAreas, {});
 
   const steps = planState.steps ?? [];
   const areas = planState.areas ?? [];
 
   if (areas.length > 0) {
     return (
-      <div className="mt-6">
+      <form action={keep} className="mt-6">
+        <input type="hidden" name="trackId" value={trackId} />
+
         <p className="mb-2 text-body text-ink-muted">
           Too broad to route through in one go, so here is what is inside it. Untick anything you do
-          not want; nothing is kept yet.
+          not want; what you keep becomes a topic of its own, planned when you open it.
         </p>
 
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -177,7 +195,12 @@ export function PlanForm({ trackId }: { trackId: string }) {
             <AreaRow key={`${area.name}-${index}`} area={area} index={index} />
           ))}
         </ul>
-      </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <KeepButton />
+          {keepState.error && <span className="text-ui text-danger">{keepState.error}</span>}
+        </div>
+      </form>
     );
   }
 

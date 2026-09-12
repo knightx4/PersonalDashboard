@@ -10,10 +10,11 @@ import {
   deleteReading,
   deleteTrack,
   savePlan,
+  saveBranchedAreas,
   type PlanSaveRow,
 } from '@/lib/learn/tracks/save';
 import { planTopic } from '@/lib/learn/import/plan-topic';
-import { nameAreas, type Area } from '@/lib/learn/import/areas';
+import { areaSchema, nameAreas, type Area } from '@/lib/learn/import/areas';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { planStepSchema, type PlanStep } from '@/lib/learn/import/plan-payload';
 import { loadTrack } from '@/lib/learn/tracks/load';
@@ -235,4 +236,53 @@ export async function confirmPlan(
   revalidatePath(`/learn/t/${trackId.data}`);
   revalidatePath('/learn');
   return {};
+}
+
+/**
+ * Keep the areas you ticked.
+ *
+ * Each one becomes a track of its own remembering the broad topic it came out
+ * of, and that is all that happens: nothing is planned, nothing is searched
+ * for, nothing is billed. Planning is a press on the area's own page, so one
+ * press here never sets off six searches.
+ *
+ * The areas ride back through hidden fields and are re-validated here rather
+ * than trusted, the same as the confirmed plan above.
+ */
+// latency: pending
+export async function keepAreas(
+  _prev: TrackActionState,
+  formData: FormData,
+): Promise<TrackActionState> {
+  const user = await requireUser();
+
+  const trackId = z.string().uuid().safeParse(formData.get('trackId'));
+  if (!trackId.success) return { error: 'Could not work out which topic these came from.' };
+
+  const areas: Array<{ name: string; covers: string | null }> = [];
+  for (const raw of formData.getAll('area')) {
+    if (typeof raw !== 'string') continue;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const shape = areaSchema.safeParse(payload);
+    if (!shape.success) continue;
+    areas.push({ name: shape.data.name, covers: shape.data.covers || null });
+  }
+
+  if (areas.length === 0) return { error: 'Tick at least one area to keep.' };
+
+  const supabase = await createLearnClient();
+  try {
+    await saveBranchedAreas(supabase, user.id, { fromTrackId: trackId.data, areas });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not keep those areas.' };
+  }
+
+  revalidatePath(`/learn/t/${trackId.data}`);
+  revalidatePath('/learn');
+  redirect('/learn');
 }

@@ -33,6 +33,8 @@ export type TrackSummary = {
   question: string | null;
   status: TrackStatus;
   createdAt: string;
+  /** The broader track this one was kept out of, if it was. */
+  branchedFrom: string | null;
   progress: TrackProgress;
 };
 
@@ -199,7 +201,7 @@ const READING_COLUMNS =
 export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSummary[]> {
   const { data, error } = await supabase
     .from('tracks')
-    .select('id, title, question, status, created_at')
+    .select('id, title, question, status, created_at, branched_from')
     .order('created_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
@@ -211,6 +213,7 @@ export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSu
     question: string | null;
     status: TrackStatus;
     created_at: string;
+    branched_from: string | null;
   }>;
   if (tracks.length === 0) return [];
 
@@ -234,6 +237,7 @@ export async function loadTracks(supabase: LearnSupabaseClient): Promise<TrackSu
     question: track.question,
     status: track.status,
     createdAt: track.created_at,
+    branchedFrom: track.branched_from,
     progress: progressOf(byTrack.get(track.id) ?? []),
   }));
 }
@@ -244,7 +248,7 @@ export async function loadTrack(
 ): Promise<TrackDetail | null> {
   const { data, error } = await supabase
     .from('tracks')
-    .select('id, title, question, status, created_at')
+    .select('id, title, question, status, created_at, branched_from')
     .eq('id', trackId)
     .maybeSingle();
 
@@ -257,6 +261,7 @@ export async function loadTrack(
     question: string | null;
     status: TrackStatus;
     created_at: string;
+    branched_from: string | null;
   };
 
   const { data: readingRows, error: readingError } = await supabase
@@ -277,6 +282,7 @@ export async function loadTrack(
     question: track.question,
     status: track.status,
     createdAt: track.created_at,
+    branchedFrom: track.branched_from,
     progress: progressOf(readings.map((r) => r.status)),
     readings,
   };

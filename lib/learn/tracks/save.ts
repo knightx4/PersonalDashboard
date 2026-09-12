@@ -186,6 +186,43 @@ export async function createTrack(
 }
 
 /**
+ * The areas you kept out of a topic too broad to plan.
+ *
+ * One track each, so an area has its own queue, its own progress and its own
+ * plan button rather than being a row with nothing behind it. Each remembers
+ * the topic it came out of in `branched_from`; nothing is planned and nothing
+ * is searched for here, which happens when you open one.
+ *
+ * The line the model wrote about what an area covers goes in as the question.
+ * It is not a question, but it is what the planner reads for context later,
+ * and it is the only thing distinguishing "trade between countries" from the
+ * other seven names on a list you picked from once.
+ */
+export async function saveBranchedAreas(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { fromTrackId: string; areas: Array<{ name: string; covers: string | null }> },
+): Promise<string[]> {
+  if (input.areas.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('tracks')
+    .insert(
+      input.areas.map((area) => ({
+        user_id: userId,
+        title: area.name,
+        question: area.covers,
+        branched_from: input.fromTrackId,
+      })),
+    )
+    .select('id');
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw messageFor('Keeping the areas', error ?? { message: 'no rows' });
+  return (data as Array<{ id: string }>).map((row) => row.id);
+}
+
+/**
  * Something specific you want to learn, inside a track.
  *
  * No source, because you have not found one -- that is what `readings.title`
