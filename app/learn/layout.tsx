@@ -9,6 +9,7 @@ import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
+import { countReadyToLearn } from '@/lib/learn/graph/load';
 
 /**
  * Shell for the learn workspace.
@@ -46,7 +47,11 @@ export default async function LearnLayout({ children }: { children: React.ReactN
    * make. The badge is the count, so the tab answers "is there anything" from
    * the column.
    */
-  const readNow = await countReadNow(await createLearnClient());
+  const learnClient = await createLearnClient();
+  const [readNow, readyToLearn] = await Promise.all([
+    countReadNow(learnClient),
+    countReadyToLearn(learnClient),
+  ]);
 
   const sections: NavSection[] = [
     {
@@ -62,6 +67,16 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       icon: 'readNow',
       exact: true,
       badge: readNow,
+    },
+    // Learn next earns a tab on the same argument Read now does: it is not a
+    // deeper view of a subject, it is every subject's ready concepts on one
+    // screen, and the badge answers "is there anything" from the column.
+    {
+      href: '/learn/next',
+      label: 'Learn next',
+      icon: 'learnNext',
+      exact: true,
+      badge: readyToLearn,
     },
     // The other half of the module. A subject is reached through here, and a
     // single concept through a subject, so both are alsoMatches rather than
