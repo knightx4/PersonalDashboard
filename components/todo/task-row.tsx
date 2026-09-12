@@ -109,6 +109,7 @@ export function TaskRow({
   anchor,
   pile,
   items = [],
+  under,
 }: {
   task: Task;
   timezone: string;
@@ -121,6 +122,14 @@ export function TaskRow({
    * shows every row in its own right, so nothing is nested there.
    */
   items?: Task[];
+  /**
+   * The task this one sits under, where the list is flat.
+   *
+   * The archive is a history and shows every row in its own right, so an item
+   * there says what it came out of instead of being nested under it. Absent on
+   * the agenda, where the nesting says it.
+   */
+  under?: { label: string; href: string } | null;
   /**
    * The tasks of the pile this row is in, in the order they are on screen.
    *
@@ -372,6 +381,18 @@ export function TaskRow({
               >
                 {anchor.label}
               </a>
+            )}
+
+            {under && (
+              <span className="truncate text-small text-ink-muted">
+                in{' '}
+                <a
+                  href={under.href}
+                  className="underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
+                >
+                  {under.label}
+                </a>
+              </span>
             )}
 
             {dropped && <span className="text-small text-ink-muted">dropped</span>}
