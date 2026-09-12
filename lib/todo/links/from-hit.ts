@@ -22,9 +22,11 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   order: 'order',
   inventory: 'inventory',
   saved: 'saved',
-  // A task about a task is a subtask, which is a different feature with a
-  // different table. task_links has no column for it and should not grow one
-  // by accident.
+  // A task sits under another task through todo.tasks.parent_id, not through
+  // a link. What a task is ABOUT and what it sits UNDER are different
+  // relations -- the first points out of the module, the second is the module
+  // holding one of its own rows -- so task_links has no column for this and
+  // should not grow one by accident.
   task: null,
   note: 'note',
   reading: 'reading',
