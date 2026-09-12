@@ -168,15 +168,23 @@ export async function saveImport(
  * The broad thing you want to learn about, written down before you have found
  * anything to read for it. Separate from saveImport because there is no paste,
  * no resolution and nothing to confirm -- you typed a name and meant it.
+ *
+ * `branchedFrom` is set when it came out of a track you already had: a step of
+ * a route opened up on its own. Null for a topic you typed.
  */
 export async function createTrack(
   supabase: LearnSupabaseClient,
   userId: string,
-  input: { title: string; question: string | null },
+  input: { title: string; question: string | null; branchedFrom?: string | null },
 ): Promise<string> {
   const { data, error } = await supabase
     .from('tracks')
-    .insert({ user_id: userId, title: input.title, question: input.question })
+    .insert({
+      user_id: userId,
+      title: input.title,
+      question: input.question,
+      branched_from: input.branchedFrom ?? null,
+    })
     .select('id')
     .single();
 

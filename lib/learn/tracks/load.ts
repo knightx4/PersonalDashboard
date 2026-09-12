@@ -88,7 +88,11 @@ export type ReadingRow = {
   } | null;
 };
 
-export type TrackDetail = TrackSummary & { readings: ReadingRow[] };
+export type TrackDetail = TrackSummary & {
+  /** The title of the track this one was branched out of, for the way back. */
+  branchedFromTitle: string | null;
+  readings: ReadingRow[];
+};
 
 /**
  * Progress over a set of readings.
@@ -276,6 +280,18 @@ export async function loadTrack(
 
   const readings = ((readingRows ?? []) as unknown as ReadingRecord[]).map(toReading);
 
+  // The topic this one came out of, for the link back up. A second query
+  // rather than an embed, and only for the few tracks that have a parent.
+  let branchedFromTitle: string | null = null;
+  if (track.branched_from) {
+    const { data: parent } = await supabase
+      .from('tracks')
+      .select('title')
+      .eq('id', track.branched_from)
+      .maybeSingle();
+    branchedFromTitle = parent ? (parent as { title: string }).title : null;
+  }
+
   return {
     id: track.id,
     title: track.title,
@@ -283,6 +299,7 @@ export async function loadTrack(
     status: track.status,
     createdAt: track.created_at,
     branchedFrom: track.branched_from,
+    branchedFromTitle,
     progress: progressOf(readings.map((r) => r.status)),
     readings,
   };
