@@ -157,7 +157,18 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
   );
 }
 
-export function ProbeSession({ subjectId, startingPercent }: { subjectId: string; startingPercent: number }) {
+export function ProbeSession({
+  subjectId,
+  startingPercent,
+  startConceptId = null,
+  startConceptName = null,
+}: {
+  subjectId: string;
+  startingPercent: number;
+  /** Named by the row on /learn/next. Carried by the first question only. */
+  startConceptId?: string | null;
+  startConceptName?: string | null;
+}) {
   const [state, ask] = useActionState<AskState, FormData>(askQuestion, { percent: startingPercent });
   const [answerState, answer] = useActionState<AskState, FormData>(answerQuestion, state);
 
@@ -237,9 +248,14 @@ export function ProbeSession({ subjectId, startingPercent }: { subjectId: string
       ) : (
         <form action={ask} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
           <input type="hidden" name="subjectId" value={subjectId} />
+          {/* Only here, and deliberately: the form that asks for another
+              question carries no concept, so the session picks for itself from
+              the second question on. */}
+          {startConceptId && <input type="hidden" name="conceptId" value={startConceptId} />}
           <p className="text-body text-ink-muted">
-            One question at a time, written against one claim in this subject. Ten is a good start,
-            and then as many as you want.
+            {startConceptName
+              ? `The first question is about ${startConceptName}. After that, one at a time against whatever this subject has least evidence on.`
+              : 'One question at a time, written against one claim in this subject. Ten is a good start, and then as many as you want.'}
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
             <AskButton label="Start" />

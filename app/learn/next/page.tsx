@@ -88,7 +88,15 @@ export default async function LearnNextPage() {
                     </p>
                   )}
 
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {/* The first question is written against this claim rather
+                        than whichever one the session would have picked. */}
+                    <Link
+                      href={`/learn/s/${subjectId}/probe?concept=${concept.id}`}
+                      className="text-ui text-ink-muted underline-offset-2 hover:text-accent hover:underline"
+                    >
+                      Probe this claim
+                    </Link>
                     <ReadAbout concept={concept} subjectId={subjectId} anyState />
                   </div>
                 </div>
