@@ -42,6 +42,34 @@ export const PLAIN_ENGLISH_RULE =
   'No stock phrases, no metaphor for machinery, no claims about why the step ' +
   'matters.';
 
+/**
+ * What a session may write as fog, said in the instruction itself.
+ *
+ * Fog is the part of the feature in hand that cannot be specified until more
+ * of it exists. It was being used for anything a session thought of and did
+ * not want to lose: whether ten interview questions should be asked again
+ * months later, whether the five-minute reading unit should exist for reading
+ * too, what a selection is for on a list belonging to a different feature.
+ * None of those stop their feature being finished, and fog is the one place
+ * nothing reads again -- the feature ships, the patch stays, and the thought
+ * is lost more thoroughly than if it had been dropped.
+ *
+ * So the test is about finishing rather than about certainty, and a follow-on
+ * has somewhere else to go. Carried by shaping and re-shaping both, for the
+ * same reason as the writing rule above: these are the two jobs that write
+ * fog, and a rule only one of them had would show up as half the plan
+ * collecting it again.
+ */
+export const FOG_RULE =
+  'Fog is only what cannot be decided until part of THIS feature exists. ' +
+  'Before writing any, ask: if this is never resolved, is the feature still ' +
+  'finished? If yes, it is a follow-on, not fog -- file it on the ideas page ' +
+  '(plan.ts idea "the follow-on" --module <id>) and name it in your report. If ' +
+  'no, and it can be phrased sharply now, it is a decision step; if it cannot ' +
+  'be phrased yet, it is fog. One patch per feature: fog is a single column, ' +
+  'so a second one replaces the first rather than joining it, and a feature ' +
+  'that seems to need two has one of them wrong.';
+
 export const STATUS_WORD: Record<PlanStatus, string> = {
   proposed: 'proposed',
   not_started: 'not started',

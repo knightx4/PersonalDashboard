@@ -28,6 +28,7 @@
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
+ *                                # one patch per feature, about finishing it
  *   npx tsx scripts/plan.ts assign <n> me|claude|none
  *   npx tsx scripts/plan.ts priority <n> 1|2|3
  *   npx tsx scripts/plan.ts depends <n> --on <m>
@@ -668,6 +669,13 @@ async function main(): Promise<void> {
      * fog is a description of the step, and the description simply becomes
      * accurate or stops being needed. What replaced it is legible from the
      * steps that appeared, which is the point of graduating it.
+     *
+     * One patch per feature, because it is one column: a second `--note`
+     * overwrites the first rather than joining it, and the patch it replaced
+     * is printed so that losing one is never silent. A session with two things
+     * to say has one of them wrong -- fog is what cannot be decided until part
+     * of this feature exists, and anything the feature can ship without is a
+     * follow-on that belongs on the ideas page (`plan.ts idea`).
      */
     if (command === 'fog') {
       const note = arg('--note')?.trim();
@@ -685,6 +693,9 @@ async function main(): Promise<void> {
           ? `#${item.number} fog cleared${item.fog ? '' : ' (it had none)'}.`
           : `#${item.number} fog: ${note}`,
       );
+      if (!clear && item.fog) {
+        console.log(`Replaced the patch it had: ${item.fog.replace(/\s+/g, ' ')}`);
+      }
       return;
     }
 
