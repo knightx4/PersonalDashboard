@@ -33,7 +33,9 @@ npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…
                                                [--from <n>]  # stamp: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
-npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet; --clear once it can
+npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
+                                               # finishing this feature, one patch;
+                                               # --clear once it can be seen
 npx tsx scripts/plan.ts idea "…" [--module <id>]   # file an idea on /dev/ideas, unshaped
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
 npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>]
@@ -185,22 +187,27 @@ it. Never delete a step; deleting is the user's.
 
 ## Raising something that belongs to no step
 
-Three places take something a session has to say, and they are not
+Four places take something a session has to say, and they are not
 interchangeable:
 
 - **A plan decision** — a `decision` step under one feature. A question about
   that feature, answered before it is built.
 - **The notes queue** — `feedback_items`, `.claude/skills/notes`. What the user
   reported as wrong, or asked for.
+- **An idea** — `ideas`, read on `/dev/ideas`, written with
+  `idea "…" [--module <id>]`. Work worth doing later that the feature in front
+  of you can be finished without. This is where a follow-on goes; fog is not,
+  and neither is a step invented under a feature nobody proposed it for.
 - **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
-  that belongs to neither: a risk found in code it was only passing through, a
-  question of taste, a thing it will not decide alone. Without it, that goes in
-  the transcript, where it is only read by somebody who opens Claude.
+  that belongs to none of those: a risk found in code it was only passing
+  through, a question of taste, a thing it will not decide alone. Without it,
+  that goes in the transcript, where it is only read by somebody who opens
+  Claude.
 
 The test is what the answer would change. If it changes how one feature gets
 built, it is a decision under that feature. If it is something already shipped
-being wrong, it is a note. If it is neither and it still needs the person, it
-is a raise.
+being wrong, it is a note. If it is more work rather than a question, it is an
+idea. If it is none of those and it still needs the person, it is a raise.
 
 **Read the raises at the start of a run**, before claiming a step:
 
@@ -339,9 +346,23 @@ nothing else.
 
    **Do not pad to a step count.** Three real steps and an honest gap beat
    six, three of which were invented to look complete. What goes in the gap
-   is a decision or fog, and the test for which is one question:
+   is a decision, fog, or an idea, and two tests in order say which.
 
-   > **Can the question be phrased sharply, right now?**
+   > **First: if this question is never resolved, is the feature still
+   > finished?**
+   >
+   > Yes → it is a follow-on, not a gap in this feature. File it on the ideas
+   > page — `idea "<the follow-on>" --module <id>` — and name it in the
+   > report. Whether the thing you are building should later work somewhere
+   > else, whether it will still be right in six months, what a neighbouring
+   > feature should do with it: all of these are follow-ons. **They are not
+   > fog.** Written as fog they sit on a feature that ships without them and
+   > nothing reads them again.
+   >
+   > No, and it can only be settled once part of this feature exists → it is a
+   > real gap, and the second test says which kind.
+
+   > **Second: can the question be phrased sharply, right now?**
    >
    > Yes → it is a **decision**. Write it as a step:
    > `add "…?" --parent <n> --kind decision --detail "<the two or three real
@@ -355,9 +376,14 @@ nothing else.
    > known, and what would have to be found out>"`. It graduates into steps
    > once somebody can see far enough to write them, and is cleared then.
 
-   The test is *not* whether you can answer the question. A question you
-   could answer yourself is still a decision if it is the person's to make;
-   a question nobody can answer yet is still a decision if it is sharp.
+   The second test is *not* whether you can answer the question. A question
+   you could answer yourself is still a decision if it is the person's to
+   make; a question nobody can answer yet is still a decision if it is sharp.
+
+   **One patch of fog per feature.** `fog` is one column, so a second one
+   replaces the first rather than joining it. A feature that seems to need two
+   has at most one: the other is a decision, or it is a follow-on and belongs
+   on the ideas page.
 5. **Say what you are unsure of** in the feature's `--detail` as well: the
    costs, the trade-offs, the thing the idea did not say. A proposal that
    hides its open questions gets approved with them still open. A decision
@@ -419,8 +445,11 @@ against everything now known and write down what has changed — as
    If it can be phrased sharply, it is a decision: `add "…?" --parent <n>
    --kind decision --from <the decision it came out of> --detail "<the real
    options, lettered from A, one per line, each with its cost; then your
-   recommendation>"`. If it cannot, it is fog on the feature. Same test as
-   shaping, and the same three parts — see **How a decision must be written**.
+   recommendation>"`. If it cannot, it is fog on the feature — but only if the
+   feature is unfinished without it. A question the feature can ship without is
+   a follow-on: file it with `idea "…"` and leave the feature alone. Same two
+   tests as shaping, the same one patch of fog, and the same three parts to a
+   decision — see **How a decision must be written**.
 5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not re-propose what the feature already holds —
    read the existing steps first, including ones an earlier re-shape added.
