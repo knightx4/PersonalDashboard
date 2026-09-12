@@ -4,7 +4,8 @@ import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadTrack } from '@/lib/learn/tracks/load';
+import { loadTrack, loadTracks } from '@/lib/learn/tracks/load';
+import { rollUpAll } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { AddForm } from './add-form';
@@ -30,7 +31,10 @@ export default async function TrackPage({ params }: { params: Promise<{ id: stri
   const track = await loadTrack(supabase, id);
   if (!track) notFound();
 
-  const { progress } = track;
+  // The header counts the branches too, so it says the same thing the Learn
+  // list says about this row. A track with nothing under it rolls up to its
+  // own readings and reads exactly as it did.
+  const progress = rollUpAll(await loadTracks(supabase)).get(track.id) ?? track.progress;
   const remaining = progress.remaining;
 
   return (

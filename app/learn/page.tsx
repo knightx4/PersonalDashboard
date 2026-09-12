@@ -72,7 +72,7 @@ export default async function LearnPage() {
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-          {rows.map(({ track, depth }) => (
+          {rows.map(({ track, depth, rolled }) => (
             <li key={track.id}>
               <Link
                 href={`/learn/t/${track.id}`}
@@ -97,7 +97,7 @@ export default async function LearnPage() {
                     <span className="mt-0.5 block text-ui text-ink-muted">{track.question}</span>
                   )}
                 </span>
-                <ProgressBar progress={track.progress} />
+                <ProgressBar progress={rolled} />
               </Link>
             </li>
           ))}

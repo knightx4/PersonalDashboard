@@ -2,13 +2,13 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
+import { Bot, ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
 import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import type { IdeaRow } from '@/lib/ideas/load';
+import type { IdeaRow, IdeaSource } from '@/lib/ideas/load';
 import { cardVariants } from '@/components/ui/card';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
@@ -159,6 +159,17 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
         <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
           {scopeLabel(idea.module)}
         </span>
+        {/* Only a suggestion is marked. Tagging your own ideas "me" would put a
+            label on every row to distinguish the few that need one. */}
+        {idea.source === 'claude' && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted"
+            title={idea.from ? `Suggested while working on #${idea.from.number} ${idea.from.title}` : 'Written by Claude'}
+          >
+            <Bot className="size-3" strokeWidth={2} aria-hidden />
+            Suggested
+          </span>
+        )}
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
       </div>
 
@@ -215,7 +226,14 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
  * down" is a question this page has to answer.
  */
 export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
-  const open = ideas.filter((idea) => !idea.planItem);
+  // Whose ideas to show. A filter rather than a second grouping: the module
+  // headings already group the list, and a page grouped two ways reads as
+  // neither.
+  const [whose, setWhose] = useState<IdeaSource | 'all'>('all');
+
+  const unshaped = ideas.filter((idea) => !idea.planItem);
+  const suggested = unshaped.filter((idea) => idea.source === 'claude').length;
+  const open = unshaped.filter((idea) => whose === 'all' || idea.source === whose);
   const shaped = ideas.filter((idea) => idea.planItem);
 
   const scopes: Array<ModuleId | null> = [
@@ -226,6 +244,31 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
   return (
     <div className="space-y-6">
       <AddIdea />
+
+      {/* Offered only once there is something to separate. One kind of idea is
+          not two lists. */}
+      {suggested > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              ['all', `Everything (${unshaped.length})`],
+              ['me', `Mine (${unshaped.length - suggested})`],
+              ['claude', `Suggested (${suggested})`],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={whose === value ? 'secondary' : 'ghost'}
+              aria-pressed={whose === value}
+              onClick={() => setWhose(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {ideas.length === 0 && (
         // The shared empty state rather than a hand-drawn dashed paragraph:

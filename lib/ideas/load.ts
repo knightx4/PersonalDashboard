@@ -10,6 +10,14 @@ import { isModuleId, type ModuleId } from '@/lib/modules';
  * stops being carried around in someone's head.
  */
 
+/** Who wrote it. A suggestion is shown apart from the ideas you filed. */
+export const IDEA_SOURCES = ['me', 'claude'] as const;
+export type IdeaSource = (typeof IDEA_SOURCES)[number];
+
+export function isIdeaSource(value: string): value is IdeaSource {
+  return (IDEA_SOURCES as readonly string[]).includes(value);
+}
+
 export type IdeaRow = {
   id: string;
   body: string;
@@ -18,6 +26,9 @@ export type IdeaRow = {
   createdAt: string;
   /** The plan feature it was shaped into, once it has been. */
   planItem: { id: string; number: number; title: string; status: string } | null;
+  source: IdeaSource;
+  /** The feature a suggestion came out of, when it came out of one. */
+  from: { number: number; title: string } | null;
 };
 
 /**
@@ -30,16 +41,27 @@ export async function loadIdeas(
 ): Promise<IdeaRow[]> {
   const { data } = await supabase
     .from('ideas')
-    .select('id, body, module, created_at, plan_item:plan_items(id, number, title, status)')
+    // Two foreign keys point at plan_items now, so both joins name theirs.
+    .select(
+      'id, body, module, created_at, source, ' +
+        'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
+        'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title)',
+    )
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
+  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
     const scope = row.module as string | null;
     const linked = row.plan_item as Record<string, unknown> | null;
+    const origin = row.from_plan_item as Record<string, unknown> | null;
+    const source = row.source as string | null;
     return {
       id: row.id as string,
       body: row.body as string,
+      // An unknown value reads as yours. The page separates suggestions out,
+      // and putting an idea you wrote into that pile is the worse mistake.
+      source: source && isIdeaSource(source) ? source : 'me',
+      from: origin ? { number: Number(origin.number), title: String(origin.title) } : null,
       planItem: linked
         ? {
             id: String(linked.id),
