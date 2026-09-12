@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
-import { openReading } from './actions';
+import { goDeeper, openReading } from './actions';
 import { FindSources } from './find-sources';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeFromTrack } from '../../t/[id]/actions';
@@ -170,6 +170,23 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         <p className="mt-1.5 text-small text-ink-muted">
           Puts it on <Link href="/learn/now" className="underline underline-offset-2 hover:text-ink">Read now</Link>
           , the shelf you read from. Finishing it takes it off again.
+        </p>
+      </section>
+
+      {/* The other direction from Find sources, which finds more to read about
+          this subject as it stands. This breaks the subject into parts. */}
+      <section className="mb-5">
+        <h2 className="mb-2 text-ui font-semibold text-ink-muted">Go deeper</h2>
+        <form action={goDeeper}>
+          <input type="hidden" name="readingId" value={reading.id} />
+          <Button type="submit" variant="secondary" size="md">
+            <GitBranch className="size-4" strokeWidth={2} aria-hidden />
+            Go deeper on this
+          </Button>
+        </form>
+        <p className="mt-1.5 text-small text-ink-muted">
+          Opens this one subject up as a topic of its own, planned when you get there. This step
+          stays where it is.
         </p>
       </section>
 

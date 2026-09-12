@@ -8,7 +8,14 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 import type { PlanStep } from '@/lib/learn/import/plan-payload';
-import { confirmPlan, planTrack, type PlanState, type TrackActionState } from './actions';
+import type { Area } from '@/lib/learn/import/areas';
+import {
+  confirmPlan,
+  keepAreas,
+  planTrack,
+  type PlanState,
+  type TrackActionState,
+} from './actions';
 
 /**
  * A topic with nothing in it, and a way out of that.
@@ -25,6 +32,10 @@ import { confirmPlan, planTrack, type PlanState, type TrackActionState } from '.
  * source deleted reads as the whole topic, and there is no way to tell from
  * the outside. So a step with nothing behind it stays, says why, and goes into
  * the queue as a subject you can search for later.
+ *
+ * A topic too broad to route through takes the other branch: instead of a red
+ * line telling you to be more specific about a subject you do not yet know the
+ * parts of, it comes back with the areas inside it to pick from.
  */
 
 const ACCESS_NOTE: Record<string, string | null> = {
@@ -50,6 +61,15 @@ function SaveButton() {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? 'Saving…' : 'Add these to the track'}
+    </Button>
+  );
+}
+
+function KeepButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? 'Keeping…' : 'Keep these'}
     </Button>
   );
 }
@@ -131,11 +151,58 @@ function StepRow({ step, index }: { step: PlanStep; index: number }) {
   );
 }
 
+function AreaRow({ area, index }: { area: Area; index: number }) {
+  const id = `area-${index}`;
+
+  return (
+    <li className="flex gap-3 px-4 py-3">
+      <input
+        type="checkbox"
+        id={id}
+        name="area"
+        value={JSON.stringify({ name: area.name, covers: area.covers })}
+        defaultChecked
+        className="mt-1 size-4 shrink-0 accent-accent"
+      />
+      <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
+        <span className="block text-body font-medium text-ink">{area.name}</span>
+        <span className="mt-0.5 block text-ui text-ink-muted">{area.covers}</span>
+      </label>
+    </li>
+  );
+}
+
 export function PlanForm({ trackId }: { trackId: string }) {
   const [planState, plan] = useActionState<PlanState, FormData>(planTrack, {});
   const [saveState, save] = useActionState<TrackActionState, FormData>(confirmPlan, {});
+  const [keepState, keep] = useActionState<TrackActionState, FormData>(keepAreas, {});
 
   const steps = planState.steps ?? [];
+  const areas = planState.areas ?? [];
+
+  if (areas.length > 0) {
+    return (
+      <form action={keep} className="mt-6">
+        <input type="hidden" name="trackId" value={trackId} />
+
+        <p className="mb-2 text-body text-ink-muted">
+          Too broad to route through in one go, so here is what is inside it. Untick anything you do
+          not want; what you keep becomes a topic of its own, planned when you open it.
+        </p>
+
+        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+          {areas.map((area, index) => (
+            <AreaRow key={`${area.name}-${index}`} area={area} index={index} />
+          ))}
+        </ul>
+
+        <div className="mt-4 flex items-center gap-3">
+          <KeepButton />
+          {keepState.error && <span className="text-ui text-danger">{keepState.error}</span>}
+        </div>
+      </form>
+    );
+  }
 
   if (steps.length > 0) {
     const sourced = steps.filter((step) => step.source !== null).length;
