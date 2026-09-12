@@ -60,6 +60,7 @@ export async function refreshFeed(
   feedId: string,
   now: Date = new Date(),
   timezone = 'UTC',
+  timeoutMs?: number,
 ): Promise<RefreshResult> {
   const supabase = await createTodoClient();
 
@@ -85,7 +86,7 @@ export async function refreshFeed(
     return record(userId, feedId, 0, 'That address could not be read. Add the calendar again.');
   }
 
-  const fetched = await fetchCalendar(address);
+  const fetched = await fetchCalendar(address, timeoutMs);
   if (!fetched.ok) return record(userId, feedId, 0, fetched.detail);
 
   const today = todayIn(timezone, now);
@@ -167,10 +168,91 @@ async function record(
     .from('calendar_feeds')
     .update({
       last_error: error?.slice(0, 2000) ?? null,
+      // The claim is released here whichever way the read went, so a failure
+      // does not leave the subscription looking busy until the stamp ages out.
+      refreshing_since: null,
       ...(error ? {} : { last_read_at: new Date().toISOString() }),
     })
     .eq('user_id', userId)
     .eq('id', feedId);
 
   return { stored, error };
+}
+
+/**
+ * How old a copy may be before opening the calendar re-reads it.
+ *
+ * #277 settled on an hour: a calendar that can be a day behind is one you
+ * check your phone to confirm, which is the thing this exists to stop.
+ */
+export const STALE_MS = 60 * 60 * 1000;
+
+/**
+ * How long a claim stands before another reader takes it over.
+ *
+ * Longer than a read can take -- the fetch timeout plus the writing -- so a
+ * live reader is never cut in on, and short enough that a process that died
+ * holding the claim costs one refresh rather than the subscription.
+ */
+const CLAIM_MS = 5 * 60 * 1000;
+
+/** A page render waits for this, so it gets less patience than a button does. */
+const PAGE_TIMEOUT_MS = 8_000;
+
+/**
+ * Re-read the subscriptions whose copy has gone stale.
+ *
+ * Called when the calendar is opened, which is the whole of the schedule:
+ * there is no job, nothing runs while nobody is looking, and a calendar
+ * nobody opens costs nothing to keep fresh.
+ *
+ * One broken subscription does not stop the others -- they are read together
+ * and each failure is recorded on its own row. A subscription another tab is
+ * already reading is skipped rather than fetched twice.
+ */
+export async function refreshStaleFeeds(
+  userId: string,
+  now: Date = new Date(),
+  timezone = 'UTC',
+): Promise<void> {
+  const supabase = await createTodoClient();
+
+  const staleBefore = new Date(now.getTime() - STALE_MS).toISOString();
+
+  const { data, error } = await supabase
+    .from('calendar_feeds')
+    .select('id')
+    .eq('user_id', userId)
+    .or(`last_read_at.is.null,last_read_at.lt.${staleBefore}`);
+
+  if (error || !data || data.length === 0) return;
+
+  await Promise.allSettled(
+    data.map(async (row) => {
+      const feedId = row.id as string;
+      if (!(await claim(userId, feedId, now))) return;
+      await refreshFeed(userId, feedId, now, timezone, PAGE_TIMEOUT_MS);
+    }),
+  );
+}
+
+/**
+ * Take this subscription, if nobody else has it.
+ *
+ * The condition is part of the update rather than a read followed by a write,
+ * because two tabs opened together would both pass a check written that way.
+ */
+async function claim(userId: string, feedId: string, now: Date): Promise<boolean> {
+  const supabase = await createTodoClient();
+  const expired = new Date(now.getTime() - CLAIM_MS).toISOString();
+
+  const { data, error } = await supabase
+    .from('calendar_feeds')
+    .update({ refreshing_since: now.toISOString() })
+    .eq('user_id', userId)
+    .eq('id', feedId)
+    .or(`refreshing_since.is.null,refreshing_since.lt.${expired}`)
+    .select('id');
+
+  return !error && (data?.length ?? 0) > 0;
 }

@@ -18,6 +18,8 @@ import { assertHostIsPublic } from '@/lib/net/public-address';
 
 /** A year of a busy calendar is well under this. Beyond it, something is wrong. */
 const MAX_BYTES = 4 * 1024 * 1024;
+
+/** How long a read waits when somebody pressed something and is watching. */
 const TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 5;
 
@@ -45,7 +47,10 @@ function fail(detail: string): CalendarFetch {
  * is an https URL wearing a different scheme, and turning it into one here
  * saves everybody the paste-and-edit.
  */
-export async function fetchCalendar(address: string): Promise<CalendarFetch> {
+export async function fetchCalendar(
+  address: string,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<CalendarFetch> {
   let url: URL;
   try {
     url = new URL(address.trim().replace(/^webcal:/i, 'https:'));
@@ -68,7 +73,7 @@ export async function fetchCalendar(address: string): Promise<CalendarFetch> {
     try {
       response = await fetch(url, {
         redirect: 'manual',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
           // Identify honestly. A calendar host that blocks this is entitled to.
           'user-agent': 'PersonalTracker-Calendar/1.0 (+calendar subscription; one user)',
