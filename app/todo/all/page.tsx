@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ListChecks, Search } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
-import { loadAllTasks } from '@/lib/todo/tasks/load';
+import { loadAllTasks, loadParentTitles } from '@/lib/todo/tasks/load';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
@@ -63,7 +63,12 @@ export default async function AllTasksPage({
   // in. A workspace that cannot be read costs its labels and nothing else;
   // resolveAnchors swallows that per target.
   const links = await loadLinksForTasks(tasks.map((task) => task.id));
-  const anchors = await resolveAnchors(links);
+  const [anchors, parents] = await Promise.all([
+    resolveAnchors(links),
+    // Which task an item came out of. Only the titles, and only for the rows
+    // on this page -- the list here is not nested, so the row has to say it.
+    loadParentTitles(user.id, tasks),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -129,6 +134,16 @@ export default async function AllTasksPage({
                 task={task}
                 timezone={settings.timezone}
                 anchor={anchors.get(task.id) ?? null}
+                under={
+                  parents.has(task.id)
+                    ? {
+                        label: parents.get(task.id)!,
+                        // Whatever the holding task's status, so the link never
+                        // lands on a filter that hides the row it names.
+                        href: `/todo/all?status=all&focus=${task.parentId}`,
+                      }
+                    : null
+                }
               />
             </div>
           ))}

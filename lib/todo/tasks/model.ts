@@ -47,6 +47,38 @@ export interface Task {
   parentId: string | null;
 }
 
+/**
+ * The items written under each task, keyed by the task they sit under.
+ *
+ * Dropped items are left out: an item you decided against is not part of the
+ * list any more, and counting it would make "2 of 5" mean nothing. Done ones
+ * stay, because a ticked item is what the count is counting against.
+ *
+ * Inside a list the order is the order they were written. The drag ordering
+ * renumbers a whole pile and a list under a task is not one, so `position` is
+ * not consulted here.
+ */
+export function childrenByParent(tasks: Task[]): Map<string, Task[]> {
+  const byParent = new Map<string, Task[]>();
+
+  for (const task of tasks) {
+    if (task.parentId === null) continue;
+    if (task.status === 'dropped') continue;
+    byParent.set(task.parentId, [...(byParent.get(task.parentId) ?? []), task]);
+  }
+
+  for (const children of byParent.values()) {
+    children.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  }
+
+  return byParent;
+}
+
+/** How many of a task's items are still to do. */
+export function openCount(children: Task[]): number {
+  return children.filter((child) => child.status === 'open').length;
+}
+
 /** The piles the list is shown in, in the order they matter. */
 export type Bucket = 'overdue' | 'today' | 'soon' | 'later' | 'someday';
 
@@ -159,6 +191,9 @@ export function bucketFor(task: Task, timezone: string, now: Date): Bucket {
  *
  * Snoozed tasks are dropped entirely rather than shown greyed out. "Later"
  * means later; a list that still shows what you deferred has not deferred it.
+ *
+ * An item that sits under a task is not a row of its own here either. It is
+ * shown under the task it belongs to, and childrenByParent is what finds it.
  */
 export function bucketTasks(
   tasks: Task[],
@@ -169,6 +204,7 @@ export function bucketTasks(
 
   for (const task of tasks) {
     if (task.status !== 'open') continue;
+    if (task.parentId !== null) continue;
     if (isSnoozed(task, now)) continue;
 
     const bucket = bucketFor(task, opts.timezone, now);

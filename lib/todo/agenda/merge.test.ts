@@ -293,4 +293,66 @@ describe('mergeAgenda', () => {
 
     expect(piles[0].entries.map((entry) => entry.task?.id)).toEqual(['pinned', 'dawn', 'noon']);
   });
+  it('gathers a task\u2019s items under it instead of leaving them loose', () => {
+    const piles = merge({
+      tasks: [
+        task({ id: 'big', title: 'Move house', dueOn: '2026-03-10' }),
+        task({ id: 'i2', title: 'Book the van', parentId: 'big', createdAt: '2026-01-02T00:00:00.000Z' }),
+        task({ id: 'i1', title: 'Pack the kitchen', parentId: 'big', createdAt: '2026-01-01T00:00:00.000Z' }),
+      ],
+    });
+
+    expect(piles[0].entries.map((entry) => entry.key)).toEqual(['task:big']);
+    expect(piles[0].entries[0].children.map((child) => child.id)).toEqual(['i1', 'i2']);
+    expect(piles[0].entries[0].openChildren).toBe(2);
+    expect(piles[0].entries[0].totalChildren).toBe(2);
+  });
+
+  it('keeps a ticked item under its task and out of the count', () => {
+    const piles = merge({
+      tasks: [
+        task({ id: 'big', dueOn: '2026-03-10' }),
+        task({ id: 'done', parentId: 'big', status: 'done' }),
+        task({ id: 'open', parentId: 'big' }),
+      ],
+    });
+
+    expect(piles[0].entries[0].children.map((child) => child.id)).toEqual(['done', 'open']);
+    expect(piles[0].entries[0].openChildren).toBe(1);
+    expect(piles[0].entries[0].totalChildren).toBe(2);
+  });
+
+  it('hides a snoozed task\u2019s items with it', () => {
+    // The items are reached through the task, so deferring the task defers the
+    // whole list. An item left behind would be a row nothing explains.
+    const piles = merge({
+      tasks: [
+        task({ id: 'big', dueOn: '2026-03-10', snoozedUntil: '2026-03-17T00:00:00.000Z' }),
+        task({ id: 'item', parentId: 'big', dueOn: '2026-03-10' }),
+      ],
+    });
+
+    expect(piles).toEqual([]);
+  });
+
+  it('never files an item in the pile its own date would put it in', () => {
+    // #260: an item shows under its task and nowhere else. This one is due
+    // next month and its task is due today.
+    const piles = merge({
+      tasks: [
+        task({ id: 'big', dueOn: '2026-03-10' }),
+        task({ id: 'item', parentId: 'big', dueOn: '2026-04-20' }),
+      ],
+    });
+
+    expect(piles.map((pile) => pile.bucket)).toEqual(['today']);
+    expect(piles[0].entries[0].children.map((child) => child.id)).toEqual(['item']);
+  });
+
+  it('says a task with no items has none', () => {
+    const piles = merge({ tasks: [task({ id: 'alone', dueOn: '2026-03-10' })] });
+
+    expect(piles[0].entries[0].children).toEqual([]);
+    expect(piles[0].entries[0].totalChildren).toBe(0);
+  });
 });

@@ -7,8 +7,12 @@ import { isLinkTarget } from '@/lib/todo/links/model';
 import { clearTaskAbout, linkTask, setTaskAbout } from '@/lib/todo/links/write';
 import { resolveRelativeDay, todayIn } from '@/lib/todo/tasks/model';
 import {
+  completeTaskWithItems,
+  createItem,
   createTask,
   deleteTask,
+  itemInput,
+  reopenTaskWithItems,
   reorderTasks,
   setTaskPinned,
   setTaskStatus,
@@ -168,20 +172,62 @@ export async function unpointTask(taskId: string): Promise<{ error: string | nul
  * that drew the change before the round trip finished needs the error to put
  * itself back; a caller that does not draw ahead can ignore it.
  */
+/**
+ * Tick a task off, and its items with it.
+ *
+ * `items` is what the tick actually changed, and the caller passes it back to
+ * `reopenTask` as the undo. Items that were already ticked are not in it and
+ * are left alone, so undoing puts the list back exactly as it was.
+ */
 // latency: optimistic -- the checkbox fills before the write returns
-export async function completeTask(id: string): Promise<{ error: string | null }> {
+export async function completeTask(
+  id: string,
+): Promise<{ error: string | null; items: string[] }> {
   const user = await requireUser();
-  const { error } = await setTaskStatus(user.id, id, 'done');
+  const { items, error } = await completeTaskWithItems(user.id, id);
+  if (error) return { error, items: [] };
+
+  revalidateTodo();
+  return { error: null, items };
+}
+
+/**
+ * Put a task back on the list.
+ *
+ * `items` are the ones a tick took down with it, sent back by the undo in the
+ * toast. Nothing is trusted about them beyond their being ids: the write is
+ * scoped to this session's user, so a borrowed id reopens nothing.
+ */
+// latency: optimistic -- the same checkbox, the other way
+export async function reopenTask(
+  id: string,
+  items: string[] = [],
+): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const { error } = await reopenTaskWithItems(user.id, id, items);
   if (error) return { error };
 
   revalidateTodo();
   return { error: null };
 }
 
-// latency: optimistic -- the same checkbox, the other way
-export async function reopenTask(id: string): Promise<{ error: string | null }> {
+/**
+ * Write one more item under a task.
+ *
+ * The box under a list sends a title and the task it belongs to. Whether that
+ * task is yours, and whether it is allowed to hold a list at all, is the
+ * database's answer rather than this function's -- see migration 0006 -- and
+ * its message is what comes back.
+ */
+// latency: pending
+export async function addItem(parentId: string, title: string): Promise<{ error: string | null }> {
   const user = await requireUser();
-  const { error } = await setTaskStatus(user.id, id, 'open');
+  if (!parentId) return { error: 'Which task?' };
+
+  const parsed = itemInput.safeParse({ title });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { error } = await createItem(user.id, parentId, parsed.data);
   if (error) return { error };
 
   revalidateTodo();

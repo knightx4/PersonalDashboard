@@ -123,7 +123,10 @@ deliberately not chosen yet, and the source is not built in v1.
 Listing these because they will otherwise get invented.
 
 - **Not a project manager.** No projects, no boards, no assignees, no
-  dependencies, no subtasks. One account, one person.
+  dependencies. One account, one person. A task can be broken into smaller
+  todos -- one level, added and ticked in place on the agenda -- and that is
+  as far as it goes: an item cannot hold a list of its own, and there is
+  nothing here that schedules one piece of work against another.
 - **No priority field.** A P1/P2/P3 column is a decoration that becomes noise
   within a week: everything is P1 by March. The ordering is the due date, and
   `pinned` (which `job_search.notes` already uses) is the one manual override.
@@ -224,10 +227,19 @@ create table todo.tasks (
   -- The "Later" half, exactly as the dismissal tables use it.
   snoozed_until timestamptz,
 
+  -- The task this one sits under, or null for a task of its own. An item IS a
+  -- task, which is why this is a column and not a second table: tick, drop,
+  -- defer, search and link all keep working on it for free. One level only --
+  -- a trigger refuses a task that holds a list from being filed under another,
+  -- and refuses a parent that belongs to somebody else, which a foreign key
+  -- cannot do. Cascades, so deleting a task takes its list with it.
+  parent_id uuid references todo.tasks (id) on delete cascade,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
   constraint tasks_title_ck check (title <> '' and length(title) <= 500),
+  constraint tasks_parent_not_self_ck check (parent_id is distinct from id),
   constraint tasks_one_due_ck check (num_nonnulls(due_on, due_at) <= 1),
   -- The database stamps these, it does not merely check them. See below.
   constraint tasks_completed_ck check (
@@ -246,6 +258,8 @@ create index tasks_user_due_on_idx on todo.tasks (user_id, due_on)
 create index tasks_user_due_at_idx on todo.tasks (user_id, due_at)
   where status = 'open' and due_at is not null;
 create index tasks_user_status_idx on todo.tasks (user_id, status, created_at desc);
+-- The read the column exists for: the items under these tasks, for this account.
+create index tasks_user_parent_idx on todo.tasks (user_id, parent_id);
 ```
 
 There is no `source` column and no key pointing at where a task came from. Both
@@ -917,6 +931,22 @@ confident and the code disagreed.
 - **`countOpenTasks` is imported dynamically on `/home`.** A static import
   pulled the todo client into a page that must still render when the module is
   switched off.
+- **Subtasks stopped being a non-goal.** Breaking one task into smaller todos
+  was listed above as something this module would not have, and it was built
+  anyway, as `parent_id` on `todo.tasks`. Three questions were settled before
+  it was:
+  - *Can an item hold a list of its own?* No. One level, refused by a trigger
+    rather than by the app, so a third level cannot arrive by another route.
+  - *Where does an item show besides under its task?* Nowhere. Its own due
+    date is text on its row; it never gets a row in a pile of its own, on the
+    agenda or on the calendar. A task broken into six things due today would
+    otherwise fill Today with seven rows.
+  - *What happens to the items when the task is ticked?* They are ticked with
+    it, and one undo puts back exactly the ones that tick took down -- items
+    already done stay done.
+
+  The archive is the one list that stays flat: it is a history, so an item
+  there says which task it came out of instead of being nested under it.
 
 ## What this unlocks (not v1)
 

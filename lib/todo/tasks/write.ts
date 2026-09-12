@@ -42,6 +42,17 @@ export const taskInput = z.object({
 export type TaskInput = z.infer<typeof taskInput>;
 
 /**
+ * What an item under a task needs, which is a title and nothing else.
+ *
+ * Taken off taskInput rather than written again, so the one title rule -- not
+ * blank, not longer than 500 -- is stated once and cannot drift between the
+ * add bar and the box under a task.
+ */
+export const itemInput = taskInput.pick({ title: true });
+
+export type ItemInput = z.infer<typeof itemInput>;
+
+/**
  * The one place the date/instant split is decided.
  *
  * A day with no time is a `due_on`, which never moves. A day with a time is a
@@ -79,6 +90,34 @@ export async function createTask(
       pinned: input.pinned,
       ...resolveDue(input, timezone),
     })
+    .select('id')
+    .single();
+
+  return { id: (data?.id as string) ?? null, error: error?.message ?? null };
+}
+
+/**
+ * Write one item under a task.
+ *
+ * Nothing but a title and the task it sits under: an item is written in the
+ * middle of reading a list, and a form asking for a due date there would make
+ * writing the next small thing down slower than not writing it down.
+ *
+ * A parent that belongs to somebody else, or that already sits under a task
+ * itself, is refused by the trigger in migration 0006 rather than checked here.
+ * The database is not the only caller's word for who owns what, and its
+ * message is the one that comes back.
+ */
+export async function createItem(
+  userId: string,
+  parentId: string,
+  input: ItemInput,
+): Promise<{ id: string | null; error: string | null }> {
+  const supabase = await createTodoClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({ user_id: userId, title: input.title, parent_id: parentId })
     .select('id')
     .single();
 
@@ -125,6 +164,65 @@ export async function setTaskStatus(
     .from('tasks')
     .update({ status })
     .eq('id', id)
+    .eq('user_id', userId);
+
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Tick a task off, and everything on its list with it.
+ *
+ * #261 settled that finishing the big thing finishes the small ones: ticking
+ * six boxes to say one thing is done is a chore, and a finished task holding
+ * open items reads as a bug.
+ *
+ * The ids of the items this actually ticked come back, because the way back
+ * needs them. Reopening every item would un-tick ones that were already done
+ * before the task was, and an undo that changes more than the thing it is
+ * undoing is not one. Only the still-open ones are touched, for the same
+ * reason.
+ */
+export async function completeTaskWithItems(
+  userId: string,
+  id: string,
+): Promise<{ items: string[]; error: string | null }> {
+  const supabase = await createTodoClient();
+
+  // The task first: it is what was asked for, so if only one of the two writes
+  // lands it should be that one.
+  const { error } = await supabase
+    .from('tasks')
+    .update({ status: 'done' })
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) return { items: [], error: error.message };
+
+  const { data, error: itemsError } = await supabase
+    .from('tasks')
+    .update({ status: 'done' })
+    .eq('parent_id', id)
+    .eq('user_id', userId)
+    .eq('status', 'open')
+    .select('id');
+
+  if (itemsError) return { items: [], error: itemsError.message };
+
+  return { items: (data ?? []).map((row) => row.id as string), error: null };
+}
+
+/** Put a task back on the list, with the items a tick took down with it. */
+export async function reopenTaskWithItems(
+  userId: string,
+  id: string,
+  items: readonly string[] = [],
+): Promise<{ error: string | null }> {
+  const supabase = await createTodoClient();
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ status: 'open' })
+    .in('id', [id, ...items])
     .eq('user_id', userId);
 
   return { error: error?.message ?? null };
