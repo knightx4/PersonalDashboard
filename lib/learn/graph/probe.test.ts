@@ -118,3 +118,36 @@ describe('when the question is no good', () => {
     expect(reports).toHaveLength(1);
   });
 });
+
+describe('aiming at one check', () => {
+  const CHECK = 'Says what happens to employment when the inflation is expected in advance.';
+
+  it('puts the check above the claim and names the others', async () => {
+    const { client, create } = clientReturning(GOOD);
+    await ask(client, { check: CHECK, otherChecks: ['Explains the long run.'] });
+
+    const prompt = create.mock.calls[0][0].messages[0].content as string;
+    expect(prompt.indexOf(CHECK)).toBeLessThan(prompt.indexOf('The claim:'));
+    expect(prompt).toContain('Explains the long run.');
+  });
+
+  it('keeps the check beside the question it produced', async () => {
+    const { client } = clientReturning(GOOD);
+    const result = await ask(client, { check: CHECK });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.probe.masteryCheck).toBe(CHECK);
+  });
+
+  it('asks about the claim itself when the concept has no checks', async () => {
+    // Exactly as it was before the checks existed, rather than a prompt with
+    // an empty line where the check would be.
+    const { client, create } = clientReturning(GOOD);
+    const result = await ask(client);
+
+    const prompt = create.mock.calls[0][0].messages[0].content as string;
+    expect(prompt).not.toContain('check of understanding');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.probe.masteryCheck).toBeNull();
+  });
+});

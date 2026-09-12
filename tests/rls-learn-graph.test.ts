@@ -392,3 +392,36 @@ describe('what understanding a concept looks like', () => {
     await expect(seedWithMastery(['A real check.', 3])).rejects.toThrow();
   });
 });
+
+describe('which check a question was written against', () => {
+  async function seedProbe(masteryCheck: string | null): Promise<void> {
+    await admin`
+      insert into probes (user_id, concept_id, question, options, correct_index, reason,
+                          mastery_check)
+      values (${userA}, ${conceptA1}, 'What follows?',
+              ${admin.json(['It steepens', 'It vanishes'])}, 1, 'Because of the mechanism.',
+              ${masteryCheck})`;
+  }
+
+  it('stores the check as the text it was at the time', async () => {
+    await seedProbe('Rules out a pay freeze.');
+    const [row] = await admin<{ mastery_check: string }[]>`
+      select mastery_check from probes where concept_id = ${conceptA1}
+      order by created_at desc limit 1`;
+    expect(row.mastery_check).toBe('Rules out a pay freeze.');
+  });
+
+  it('takes a question about a concept with no checks', async () => {
+    await seedProbe(null);
+    const [row] = await admin<{ mastery_check: string | null }[]>`
+      select mastery_check from probes where concept_id = ${conceptA1}
+      order by created_at desc limit 1`;
+    expect(row.mastery_check).toBeNull();
+  });
+
+  it('refuses an empty one', async () => {
+    // Empty would read as "no check" in the database and as "a check"
+    // everywhere else.
+    await expect(seedProbe('')).rejects.toThrow();
+  });
+});

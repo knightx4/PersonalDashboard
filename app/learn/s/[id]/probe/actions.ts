@@ -10,6 +10,7 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   answeredWeight,
   nextConcept,
+  nextMasteryCheck,
   probesFor,
   recordAnswer,
   recordProbe,
@@ -81,10 +82,19 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
   if (!concept) return { error: 'Nothing in this subject to ask about yet.' };
 
   const previous = await probesFor(supabase, concept.id);
+  // Which check of understanding this one is for. Null when the concept
+  // carries none, and then the question is written against the claim itself.
+  const check = nextMasteryCheck(
+    concept.mastery,
+    previous.map((probe) => probe.masteryCheck),
+  );
+
   const spend = collectSpend();
   const result = await writeProbe({
     concept: concept.name,
     claim: concept.claim,
+    check,
+    otherChecks: concept.mastery.filter((other) => other !== check),
     asked: previous.map((probe) => probe.question),
     missedBefore: previous.some(
       (probe) => probe.chosenIndex !== null && probe.chosenIndex !== probe.correctIndex,

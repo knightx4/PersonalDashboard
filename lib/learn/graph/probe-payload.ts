@@ -41,6 +41,12 @@ export type Probe = {
   options: string[];
   correctIndex: number;
   reason: string;
+  /**
+   * The check of understanding the question was aimed at, as it read when the
+   * question was written. Null for a concept with no checks, which is probed
+   * against its claim in general the way everything was before.
+   */
+  masteryCheck: string | null;
 };
 
 export type ProbeRejection =
@@ -72,7 +78,11 @@ const POINTS_BACK = [
  * writing the missing half here, and the missing half is the part that decides
  * whether the question is about the claim at all.
  */
-export function toProbe(payload: ProbePayload): { ok: true; probe: Probe } | { ok: false; reason: ProbeRejection } {
+export function toProbe(
+  payload: ProbePayload,
+  /** What the question was aimed at. Carried in, not reported by the model. */
+  masteryCheck: string | null = null,
+): { ok: true; probe: Probe } | { ok: false; reason: ProbeRejection } {
   if (payload.unusable) return { ok: false, reason: 'unusable' };
 
   const options = payload.options.map((option) => option.trim());
@@ -94,6 +104,7 @@ export function toProbe(payload: ProbePayload): { ok: true; probe: Probe } | { o
       options,
       correctIndex: payload.correct_index,
       reason: payload.reason.trim(),
+      masteryCheck,
     },
   };
 }

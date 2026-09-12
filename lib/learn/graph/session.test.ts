@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextConcept } from './session';
+import { nextConcept, nextMasteryCheck } from './session';
 import type { Concept, KnowledgeState } from './model';
 
 /**
@@ -66,5 +66,37 @@ describe('what to ask about next', () => {
   it('still finds something when everything is settled', () => {
     // Worth a fraction of the information, but better than refusing to ask.
     expect(nextConcept([concept('settled', 'known')], noneAsked)?.id).toBe('settled');
+  });
+});
+
+describe('which check the next question is for', () => {
+  const CHECKS = ['Rules out a pay freeze.', 'Applies at 4% inflation.', 'The Lucas objection.'];
+
+  it('takes the first one when nothing has been asked', () => {
+    expect(nextMasteryCheck(CHECKS, [])).toBe('Rules out a pay freeze.');
+  });
+
+  it('moves to a check nobody has been asked about', () => {
+    expect(nextMasteryCheck(CHECKS, ['Rules out a pay freeze.'])).toBe('Applies at 4% inflation.');
+  });
+
+  it('comes back round once every check has had a question', () => {
+    // Only then, which is the point of the list: a second question about the
+    // same check is the same information asked twice.
+    expect(nextMasteryCheck(CHECKS, CHECKS)).toBe('Rules out a pay freeze.');
+  });
+
+  it('goes for the one asked about least', () => {
+    const asked = ['Rules out a pay freeze.', 'Rules out a pay freeze.', 'The Lucas objection.'];
+    expect(nextMasteryCheck(CHECKS, asked)).toBe('Applies at 4% inflation.');
+  });
+
+  it('ignores a question that was aimed at nothing', () => {
+    expect(nextMasteryCheck(CHECKS, [null, null])).toBe('Rules out a pay freeze.');
+  });
+
+  it('has nothing to aim at on a concept with no checks', () => {
+    // That concept is probed against its claim, the way everything was before.
+    expect(nextMasteryCheck([], [])).toBeNull();
   });
 });
