@@ -119,6 +119,12 @@ export async function probesFor(
  * out about, because a claim you have already got wrong is where the next
  * question is worth most. A settled node is only revisited when there is
  * nothing else left, and then it is worth a fraction of the information.
+ *
+ * Inside each of those bands the doors come first. What sits downstream of a
+ * door does not land until you are through it, so finding out where you stand
+ * on the door tells you more than the same question about one of its
+ * consequences -- and if the door turns out to be a misconception, half the
+ * answers below it were going to be wrong for the same reason.
  */
 export function nextConcept(concepts: Concept[], askedCounts: Map<string, number>): Concept | null {
   const rank = (concept: Concept): number => {
@@ -128,9 +134,17 @@ export function nextConcept(concepts: Concept[], askedCounts: Map<string, number
     return 3;
   };
 
+  // A door before anything else in the same band. An unmarked concept ranks
+  // with the consequences rather than below them: nobody has judged it, and
+  // putting it last would be a judgement -- the same reason the column is left
+  // null for everything that was in a graph before the marks existed.
+  const doorRank = (concept: Concept): number => (concept.kind === 'threshold' ? 0 : 1);
+
   const sorted = [...concepts].sort((a, b) => {
     const byRank = rank(a) - rank(b);
     if (byRank !== 0) return byRank;
+    const byDoor = doorRank(a) - doorRank(b);
+    if (byDoor !== 0) return byDoor;
     // Then whichever has been asked about least, so a session spreads out
     // rather than circling one node.
     const byAsked = (askedCounts.get(a.id) ?? 0) - (askedCounts.get(b.id) ?? 0);
