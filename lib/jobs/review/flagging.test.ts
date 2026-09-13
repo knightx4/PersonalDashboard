@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  handLinkedEventNeedsReview,
   inboundMayMove,
   inferredApplicationNeedsReview,
   unappliedEventNeedsReview,
@@ -77,6 +78,26 @@ describe('events that could not be applied', () => {
     expect(unappliedEventNeedsReview('assessment_sent')).toBe(true);
     expect(unappliedEventNeedsReview('interview_scheduled')).toBe(true);
     expect(unappliedEventNeedsReview('offer')).toBe(true);
+  });
+});
+
+describe('linking a held message to a pursuit by hand', () => {
+  it('never asks whether a rejection reopened a closed pursuit', () => {
+    // The queue asked exactly this, of a rejection linked onto an already
+    // rejected pursuit: the hand-link path flagged on the status alone and
+    // never looked at the kind.
+    expect(handLinkedEventNeedsReview('rejected', 'rejection')).toBe(false);
+    expect(handLinkedEventNeedsReview('rejected', 'confirmation')).toBe(false);
+  });
+
+  it('still asks when forward-moving mail lands on a closed pursuit', () => {
+    expect(handLinkedEventNeedsReview('rejected', 'interview_scheduled')).toBe(true);
+    expect(handLinkedEventNeedsReview('withdrawn', 'offer')).toBe(true);
+  });
+
+  it('asks nothing at all while the pursuit is still live', () => {
+    expect(handLinkedEventNeedsReview('in_process', 'interview_scheduled')).toBe(false);
+    expect(handLinkedEventNeedsReview('submitted', 'rejection')).toBe(false);
   });
 });
 

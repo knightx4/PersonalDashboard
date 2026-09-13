@@ -8,7 +8,8 @@ import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
 import { excludableDomains } from '@/lib/jobs/review/exclusions';
-import { isTerminal, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
+import { type ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
  * Working the queue.
@@ -72,8 +73,11 @@ export async function linkMessage(
 
   if (kind) {
     // The same backwards-transition rule applies to a hand link: the event is
-    // recorded, and it does not reopen a closed pursuit.
-    const wouldReopen = isTerminal(application.status as ApplicationStatus);
+    // recorded, and it does not reopen a closed pursuit. Whether the conflict
+    // is worth raising is the ingestion's rule too -- a rejection landing on a
+    // pursuit that is already closed is an echo, not a reason to ask whether
+    // it reopened.
+    const conflict = handLinkedEventNeedsReview(application.status as ApplicationStatus, kind);
     await supabase.from('application_events').insert({
       user_id: user.id,
       application_id: parsed.data.applicationId,
@@ -82,7 +86,7 @@ export async function linkMessage(
       source: 'email',
       ingested_message_id: parsed.data.messageId,
       summary: (message.subject as string) ?? 'Linked by hand from the review queue',
-      needs_review: wouldReopen,
+      needs_review: conflict,
     });
   }
 
