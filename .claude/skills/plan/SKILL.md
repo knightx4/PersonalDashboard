@@ -64,6 +64,10 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
   decision** — not by running `answer`, not by writing the resolution into the
   row, and not by building as though it had been settled. A routine that can
   answer its own questions has no questions, only guesses with a paper trail.
+- A **dismissed** row is nobody's. The person has put it aside as not right
+  now, and it is hidden from the page, from `next`, from `list` and from every
+  brief. You will not normally see one; if you do, leave it exactly as it is.
+  Dismissing something and bringing it back are both their moves.
 - Anything else, ask before starting. A step nobody has handed over may be one
   the user wants to do themselves, or is still thinking about.
 
@@ -249,6 +253,33 @@ feature, per **When you reach something you should not decide** above.
 
 Say in the report, by title, anything raised during the run — a question
 nobody knows is waiting is the failure this exists to prevent.
+
+## Not right now
+
+A question the person does not want to settle yet, a patch of fog they do not
+want raised again, and a suggestion they are not taking are all **dismissed**
+rather than answered, cleared or deleted. Dismissing hides the row — off the
+plan page, out of the counts, out of `next` and `list`, out of every brief and
+every re-shape turn — and keeps it under the **Dismissed** view on `/dev/plan`
+and the **Dismissed** section on `/dev/ideas`, where it can be brought back by
+hand. Nothing surfaces on its own. That is what #340 settled.
+
+Three rules, and they are the same rule as never answering your own decision:
+
+- **Never dismiss anything.** Not a question, not fog, not a suggestion. A
+  session that can put its own questions out of sight has no questions.
+- **Never bring one back.** If a dismissed question turns out to block the work
+  in front of you, say so — `block <n> --note "…"` on your step, naming it.
+- **Never write it again.** A re-shape is handed what was dismissed under the
+  feature, under *Already dismissed*. Do not propose it again, do not ask the
+  same question in different words, do not write it back as fog, and do not
+  file it as an idea. The loop this ends is the plan asking the same thing
+  every time anything reads it.
+
+A dismissed patch of fog does not hold a step open: `done` refuses fog, but not
+fog that has been put aside. Rewriting a patch — `fog <n> --note "…"` — clears
+any dismissal on the old one, because the new sentence is not one anybody has
+put aside yet.
 
 ## How to write a title and a detail
 
@@ -461,7 +492,9 @@ against everything now known and write down what has changed — as
    decision — see **How a decision must be written**.
 5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not re-propose what the feature already holds —
-   read the existing steps first, including ones an earlier re-shape added.
+   read the existing steps first, including ones an earlier re-shape added,
+   and everything under *Already dismissed*, which is what the person has
+   turned down and is not to be written back in any form.
    Report what you proposed, what you dropped and why, what fog you cleared,
    and anything you noticed and deliberately left alone, all **by number and
    title**.
@@ -521,8 +554,17 @@ set status = 'done', resolution = '<their words>', commit_sha = null,
 where id = '…';
 
 -- fog: write it, or clear it once the steps that dispel it exist. Not a
--- status change, so no dated line goes in the comment.
-update plan_items set fog = '…' where id = '…';   -- or fog = null to clear
+-- status change, so no dated line goes in the comment. Writing a new patch
+-- clears any dismissal on the old one, which is the person's, not yours.
+update plan_items set fog = '…', fog_dismissed_at = null where id = '…';
+
+-- dismissed: put aside as not right now. Here to be read, never written.
+-- `dismissed_at` is the row itself -- a question they are not answering --
+-- and `fog_dismissed_at` is the patch of fog on it; `ideas.dismissed_at` is
+-- a suggestion they are not taking. Leave every one of them out of what you
+-- read the plan for, and never write one back in another form.
+select number, title, dismissed_at, fog_dismissed_at from plan_items
+where user_id = '…' and (dismissed_at is not null or fog_dismissed_at is not null);
 
 -- a row a re-shape wrote, stamped with the answer that produced it. The same
 -- line `add --from` writes, and what the page and the brief read back; keep
@@ -595,6 +637,7 @@ Beside the status, two columns say what a step is rather than where it stands.
 | | Meaning |
 |---|---|
 | `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`. It is a kind and not a status because a decision moves through the same states — it can be not started, blocked, dropped — and differs only in what closing it means. |
+| `dismissed_at`, `fog_dismissed_at` | Put aside by the person as not right now — the row itself, and the patch of fog on it. Hidden everywhere but the Dismissed view. Never written by a session. See *Not right now* above. |
 | `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. *Re-shaping a feature* above is what does that clearing. |
 
 Every answered decision beneath a feature is carried into the brief of every

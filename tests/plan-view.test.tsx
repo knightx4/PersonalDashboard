@@ -29,6 +29,8 @@ vi.mock('@/app/dev/plan/actions', () => {
     answerPlanDecision: noop,
     approvePlanItem: noop,
     deletePlanItem: noop,
+    dismissPlanDecision: noop,
+    dismissPlanFog: noop,
     movePlanItem: noop,
     removePlanDependency: noop,
     reshapePlanFeature: noop,
@@ -58,6 +60,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     kind: 'build',
     fog: null,
     resolution: null,
+    dismissedAt: null,
+    fogDismissedAt: null,
     comment: null,
     priority: 2,
     size: null,
@@ -380,6 +384,73 @@ describe('PlanView', () => {
     expect((html.match(/Not yet specified/g) ?? []).length).toBe(1);
     // And a plan with none of it anywhere says nothing at all.
     expect(render('all')).not.toContain('Not yet specified');
+  });
+
+  it('says nothing about a patch of fog that has been put aside', () => {
+    const aside = buildPlanTree({
+      items: [
+        item({
+          id: 'export',
+          title: 'Export',
+          fog: 'How the second half is shaped is not yet known.',
+          fogDismissedAt: '2026-09-13T00:00:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const at = (view: 'all' | 'dismissed') =>
+      renderToStaticMarkup(
+        <PlanView
+          sections={applyView(aside, view)}
+          summary={summarize(aside)}
+          view={view}
+          catalog={[]}
+          empty={false}
+          canSend={false}
+          queued={0}
+        />,
+      );
+
+    expect(at('all')).not.toContain('How the second half is shaped is not yet known.');
+    // Under Dismissed it is shown again, with the one move back.
+    expect(at('dismissed')).toContain('How the second half is shaped is not yet known.');
+    expect(at('dismissed')).toContain('Bring back');
+  });
+
+  it('finds a question put aside, with the way back, under Dismissed', () => {
+    const aside = buildPlanTree({
+      items: [
+        item({ id: 'feature', title: 'Talking back' }),
+        item({
+          id: 'question',
+          title: 'Which shape for the reply?',
+          parentId: 'feature',
+          kind: 'decision',
+          dismissedAt: '2026-09-13T00:00:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    const at = (view: 'open' | 'dismissed') =>
+      renderToStaticMarkup(
+        <PlanView
+          sections={applyView(aside, view)}
+          summary={summarize(aside)}
+          view={view}
+          catalog={[]}
+          empty={false}
+          canSend={false}
+          queued={0}
+        />,
+      );
+
+    expect(at('open')).not.toContain('Which shape for the reply?');
+    // The step it hangs off opens itself here: a question lives in its step's
+    // panel, so a Dismissed view of closed rows would be a list to click
+    // through one at a time.
+    const dismissed = at('dismissed');
+    expect(dismissed).toContain('Which shape for the reply?');
+    expect(dismissed).toContain('Bring back');
   });
 
   it('opens on the import when there is no plan at all', () => {
