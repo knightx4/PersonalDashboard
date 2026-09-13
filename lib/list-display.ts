@@ -294,6 +294,34 @@ export function displayHref<T>(
   return qs ? `${spec.pathname}?${qs}` : spec.pathname;
 }
 
+/**
+ * The query string a list is currently showing, with the parameters in a
+ * stable order.
+ *
+ * Stable so that two URLs asking for the same view compare equal: a saved view
+ * has to be recognisable as the one in force however the person got here.
+ */
+export function currentQuery(params: ListSearchParams): string {
+  const query = new URLSearchParams();
+  for (const key of Object.keys(params).sort()) {
+    const value = params[key];
+    if (value == null) continue;
+    for (const entry of Array.isArray(value) ? value : [value]) {
+      if (entry !== '') query.append(key, entry);
+    }
+  }
+  return query.toString();
+}
+
+/** Two query strings asking for the same thing, whatever order they are in. */
+export function sameView(a: string, b: string): boolean {
+  const normalise = (query: string) => {
+    const pairs = [...new URLSearchParams(query).entries()].map(([k, v]) => `${k}=${v}`);
+    return pairs.sort().join('&');
+  };
+  return normalise(a) === normalise(b);
+}
+
 /** One choice in the display control: a sort, or a grouping. */
 export type DisplayChoice = { id: string; label: string; href: string; chosen: boolean };
 
@@ -308,6 +336,16 @@ export type DisplayToggle = { id: string; label: string; href: string; hidden: b
  * passes the rows. It is also why the control never imports a page's options:
  * every list arrives here in the same shape.
  */
+/** One arrangement somebody saved, as the control draws it. */
+export type DisplayView = {
+  id: string;
+  name: string;
+  href: string;
+  /** True when the URL on screen is asking for exactly this view. */
+  inForce: boolean;
+  isDefault: boolean;
+};
+
 export type ListDisplayMenu = {
   sorts: DisplayChoice[];
   /** Empty when the list declares no groupings; otherwise led by "No grouping". */
@@ -317,6 +355,11 @@ export type ListDisplayMenu = {
   sortLabel: string | null;
   groupLabel: string | null;
   hiddenCount: number;
+  /** Saved arrangements for this list, and which of them is in force. */
+  views: DisplayView[];
+  /** Where the links point, and what a save would store. */
+  pathname: string;
+  query: string;
 };
 
 /** The label of the grouping row that turns grouping off. */
@@ -326,9 +369,11 @@ const NO_GROUP_LABEL = 'No grouping';
 export function listDisplayMenu<T>(
   spec: ListDisplaySpec<T>,
   params: ListSearchParams,
+  views: readonly { id: string; name: string; query: string; isDefault: boolean }[] = [],
 ): ListDisplayMenu {
   const state = parseListDisplay(spec, params);
   const groups = spec.groups ?? [];
+  const query = currentQuery(params);
 
   return {
     sorts: spec.sorts.map((sort) => ({
@@ -363,5 +408,14 @@ export function listDisplayMenu<T>(
     sortLabel: state.sortBy?.label ?? null,
     groupLabel: state.groupBy?.label ?? null,
     hiddenCount: state.hidden.length,
+    views: views.map((view) => ({
+      id: view.id,
+      name: view.name,
+      href: view.query ? `${spec.pathname}?${view.query}` : spec.pathname,
+      inForce: sameView(view.query, query),
+      isDefault: view.isDefault,
+    })),
+    pathname: spec.pathname,
+    query,
   };
 }

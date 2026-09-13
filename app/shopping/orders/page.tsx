@@ -2,6 +2,8 @@ import { Receipt, Search } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
+import { redirect } from 'next/navigation';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 
 type OrderSourceMessage = {
@@ -241,7 +243,10 @@ export default async function OrdersPage({
 
   const displaySpec = ordersDisplay<(typeof arrangeable)[number]>({ withPeople: showPeople });
   const display = parseListDisplay(displaySpec, params);
-  const menu = listDisplayMenu(displaySpec, params);
+  const savedViews = await savedViewsFor(core, displaySpec.pathname);
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+  const menu = listDisplayMenu(displaySpec, params, savedViews);
 
   /** A filter link that keeps the arrangement, since changing one is not changing the other. */
   const filterHref = (opts: Parameters<typeof hrefFor>[0]) =>

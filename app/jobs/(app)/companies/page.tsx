@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { Building2 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
@@ -95,7 +98,10 @@ export default async function CompaniesPage({
 
   const displaySpec = companiesDisplay<(typeof companies)[number]>();
   const display = parseListDisplay(displaySpec, params);
-  const menu = listDisplayMenu(displaySpec, params);
+  const savedViews = await savedViewsFor(await createCoreClient(), displaySpec.pathname);
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+  const menu = listDisplayMenu(displaySpec, params, savedViews);
   const sections = groupRows(sortRows(filtered, display), display.groupBy);
 
   /** A filter link that keeps the arrangement, the same as every other list. */

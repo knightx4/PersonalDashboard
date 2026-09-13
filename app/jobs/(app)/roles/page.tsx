@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { Table2 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
@@ -55,7 +58,10 @@ export default async function RolesPage({
 
   const displaySpec = rolesDisplay();
   const display = parseListDisplay(displaySpec, params);
-  const menu = listDisplayMenu(displaySpec, params);
+  const savedViews = await savedViewsFor(await createCoreClient(), displaySpec.pathname);
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+  const menu = listDisplayMenu(displaySpec, params, savedViews);
 
   const status = APPLICATION_STATUSES.find((s) => s === params.status);
   const source = APPLICATION_SOURCES.find((s) => s === params.source);

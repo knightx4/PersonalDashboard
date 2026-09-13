@@ -39,6 +39,8 @@ import { GroupHeader } from '@/components/shell/group-header';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
+import { redirect } from 'next/navigation';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
 import { loadShareOptions } from '@/lib/share/load-options';
 import { SendToShare } from '@/components/share/send-to-share';
@@ -157,7 +159,10 @@ export default async function InventoryPage({
   const display = parseListDisplay(displaySpec, params);
   // While searching, relevance decides the order, so the sorts come out of
   // the panel rather than sitting there marked as chosen and doing nothing.
-  const fullMenu = listDisplayMenu(displaySpec, params);
+  const savedViews = await savedViewsFor(await createCoreClient(), displaySpec.pathname);
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+  const fullMenu = listDisplayMenu(displaySpec, params, savedViews);
   const menu = q ? { ...fullMenu, sorts: [], sortLabel: null } : fullMenu;
 
   await backfillUserInventoryDisplay(supabase, user.id);
