@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
+import { consequenceFrom, type RaiseConsequence } from './consequence';
 
 /**
  * What sessions have raised, read for the dev pages.
@@ -25,6 +26,18 @@ export type RaisedRow = {
    * for it — everything raised from here carries one.
    */
   ask: string | null;
+  /**
+   * What answering yes does: the action itself, and the sentence the page
+   * shows under the ask. Null on the rows filed before there was a column for
+   * it — everything raised from here names one.
+   */
+  consequence: RaiseConsequence | null;
+  /**
+   * What closing it produced: what the action did, or the reason there was
+   * none. Null on a raise that closed into nothing, which is what the page
+   * shows as still waiting on its own follow-through.
+   */
+  outcome: string | null;
   /** The workspace it is about, or null for the app as a whole. */
   module: ModuleId | null;
   /** Which run raised it, and what it was doing. Free text from the session. */
@@ -40,6 +53,8 @@ export type RaisedRow = {
 export interface RaisedQueue {
   rows: RaisedRow[];
   open: RaisedRow[];
+  /** Answered, but nothing was recorded as having come of it. */
+  unfinished: RaisedRow[];
   closed: RaisedRow[];
   openCount: number;
 }
@@ -48,23 +63,44 @@ export function isOpen(row: RaisedRow): boolean {
   return row.status === 'open';
 }
 
+/**
+ * Answered, and nothing came of it.
+ *
+ * The #342 raise was answered yes and closed while the thing it described was
+ * still possible. A raise that reached `answered` without an action or a
+ * reason for none is not finished, whatever its status says, so it is listed
+ * as waiting on its own follow-through rather than among the closed rows. A
+ * dismissal is not this: putting one aside without saying anything is allowed.
+ */
+export function needsFollowThrough(row: RaisedRow): boolean {
+  return row.status === 'answered' && !row.outcome;
+}
+
 /** Every column the app reads off a raise, and the thread under it. */
 export const RAISED_COLUMNS =
-  'id, title, detail, ask, module, source, status, created_at, answered_at, ' +
+  'id, title, detail, ask, consequence, outcome, module, source, status, created_at, ' +
+  'answered_at, ' +
   `thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
-  const scope = row.module as string | null;
+  const raw = row.module as string | null;
+  // Named `scope` rather than `module`, which Next reserves. A module removed
+  // from lib/modules reads back as the whole app, and the consequence's
+  // sentence has to say the same thing, so it is read from what the row ends
+  // up with rather than from the column.
+  const scope = raw && isModuleId(raw) ? raw : null;
   return {
     id: row.id as string,
     title: row.title as string,
     detail: (row.detail as string | null) ?? null,
     ask: (row.ask as string | null) ?? null,
+    consequence: consequenceFrom(row.consequence, scope),
+    outcome: (row.outcome as string | null) ?? null,
     // A module removed from lib/modules leaves a harmless string in the
     // column, and it reads back as the whole app rather than as a workspace
     // nothing can look up. Same as ideas.
-    module: scope && isModuleId(scope) ? scope : null,
+    module: scope,
     source: (row.source as string | null) ?? null,
     status: row.status as RaisedStatus,
     createdAt: row.created_at as string,
@@ -74,16 +110,27 @@ export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
 }
 
 /**
- * Open first, newest first within each half — the same shape the notes queue
- * uses, for the same reason: what is still waiting on you goes at the top, and
- * the answered ones are history you scroll to.
+ * Open first, then the ones that closed into nothing, then the rest — newest
+ * first within each. What is waiting on you goes at the top for the same
+ * reason the notes queue does it; the ones that produced nothing go under it
+ * because they are not finished either, and a page that filed them with the
+ * history is the page the #342 raise disappeared into.
  */
 export function raisedQueueFrom(rows: readonly RaisedRow[]): RaisedQueue {
   const byNewest = (a: RaisedRow, b: RaisedRow) => b.createdAt.localeCompare(a.createdAt);
   const open = rows.filter(isOpen).sort(byNewest);
-  const closed = rows.filter((row) => !isOpen(row)).sort(byNewest);
+  const unfinished = rows.filter(needsFollowThrough).sort(byNewest);
+  const closed = rows
+    .filter((row) => !isOpen(row) && !needsFollowThrough(row))
+    .sort(byNewest);
 
-  return { rows: [...open, ...closed], open, closed, openCount: open.length };
+  return {
+    rows: [...open, ...unfinished, ...closed],
+    open,
+    unfinished,
+    closed,
+    openCount: open.length,
+  };
 }
 
 /**

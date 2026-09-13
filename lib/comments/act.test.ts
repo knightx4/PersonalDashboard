@@ -1,6 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { carryOut, type ActInput } from './act';
+import { handStepToClaude } from '@/lib/plan/handover';
 import type { DashAction } from './reply-payload';
+
+// The hand-over is its own tested unit and reads the whole plan tree; what
+// matters here is which step id reaches it.
+vi.mock('@/lib/plan/handover', () => ({
+  handStepToClaude: vi.fn(async () => ({
+    ok: true,
+    number: 342,
+    title: 'Refuse a second session on a step',
+    beneath: 0,
+    detail: 'The routine is running.',
+    changed: true,
+  })),
+}));
 
 type Write = { table: string; op: 'insert' | 'update'; row: Record<string, unknown> };
 
@@ -20,15 +34,13 @@ function db(options: { row?: Record<string, unknown> | null; error?: { message: 
           return Promise.resolve({ error });
         },
         select() {
-          return {
-            eq() {
-              return {
-                maybeSingle() {
-                  return Promise.resolve({ data: options.row ?? null });
-                },
-              };
-            },
+          // `eq` chains, because a lookup by number filters on the account as
+          // well: eq('user_id').eq('number').maybeSingle().
+          const filtered = {
+            eq: () => filtered,
+            maybeSingle: () => Promise.resolve({ data: options.row ?? null }),
           };
+          return filtered;
         },
         update(row: Record<string, unknown>) {
           writes.push({ table, op: 'update', row });
@@ -195,13 +207,37 @@ describe('rewording the row a comment is on', () => {
 });
 
 describe('sending a step to be built', () => {
-  it('will not start anything from a comment that is not on a plan step', async () => {
+  it('will not start anything from a row that is not a step and names none', async () => {
     for (const target of ['idea', 'raise', 'note'] as const) {
       const { writes, supabase } = db();
       const outcome = await carryOut(input({ supabase, target, action: action({ name: 'send_step' }) }));
       expect(writes).toHaveLength(0);
       expect(outcome.ok === false && outcome.why).toContain('nothing was started');
     }
+  });
+
+  // A raise has no step of its own, so its consequence names one by number --
+  // "yes, build #342". The number is looked up under the caller's own id.
+  it('sends the step a raise named by number', async () => {
+    const { supabase } = db({ row: { id: 'step-342' } });
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', id: 'raise-1', action: action({ name: 'send_step', text: '#342' }) }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(vi.mocked(handStepToClaude)).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', id: 'step-342' }),
+    );
+  });
+
+  it('says so when the number a raise named is not a step of yours', async () => {
+    const { supabase } = db({ row: null });
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', id: 'raise-1', action: action({ name: 'send_step', text: '#9999' }) }),
+    );
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.why).toContain('nothing was started');
   });
 });
 

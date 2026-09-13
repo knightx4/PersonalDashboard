@@ -226,7 +226,28 @@ function rewritten(what: string, now: string, was: string | null): string {
 }
 
 /**
- * Hand the step the comment is on to a session, and start it now.
+ * Which step to send, when the row this is on is not itself a step.
+ *
+ * A comment on a step means that step. A raise means whichever step its
+ * consequence named, because a raise whose answer is "build #342" has no step
+ * of its own to point at. The number is looked up under the caller's own id,
+ * so a number belonging to somebody else finds nothing.
+ */
+async function stepNamed(input: ActInput): Promise<string | null> {
+  const number = Number(input.action.text?.trim().replace(/^#/, ''));
+  if (!Number.isInteger(number) || number <= 0) return null;
+
+  const { data } = await input.supabase
+    .from('plan_items')
+    .select('id')
+    .eq('user_id', input.userId)
+    .eq('number', number)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * Hand a plan step to a session, and start it now.
  *
  * The same rules as the button on the plan page, because they are the same
  * function: a proposal is not work yet, a question and a blocked step are
@@ -235,17 +256,19 @@ function rewritten(what: string, now: string, was: string | null): string {
  * thread says, so a comment that started nothing says why.
  */
 async function sendStep(input: ActInput): Promise<ActOutcome> {
-  if (input.target !== 'step') {
+  const id = input.target === 'step' ? input.id : await stepNamed(input);
+  if (!id) {
     return {
       ok: false,
-      why: 'I can only send a plan step to be built, and this comment is not on one, so nothing was started.',
+      why:
+        'This is not a plan step and nothing here names one by number, so nothing was started.',
     };
   }
 
   const sent = await handStepToClaude({
     supabase: input.supabase,
     userId: input.userId,
-    id: input.id,
+    id,
   });
   if (!sent.ok) return { ok: false, why: `I did not send it: ${sent.error}` };
 

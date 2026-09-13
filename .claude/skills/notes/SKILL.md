@@ -218,7 +218,8 @@ against:
 
 ```
 npx tsx scripts/plan.ts raises
-npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>]
+npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
+                                            [--detail "…"] [--module <id>]
 ```
 
 `DATABASE_URL` is not set on the web, so the SQL for both is in

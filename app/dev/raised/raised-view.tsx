@@ -2,12 +2,12 @@
 
 import { useActionState, useState } from 'react';
 import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
-import { answerRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
+import { decideRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
+import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
 import { cardVariants } from '@/components/ui/card';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -39,6 +39,23 @@ function Ask({ ask }: { ask: string }) {
 }
 
 /**
+ * What a yes does, said before you give it. The #342 raise was answered yes,
+ * closed, and produced nothing; reading the action first is what makes the
+ * answer worth something. A raise filed before there was a column for it shows
+ * nothing here.
+ */
+function Consequence({ said }: { said: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
+        Answering yes
+      </p>
+      <p className="whitespace-pre-wrap text-body text-ink-muted">{said}</p>
+    </div>
+  );
+}
+
+/**
  * The first sentence of the detail, for the closed line of the fold — law 10
  * wants the summary to say whether opening it is worth it.
  */
@@ -59,46 +76,81 @@ function StatusLabel({ row }: { row: RaisedRow }) {
 }
 
 /**
- * Writing an answer. Closed until asked for (law 14): the reason to open this
- * page is to read what is waiting, and a box under every raise would be the
- * page.
+ * How a raise closes, and the only way it does.
+ *
+ * Yes runs the action it named and writes what happened into the thread, with
+ * no second press: #359 settled that what you asked for is done and reported.
+ * It is offered only on a raise that named one.
+ *
+ * The other way out is a reason, and it is offered on every raise, because a
+ * raise closes on what it produced or on why nothing was needed. Answering in
+ * free words used to close one too, which is how the #342 raise read as
+ * handled for a day while what it described was still possible.
+ *
+ * "Yes, and…" opens a box for anything the declared action does not cover —
+ * "take a look at the bug I just sent in too" — which is read as a comment on
+ * the raise once the action has run. Closed until asked for (law 14): the
+ * common answer is one press.
  */
-function AnswerRaise({ row }: { row: RaisedRow }) {
-  const [state, action, pending] = useActionState(answerRaise, {} as RaisedActionState);
-  const [writing, setWriting] = useState(false);
+function Decide({ row }: { row: RaisedRow }) {
+  const [state, action, pending] = useActionState(decideRaise, {} as RaisedActionState);
+  const [saying, setSaying] = useState<'nothing' | 'more' | 'why not'>('nothing');
 
-  // Close once it has saved, the same as the ideas composer: the answer
-  // appearing in the thread is the confirmation.
-  const [seen, setSeen] = useState<string | undefined>(undefined);
-  if (state.message !== seen) {
-    setSeen(state.message);
-    if (state.message && !state.error) setWriting(false);
-  }
-
-  if (!writing) {
+  if (saying === 'why not') {
     return (
-      <Button type="button" size="sm" variant="secondary" onClick={() => setWriting(true)}>
-        {row.thread.length === 0 ? 'Answer' : 'Reply'}
-      </Button>
+      <form action={action} className="w-full space-y-2">
+        <input type="hidden" name="id" value={row.id} />
+        <input type="hidden" name="answer" value="no" />
+        <Textarea
+          name="body"
+          rows={2}
+          autoFocus
+          placeholder="What this came to, or why nothing was needed. It is what the raise closes on."
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" size="sm" variant="secondary" pending={pending}>
+            Close it
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSaying('nothing')}>
+            Cancel
+          </Button>
+          <FieldError>{state.error}</FieldError>
+        </div>
+      </form>
     );
   }
 
   return (
     <form action={action} className="w-full space-y-2">
       <input type="hidden" name="id" value={row.id} />
-      <Textarea
-        name="body"
-        rows={3}
-        autoFocus
-        placeholder="What you want done about it. The next session reads this before it starts."
-      />
+      <input type="hidden" name="answer" value="yes" />
+      {saying === 'more' && (
+        <Textarea
+          name="body"
+          rows={2}
+          autoFocus
+          placeholder="Anything the action above does not cover. It is read as a comment on this raise."
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" pending={pending}>
-          {row.thread.length === 0 ? 'Answer' : 'Reply'}
+        {row.consequence && (
+          <Button type="submit" size="sm" pending={pending}>
+            Yes, do it
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="sm"
+          variant={row.consequence ? 'secondary' : 'primary'}
+          onClick={() => setSaying('why not')}
+        >
+          Close with a reason
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setWriting(false)}>
-          Cancel
-        </Button>
+        {row.consequence && saying === 'nothing' && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSaying('more')}>
+            Yes, and…
+          </Button>
+        )}
         <FieldError>{state.error}</FieldError>
       </div>
     </form>
@@ -134,6 +186,7 @@ function RaiseCard({ row }: { row: RaisedRow }) {
       {row.ask ? (
         <>
           <Ask ask={row.ask} />
+          {row.consequence && <Consequence said={row.consequence.said} />}
           {row.detail && (
             <Disclosure title="Why it came up" meta={lead(row.detail)}>
               <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
@@ -158,8 +211,11 @@ function RaiseCard({ row }: { row: RaisedRow }) {
         placeholder="Something about this raise that is not the answer to it. Tag @dash to ask; it stays open."
       />
 
+      {/* Also on one that reached answered with nothing recorded: that raise is
+          not finished, and the way to finish it is the same as any other. */}
+      {(row.status === 'open' || needsFollowThrough(row)) && <Decide row={row} />}
+
       <div className="flex flex-wrap items-center gap-2">
-        {row.status !== 'dismissed' && <AnswerRaise row={row} />}
         {row.status === 'open' ? (
           <form action={dismissAction}>
             <input type="hidden" name="id" value={row.id} />
@@ -184,6 +240,10 @@ function RaiseCard({ row }: { row: RaisedRow }) {
 /**
  * What sessions have asked you, open ones first.
  *
+ * Under them, the ones that were answered and produced nothing. They are not
+ * waiting on you — you already answered — and they are not finished either, so
+ * they are listed rather than filed with the history.
+ *
  * Answered and dismissed rows go under a disclosure rather than in the list:
  * the reason to open this page is what is still waiting, and a closed raise is
  * kept so that a session can read the answer back rather than so you can read
@@ -207,6 +267,24 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
           </h2>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.open.map((row) => (
+              <RaiseCard key={row.id} row={row} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {queue.unfinished.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-body font-semibold text-ink">
+            Answered, nothing done{' '}
+            <span className="font-normal text-ink-muted">({queue.unfinished.length})</span>
+          </h2>
+          <p className="text-small text-ink-muted">
+            These closed without anything coming of them. Run what they asked for, or close one
+            with the reason nothing was needed.
+          </p>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+            {queue.unfinished.map((row) => (
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
