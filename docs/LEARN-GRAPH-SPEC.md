@@ -70,6 +70,14 @@ already runs on. "Standard in any intermediate macro sequence" and "inferred
 from the goal, not checked against a syllabus" are different claims about a
 node, and the difference is visible.
 
+Every node carries two to four **checks** as well: short statements of what
+having the idea actually looks like — what it rules out, how it applies to a
+case with the numbers changed, what the standard objection to it is. Every path
+that creates a concept writes them, and they are on the approval screen before
+the chain is saved, so a bad check can be refused before it is stored. A
+question is written against one of the checks rather than against the claim in
+general.
+
 ## The graph is never finished
 
 It is not generated once. Generation is simply the first growth event. After
@@ -141,6 +149,11 @@ carries how it was established — `tested`, `inferred`, or `declared` — becau
 "you told me you knew this" and "you answered three questions on it" should not
 look the same on a screen.
 
+Every question records which of the concept's checks it tested. The states do
+not read that record — one correct answer still settles a concept, whether or
+not its other checks have been asked about — but the progress bar does, and
+that is the next section.
+
 ## The progress bar
 
 Not a percentage of a fixed list, because there is no fixed list. It measures
@@ -149,13 +162,26 @@ actually arrives: fast at first, then slower and slower.
 
     filled = 1 − 0.85 ^ w
 
-`w` is information weight, not question count:
+`w` is information weight, not question count. What an answer is worth is
+decided by the check the question tested and what earlier answers did with that
+same check, not by whether the concept was already settled:
 
 | what happened | weight |
 | --- | --- |
-| settled a concept that was unknown | 1.0 |
-| reinforced one already settled | 0.3 |
+| got a check right that no earlier answer had got right | 1.0 |
+| missed a check you had not missed before | 1.0 |
+| answered about a check an earlier answer already got right | 0.3 |
+| missed again a check you have already missed | 0 |
 | inconclusive — ambiguous answer, or a question that failed its own check | 0 |
+
+A check counts as covered only once you have got it right, so the answer that
+closes a gap earns the full amount even though an earlier answer missed it. A
+first miss earns the full amount too, because it is what found the gap; missing
+the same check again earns nothing.
+
+A concept that carries no checks has nothing to weigh from, so it keeps the
+older rule: 1.0 for settling it when it was unknown, 0.3 for reinforcing one
+already settled.
 
 Ten clean questions puts the bar at 80%. Twenty puts it at 96%. Forty puts it
 at 99.8%. It never reaches 100%, and that is not a trick — nothing here can
@@ -163,7 +189,8 @@ establish that you know a subject, and a bar that hits 100% would be claiming
 it did. Display caps at 99%.
 
 Weighting by information rather than by questions answered is what stops the
-bar rewarding you for answering ten easy questions about the same node.
+bar rewarding you for answering ten easy questions about the same node, or ten
+about the same part of one.
 
 ## What it costs, and the one decision that decides it
 
@@ -209,12 +236,12 @@ than merely unlikely.
 | table | holds |
 | --- | --- |
 | `subjects` | the container. name, one row per subject per user |
-| `concepts` | a node: name, claim, basis, how it got here |
+| `concepts` | a node: name, claim, basis, its two to four checks, how it got here |
 | `concept_edges` | prerequisite → dependent, within one subject, acyclic |
 | `concept_mentions` | one claim refers to another: source, target, why. Both directions allowed |
 | `goals` | what you typed, the concept it resolved to, and its status |
 | `concept_state` | one row per concept: state, how established, when tested, any named misconception |
-| `probes` | every question asked: options, correct index, its reason, what you chose, the weight it earned |
+| `probes` | every question asked: the check it tested, options, correct index, its reason, what you chose, the weight it earned |
 
 `concept_mentions` is the one relation nothing walks. An edge says you cannot
 understand this without that first; a mention says this claim brings that one
