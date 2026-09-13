@@ -86,6 +86,8 @@ export async function addComment(
   // way: the comment is written, and when no reply could be produced the thread
   // says why.
   revalidatePath(TARGET_PATH[target.data]);
+  // And the page an action wrote to, when that was somewhere else.
+  if (asked.ok && asked.redraw) revalidatePath(asked.redraw);
   return { message: asked.ok ? asked.message : asked.error };
 }
 

@@ -317,3 +317,88 @@ describe('what has been put aside', () => {
     expect(dismissedUnder(findNode(clean, 'plain')!)).toBe('');
   });
 });
+
+describe('the comments a hand-over carries', () => {
+  // The numbers below are asserted literally.
+  counter = 0;
+
+  function said(id: string, author: 'me' | 'claude', body: string, at: string) {
+    return { id, author, body, createdAt: `2026-02-01T0${at}:00:00Z` };
+  }
+
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'feature',
+        title: 'Share links',
+        acceptance: 'A link opens without an account.',
+        thread: [
+          said('c1', 'me', 'Keep the whole thing behind one token.', '1'),
+          said('c2', 'claude', 'Then the token is what the RLS policy reads.', '2'),
+        ],
+      }),
+      item({
+        id: 'page',
+        title: 'The anonymous page',
+        parentId: 'feature',
+        comment: 'Waiting on the RPC review.',
+        thread: [said('c3', 'me', 'No prices on this one.', '3')],
+      }),
+      item({ id: 'form', title: 'The form', parentId: 'feature' }),
+      item({
+        id: 'aside',
+        title: 'A question put aside',
+        parentId: 'feature',
+        kind: 'decision',
+        dismissedAt: '2026-02-02T00:00:00Z',
+        thread: [said('c4', 'me', 'Not now.', '4')],
+      }),
+    ],
+    dependencies: [],
+  });
+
+  const feature = findNode(sections, 'feature')!;
+  const page = findNode(sections, 'page')!;
+
+  it('says nothing about them unless the hand-over asks', () => {
+    expect(planBrief(sections, feature)).not.toContain('## Comments');
+    expect(planBrief(sections, page)).toBe(planBrief(sections, page, {}));
+  });
+
+  it('carries the comments on the step, oldest first and marked', () => {
+    const brief = planBrief(sections, page, { thread: true });
+    expect(brief).toContain('## Comments\n\nLeft on these rows, oldest first.');
+    expect(brief).toContain('On #2 The anonymous page:\n\n- The person: No prices on this one.');
+  });
+
+  it('carries the comments on the steps beneath it as well, grouped by row', () => {
+    const brief = planBrief(sections, feature, { thread: true });
+    expect(brief).toContain(
+      'On #1 Share links:\n\n- The person: Keep the whole thing behind one token.\n' +
+        '- Claude: Then the token is what the RLS policy reads.',
+    );
+    expect(brief).toContain('On #2 The anonymous page:\n\n- The person: No prices on this one.');
+  });
+
+  it('leaves out what has been put aside, the same as the checklist', () => {
+    expect(planBrief(sections, feature, { thread: true })).not.toContain('Not now.');
+  });
+
+  it('gives a step nobody has commented on the brief it had', () => {
+    const form = findNode(sections, 'form')!;
+    expect(planBrief(sections, form, { thread: true })).toBe(planBrief(sections, form));
+  });
+
+  it('puts them after the notes', () => {
+    const brief = planBrief(sections, page, { thread: true });
+    expect(brief.indexOf('## Comments')).toBeGreaterThan(brief.indexOf('## Notes'));
+  });
+
+  it('carries them through a queue as well', () => {
+    const queue = [page, feature];
+    expect(planQueueBrief(sections, queue, { thread: true })).toContain(
+      '- The person: No prices on this one.',
+    );
+    expect(planQueueBrief(sections, queue)).not.toContain('## Comments');
+  });
+});

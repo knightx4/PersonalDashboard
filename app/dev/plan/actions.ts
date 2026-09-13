@@ -27,14 +27,15 @@ import {
   type PlanStatus,
 } from '@/lib/plan/load';
 import { hasLiveClaim } from '@/lib/plan/elapsed';
+import { handStepToClaude } from '@/lib/plan/handover';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
-  ancestorsOf,
   buildPlanTree,
   findNode,
   flatten,
   handedToClaude,
   isWaitingOnThePerson,
+  topFeatureOf,
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
@@ -758,7 +759,7 @@ export async function answerPlanDecision(
   const answered = findNode(after, id.data);
   if (!answered) return { message: 'Answered.' };
 
-  const feature = featureOf(after, answered);
+  const feature = topFeatureOf(after, answered);
   // A question put aside is not one the feature is still waiting on, so it
   // does not hold the re-shape back for ever.
   const stillOpen = flatten([feature]).filter(
@@ -879,102 +880,20 @@ export async function sendPlanItemToClaude(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
 
-  const data = await loadPlan(supabase, user.id);
-  const sections = buildPlanTree(data);
-  const node = findNode(sections, id.data);
-  if (!node) return { error: 'That step no longer exists.' };
+  // Every rule about what may be sent is in lib/plan/handover.ts, because a
+  // comment can now ask for the same thing and the two ways in have to refuse
+  // the same steps.
+  const sent = await handStepToClaude({ supabase, userId: user.id, id: id.data });
+  if (!sent.ok) return { error: sent.error };
+  if (sent.changed) revalidatePlan();
 
-  // Same rule as the hand-over: a question you have not answered and a step
-  // blocked on something outside the repo are both waiting on you, and starting
-  // a session on either sends it at a wall it cannot get past.
-  if (isWaitingOnThePerson(node)) {
-    return {
-      error:
-        node.status === 'blocked'
-          ? `#${node.number} is blocked on something outside the repo. Clear what it is waiting on first -- its note says what.`
-          : `#${node.number} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
-    };
-  }
-
-  // One session per feature at a time.
-  //
-  // Two sessions were sent at #342 within moments of each other on 13
-  // September, and both would have been editing the same files. Nothing but
-  // timing kept them apart, because nothing here knew the other was running.
-  //
-  // A step already underway refuses on its own account; another step under the
-  // same feature refuses because a batch run holds the whole feature and a
-  // second session would land in the middle of it.
-  //
-  // Only a live claim refuses. A claim nothing has touched for two hours is a
-  // session that stopped without closing its step, and a guard that took the
-  // status at its word left the feature refusing work forever -- a lock
-  // outliving the run it was protecting is worse than the collision it was
-  // added for. The page has read the clock beside the status since it started
-  // calling these stalled; this reads the same clock.
-  const feature = featureOf(sections, node);
-  const now = Date.now();
-  const underway = flatten([feature]).filter((step) => hasLiveClaim(step, now));
-  const other = underway.find((step) => step.id !== node.id);
-  if (underway.some((step) => step.id === node.id)) {
-    return {
-      error: `#${node.number} is already underway. Put it back to not started first if the session that had it is gone.`,
-    };
-  }
-  if (other) {
-    return {
-      error: `#${other.number} ${other.title} is underway under the same feature. Wait for it, or put it back to not started if its session is gone.`,
-    };
-  }
-
-  // Handed over and underway, in the one write. A step sent to Claude is being
-  // built from the moment the routine wakes, and a plan still reading "not
-  // started" while a session works it is the plan lying about itself -- the one
-  // thing it is not allowed to do. `started_at` comes from the trigger, so the
-  // page can also say how long it has been going.
-  const patch: Record<string, string> = {};
-  if (node.assignee !== 'claude') patch.assignee = 'claude';
-  // Only a step nobody has started moves. A blocked one keeps its status and
-  // its reason, and one already underway keeps the clock it started on.
-  if (node.status === 'not_started') patch.status = 'in_progress';
-  if (Object.keys(patch).length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update(patch)
-      .eq('id', node.id)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-    revalidatePlan();
-  }
-
-  const text =
-    `Build plan step #${node.number}, "${node.title}", following .claude/skills/plan/SKILL.md. ` +
-    'The brief is below; it is the plan as the app holds it right now, and the plan is the ' +
-    'source of truth -- claim the step, build it, verify, commit with the step number in the ' +
-    'subject, and close it with a note.\n\n' +
-    planBrief(sections, node);
-
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
-    text,
-  });
-  if (!result.ok) return { error: result.error };
-
-  // What went with it, when something did.
-  //
-  // This button sends one step, but the brief carries that step's whole
-  // subtree under "## Steps" -- so pressing it on a higher-level row hands over
-  // rather more than the row you clicked, and "Sent." was the only thing said
-  // about it. The count is every row beneath, at any depth, because that is
-  // what the brief prints.
-  const beneath = flatten([node]).length - 1;
+  // What went with it, when something did. "Sent." on its own said nothing
+  // about the subtree that travelled in the brief.
   return {
     message:
-      beneath === 0
-        ? `Sent #${node.number}. ${result.detail}`
-        : `Sent #${node.number}, with ${beneath} ${beneath === 1 ? 'step' : 'steps'} beneath it. ${result.detail}`,
+      sent.beneath === 0
+        ? `Sent #${sent.number}. ${sent.detail}`
+        : `Sent #${sent.number}, with ${sent.beneath} ${sent.beneath === 1 ? 'step' : 'steps'} beneath it. ${sent.detail}`,
   };
 }
 
@@ -1074,7 +993,7 @@ export async function sendPlanFeatureToClaude(
     'Push once at the end of the batch and report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
-    planBrief(sections, node);
+    planBrief(sections, node, { thread: true });
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({
@@ -1111,17 +1030,6 @@ export async function sendPlanFeatureToClaude(
  * It refuses a proposal -- there is nothing agreed there to adapt -- and a leaf
  * step, which has nothing beneath it to re-read.
  */
-/**
- * The feature a step belongs to: the highest step above it, or itself.
- *
- * A re-shape reads a whole feature, so a decision three levels down still
- * sends the top of its tree.
- */
-function featureOf(sections: readonly PlanSection[], node: PlanNode): PlanNode {
-  const ancestors = ancestorsOf(sections, node.id);
-  return ancestors[0] ?? node;
-}
-
 /**
  * Start a re-shape of one feature.
  *
@@ -1174,7 +1082,7 @@ async function startReshape(
     `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
-    planBrief(sections, node) +
+    planBrief(sections, node, { thread: true }) +
     (dismissed ? `\n${dismissed}` : '');
 
   const routine = planRoutine();
@@ -1281,7 +1189,7 @@ export async function sendPlanQueueToClaude(
     'running short. Push once at the end and report every step you closed, by number and ' +
     'title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
     'plan is the source of truth.\n\n' +
-    planQueueBrief(sections, queue);
+    planQueueBrief(sections, queue, { thread: true });
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({
