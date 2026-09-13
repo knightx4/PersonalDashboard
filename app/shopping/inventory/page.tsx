@@ -1,4 +1,4 @@
-import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
+import { Package, Search, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
@@ -12,7 +12,7 @@ import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { ChipSelect, Input } from '@/components/ui/field';
+import { Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
@@ -26,14 +26,16 @@ import {
 } from '@/lib/inventory/attribute-filters';
 import { parseAttributeValues, parseTemplateFields } from '@/lib/inventory/attributes';
 import { stackUnits, unitCostRange } from '@/lib/inventory/item-groups';
+import { inventoryDisplay, type SortableInventoryItem } from '@/lib/inventory/list-display';
 import {
-  GROUP_OPTIONS,
-  groupInventoryItems,
-  parseGroupId,
-  parseSortId,
-  SORT_OPTIONS,
-  sortInventoryItems,
-} from '@/lib/inventory/sort-group';
+  groupRows as bucketRows,
+  listDisplayMenu,
+  NO_GROUP,
+  parseListDisplay,
+  sortRows,
+} from '@/lib/list-display';
+import { DisplayMenu } from '@/components/shell/display-menu';
+import { GroupHeader } from '@/components/shell/group-header';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -68,6 +70,7 @@ function inventoryHref(opts: {
   range?: string;
   sort?: string;
   group?: string;
+  hide?: string[];
   person?: string;
   attrs?: AttributeFilter[];
 }): string {
@@ -79,6 +82,7 @@ function inventoryHref(opts: {
   if (opts.list) params.set('list', opts.list);
   if (opts.sort && opts.sort !== 'newest') params.set('sort', opts.sort);
   if (opts.group && opts.group !== 'none') params.set('group', opts.group);
+  if (opts.hide && opts.hide.length > 0) params.set('hide', opts.hide.join(','));
   if (opts.person) params.set('person', opts.person);
   for (const attr of opts.attrs ?? []) params.append('attr', serializeAttributeFilter(attr));
   const qs = params.toString();
@@ -127,6 +131,7 @@ export default async function InventoryPage({
     range?: string;
     sort?: string;
     group?: string;
+    hide?: string | string[];
     person?: string;
     attr?: string | string[];
   }>;
@@ -143,9 +148,17 @@ export default async function InventoryPage({
   const merchantId = parseMerchantId(params.merchant);
   const listId = parseListId(params.list);
   const range = RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
-  const sort = parseSortId(params.sort);
-  const group = parseGroupId(params.group);
   const attrFilters = parseAttributeFilters(params.attr);
+
+  // Sort, grouping and hidden columns, all read out of the URL by the shared
+  // module. The ids and the defaults are the ones this list has always used,
+  // so a bookmarked inventory link opens the view it opened before.
+  const displaySpec = inventoryDisplay<SortableInventoryItem>();
+  const display = parseListDisplay(displaySpec, params);
+  // While searching, relevance decides the order, so the sorts come out of
+  // the panel rather than sitting there marked as chosen and doing nothing.
+  const fullMenu = listDisplayMenu(displaySpec, params);
+  const menu = q ? { ...fullMenu, sorts: [], sortLabel: null } : fullMenu;
 
   await backfillUserInventoryDisplay(supabase, user.id);
 
@@ -385,7 +398,7 @@ export default async function InventoryPage({
 
   const searched = q ? filterAndRankBySearch(byAttributes, q) : byAttributes;
   // Relevance wins while searching; otherwise honor the sort control.
-  const finalItems = q ? searched : sortInventoryItems(searched, sort);
+  const finalItems = q ? searched : sortRows(searched, display);
 
   // Fold copies into items, after sorting rather than before: the sort control
   // orders what the user is looking at, and a stack takes the position of its
@@ -414,7 +427,9 @@ export default async function InventoryPage({
     };
   });
 
-  const groups = groupInventoryItems(stackRows, group);
+  const groups = bucketRows(stackRows, display.groupBy, (rows) =>
+    rows.reduce((sum, item) => sum + item.cost_cents, 0),
+  );
 
   const filtered = Boolean(
     q || categoryId || activeMerchant || activeList || range !== 'all' || attrFilters.length,
@@ -433,8 +448,9 @@ export default async function InventoryPage({
     category: categoryId,
     merchant: activeMerchant,
     list: activeList,
-    sort,
-    group,
+    sort: display.sort,
+    group: display.group,
+    hide: display.hidden,
     person: personId ?? undefined,
     attrs: attrFilters,
   };
@@ -700,44 +716,16 @@ export default async function InventoryPage({
               />
             </div>
 
-            {/* Sort and group are chips rather than two 160px bordered selects
-              with a glyph beside each. Their value is their own label -- "Most
-              recent", "By category" -- so the caption they carried was
-              sr-only already, and the glyph says which property it is. Two
-              chips are a row where two boxed selects were a bar. Laws 9
-              and 12, and the same shape as the filter chips above them. */}
+            {/* One Display control where two selects were: the sorts, the
+              groupings and a switch per column, all of them links. #329 --
+              the rail narrows the list, this arranges the rows already in
+              it. Rendered next to the search box because that is where the
+              two selects sat, and both are about the list below them. */}
             <div className="flex flex-wrap items-center gap-2">
-              <ChipSelect
-                name="sort"
-                defaultValue={sort}
-                aria-label="Sort inventory"
-                // Disabled while searching: relevance wins, and a disabled
-                // control submits nothing, so the sort falls back on its own.
-                disabled={Boolean(q)}
-                className={q ? 'opacity-50' : undefined}
-                icon={<ArrowUpDown className="size-3.5" strokeWidth={2} />}
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </ChipSelect>
-              <ChipSelect
-                name="group"
-                defaultValue={group}
-                aria-label="Group inventory"
-                icon={<Layers className="size-3.5" strokeWidth={2} />}
-              >
-                {GROUP_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </ChipSelect>
+              <DisplayMenu menu={menu} align="start" />
               <SubmitOnChange />
-              {/* Hidden once the selects submit themselves; still there, and
-                still the only way through, with JavaScript off. */}
+              {/* Still the only way through with JavaScript off, and still
+                what submits the search box. */}
               <Button type="submit" variant="secondary" size="sm" data-fallback-submit>
                 Apply
               </Button>
@@ -769,20 +757,14 @@ export default async function InventoryPage({
             />
           ) : (
             <div className="space-y-5">
-              {groups.map((section) => {
-                const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
-                return (
+              {groups.map((section) => (
                   <section key={section.key} className="space-y-2">
-                    {group !== 'none' && (
-                      <div className="flex items-baseline justify-between gap-3 px-1">
-                        <h2 className="text-ui font-semibold text-ink">
-                          {section.label}
-                          <span className="ml-2 font-normal text-ink-muted">
-                            {section.items.length}
-                          </span>
-                        </h2>
-                        <p className="tabular text-small text-ink-muted">{formatMoney(subtotal)}</p>
-                      </div>
+                    {display.group !== NO_GROUP && (
+                      <GroupHeader
+                        label={section.label}
+                        count={section.count}
+                        subtotal={formatMoney(section.subtotal ?? 0)}
+                      />
                     )}
                     <ul
                       className={cn(
@@ -790,10 +772,11 @@ export default async function InventoryPage({
                         'divide-y divide-border overflow-hidden',
                       )}
                     >
-                      {section.items.map((item) => (
+                      {section.rows.map((item) => (
                         <InventoryRow
                           key={item.id}
                           item={item}
+                          hidden={display.hidden}
                           lists={(lists ?? []).map((list) => ({
                             id: list.id,
                             name: list.name,
@@ -802,8 +785,7 @@ export default async function InventoryPage({
                       ))}
                     </ul>
                   </section>
-                );
-              })}
+              ))}
             </div>
           )}
         </SelectionProvider>

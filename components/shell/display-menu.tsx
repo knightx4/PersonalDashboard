@@ -84,11 +84,16 @@ export function DisplayMenu({
           aria-label="Display options"
           className="w-64 space-y-4"
         >
-          <Section title="Sort">
-            {menu.sorts.map((sort) => (
-              <ChoiceRow key={sort.id} choice={sort} />
-            ))}
-          </Section>
+          {/* Empty on a list whose order is not the reader's to set -- a
+            * search ranked by relevance, say. An empty heading would offer a
+            * choice that is not there. */}
+          {menu.sorts.length > 0 && (
+            <Section title="Sort">
+              {menu.sorts.map((sort) => (
+                <ChoiceRow key={sort.id} choice={sort} />
+              ))}
+            </Section>
+          )}
 
           {menu.groups.length > 0 && (
             <Section title="Group">
