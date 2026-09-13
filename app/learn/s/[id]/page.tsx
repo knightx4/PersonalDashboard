@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { GoalForm } from '@/app/learn/know/goal-form';
@@ -41,11 +43,13 @@ function GoalSection({
   goalName,
   conceptId,
   subjectId,
+  timezone,
 }: {
   graph: Graph;
   goalName: string;
   conceptId: string;
   subjectId: string;
+  timezone: string;
 }) {
   const kept = pruneForGoal(graph, conceptId);
   const chain = learningOrder(graph, kept);
@@ -71,7 +75,12 @@ function GoalSection({
               ? 'One thing left, in the order it would be learned.'
               : `${chain.length} things left, in the order they would be learned. What you already know is not shown.`}
           </p>
-          <ConceptList concepts={chain} nextId={next?.id ?? null} subjectId={subjectId} />
+          <ConceptList
+            concepts={chain}
+            nextId={next?.id ?? null}
+            subjectId={subjectId}
+            timezone={timezone}
+          />
         </>
       )}
     </section>
@@ -114,11 +123,16 @@ export default async function SubjectPage({
   const showEverything = all === '1';
   const seeded = seededLine(known, shaky, unmatched);
 
+  const user = await requireUser();
   const supabase = await createLearnClient();
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals] = await Promise.all([loadGraph(supabase, id), loadGoals(supabase, id)]);
+  const [graph, goals, settings] = await Promise.all([
+    loadGraph(supabase, id),
+    loadGoals(supabase, id),
+    loadAccountSettings(user.id),
+  ]);
   const counts = countStates(graph);
   const live = goals.filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null);
 
@@ -193,6 +207,7 @@ export default async function SubjectPage({
             concepts={learningOrder(graph, graph.concepts.map((concept) => concept.id))}
             nextId={null}
             subjectId={id}
+            timezone={settings.timezone}
           />
         </>
       ) : live.length === 0 ? (
@@ -213,6 +228,7 @@ export default async function SubjectPage({
             goalName={goal.asked}
             conceptId={goal.conceptId!}
             subjectId={id}
+            timezone={settings.timezone}
           />
         ))
       )}

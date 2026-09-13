@@ -1,7 +1,12 @@
 import Link from 'next/link';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
+import {
+  ESTABLISHED_LABEL,
+  LastChecked,
+  STATE_LABEL,
+  StateMark,
+} from '@/components/learn/concept-state';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
 import type { Concept } from '@/lib/learn/graph/model';
 
@@ -17,10 +22,12 @@ export function ConceptRow({
   concept,
   next,
   subjectId,
+  timezone,
 }: {
   concept: Concept;
   next: boolean;
   subjectId: string;
+  timezone: string;
 }) {
   // A door is drawn bigger than what follows from it. The size is the whole
   // point of the mark on this page: forty rows at one weight say every claim
@@ -66,6 +73,8 @@ export function ConceptRow({
             : `${STATE_LABEL[concept.state]} — ${ESTABLISHED_LABEL[concept.established]}. ${concept.basis}`}
         </p>
 
+        <LastChecked concept={concept} timezone={timezone} />
+
         <div className="mt-2">
           <ReadAbout concept={concept} subjectId={subjectId} />
         </div>
@@ -78,10 +87,12 @@ function ConceptCard({
   concepts,
   nextId,
   subjectId,
+  timezone,
 }: {
   concepts: Concept[];
   nextId: string | null;
   subjectId: string;
+  timezone: string;
 }) {
   return (
     <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -91,6 +102,7 @@ function ConceptCard({
           concept={concept}
           next={concept.id === nextId}
           subjectId={subjectId}
+          timezone={timezone}
         />
       ))}
     </ul>
@@ -113,16 +125,26 @@ export function ConceptList({
   concepts,
   nextId,
   subjectId,
+  timezone,
 }: {
   concepts: Concept[];
   nextId: string | null;
   subjectId: string;
+  /** The account's timezone, for the day each claim was last checked on. */
+  timezone: string;
 }) {
   const doors = concepts.filter((concept) => concept.kind === 'threshold');
   const rest = concepts.filter((concept) => concept.kind !== 'threshold');
 
   if (doors.length === 0 || rest.length === 0) {
-    return <ConceptCard concepts={concepts} nextId={nextId} subjectId={subjectId} />;
+    return (
+      <ConceptCard
+        concepts={concepts}
+        nextId={nextId}
+        subjectId={subjectId}
+        timezone={timezone}
+      />
+    );
   }
 
   return (
@@ -131,11 +153,11 @@ export function ConceptList({
         <h3 className="mb-1 text-small font-semibold text-ink-muted">
           {doors.length === 1 ? 'The door' : 'The doors'}
         </h3>
-        <ConceptCard concepts={doors} nextId={nextId} subjectId={subjectId} />
+        <ConceptCard concepts={doors} nextId={nextId} subjectId={subjectId} timezone={timezone} />
       </div>
       <div>
         <h3 className="mb-1 text-small font-semibold text-ink-muted">What follows from them</h3>
-        <ConceptCard concepts={rest} nextId={nextId} subjectId={subjectId} />
+        <ConceptCard concepts={rest} nextId={nextId} subjectId={subjectId} timezone={timezone} />
       </div>
     </div>
   );
