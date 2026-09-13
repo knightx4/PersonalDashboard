@@ -104,6 +104,34 @@ export function ideaListFrom(rows: readonly IdeaRow[]): IdeaList {
 }
 
 /**
+ * The suggestions you turned down that came out of one feature.
+ *
+ * Read when that feature is re-read, and nowhere else. Without it a session
+ * writes the same follow-on again -- it is reading the same code and reaching
+ * the same thought -- and the page fills with things you have already said no
+ * to. The body is all the turn needs: it is there to be recognised, not
+ * followed.
+ */
+export async function loadDismissedSuggestions(
+  supabase: SupabaseClient,
+  userId: string,
+  planItemId: string,
+): Promise<Array<{ id: string; body: string }>> {
+  const { data } = await supabase
+    .from('ideas')
+    .select('id, body')
+    .eq('user_id', userId)
+    .eq('from_plan_item_id', planItemId)
+    .not('dismissed_at', 'is', null)
+    .order('created_at', { ascending: false });
+
+  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: row.id as string,
+    body: row.body as string,
+  }));
+}
+
+/**
  * Newest first: the reason to open this page is usually the thought you had
  * last week, not the one you had in March.
  */

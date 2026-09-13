@@ -1,6 +1,8 @@
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
+  hasLiveFog,
   isClosed,
+  isDismissed,
   type PlanAssignee,
   type PlanData,
   type PlanItem,
@@ -92,6 +94,7 @@ export const PLAN_VIEWS = [
   'claude',
   'blocked',
   'fog',
+  'dismissed',
 ] as const;
 export type PlanView = (typeof PLAN_VIEWS)[number];
 
@@ -108,6 +111,7 @@ export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   claude: "Claude's",
   blocked: 'Waiting',
   fog: 'Not specified',
+  dismissed: 'Dismissed',
 };
 
 /** The numbers across the whole plan, for the strip at the top of the page. */
@@ -142,6 +146,8 @@ export type PlanSummary = {
   claude: number;
   /** Steps carrying a "not yet specified" note, closed ones included. */
   fog: number;
+  /** Rows put aside, and rows whose fog was. The only count they appear in. */
+  dismissed: number;
 };
 
 /**
@@ -159,9 +165,21 @@ export type PlanSummary = {
  * is worth having only if it does not tell.
  */
 export function planProgress(
-  items: readonly { status: PlanStatus; dependsOn?: readonly PlanLink[] }[],
+  items: readonly {
+    status: PlanStatus;
+    dependsOn?: readonly PlanLink[];
+    dismissedAt?: string | null;
+  }[],
 ): PlanProgress {
-  const live = items.filter((item) => item.status !== 'dropped' && item.status !== 'proposed');
+  // A dismissed question is out of the denominator with the proposals and the
+  // dropped steps. It is not work anybody is doing, and counted it would hold
+  // a feature below 100% for as long as it stayed put aside.
+  const live = items.filter(
+    (item) =>
+      item.status !== 'dropped' &&
+      item.status !== 'proposed' &&
+      !isDismissed({ dismissedAt: item.dismissedAt ?? null }),
+  );
   const done = live.filter((item) => item.status === 'done').length;
   const inProgress = live.filter((item) => item.status === 'in_progress').length;
   const blocked = live.filter((item) => isBlocked(item)).length;
@@ -264,7 +282,10 @@ export function isReady(
 ): boolean {
   if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
   if (node.waitingOn.length > 0) return false;
-  if (node.children.some((child) => !isClosed(child.status))) return false;
+  // A dismissed step is not one of the steps outstanding. Left in, a question
+  // put aside would hold its feature open for good, which is the opposite of
+  // what dismissing it was for.
+  if (node.children.some((child) => !isClosed(child.status) && !isDismissed(child))) return false;
   if (ancestors.some((a) => ['blocked', 'dropped', 'proposed'].includes(a.status))) return false;
   return true;
 }
@@ -431,7 +452,9 @@ export function healthOf(
   // Dropped as well as done: a step decided against with live work under it is
   // the same wrong answer, and the open rows are the ones that need seeing.
   if (isClosed(node.status)) {
-    const open = descendantsOf(node).filter((child) => !isClosed(child.status));
+    const open = descendantsOf(node).filter(
+      (child) => !isClosed(child.status) && !isDismissed(child),
+    );
     if (open.length > 0) {
       const healths = new Set(open.map((child) => healthOf(child)));
       const worst = OPEN_HEALTH_RANK.find((health) => healths.has(health));
@@ -482,11 +505,16 @@ export type PlanTally = Record<PlanHealth, number>;
  * same reason: a feature's state is mostly a summary of the steps under it, so
  * counting both says "twelve things" about a module that has seven. Questions
  * are leaves and so are counted -- an unanswered one is exactly the kind of
- * thing this is meant to surface without being opened.
+ * thing this is meant to surface without being opened. A dismissed one is not:
+ * the count beside a module heading is one of the places it stopped being
+ * asked about.
  */
 export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
   const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
-  for (const leaf of leavesOf(nodes)) tally[healthOf(leaf)] += 1;
+  for (const leaf of leavesOf(nodes)) {
+    if (isDismissed(leaf)) continue;
+    tally[healthOf(leaf)] += 1;
+  }
   return tally;
 }
 
@@ -598,9 +626,13 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
  * opened.
  */
 export function needsThePerson(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'>,
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
+    dismissedAt?: string | null;
+  },
 ) {
   if (isClosed(node.status)) return false;
+  // Dismissing is how a row stops being on you without being settled.
+  if (isDismissed({ dismissedAt: node.dismissedAt ?? null })) return false;
   const health = healthOf(node);
   return health === 'unanswered' || health === 'proposed' || health === 'blocked';
 }
@@ -625,14 +657,27 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
       return !isClosed(node.status) && (isBlocked(node) || node.waitingOn.length > 0);
     // Closed steps included. A finished feature still carrying fog is the
     // case worth seeing: the work stopped and the gap it admitted to did not
-    // get filled. Nothing else on the page shows that.
+    // get filled. Nothing else on the page shows that. A patch you have put
+    // aside is not in it — that is what putting it aside meant.
     case 'fog':
-      return node.fog !== null;
+      return hasLiveFog(node);
+    // The one view that asks for what everything else hides: a question you
+    // are not answering now, and a row whose fog you have put aside. Both,
+    // because a feature can be here for its fog while it is otherwise live.
+    case 'dismissed':
+      return isDismissed(node) || node.fogDismissedAt !== null;
   }
 }
 
+/**
+ * A dismissed row leaves every view but the one that looks for it, and takes
+ * its own steps with it. Dropping it inside `matchesView` would not be enough:
+ * a parent stays when a child matches, so a dismissed question would come back
+ * the moment anything under it did.
+ */
 function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
   return nodes.flatMap((node) => {
+    if (isDismissed(node) && view !== 'dismissed') return [];
     const children = prune(node.children, view);
     const matches = matchesView(node, view);
     if (!matches && children.length === 0) return [];
@@ -652,12 +697,14 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  * "Open" keeps every module, empty or not, because it is the working view and
  * an empty module there is the invitation to plan it. The narrower views leave
  * out modules with nothing to show, so a narrowed page is a short one.
+ *
+ * "Everything" goes through the same pruning rather than past it, because
+ * dismissed rows are hidden from every view and it is a view.
  */
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
-  if (view === 'all') return [...sections];
   return sections
     .map((section) => ({ ...section, nodes: prune(section.nodes, view) }))
-    .filter((section) => view === 'open' || section.nodes.length > 0);
+    .filter((section) => view === 'open' || view === 'all' || section.nodes.length > 0);
 }
 
 /**
@@ -681,6 +728,7 @@ export function workOrder(
 ): PlanNode[] {
   return flattenSections(sections)
     .filter((node) => node.ready)
+    .filter((node) => !isDismissed(node))
     .filter((node) => (options.assignee ? node.assignee === options.assignee : true))
     .filter((node) => (options.assignee === 'claude' ? node.kind !== 'decision' : true))
     .sort((a, b) => a.priority - b.priority);
@@ -703,6 +751,7 @@ export function workOrder(
 export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
   return flattenSections(sections)
     .filter((node) => node.assignee === 'claude')
+    .filter((node) => !isDismissed(node))
     .filter((node) => !isClosed(node.status) && node.status !== 'proposed')
     .filter((node) => !isWaitingOnThePerson(node))
     .sort((a, b) => a.priority - b.priority);
@@ -735,7 +784,11 @@ export function isWaitingOnThePerson(
 }
 
 export function summarize(sections: readonly PlanSection[]): PlanSummary {
-  const nodes = flattenSections(sections);
+  const all = flattenSections(sections);
+  // Every count on the strip is over the rows still being asked about. A
+  // dismissed one is in exactly one of them, the one that says how many there
+  // are to find.
+  const nodes = all.filter((node) => !isDismissed(node));
   // Everything still outstanding, proposals included -- what the Open view
   // lists. The counts below it are about the decided work, so they keep the
   // narrower set: a proposal is not "ready", not "underway" and not Claude's.
@@ -752,6 +805,7 @@ export function summarize(sections: readonly PlanSection[]): PlanSummary {
     done: nodes.filter((node) => node.status === 'done').length,
     claude: open.filter((node) => node.assignee === 'claude' && !isWaitingOnThePerson(node))
       .length,
-    fog: nodes.filter((node) => node.fog !== null).length,
+    fog: nodes.filter((node) => hasLiveFog(node)).length,
+    dismissed: all.filter((node) => isDismissed(node) || node.fogDismissedAt !== null).length,
   };
 }
