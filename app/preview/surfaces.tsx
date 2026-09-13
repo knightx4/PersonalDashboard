@@ -1671,7 +1671,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => (
-      <ConceptList concepts={subjectConcepts} nextId="k1" subjectId="s1" />
+      <ConceptList concepts={subjectConcepts} nextId="k1" subjectId="s1" timezone="Europe/London" />
     ),
   },
   {

@@ -3,7 +3,14 @@ import { Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
+import {
+  ESTABLISHED_LABEL,
+  LastChecked,
+  STATE_LABEL,
+  StateMark,
+} from '@/components/learn/concept-state';
+import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadReadyToLearn } from '@/lib/learn/graph/load';
 import { ReadAbout } from '../s/[id]/read-about';
@@ -24,8 +31,12 @@ export const metadata = { title: 'Learn next' };
  * to a goal you named, which is what plan #298 settled.
  */
 export default async function LearnNextPage() {
+  const user = await requireUser();
   const supabase = await createLearnClient();
-  const rows = await loadReadyToLearn(supabase);
+  const [rows, settings] = await Promise.all([
+    loadReadyToLearn(supabase),
+    loadAccountSettings(user.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -87,6 +98,8 @@ export default async function LearnNextPage() {
                       {`${STATE_LABEL[concept.state]} — ${ESTABLISHED_LABEL[concept.established]}.`}
                     </p>
                   )}
+
+                  <LastChecked concept={concept} timezone={settings.timezone} />
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                     {/* The first question is written against this claim rather

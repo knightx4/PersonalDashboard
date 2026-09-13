@@ -5,6 +5,7 @@ import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-na
 import type { Probe } from '@/lib/learn/graph/probe-payload';
 import { barPercent, standingOf, weightFor } from '@/lib/learn/graph/probe-payload';
 import { inferredFrom, type Concept, type Graph } from '@/lib/learn/graph/model';
+import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
 
 /**
  * A probe session: what to ask about next, and what an answer settles.
@@ -62,6 +63,34 @@ export async function answeredWeight(
     (total, row) => total + Number(row.weight),
     0,
   );
+}
+
+/**
+ * How many questions have actually been answered.
+ *
+ * The cadence a re-check runs on is counted from this rather than from a
+ * counter held somewhere: each question is picked fresh, so the only record of
+ * how many have gone by is the rows themselves. `conceptIds` narrows it to one
+ * subject; left out, it counts the account's answers across every subject.
+ */
+export async function answeredCount(
+  supabase: LearnSupabaseClient,
+  conceptIds?: string[],
+): Promise<number> {
+  if (conceptIds !== undefined && conceptIds.length === 0) return 0;
+
+  let query = supabase
+    .from('probes')
+    .select('id', { count: 'exact', head: true })
+    .not('answered_at', 'is', null);
+  if (conceptIds !== undefined) query = query.in('concept_id', conceptIds);
+
+  const { count, error } = await query;
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Counting what you have answered', error);
+
+  return count ?? 0;
 }
 
 /** The bar, from the rows. */
@@ -147,8 +176,23 @@ export async function probesFor(
  * on the door tells you more than the same question about one of its
  * consequences -- and if the door turns out to be a misconception, half the
  * answers below it were going to be wrong for the same reason.
+ *
+ * `recheck` is the exception to all of that, and the same cadence the
+ * five-minute screen runs on: on every fifth question the claim in this subject
+ * you were asked about longest ago takes the turn, so old ground comes round
+ * without waiting for the frontier to run out. Nothing old enough, or no
+ * cadence passed, and the bands decide as before.
  */
-export function nextConcept(concepts: Concept[], askedCounts: Map<string, number>): Concept | null {
+export function nextConcept(
+  concepts: Concept[],
+  askedCounts: Map<string, number>,
+  recheck?: { answered: number; now: Date },
+): Concept | null {
+  if (recheck && isRecheckTurn(recheck.answered)) {
+    const old = conceptToRecheck(concepts, recheck.now);
+    if (old) return old;
+  }
+
   const rank = (concept: Concept): number => {
     if (concept.state === 'misconception') return 0;
     if (concept.state === 'shaky') return 1;

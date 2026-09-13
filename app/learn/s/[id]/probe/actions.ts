@@ -8,6 +8,7 @@ import { loadGraph } from '@/lib/learn/graph/load';
 import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
+  answeredCount,
   answeredWeight,
   nextConcept,
   nextMasteryCheck,
@@ -95,7 +96,15 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
     for (const c of graph.concepts) {
       asked.set(c.id, (await probesFor(supabase, c.id)).length);
     }
-    concept = nextConcept(graph.concepts, asked);
+    // Every fifth question in this subject goes back to the claim here you
+    // were asked about longest ago. Counted from the answers stored against
+    // this subject's concepts, so it does not move with what you have been
+    // doing elsewhere.
+    const answered = await answeredCount(
+      supabase,
+      graph.concepts.map((c) => c.id),
+    );
+    concept = nextConcept(graph.concepts, asked, { answered, now: new Date() });
   }
 
   if (!concept) return { error: 'Nothing in this subject to ask about yet.' };
