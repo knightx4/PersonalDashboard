@@ -67,11 +67,18 @@ const CHAIN: ProposedChain = {
   subject: 'Economics',
   goalConcept: 'Expectations close the gap',
   nodes: [
-    { name: 'Wage stickiness', claim: 'Wages lag prices.', basis: 'Standard.', existingId: 'already-here' },
+    {
+      name: 'Wage stickiness',
+      claim: 'Wages lag prices.',
+      basis: 'Standard.',
+      mastery: [],
+      existingId: 'already-here',
+    },
     {
       name: 'Expectations close the gap',
       claim: 'The gain goes, the inflation stays.',
       basis: 'Standard.',
+      mastery: ['Says what happens when the inflation is expected.', 'Explains the long run.'],
       existingId: null,
     },
   ],
@@ -100,6 +107,31 @@ describe('saving an approved chain', () => {
     expect(concepts[0].name).toBe('Expectations close the gap');
     expect(concepts[0].origin).toBe('generated');
     expect(saved.conceptsAdded).toBe(1);
+  });
+
+  it('writes the checks on a concept that has them', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');
+
+    const concepts = rowsFor(inserts, 'concepts') as { mastery: string[] | null }[];
+    expect(concepts[0].mastery).toEqual([
+      'Says what happens when the inflation is expected.',
+      'Explains the long run.',
+    ]);
+  });
+
+  it('writes nothing where a node came back with no checks', async () => {
+    // The column takes two to four or null, so a node the model wrote none for
+    // is saved as it is rather than refused by the database.
+    const { client, inserts } = clientReturningIds('subject-1');
+    const bare = {
+      ...CHAIN,
+      nodes: CHAIN.nodes.map((node) => ({ ...node, mastery: [] })),
+    };
+    await saveChain(client, 'user-1', bare, 'how rates reach prices');
+
+    const concepts = rowsFor(inserts, 'concepts') as { mastery: string[] | null }[];
+    expect(concepts[0].mastery).toBeNull();
   });
 
   it('joins the new node to the one that was already there', async () => {

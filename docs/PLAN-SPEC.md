@@ -167,6 +167,24 @@ paragraph on the feature saying what is not known and what would have to be
 found out. The test between them is not whether the question can be
 *answered* — it is whether it can be *asked*.
 
+**What may be written as fog** is a second test, and it comes first: if this
+is never resolved, is the feature still finished? Yes means it is a follow-on
+rather than a gap, and it goes on the ideas page, where it can be shaped into
+its own feature later. Fog is what cannot be decided until part of *this*
+feature exists. Nine of the fourteen patches on the plan when the test was
+written failed it — whether ten interview questions should be asked again
+months later, whether the five-minute unit should exist for reading too — and
+none of them stopped their own feature being finished. They sat where nothing
+reads them again: the feature ships, the patch stays, and the thought is lost
+more thoroughly than if it had been dropped. `FOG_RULE` in
+`lib/plan/brief.ts` carries the test into both turns that write fog, the
+shaping one and the re-shaping one, and `.claude/skills/plan/SKILL.md` says it
+at length.
+
+**One patch per feature**, because it is one column: a second `fog --note`
+replaces the first rather than joining it, and the CLI prints what it replaced
+so that losing one is never silent.
+
 Fog is a column rather than a table because it has no life beyond its step:
 it graduates into sub-steps and is cleared once they exist. Two things do
 that graduating, and until they were built the sentence you just read

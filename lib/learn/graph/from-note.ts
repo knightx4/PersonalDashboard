@@ -8,6 +8,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
  * What a reading actually taught, read out of the note you already wrote.
@@ -51,6 +52,8 @@ new node is attached to something. Nothing goes in the graph without an edge.
 
 DO NOT REPROPOSE what the subject already has. Name it exactly as given and
 draw the edge instead.
+
+${MASTERY_RULE}
 
 BASIS. Each node and edge says how you know it belongs, in one short sentence.
 Here that sentence is usually "taken from the note on <the reading>", and
@@ -119,8 +122,9 @@ export async function conceptsFromNote(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    mastery: MASTERY_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis'],
+                  required: ['name', 'claim', 'basis', 'mastery'],
                 },
               },
               edges: {

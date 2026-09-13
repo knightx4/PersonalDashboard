@@ -17,9 +17,21 @@ export const dynamic = 'force-dynamic';
  * The bar starts where the rows left it, so a session picked up next week
  * carries on rather than starting again -- nothing about a session lives
  * anywhere but in the probes table.
+ *
+ * `?concept=` names what the first question is about, which is how the row on
+ * /learn/next opens a session. It is not checked here: an id from another
+ * subject is refused by the action, with a message, rather than turning into a
+ * page that quietly probes something else.
  */
-export default async function ProbePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProbePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ concept?: string }>;
+}) {
   const { id } = await params;
+  const { concept: namedConceptId } = await searchParams;
 
   const supabase = await createLearnClient();
   const subject = await loadSubject(supabase, id);
@@ -59,7 +71,14 @@ export default async function ProbePage({ params }: { params: Promise<{ id: stri
           is what gets probed.
         </p>
       ) : (
-        <ProbeSession subjectId={id} startingPercent={percent} />
+        <ProbeSession
+          subjectId={id}
+          startingPercent={percent}
+          startConceptId={namedConceptId ?? null}
+          startConceptName={
+            graph.concepts.find((concept) => concept.id === namedConceptId)?.name ?? null
+          }
+        />
       )}
     </>
   );

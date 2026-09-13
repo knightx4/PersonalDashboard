@@ -23,6 +23,7 @@ function probe(partial: Partial<ProbeRow> = {}): ProbeRow {
     reason: 'Because of the mechanism.',
     chosenIndex: null,
     weight: 0,
+    masteryCheck: null,
     ...partial,
   };
 }

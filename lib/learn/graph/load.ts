@@ -3,6 +3,12 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { Concept, Graph, KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
+import {
+  rankReady,
+  readyInSubject,
+  READY_LIMIT,
+  type ReadyConcept,
+} from '@/lib/learn/graph/ready';
 
 /**
  * Reading a subject's graph.
@@ -107,7 +113,22 @@ type ConceptRow = {
   name: string;
   claim: string;
   basis: string;
+  mastery: unknown;
 };
+
+/**
+ * The checks, as a list the screens can map over.
+ *
+ * The column is a jsonb array of strings and the database refuses anything
+ * else, but it is also nullable -- a concept written before the checks existed,
+ * or one the model wrote none for, has nothing there. Both arrive here as an
+ * empty list, because "no checks" is a thing the pages say rather than a case
+ * they crash on.
+ */
+function masteryOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((check): check is string => typeof check === 'string');
+}
 
 type StateRow = {
   concept_id: string;
@@ -130,6 +151,7 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     name: row.name,
     claim: row.claim,
     basis: row.basis,
+    mastery: masteryOf(row.mastery),
     state: state?.state ?? 'unknown',
     established: state?.established ?? 'inferred',
     misconception: state?.misconception ?? null,
@@ -148,7 +170,7 @@ export async function loadGraph(
   ] = await Promise.all([
     supabase
       .from('concepts')
-      .select('id, name, claim, basis')
+      .select('id, name, claim, basis, mastery')
       .eq('subject_id', subjectId)
       .order('name'),
     supabase
@@ -229,4 +251,46 @@ export async function loadGoals(
     conceptId: row.concept_id,
     status: row.status,
   }));
+}
+
+/**
+ * Everything you could start on, in every subject.
+ *
+ * One read per subject, the same four queries `/learn/know` already runs in a
+ * loop, and no model call anywhere in it. A goal counts as one you named
+ * unless you abandoned it, which is the rule the subject page uses to decide
+ * what to draw a chain for.
+ */
+async function readyEverywhere(supabase: LearnSupabaseClient): Promise<ReadyConcept[]> {
+  const subjects = await loadSubjects(supabase);
+
+  const perSubject = await Promise.all(
+    subjects.map(async (subject) => {
+      const [graph, goals] = await Promise.all([
+        loadGraph(supabase, subject.id),
+        loadGoals(supabase, subject.id),
+      ]);
+
+      const goalConceptIds = goals
+        .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
+        .map((goal) => goal.conceptId!);
+
+      return readyInSubject(graph, subject, goalConceptIds);
+    }),
+  );
+
+  return perSubject.flat();
+}
+
+/** What to learn next: the ranked few, for the screen. */
+export async function loadReadyToLearn(
+  supabase: LearnSupabaseClient,
+  limit: number = READY_LIMIT,
+): Promise<ReadyConcept[]> {
+  return rankReady(await readyEverywhere(supabase), limit);
+}
+
+/** How many are ready in total -- for the tab's badge. */
+export async function countReadyToLearn(supabase: LearnSupabaseClient): Promise<number> {
+  return (await readyEverywhere(supabase)).length;
 }

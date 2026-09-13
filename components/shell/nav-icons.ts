@@ -28,6 +28,7 @@ import {
   Shapes,
   StickyNote,
   Tag,
+  Target,
   Undo2,
   Users,
 } from 'lucide-react';
@@ -89,6 +90,7 @@ export const NAV_ICONS = {
   tracks: BookOpen,
   readNow: BookOpenCheck,
   know: Network,
+  learnNext: Target,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

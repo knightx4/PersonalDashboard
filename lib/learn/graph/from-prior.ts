@@ -9,6 +9,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
  * What you already know, told directly.
@@ -74,6 +75,8 @@ in the graph without an edge.
 
 DO NOT REPROPOSE what the subject already has. Name it exactly as given and
 draw the edge instead.
+
+${MASTERY_RULE}
 
 BASIS, HONESTLY. Each node and edge carries one short sentence on how you know
 it belongs, and it is shown to the reader. Here that sentence says where in
@@ -143,8 +146,9 @@ export async function conceptsFromPrior(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    mastery: MASTERY_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis'],
+                  required: ['name', 'claim', 'basis', 'mastery'],
                 },
               },
               edges: {

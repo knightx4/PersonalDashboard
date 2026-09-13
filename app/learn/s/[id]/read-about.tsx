@@ -10,9 +10,22 @@ import { readAboutConcept } from './actions';
  *
  * The subject page shows it on a card and the concept page shows it on its
  * own, and both send the same two ids to the same action.
+ *
+ * `anyState` drops the gate, for the screen of what to learn next: there the
+ * row is already something you could start on, and a claim nothing is known
+ * about is the most ordinary thing on it. On a subject's chain the gate stays,
+ * or every node in a long graph grows a button nobody asked for.
  */
-export function ReadAbout({ concept, subjectId }: { concept: Concept; subjectId: string }) {
-  if (concept.state !== 'shaky' && concept.state !== 'misconception') return null;
+export function ReadAbout({
+  concept,
+  subjectId,
+  anyState = false,
+}: {
+  concept: Concept;
+  subjectId: string;
+  anyState?: boolean;
+}) {
+  if (!anyState && concept.state !== 'shaky' && concept.state !== 'misconception') return null;
 
   return (
     <form action={readAboutConcept}>

@@ -29,6 +29,8 @@ export type ProbeRow = {
   reason: string;
   chosenIndex: number | null;
   weight: number;
+  /** The check it was written against, or null for a concept with none. */
+  masteryCheck: string | null;
 };
 
 function fail(action: string, error: { message: string }): Error {
@@ -77,7 +79,9 @@ export async function probesFor(
 ): Promise<ProbeRow[]> {
   const { data, error } = await supabase
     .from('probes')
-    .select('id, concept_id, question, options, correct_index, reason, chosen_index, weight')
+    .select(
+      'id, concept_id, question, options, correct_index, reason, chosen_index, weight, mastery_check',
+    )
     .eq('concept_id', conceptId)
     .order('created_at', { ascending: false });
 
@@ -93,6 +97,7 @@ export async function probesFor(
     reason: string;
     chosen_index: number | null;
     weight: number | string;
+    mastery_check: string | null;
   }[]).map((row) => ({
     id: row.id,
     conceptId: row.concept_id,
@@ -102,6 +107,7 @@ export async function probesFor(
     reason: row.reason,
     chosenIndex: row.chosen_index,
     weight: Number(row.weight),
+    masteryCheck: row.mastery_check,
   }));
 }
 
@@ -133,6 +139,48 @@ export function nextConcept(concepts: Concept[], askedCounts: Map<string, number
   });
 
   return sorted[0] ?? null;
+}
+
+/**
+ * Which of a concept's checks the next question is for.
+ *
+ * The one asked about least, and among equals the one written first. So the
+ * first question about a concept with three checks takes the first of them,
+ * the second question takes the second, and a concept only gets a second
+ * question about the same check once every check has had one -- which is the
+ * point of having them: a second question about the same idea that repeats the
+ * same check is the same information asked twice.
+ *
+ * Asked rather than answered, because a question abandoned half way has still
+ * been put, and putting it again would be the same question.
+ *
+ * Null for a concept with no checks. That concept is probed against its claim
+ * in general, exactly as everything was before the checks existed.
+ */
+export function nextMasteryCheck(
+  mastery: readonly string[],
+  /** What the questions already asked about this concept were aimed at. */
+  asked: readonly (string | null)[],
+): string | null {
+  if (mastery.length === 0) return null;
+
+  const counts = new Map<string, number>();
+  for (const check of asked) {
+    if (check === null) continue;
+    counts.set(check, (counts.get(check) ?? 0) + 1);
+  }
+
+  let chosen = mastery[0];
+  let fewest = counts.get(chosen) ?? 0;
+  for (const check of mastery.slice(1)) {
+    const count = counts.get(check) ?? 0;
+    if (count < fewest) {
+      chosen = check;
+      fewest = count;
+    }
+  }
+
+  return chosen;
 }
 
 /**
@@ -181,6 +229,9 @@ export async function recordProbe(
       options: input.probe.options,
       correct_index: input.probe.correctIndex,
       reason: input.probe.reason,
+      // The check it was aimed at, stored as the text it was at the time, for
+      // the same reason the options are: the list on the concept can change.
+      mastery_check: input.probe.masteryCheck,
       model: input.model,
     })
     .select('id')

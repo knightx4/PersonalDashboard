@@ -6,6 +6,7 @@ import {
   mentionsFor,
   pruneForGoal,
   readyNow,
+  readyToLearn,
   type Concept,
   type Graph,
   type KnowledgeState,
@@ -31,6 +32,7 @@ function concept(id: string, state: KnowledgeState = 'unknown'): Concept {
     name: id,
     claim: `${id} is the case, for a reason.`,
     basis: 'Written by hand for this test.',
+    mastery: [],
     state,
     established: 'inferred',
     misconception: state === 'misconception' ? `A wrong idea about ${id}.` : null,
@@ -179,6 +181,39 @@ describe('what could be started now', () => {
   it('can be more than one thing', () => {
     const graph = graphOf({ a: 'unknown', b: 'unknown', goal: 'unknown' }, ['a>goal', 'b>goal']);
     expect(names(readyNow(graph, pruneForGoal(graph, 'goal')))).toEqual(['a', 'b']);
+  });
+});
+
+describe('what could be started anywhere in a subject', () => {
+  it('is a node with nothing underneath it', () => {
+    const graph = graphOf({ a: 'unknown', b: 'unknown' }, ['a>b']);
+    expect(names(readyToLearn(graph))).toEqual(['a']);
+  });
+
+  it('holds back whatever rests on a shaky prerequisite', () => {
+    // The difference from readyNow: nothing was pruned away here, so a
+    // prerequisite somebody half-knows is an obstacle rather than an absence.
+    const graph = graphOf({ a: 'shaky', b: 'unknown' }, ['a>b']);
+    expect(names(readyToLearn(graph))).toEqual(['a']);
+  });
+
+  it('lets it through once that prerequisite is known', () => {
+    const graph = graphOf({ a: 'known', b: 'unknown' }, ['a>b']);
+    expect(names(readyToLearn(graph))).toEqual(['b']);
+  });
+
+  it('returns nothing when every node is known', () => {
+    const graph = graphOf({ a: 'known', b: 'known' }, ['a>b']);
+    expect(readyToLearn(graph)).toEqual([]);
+  });
+
+  it('finds something whenever anything is unsettled', () => {
+    const graph = graphOf({ a: 'known', b: 'misconception', c: 'unknown', d: 'shaky' }, [
+      'a>b',
+      'b>c',
+      'c>d',
+    ]);
+    expect(names(readyToLearn(graph))).toEqual(['b']);
   });
 });
 
