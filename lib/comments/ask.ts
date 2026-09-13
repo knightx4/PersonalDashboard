@@ -22,7 +22,7 @@ import { planBrief } from '@/lib/plan/brief';
 import { loadPlan } from '@/lib/plan/load';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 import { raisedRowFrom, RAISED_COLUMNS } from '@/lib/raised/load';
-import { askMessage, ideaContext, raiseContext } from './context';
+import { askMessage, ideaContext, raiseContext, threadText } from './context';
 import { TARGET_COLUMN, type CommentTarget, type DevComment } from './load';
 import { replyToComment } from './reply';
 
@@ -111,16 +111,28 @@ async function say(input: AskInput, body: string): Promise<void> {
 /**
  * The turn the slow path is started with.
  *
- * It carries the row, the question and where the answer goes, and it says what
- * the session must not do: this is a question, and answering a question is not
- * settling it. The SQL is spelled out because `scripts/plan.ts` needs a direct
- * database connection that Claude Code on the web does not have.
+ * It carries the row, what has already been said on it, the question and where
+ * the answer goes, and it says what the session must not do: this is a
+ * question, and answering a question is not settling it. The SQL is spelled
+ * out because `scripts/plan.ts` needs a direct database connection that Claude
+ * Code on the web does not have.
+ *
+ * The history is what the fast reply already gets. A second question on a row
+ * is almost always about the first answer, and a session handed the row alone
+ * starts again from the top and writes back what the thread already says.
  */
-function sessionTurn(input: AskInput, subject: Subject): string {
+function sessionTurn(
+  input: AskInput,
+  subject: Subject,
+  /** The thread with the comment carrying the question taken out. */
+  history: readonly DevComment[],
+): string {
+  const said = threadText(history);
   return (
     `Answer a question asked on ${subject.label}, in the app. Read the code it is about, ` +
     'write the answer into the thread on that row, and then stop.\n\n' +
     `${subject.context.trimEnd()}\n\n` +
+    (said ? `${said.trimEnd()}\n\n` : '') +
     `## The question\n\n${input.question}\n\n` +
     '## Where the answer goes\n\n' +
     'insert into dev_comments (user_id, ' +
@@ -177,7 +189,7 @@ export async function askDash(input: AskInput): Promise<AskOutcome> {
   const started = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: sessionTurn(input, subject),
+    text: sessionTurn(input, subject, history),
   });
 
   if (!started.ok) {
