@@ -24,7 +24,7 @@ export const MAX_REPLY = 4000;
  * deleting anything. A name outside this list is refused by lib/comments/act.ts
  * with a sentence saying so, so a model inventing one changes nothing.
  */
-export const ACTIONS = ['file_idea'] as const;
+export const ACTIONS = ['file_idea', 'reword'] as const;
 export type ActionName = (typeof ACTIONS)[number];
 
 /**
@@ -37,10 +37,17 @@ export type ActionName = (typeof ACTIONS)[number];
  */
 export const actionSchema = z.object({
   name: z.string().trim().min(1),
-  /** What the action writes: the text of an idea, for now. */
+  /** What the action writes: the text of an idea, or a row's new wording. */
   text: z.string().trim().nullable().optional().default(null),
   /** Which workspace it belongs to, when the action takes one. */
   module: z.string().trim().nullable().optional().default(null),
+  /**
+   * Which part of a row is being rewritten: its title, its detail or its
+   * done-when. Read as a plain string for the same reason as the name, and
+   * anything not on lib/comments/act.ts's own list is refused there — which is
+   * what keeps a status, an assignee and a decision's answer out of reach.
+   */
+  field: z.string().trim().nullable().optional().default(null),
 });
 
 export type DashAction = z.infer<typeof actionSchema>;

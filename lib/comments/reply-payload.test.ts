@@ -53,7 +53,7 @@ describe('an instruction rather than a question', () => {
       }),
     ).toEqual({
       kind: 'action',
-      action: { name: 'file_idea', text: 'Photos on receipts.', module: 'shopping' },
+      action: { name: 'file_idea', text: 'Photos on receipts.', module: 'shopping', field: null },
     });
   });
 

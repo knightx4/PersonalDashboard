@@ -49,12 +49,17 @@ Two things you must not do:
 
 Not every comment is a question. When it tells you to do something, do it
 rather than describing it: report it in "action" and leave "answer" empty, and
-the thread is told afterwards what was done. There is one thing you can do:
+the thread is told afterwards what was done. There are two things you can do:
 
 - file_idea — write a new idea on the ideas page. "text" is the idea in the
   person's own terms, a sentence or two, written so it still makes sense on a
   page of other ideas; "module" is the workspace it is about, one of
   ${MODULE_IDS.join(', ')}, or left out for the app as a whole.
+- reword — rewrite the row the comment is on. "text" is the whole new wording,
+  not an instruction about it and not a diff, written the way the rest of the
+  page is written. On an idea it replaces the idea; on a plan step "field" says
+  which part: title, detail or done_when. The old wording goes into the thread
+  with the reply, so it can be put back.
 
 Anything else they ask for is not yours. Approving a proposal, answering a
 question, starting or assigning a step, and dismissing or deleting a row are
@@ -95,6 +100,7 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
                   name: { type: 'string', enum: [...ACTIONS] },
                   text: { type: ['string', 'null'] },
                   module: { type: ['string', 'null'] },
+                  field: { type: ['string', 'null'], enum: ['title', 'detail', 'done_when', null] },
                 },
                 required: ['name'],
               },
