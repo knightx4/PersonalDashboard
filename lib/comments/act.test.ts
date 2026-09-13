@@ -179,19 +179,24 @@ describe('rewording the row a comment is on', () => {
     expect(outcome.ok === false && outcome.why).toContain('200 characters');
   });
 
-  it('will not reword a raise', async () => {
-    const { writes, supabase } = db({ row: { title: 'A raise' } });
-    const outcome = await carryOut(
-      input({ supabase, target: 'raise', action: action({ name: 'reword', text: 'Something else' }) }),
-    );
-    expect(writes).toHaveLength(0);
-    expect(outcome.ok === false && outcome.why).toContain('raise');
+  it('will not reword a raise or a bug note', async () => {
+    for (const [target, said] of [
+      ['raise', 'a raise'],
+      ['note', 'a bug note'],
+    ] as const) {
+      const { writes, supabase } = db({ row: { title: 'A row' } });
+      const outcome = await carryOut(
+        input({ supabase, target, action: action({ name: 'reword', text: 'Something else' }) }),
+      );
+      expect(writes).toHaveLength(0);
+      expect(outcome.ok === false && outcome.why).toContain(said);
+    }
   });
 });
 
 describe('sending a step to be built', () => {
   it('will not start anything from a comment that is not on a plan step', async () => {
-    for (const target of ['idea', 'raise'] as const) {
+    for (const target of ['idea', 'raise', 'note'] as const) {
       const { writes, supabase } = db();
       const outcome = await carryOut(input({ supabase, target, action: action({ name: 'send_step' }) }));
       expect(writes).toHaveLength(0);
