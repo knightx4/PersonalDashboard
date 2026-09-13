@@ -1404,7 +1404,16 @@ The rule is written down in [the plan spec](https://example.com/docs/PLAN-SPEC.m
     createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
   },
   {
+    /* Two from Dash in a row: the answer, and then what the session that read
+     * the code did about it. The pair is here because a run from one author is
+     * what the shared header has to be looked at on. */
     id: 'fixture-3',
+    author: 'claude',
+    body: 'Reworded the done-when on #412 to say the count and the view are read off different things, and put the old wording in the thread on that step.',
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'fixture-4',
     author: 'me',
     body: '@dash take #412 back off Dash then, and leave the feature where it is.',
     createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),

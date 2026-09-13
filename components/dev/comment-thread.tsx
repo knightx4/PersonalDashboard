@@ -1,13 +1,15 @@
 'use client';
 
 import { useActionState, useOptimistic, useState } from 'react';
-import { X } from 'lucide-react';
+import { Bot, CircleUser, X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { mentionsDash } from '@/lib/comments/mention';
-import type { CommentTarget, DevComment } from '@/lib/comments/load';
+import { commentWhen, exactTime } from '@/lib/comments/when';
+import { useClockNow } from '@/lib/use-clock-now';
+import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
 
 /**
  * The thread on one row of the dev pages, and the box for adding to it.
@@ -26,7 +28,7 @@ function DeleteComment({ id, target }: { id: string; target: CommentTarget }) {
   const [state, action, pending] = useActionState(deleteComment, {} as CommentActionState);
 
   return (
-    <form action={action} className="ml-auto flex items-center gap-1">
+    <form action={action} className="flex items-center gap-1">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="target" value={target} />
       <FieldError>{state.error}</FieldError>
@@ -45,6 +47,83 @@ function DeleteComment({ id, target }: { id: string; target: CommentTarget }) {
 
 /** The id the not-yet-written comment carries, so it can be told apart. */
 const PENDING = 'pending';
+
+/** What the interface calls each of you. The stored author stays `claude`. */
+const AUTHOR_NAME: Record<CommentAuthor, string> = { me: 'You', claude: 'Dash' };
+
+/**
+ * Who is talking, as a shape rather than as another word.
+ *
+ * The name says it too, but a thread is read by running down the left edge of
+ * it, and two glyphs are told apart there in a way that "You" and "Dash" set
+ * in the same face are not. Ink, not colour: whose turn it is is none of the
+ * five things a hue is allowed to mean.
+ */
+function AuthorMark({ author }: { author: CommentAuthor }) {
+  const Glyph = author === 'claude' ? Bot : CircleUser;
+  return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
+}
+
+/**
+ * One message: who wrote it, when, and what they said.
+ *
+ * A row rather than a bubble or a card. The mark sits in a column of its own
+ * and the body hangs off it, so alignment does the grouping and no turn needs
+ * a frame around it -- laws 11 and 13. A run of messages from one author draws
+ * the header once and leaves the column empty under it, the way a chat window
+ * does: repeating "Dash 3h ago" four times says the same thing four times.
+ *
+ * Deleting lives on the message being pointed at. It used to be an X in every
+ * header, which is a destructive control standing permanently on every turn of
+ * a conversation for the once a month somebody takes one back.
+ */
+function Message({
+  comment,
+  target,
+  grouped,
+}: {
+  comment: DevComment;
+  target: CommentTarget;
+  /** Whether the message above is from the same author, so the header is up already. */
+  grouped: boolean;
+}) {
+  const now = useClockNow();
+  const sending = comment.id === PENDING;
+
+  return (
+    <li className={cn('group flex gap-2', sending && 'opacity-60')}>
+      <div className="flex w-4 shrink-0 justify-center pt-1">
+        {!grouped && <AuthorMark author={comment.author} />}
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-0.5">
+        {!grouped && (
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-small font-semibold text-ink">{AUTHOR_NAME[comment.author]}</span>
+            {sending ? (
+              <span className="text-small text-ink-muted">Sending…</span>
+            ) : (
+              <time
+                dateTime={comment.createdAt}
+                title={exactTime(comment.createdAt)}
+                className="tabular text-small text-ink-muted"
+              >
+                {commentWhen(comment.createdAt, now)}
+              </time>
+            )}
+          </div>
+        )}
+        <p className="whitespace-pre-wrap text-body text-ink">{comment.body}</p>
+      </div>
+
+      {!sending && (
+        <div className="shrink-0 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+          <DeleteComment id={comment.id} target={target} />
+        </div>
+      )}
+    </li>
+  );
+}
 
 /**
  * An action the box sends to instead of `addComment`.
@@ -140,23 +219,16 @@ export function CommentThread({
   return (
     <div className="space-y-2">
       {shown.length > 0 && (
-        <ul className="space-y-2 border-l border-border pl-3">
-          {shown.map((comment) => (
-            <li
+        <ul className="space-y-2.5">
+          {shown.map((comment, index) => (
+            <Message
               key={comment.id}
-              className={cn('space-y-0.5', comment.id === PENDING && 'opacity-60')}
-            >
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-small font-semibold text-ink">
-                  {comment.author === 'me' ? 'You' : 'Dash'}
-                </span>
-                <span className="tabular text-small text-ink-muted">
-                  {comment.id === PENDING ? 'Sending…' : comment.createdAt.slice(0, 10)}
-                </span>
-                {comment.id !== PENDING && <DeleteComment id={comment.id} target={target} />}
-              </div>
-              <p className="whitespace-pre-wrap text-body text-ink">{comment.body}</p>
-            </li>
+              comment={comment}
+              target={target}
+              // A message on its way keeps its own header whatever is above it:
+              // "Sending…" is the one thing that header has to say.
+              grouped={comment.id !== PENDING && shown[index - 1]?.author === comment.author}
+            />
           ))}
 
           {/* Where the answer is going to appear, while it is being written.
@@ -165,9 +237,14 @@ export function CommentThread({
               wrote, left behind above the real answer forever. A line that is
               only there while you wait says the same thing and does not. */}
           {asking && (
-            <li className="space-y-0.5" aria-live="polite">
-              <span className="text-small font-semibold text-ink-muted">Dash</span>
-              <p className="text-body text-ink-muted">Reading the row and replying…</p>
+            <li className="flex gap-2" aria-live="polite">
+              <div className="flex w-4 shrink-0 justify-center pt-1">
+                <AuthorMark author="claude" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <span className="text-small font-semibold text-ink-muted">Dash</span>
+                <p className="text-body text-ink-muted">Reading the row and replying…</p>
+              </div>
             </li>
           )}
         </ul>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Bot,
@@ -38,6 +38,7 @@ import {
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
@@ -1483,51 +1484,6 @@ function RowIconButton({
 
 function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
-}
-
-/**
- * The wall clock, as something to subscribe to.
- *
- * One interval for the whole page rather than one per running step: a plan
- * with six steps underway should not be six timers waking the tab up out of
- * step with each other. It only runs while something is watching, and 30
- * seconds is as often as a figure rounded to the minute can change.
- *
- * Zero until the first subscriber arrives, which is what makes it safe to
- * render on the server: the elapsed time is the one value already different by
- * the time the HTML lands, so both sides render the placeholder and the figure
- * appears on the tick after mount.
- */
-const CLOCK_TICK_MS = 30_000;
-let clockNow = 0;
-let clockTimer: ReturnType<typeof setInterval> | null = null;
-const clockWatchers = new Set<() => void>();
-
-function subscribeToClock(onTick: () => void): () => void {
-  clockWatchers.add(onTick);
-  if (clockTimer === null) {
-    clockNow = Date.now();
-    clockTimer = setInterval(() => {
-      clockNow = Date.now();
-      for (const watcher of clockWatchers) watcher();
-    }, CLOCK_TICK_MS);
-  }
-  return () => {
-    clockWatchers.delete(onTick);
-    if (clockWatchers.size === 0 && clockTimer !== null) {
-      clearInterval(clockTimer);
-      clockTimer = null;
-    }
-  };
-}
-
-/** The wall clock as a number. Zero until the first tick after mount. */
-function useClockNow(): number {
-  return useSyncExternalStore(
-    subscribeToClock,
-    () => clockNow,
-    () => 0,
-  );
 }
 
 /** The clock on a step that is underway. */
