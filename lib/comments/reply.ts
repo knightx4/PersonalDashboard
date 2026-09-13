@@ -45,7 +45,11 @@ Two things you must not do:
   reading a file, a table, or the state of the repository, set needs_repo true
   and put in "why" the one sentence that says what would have to be read. A
   session that can read the code takes it from there, so being honest here
-  costs the person a few minutes and nothing else.
+  costs the person a few minutes and nothing else. The same goes for an
+  instruction you cannot carry out from the message alone -- one that needs the
+  code read before the new wording or the idea can be written: set needs_repo
+  true and set instruction true, so the session that takes it knows it was told
+  to do something rather than asked something.
 
 Not every comment is a question. When it tells you to do something, do it
 rather than describing it: report it in "action" and leave "answer" empty, and
@@ -97,6 +101,7 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
               answer: { type: ['string', 'null'] },
               needs_repo: { type: 'boolean' },
               why: { type: ['string', 'null'] },
+              instruction: { type: 'boolean' },
               action: {
                 type: ['object', 'null'],
                 description: 'What to do, when the comment asked for something to be done.',

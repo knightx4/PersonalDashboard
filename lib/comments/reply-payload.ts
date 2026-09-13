@@ -57,13 +57,23 @@ export const replySchema = z.object({
   needs_repo: z.boolean().optional().default(false),
   why: z.string().trim().nullable().optional().default(null),
   action: actionSchema.nullable().optional().default(null),
+  /**
+   * Whether the comment told it to do something rather than asked it
+   * something. Only read when the reply hands over to a session: what that
+   * session may do about the row depends on which of the two it was given.
+   */
+  instruction: z.boolean().optional().default(false),
 });
 
 export type DashReply =
   /** Answered from what the row already said. */
   | { kind: 'answer'; body: string }
-  /** Cannot be answered without reading the code. `why` says what it would read. */
-  | { kind: 'needs_repo'; why: string }
+  /**
+   * Cannot be done without reading the code. `why` says what it would read,
+   * and `instruction` says whether the session it hands to was told to do
+   * something or asked something.
+   */
+  | { kind: 'needs_repo'; why: string; instruction: boolean }
   /** An instruction to carry out. What it changed is written into the thread. */
   | { kind: 'action'; action: DashAction }
   /** Nothing usable came back. */
@@ -85,10 +95,17 @@ export function parseReplyPayload(raw: unknown): DashReply {
   const parsed = replySchema.safeParse(raw);
   if (!parsed.success) return { kind: 'error', error: 'The reply came back in an unexpected shape.' };
 
-  const { answer, needs_repo: needsRepo, why, action } = parsed.data;
+  const { answer, needs_repo: needsRepo, why, action, instruction } = parsed.data;
 
   if (needsRepo) {
-    return { kind: 'needs_repo', why: why || 'This one needs a look at the code.' };
+    return {
+      kind: 'needs_repo',
+      why: why || 'This one needs a look at the code.',
+      // An action reported beside it is an instruction whatever the flag says:
+      // it named a thing to do, and this call is only declining to be the one
+      // that does it.
+      instruction: instruction || action !== null,
+    };
   }
   if (action) return { kind: 'action', action };
   if (!answer) return { kind: 'error', error: 'Nothing usable came back.' };

@@ -115,6 +115,32 @@ async function say(input: AskInput, body: string): Promise<void> {
 }
 
 /**
+ * What a session started from a comment may do, in each of the two cases.
+ *
+ * A question and an instruction are answered differently and the difference is
+ * the whole of it: answering a question by settling it takes the decision away
+ * from the person, and replying to an instruction with a description of what
+ * could be done is the thing #356 exists to stop. The list an instruction may
+ * work inside is the same one lib/comments/act.ts holds, and the moves left out
+ * are left out in both places.
+ */
+const QUESTION_RULE =
+  'This is a question. Answer it and nothing else. Do not answer a decision, do not change ' +
+  'the status, the detail or the done-when of any plan row, do not shape an idea, do not ' +
+  'close or dismiss a raise, and do not commit anything. The person asked what something ' +
+  'means, not for it to be settled or built.';
+
+const INSTRUCTION_RULE =
+  'This is an instruction, so do it rather than describe it, and then say in the thread what ' +
+  'you did. Three things are yours to do: file an idea on the ideas page (it lands as a ' +
+  'suggestion, under their own), reword the row this was written on (an idea\'s text, or a ' +
+  'plan step\'s title, detail or done-when -- put the old wording in the thread with the new), ' +
+  'and hand a plan step over to be built. Anything else is theirs, made on the page: never ' +
+  'approve a proposal, never answer a decision, never set a status or an assignee by hand, ' +
+  'and never dismiss or delete anything. Asked for one of those, change nothing and say in ' +
+  'the thread that it was not done and why. Do not commit anything either way.';
+
+/**
  * The turn the slow path is started with.
  *
  * It carries the row, what has already been said on it, the question and where
@@ -132,22 +158,27 @@ function sessionTurn(
   subject: Subject,
   /** The thread with the comment carrying the question taken out. */
   history: readonly DevComment[],
+  /** Whether the comment told it to do something rather than asked it something. */
+  instruction: boolean,
 ): string {
   const said = threadText(history);
+  const opening = instruction
+    ? `Carry out an instruction left on ${subject.label}, in the app. Read the code it is ` +
+      'about, do what it asks inside the list below, and write into the thread on that row ' +
+      'what you did.'
+    : `Answer a question asked on ${subject.label}, in the app. Read the code it is about, ` +
+      'write the answer into the thread on that row, and then stop.';
+
   return (
-    `Answer a question asked on ${subject.label}, in the app. Read the code it is about, ` +
-    'write the answer into the thread on that row, and then stop.\n\n' +
+    `${opening}\n\n` +
     `${subject.context.trimEnd()}\n\n` +
     (said ? `${said.trimEnd()}\n\n` : '') +
-    `## The question\n\n${input.question}\n\n` +
-    '## Where the answer goes\n\n' +
+    `## ${instruction ? 'What they asked for' : 'The question'}\n\n${input.question}\n\n` +
+    `## Where ${instruction ? 'what you did goes' : 'the answer goes'}\n\n` +
     'insert into dev_comments (user_id, ' +
     `${TARGET_COLUMN[input.target]}, author, body) values ('${input.userId}', '${input.id}', ` +
-    "'claude', '<your answer>');\n\n" +
-    'Answer it and nothing else. Do not answer a decision, do not change the status, the ' +
-    'detail or the done-when of any plan row, do not shape an idea, do not close or dismiss ' +
-    'a raise, and do not commit anything. The person asked what something means, not for it ' +
-    'to be settled or built.'
+    `'claude', '<${instruction ? 'what you did' : 'your answer'}>');\n\n` +
+    (instruction ? INSTRUCTION_RULE : QUESTION_RULE)
   );
 }
 
@@ -213,7 +244,7 @@ export async function askDash(input: AskInput): Promise<AskOutcome> {
   const started = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: sessionTurn(input, subject, history),
+    text: sessionTurn(input, subject, history, reply.instruction),
   });
 
   if (!started.ok) {
@@ -222,6 +253,16 @@ export async function askDash(input: AskInput): Promise<AskOutcome> {
     return { ok: false, error: why };
   }
 
-  await say(input, `${reply.why} I have started a session on it; the answer will land here.`);
-  return { ok: true, message: 'A session is reading the code. Its answer lands in this thread.' };
+  await say(
+    input,
+    reply.instruction
+      ? `${reply.why} I have started a session on it; it will say here what it did.`
+      : `${reply.why} I have started a session on it; the answer will land here.`,
+  );
+  return {
+    ok: true,
+    message: reply.instruction
+      ? 'A session is reading the code. What it did lands in this thread.'
+      : 'A session is reading the code. Its answer lands in this thread.',
+  };
 }
