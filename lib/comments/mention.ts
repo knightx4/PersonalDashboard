@@ -23,6 +23,38 @@ export function mentionsDash(body: string): boolean {
 }
 
 /**
+ * A body split into the tag and the words around it.
+ *
+ * The thread draws the tag as a mention rather than as four ordinary
+ * characters, and the split happens here so it is the same test that decides
+ * whether a comment is a question. Two rules that agree today and drift in six
+ * months would show up as a comment marked as asking and never answered.
+ *
+ * Returns one part per run of text; a body with no tag in it comes back as a
+ * single part.
+ */
+export function splitOnMention(text: string): { text: string; mention: boolean }[] {
+  const parts: { text: string; mention: boolean }[] = [];
+  const scan = new RegExp(TAG.source, 'gi');
+  let from = 0;
+
+  for (let hit = scan.exec(text); hit; hit = scan.exec(text)) {
+    // The match carries the character before the tag, which belongs to the
+    // words around it: `[^A-Za-z0-9_@.]` is the boundary, not part of it.
+    const before = hit[1] ?? '';
+    const start = hit.index + before.length;
+    if (start > from) parts.push({ text: text.slice(from, start), mention: false });
+    parts.push({ text: text.slice(start, scan.lastIndex), mention: true });
+    from = scan.lastIndex;
+  }
+
+  if (from < text.length || parts.length === 0) {
+    parts.push({ text: text.slice(from), mention: false });
+  }
+  return parts;
+}
+
+/**
  * The question, with the tag taken out.
  *
  * "@dash what does option B cost?" is asking what option B costs; the tag is

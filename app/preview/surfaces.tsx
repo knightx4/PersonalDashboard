@@ -1400,7 +1400,7 @@ If you want the child back, take it back from its own menu -- that writes the co
 const queue = handedToClaude(sections);
 \`\`\`
 
-The rule is written down in [the plan spec](https://example.com/docs/PLAN-SPEC.md), under how a feature is worked.`,
+The rule is written down in [the plan spec](https://example.com/docs/PLAN-SPEC.md), under how a feature is worked. Anything pasted in, <b>markup included</b>, is shown as the text it is.`,
     createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
   },
   {

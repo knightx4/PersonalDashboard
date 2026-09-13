@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mentionsDash, questionFrom } from './mention';
+import { mentionsDash, questionFrom, splitOnMention } from './mention';
 
 describe('mentionsDash', () => {
   it('finds the tag anywhere in the comment', () => {
@@ -34,5 +34,29 @@ describe('questionFrom', () => {
 
   it('keeps the body when the tag is all there was', () => {
     expect(questionFrom('@dash')).toBe('@dash');
+  });
+});
+
+describe('splitOnMention', () => {
+  it('separates the tag from the words around it', () => {
+    expect(splitOnMention('I think A, but @dash what breaks?')).toEqual([
+      { text: 'I think A, but ', mention: false },
+      { text: '@dash', mention: true },
+      { text: ' what breaks?', mention: false },
+    ]);
+  });
+
+  it('finds every one of them', () => {
+    expect(splitOnMention('@dash and again @DASH').filter((part) => part.mention)).toEqual([
+      { text: '@dash', mention: true },
+      { text: '@DASH', mention: true },
+    ]);
+  });
+
+  it('leaves a body with no tag as one part', () => {
+    expect(splitOnMention('the @dashboard is slow')).toEqual([
+      { text: 'the @dashboard is slow', mention: false },
+    ]);
+    expect(splitOnMention('')).toEqual([{ text: '', mention: false }]);
   });
 });

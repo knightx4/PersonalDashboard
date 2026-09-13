@@ -3,6 +3,7 @@
 import { useActionState, useOptimistic, useState } from 'react';
 import { Bot, CircleUser, X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
+import { CommentBody } from '@/components/dev/comment-body';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -113,7 +114,9 @@ function Message({
             )}
           </div>
         )}
-        <p className="whitespace-pre-wrap text-body text-ink">{comment.body}</p>
+        <div className="text-body text-ink">
+          <CommentBody body={comment.body} />
+        </div>
       </div>
 
       {!sending && (

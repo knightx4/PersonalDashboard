@@ -1390,3 +1390,75 @@ form[data-auto-submit] [data-fallback-submit] {
   font-size: 0.9em;
   padding: 0.1em 0.35em;
 }
+
+/* ---------------------------------------------------------------------------
+ * Comment prose.
+ *
+ * A comment on a dev row, which is a turn in a conversation rather than a
+ * document: the rhythm is tighter than .vault-prose, there is no measure to
+ * hold it to because it already sits in a narrow column, and the elements it
+ * can draw stop at a list and a block of code. Its own class for the reason
+ * .jobs-prose has one -- the three will drift, and a shared class would make
+ * that a regression in all of them.
+ * ------------------------------------------------------------------------ */
+.comment-prose {
+  color: var(--c-ink);
+  font-size: inherit;
+  line-height: 1.55;
+}
+
+.comment-prose > * + * {
+  margin-top: 0.55em;
+}
+
+.comment-prose a {
+  color: var(--c-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.comment-prose strong {
+  font-weight: 600;
+}
+
+.comment-prose ul,
+.comment-prose ol {
+  padding-left: 1.3em;
+}
+
+.comment-prose ul { list-style: disc; }
+.comment-prose ol { list-style: decimal; }
+.comment-prose li + li { margin-top: 0.2em; }
+
+.comment-prose code {
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+}
+
+.comment-prose pre {
+  background: var(--c-sunken);
+  border: 1px solid var(--c-border);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  padding: 0.7em 0.85em;
+}
+
+.comment-prose pre code {
+  background: none;
+  border: 0;
+  font-size: 0.85em;
+  padding: 0;
+}
+
+/* The tag, drawn as addressing somebody. A shape rather than a hue: whose
+ * attention a comment is asking for is none of the five things colour is
+ * allowed to claim. */
+.comment-mention {
+  background: var(--c-sunken);
+  border-radius: 0.25rem;
+  font-weight: 500;
+  padding: 0.05em 0.25em;
+}
