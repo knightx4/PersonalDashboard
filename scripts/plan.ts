@@ -15,7 +15,8 @@
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision] [--from <n>]
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
- *   npx tsx scripts/plan.ts idea "<body>" [--module <id>]  # file one idea
+ *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
+ *                                # file one follow-on, marked as your suggestion
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
  *   npx tsx scripts/plan.ts raise "<title>" [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
@@ -52,6 +53,7 @@ import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import { reshapeStamp } from '../lib/plan/origin';
 import {
   isClosed,
+  isDismissed,
   isPlanKind,
   isPlanPriority,
   isPlanSize,
@@ -149,7 +151,7 @@ async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
            resolution, comment, priority, size, assignee, commit_sha, position,
-           started_at, completed_at, created_at
+           started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
     from plan_items where user_id = ${userId}
     order by position, created_at`;
   const deps = await sql<{ id: string; item_id: string; depends_on_id: string }[]>`
@@ -170,7 +172,7 @@ async function byNumber(sql: Sql, userId: string, raw: string | undefined): Prom
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
            resolution, comment, priority, size, assignee, commit_sha, position,
-           started_at, completed_at, created_at
+           started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
     from plan_items where user_id = ${userId} and number = ${number}`;
   if (rows.length === 0) fail(`No step #${number}.`);
   return planItemFromRow(rows[0]);
@@ -204,6 +206,9 @@ function facts(node: PlanNode): string {
 }
 
 function printNode(node: PlanNode, indent = ''): void {
+  // Put aside as not right now, so it is not asked here either. It is on
+  // /dev/plan under Dismissed, which is the one place it shows.
+  if (isDismissed(node)) return;
   // An unanswered decision gets "[?]" where a build step gets its status box,
   // so a session scanning the list sees what is a question before it reads a
   // word of the title. An answered one keeps "[x]": it is closed either way.
@@ -214,7 +219,9 @@ function printNode(node: PlanNode, indent = ''): void {
   const tail = facts(node);
   console.log(tail ? `${head.padEnd(64)}  ${tail}` : head);
   // The admission that part of this is not yet planned, on the line under it.
-  if (node.fog) console.log(`${indent}      fog: ${node.fog.replace(/\s+/g, ' ').slice(0, 100)}`);
+  if (node.fog && !node.fogDismissedAt) {
+    console.log(`${indent}      fog: ${node.fog.replace(/\s+/g, ' ').slice(0, 100)}`);
+  }
   for (const child of node.children) printNode(child, indent + '  ');
 }
 
@@ -329,9 +336,12 @@ async function main(): Promise<void> {
     }
 
     if (command === 'ideas') {
+      // Dismissed ones are left out, which is what dismissing them was for: an
+      // idea the user has put aside is not offered back to the session that
+      // would suggest it again.
       const rows = await sql<{ id: string; body: string; module: string | null; created_at: Date }[]>`
         select id, body, module, created_at from ideas
-        where user_id = ${userId} and plan_item_id is null
+        where user_id = ${userId} and plan_item_id is null and dismissed_at is null
         order by created_at desc`;
       if (rows.length === 0) {
         console.log('Every idea has been shaped into the plan, or there are none.');
@@ -346,27 +356,42 @@ async function main(): Promise<void> {
       return;
     }
 
+    /**
+     * Filing a follow-on, which is where one goes now that fog is only about
+     * finishing the feature in front of you.
+     *
+     * Everything written here is a suggestion: this command is how a session
+     * writes an idea, and the user writes theirs on the page or from the
+     * capture panel. So the row is stamped `claude`, the ideas page lists it
+     * under their own, and `--from <n>` says which step the session was on
+     * when it thought of it.
+     */
     if (command === 'idea') {
       const file = arg('--file');
       const moduleArg = arg('--module');
       if (moduleArg && !isModuleId(moduleArg)) fail(`"${moduleArg}" is not a module.`);
+      const from = arg('--from');
+      const step = from ? await byNumber(sql, userId, from) : null;
       const ideas = file
         ? ideasFromFile(file)
         : target?.trim()
           ? [{ body: target.trim(), module: moduleArg && isModuleId(moduleArg) ? moduleArg : null }]
           : [];
       if (ideas.length === 0) {
-        fail('Give the idea: idea "…" [--module <id>], or idea --file <path> with a "## " heading per idea.');
+        fail('Give the idea: idea "…" [--module <id>] [--from <n>], or idea --file <path> with a "## " heading per idea.');
       }
       for (const idea of ideas) {
         if (idea.body.length > 4000) fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
         const [row] = await sql<{ id: string }[]>`
-          insert into ideas (user_id, body, module)
-          values (${userId}, ${idea.body}, ${idea.module})
+          insert into ideas (user_id, body, module, source, from_plan_item_id)
+          values (${userId}, ${idea.body}, ${idea.module}, 'claude', ${step?.id ?? null})
           returning id`;
         console.log(`${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${idea.body.replace(/\s+/g, ' ').slice(0, 90)}`);
       }
-      console.log(`\n${ideas.length} filed. They are on /dev/ideas.`);
+      console.log(
+        `\n${ideas.length} filed as suggestions${step ? ` from #${step.number}` : ''}. ` +
+          'They are on /dev/ideas, under the user\'s own list.',
+      );
       return;
     }
 
@@ -434,7 +459,7 @@ async function main(): Promise<void> {
                           json_build_object('author', c.author, 'body', c.body)
                           order by c.created_at
                         )
-                 from raised_comments c where c.raised_item_id = r.id
+                 from dev_comments c where c.raised_item_id = r.id
                ) as comments
         from raised_items r
         where r.user_id = ${userId} and r.status in ('open', 'answered')
@@ -685,8 +710,11 @@ async function main(): Promise<void> {
         fail(`fog ${item.number} --note "what cannot be seen yet", or --clear once it can.`);
       }
 
+      // Writing a patch clears any dismissal on the old one: what the person
+      // put aside was the sentence that was there, not the column.
       await sql`
-        update plan_items set fog = ${clear ? null : (note ?? null)}
+        update plan_items
+        set fog = ${clear ? null : (note ?? null)}, fog_dismissed_at = null
         where id = ${item.id} and user_id = ${userId}`;
       console.log(
         clear
@@ -710,7 +738,7 @@ async function main(): Promise<void> {
       // Graduating it is the re-shape's first move; clearing it is one
       // command. Blocking and dropping are fine: neither claims the step is
       // complete.
-      if (command === 'done' && item.fog) {
+      if (command === 'done' && item.fog && !item.fogDismissedAt) {
         fail(
           `#${item.number} still says part of it is not specified. Write the steps that ` +
             `patch covers, or run plan.ts fog ${item.number} --clear, then close it.`,

@@ -1,5 +1,5 @@
 import { MODULES } from '@/lib/modules';
-import { isClosed, type PlanStatus } from './load';
+import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
 import { ancestorsOf, flatten, type PlanNode, type PlanSection } from './tree';
 
@@ -70,6 +70,23 @@ export const FOG_RULE =
   'so a second one replaces the first rather than joining it, and a feature ' +
   'that seems to need two has one of them wrong.';
 
+/**
+ * What "not right now" means to a session, said in the instruction itself.
+ *
+ * Dismissing is the way out of a question you do not want to settle and a fog
+ * patch you do not want raised again. It only works if the next run reads it:
+ * a re-shape that cannot see what was put aside re-derives the same question
+ * from the same code and writes it back, which is the loop this is meant to
+ * end. So the dismissed rows are listed in the turn, and this says what to do
+ * about them.
+ */
+export const DISMISSAL_RULE =
+  'Anything listed as dismissed has been put aside by the person as not right ' +
+  'now. Respect it: do not propose it again, do not ask the same question in ' +
+  'different words, do not write it back as fog, and do not file it as an idea. ' +
+  'Dismissing and bringing one back are both the person\'s moves, on /dev/plan ' +
+  'and /dev/ideas -- a session never does either.';
+
 export const STATUS_WORD: Record<PlanStatus, string> = {
   proposed: 'proposed',
   not_started: 'not started',
@@ -92,8 +109,15 @@ function line(node: Pick<PlanNode, 'number' | 'title' | 'status'>): string {
   }`;
 }
 
+/**
+ * The steps under a step, as a checklist. A dismissed one is left out, with
+ * everything beneath it: the brief is what a session works from, and a
+ * question put aside is not part of the job.
+ */
 function steps(nodes: readonly PlanNode[], indent = ''): string[] {
-  return nodes.flatMap((node) => [indent + line(node), ...steps(node.children, indent + '  ')]);
+  return nodes
+    .filter((node) => !isDismissed(node))
+    .flatMap((node) => [indent + line(node), ...steps(node.children, indent + '  ')]);
 }
 
 /**
@@ -170,6 +194,54 @@ export function planQueueBrief(
   return out.join('\n') + '\n';
 }
 
+/**
+ * What has been put aside under a feature, for the turn that re-reads it.
+ *
+ * The one place dismissed rows are written out. Everywhere else they are
+ * hidden, which is what dismissing them was for; here they are named so the
+ * session knows what not to bring back, and each one says which kind it is,
+ * because "do not ask this again" and "do not file this again" land in
+ * different places.
+ *
+ * Empty when nothing under the feature has been dismissed, so the turn carries
+ * the section only when there is something in it.
+ */
+export function dismissedUnder(
+  feature: PlanNode,
+  suggestions: readonly { body: string }[] = [],
+): string {
+  const rows = flatten([feature]);
+  const lines: string[] = [];
+
+  for (const item of rows) {
+    if (isDismissed(item)) {
+      lines.push(`- #${item.number} ${item.title} (${item.kind === 'decision' ? 'question' : 'step'})`);
+    }
+    if (item.fog && item.fogDismissedAt !== null) {
+      lines.push(`- The fog on #${item.number}: ${firstLine(item.fog)} (fog)`);
+    }
+  }
+  for (const idea of suggestions) {
+    lines.push(`- ${firstLine(idea.body)} (suggestion, on the ideas page)`);
+  }
+
+  if (lines.length === 0) return '';
+  return (
+    [
+      '## Already dismissed',
+      '',
+      'Put aside by the person as not right now. Left here so they are not written back.',
+      '',
+      ...lines,
+    ].join('\n') + '\n'
+  );
+}
+
+function firstLine(text: string): string {
+  const line = text.split('\n').find((part) => part.trim()) ?? '';
+  return line.trim().length > 160 ? `${line.trim().slice(0, 157)}…` : line.trim();
+}
+
 export function planBrief(sections: readonly PlanSection[], node: PlanNode): string {
   const ancestors = ancestorsOf(sections, node.id);
   const out: string[] = [];
@@ -222,8 +294,10 @@ export function planBrief(sections: readonly PlanSection[], node: PlanNode): str
   }
 
   // What nobody can see yet. Said plainly, because the alternative a proposal
-  // reaches for is plausible steps invented to fill the gap.
-  if (node.fog) {
+  // reaches for is plausible steps invented to fill the gap. A patch that has
+  // been put aside is not said at all -- that is the whole of what dismissing
+  // it does.
+  if (node.fog && hasLiveFog(node)) {
     out.push('', '## Not yet specified', '', node.fog);
   }
 

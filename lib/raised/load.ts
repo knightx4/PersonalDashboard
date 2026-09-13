@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -13,18 +14,6 @@ import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /** Mirrors the `raised_items_status_ck` check. */
 export type RaisedStatus = 'open' | 'answered' | 'dismissed';
-
-/**
- * A message in the thread under a raise. 'me' is you on the page, 'claude' is
- * a session — both write with your account, so the column is what tells the
- * two halves of the conversation apart.
- */
-export type RaisedComment = {
-  id: string;
-  author: 'me' | 'claude';
-  body: string;
-  createdAt: string;
-};
 
 export type RaisedRow = {
   id: string;
@@ -45,7 +34,7 @@ export type RaisedRow = {
   /** When you answered it. Null while it is open, and null on a dismissal. */
   answeredAt: string | null;
   /** The thread, oldest first. Empty until somebody says something. */
-  comments: RaisedComment[];
+  thread: DevComment[];
 };
 
 export interface RaisedQueue {
@@ -62,7 +51,7 @@ export function isOpen(row: RaisedRow): boolean {
 /** Every column the app reads off a raise, and the thread under it. */
 export const RAISED_COLUMNS =
   'id, title, detail, ask, module, source, status, created_at, answered_at, ' +
-  'comments:raised_comments(id, author, body, created_at)';
+  `thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
@@ -80,26 +69,8 @@ export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
     status: row.status as RaisedStatus,
     createdAt: row.created_at as string,
     answeredAt: (row.answered_at as string | null) ?? null,
-    comments: commentsFrom(row.comments),
+    thread: threadFrom(row.thread),
   };
-}
-
-/**
- * Oldest first, so the thread reads downwards. Sorted here rather than in the
- * query: an embedded select carries no order of its own, and the alternative
- * is a second round trip for something that is never more than a handful of
- * rows.
- */
-function commentsFrom(value: unknown): RaisedComment[] {
-  if (!Array.isArray(value)) return [];
-  return (value as Array<Record<string, unknown>>)
-    .map((row) => ({
-      id: row.id as string,
-      author: row.author as RaisedComment['author'],
-      body: row.body as string,
-      createdAt: row.created_at as string,
-    }))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /**

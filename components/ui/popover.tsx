@@ -82,6 +82,14 @@ const popover = cva(`${popoverSurface} z-overlay`, {
       'trigger-right':
         'fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-10',
       'trigger-below': 'absolute left-0 top-full mt-1.5',
+      /**
+       * The same drop, hung from the trigger's right edge instead of its
+       * left. A panel wider than its button runs off the right of a phone
+       * when the button is at the end of a toolbar -- which is where a
+       * control that arranges the list below it belongs -- and nothing
+       * scrolls it back.
+       */
+      'trigger-below-end': 'absolute right-0 top-full mt-1.5',
     },
     /**
      * `menu` is a list of rows that carry their own padding, so the panel

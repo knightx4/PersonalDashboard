@@ -27,6 +27,8 @@ import {
   seedPlan,
   reshapePlanFeature,
   sendPlanFeatureToClaude,
+  dismissPlanDecision,
+  dismissPlanFog,
   sendPlanItemToClaude,
   sendPlanQueueToClaude,
   setPlanItemAssignee,
@@ -35,6 +37,7 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
@@ -60,6 +63,7 @@ import {
   PLAN_SIZES,
   PLAN_STATUSES,
   isClosed,
+  isDismissed,
   type PlanAssignee,
   type PlanPriority,
   type PlanSize,
@@ -326,6 +330,11 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
     description:
       'Every open step is underway, blocked, or waiting on another. Finish one and the next becomes ready.',
   },
+  dismissed: {
+    title: 'Nothing put aside',
+    description:
+      'A question you do not want to settle yet, or a patch of fog you do not want raised, is put aside from the row it sits on. It waits here until you bring it back.',
+  },
   blocked: {
     title: 'Nothing waiting right now',
     description: 'Nothing is blocked and nothing waits on another step.',
@@ -365,6 +374,11 @@ function SummaryStrip({
     { view: 'proposed', value: summary.proposed, noun: 'proposed' },
     { view: 'blocked', value: summary.waiting, noun: 'waiting' },
     { view: 'fog', value: summary.fog, noun: 'not specified' },
+    // Only once there is something in it. A permanent "0 dismissed" would be
+    // a count of a thing that has never happened.
+    ...(summary.dismissed > 0
+      ? [{ view: 'dismissed' as const, value: summary.dismissed, noun: 'dismissed' }]
+      : []),
     { view: null, value: summary.inProgress, noun: 'underway' },
     { view: 'claude', value: summary.claude, noun: "Claude's" },
     { view: null, value: summary.done, noun: 'done' },
@@ -978,11 +992,18 @@ function QuestionRow({ node }: { node: PlanNode }) {
     setPlanItemStatus,
     {} as PlanActionState,
   );
+  const [dismissState, dismissAction, dismissPending] = useActionState(
+    dismissPlanDecision,
+    {} as PlanActionState,
+  );
   const [answering, setAnswering] = useState(false);
   const [answer, setAnswer] = useState('');
   useSettled(answerState, () => setAnswering(false));
 
   const settled = isClosed(node.status);
+  // Only ever rendered under the Dismissed view: everywhere else the row is
+  // pruned before it gets here.
+  const aside = isDismissed(node);
   const field = `question-${node.id}`;
 
   /**
@@ -1102,10 +1123,40 @@ function QuestionRow({ node }: { node: PlanNode }) {
                   </Button>
                 </form>
               )}
+              {/* The third way out, and the one that says nothing about the
+                  question: it is still open, still unanswered, and out of
+                  sight until you come and get it. */}
+              {!settled && (
+                <form action={dismissAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  <input type="hidden" name="dismissed" value={aside ? '0' : '1'} />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant={aside ? 'secondary' : 'ghost'}
+                    pending={dismissPending}
+                  >
+                    {aside ? 'Bring back' : 'Not now'}
+                  </Button>
+                </form>
+              )}
             </div>
           )}
 
-          <FieldError>{answerState.error ?? dropState.error}</FieldError>
+          {/* A question is commented on where it is read, which is here: a
+              decision beneath a step is deliberately not a row of its own in
+              the tree, so this is the only place to say anything about it. */}
+          {node.status !== 'dropped' && (
+            <CommentThread
+              target="step"
+              id={node.id}
+              thread={node.thread}
+              label="Comment"
+              placeholder="What is unclear about the question, or what you are weighing. It does not answer it."
+            />
+          )}
+
+          <FieldError>{answerState.error ?? dropState.error ?? dismissState.error}</FieldError>
         </div>
       </div>
     </li>
@@ -1132,7 +1183,9 @@ function QuestionRow({ node }: { node: PlanNode }) {
 function Questions({ node }: { node: PlanNode }) {
   const [asking, setAsking] = useState(false);
   const questions = node.children.filter((child) => child.kind === 'decision');
-  const unanswered = questions.filter((question) => !isClosed(question.status)).length;
+  const unanswered = questions.filter(
+    (question) => !isClosed(question.status) && !isDismissed(question),
+  ).length;
 
   if (questions.length === 0 && isClosed(node.status)) return null;
 
@@ -1831,14 +1884,23 @@ function PlanRow({
   trail,
   catalog,
   canSend,
+  view,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
   trail: readonly boolean[];
   catalog: readonly PlanCatalogEntry[];
   canSend: boolean;
+  /** Which view is on. Only Dismissed shows what has been put aside. */
+  view: View;
 }) {
-  const [open, setOpen] = useState(false);
+  // A question lives in its step's panel rather than as a row of its own, so
+  // the Dismissed view would otherwise be a list of steps to open one at a
+  // time. The rows that hold something put aside start open there.
+  const [open, setOpen] = useState(
+    view === 'dismissed' &&
+      node.children.some((child) => child.kind === 'decision' && isDismissed(child)),
+  );
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [answering, setAnswering] = useState(false);
@@ -1867,6 +1929,10 @@ function PlanRow({
   // been answered beneath it, and propose what has changed.
   const [reshapeState, reshapeAction, reshapePending] = useActionState(
     reshapePlanFeature,
+    {} as PlanActionState,
+  );
+  const [fogState, fogAction, fogPending] = useActionState(
+    dismissPlanFog,
     {} as PlanActionState,
   );
 
@@ -2308,16 +2374,32 @@ function PlanRow({
           thing it described. Only where there is an arrow to fold: on a leaf
           `showChildren` is a state with no control, and gating on it alone
           would hide fog on every closed step with no way back. */}
-      {node.fog && (!hasChildren || showChildren) && (
-        <li style={inset} className="pb-1.5 pr-3">
-          <div className="border-l-2 border-dashed border-border-strong pl-2.5">
-            <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
-              Not yet specified
-            </p>
-            <p className="whitespace-pre-wrap text-small text-ink-muted">{node.fog}</p>
-          </div>
-        </li>
-      )}
+      {node.fog && (node.fogDismissedAt === null || view === 'dismissed') &&
+        (!hasChildren || showChildren) && (
+          <li style={inset} className="pb-1.5 pr-3">
+            <div className="border-l-2 border-dashed border-border-strong pl-2.5">
+              <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
+                Not yet specified
+              </p>
+              <p className="whitespace-pre-wrap text-small text-ink-muted">{node.fog}</p>
+              {/* Putting the patch aside stops it being raised: off the page,
+                  out of the Not specified view, out of every turn, and no
+                  longer holding the step open when you close it. */}
+              <form action={fogAction} className="mt-1">
+                <input type="hidden" name="id" value={node.id} />
+                <input
+                  type="hidden"
+                  name="dismissed"
+                  value={node.fogDismissedAt === null ? '1' : '0'}
+                />
+                <Button type="submit" size="sm" variant="ghost" pending={fogPending}>
+                  {node.fogDismissedAt === null ? 'Not now' : 'Bring back'}
+                </Button>
+              </form>
+              <FieldError>{fogState.error}</FieldError>
+            </div>
+          </li>
+        )}
 
       {editing ? (
         <li style={inset} className="pr-3">
@@ -2361,6 +2443,13 @@ function PlanRow({
             <Questions node={node} />
 
             <Dependencies node={node} catalog={catalog} />
+
+            <CommentThread
+              target="step"
+              id={node.id}
+              thread={node.thread}
+              placeholder="A note on this step. Nothing reads it and nothing happens."
+            />
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
               <span>{scopeLabel(node.module)}</span>
@@ -2442,6 +2531,7 @@ function PlanRow({
             trail={[...trail, index < substeps.length - 1]}
             catalog={catalog}
             canSend={canSend}
+            view={view}
           />
         ))}
 
@@ -2594,6 +2684,7 @@ export function PlanView({
                       trail={[]}
                       catalog={catalog}
                       canSend={canSend}
+                      view={view}
                     />
                   ))}
                 </ul>

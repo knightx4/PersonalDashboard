@@ -31,6 +31,17 @@ import { ReadingCard } from '@/components/learn/reading-card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
+import { DisplayMenu } from '@/components/shell/display-menu';
+import { GroupHeader } from '@/components/shell/group-header';
+import {
+  groupRows,
+  isHidden,
+  listDisplayMenu,
+  parseListDisplay,
+  sortRows,
+  type ListDisplaySpec,
+} from '@/lib/list-display';
+import { formatMoney } from '@/lib/money';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -1244,6 +1255,157 @@ const trackReadings: ReadingRow[] = [
   }),
 ];
 
+/**
+ * A list with display options, drawn from the shared control and the shared
+ * group header, with no page behind it yet.
+ *
+ * The rows are orders because orders is the list with the least of this today
+ * -- one grouping it cannot leave, no sort at all -- and it is where the
+ * control lands first. The params are a set arrangement rather than the page's
+ * own: a sort that is not the default, a grouping that is, and one property
+ * turned off, so the panel shows a chosen row, an unchosen one and both states
+ * of a switch at once.
+ */
+type SampleOrder = {
+  id: string;
+  merchant: string;
+  month: string;
+  monthLabel: string;
+  person: string;
+  number: string;
+  inbox: string;
+  items: string;
+  totalCents: number;
+};
+
+const sampleOrders: SampleOrder[] = [
+  {
+    id: 'o1',
+    merchant: 'Zatu Games',
+    month: '2026-09',
+    monthLabel: 'September 2026',
+    person: 'Chris',
+    number: 'ZT-88213',
+    inbox: 'shop+zatu@…',
+    items: 'Brass Birmingham, Ark Nova',
+    totalCents: 11250,
+  },
+  {
+    id: 'o2',
+    merchant: 'Amazon',
+    month: '2026-09',
+    monthLabel: 'September 2026',
+    person: 'Chris',
+    number: '206-4471928',
+    inbox: 'shop+amazon@…',
+    items: 'USB-C cable, two of them',
+    totalCents: 1899,
+  },
+  {
+    id: 'o3',
+    merchant: 'Waterstones',
+    month: '2026-08',
+    monthLabel: 'August 2026',
+    person: 'Ana',
+    number: 'WS-70119',
+    inbox: 'shop+waterstones@…',
+    items: 'The Mars Room',
+    totalCents: 899,
+  },
+  {
+    id: 'o4',
+    merchant: 'Zatu Games',
+    month: '2026-08',
+    monthLabel: 'August 2026',
+    person: 'Chris',
+    number: 'ZT-87004',
+    inbox: 'shop+zatu@…',
+    items: 'Sleeves, 200',
+    totalCents: 2400,
+  },
+];
+
+const orderDisplay: ListDisplaySpec<SampleOrder> = {
+  pathname: '/preview',
+  sorts: [
+    { id: 'newest', label: 'Newest', compare: (a, b) => b.month.localeCompare(a.month) },
+    { id: 'oldest', label: 'Oldest', compare: (a, b) => a.month.localeCompare(b.month) },
+    { id: 'total_desc', label: 'Total: high to low', compare: (a, b) => b.totalCents - a.totalCents },
+    { id: 'total_asc', label: 'Total: low to high', compare: (a, b) => a.totalCents - b.totalCents },
+  ],
+  groups: [
+    {
+      id: 'month',
+      label: 'Month',
+      order: 'key-desc',
+      bucket: (row) => ({ key: row.month, label: row.monthLabel }),
+    },
+    { id: 'merchant', label: 'Merchant', bucket: (row) => ({ key: row.merchant, label: row.merchant }) },
+    { id: 'person', label: 'Whose order', bucket: (row) => ({ key: row.person, label: row.person }) },
+  ],
+  properties: [
+    { id: 'merchant', label: 'Merchant', alwaysOn: true },
+    { id: 'number', label: 'Order number' },
+    { id: 'inbox', label: 'Inbox address' },
+    { id: 'person', label: 'Whose order' },
+    { id: 'items', label: 'What was in it' },
+  ],
+  defaultSort: 'newest',
+  defaultGroup: 'month',
+};
+
+const orderDisplayParams = {
+  s: 'shell-display-options',
+  sort: 'total_desc',
+  hide: 'inbox',
+};
+
+function SharedDisplayOptions() {
+  const state = parseListDisplay(orderDisplay, orderDisplayParams);
+  const groups = groupRows(sortRows(sampleOrders, state), state.groupBy, (rows) =>
+    formatMoney(rows.reduce((sum, row) => sum + row.totalCents, 0)),
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-end">
+        <DisplayMenu menu={listDisplayMenu(orderDisplay, orderDisplayParams)} />
+      </div>
+      {groups.map((group) => (
+        <section key={group.key} className="space-y-2">
+          <GroupHeader label={group.label} count={group.count} subtotal={group.subtotal} />
+          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
+            {group.rows.map((row) => (
+              <li key={row.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-ui text-ink">
+                    {row.merchant}
+                    {!isHidden(state, 'number') && (
+                      <span className="ml-2 text-small text-ink-muted">{row.number}</span>
+                    )}
+                  </p>
+                  {!isHidden(state, 'items') && (
+                    <p className="truncate text-small text-ink-muted">{row.items}</p>
+                  )}
+                  {!isHidden(state, 'inbox') && (
+                    <p className="truncate text-small text-ink-ghost">{row.inbox}</p>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="tabular text-ui text-ink">{formatMoney(row.totalCents)}</p>
+                  {!isHidden(state, 'person') && (
+                    <p className="text-small text-ink-muted">{row.person}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -1519,6 +1681,18 @@ export const SURFACES: readonly Surface[] = [
         <RoundsTable title="Past" rows={interviewRounds.slice(2)} timezone="Europe/London" />
       </>
     ),
+  },
+
+  {
+    /* The shared display control and the shared group header, before any page
+     * uses either. Both at once because they are two halves of one idea: the
+     * panel says how the list is arranged and the header is where a grouping
+     * proves it is a grouping rather than a reordering. */
+    id: 'shell-display-options',
+    label: 'Display options · Control and group headers',
+    module: 'shopping',
+    width: 'wide',
+    render: () => <SharedDisplayOptions />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

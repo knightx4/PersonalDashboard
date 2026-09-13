@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -39,6 +40,23 @@ export function isPlanStatus(value: string): value is PlanStatus {
 /** Finished, one way or the other. Neither counts as work outstanding. */
 export function isClosed(status: PlanStatus): boolean {
   return status === 'done' || status === 'dropped';
+}
+
+/**
+ * Put aside as "not right now" — see migration 0062.
+ *
+ * Not a status, because nothing about the row has been settled: a dismissed
+ * question is still unanswered and a dismissed step is still unbuilt. It says
+ * only that you do not want to be asked again, so everything that asks —
+ * the page, the counts, a brief, a re-shape — reads this and leaves it out.
+ */
+export function isDismissed(item: { dismissedAt: string | null }): boolean {
+  return item.dismissedAt !== null;
+}
+
+/** Fog that is still being raised: written, and not put aside. */
+export function hasLiveFog(item: { fog: string | null; fogDismissedAt: string | null }): boolean {
+  return item.fog !== null && item.fogDismissedAt === null;
 }
 
 /** 1 next, 2 normal, 3 someday — the same three the notes queue uses. */
@@ -107,8 +125,23 @@ export type PlanItem = {
   fog: string | null;
   /** The answer a decision closed with, in the person's words. */
   resolution: string | null;
+  /**
+   * When you said "not right now" to this row. A dismissed question is not
+   * answered and not withdrawn: it is out of sight, off every count and out
+   * of every re-shape, and the Dismissed view is where it can be found and
+   * brought back. Null on everything you have not put aside.
+   */
+  dismissedAt: string | null;
+  /** The same for the fog patch alone, which outlives the row it sits on. */
+  fogDismissedAt: string | null;
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
+  /**
+   * What has been said about it, oldest first: your notes and a session's
+   * replies. Not a column — it is read alongside the row — and empty on the
+   * paths that do not ask for it, the CLI's direct connection among them.
+   */
+  thread: DevComment[];
   priority: PlanPriority;
   size: PlanSize | null;
   assignee: PlanAssignee | null;
@@ -136,7 +169,8 @@ export type PlanData = {
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
   'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
-  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at';
+  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at, ' +
+  'dismissed_at, fog_dismissed_at';
 
 /**
  * Every row of the account's plan, in one read. The whole tree is what the
@@ -152,7 +186,11 @@ export async function loadPlan(
   const [{ data: rows }, { data: deps }] = await Promise.all([
     supabase
       .from('plan_items')
-      .select(ITEM_COLUMNS)
+      // The thread is read with the row rather than as a second query, the
+      // same as on a raise. It is not in ITEM_COLUMNS because an embedded
+      // select is PostgREST's and the CLI reads these columns over a direct
+      // connection.
+      .select(`${ITEM_COLUMNS}, thread:dev_comments(${COMMENT_COLUMNS})`)
       .eq('user_id', userId)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true }),
@@ -204,7 +242,10 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     kind: isPlanKind(kind) ? kind : 'build',
     fog: (row.fog as string | null) ?? null,
     resolution: (row.resolution as string | null) ?? null,
+    dismissedAt: stamp(row.dismissed_at),
+    fogDismissedAt: stamp(row.fog_dismissed_at),
     comment: (row.comment as string | null) ?? null,
+    thread: threadFrom(row.thread),
     priority: isPlanPriority(priority) ? priority : 2,
     size: size && isPlanSize(size) ? size : null,
     assignee: assignee && isPlanAssignee(assignee) ? assignee : null,

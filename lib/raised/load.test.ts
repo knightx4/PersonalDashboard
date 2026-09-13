@@ -66,20 +66,18 @@ describe('the thread under a raise', () => {
   it('reads oldest first, whatever order the embedded select returned', () => {
     const row = raisedRowFrom({
       ...raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' }),
-      comments: [
+      thread: [
         { id: 'c2', author: 'claude', body: 'Then B it is.', created_at: '2026-09-02T09:00:00Z' },
         { id: 'c1', author: 'me', body: 'Do B.', created_at: '2026-09-01T18:00:00Z' },
       ],
     });
 
-    expect(row.comments.map((comment) => comment.id)).toEqual(['c1', 'c2']);
-    expect(row.comments.map((comment) => comment.author)).toEqual(['me', 'claude']);
+    expect(row.thread.map((comment) => comment.id)).toEqual(['c1', 'c2']);
+    expect(row.thread.map((comment) => comment.author)).toEqual(['me', 'claude']);
   });
 
   it('is an empty list when nobody has said anything', () => {
-    expect(raisedRowFrom(raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' })).comments).toEqual(
-      [],
-    );
+    expect(raisedRowFrom(raise({ id: 'a', created_at: '2026-09-01T09:00:00Z' })).thread).toEqual([]);
   });
 });
 

@@ -293,3 +293,75 @@ export function displayHref<T>(
   const qs = query.toString();
   return qs ? `${spec.pathname}?${qs}` : spec.pathname;
 }
+
+/** One choice in the display control: a sort, or a grouping. */
+export type DisplayChoice = { id: string; label: string; href: string; chosen: boolean };
+
+/** One property switch, which is on or off rather than one of a set. */
+export type DisplayToggle = { id: string; label: string; href: string; hidden: boolean };
+
+/**
+ * What the control draws: labels, links, and which of them is in force.
+ *
+ * The spec carries comparators and bucket functions, and neither can be handed
+ * to a client component, so a page turns its spec into this on the server and
+ * passes the rows. It is also why the control never imports a page's options:
+ * every list arrives here in the same shape.
+ */
+export type ListDisplayMenu = {
+  sorts: DisplayChoice[];
+  /** Empty when the list declares no groupings; otherwise led by "No grouping". */
+  groups: DisplayChoice[];
+  properties: DisplayToggle[];
+  /** What the button can say about the arrangement without opening the panel. */
+  sortLabel: string | null;
+  groupLabel: string | null;
+  hiddenCount: number;
+};
+
+/** The label of the grouping row that turns grouping off. */
+const NO_GROUP_LABEL = 'No grouping';
+
+/** Every choice the control offers, each with the link that makes it. */
+export function listDisplayMenu<T>(
+  spec: ListDisplaySpec<T>,
+  params: ListSearchParams,
+): ListDisplayMenu {
+  const state = parseListDisplay(spec, params);
+  const groups = spec.groups ?? [];
+
+  return {
+    sorts: spec.sorts.map((sort) => ({
+      id: sort.id,
+      label: sort.label,
+      href: displayHref(spec, params, { sort: sort.id }),
+      chosen: sort.id === state.sort,
+    })),
+    groups:
+      groups.length === 0
+        ? []
+        : [
+            {
+              id: NO_GROUP,
+              label: NO_GROUP_LABEL,
+              href: displayHref(spec, params, { group: NO_GROUP }),
+              chosen: state.group === NO_GROUP,
+            },
+            ...groups.map((group) => ({
+              id: group.id,
+              label: group.label,
+              href: displayHref(spec, params, { group: group.id }),
+              chosen: group.id === state.group,
+            })),
+          ],
+    properties: hideableProperties(spec).map((property) => ({
+      id: property.id,
+      label: property.label,
+      href: displayHref(spec, params, { toggleProperty: property.id }),
+      hidden: state.hidden.includes(property.id),
+    })),
+    sortLabel: state.sortBy?.label ?? null,
+    groupLabel: state.groupBy?.label ?? null,
+    hiddenCount: state.hidden.length,
+  };
+}
