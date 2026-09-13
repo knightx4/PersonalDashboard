@@ -3,8 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { threadText } from '@/lib/comments/context';
 import { codeMatches } from '@/lib/feedback/code';
 import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { IDEA_COLUMNS, ideaRowFrom } from '@/lib/ideas/load';
 import { FOG_RULE, PLAIN_ENGLISH_RULE } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 
@@ -205,17 +207,23 @@ export async function shapeIdea(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing idea.' };
 
-  const { data: idea } = await supabase
+  // The whole row rather than the four columns the turn used to name, because
+  // the thread comes with it. What was said underneath an idea is usually the
+  // half that says what it actually means -- the first sentence is a note to
+  // self, and the shape it should take was worked out in the replies.
+  const { data } = await supabase
     .from('ideas')
-    .select('id, body, module, plan_item_id')
+    .select(IDEA_COLUMNS)
     .eq('user_id', user.id)
     .eq('id', id.data)
     .maybeSingle();
-  if (!idea) return { error: 'That idea no longer exists.' };
-  if (idea.plan_item_id) return { error: 'This idea is already in the plan.' };
+  if (!data) return { error: 'That idea no longer exists.' };
+  const idea = ideaRowFrom(data as unknown as Record<string, unknown>);
+  if (idea.planItem) return { error: 'This idea is already in the plan.' };
 
-  const scope = idea.module as string | null;
+  const scope = idea.module;
   const label = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
+  const said = threadText(idea.thread);
 
   const text =
     `Shape idea ${String(idea.id).slice(0, 8)} into the plan, following the "Shaping an idea" ` +
@@ -223,7 +231,8 @@ export async function shapeIdea(
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
     `${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n` +
-    `Idea ${String(idea.id)} (about ${label}):\n\n${String(idea.body)}\n`;
+    `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
+    (said ? `\n${said}` : '');
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({

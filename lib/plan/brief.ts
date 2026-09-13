@@ -1,3 +1,4 @@
+import { commentLine } from '@/lib/comments/context';
 import { MODULES } from '@/lib/modules';
 import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
@@ -158,6 +159,44 @@ function decidedSoFar(feature: PlanNode, node: PlanNode): PlanNode[] {
 }
 
 /**
+ * What a brief carries beyond the step itself.
+ *
+ * The thread is off by default because most callers already have it or do not
+ * want it: the `@dash` path prints the exchange in its own section with the
+ * question taken out of it, and the CLI reads plan rows over a direct
+ * connection that asks for no comments at all. The four hand-over buttons on
+ * the plan page turn it on, because there the comments are the only place some
+ * of what the person decided was ever written down.
+ */
+export type BriefOptions = {
+  /** Print the comments on the step and on the steps beneath it. */
+  thread?: boolean;
+};
+
+/**
+ * What has been said on the rows a brief carries, oldest first.
+ *
+ * Grouped by row rather than run together, because a hand-over carries a whole
+ * subtree and a comment left on one step means something different from the
+ * same words left on the feature above it. Each line says who wrote it: both
+ * halves of the conversation are written under the person's account, so
+ * without the marker a session cannot tell its own past replies from theirs.
+ *
+ * Dismissed rows are left out, the same as in the checklist.
+ */
+function saidOn(node: PlanNode): string[] {
+  const rows = flatten([node]).filter((item) => !isDismissed(item) && item.thread.length > 0);
+  if (rows.length === 0) return [];
+
+  const out = ['', '## Comments', '', 'Left on these rows, oldest first.'];
+  for (const row of rows) {
+    out.push('', `On #${row.number} ${row.title}:`, '');
+    for (const comment of row.thread) out.push(`- ${commentLine(comment)}`);
+  }
+  return out;
+}
+
+/**
  * Several steps written out as one hand-over.
  *
  * The order is the running order, so the checklist at the top is both the
@@ -174,6 +213,7 @@ function decidedSoFar(feature: PlanNode, node: PlanNode): PlanNode[] {
 export function planQueueBrief(
   sections: readonly PlanSection[],
   nodes: readonly PlanNode[],
+  options: BriefOptions = {},
 ): string {
   const out: string[] = [];
 
@@ -188,7 +228,7 @@ export function planQueueBrief(
   }
 
   for (const node of nodes) {
-    out.push('', '---', '', planBrief(sections, node).trimEnd());
+    out.push('', '---', '', planBrief(sections, node, options).trimEnd());
   }
 
   return out.join('\n') + '\n';
@@ -242,7 +282,11 @@ function firstLine(text: string): string {
   return line.trim().length > 160 ? `${line.trim().slice(0, 157)}…` : line.trim();
 }
 
-export function planBrief(sections: readonly PlanSection[], node: PlanNode): string {
+export function planBrief(
+  sections: readonly PlanSection[],
+  node: PlanNode,
+  options: BriefOptions = {},
+): string {
   const ancestors = ancestorsOf(sections, node.id);
   const out: string[] = [];
 
@@ -329,6 +373,8 @@ export function planBrief(sections: readonly PlanSection[], node: PlanNode): str
   if (node.comment) {
     out.push('', '## Notes', '', node.comment);
   }
+
+  if (options.thread) out.push(...saidOn(node));
 
   if (node.resolution) {
     out.push('', '## Answered', '', node.resolution);

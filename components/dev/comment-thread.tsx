@@ -120,7 +120,7 @@ export function CommentThread({
   id,
   thread,
   label,
-  placeholder = 'A note on this row. Tag @dash to get a reply; without it nothing reads it.',
+  placeholder = 'A note on this row. Tag @dash to ask something, or to tell it to do something; without it nothing reads it.',
 }: {
   target: CommentTarget;
   /** The row being commented on, not the comment. */

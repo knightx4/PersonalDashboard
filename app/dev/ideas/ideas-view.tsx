@@ -214,7 +214,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
             target="idea"
             id={idea.id}
             thread={idea.thread}
-            placeholder="What you think about this idea, or what you would want it to do. Tag @dash to ask about it; shaping does not read this."
+            placeholder="What you think about this idea, or what you would want it to do. Shaping reads it; tag @dash to ask about it."
           />
           <div className="flex flex-wrap items-center gap-2">
             {/* A dismissed idea gets one move back into the list and nothing

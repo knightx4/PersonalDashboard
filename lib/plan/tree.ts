@@ -783,6 +783,20 @@ export function isWaitingOnThePerson(
   return node.kind === 'decision' && !isClosed(node.status);
 }
 
+/**
+ * The feature a step belongs to: the highest step above it, or itself.
+ *
+ * The whole tree it sits in, rather than the nearest ancestor that says what
+ * finishing means -- lib/plan/brief.ts wants that narrower one for a
+ * destination, and this one is for the rules that hold over a batch: one
+ * session per feature, and a re-shape that re-reads everything under the top
+ * of the tree.
+ */
+export function topFeatureOf(sections: readonly PlanSection[], node: PlanNode): PlanNode {
+  const ancestors = ancestorsOf(sections, node.id);
+  return ancestors[0] ?? node;
+}
+
 export function summarize(sections: readonly PlanSection[]): PlanSummary {
   const all = flattenSections(sections);
   // Every count on the strip is over the rows still being asked about. A

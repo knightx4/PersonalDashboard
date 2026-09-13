@@ -44,6 +44,17 @@ export function raiseContext(row: RaisedRow): string {
 }
 
 /**
+ * One comment, marked as whose it is.
+ *
+ * Both halves of the conversation are written under the same account, so the
+ * marker is the only thing that says which of them wrote a line. Shared with
+ * the plan brief, which prints comments per row rather than as one history.
+ */
+export function commentLine(comment: DevComment): string {
+  return `${comment.author === 'claude' ? 'Claude' : 'The person'}: ${comment.body}`;
+}
+
+/**
  * The exchange so far, oldest first.
  *
  * The comment carrying the question is left out by its caller: it is asked in
@@ -52,10 +63,7 @@ export function raiseContext(row: RaisedRow): string {
  */
 export function threadText(thread: readonly DevComment[]): string {
   if (thread.length === 0) return '';
-  const lines = thread.map(
-    (comment) => `${comment.author === 'claude' ? 'Claude' : 'The person'}: ${comment.body}`,
-  );
-  return ['## Said so far on this row', '', ...lines].join('\n') + '\n';
+  return ['## Said so far on this row', '', ...thread.map(commentLine)].join('\n') + '\n';
 }
 
 /** The whole message the reply is produced from. */
