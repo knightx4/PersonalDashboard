@@ -103,6 +103,24 @@ export function unappliedEventNeedsReview(kind: ApplicationEventKind): boolean {
 }
 
 /**
+ * The same question for a message linked to a pursuit by hand.
+ *
+ * Linking from the queue records the event without moving a closed pursuit,
+ * exactly as ingestion does -- so it asks the same thing, and for a while it
+ * did not: it flagged *every* event that landed on a closed pursuit, kind
+ * ignored. Linking a rejection to an already-rejected pursuit therefore put
+ * "they really did come back -- reopen" in front of a person, on the strength
+ * of mail saying the opposite. A rejection is the one kind of mail that can
+ * never mean a pursuit reopened.
+ */
+export function handLinkedEventNeedsReview(
+  status: ApplicationStatus,
+  kind: ApplicationEventKind,
+): boolean {
+  return isTerminal(status) && unappliedEventNeedsReview(kind);
+}
+
+/**
  * Whether inbound mail may move a pursuit at this status.
  *
  * `rejected`, `withdrawn` and `role_closed` are facts, and nothing in the
