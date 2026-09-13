@@ -5,9 +5,9 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { lastAnsweredLine } from '@/lib/learn/graph/last-answered';
-import { loadReadyToLearn, loadSubjects } from '@/lib/learn/graph/load';
+import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk } from '@/lib/learn/graph/pick';
-import { lastAnsweredAt } from '@/lib/learn/graph/session';
+import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
 import { TodaySession } from './session';
 
 export const dynamic = 'force-dynamic';
@@ -25,14 +25,21 @@ export const metadata = { title: 'Five minutes' };
 export default async function FiveMinutesPage() {
   const user = await requireUser();
   const supabase = await createLearnClient();
-  const [settings, subjects, rows, answeredAt] = await Promise.all([
+  const [settings, subjects, rows, answeredAt, answeredSoFar] = await Promise.all([
     loadAccountSettings(user.id),
     loadSubjects(supabase),
-    loadReadyToLearn(supabase, 1),
+    loadReadyAndSettled(supabase, 1),
     lastAnsweredAt(supabase),
+    answeredCount(supabase),
   ]);
 
-  const picked = pickOneToAsk(rows, subjects.length);
+  const picked = pickOneToAsk({
+    ready: rows.ready,
+    settled: rows.settled,
+    subjectCount: subjects.length,
+    answered: answeredSoFar,
+    now: new Date(),
+  });
   // Read when the page was, and left alone afterwards. Answering does not
   // revalidate this route: re-running the pick would swap the card for an
   // empty state the moment the last ready claim was settled, and take the
@@ -45,7 +52,9 @@ export default async function FiveMinutesPage() {
         title="Five minutes"
         description={
           <>
-            One question about the one thing you are ready for next.
+            {picked.kind === 'recheck'
+              ? 'One question, and this one is about something you settled a while ago.'
+              : 'One question about the one thing you are ready for next.'}
             {/* When the last one was, and nothing about how many days in a
                 row: a run is something you can lose, and missing a day here
                 costs nothing. */}
@@ -55,7 +64,7 @@ export default async function FiveMinutesPage() {
       />
 
       <div className="mt-6">
-        {picked.kind === 'ask' ? (
+        {picked.kind !== 'nothing' ? (
           <TodaySession />
         ) : picked.because === 'no-subjects' ? (
           <EmptyState

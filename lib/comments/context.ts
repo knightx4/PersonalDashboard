@@ -12,6 +12,7 @@
  * again from the top.
  */
 import type { DevComment } from './load';
+import type { FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
 import type { RaisedRow } from '@/lib/raised/load';
 import { MODULES } from '@/lib/modules';
@@ -40,6 +41,29 @@ export function raiseContext(row: RaisedRow): string {
   if (row.source) out.push(`Raised by: ${row.source}`);
   if (row.ask) out.push('', '## What it asks for', '', row.ask);
   if (row.detail) out.push('', '## The evidence', '', row.detail);
+  return out.join('\n') + '\n';
+}
+
+/**
+ * A bug report or a feature request as it stands.
+ *
+ * The resolution note is the half a question is usually about: it holds what a
+ * run said when it stopped, which on a blocked note is the question it is
+ * waiting on. The page path says where the person was standing when they filed
+ * it, which is often the whole of what the sentence leaves out.
+ */
+export function noteContext(note: FeedbackRow): string {
+  const out = [
+    note.kind === 'bug' ? '# A bug report' : '# A feature request',
+    '',
+    `Status: ${note.status}`,
+    `Filed: ${note.createdAt.slice(0, 10)}`,
+  ];
+  if (note.pagePath) out.push(`Filed from: ${note.pagePath}`);
+  out.push('', note.body);
+  if (note.resolutionNote) {
+    out.push('', '## What a run said about it', '', note.resolutionNote);
+  }
   return out.join('\n') + '\n';
 }
 

@@ -62,6 +62,14 @@ export function TodaySession() {
         {live.conceptName}
         {live.subjectName && ` · ${live.subjectName}`}
       </p>
+      {/* Said before the question rather than after the answer: being asked
+          about something you settled months ago looks like the app having lost
+          track until you know it is deliberate. */}
+      {live.recheck && (
+        <p className="mt-0.5 text-small text-ink-muted">
+          A re-check — you settled this one a while ago.
+        </p>
+      )}
       <p className="mt-1 text-body text-ink">{live.question}</p>
 
       <form action={answer} className="mt-4 space-y-2">

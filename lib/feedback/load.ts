@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 
 /**
  * The feedback queue, loaded and ordered once for both workspaces.
@@ -30,6 +31,8 @@ export type FeedbackRow = {
   createdAt: string;
   /** When it closed, done or declined. Null while it is still outstanding. */
   completedAt: string | null;
+  /** What has been said under it since it was filed, oldest first. */
+  thread: DevComment[];
 };
 
 /** Anything not finished — including blocked, the state most easily forgotten. */
@@ -69,7 +72,8 @@ export interface FeedbackQueue {
 
 /** Every column the app reads off a note. Shared with the changelog. */
 export const FEEDBACK_COLUMNS =
-  'id, kind, body, page_path, status, priority, resolution_note, commit_sha, created_at, completed_at';
+  'id, kind, body, page_path, status, priority, resolution_note, commit_sha, ' +
+  `created_at, completed_at, thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function feedbackRowFrom(row: Record<string, unknown>): FeedbackRow {
@@ -84,6 +88,7 @@ export function feedbackRowFrom(row: Record<string, unknown>): FeedbackRow {
     commitSha: (row.commit_sha as string | null) ?? null,
     createdAt: row.created_at as string,
     completedAt: (row.completed_at as string | null) ?? null,
+    thread: threadFrom(row.thread),
   };
 }
 
@@ -104,7 +109,12 @@ export async function loadFeedbackQueue(
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const rows: FeedbackRow[] = (data ?? []).map(feedbackRowFrom);
+  // Through `unknown`: the column list is built as an expression, so the client
+  // cannot infer a row shape from it and types the result as its error case
+  // instead. Same as the ideas loader.
+  const rows: FeedbackRow[] = ((data ?? []) as unknown as Array<Record<string, unknown>>).map(
+    feedbackRowFrom,
+  );
 
   const outstanding = sortOutstanding(rows.filter(isOutstanding));
 

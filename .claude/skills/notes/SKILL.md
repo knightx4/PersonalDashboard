@@ -21,7 +21,7 @@ to look tidy, and not marked `done` because the session is ending.
 ```
 npx tsx scripts/notes.ts list                 # the queue, in work order
 npx tsx scripts/notes.ts list --all           # including closed
-npx tsx scripts/notes.ts show <id>            # full text of one note
+npx tsx scripts/notes.ts show <id>            # the note, and the thread under it
 npx tsx scripts/notes.ts start <id>           # claim it (in_progress)
 npx tsx scripts/notes.ts done <id> --note "…" # close it; records HEAD commit
 npx tsx scripts/notes.ts block <id> --note "…" # cannot proceed; say what is needed
@@ -53,6 +53,13 @@ the queue records the same thing either way:
 select id, kind, status, priority, page_path, body, created_at
 from feedback_items where status in ('open','in_progress','blocked','planned')
 order by (kind = 'bug') desc, priority asc, created_at asc;
+
+-- the thread under a note: what was added after it was filed, oldest first.
+-- Read it before claiming the note. An answer to a blocked note arrives here
+-- as an 'me' comment rather than on the end of the body, and so does anything
+-- else written on the card afterwards.
+select author, body, created_at from dev_comments
+where feedback_item_id = '…' order by created_at;
 
 -- start
 update feedback_items set status = 'in_progress' where id = '…';
@@ -98,8 +105,11 @@ one is closed.
 1. **Read the queue.** `list` orders it correctly: bugs before features, then
    priority, then oldest. Work it top to bottom. State the plan for the batch
    before starting — how many notes, and in what order.
-2. **Claim one.** `start <id>`. Read it with `show <id>` and re-read the page
-   path — it says where the user was standing.
+2. **Claim one.** `start <id>`. Read it with `show <id>`, which prints the
+   thread under the note as well as its text, and re-read the page path — it
+   says where the user was standing. Read the thread before starting: an
+   answer to a note that came back blocked is in there, and so is anything
+   the user added after filing it.
 3. **Reproduce first, for bugs.** Find the actual cause in the code before
    changing anything. A fix for a guessed cause is how a note gets closed
    twice. If it cannot be reproduced, that is a `block`, with what you tried.

@@ -213,9 +213,10 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     return { ok: true, said: rewritten(field.word, text, was) };
   }
 
+  const what = input.target === 'note' ? 'a bug note' : 'a raise';
   return {
     ok: false,
-    why: 'I can only reword an idea or a plan step, and this is a raise, so nothing was changed.',
+    why: `I can only reword an idea or a plan step, and this is ${what}, so nothing was changed.`,
   };
 }
 

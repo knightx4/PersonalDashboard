@@ -4,9 +4,16 @@ import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
-import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
+import {
+  ESTABLISHED_LABEL,
+  LastChecked,
+  STATE_LABEL,
+  StateMark,
+} from '@/components/learn/concept-state';
 import { KIND_LINE } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
+import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
@@ -106,10 +113,14 @@ function Probe({ probe }: { probe: ProbeRow }) {
 export default async function ConceptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
+  const user = await requireUser();
   const supabase = await createLearnClient();
   // Somebody else's concept reads as no row at all, so it lands here as a 404
   // rather than as a page saying whose it is.
-  const view = await loadConceptView(supabase, id);
+  const [view, settings] = await Promise.all([
+    loadConceptView(supabase, id),
+    loadAccountSettings(user.id),
+  ]);
   if (!view) notFound();
 
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
@@ -150,6 +161,10 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
             {concept.state !== 'unknown' && ` — ${ESTABLISHED_LABEL[concept.established]}`}
           </span>
         </p>
+
+        {/* The date under the state, because "known" reads the same whether
+            the question was yesterday or in March. */}
+        <LastChecked concept={concept} timezone={settings.timezone} className="mt-1 pl-6" />
 
         {concept.misconception && <p className="mt-2 text-ui text-danger">{concept.misconception}</p>}
 

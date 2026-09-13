@@ -10,6 +10,11 @@ import type {
   StateBasis,
 } from '@/lib/learn/graph/model';
 import {
+  rankByLastChecked,
+  settledInSubject,
+  type SettledConcept,
+} from '@/lib/learn/graph/recheck';
+import {
   rankReady,
   readyInSubject,
   READY_LIMIT,
@@ -262,14 +267,19 @@ export async function loadGoals(
 }
 
 /**
- * Everything you could start on, in every subject.
+ * Everything you could start on and everything you have settled, in every
+ * subject.
  *
  * One read per subject, the same four queries `/learn/know` already runs in a
  * loop, and no model call anywhere in it. A goal counts as one you named
  * unless you abandoned it, which is the rule the subject page uses to decide
- * what to draw a chain for.
+ * what to draw a chain for. Both lists come out of the same walk because the
+ * five-minute screen needs both to pick one question, and walking twice would
+ * be the same graphs read twice.
  */
-async function readyEverywhere(supabase: LearnSupabaseClient): Promise<ReadyConcept[]> {
+async function everywhere(
+  supabase: LearnSupabaseClient,
+): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
   const subjects = await loadSubjects(supabase);
 
   const perSubject = await Promise.all(
@@ -283,11 +293,17 @@ async function readyEverywhere(supabase: LearnSupabaseClient): Promise<ReadyConc
         .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
         .map((goal) => goal.conceptId!);
 
-      return readyInSubject(graph, subject, goalConceptIds);
+      return {
+        ready: readyInSubject(graph, subject, goalConceptIds),
+        settled: settledInSubject(graph, subject),
+      };
     }),
   );
 
-  return perSubject.flat();
+  return {
+    ready: perSubject.flatMap((subject) => subject.ready),
+    settled: perSubject.flatMap((subject) => subject.settled),
+  };
 }
 
 /** What to learn next: the ranked few, for the screen. */
@@ -295,10 +311,25 @@ export async function loadReadyToLearn(
   supabase: LearnSupabaseClient,
   limit: number = READY_LIMIT,
 ): Promise<ReadyConcept[]> {
-  return rankReady(await readyEverywhere(supabase), limit);
+  return rankReady((await everywhere(supabase)).ready, limit);
+}
+
+/**
+ * What the five-minute question is picked from.
+ *
+ * The ranked few that could be started next, and the settled claims you have
+ * gone longest without being asked about, oldest first. One walk of the
+ * subjects for both, so the page and the action each read the graphs once.
+ */
+export async function loadReadyAndSettled(
+  supabase: LearnSupabaseClient,
+  limit: number = READY_LIMIT,
+): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
+  const { ready, settled } = await everywhere(supabase);
+  return { ready: rankReady(ready, limit), settled: rankByLastChecked(settled) };
 }
 
 /** How many are ready in total -- for the tab's badge. */
 export async function countReadyToLearn(supabase: LearnSupabaseClient): Promise<number> {
-  return (await readyEverywhere(supabase)).length;
+  return (await everywhere(supabase)).ready.length;
 }

@@ -6,7 +6,7 @@
  * queue always reflects reality rather than intent.
  *
  *   npx tsx scripts/notes.ts list [--all]
- *   npx tsx scripts/notes.ts show <id>
+ *   npx tsx scripts/notes.ts show <id>          # the note, and the thread under it
  *   npx tsx scripts/notes.ts start <id>
  *   npx tsx scripts/notes.ts done <id> --note "what changed" [--commit <sha>]
  *   npx tsx scripts/notes.ts block <id> --note "the question blocking it"
@@ -71,6 +71,27 @@ function currentCommit(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * What has been written under a note since it was filed, oldest first.
+ *
+ * Read before the fix, not after it: half of what a note needs to be
+ * understood arrives afterwards -- the answer to a question a run left, the
+ * detail the phone was too small for -- and a run that reads only the body is
+ * working from the first sentence anybody wrote about it.
+ *
+ * Raw SQL because `dev_comments` is not in lib/db/schema.ts, which mirrors the
+ * migrations the app itself reads.
+ */
+type ThreadRow = { author: string; body: string; created_at: Date };
+
+async function threadOf(database: Db, noteId: string): Promise<ThreadRow[]> {
+  return database.execute<ThreadRow>(
+    sql`select author, body, created_at from dev_comments
+        where feedback_item_id = ${noteId}
+        order by created_at`,
+  );
 }
 
 async function findOne(database: Db, idPrefix: string) {
@@ -198,6 +219,16 @@ async function main(): Promise<void> {
   if (command === 'show') {
     printRow(row, true);
     console.log(`\n${row.body}`);
+
+    const thread = await threadOf(database, row.id);
+    if (thread.length > 0) {
+      console.log('\nWritten under it since:');
+      for (const comment of thread) {
+        const who = comment.author === 'claude' ? 'claude' : 'user';
+        const when = new Date(comment.created_at).toISOString().slice(0, 10);
+        console.log(`  ${who} ${when}: ${comment.body.replace(/\s+/g, ' ')}`);
+      }
+    }
     return;
   }
 

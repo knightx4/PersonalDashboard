@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { askMessage, ideaContext, raiseContext, threadText } from './context';
+import { askMessage, ideaContext, noteContext, raiseContext, threadText } from './context';
 import type { DevComment } from './load';
+import type { FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
 import type { RaisedRow } from '@/lib/raised/load';
 
@@ -32,6 +33,23 @@ function raise(overrides: Partial<RaisedRow> = {}): RaisedRow {
     status: 'open',
     createdAt: '2026-09-01T00:00:00Z',
     answeredAt: null,
+    thread: [],
+    ...overrides,
+  };
+}
+
+function note(overrides: Partial<FeedbackRow> = {}): FeedbackRow {
+  return {
+    id: 'f1',
+    kind: 'bug',
+    body: 'The shelf photo picker opens empty.',
+    pagePath: '/shopping/inventory',
+    status: 'blocked',
+    priority: 2,
+    resolutionNote: 'Which shelf were you on? I could not reproduce it on any of them.',
+    commitSha: null,
+    createdAt: '2026-09-01T00:00:00Z',
+    completedAt: null,
     thread: [],
     ...overrides,
   };
@@ -107,5 +125,25 @@ describe('askMessage', () => {
   it('leaves the history out when there is none', () => {
     const message = askMessage({ context: 'x', thread: [], question: 'y' });
     expect(message).not.toContain('Said so far');
+  });
+});
+
+describe('noteContext', () => {
+  it('says what the note is, where it was filed and what a run said', () => {
+    const written = noteContext(note());
+
+    expect(written).toContain('# A bug report');
+    expect(written).toContain('Status: blocked');
+    expect(written).toContain('Filed from: /shopping/inventory');
+    expect(written).toContain('The shelf photo picker opens empty.');
+    expect(written).toContain('Which shelf were you on?');
+  });
+
+  it('calls a request a request, and leaves out what is not there', () => {
+    const written = noteContext(note({ kind: 'feature', pagePath: null, resolutionNote: null }));
+
+    expect(written).toContain('# A feature request');
+    expect(written).not.toContain('Filed from:');
+    expect(written).not.toContain('What a run said');
   });
 });
