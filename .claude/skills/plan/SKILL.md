@@ -36,7 +36,11 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
                                                # finishing this feature, one patch;
                                                # --clear once it can be seen
-npx tsx scripts/plan.ts idea "…" [--module <id>]   # file an idea on /dev/ideas, unshaped
+npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
+                                               # file a follow-on on /dev/ideas; it lands
+                                               # marked as your suggestion, under the
+                                               # user's own ideas. --from names the step
+                                               # you were on when you thought of it.
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
 npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>]
                                                # ask the person something. Never answered by you.
@@ -195,9 +199,14 @@ interchangeable:
 - **The notes queue** — `feedback_items`, `.claude/skills/notes`. What the user
   reported as wrong, or asked for.
 - **An idea** — `ideas`, read on `/dev/ideas`, written with
-  `idea "…" [--module <id>]`. Work worth doing later that the feature in front
-  of you can be finished without. This is where a follow-on goes; fog is not,
-  and neither is a step invented under a feature nobody proposed it for.
+  `idea "…" [--module <id>] [--from <n>]`. Work worth doing later that the
+  feature in front of you can be finished without. This is where a follow-on
+  goes; fog is not, and neither is a step invented under a feature nobody
+  proposed it for. Anything the CLI files is marked as your suggestion and
+  listed under the user's own ideas, so `--from <the feature>` is worth
+  passing: it is what the page shows as where the suggestion came from. One
+  the user dismisses stops being listed, including by `ideas`, so do not
+  write it again.
 - **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
   that belongs to none of those: a risk found in code it was only passing
   through, a question of taste, a thing it will not decide alone. Without it,

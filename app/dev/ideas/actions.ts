@@ -109,6 +109,60 @@ export async function updateIdea(
   return { message: 'Saved.' };
 }
 
+/**
+ * Putting one aside. Dismissing rather than deleting, because the reason for
+ * saying no to an idea is usually that it is not now: the row goes out of the
+ * list and into the dismissed section, where you can bring it back.
+ *
+ * It is also what stops a suggestion coming round again. A session reads the
+ * live ideas, so one you have put aside is not there to be suggested, shaped
+ * or counted.
+ */
+// latency: pending
+export async function dismissIdea(
+  _prev: IdeaActionState,
+  formData: FormData,
+): Promise<IdeaActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing idea.' };
+
+  const { error } = await supabase
+    .from('ideas')
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/dev/ideas');
+  return { message: 'Dismissed.' };
+}
+
+/** The way back, for an idea whose time has come after all. */
+// latency: pending
+export async function restoreIdea(
+  _prev: IdeaActionState,
+  formData: FormData,
+): Promise<IdeaActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing idea.' };
+
+  const { error } = await supabase
+    .from('ideas')
+    .update({ dismissed_at: null })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/dev/ideas');
+  return { message: 'Back in the list.' };
+}
+
 // latency: pending
 export async function deleteIdea(
   _prev: IdeaActionState,

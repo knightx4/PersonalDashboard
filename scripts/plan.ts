@@ -15,7 +15,8 @@
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision] [--from <n>]
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
- *   npx tsx scripts/plan.ts idea "<body>" [--module <id>]  # file one idea
+ *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
+ *                                # file one follow-on, marked as your suggestion
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
  *   npx tsx scripts/plan.ts raise "<title>" [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
@@ -329,9 +330,12 @@ async function main(): Promise<void> {
     }
 
     if (command === 'ideas') {
+      // Dismissed ones are left out, which is what dismissing them was for: an
+      // idea the user has put aside is not offered back to the session that
+      // would suggest it again.
       const rows = await sql<{ id: string; body: string; module: string | null; created_at: Date }[]>`
         select id, body, module, created_at from ideas
-        where user_id = ${userId} and plan_item_id is null
+        where user_id = ${userId} and plan_item_id is null and dismissed_at is null
         order by created_at desc`;
       if (rows.length === 0) {
         console.log('Every idea has been shaped into the plan, or there are none.');
@@ -346,27 +350,42 @@ async function main(): Promise<void> {
       return;
     }
 
+    /**
+     * Filing a follow-on, which is where one goes now that fog is only about
+     * finishing the feature in front of you.
+     *
+     * Everything written here is a suggestion: this command is how a session
+     * writes an idea, and the user writes theirs on the page or from the
+     * capture panel. So the row is stamped `claude`, the ideas page lists it
+     * under their own, and `--from <n>` says which step the session was on
+     * when it thought of it.
+     */
     if (command === 'idea') {
       const file = arg('--file');
       const moduleArg = arg('--module');
       if (moduleArg && !isModuleId(moduleArg)) fail(`"${moduleArg}" is not a module.`);
+      const from = arg('--from');
+      const step = from ? await byNumber(sql, userId, from) : null;
       const ideas = file
         ? ideasFromFile(file)
         : target?.trim()
           ? [{ body: target.trim(), module: moduleArg && isModuleId(moduleArg) ? moduleArg : null }]
           : [];
       if (ideas.length === 0) {
-        fail('Give the idea: idea "…" [--module <id>], or idea --file <path> with a "## " heading per idea.');
+        fail('Give the idea: idea "…" [--module <id>] [--from <n>], or idea --file <path> with a "## " heading per idea.');
       }
       for (const idea of ideas) {
         if (idea.body.length > 4000) fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
         const [row] = await sql<{ id: string }[]>`
-          insert into ideas (user_id, body, module)
-          values (${userId}, ${idea.body}, ${idea.module})
+          insert into ideas (user_id, body, module, source, from_plan_item_id)
+          values (${userId}, ${idea.body}, ${idea.module}, 'claude', ${step?.id ?? null})
           returning id`;
         console.log(`${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${idea.body.replace(/\s+/g, ' ').slice(0, 90)}`);
       }
-      console.log(`\n${ideas.length} filed. They are on /dev/ideas.`);
+      console.log(
+        `\n${ideas.length} filed as suggestions${step ? ` from #${step.number}` : ''}. ` +
+          'They are on /dev/ideas, under the user\'s own list.',
+      );
       return;
     }
 
