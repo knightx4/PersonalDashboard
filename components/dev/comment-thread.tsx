@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
+import { mentionsDash } from '@/lib/comments/mention';
 import type { CommentTarget, DevComment } from '@/lib/comments/load';
 
 /**
@@ -12,8 +13,8 @@ import type { CommentTarget, DevComment } from '@/lib/comments/load';
  *
  * The same component on an idea, a plan step and a raise, because the thing
  * being written is the same thing in all three places: something you want
- * attached to that row rather than to a transcript. It is a note until it asks
- * for a reply, which is what makes it worth having on rows nobody is waiting
+ * attached to that row rather than to a transcript. It is a note until `@dash`
+ * appears in it, which is what makes it worth having on rows nobody is waiting
  * on.
  *
  * The list is the whole thread including a session's replies, told apart by who
@@ -58,6 +59,10 @@ function AddComment({
 }) {
   const [state, action, pending] = useActionState(addComment, {} as CommentActionState);
   const [writing, setWriting] = useState(false);
+  // Read as it is typed, only so the button can say which of the two writes is
+  // running. A tagged comment waits on a model call and an untagged one waits
+  // on an insert, and the difference is several seconds.
+  const [draft, setDraft] = useState('');
 
   // Close once it has saved: the comment appearing in the thread is the
   // confirmation. Adjusted during render rather than in an effect, the same
@@ -65,7 +70,10 @@ function AddComment({
   const [seen, setSeen] = useState<string | undefined>(undefined);
   if (state.message !== seen) {
     setSeen(state.message);
-    if (state.message && !state.error) setWriting(false);
+    if (state.message && !state.error) {
+      setWriting(false);
+      setDraft('');
+    }
   }
 
   if (!writing) {
@@ -85,10 +93,18 @@ function AddComment({
     <form action={action} className="space-y-2">
       <input type="hidden" name="target" value={target} />
       <input type="hidden" name="id" value={id} />
-      <Textarea name="body" rows={2} className="min-h-12" autoFocus placeholder={placeholder} />
+      <Textarea
+        name="body"
+        rows={2}
+        className="min-h-12"
+        autoFocus
+        placeholder={placeholder}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
       <div className="flex flex-wrap items-center gap-1">
         <Button type="submit" size="sm" pending={pending}>
-          {pending ? 'Saving…' : 'Save'}
+          {pending ? (mentionsDash(draft) ? 'Asking…' : 'Saving…') : 'Save'}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setWriting(false)}>
           Cancel
@@ -104,7 +120,7 @@ export function CommentThread({
   id,
   thread,
   label,
-  placeholder = 'A note on this row. It is yours — nothing reads it and nothing happens.',
+  placeholder = 'A note on this row. Tag @dash to get a reply; without it nothing reads it.',
 }: {
   target: CommentTarget;
   /** The row being commented on, not the comment. */

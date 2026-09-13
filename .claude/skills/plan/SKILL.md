@@ -607,10 +607,34 @@ order by r.created_at desc;
 -- replying to an answer, which is how a raise takes a second round.
 insert into dev_comments (user_id, raised_item_id, author, body)
 values ('…', '<the raise>', 'claude', '…');
+
+-- answering a question asked on a row. The same table, and which column is
+-- set says what the question was about: `plan_item_id` a step or a decision,
+-- `idea_id` an idea, `raised_item_id` a raise. Exactly one of the three.
+insert into dev_comments (user_id, plan_item_id, author, body)
+values ('…', '<the step>', 'claude', '…');
 ```
 
 `started_at` and `completed_at` are kept by a trigger from the status; do not
 write them. A step is never closed without a note.
+
+## Answering a question asked on a row
+
+A comment on a step, an idea or a raise with `@dash` in it is a question put to
+you. Most are answered in seconds by a direct model call, which has the row and
+the thread and nothing else; when that call says the question needs the code, it
+starts a session with the row, the question, and where the answer goes. That
+session is you.
+
+The job is to answer, and only to answer. Read what the question is about, write
+one comment into the thread with the insert above, and stop. Do not answer a
+decision, do not change a status, a detail or a done-when, do not shape the idea,
+do not close or dismiss the raise, and do not commit. The person asked what
+something means; a session that answers by settling it has taken the decision
+away from them, which is the same rule as never answering your own decision.
+
+If the answer is that the thing being asked about is wrong, say that in the
+thread. Then it is theirs to act on — a note, a decision, or nothing.
 
 ## Statuses
 
