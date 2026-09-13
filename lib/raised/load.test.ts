@@ -8,12 +8,16 @@ const raise = (over: {
   module?: string | null;
   ask?: string | null;
   consequence?: unknown;
+  outcome?: string | null;
 }) => ({
   id: over.id,
   title: `raise ${over.id}`,
   detail: null,
   ask: over.ask === undefined ? 'Run the gate on the merge to main? I would.' : over.ask,
   consequence: over.consequence ?? null,
+  // Answered rows carry one by default: the ones that do not are the ones that
+  // closed into nothing, and they are their own case below.
+  outcome: over.outcome === undefined ? 'Filed on the ideas page.' : over.outcome,
   module: over.module === undefined ? 'dev' : over.module,
   source: 'the plan routine, step #199',
   status: over.status ?? 'open',
@@ -40,6 +44,43 @@ describe('the raised queue', () => {
     ]);
     expect(queue.open.map((row) => row.id)).toEqual(['new-open', 'old-open']);
     expect(queue.closed.map((row) => row.id)).toEqual(['answered', 'dismissed']);
+    expect(queue.unfinished).toEqual([]);
+  });
+
+  // Answered with nothing recorded is not history: the #342 raise read as
+  // handled for a day while what it described was still possible.
+  it('lists a raise that closed into nothing between the open ones and the closed', () => {
+    const queue = raisedQueueFrom(
+      [
+        raise({ id: 'open', created_at: '2026-09-03T09:00:00Z' }),
+        raise({
+          id: 'nothing-came-of-it',
+          created_at: '2026-09-02T09:00:00Z',
+          status: 'answered',
+          outcome: null,
+        }),
+        raise({ id: 'finished', created_at: '2026-09-01T09:00:00Z', status: 'answered' }),
+      ].map(raisedRowFrom),
+    );
+
+    expect(queue.rows.map((row) => row.id)).toEqual(['open', 'nothing-came-of-it', 'finished']);
+    expect(queue.unfinished.map((row) => row.id)).toEqual(['nothing-came-of-it']);
+    expect(queue.closed.map((row) => row.id)).toEqual(['finished']);
+    // It is not waiting on the person — they answered it — so the bell count
+    // is unchanged.
+    expect(queue.openCount).toBe(1);
+  });
+
+  // Dismissing is closing one without saying anything, and that stays allowed.
+  it('does not call a dismissal unfinished', () => {
+    const queue = raisedQueueFrom(
+      [
+        raise({ id: 'put-aside', created_at: '2026-09-01T09:00:00Z', status: 'dismissed', outcome: null }),
+      ].map(raisedRowFrom),
+    );
+
+    expect(queue.unfinished).toEqual([]);
+    expect(queue.closed.map((row) => row.id)).toEqual(['put-aside']);
   });
 
   it('counts the open ones, which is what the sidebar and the bell read', () => {
@@ -105,6 +146,7 @@ describe('a raise as the app reads it', () => {
     expect(selected).toContain('answered_at');
     expect(selected).toContain('ask');
     expect(selected).toContain('consequence');
+    expect(selected).toContain('outcome');
     expect(row.source).toBe('the plan routine, step #199');
     expect(row.answeredAt).toBeNull();
   });

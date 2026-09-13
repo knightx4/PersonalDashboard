@@ -82,10 +82,19 @@ export async function decideRaise(
   if (!raise) return { error: 'That raise no longer exists.' };
 
   const answeredAt = (raise.answered_at as string | null) ?? new Date().toISOString();
-  const close = () =>
+
+  /**
+   * Closing it, and what it produced.
+   *
+   * `outcome` is required here rather than optional: a raise that reaches
+   * answered with nothing in that column is one that closed into nothing, and
+   * /dev/raised lists it as still waiting on its own follow-through. #367 is
+   * that rule, and this is the only place a raise is answered.
+   */
+  const close = (outcome: string) =>
     supabase
       .from('raised_items')
-      .update({ status: 'answered', answered_at: answeredAt })
+      .update({ status: 'answered', answered_at: answeredAt, outcome })
       .eq('id', id.data)
       .eq('user_id', user.id);
 
@@ -94,7 +103,7 @@ export async function decideRaise(
     if (!reason.success) return { error: 'Say why not. It is what the raise closes on.' };
 
     await say(supabase, user.id, id.data, 'me', `No — ${reason.data}`);
-    const { error } = await close();
+    const { error } = await close(reason.data);
     if (error) return { error: error.message };
 
     revalidatePath('/dev/raised');
@@ -123,7 +132,7 @@ export async function decideRaise(
   await say(supabase, user.id, id.data, 'claude', outcome.ok ? outcome.said : outcome.why);
 
   if (outcome.ok) {
-    const { error } = await close();
+    const { error } = await close(outcome.said);
     if (error) return { error: error.message };
     if (outcome.redraw) revalidatePath(outcome.redraw);
   }
@@ -147,59 +156,6 @@ export async function decideRaise(
   if (!outcome.ok) return { error: outcome.why };
   if (asked && !asked.ok) return { error: asked.error };
   return { message: asked ? `Done. ${asked.message}` : 'Done.' };
-}
-
-/**
- * Answering one, which is what the page is for.
- *
- * The answer is a row in the thread rather than a column on the raise, so a
- * session can reply to it and you can come back — decision #202. Answering
- * also closes the raise: it is out of the open list from here, and a session
- * that wants another round writes a comment rather than reopening it.
- *
- * `answered_at` is the first answer, not the last: it says when you got to it.
- */
-// latency: pending
-export async function answerRaise(
-  _prev: RaisedActionState,
-  formData: FormData,
-): Promise<RaisedActionState> {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const id = idSchema.safeParse(formData.get('id'));
-  const body = bodySchema.safeParse(formData.get('body') ?? '');
-  if (!id.success) return { error: 'Missing raise.' };
-  if (!body.success) return { error: body.error.issues[0].message };
-
-  const { data: raise } = await supabase
-    .from('raised_items')
-    .select('id, answered_at')
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!raise) return { error: 'That raise no longer exists.' };
-
-  const { error: commentError } = await supabase.from('dev_comments').insert({
-    user_id: user.id,
-    raised_item_id: id.data,
-    author: 'me',
-    body: body.data,
-  });
-  if (commentError) return { error: commentError.message };
-
-  const { error } = await supabase
-    .from('raised_items')
-    .update({
-      status: 'answered',
-      answered_at: (raise.answered_at as string | null) ?? new Date().toISOString(),
-    })
-    .eq('id', id.data)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
-
-  revalidatePath('/dev/raised');
-  return { message: 'Answered.' };
 }
 
 /**
@@ -245,7 +201,7 @@ export async function reopenRaise(
 
   const { error } = await supabase
     .from('raised_items')
-    .update({ status: 'open', answered_at: null })
+    .update({ status: 'open', answered_at: null, outcome: null })
     .eq('id', id.data)
     .eq('user_id', user.id);
   if (error) return { error: error.message };

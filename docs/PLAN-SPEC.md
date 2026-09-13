@@ -417,8 +417,18 @@ The open detail also carries the step's comments, and so does each question in
 its questions section — the only place a question can be commented on, since a
 decision beneath a step is deliberately not a row of its own in the tree. The
 box is closed until asked for. The same thread is on an idea on `/dev/ideas`
-and on a raise on `/dev/raised`, where it sits beside the answer box rather
-than replacing it: answering closes the raise, commenting leaves it open.
+and on a raise on `/dev/raised`, where a comment leaves the raise open.
+
+A raise closes two ways and no others. **Yes, do it** runs the action the raise
+named when it was filed — the `consequence` column, in the same shape a comment
+instruction is carried out in — and the thread says what was done; it is shown
+only on a raise that named one. **Close with a reason** takes the reason
+nothing was needed. Either way the raise records what it produced, and one that
+reached answered with nothing recorded is listed under *Answered, nothing done*
+rather than filed with the closed rows: that is what the #342 raise did, read
+as handled for a day while the collision it described was still possible.
+**Yes, and…** opens a box beside the yes, and what goes in it is read as a
+comment on the raise once the action has run.
 
 Editing a step includes moving it: *Part of* lists the module's other steps,
 less the step's own subtree. A moved step goes last under its new parent. The

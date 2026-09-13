@@ -26,6 +26,7 @@ function raise(overrides: Partial<RaisedRow> = {}): RaisedRow {
     detail: 'Two pushes landed while the gate was off.',
     ask: 'Should the merge run tsc first?',
     consequence: null,
+    outcome: null,
     module: 'dev',
     source: 'plan #20',
     status: 'open',

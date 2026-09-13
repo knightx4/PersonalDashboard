@@ -15,7 +15,7 @@ import { raisedQueueFrom, raisedRowFrom, type RaisedRow } from '@/lib/raised/loa
 // render test; the view only needs them to exist to hand to its forms.
 vi.mock('@/app/dev/raised/actions', () => {
   const noop = async () => ({});
-  return { answerRaise: noop, decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
+  return { decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
 });
 
 const { RaisedView } = await import('@/app/dev/raised/raised-view');
@@ -27,6 +27,7 @@ function raise(over: Record<string, unknown> = {}): RaisedRow {
     detail: 'Both runs claimed it within the same minute.',
     ask: 'Should Send to Claude refuse a step whose feature is already being worked?',
     consequence: null,
+    outcome: null,
     module: 'dev',
     source: 'plan #342',
     status: 'open',
@@ -41,7 +42,7 @@ function render(rows: RaisedRow[]): string {
 }
 
 describe('a raise on the page', () => {
-  it('says what answering yes does, and offers yes and no', () => {
+  it('says what answering yes does, and offers the two ways out', () => {
     const html = render([
       raise({
         consequence: {
@@ -56,7 +57,7 @@ describe('a raise on the page', () => {
     expect(html).toContain('Answering yes');
     expect(html).toContain('Refuse a second session on a step already being worked');
     expect(html).toContain('Yes, do it');
-    expect(html).toContain('>No</button>');
+    expect(html).toContain('Close with a reason');
     expect(html).toContain('Yes, and…');
     // The box for those extra words is closed until it is asked for, so a page
     // of raises is not a page of textareas.
@@ -71,20 +72,41 @@ describe('a raise on the page', () => {
     expect(html).toContain(
       'Should Send to Claude refuse a step whose feature is already being worked?',
     );
+    // It can still be closed, but only on a reason: a raise that closes into
+    // nothing is what #367 is about.
+    expect(html).toContain('Close with a reason');
   });
 
-  // Answered and dismissed rows are history: the action either ran or it did
-  // not, and a button that would run it again does not belong on them.
-  it('offers no yes on a raise that is already closed', () => {
+  // The action either ran or a reason was recorded, so a button that would run
+  // it again does not belong on a row that is genuinely finished.
+  it('offers nothing to press on a raise that closed on something', () => {
     const html = render([
       raise({
         status: 'answered',
         answered_at: '2026-09-13T05:00:00.000Z',
+        outcome: 'Filed on the ideas page.',
         consequence: { name: 'file_idea', text: 'Refuse a second session', module: null },
       }),
     ]);
 
-    expect(html).toContain('Answering yes');
     expect(html).not.toContain('Yes, do it');
+    expect(html).not.toContain('Close with a reason');
+  });
+
+  // The #342 raise: answered yes, closed, and nothing came of it. It reads as
+  // waiting on its own follow-through rather than sitting in the history.
+  it('lists a raise that closed into nothing, and offers the way to finish it', () => {
+    const html = render([
+      raise({
+        status: 'answered',
+        answered_at: '2026-09-13T05:00:00.000Z',
+        outcome: null,
+        consequence: { name: 'file_idea', text: 'Refuse a second session', module: null },
+      }),
+    ]);
+
+    expect(html).toContain('Answered, nothing done');
+    expect(html).toContain('Yes, do it');
+    expect(html).toContain('Close with a reason');
   });
 });
