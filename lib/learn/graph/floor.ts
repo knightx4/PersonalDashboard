@@ -8,6 +8,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
@@ -55,6 +56,8 @@ name; when one of them is the missing floor, name it exactly as given and draw
 the edge to it -- the graph was missing a connection rather than a node.
 
 ${MASTERY_RULE}
+
+${KIND_RULE}
 
 BASIS. Every node and edge says in one short sentence how you know it belongs.
 It is shown to the reader.
@@ -126,8 +129,9 @@ export async function proposeFloor(input: {
                     claim: { type: 'string' },
                     basis: { type: 'string' },
                     mastery: MASTERY_TOOL_FIELD,
+                    kind: KIND_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis', 'mastery'],
+                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
                 },
               },
               edges: {

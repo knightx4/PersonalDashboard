@@ -15,6 +15,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
@@ -115,6 +116,8 @@ other, and often do. Report a mention only where the section actually makes the
 connection, and say where, in the same one short sentence a basis takes.
 
 ${MASTERY_RULE}
+
+${KIND_RULE}
 
 BASIS, HONESTLY. Each node and edge carries one short sentence on how you know
 it belongs, and it is shown to the reader. Here that sentence says where in the
@@ -263,8 +266,9 @@ async function readSection(input: {
                     claim: { type: 'string' },
                     basis: { type: 'string' },
                     mastery: MASTERY_TOOL_FIELD,
+                    kind: KIND_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis', 'mastery'],
+                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
                 },
               },
               edges: {

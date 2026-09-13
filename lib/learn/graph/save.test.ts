@@ -72,6 +72,7 @@ const CHAIN: ProposedChain = {
       claim: 'Wages lag prices.',
       basis: 'Standard.',
       mastery: [],
+      kind: null,
       existingId: 'already-here',
     },
     {
@@ -79,6 +80,7 @@ const CHAIN: ProposedChain = {
       claim: 'The gain goes, the inflation stays.',
       basis: 'Standard.',
       mastery: ['Says what happens when the inflation is expected.', 'Explains the long run.'],
+      kind: 'threshold',
       existingId: null,
     },
   ],
@@ -132,6 +134,28 @@ describe('saving an approved chain', () => {
 
     const concepts = rowsFor(inserts, 'concepts') as { mastery: string[] | null }[];
     expect(concepts[0].mastery).toBeNull();
+  });
+
+  it('writes the door mark on a concept that came back with one', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');
+
+    const concepts = rowsFor(inserts, 'concepts') as { kind: string | null }[];
+    expect(concepts[0].kind).toBe('threshold');
+  });
+
+  it('writes nothing where a node came back with no mark', async () => {
+    // A proposal made before the distinction existed, or a node the model said
+    // nothing usable about. Unmarked is a state the screens show.
+    const { client, inserts } = clientReturningIds('subject-1');
+    const unmarked = {
+      ...CHAIN,
+      nodes: CHAIN.nodes.map((node) => ({ ...node, kind: null })),
+    };
+    await saveChain(client, 'user-1', unmarked, 'how rates reach prices');
+
+    const concepts = rowsFor(inserts, 'concepts') as { kind: string | null }[];
+    expect(concepts[0].kind).toBeNull();
   });
 
   it('joins the new node to the one that was already there', async () => {

@@ -59,6 +59,34 @@ describe('when it lays out a chain', () => {
     }
   });
 
+  it('asks which nodes are doors, and carries the marks back', async () => {
+    // Plan #305's answer: the pass that proposes the nodes is what marks them,
+    // so the field is in this call's tool schema rather than in one of its own.
+    const client = clientReturning({
+      ...CHAIN,
+      concepts: [
+        { ...CHAIN.concepts[0], kind: 'threshold' },
+        { ...CHAIN.concepts[1], kind: 'consequence' },
+      ],
+    });
+    const result = await ask(client);
+
+    const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
+      .messages.create;
+    const concept = create.mock.calls[0][0].tools[0].input_schema.properties.concepts.items;
+    expect(concept.required).toContain('kind');
+    expect(concept.properties.kind.enum).toEqual(['threshold', 'consequence']);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.chain.nodes.map((n) => n.kind)).toEqual(['threshold', 'consequence']);
+  });
+
+  it('takes a chain that came back with no marks on it', async () => {
+    const result = await ask(clientReturning(CHAIN));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.chain.nodes.map((n) => n.kind)).toEqual([null, null]);
+  });
+
   it('runs on Sonnet, which is what the cost table assumes', async () => {
     const client = clientReturning(CHAIN);
     await ask(client);

@@ -221,4 +221,15 @@ describe('what understanding a node looks like', () => {
     expect(concept.required).toContain('mastery');
     expect(concept.properties.mastery.maxItems).toBe(4);
   });
+
+  it('asks which of them are doors as well', async () => {
+    // Prior learning is one of the five paths a concept reaches the graph by,
+    // and a path that skips the mark leaves nodes nobody judged.
+    const client = clientReturning(CHAIN);
+    await ask(client);
+    const tool = createOf(client).mock.calls[0][0].tools[0];
+    const concept = tool.input_schema.properties.concepts.items;
+    expect(concept.required).toContain('kind');
+    expect(concept.properties.kind.enum).toEqual(['threshold', 'consequence']);
+  });
 });
