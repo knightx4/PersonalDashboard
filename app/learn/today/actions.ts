@@ -2,10 +2,10 @@
 
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadReadyToLearn, loadSubjects } from '@/lib/learn/graph/load';
+import { loadReadyAndSettled, loadSubjects } from '@/lib/learn/graph/load';
 import { pickOneToAsk, type NothingToAsk } from '@/lib/learn/graph/pick';
 import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
-import { nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
+import { answeredCount, nextMasteryCheck, probesFor, recordProbe } from '@/lib/learn/graph/session';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { answerQuestion, type AskState } from '../s/[id]/probe/actions';
 
@@ -25,6 +25,8 @@ export type TodayState = AskState & {
   subjectName?: string;
   /** Set instead of a question when there is nothing to ask about. */
   nothing?: NothingToAsk;
+  /** True when this question is about a claim you settled a while ago. */
+  recheck?: boolean;
 };
 
 // latency: pending
@@ -46,12 +48,19 @@ export async function askTodayQuestion(
   // Picked again here rather than carried from the page: what is ready can
   // have changed since the page was rendered, and the question should be
   // about what is ready now.
-  const [subjects, rows] = await Promise.all([
+  const [subjects, rows, answered] = await Promise.all([
     loadSubjects(supabase),
-    loadReadyToLearn(supabase, 1),
+    loadReadyAndSettled(supabase, 1),
+    answeredCount(supabase),
   ]);
 
-  const picked = pickOneToAsk(rows, subjects.length);
+  const picked = pickOneToAsk({
+    ready: rows.ready,
+    settled: rows.settled,
+    subjectCount: subjects.length,
+    answered,
+    now: new Date(),
+  });
   if (picked.kind === 'nothing') return { nothing: picked.because };
 
   const { concept, subjectId, subjectName } = picked.row;
@@ -90,6 +99,7 @@ export async function askTodayQuestion(
     conceptName: concept.name,
     subjectId,
     subjectName,
+    recheck: picked.kind === 'recheck',
     question: result.probe.question,
     options: result.probe.options,
   };

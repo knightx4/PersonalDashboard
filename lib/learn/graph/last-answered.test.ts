@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastAnsweredLine } from './last-answered';
+import { lastAnsweredLine, lastCheckedLine } from './last-answered';
 
 /**
  * The line is about days in the account's timezone, not about hours elapsed,
@@ -40,6 +40,37 @@ describe('when the last question was answered', () => {
   it('adds the year when it was not this one', () => {
     expect(lastAnsweredLine('2025-03-14T10:00:00Z', NOW, 'Europe/London')).toBe(
       'The last one was on 14 March 2025.',
+    );
+  });
+});
+
+describe('when a claim was last checked', () => {
+  it('says nothing for a claim nobody has been asked about', () => {
+    expect(lastCheckedLine(null, NOW, 'Europe/London')).toBeNull();
+  });
+
+  it('says today when it was checked today', () => {
+    expect(lastCheckedLine('2026-09-13T07:30:00Z', NOW, 'Europe/London')).toBe(
+      'Last checked today.',
+    );
+  });
+
+  it('gives the date when it was earlier this year', () => {
+    expect(lastCheckedLine('2026-03-14T10:00:00Z', NOW, 'Europe/London')).toBe(
+      'Last checked on 14 March.',
+    );
+  });
+
+  it('adds the year when it was an earlier one', () => {
+    expect(lastCheckedLine('2025-03-14T10:00:00Z', NOW, 'Europe/London')).toBe(
+      'Last checked on 14 March 2025.',
+    );
+  });
+
+  it('reads the day in the account timezone rather than UTC', () => {
+    expect(lastCheckedLine('2026-09-12T22:00:00Z', NOW, 'Asia/Tokyo')).toBe('Last checked today.');
+    expect(lastCheckedLine('2026-09-12T22:00:00Z', NOW, 'Europe/London')).toBe(
+      'Last checked on 12 September.',
     );
   });
 });

@@ -1,5 +1,6 @@
 import { AlertTriangle, BadgeCheck, CircleDashed, CircleDot } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { lastCheckedLine } from '@/lib/learn/graph/last-answered';
 import type { Concept } from '@/lib/learn/graph/model';
 
 /**
@@ -38,4 +39,32 @@ export function StateMark({ concept, className }: { concept: Concept; className?
     default:
       return <CircleDashed className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
   }
+}
+
+/**
+ * When this claim was last actually asked about.
+ *
+ * "Known" reads the same whether the question was yesterday or in March, and
+ * the difference is the whole of what a re-check is for. Nothing here says
+ * "never": a claim settled by inference or because you said so has no date,
+ * and the line is left off rather than filled in with an absence.
+ *
+ * `now` is a parameter so a gallery shot and a test render the same words
+ * twice; the pages leave it out and get the time the page was rendered.
+ */
+export function LastChecked({
+  concept,
+  timezone,
+  now,
+  className,
+}: {
+  concept: Concept;
+  timezone: string;
+  now?: Date;
+  className?: string;
+}) {
+  const line = lastCheckedLine(concept.testedAt, now ?? new Date(), timezone);
+  if (!line) return null;
+
+  return <p className={cn('text-small text-ink-muted', className)}>{line}</p>;
 }

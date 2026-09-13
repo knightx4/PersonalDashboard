@@ -149,6 +149,26 @@ carries how it was established — `tested`, `inferred`, or `declared` — becau
 "you told me you knew this" and "you answered three questions on it" should not
 look the same on a screen.
 
+Every state also carries the date it was last actually answered on, in
+`tested_at`, written by the answer and by nothing else. Every screen that shows
+a state shows that date beside it, so "known" does not read the same whether the
+question was yesterday or in March. A concept marked known by inference, or
+because you said so, has no date and shows no line rather than one saying never.
+
+One question in five goes back over old ground. Instead of the next claim on the
+frontier it is about the settled claim you were asked about longest ago, and
+only from claims last answered more than a month ago; when nothing is that old
+the turn is skipped and an ordinary question is asked instead. The five-minute
+screen counts those four questions across every subject and a session inside one
+subject counts its own, both read back from the stored answers rather than held
+between questions — there is no session object anywhere in this module.
+
+Nothing decays on a timer. The state and the bar move only when you answer
+something: a re-check you get right settles the claim again, and one you get
+wrong makes it shaky, which puts it and everything resting on it back on the
+frontier at once. A bar that falls while you do nothing is a nag, and the
+reading side already refused that once.
+
 Every question records which of the concept's checks it tested. The states do
 not read that record — one correct answer still settles a concept, whether or
 not its other checks have been asked about — but the progress bar does, and
@@ -313,11 +333,6 @@ Each slice is useless without the one above it, same as everywhere else here.
   matching problem small and the duplication real. Deferred deliberately: the
   cost of a duplicate is low and the cost of a bad cross-subject merge is high.
   Decide it after seeing real duplicates, not before.
-- **Does knowledge decay?** A node tested nine months ago is not the same claim
-  as one tested yesterday. The cheap version is to store `tested_at`, show "not
-  checked since March", and make old nodes eligible for re-probing. Not to decay
-  the state automatically — a bar that falls while you do nothing is a nag, and
-  the reading side already refused that once.
 - **Multiple choice, or free text?** Multiple choice is free to grade and hard
   to game only if the distractors are good. Free text is a much better probe and
   needs a grading call per answer. Start with multiple choice, measure how often
