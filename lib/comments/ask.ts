@@ -7,10 +7,12 @@
  * needs the code, the plan routine is started on it and the thread says so, so
  * the person is not left watching a box that never fills in.
  *
- * Nothing here writes anything but comments. A question asked on a decision
- * leaves that decision open, a question asked on an idea leaves it unshaped,
- * and a question asked on a step changes neither its status nor its detail —
- * asking is not deciding, and the row is the person's.
+ * A comment that asks for something to be done is carried out instead, inside
+ * the fixed list in lib/comments/act.ts, and the thread says what was done.
+ * Everything left off that list stays the person's: a question asked on a
+ * decision leaves that decision open, a question asked on an idea leaves it
+ * unshaped, and nothing here approves, answers, starts, assigns or dismisses
+ * anything — asking is not deciding, and those moves are made on the page.
  */
 import 'server-only';
 
@@ -22,6 +24,7 @@ import { planBrief } from '@/lib/plan/brief';
 import { loadPlan } from '@/lib/plan/load';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 import { raisedRowFrom, RAISED_COLUMNS } from '@/lib/raised/load';
+import { carryOut } from './act';
 import { askMessage, ideaContext, raiseContext, threadText } from './context';
 import { TARGET_COLUMN, type CommentTarget, type DevComment } from './load';
 import { replyToComment } from './reply';
@@ -29,7 +32,10 @@ import { replyToComment } from './reply';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
-export type AskOutcome = { ok: true; message: string } | { ok: false; error: string };
+export type AskOutcome =
+  /** `redraw` is a second page an action changed, when there was one. */
+  | { ok: true; message: string; redraw?: string }
+  | { ok: false; error: string };
 
 export type AskInput = {
   supabase: Db;
@@ -175,6 +181,24 @@ export async function askDash(input: AskInput): Promise<AskOutcome> {
   if (reply.kind === 'answer') {
     await say(input, reply.body);
     return { ok: true, message: 'Answered in the thread.' };
+  }
+
+  // An instruction, which #359 settled is carried out rather than offered back
+  // for a second press. The thread is told either way: what was done, or why
+  // nothing was, so a comment never disappears into a box that fills in with
+  // nothing.
+  if (reply.kind === 'action') {
+    const outcome = await carryOut({
+      supabase: input.supabase,
+      userId: input.userId,
+      target: input.target,
+      id: input.id,
+      action: reply.action,
+    });
+    await say(input, outcome.ok ? outcome.said : outcome.why);
+    return outcome.ok
+      ? { ok: true, message: 'Done, and said in the thread.', redraw: outcome.redraw }
+      : { ok: false, error: outcome.why };
   }
 
   if (reply.kind === 'error') {

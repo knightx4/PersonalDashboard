@@ -44,3 +44,51 @@ describe('parseReplyPayload', () => {
     expect(reply.body.endsWith('…')).toBe(true);
   });
 });
+
+describe('an instruction rather than a question', () => {
+  it('reads the action and its arguments', () => {
+    expect(
+      parseReplyPayload({
+        action: { name: 'file_idea', text: 'Photos on receipts.', module: 'shopping' },
+      }),
+    ).toEqual({
+      kind: 'action',
+      action: { name: 'file_idea', text: 'Photos on receipts.', module: 'shopping' },
+    });
+  });
+
+  it('keeps a name nobody listed, so it can be refused in words', () => {
+    const reply = parseReplyPayload({ action: { name: 'approve_step' } });
+    expect(reply.kind).toBe('action');
+    expect(reply.kind === 'action' && reply.action.name).toBe('approve_step');
+  });
+
+  it('does the instruction rather than the explanation that came with it', () => {
+    const reply = parseReplyPayload({
+      answer: 'I could file that as an idea.',
+      action: { name: 'file_idea', text: 'Photos on receipts.' },
+    });
+    expect(reply.kind).toBe('action');
+  });
+
+  it('leaves an action alone when the reply says it needs the code first', () => {
+    const reply = parseReplyPayload({
+      needs_repo: true,
+      why: 'It depends what the shape action reads.',
+      action: { name: 'file_idea', text: 'Photos on receipts.' },
+    });
+    expect(reply).toEqual({ kind: 'needs_repo', why: 'It depends what the shape action reads.' });
+  });
+
+  it('refuses an action with no name', () => {
+    expect(parseReplyPayload({ action: { name: '  ' } }).kind).toBe('error');
+    expect(parseReplyPayload({ action: {} }).kind).toBe('error');
+  });
+
+  it('still answers a question exactly as it did', () => {
+    expect(parseReplyPayload({ answer: 'B costs a migration.', action: null })).toEqual({
+      kind: 'answer',
+      body: 'B costs a migration.',
+    });
+  });
+});
