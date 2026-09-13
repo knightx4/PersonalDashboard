@@ -77,6 +77,15 @@ checked something you did not: "standard in any intermediate macro sequence"
 and "inferred from the goal, not checked against a syllabus" are different
 claims and both are fine to make.
 
+WHAT THEY ALREADY SHOWED YOU. When you are given the answers to the opening
+questions, build the chain around them. A claim they got right is treated the
+way a concept already in the subject is treated: name it if it is a rung in the
+chain and do not restate it in your own words, and never propose it as
+something for them to learn. A claim they got wrong or passed on is where the
+chain should be aimed -- those are the gaps this person actually has, measured
+rather than guessed at. They answered from memory before reading anything, so a
+right answer is real and a wrong one is ordinary.
+
 SUBJECT. Name the subject this goal belongs in. Prefer the one you were given
 if the goal genuinely sits inside it. A subject has to be something one survey
 course could plausibly cover: Economics yes, Philosophy yes, Machine learning
@@ -101,11 +110,25 @@ export type GenerateResult =
  */
 export type BranchFrom = { name: string; claim: string };
 
+/**
+ * One of the opening questions, and how it came out.
+ *
+ * What somebody could produce about a subject before reading anything, which
+ * is a better picture of where they are starting from than anything this call
+ * could infer from the goal alone.
+ */
+export type SweptClaim = {
+  name: string;
+  claim: string;
+  outcome: 'right' | 'wrong' | 'skipped';
+};
+
 function buildPrompt(input: {
   goal: string;
   subject: string | null;
   existing: ExistingConcept[];
   from?: BranchFrom | null;
+  swept?: SweptClaim[] | null;
 }): string {
   const lines = input.from
     ? [`They selected this phrase and asked to understand it: ${input.goal}`]
@@ -135,6 +158,35 @@ function buildPrompt(input: {
     lines.push('', 'The subject is empty, so every node in the chain will be new.');
   }
 
+  const swept = input.swept ?? [];
+  if (swept.length > 0) {
+    const held = swept.filter((claim) => claim.outcome === 'right');
+    const missed = swept.filter((claim) => claim.outcome !== 'right');
+
+    lines.push(
+      '',
+      'Before anything was laid out they were asked about this subject and answered from memory.',
+    );
+
+    if (held.length > 0) {
+      lines.push(
+        '',
+        'They got these right, so treat them as already held -- name one only if it is a rung in the chain, and never propose it as something to learn:',
+        ...held.map((claim) => `- ${claim.name}: ${claim.claim}`),
+      );
+    } else {
+      lines.push('', 'They got none of them right, so assume nothing is in place yet.');
+    }
+
+    if (missed.length > 0) {
+      lines.push(
+        '',
+        'They got these wrong or passed on them. This is what the chain should reach:',
+        ...missed.map((claim) => `- ${claim.name}: ${claim.claim}`),
+      );
+    }
+  }
+
   lines.push('', `Call ${TOOL_NAME}.`);
   return lines.join('\n');
 }
@@ -152,6 +204,8 @@ export async function generateChain(input: {
   existing: ExistingConcept[];
   /** Set when the goal is a phrase selected in a claim rather than typed. */
   from?: BranchFrom | null;
+  /** The opening questions and how they came out, when they were asked. */
+  swept?: SweptClaim[] | null;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

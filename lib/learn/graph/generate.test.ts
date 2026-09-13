@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateChain } from './generate';
+import { generateChain, type SweptClaim } from './generate';
 
 /**
  * What comes back when you name a goal.
@@ -200,5 +200,69 @@ describe('when it cannot', () => {
     });
 
     expect(reports).toHaveLength(1);
+  });
+});
+
+describe('what the opening questions put in front of it', () => {
+  /**
+   * The answers are a measurement of where somebody is starting from, taken
+   * before they read anything, so what matters is that the two halves reach
+   * the call as two different instructions: what they hold is not to be
+   * proposed back to them, and what they missed is what the chain is for.
+   */
+  async function promptFor(swept: SweptClaim[] | null) {
+    const client = clientReturning(CHAIN);
+    await generateChain({
+      goal: 'how a policy rate reaches prices',
+      subject: null,
+      existing: [],
+      swept,
+      anthropicApiKey: 'test',
+      client: client as never,
+    });
+    const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
+      .messages.create;
+    return create.mock.calls[0][0].messages[0].content as string;
+  }
+
+  const SWEPT: SweptClaim[] = [
+    { name: 'Wage stickiness', claim: 'Wages adjust more slowly than prices.', outcome: 'right' },
+    { name: 'Liquidity trap', claim: 'Rate cuts stop working near zero.', outcome: 'wrong' },
+    { name: 'Velocity', claim: 'Money changes hands at a rate that is not fixed.', outcome: 'skipped' },
+  ];
+
+  it('names what they got right as already held', async () => {
+    const prompt = await promptFor(SWEPT);
+
+    expect(prompt).toContain('already held');
+    expect(prompt).toContain('Wage stickiness');
+    expect(prompt).toContain('never propose it as something to learn');
+  });
+
+  it('names what they missed as what the chain should reach', async () => {
+    const prompt = await promptFor(SWEPT);
+
+    expect(prompt).toContain('This is what the chain should reach');
+    expect(prompt).toContain('Liquidity trap');
+    // A pass is a miss. Not knowing and not saying are the same gap.
+    expect(prompt).toContain('Velocity');
+  });
+
+  it('says so plainly when they got none of them right', async () => {
+    const prompt = await promptFor(SWEPT.map((claim) => ({ ...claim, outcome: 'wrong' as const })));
+
+    expect(prompt).toContain('none of them right');
+    expect(prompt).not.toContain('already held');
+  });
+
+  it('says nothing about a sweep when there was none', async () => {
+    const prompt = await promptFor(null);
+
+    expect(prompt).not.toContain('answered from memory');
+    expect(prompt).not.toContain('already held');
+  });
+
+  it('builds the same prompt it always did when nothing was asked', async () => {
+    expect(await promptFor(null)).toBe(await promptFor([]));
   });
 });

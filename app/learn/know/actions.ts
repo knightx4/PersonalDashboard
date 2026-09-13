@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { generateChain } from '@/lib/learn/graph/generate';
+import { generateChain, type SweptClaim } from '@/lib/learn/graph/generate';
 import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
 import {
   approvedBriefSchema,
@@ -17,6 +17,7 @@ import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { nameOpeningClaims } from '@/lib/learn/graph/opening-claims';
 import { MIN_CLAIMS } from '@/lib/learn/graph/opening-payload';
 import { writeOpeningQuestions } from '@/lib/learn/graph/opening-probe';
+import { loadSweep, sweepForGoal, type OpeningSweep } from '@/lib/learn/graph/opening';
 import { writeSweep } from '@/lib/learn/graph/opening';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
@@ -57,6 +58,18 @@ const ProposeInput = z.object({
   /** Set once the opening questions have been asked, so they are not asked twice. */
   sweepId: z.string().uuid().nullable(),
 });
+
+/** The answered questions from a sweep, as generation reads them. */
+function sweptClaims(sweep: OpeningSweep | null): SweptClaim[] {
+  if (!sweep) return [];
+  return sweep.questions
+    .filter((question) => question.outcome !== null)
+    .map((question) => ({
+      name: question.claimName,
+      claim: question.claim,
+      outcome: question.outcome as SweptClaim['outcome'],
+    }));
+}
 
 /**
  * The ten questions, when this is a subject you have never worked on.
@@ -145,11 +158,19 @@ export async function proposeGoal(
     : null;
   const existing = subject ? await existingConcepts(supabase, subject.id) : [];
 
+  // What they could produce about this before reading anything. Found by the
+  // words when the sweep id was not carried through, so a chain laid out days
+  // later still starts from where they were.
+  const swept = parsed.data.sweepId
+    ? await loadSweep(supabase, parsed.data.sweepId)
+    : await sweepForGoal(supabase, parsed.data.goal);
+
   const spend = collectSpend();
   const result = await generateChain({
     goal: parsed.data.goal,
     subject: subject?.name ?? null,
     existing,
+    swept: sweptClaims(swept),
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
