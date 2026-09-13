@@ -72,6 +72,28 @@ export async function subjectBarPercent(
   return barPercent(await answeredWeight(supabase, conceptIds));
 }
 
+/**
+ * When the newest answered question was answered, across every subject.
+ *
+ * One row, ordered by the column that is null until an answer lands, so an
+ * asked-and-abandoned question does not count as a session. RLS scopes it to
+ * the account, the same as every other read here.
+ */
+export async function lastAnsweredAt(supabase: LearnSupabaseClient): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('probes')
+    .select('answered_at')
+    .not('answered_at', 'is', null)
+    .order('answered_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading when you last answered one', error);
+
+  return data ? (data as { answered_at: string }).answered_at : null;
+}
+
 /** Everything asked about one concept, newest first. */
 export async function probesFor(
   supabase: LearnSupabaseClient,
