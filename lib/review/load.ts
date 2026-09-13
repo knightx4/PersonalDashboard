@@ -86,7 +86,7 @@ export async function loadReviewQueue(
   const accountIds = accounts.map((row) => row.id);
   const inboxById = new Map(accounts.map((row) => [row.id, row.emailAddress]));
 
-  const [{ data: orders }, messagesResult] = await Promise.all([
+  const [ordersResult, messagesResult] = await Promise.all([
     supabase
       .from('orders')
       .select(
@@ -103,17 +103,41 @@ export async function loadReviewQueue(
     accountIds.length > 0
       ? supabase
           .from('inbox_messages')
+          // Every column here has to exist on the `public.inbox_messages`
+          // view. PostgREST refuses the whole request over a single one it
+          // does not know, which is how asking for `created_at` -- a column of
+          // the old table, gone when 0029 replaced it with the view -- emptied
+          // this queue for every account that had anything in it.
+          // `received_at` is the only clock the view carries, and it is the one
+          // the queue sorts on.
           .select(
             `
             id, email_account_id, provider_message_id, thread_id, subject,
-            from_address, received_at, classification, error, resulting_order_id, created_at
+            from_address, received_at, classification, error, resulting_order_id
           `,
           )
           .in('email_account_id', accountIds)
           .eq('parse_status', 'needs_review')
           .order('received_at', { ascending: false })
-      : Promise.resolve({ data: [] as const }),
+      : Promise.resolve({ data: [], error: null }),
   ]);
+
+  // Loudly, rather than as an empty queue.
+  //
+  // Both reads were destructured straight to `data`, so a refused query came
+  // back as null, became no rows, and drew "Nothing needs review" over
+  // forty-six things that needed reviewing. The nav badge counts with its own
+  // narrower query, which kept working, and those two numbers disagreeing was
+  // the only sign anything was wrong -- it took a bug report to notice. A read
+  // that fails is an error page now. Failing quietly is the one thing this
+  // queue must not do, because empty is also what success looks like here.
+  if (ordersResult.error) {
+    throw new Error(`Review queue could not read orders: ${ordersResult.error.message}`);
+  }
+  if (messagesResult.error) {
+    throw new Error(`Review queue could not read emails: ${messagesResult.error.message}`);
+  }
+  const orders = ordersResult.data;
 
   const orderIds = (orders ?? []).map((row) => row.id as string);
   const sourceByOrder = new Map<
@@ -208,7 +232,9 @@ export async function loadReviewQueue(
       }),
       inboxEmail,
       linkedOrderId: (message.resulting_order_id as string | null) ?? null,
-      sortAt: receivedAt ?? (message.created_at as string),
+      // Sorted newest first, so a message that never carried a received date
+      // has nothing to sort by and goes to the bottom rather than the top.
+      sortAt: receivedAt ?? '',
     };
   });
 
