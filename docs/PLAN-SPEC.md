@@ -75,6 +75,27 @@ account and the column is what tells the two halves of a thread apart.
 Not the same thing as `comment` on the step, which is the note the CLI
 appends a dated line to when it closes or blocks something.
 
+#### Asking rather than noting
+
+A comment with `@dash` in it is a question and gets a reply in the same thread;
+one without is a note to yourself and starts nothing. The tag has to stand on
+its own — `@dashboard` and `me@dash.io` are not asking anybody anything.
+
+Two paths produce the reply, which is what #339 settled. A direct model call
+runs first with the row written out and the thread so far, and nothing else: no
+repository, no database. Most questions asked on a row are about what is written
+on it, and that call answers them in seconds. When the question needs to know
+what the code currently does, that call says so instead of guessing, and the
+plan routine is started with the row, the question and where the answer goes.
+The thread says which happened, so a reply that is still minutes away does not
+look like one that failed.
+
+Asking never decides anything. A question on a decision leaves it open and
+answerable, a question on an idea leaves it unshaped, and a question on a step
+changes no column on it — the reply is a comment like any other. A reply that
+cannot be produced at all says so in the thread, and the question stays where it
+was written.
+
 ### `plan_dependencies`
 
 `item_id` cannot start until `depends_on_id` is done. One direction; the

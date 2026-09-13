@@ -3,16 +3,18 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { askDash } from '@/lib/comments/ask';
 import { COMMENT_TARGETS, TARGET_COLUMN, TARGET_PATH } from '@/lib/comments/load';
+import { mentionsDash, questionFrom } from '@/lib/comments/mention';
 
 /**
  * Writing and removing a comment, from any of the three dev pages.
  *
  * One file rather than a copy in each page's own actions, because the write is
  * the same write: the target decides which column the row names and which page
- * is revalidated, and nothing else differs. The author is always 'me' — a
- * session writes its own replies, and the column exists so the two halves of a
- * thread can be told apart.
+ * is revalidated, and nothing else differs. What you write is always 'me'; the
+ * replies under it are 'claude', which is what tells the two halves of a thread
+ * apart.
  */
 
 export type CommentActionState = {
@@ -25,7 +27,13 @@ const targetSchema = z.enum(COMMENT_TARGETS);
 const bodySchema = z.string().trim().min(1, 'Write something.').max(4000);
 
 /**
- * A comment on an idea, a plan step or a raise.
+ * A comment on an idea, a plan step or a raise, and the reply when it asks for
+ * one.
+ *
+ * Tagging `@dash` is what turns a note into a question — see
+ * lib/comments/mention.ts for why the test for the tag is strict. Everything
+ * that follows from it is in lib/comments/ask.ts, so the two paths a reply can
+ * take are described in one place rather than half here.
  *
  * Ownership of the row being commented on is checked by the insert policy in
  * migration 0062 rather than here: a comment on somebody else's row matches no
@@ -46,16 +54,39 @@ export async function addComment(
   if (!id.success) return { error: 'Missing what the comment is about.' };
   if (!body.success) return { error: body.error.issues[0].message };
 
-  const { error } = await supabase.from('dev_comments').insert({
-    user_id: user.id,
-    [TARGET_COLUMN[target.data]]: id.data,
-    author: 'me',
-    body: body.data,
-  });
+  const { data: written, error } = await supabase
+    .from('dev_comments')
+    .insert({
+      user_id: user.id,
+      [TARGET_COLUMN[target.data]]: id.data,
+      author: 'me',
+      body: body.data,
+    })
+    .select('id')
+    .single();
   if (error) return { error: error.message };
 
+  // Untagged, so it is a note to yourself and this is the end of it.
+  if (!mentionsDash(body.data)) {
+    revalidatePath(TARGET_PATH[target.data]);
+    return { message: 'Saved.' };
+  }
+
+  const asked = await askDash({
+    supabase,
+    userId: user.id,
+    target: target.data,
+    id: id.data,
+    commentId: (written as { id: string } | null)?.id ?? '',
+    question: questionFrom(body.data),
+  });
+
+  // One redraw, after the reply, so the question and the answer under it
+  // arrive together. What comes back is a message rather than an error either
+  // way: the comment is written, and when no reply could be produced the thread
+  // says why.
   revalidatePath(TARGET_PATH[target.data]);
-  return { message: 'Saved.' };
+  return { message: asked.ok ? asked.message : asked.error };
 }
 
 /** Taking one back out. Yours and a session's alike: it is your thread. */

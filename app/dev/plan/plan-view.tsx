@@ -1152,7 +1152,7 @@ function QuestionRow({ node }: { node: PlanNode }) {
               id={node.id}
               thread={node.thread}
               label="Comment"
-              placeholder="What is unclear about the question, or what you are weighing. It does not answer it."
+              placeholder="What is unclear about the question, or what you are weighing. Tag @dash to ask; either way it does not answer it."
             />
           )}
 
@@ -2448,7 +2448,7 @@ function PlanRow({
               target="step"
               id={node.id}
               thread={node.thread}
-              placeholder="A note on this step. Nothing reads it and nothing happens."
+              placeholder="A note on this step. Tag @dash to get a reply; without it nothing reads it."
             />
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">

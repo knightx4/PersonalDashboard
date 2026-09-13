@@ -155,7 +155,7 @@ function RaiseCard({ row }: { row: RaisedRow }) {
         id={row.id}
         thread={row.thread}
         label="Add a comment"
-        placeholder="Something about this raise that is not the answer to it. It stays open."
+        placeholder="Something about this raise that is not the answer to it. Tag @dash to ask; it stays open."
       />
 
       <div className="flex flex-wrap items-center gap-2">
