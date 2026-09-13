@@ -158,28 +158,22 @@ export async function editFeedback(
 
 const respondSchema = z.object({
   id: z.string().uuid(),
-  response: z
-    .string()
-    .trim()
-    .min(1, 'Write your answer first.')
-    .max(4000),
+  body: z.string().trim().min(1, 'Write your answer first.').max(4000),
 });
 
 /**
  * Answer a note that came back with a question.
  *
  * A run that cannot finish a note blocks it and writes the question in the
- * resolution note, often with lettered options and a recommendation. Until now
- * there was nowhere to reply: the only way through was to notice the question,
- * edit the note's body to append an answer, and remember to set the status back
- * to open -- three steps, two of them easy to forget, and a blocked note whose
- * answer never reaches a run is a note that stays blocked forever.
+ * resolution note, often with lettered options and a recommendation. This is
+ * the reply: the answer goes into the note's thread as a comment of yours, and
+ * the note goes back in the queue in the same press.
  *
- * This is those three steps as one. The answer is appended to the body rather
- * than replacing it, dated and labelled, because the next run reads the body:
- * the ask and the answer belong together, and an answer written anywhere else
- * would need the run to know to look for it. The question stays in the
- * resolution note as the record of what was actually asked.
+ * It used to be appended to the note's own body, dated and labelled, because
+ * that was the only place a run read. #393 settled that it goes in the thread
+ * instead, now that there is one: the note stays the report you filed rather
+ * than growing a conversation inside it, and the card stops offering two boxes
+ * that look alike. The run reads the thread before it starts -- #395.
  *
  * Blocked and planned only. Those are the two pending states -- the ones that
  * are waiting on the person rather than on a run -- and answering anything else
@@ -196,13 +190,13 @@ export async function respondToFeedback(
 
   const parsed = respondSchema.safeParse({
     id: formData.get('id'),
-    response: String(formData.get('response') ?? ''),
+    body: String(formData.get('body') ?? ''),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { data: existing } = await supabase
     .from('feedback_items')
-    .select('body, status')
+    .select('status')
     .eq('id', parsed.data.id)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -213,12 +207,19 @@ export async function respondToFeedback(
     return { error: 'Only a blocked or planned note is waiting on an answer from you.' };
   }
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  const body = `${existing.body as string}\n\nAnswered ${stamp}: ${parsed.data.response}`;
+  // The comment first: a note put back in the queue without the answer under it
+  // is a note the next run picks up and blocks again for the same reason.
+  const { error: unwritten } = await supabase.from('dev_comments').insert({
+    user_id: user.id,
+    feedback_item_id: parsed.data.id,
+    author: 'me',
+    body: parsed.data.body,
+  });
+  if (unwritten) return { error: unwritten.message };
 
   const { error } = await supabase
     .from('feedback_items')
-    .update({ body, status: 'open', completed_at: null })
+    .update({ status: 'open', completed_at: null })
     .eq('id', parsed.data.id)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
