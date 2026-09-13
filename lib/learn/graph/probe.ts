@@ -20,7 +20,9 @@ import { probePayloadSchema, toProbe, type Probe } from '@/lib/learn/graph/probe
  * independent, and all the state is in Postgres.
  */
 
-const MODEL = 'claude-haiku-4-5';
+/** Stored on every probe row, so the two routes that ask record the same thing. */
+export const PROBE_MODEL = 'claude-haiku-4-5';
+const MODEL = PROBE_MODEL;
 const TOOL_NAME = 'report_question';
 
 const SYSTEM = `You write one multiple-choice question testing whether somebody
