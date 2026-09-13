@@ -47,6 +47,21 @@ function DeleteComment({ id, target }: { id: string; target: CommentTarget }) {
 const PENDING = 'pending';
 
 /**
+ * An action the box sends to instead of `addComment`.
+ *
+ * One box, whatever it is for. A blocked bug note is the case that needs it:
+ * the answer to the question a run left is a comment like any other, and it
+ * also puts the note back in the queue, so the write goes through
+ * `respondToFeedback` -- #393. Without this the card carries two text boxes
+ * that look alike and do different things.
+ */
+export type CommentSubmit = {
+  action: (prev: CommentActionState, formData: FormData) => Promise<CommentActionState>;
+  /** What the trigger and the save button say. */
+  label: string;
+};
+
+/**
  * The thread, the box, and the comment that is on its way.
  *
  * These were two components, and the split is what made posting feel slow. The
@@ -66,6 +81,7 @@ export function CommentThread({
   id,
   thread,
   label,
+  submit,
   placeholder = 'A note on this row. Tag @dash to ask something, or to tell it to do something; without it nothing reads it.',
 }: {
   target: CommentTarget;
@@ -74,9 +90,14 @@ export function CommentThread({
   thread: readonly DevComment[];
   /** What the trigger says when the thread is empty. */
   label?: string;
+  /** Where the box writes, when it is not a plain comment. */
+  submit?: CommentSubmit;
   placeholder?: string;
 }) {
-  const [state, action, pending] = useActionState(addComment, {} as CommentActionState);
+  const [state, action, pending] = useActionState(
+    submit?.action ?? addComment,
+    {} as CommentActionState,
+  );
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState('');
   /** Kept only so a failed write can hand the words back rather than lose them. */
@@ -101,8 +122,11 @@ export function CommentThread({
     }
   }
 
-  const trigger = label ?? (thread.length === 0 ? 'Add a comment' : 'Add another');
-  const asking = pending && mentionsDash(sent);
+  const trigger = submit?.label ?? label ?? (thread.length === 0 ? 'Add a comment' : 'Add another');
+  // Nothing is coming back from an action of somebody else's, so the line
+  // saying an answer is on its way would be describing a wait that is not
+  // happening.
+  const asking = !submit && pending && mentionsDash(sent);
 
   return (
     <div className="space-y-2">
@@ -177,7 +201,7 @@ export function CommentThread({
           />
           <div className="flex flex-wrap items-center gap-1">
             <Button type="submit" size="sm">
-              Save
+              {submit?.label ?? 'Save'}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setWriting(false)}>
               Cancel

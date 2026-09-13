@@ -10,6 +10,7 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
@@ -99,22 +100,11 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
    * Answering a note that came back with a question.
    *
    * Only where there is a question to answer: blocked and planned are the two
-   * states waiting on the person rather than on a run. Behind a button rather
-   * than always open, so a queue of twenty notes is not twenty text boxes --
-   * the same reason Edit is behind one.
+   * states waiting on the person rather than on a run. It is written in the
+   * thread rather than in a box of its own -- #393 -- so the card has one
+   * place to type and the answer sits where the next run reads it.
    */
-  const [answering, setAnswering] = useState(false);
-  const [respondState, respondAction, respondPending] = useActionState(
-    respondToFeedback,
-    {} as FeedbackActionState,
-  );
   const canAnswer = row.status === 'blocked' || row.status === 'planned';
-
-  const [answered, setAnswered] = useState<FeedbackActionState | null>(null);
-  if (respondState.message && respondState !== answered) {
-    setAnswered(respondState);
-    setAnswering(false);
-  }
 
   return (
     <li className="row-pad flex flex-col gap-2 px-4">
@@ -206,29 +196,21 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         </p>
       )}
 
-      {/* Directly under the question, which is where an answer goes. Putting it
-          down among Set, Edit and Delete would make replying to a question look
-          like another way of triaging the note. */}
-      {canAnswer && answering && (
-        <form action={respondAction} className="flex flex-col gap-2">
-          <input type="hidden" name="id" value={row.id} />
-          <Textarea
-            name="response"
-            rows={3}
-            autoFocus
-            placeholder="Answer the question above. It goes on the note and the next run reads it."
-            aria-label="Your answer"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="sm" pending={respondPending}>
-              {respondPending ? 'Sending…' : 'Answer and reopen'}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(false)}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
+      {/* Under the note and its resolution note, above the row of buttons: what
+          was written after filing belongs with the report, not among the
+          controls for triaging it. A closed note keeps its thread, which is the
+          record of what was said while it was being fixed. */}
+      <CommentThread
+        target="note"
+        id={row.id}
+        thread={row.thread}
+        submit={canAnswer ? { action: respondToFeedback, label: 'Answer and reopen' } : undefined}
+        placeholder={
+          canAnswer
+            ? 'Answer the question above. It goes in the thread, and the note goes back in the queue.'
+            : 'Anything you have to add to this note since filing it. The run that picks it up reads it; tag @dash to ask about it.'
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <form action={statusAction} className="flex items-center gap-2">
@@ -263,11 +245,6 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           </Button>
           {statusPending && <span className="text-small text-ink-muted">Saving…</span>}
         </form>
-        {canAnswer && !answering && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => setAnswering(true)}>
-            Answer
-          </Button>
-        )}
         {canEdit && !editing && (
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
             Edit
@@ -279,9 +256,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             Delete
           </Button>
         </form>
-        <FieldError>
-          {statusState.error ?? deleteState.error ?? editState.error ?? respondState.error}
-        </FieldError>
+        <FieldError>{statusState.error ?? deleteState.error ?? editState.error}</FieldError>
       </div>
     </li>
   );

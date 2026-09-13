@@ -18,6 +18,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { serverEnv } from '@/lib/env';
+import { FEEDBACK_COLUMNS, feedbackRowFrom } from '@/lib/feedback/load';
 import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
 import { ideaRowFrom, IDEA_COLUMNS } from '@/lib/ideas/load';
 import { planBrief } from '@/lib/plan/brief';
@@ -25,7 +26,7 @@ import { loadPlan } from '@/lib/plan/load';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 import { raisedRowFrom, RAISED_COLUMNS } from '@/lib/raised/load';
 import { carryOut } from './act';
-import { askMessage, ideaContext, raiseContext, threadText } from './context';
+import { askMessage, ideaContext, noteContext, raiseContext, threadText } from './context';
 import { TARGET_COLUMN, type CommentTarget, type DevComment } from './load';
 import { replyToComment } from './reply';
 
@@ -60,11 +61,11 @@ function apiKey(): string | null {
 }
 
 /**
- * The step, idea or raise written out.
+ * The step, idea, raise or bug note written out.
  *
  * A step goes through `planBrief`, which is the same text a session building
  * it would be handed: its done-when, where the feature is going, and every
- * question already settled beneath it. The other two are shorter and are
+ * question already settled beneath it. The other three are shorter and are
  * assembled in lib/comments/context.ts.
  */
 async function subjectOf(input: AskInput): Promise<Subject | null> {
@@ -93,15 +94,31 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
     return { context: ideaContext(idea), thread: idea.thread, label: 'an idea' };
   }
 
+  if (target === 'raise') {
+    const { data } = await supabase
+      .from('raised_items')
+      .select(RAISED_COLUMNS)
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+    const row = raisedRowFrom(data as unknown as Record<string, unknown>);
+    return { context: raiseContext(row), thread: row.thread, label: row.title };
+  }
+
   const { data } = await supabase
-    .from('raised_items')
-    .select(RAISED_COLUMNS)
+    .from('feedback_items')
+    .select(FEEDBACK_COLUMNS)
     .eq('user_id', userId)
     .eq('id', id)
     .maybeSingle();
   if (!data) return null;
-  const row = raisedRowFrom(data as unknown as Record<string, unknown>);
-  return { context: raiseContext(row), thread: row.thread, label: row.title };
+  const note = feedbackRowFrom(data as unknown as Record<string, unknown>);
+  return {
+    context: noteContext(note),
+    thread: note.thread,
+    label: note.kind === 'bug' ? 'a bug report' : 'a feature request',
+  };
 }
 
 /** A reply in the thread, under the same account and marked as Claude's. */
