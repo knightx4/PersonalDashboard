@@ -93,15 +93,22 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
     return { context: ideaContext(idea), thread: idea.thread, label: 'an idea' };
   }
 
-  const { data } = await supabase
-    .from('raised_items')
-    .select(RAISED_COLUMNS)
-    .eq('user_id', userId)
-    .eq('id', id)
-    .maybeSingle();
-  if (!data) return null;
-  const row = raisedRowFrom(data as unknown as Record<string, unknown>);
-  return { context: raiseContext(row), thread: row.thread, label: row.title };
+  if (target === 'raise') {
+    const { data } = await supabase
+      .from('raised_items')
+      .select(RAISED_COLUMNS)
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+    const row = raisedRowFrom(data as unknown as Record<string, unknown>);
+    return { context: raiseContext(row), thread: row.thread, label: row.title };
+  }
+
+  // A bug note is the fourth target a comment can name. Writing one out for a
+  // reply is #396; until that lands there is nothing to read it from, and
+  // saying so is better than handing the note to the branch above it.
+  return null;
 }
 
 /** A reply in the thread, under the same account and marked as Claude's. */

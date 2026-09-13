@@ -54,6 +54,7 @@ function note(over: Partial<FeedbackRow> & { id: string }): FeedbackRow {
     commitSha: null,
     createdAt: '2026-01-01T00:00:00Z',
     completedAt: '2026-03-02T09:00:00Z',
+    thread: [],
     ...over,
   };
 }
