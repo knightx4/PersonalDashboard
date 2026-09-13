@@ -9,6 +9,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
@@ -67,6 +68,8 @@ NO CYCLES. Prerequisites run one way. If A is needed for B then B is never
 needed for A, however tempting the symmetry.
 
 ${MASTERY_RULE}
+
+${KIND_RULE}
 
 BASIS, HONESTLY. Every node and every edge carries a basis, one short sentence
 on how you know it belongs. It is shown to the reader, so never imply you
@@ -180,8 +183,9 @@ export async function generateChain(input: {
                     claim: { type: 'string' },
                     basis: { type: 'string' },
                     mastery: MASTERY_TOOL_FIELD,
+                    kind: KIND_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis', 'mastery'],
+                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
                 },
               },
               edges: {

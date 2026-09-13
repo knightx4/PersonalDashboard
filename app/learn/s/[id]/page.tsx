@@ -8,14 +8,12 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { GoalForm } from '@/app/learn/know/goal-form';
-import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
-import { ReadAbout } from './read-about';
+import { ConceptList } from '@/components/learn/concept-list';
 import {
   countStates,
   learningOrder,
   pruneForGoal,
   readyNow,
-  type Concept,
   type Graph,
 } from '@/lib/learn/graph/model';
 
@@ -37,82 +35,6 @@ export const dynamic = 'force-dynamic';
  * different claims, and a page that rendered them identically would be
  * overstating one of them every time.
  */
-
-function ConceptRow({
-  concept,
-  next,
-  subjectId,
-}: {
-  concept: Concept;
-  next: boolean;
-  subjectId: string;
-}) {
-  return (
-    <li className="flex gap-3 px-4 py-3">
-      <StateMark concept={concept} className="mt-0.5" />
-      <div className="min-w-0 flex-1">
-        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <Link
-            href={`/learn/c/${concept.id}`}
-            className="text-body font-medium text-ink hover:text-accent"
-          >
-            {concept.name}
-          </Link>
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            {STATE_LABEL[concept.state]}
-          </span>
-          {next && (
-            <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
-              Start here
-            </span>
-          )}
-        </p>
-
-        {/* The claim, not a heading. This is the thing a question would be
-            written against, and reading it is how you tell a real node from a
-            chapter title that got in. */}
-        <p className="mt-0.5 text-ui text-ink">{concept.claim}</p>
-
-        {concept.misconception && (
-          <p className="mt-1 text-ui text-danger">{concept.misconception}</p>
-        )}
-
-        <p className="mt-0.5 text-small text-ink-muted">
-          {concept.state === 'unknown'
-            ? concept.basis
-            : `${STATE_LABEL[concept.state]} — ${ESTABLISHED_LABEL[concept.established]}. ${concept.basis}`}
-        </p>
-
-        <div className="mt-2">
-          <ReadAbout concept={concept} subjectId={subjectId} />
-        </div>
-      </div>
-    </li>
-  );
-}
-
-function ConceptList({
-  concepts,
-  nextId,
-  subjectId,
-}: {
-  concepts: Concept[];
-  nextId: string | null;
-  subjectId: string;
-}) {
-  return (
-    <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-      {concepts.map((concept) => (
-        <ConceptRow
-          key={concept.id}
-          concept={concept}
-          next={concept.id === nextId}
-          subjectId={subjectId}
-        />
-      ))}
-    </ul>
-  );
-}
 
 function GoalSection({
   graph,

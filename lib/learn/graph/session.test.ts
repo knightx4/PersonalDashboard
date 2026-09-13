@@ -11,12 +11,13 @@ import type { Concept, KnowledgeState } from './model';
  * questions worth ten questions.
  */
 
-function concept(id: string, state: KnowledgeState): Concept {
+function concept(id: string, state: KnowledgeState, kind: Concept['kind'] = null): Concept {
   return {
     id,
     name: id,
     claim: `${id} is the case.`,
     basis: 'Seeded.',
+    kind,
     mastery: [],
     state,
     established: 'inferred',
@@ -57,6 +58,53 @@ describe('what to ask about next', () => {
     ]);
     const picked = nextConcept([concept('a', 'unknown'), concept('b', 'unknown')], asked);
     expect(picked?.id).toBe('b');
+  });
+
+  it('asks about the door before what follows from it', () => {
+    // Same state, so nothing else separates them. The claims downstream of a
+    // door do not land until you are through it, and the question about the
+    // door is the one that says whether you are.
+    const picked = nextConcept(
+      [
+        concept('downstream', 'unknown', 'consequence'),
+        concept('door', 'unknown', 'threshold'),
+      ],
+      noneAsked,
+    );
+    expect(picked?.id).toBe('door');
+  });
+
+  it('does not lift a door out of its state', () => {
+    // The bands still decide first: a consequence you have got wrong beats a
+    // door nothing has been found out about.
+    const picked = nextConcept(
+      [concept('door', 'unknown', 'threshold'), concept('wrong', 'misconception', 'consequence')],
+      noneAsked,
+    );
+    expect(picked?.id).toBe('wrong');
+  });
+
+  it('still spreads out between two doors', () => {
+    const asked = new Map([
+      ['a', 3],
+      ['b', 1],
+    ]);
+    const picked = nextConcept(
+      [concept('a', 'unknown', 'threshold'), concept('b', 'unknown', 'threshold')],
+      asked,
+    );
+    expect(picked?.id).toBe('b');
+  });
+
+  it('leaves an unmarked concept where it was', () => {
+    // Nobody has judged it, so it is not sorted below a consequence -- that
+    // would be the judgement the null column exists to avoid.
+    const asked = new Map([['downstream', 1]]);
+    const picked = nextConcept(
+      [concept('downstream', 'unknown', 'consequence'), concept('unmarked', 'unknown')],
+      asked,
+    );
+    expect(picked?.id).toBe('unmarked');
   });
 
   it('has nothing to say about an empty subject', () => {

@@ -8,6 +8,7 @@ import {
   type ExistingConcept,
   type ProposedChain,
 } from '@/lib/learn/graph/chain-payload';
+import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 
 /**
@@ -54,6 +55,8 @@ DO NOT REPROPOSE what the subject already has. Name it exactly as given and
 draw the edge instead.
 
 ${MASTERY_RULE}
+
+${KIND_RULE}
 
 BASIS. Each node and edge says how you know it belongs, in one short sentence.
 Here that sentence is usually "taken from the note on <the reading>", and
@@ -123,8 +126,9 @@ export async function conceptsFromNote(input: {
                     claim: { type: 'string' },
                     basis: { type: 'string' },
                     mastery: MASTERY_TOOL_FIELD,
+                    kind: KIND_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis', 'mastery'],
+                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
                 },
               },
               edges: {

@@ -14,6 +14,16 @@ export type KnowledgeState = (typeof KNOWLEDGE_STATES)[number];
 export const STATE_BASES = ['tested', 'inferred', 'declared'] as const;
 export type StateBasis = (typeof STATE_BASES)[number];
 
+/**
+ * A door into the subject, or something downstream of one.
+ *
+ * `threshold` is Meyer and Land's portal idea: usually counterintuitive, and
+ * the claims after it do not land until you are through it. Everything else is
+ * a `consequence` -- learnable once its doors are held.
+ */
+export const CONCEPT_KINDS = ['threshold', 'consequence'] as const;
+export type ConceptKind = (typeof CONCEPT_KINDS)[number];
+
 export type Concept = {
   id: string;
   name: string;
@@ -21,6 +31,12 @@ export type Concept = {
   claim: string;
   /** How this node came to be believed to belong here. */
   basis: string;
+  /**
+   * Whether this is a door into the subject or a consequence of one. Null for
+   * a concept written before the distinction existed; nothing guesses on its
+   * behalf, so a screen says nothing about it rather than calling it either.
+   */
+  kind: ConceptKind | null;
   state: KnowledgeState;
   /** How the state was established. Weaker than the state itself, and shown. */
   established: StateBasis;

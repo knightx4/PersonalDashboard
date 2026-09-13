@@ -129,6 +129,9 @@ export async function saveChain(
           // checks or nothing, and a node whose checks the model never wrote
           // is saved as it is rather than refused.
           mastery: node.mastery.length > 0 ? node.mastery : null,
+          // Null when the model said nothing usable. The column takes the two
+          // values or nothing, and nothing is what an unjudged concept is.
+          kind: node.kind,
           origin: options.origin ?? 'generated',
         })),
       )

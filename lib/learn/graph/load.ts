@@ -2,7 +2,13 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import type { Concept, Graph, KnowledgeState, StateBasis } from '@/lib/learn/graph/model';
+import type {
+  Concept,
+  ConceptKind,
+  Graph,
+  KnowledgeState,
+  StateBasis,
+} from '@/lib/learn/graph/model';
 import {
   rankReady,
   readyInSubject,
@@ -113,6 +119,7 @@ type ConceptRow = {
   name: string;
   claim: string;
   basis: string;
+  kind: ConceptKind | null;
   mastery: unknown;
 };
 
@@ -151,6 +158,7 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     name: row.name,
     claim: row.claim,
     basis: row.basis,
+    kind: row.kind,
     mastery: masteryOf(row.mastery),
     state: state?.state ?? 'unknown',
     established: state?.established ?? 'inferred',
@@ -170,7 +178,7 @@ export async function loadGraph(
   ] = await Promise.all([
     supabase
       .from('concepts')
-      .select('id, name, claim, basis, mastery')
+      .select('id, name, claim, basis, kind, mastery')
       .eq('subject_id', subjectId)
       .order('name'),
     supabase

@@ -8,6 +8,7 @@ import { Field, Select, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
+import { KindBadge } from '@/components/learn/kind-badge';
 import { keepTicked, type ChainNode, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveBrief, proposeBrief, type BriefState } from './actions';
 
@@ -94,6 +95,7 @@ function ClaimRow({
       <span className="min-w-0">
         <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-body font-medium text-ink">{node.name}</span>
+          <KindBadge kind={node.kind} />
           {unplaced && (
             <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
               Nothing left to hang it on
