@@ -10,6 +10,11 @@ import type {
   StateBasis,
 } from '@/lib/learn/graph/model';
 import {
+  rankByLastChecked,
+  settledInSubject,
+  type SettledConcept,
+} from '@/lib/learn/graph/recheck';
+import {
   rankReady,
   readyInSubject,
   READY_LIMIT,
@@ -296,6 +301,26 @@ export async function loadReadyToLearn(
   limit: number = READY_LIMIT,
 ): Promise<ReadyConcept[]> {
   return rankReady(await readyEverywhere(supabase), limit);
+}
+
+/**
+ * The settled claims you have gone longest without being asked about.
+ *
+ * The same shape of read as `readyEverywhere`, one subject at a time, and the
+ * goals are not needed: how far a settled claim sits from something you asked
+ * for says nothing about when it was last checked. Oldest first, every subject
+ * mixed together.
+ */
+export async function loadSettledByAge(
+  supabase: LearnSupabaseClient,
+): Promise<SettledConcept[]> {
+  const subjects = await loadSubjects(supabase);
+
+  const perSubject = await Promise.all(
+    subjects.map(async (subject) => settledInSubject(await loadGraph(supabase, subject.id), subject)),
+  );
+
+  return rankByLastChecked(perSubject.flat());
 }
 
 /** How many are ready in total -- for the tab's badge. */
