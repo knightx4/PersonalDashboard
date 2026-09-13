@@ -4,6 +4,7 @@ import { runInboxIncrementalSync } from '@/inngest/cron/inbox';
 import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
+import { runDevDigest } from '@/inngest/dev/digest';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -13,16 +14,20 @@ export const maxDuration = 300;
  * Everything scheduled, behind one cron.
  *
  * One inbox sync, shared by both workspaces, then the job sweep, then the JD
- * backfill, then the vault. The first two are ordered on purpose -- a message
- * that arrived this morning has to be ingested before anything is judged to
- * have gone quiet.
+ * backfill, then the vault, then the dev digest. The first two are ordered on
+ * purpose -- a message that arrived this morning has to be ingested before
+ * anything is judged to have gone quiet.
  *
- * The last two are ordered by what their absence costs. The backfill talks to
+ * The next two are ordered by what their absence costs. The backfill talks to
  * somebody else's server, and a job description that arrives tomorrow instead
  * of today is still a description; a sweep that never runs is a pipeline that
- * quietly stops telling the truth. The vault is last again: it is the newest
- * stage, and nothing reads it yet, so its freshness buys nothing today and it
- * must never be what delays a stage that does matter.
+ * quietly stops telling the truth. The vault comes after both: it is the
+ * newest stage, and nothing reads it yet, so its freshness buys nothing today
+ * and it must never be what delays a stage that does matter.
+ *
+ * The digest is last because it summarises the day, and a note fixed
+ * overnight should be on the morning summary of the day it was fixed rather
+ * than of the day after.
  *
  * Each stage is isolated. A failure in one is reported and the rest still run,
  * because the alternative is that a broken job inbox silently stops the
@@ -41,6 +46,7 @@ export async function GET(request: NextRequest) {
     { name: 'jobs-sweep', run: () => runJobSweep() },
     { name: 'jd-backfill', run: () => runJdBackfill() },
     { name: 'vault', run: () => runVaultSyncForAll() },
+    { name: 'dev-digest', run: () => runDevDigest() },
   ];
 
   const results: Record<string, unknown> = {};
