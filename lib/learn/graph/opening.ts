@@ -282,6 +282,142 @@ export async function skipOpeningQuestion(
 }
 
 /**
+ * Casing, punctuation and a leading article removed, so two spellings of one
+ * claim name match. The same normalising the claim rules use.
+ */
+function nameKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/^(the|a|an)\s+/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** What seeding a subject from a sweep did. */
+export type SeededFromSweep = {
+  known: number;
+  shaky: number;
+  /** Answered claims that matched no concept in the chain, so changed nothing. */
+  unmatched: string[];
+};
+
+/** One state to write, worked out from one answer. */
+export type SeededState = { conceptId: string; state: 'known' | 'shaky' };
+
+/**
+ * Which concepts the answers land on.
+ *
+ * Pure, and the part worth testing. A claim they got right lands known, one
+ * they got wrong lands shaky, and one they passed on lands nothing -- a pass
+ * says they did not want to guess, not that they are missing it.
+ *
+ * Matching is exact on a normalised name and nothing cleverer. A claim that
+ * matches no concept changes nothing and is named: a concept marked known is
+ * one the views stop showing you, so a loose match here is a claim somebody
+ * never sees again.
+ */
+export function matchSweepToConcepts(
+  sweep: OpeningSweep,
+  concepts: { id: string; name: string }[],
+): { states: SeededState[]; unmatched: string[] } {
+  const byName = new Map(concepts.map((concept) => [nameKey(concept.name), concept.id]));
+  const states: SeededState[] = [];
+  const unmatched: string[] = [];
+
+  for (const question of sweep.questions) {
+    if (question.outcome !== 'right' && question.outcome !== 'wrong') continue;
+
+    const conceptId = byName.get(nameKey(question.claimName));
+    if (!conceptId) {
+      unmatched.push(question.claimName);
+      continue;
+    }
+
+    states.push({ conceptId, state: question.outcome === 'right' ? 'known' : 'shaky' });
+  }
+
+  return { states, unmatched };
+}
+
+/**
+ * Turn what somebody answered into the state their first chain starts in.
+ *
+ * Both states are recorded as tested and dated, because they came from a
+ * question rather than from somebody declaring it -- the same distinction
+ * concept_state.established exists to keep.
+ */
+export async function seedFromSweep(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  sweep: OpeningSweep,
+  concepts: { id: string; name: string }[],
+): Promise<SeededFromSweep> {
+  const { states, unmatched } = matchSweepToConcepts(sweep, concepts);
+  const testedAt = new Date().toISOString();
+
+  if (states.length > 0) {
+    const { error } = await supabase.from('concept_state').upsert(
+      states.map((seeded) => ({
+        concept_id: seeded.conceptId,
+        user_id: userId,
+        state: seeded.state,
+        established: 'tested',
+        tested_at: testedAt,
+      })),
+      { onConflict: 'concept_id' },
+    );
+
+    assertSchemaExposed(error, LEARN_SCHEMA);
+    if (error) throw fail('Writing what you already knew', error);
+  }
+
+  return {
+    known: states.filter((seeded) => seeded.state === 'known').length,
+    shaky: states.filter((seeded) => seeded.state === 'shaky').length,
+    unmatched,
+  };
+}
+
+/**
+ * The opening question that established what somebody knows about one concept.
+ *
+ * Matched by name inside the subject, the same way the seeding matched. Null
+ * for a concept nobody was asked about, which is most of them.
+ */
+export async function openingQuestionFor(
+  supabase: LearnSupabaseClient,
+  subjectId: string,
+  conceptName: string,
+): Promise<OpeningQuestion | null> {
+  const { data, error } = await supabase
+    .from('opening_sweeps')
+    .select('id')
+    .eq('subject_id', subjectId);
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading the opening questions', error);
+
+  const sweepIds = ((data ?? []) as { id: string }[]).map((row) => row.id);
+  if (sweepIds.length === 0) return null;
+
+  const { data: questions, error: questionError } = await supabase
+    .from('opening_questions')
+    .select(QUESTION_COLUMNS)
+    .in('sweep_id', sweepIds)
+    .not('outcome', 'is', null)
+    .order('created_at', { ascending: false });
+
+  assertSchemaExposed(questionError, LEARN_SCHEMA);
+  if (questionError) throw fail('Reading the opening questions', questionError);
+
+  const wanted = nameKey(conceptName);
+  const match = ((questions ?? []) as unknown as QuestionRow[]).find(
+    (row) => nameKey(row.claim_name) === wanted,
+  );
+  return match ? toQuestion(match) : null;
+}
+
+/**
  * Stamp the subject onto a sweep, once approving a chain has created one.
  *
  * Until this runs the sweep knows only the name the model proposed, which is

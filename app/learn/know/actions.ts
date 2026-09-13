@@ -17,8 +17,14 @@ import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
 import { nameOpeningClaims } from '@/lib/learn/graph/opening-claims';
 import { MIN_CLAIMS } from '@/lib/learn/graph/opening-payload';
 import { writeOpeningQuestions } from '@/lib/learn/graph/opening-probe';
-import { loadSweep, sweepForGoal, type OpeningSweep } from '@/lib/learn/graph/opening';
-import { writeSweep } from '@/lib/learn/graph/opening';
+import {
+  attachSweepToSubject,
+  loadSweep,
+  seedFromSweep,
+  sweepForGoal,
+  writeSweep,
+  type OpeningSweep,
+} from '@/lib/learn/graph/opening';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   approvedChainSchema,
@@ -208,6 +214,9 @@ export async function approveChain(
   const safe = approvedChainSchema.safeParse(payload);
   if (!safe.success) return { error: 'That proposal did not survive the trip. Ask again.' };
 
+  const sweptRaw = formData.get('sweepId');
+  const sweepId = typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null;
+
   const supabase = await createLearnClient();
   let subjectId: string;
   try {
@@ -217,9 +226,29 @@ export async function approveChain(
     return { error: error instanceof Error ? error.message : 'Could not save that chain.' };
   }
 
+  // What they showed before any of this was laid out becomes the state the
+  // subject starts in. Only ever on the way in: a claim that matches nothing
+  // changes nothing, and what it seeded is counted on the subject page rather
+  // than left in a log, because a concept marked known is one the views stop
+  // showing you.
+  let seeded = '';
+  const sweep = sweepId ? await loadSweep(supabase, sweepId) : await sweepForGoal(supabase, asked.data);
+  if (sweep) {
+    try {
+      const concepts = await existingConcepts(supabase, subjectId);
+      const result = await seedFromSweep(supabase, user.id, sweep, concepts);
+      await attachSweepToSubject(supabase, sweep.id, subjectId);
+      seeded = `?known=${result.known}&shaky=${result.shaky}&unmatched=${result.unmatched.length}`;
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'Could not record what you already knew.',
+      };
+    }
+  }
+
   revalidatePath('/learn/know');
   revalidatePath(`/learn/s/${subjectId}`);
-  redirect(`/learn/s/${subjectId}`);
+  redirect(`/learn/s/${subjectId}${seeded}`);
 }
 
 /**
