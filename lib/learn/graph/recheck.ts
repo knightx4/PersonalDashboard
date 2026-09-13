@@ -10,6 +10,17 @@ import type { ReadySubject } from './ready';
  * hand, and the reading that feeds it lives in `load.ts`.
  */
 
+/**
+ * One question in five goes back over old ground. Plan #370, answer C.
+ *
+ * Two numbers rather than one: without the age, a small graph re-asks about
+ * something settled on Tuesday, which reads as the app having lost track
+ * rather than as revision. When nothing is old enough the turn is skipped and
+ * an ordinary question is asked instead.
+ */
+export const RECHECK_EVERY = 5;
+export const RECHECK_AFTER_DAYS = 30;
+
 export type SettledConcept = {
   concept: Concept;
   subjectId: string;
@@ -62,4 +73,29 @@ export function rankByLastChecked(rows: SettledConcept[]): SettledConcept[] {
 
     return a.subjectName.localeCompare(b.subjectName);
   });
+}
+
+/**
+ * Whether the next question is a re-check.
+ *
+ * Counted from the questions already answered rather than from anything held
+ * between them: there is no session object anywhere in this module, so the
+ * fifth question is the one with four answered before it. The count is read
+ * back from the stored probes, which is what makes a closed tab cost nothing.
+ */
+export function isRecheckTurn(answered: number): boolean {
+  return (answered + 1) % RECHECK_EVERY === 0;
+}
+
+/**
+ * The claim a re-check asks about, or null when nothing is old enough.
+ *
+ * Longest unchecked first, and only from what was last answered more than
+ * `RECHECK_AFTER_DAYS` ago. Ranked here rather than trusted from the caller,
+ * so a list read in any order gives the same question.
+ */
+export function claimToRecheck(rows: SettledConcept[], now: Date): SettledConcept | null {
+  const cutoff = now.getTime() - RECHECK_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  const old = rankByLastChecked(rows).filter((row) => new Date(row.testedAt).getTime() <= cutoff);
+  return old[0] ?? null;
 }

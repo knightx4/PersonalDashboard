@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { rankByLastChecked, settledInSubject, type SettledConcept } from './recheck';
+import {
+  claimToRecheck,
+  isRecheckTurn,
+  rankByLastChecked,
+  RECHECK_AFTER_DAYS,
+  settledInSubject,
+  type SettledConcept,
+} from './recheck';
 import type { Concept, Graph, KnowledgeState, StateBasis } from './model';
 
 /**
@@ -152,5 +159,52 @@ describe('the order they come back in', () => {
     rankByLastChecked(rows);
 
     expect(names(rows)).toEqual(['june', 'march']);
+  });
+});
+
+describe('how often an old claim comes back', () => {
+  it('is every fifth question, counted from the ones you have answered', () => {
+    expect([0, 1, 2, 3, 4, 5, 8, 9].map(isRecheckTurn)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  function settled(name: string, testedAt: string): SettledConcept {
+    return {
+      concept: concept(name, 'known', 'tested', testedAt),
+      subjectId: 'subject-1',
+      subjectName: 'Optics',
+      testedAt,
+    };
+  }
+
+  const now = new Date('2026-09-13T09:00:00.000Z');
+  const daysAgo = (days: number) =>
+    new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  it('takes the claim you were asked about longest ago', () => {
+    const claim = claimToRecheck([settled('recent', daysAgo(40)), settled('old', daysAgo(90))], now);
+    expect(claim?.concept.name).toBe('old');
+  });
+
+  it('leaves alone anything checked inside the month', () => {
+    expect(claimToRecheck([settled('tuesday', daysAgo(5))], now)).toBeNull();
+    expect(claimToRecheck([settled('nearly', daysAgo(RECHECK_AFTER_DAYS - 1))], now)).toBeNull();
+  });
+
+  it('takes one that has been unchecked exactly a month', () => {
+    const claim = claimToRecheck([settled('a-month', daysAgo(RECHECK_AFTER_DAYS))], now);
+    expect(claim?.concept.name).toBe('a-month');
+  });
+
+  it('has nothing to offer when nothing is settled', () => {
+    expect(claimToRecheck([], now)).toBeNull();
   });
 });

@@ -64,6 +64,34 @@ export async function answeredWeight(
   );
 }
 
+/**
+ * How many questions have actually been answered.
+ *
+ * The cadence a re-check runs on is counted from this rather than from a
+ * counter held somewhere: each question is picked fresh, so the only record of
+ * how many have gone by is the rows themselves. `conceptIds` narrows it to one
+ * subject; left out, it counts the account's answers across every subject.
+ */
+export async function answeredCount(
+  supabase: LearnSupabaseClient,
+  conceptIds?: string[],
+): Promise<number> {
+  if (conceptIds !== undefined && conceptIds.length === 0) return 0;
+
+  let query = supabase
+    .from('probes')
+    .select('id', { count: 'exact', head: true })
+    .not('answered_at', 'is', null);
+  if (conceptIds !== undefined) query = query.in('concept_id', conceptIds);
+
+  const { count, error } = await query;
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Counting what you have answered', error);
+
+  return count ?? 0;
+}
+
 /** The bar, from the rows. */
 export async function subjectBarPercent(
   supabase: LearnSupabaseClient,
