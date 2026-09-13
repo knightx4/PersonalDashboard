@@ -708,6 +708,89 @@ export function applyView(sections: readonly PlanSection[], view: PlanView): Pla
 }
 
 /**
+ * Whether a step answers a search.
+ *
+ * The number, the title and the detail, because those are the three ways
+ * somebody refers to a step they are trying to find again: "#342", "the shelf
+ * picker", or a phrase they remember writing into the detail. The number
+ * matches with or without its hash, so typing `342` and `#342` both work.
+ *
+ * Every term has to match, and each may match a different field — "342 shelf"
+ * finds the step only if it is both. Case and surrounding space are ignored.
+ */
+function matchesQuery(node: PlanNode, terms: readonly string[]): boolean {
+  const haystack = [`#${node.number}`, node.title, node.detail ?? '']
+    .join(' ')
+    .toLowerCase();
+  return terms.every((term) => haystack.includes(term));
+}
+
+/** A query split into the terms every step has to carry. Empty when blank. */
+export function searchTerms(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((term) => term.replace(/^#/, ''))
+    .filter(Boolean);
+}
+
+/** A whole subtree kept for context, so nothing under a hit reads as a hit. */
+function asContext(nodes: readonly PlanNode[]): PlanNode[] {
+  return nodes.map((node) => ({
+    ...node,
+    children: asContext(node.children),
+    matches: false,
+  }));
+}
+
+function pruneToQuery(nodes: readonly PlanNode[], terms: readonly string[]): PlanNode[] {
+  return nodes.flatMap((node): PlanNode[] => {
+    const matches = matchesQuery(node, terms);
+    // A hit keeps the steps beneath it, the way opening the row would show
+    // them: finding a feature and being handed it with its steps stripped out
+    // is finding the wrong thing. They are context, not hits, so they are
+    // marked as such -- otherwise the count would call a one-hit search seven.
+    if (matches) return [{ ...node, children: asContext(node.children), matches: true }];
+
+    const children = pruneToQuery(node.children, terms);
+    if (children.length === 0) return [];
+    return [{ ...node, children, matches: false }];
+  });
+}
+
+/**
+ * The plan narrowed to a search.
+ *
+ * The same shape as a view, and deliberately so: a step that does not match
+ * stays if something beneath it does, dimmed, so a hit is still read in its
+ * place rather than as a bare sub-step with no feature over it. `matches` is
+ * the flag the row already dims on, so search needs nothing new to render.
+ *
+ * A blank query is not a search and gives the sections back untouched, so the
+ * caller does not have to decide whether to call this.
+ *
+ * Modules with no hits are dropped, every view included -- unlike "Open",
+ * which keeps an empty module because an empty module is an invitation to plan
+ * it. Under a search it is only noise between results.
+ */
+export function searchSections(
+  sections: readonly PlanSection[],
+  query: string,
+): PlanSection[] {
+  const terms = searchTerms(query);
+  if (terms.length === 0) return sections.map((section) => ({ ...section }));
+
+  return sections
+    .map((section) => ({ ...section, nodes: pruneToQuery(section.nodes, terms) }))
+    .filter((section) => section.nodes.length > 0);
+}
+
+/** How many steps a search actually found, as opposed to kept for context. */
+export function countMatches(sections: readonly PlanSection[]): number {
+  return flattenSections(sections).filter((node) => node.matches).length;
+}
+
+/**
  * What to pick up next, in order.
  *
  * Every ready step, most urgent first, and within a priority in reading order
