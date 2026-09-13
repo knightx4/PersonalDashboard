@@ -10,6 +10,7 @@ import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { IdeaRow, IdeaSource } from '@/lib/ideas/load';
 import { cardVariants } from '@/components/ui/card';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
 
@@ -191,6 +192,12 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
       ) : (
         <>
           <p className="whitespace-pre-wrap text-body text-ink">{idea.body}</p>
+          <CommentThread
+            target="idea"
+            id={idea.id}
+            thread={idea.thread}
+            placeholder="What you think about this idea, or what you would want it to do. Shaping it does not read this."
+          />
           <div className="flex flex-wrap items-center gap-2">
             <ShapeIdea idea={idea} />
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>

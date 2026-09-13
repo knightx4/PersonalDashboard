@@ -122,10 +122,10 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
   ids.raised_items = raised.id;
 
   const [raisedComment] = await admin<{ id: string }[]>`
-    insert into raised_comments (user_id, raised_item_id, author, body)
+    insert into dev_comments (user_id, raised_item_id, author, body)
     values (${userId}, ${raised.id}, 'me', ${`${tag} answered it`})
     returning id`;
-  ids.raised_comments = raisedComment.id;
+  ids.dev_comments = raisedComment.id;
 
   const [uiReview] = await admin<{ id: string }[]>`
     insert into ui_reviews (user_id, module, commit_sha, violations, note)

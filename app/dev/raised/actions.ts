@@ -43,7 +43,7 @@ export async function answerRaise(
     .maybeSingle();
   if (!raise) return { error: 'That raise no longer exists.' };
 
-  const { error: commentError } = await supabase.from('raised_comments').insert({
+  const { error: commentError } = await supabase.from('dev_comments').insert({
     user_id: user.id,
     raised_item_id: id.data,
     author: 'me',

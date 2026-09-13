@@ -32,7 +32,8 @@ see *Decisions and fog*.
 
 ## The model
 
-Two tables in `public`, both under row level security.
+Two tables in `public`, both under row level security, and `dev_comments`
+beside them.
 
 ### `plan_items`
 
@@ -59,6 +60,19 @@ Two triggers keep it a tree. A parent has to be the same account's own step
 — "another account's step" and "no such step" are the same refusal, because
 the lookup runs under the caller's policies — and a step cannot be moved
 under one of its own descendants.
+
+### `dev_comments`
+
+A comment is something you want attached to a row rather than to a session
+transcript: a question about a step, what you think of an idea before it is
+shaped, a note on a raise that is not the answer to it. One table holds all
+three, with `idea_id`, `plan_item_id` and `raised_item_id` nullable and
+exactly one of them set (migration 0062, grown out of the thread under a
+raise). `author` is `me` or `claude`, because a session writes with your
+account and the column is what tells the two halves of a thread apart.
+
+Not the same thing as `comment` on the step, which is the note the CLI
+appends a dated line to when it closes or blocks something.
 
 ### `plan_dependencies`
 
@@ -310,6 +324,13 @@ menu offers **Answer** first, where a build step offers *Done*; *Done* is not
 offered on one at all. Opening it shows a single box, and an answer already
 given sits above that box rather than being loaded into it.
 
+The open detail also carries the step's comments, and so does each question in
+its questions section — the only place a question can be commented on, since a
+decision beneath a step is deliberately not a row of its own in the tree. The
+box is closed until asked for. The same thread is on an idea on `/dev/ideas`
+and on a raise on `/dev/raised`, where it sits beside the answer box rather
+than replacing it: answering closes the raise, commenting leaves it open.
+
 Editing a step includes moving it: *Part of* lists the module's other steps,
 less the step's own subtree. A moved step goes last under its new parent. The
 editor also holds the *not yet specified* box; emptying it clears the column.
@@ -434,6 +455,4 @@ question, never left in progress and never closed to look tidy.
 - **Drag and drop.** Move up and move down are two clicks and cannot drop a
   step somewhere by accident. Moving between parents is a select in the
   edit form.
-- **Comments as a thread.** One note per step, appended to by the CLI. A
-  conversation about a step happens in the session that builds it.
 - **Reading the plan from the docs again.** See *Where it came from*.

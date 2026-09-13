@@ -34,6 +34,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     fog: null,
     resolution: null,
     comment: null,
+    thread: [],
     priority: 2,
     size: null,
     assignee: null,

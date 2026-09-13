@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -29,6 +30,8 @@ export type IdeaRow = {
   source: IdeaSource;
   /** The feature a suggestion came out of, when it came out of one. */
   from: { number: number; title: string } | null;
+  /** What has been said about it, oldest first. */
+  thread: DevComment[];
 };
 
 /**
@@ -45,7 +48,8 @@ export async function loadIdeas(
     .select(
       'id, body, module, created_at, source, ' +
         'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
-        'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title)',
+        'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title), ' +
+        `thread:dev_comments(${COMMENT_COLUMNS})`,
     )
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -75,6 +79,7 @@ export async function loadIdeas(
       // nothing can look up.
       module: scope && isModuleId(scope) ? scope : null,
       createdAt: row.created_at as string,
+      thread: threadFrom(row.thread),
     };
   });
 }

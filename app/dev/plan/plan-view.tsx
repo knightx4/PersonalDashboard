@@ -35,6 +35,7 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
@@ -1103,6 +1104,19 @@ function QuestionRow({ node }: { node: PlanNode }) {
                 </form>
               )}
             </div>
+          )}
+
+          {/* A question is commented on where it is read, which is here: a
+              decision beneath a step is deliberately not a row of its own in
+              the tree, so this is the only place to say anything about it. */}
+          {node.status !== 'dropped' && (
+            <CommentThread
+              target="step"
+              id={node.id}
+              thread={node.thread}
+              label="Comment"
+              placeholder="What is unclear about the question, or what you are weighing. It does not answer it."
+            />
           )}
 
           <FieldError>{answerState.error ?? dropState.error}</FieldError>
@@ -2361,6 +2375,13 @@ function PlanRow({
             <Questions node={node} />
 
             <Dependencies node={node} catalog={catalog} />
+
+            <CommentThread
+              target="step"
+              id={node.id}
+              thread={node.thread}
+              placeholder="A note on this step. Nothing reads it and nothing happens."
+            />
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
               <span>{scopeLabel(node.module)}</span>
