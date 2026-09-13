@@ -56,6 +56,8 @@ describe('the operation names', () => {
       'concepts-from-brief',
       'branch-from-selection',
       'name-opening-claims',
+      'write-opening-question',
+      'grade-opening-answer',
     ]);
   });
 });
