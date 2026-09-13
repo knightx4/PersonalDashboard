@@ -29,6 +29,7 @@ function step(over: Partial<PlanItem> & { id: string }): PlanItem {
     fogDismissedAt: null,
     dismissedAt: null,
     resolution: null,
+    thread: [],
     comment: null,
     priority: 2,
     size: null,
