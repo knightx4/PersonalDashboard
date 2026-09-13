@@ -33,6 +33,8 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     kind: 'build',
     fog: null,
     resolution: null,
+    dismissedAt: null,
+    fogDismissedAt: null,
     comment: null,
     priority: 2,
     size: null,
@@ -523,6 +525,7 @@ describe('summarize', () => {
       done: 1,
       claude: 2,
       fog: 0,
+      dismissed: 0,
     });
   });
 });
@@ -759,6 +762,87 @@ describe('fog on the frontier', () => {
     });
     const shown = flattenSections(applyView(sections, 'fog'));
     expect(shown.map((node) => node.number)).toEqual([1]);
+  });
+});
+
+describe('put aside as not right now', () => {
+  const fixture = () =>
+    buildPlanTree({
+      items: [
+        item({ id: 'feature', number: 1, status: 'not_started' }),
+        item({
+          id: 'question',
+          number: 2,
+          parentId: 'feature',
+          kind: 'decision',
+          dismissedAt: '2026-09-13T00:00:00Z',
+        }),
+        item({ id: 'step', number: 3, parentId: 'feature', status: 'not_started' }),
+        item({
+          id: 'foggy',
+          number: 4,
+          status: 'not_started',
+          fog: 'nobody can see the second half yet',
+          fogDismissedAt: '2026-09-13T00:00:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+
+  it('leaves every view but the one that looks for it', () => {
+    for (const view of ['all', 'open', 'you', 'ready', 'blocked', 'claude', 'proposed'] as const) {
+      const shown = flattenSections(applyView(fixture(), view)).map((node) => node.number);
+      expect(shown).not.toContain(2);
+    }
+  });
+
+  it('is listed under Dismissed, with the row whose fog was put aside', () => {
+    const shown = flattenSections(applyView(fixture(), 'dismissed')).map((node) => node.number);
+    expect(shown).toContain(2);
+    expect(shown).toContain(4);
+  });
+
+  it('is out of the counts, except the one that says how many there are', () => {
+    const summary = summarize(fixture());
+    expect(summary.onYou).toBe(0);
+    expect(summary.fog).toBe(0);
+    expect(summary.dismissed).toBe(2);
+  });
+
+  it('stops holding its feature open', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'feature', number: 1, status: 'not_started' }),
+        item({
+          id: 'question',
+          number: 2,
+          parentId: 'feature',
+          kind: 'decision',
+          dismissedAt: '2026-09-13T00:00:00Z',
+        }),
+        item({ id: 'step', number: 3, parentId: 'feature', status: 'done' }),
+      ],
+      dependencies: [],
+    });
+    expect(findNode(sections, 'feature')!.ready).toBe(true);
+    expect(shopping(sections).progress.fraction).toBe(1);
+  });
+
+  it('is never picked up by a session', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({
+          id: 'handed',
+          number: 1,
+          status: 'not_started',
+          assignee: 'claude',
+          dismissedAt: '2026-09-13T00:00:00Z',
+        }),
+      ],
+      dependencies: [],
+    });
+    expect(workOrder(sections)).toEqual([]);
+    expect(handedToClaude(sections)).toEqual([]);
   });
 });
 

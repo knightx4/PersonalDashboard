@@ -46,6 +46,7 @@ Two tables in `public`, both under row level security.
 | `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step was written by a session from an idea and is waiting on the person; see *Proposals* below. |
 | `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on an answer. See *Decisions and fog* below. |
 | `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
+| `dismissed_at`, `fog_dismissed_at` | Put aside as not right now — the row, and the patch of fog on it, separately. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
 | `resolution` | The answer a decision closed with, in the person's words. Null on a build step and on a decision nobody has settled. |
 | `comment` | Your own note on it: why it stalled, what changed. The CLI appends a dated line when it closes or blocks a step. |
 | `priority` | 1 next, 2 normal, 3 someday — the same three the notes queue uses. |
@@ -100,6 +101,25 @@ ready either, whatever its own status says. Nothing in the skill or the CLI
 moves a step out of `proposed` except the person's approve, on the page or
 with `scripts/plan.ts approve`.
 
+### Suggestions
+
+The other direction. Once fog stopped being the place to park a follow-on,
+those follow-ons needed somewhere to go, and `/dev/ideas` is it: a session
+writes one with `scripts/plan.ts idea`, which stamps `source = 'claude'` and
+`from_plan_item_id` with the step it came from.
+
+The page keeps the two apart. Your own ideas are the list, grouped by
+workspace; suggestions are one section beneath them, each saying which feature
+it came out of. A night of follow-ons therefore cannot push the two thoughts
+you had off the top of the page, and a suggestion is otherwise an idea like
+any other — Shape into a plan works on it the same way.
+
+**Dismissing** is the answer to a suggestion you do not want, and it is not
+deleting (#340). `dismissed_at` puts the row in the Dismissed fold at the
+bottom of the page, out of every count above it and out of `plan.ts ideas`,
+which is what stops the next session offering it again. Bring back returns it
+to the list. Delete is still there for a row that should not exist at all.
+
 ## Decisions and fog
 
 ### When a re-shape starts
@@ -124,11 +144,13 @@ the run, never from the plan.
 Fog says part of the step was never specified; a finished step carrying that
 admission is work nobody will look at again. Write the steps the patch covers,
 or clear it, then close. `blocked` and `dropped` are unaffected: neither
-claims the step is complete.
+claims the step is complete. Nor is a patch that has been dismissed — see
+*Not right now* below, which is the other way out.
 
 The plan page counts fog in the strip at the top and has a **Not specified**
 view. Closed steps are in it, because a shipped feature still carrying fog is
-the case worth seeing.
+the case worth seeing; dismissed patches are not, which is what dismissing one
+did.
 
 Two things a proposal could not say until migration 0054, both borrowed from
 the wayfinder planning skill. They exist because of what a shaping session
@@ -207,6 +229,49 @@ without being told again, and never asks the same question twice.
 `drop <n> --note "out of scope: …"`, which reads the same and costs no
 column.
 
+## Not right now
+
+The third way out of a question, and the only one that says nothing about the
+question. Answering it writes something every session under that feature builds
+against, so an answer you do not mean is the most expensive thing on the page.
+Withdrawing it — `dropped` — says the question stopped mattering. Dismissing it
+says neither: it is still open, still unanswered, and out of the way.
+
+#340 chose hidden over gone. Dismissing takes the row off the plan page, out of
+every count, out of `next` and `list` in the CLI, out of every brief, and out of
+the turn a re-shape is fired with. The **Dismissed** view lists what was put
+aside and brings it back in one press. Nothing surfaces on its own, and nothing
+is deleted.
+
+Three things can be dismissed, and each has its own column because each is a
+different thing to stop asking about:
+
+- **A question.** `plan_items.dismissed_at`. Only an open decision: one that is
+  answered has an answer and one that is withdrawn has a reason, and hiding
+  either would hide the record rather than the ask. It stops counting toward
+  its feature's progress and stops holding its feature open, so a feature whose
+  last open row is a dismissed question can still be closed.
+- **A patch of fog.** `plan_items.fog_dismissed_at`, separate from the row,
+  because a feature whose fog you have put aside is otherwise a live feature
+  with live steps. It leaves the *Not specified* view and the count beside it,
+  and it no longer makes `done` refuse the step — the refusal is a way of
+  raising the gap, and dismissing it is saying not now to exactly that.
+  Rewriting the patch clears the dismissal: the new sentence is not one
+  anybody has put aside.
+- **A suggestion.** `ideas.dismissed_at`, which shipped with the ideas page
+  above and works on any idea. What it adds here is the other half: a
+  suggestion you turned down is named in the re-shape of the feature it came
+  out of, so the session that wrote it does not write it again.
+
+**A session never dismisses and never un-dismisses**, the same rule as never
+answering its own decision. What it does read is a list: a re-shape turn ends
+with *Already dismissed*, naming the questions, the fog and the suggestions put
+aside under that feature, and the instruction not to write any of them back —
+not as a proposal, not as the same question in different words, not as fog, not
+as an idea. Without that list the next re-shape reads the same code, reaches
+the same thought and writes it again, which is the loop dismissal exists to
+end. `.claude/skills/plan/SKILL.md` says the same thing at length.
+
 ## The routines
 
 Two of them, because there are two queues. **Morning notes review** runs on a
@@ -278,8 +343,11 @@ decision is ready for the person, not for a session.
 
 **Views.** `?view=` narrows the page to `open` (the default), `you`, `ready`,
 `proposed`, `blocked` (blocked by hand or waiting on another), `claude`
-(open steps handed to Claude) or `all`. A step that does not match stays, dimmed, when
-something beneath it does, so a ready sub-step is seen in its place.
+(open steps handed to Claude), `fog`, `dismissed` or `all`. A step that does
+not match stays, dimmed, when something beneath it does, so a ready sub-step is
+seen in its place. A dismissed step is the one thing `all` does not show:
+`dismissed` is where it is, and hiding it everywhere else is what dismissing it
+meant.
 
 `open` is everything not done and not dropped — proposals included. It is the
 whole of what is outstanding, which is what the word has to mean for the
@@ -371,7 +439,8 @@ Three ways in, all landing on the same rows.
 next [--claude]     what could be picked up, most urgent first
 list [--all]        the tree, per module
 show <n>            the brief
-ideas               ideas not yet shaped into the plan
+ideas               ideas not yet shaped into the plan, dismissals left out
+idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
                     [--fog "…"] [--kind decision]
 approve <n>         a person's move: the step and the proposed steps beneath it

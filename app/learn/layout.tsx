@@ -68,6 +68,16 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       badge: readNow,
     },
+    // Five minutes is the other end of Read now: the same module asked for
+    // when there is no time to read anything. No badge, because there is
+    // always a question waiting and a number that never goes down is not
+    // information.
+    {
+      href: '/learn/today',
+      label: 'Five minutes',
+      icon: 'fiveMinutes',
+      exact: true,
+    },
     // Learn next earns a tab on the same argument Read now does: it is not a
     // deeper view of a subject, it is every subject's ready concepts on one
     // screen, and the badge answers "is there anything" from the column.
