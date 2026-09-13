@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
+import { EditableProse } from '@/components/ui/editable-prose';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Field, FieldError, FieldHint, Textarea } from '@/components/ui/field';
@@ -2569,20 +2570,23 @@ function InterviewGroupCard({
             empty round take the space of a full one and read as filled in. */}
           <div className="mt-3">
             {showNotes ? (
+              // The same law one level up: the round's own note was a
+              // permanently open textarea holding its value, under a heading,
+              // over a Save button. It reads as writing now and opens where it
+              // is read.
               <CollapsibleField label="Notes on this round" defaultOpen>
-                <Textarea
-                  rows={3}
+                <EditableProse
+                  label="Notes on this round"
                   value={notes}
-                  autoFocus={notes === ''}
-                  onChange={(event) => setNotes(event.target.value)}
+                  startEditing={notes.trim() === ''}
                   placeholder="How the round went as a whole. Each interview keeps its own notes below."
+                  empty="Nothing written about the round as a whole."
+                  onSave={async (next) => {
+                    const result = await saveInterviewGroup(group.id, { notes: next });
+                    if (result.error) return result.error;
+                    setNotes(next);
+                  }}
                 />
-                <div className="mt-1.5 flex items-center gap-3">
-                  <Button type="button" size="sm" disabled={pending} onClick={save}>
-                    Save
-                  </Button>
-                  {saved && <span className="text-small text-ink-muted">{saved}</span>}
-                </div>
               </CollapsibleField>
             ) : (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -2785,7 +2789,6 @@ function InterviewCard({
 }) {
   const [prep, setPrep] = useState(interview.prepNotes);
   const [notes, setNotes] = useState(interview.notes);
-  const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ref = useRef<HTMLElement>(null);
@@ -2863,22 +2866,59 @@ function InterviewCard({
       )}
 
       {/* One notes section per round, holding whatever has actually been
-          written: the prep, the debrief, and any number of loose notes. */}
-      <div className="mt-3">
-        <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">Notes</h4>
+          written: the prep, the debrief, and any number of loose notes.
 
-        {empty ? (
-          <p className="mt-1 text-small text-ink-muted">Nothing written for this round yet.</p>
-        ) : (
+          The heading is only drawn over something (law 1). "Notes" above the
+          words "Nothing written for this round yet" was a heading and a
+          sentence restating it, on the rounds that had least to say -- which is
+          most of them. With nothing written, the buttons below are the whole
+          of it, and they say what they make. */}
+      <div className="mt-3">
+        {!empty && (
+          <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+            Notes
+          </h4>
+        )}
+
+        {!empty && (
           <div className="mt-1 space-y-3">
+            {/* Read as writing, edited in place (laws 12 and 14). These were
+                two permanently open textareas holding their own values, with a
+                Save button under the pair -- so a round you had written up
+                showed you an editor rather than the write-up, and four rounds
+                on a superday were eight boxes. `EditableProse` is the shape the
+                rest of the app already uses for a paragraph, and it saves
+                itself, which is what retires the Save button below. */}
             {showPrep && (
               <CollapsibleField label="Prep" defaultOpen>
-                <Textarea rows={4} value={prep} onChange={(e) => setPrep(e.target.value)} />
+                <EditableProse
+                  label="Prep for this round"
+                  value={prep}
+                  startEditing={prep.trim() === ''}
+                  placeholder="What to go in knowing, and what to ask."
+                  empty="Nothing prepped yet."
+                  onSave={async (next) => {
+                    const result = await saveInterview(interview.id, { prepNotes: next });
+                    if (result.error) return result.error;
+                    setPrep(next);
+                  }}
+                />
               </CollapsibleField>
             )}
             {showDebrief && (
               <CollapsibleField label="Interview notes" defaultOpen>
-                <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <EditableProse
+                  label="Notes on this interview"
+                  value={notes}
+                  startEditing={notes.trim() === ''}
+                  placeholder="How it went, who was in it, what they pressed on."
+                  empty="No debrief written."
+                  onSave={async (next) => {
+                    const result = await saveInterview(interview.id, { notes: next });
+                    if (result.error) return result.error;
+                    setNotes(next);
+                  }}
+                />
               </CollapsibleField>
             )}
             {interview.customNotes.map((note) => (
@@ -2936,8 +2976,11 @@ function InterviewCard({
         {/* Prep and the debrief are one each -- they are fields on the round,
             not a list -- so each offers itself only while it is not already
             there. A custom note has no such limit. */}
+        {/* No caption over them. "Create note" above three buttons reading
+            "+ Prep", "+ Interview" and "+ Custom" is the heading explained
+            underneath itself (law 15) -- it is read once and skipped forever,
+            and the buttons already say what they make. */}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-micro uppercase tracking-wider text-ink-muted">Create note</span>
           {!showPrep && <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />}
           {!showDebrief && (
             <NoteKindButton label="Interview" onClick={() => setShowDebrief(true)} />
@@ -2963,24 +3006,11 @@ function InterviewCard({
           links broke mid-phrase instead: "Move it to its own / round" and "Not
           a real round — remove / it", each centred over two lines. A row that
           wraps puts each of them on a line whole. */}
+      {/* No Save button. Every note on this round now saves itself -- the prep
+          and the debrief through their own editors, a custom note when it is
+          added -- so the one at the bottom of the card was a button for a form
+          that is no longer here. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-        {/* Only where there is a field to save. A custom note saves itself. */}
-        {(showPrep || showDebrief) && (
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await saveInterview(interview.id, { prepNotes: prep, notes });
-                setSaved(result.error ?? 'Saved.');
-              })
-            }
-          >
-            Save notes
-          </Button>
-        )}
-        {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {grouped && (
           <button
             type="button"
