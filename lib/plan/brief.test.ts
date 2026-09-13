@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planBrief, planQueueBrief } from '@/lib/plan/brief';
+import { dismissedUnder, planBrief, planQueueBrief } from '@/lib/plan/brief';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, findNode, handedToClaude } from '@/lib/plan/tree';
 
@@ -17,6 +17,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     kind: 'build',
     fog: null,
     resolution: null,
+    dismissedAt: null,
+    fogDismissedAt: null,
     comment: null,
     thread: [],
     priority: 2,
@@ -266,5 +268,52 @@ describe('planBrief on a step a re-shape wrote', () => {
     expect(brief).toContain("From #63's answer: On the server, not the client.");
     // Above the notes, which is where it would otherwise be buried.
     expect(brief.indexOf("From #63's answer")).toBeLessThan(brief.indexOf('## Notes'));
+  });
+});
+
+
+describe('what has been put aside', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'feature',
+        title: 'Talking back',
+        acceptance: 'I can answer a session without leaving the app.',
+        fog: 'how a reply reaches a decision is not settled',
+        fogDismissedAt: '2026-09-13T00:00:00Z',
+      }),
+      item({
+        id: 'asked',
+        title: 'Which shape for the reply?',
+        parentId: 'feature',
+        kind: 'decision',
+        dismissedAt: '2026-09-13T00:00:00Z',
+      }),
+      item({ id: 'step', title: 'The thread itself', parentId: 'feature' }),
+    ],
+    dependencies: [],
+  });
+  const feature = findNode(sections, 'feature')!;
+
+  it('is left out of the brief a session builds from', () => {
+    const brief = planBrief(sections, feature);
+    expect(brief).not.toContain('Which shape for the reply?');
+    expect(brief).not.toContain('## Not yet specified');
+    expect(brief).toContain('The thread itself');
+  });
+
+  it('is named for the re-shape, so it is not written back', () => {
+    const written = dismissedUnder(feature, [{ body: 'A search box over the whole plan' }]);
+    expect(written).toContain('Which shape for the reply?');
+    expect(written).toContain('how a reply reaches a decision is not settled');
+    expect(written).toContain('A search box over the whole plan');
+  });
+
+  it('says nothing at all when nothing has been put aside', () => {
+    const clean = buildPlanTree({
+      items: [item({ id: 'plain', title: 'A feature with nothing put aside' })],
+      dependencies: [],
+    });
+    expect(dismissedUnder(findNode(clean, 'plain')!)).toBe('');
   });
 });

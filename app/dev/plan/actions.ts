@@ -6,7 +6,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { fireFeatureRoutine, planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
-import { FOG_RULE, PLAIN_ENGLISH_RULE, planBrief, planQueueBrief } from '@/lib/plan/brief';
+import {
+  DISMISSAL_RULE,
+  FOG_RULE,
+  PLAIN_ENGLISH_RULE,
+  dismissedUnder,
+  planBrief,
+  planQueueBrief,
+} from '@/lib/plan/brief';
+import { loadDismissedSuggestions } from '@/lib/ideas/load';
 import {
   PLAN_ASSIGNEES,
   PLAN_KINDS,
@@ -14,7 +22,9 @@ import {
   PLAN_SIZES,
   PLAN_STATUSES,
   isClosed,
+  isDismissed,
   loadPlan,
+  type PlanStatus,
 } from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
@@ -265,7 +275,7 @@ export async function updatePlanItem(
 
   const { data: current } = await supabase
     .from('plan_items')
-    .select('parent_id, module')
+    .select('parent_id, module, fog')
     .eq('user_id', user.id)
     .eq('id', parsed.data.id)
     .maybeSingle();
@@ -286,6 +296,13 @@ export async function updatePlanItem(
     size: parsed.data.size,
     assignee: parsed.data.assignee,
   };
+
+  // A rewritten patch of fog is a new admission, and nobody has put that one
+  // aside. Leaving the dismissal on it would hide the new text the moment it
+  // was written.
+  if ((parsed.data.fog || null) !== ((current.fog as string | null) ?? null)) {
+    patch.fog_dismissed_at = null;
+  }
 
   const currentParent = (current.parent_id as string | null) ?? null;
   if (parsed.data.parent !== currentParent) {
@@ -338,14 +355,16 @@ export async function setPlanItemStatus(
   // leaves that admission sitting on finished work, where nothing looks at
   // it again -- which is how three features shipped still carrying theirs.
   // Graduate it into steps, or clear it, then close.
+  // Unless you have put that patch aside, which is the other way out: "not
+  // right now" said about the gap itself, recorded and findable.
   if (status.data === 'done') {
     const { data: current } = await supabase
       .from('plan_items')
-      .select('number, fog')
+      .select('number, fog, fog_dismissed_at')
       .eq('user_id', user.id)
       .eq('id', id.data)
       .maybeSingle();
-    if (current?.fog) {
+    if (current?.fog && !current.fog_dismissed_at) {
       return {
         error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
       };
@@ -370,6 +389,120 @@ export async function setPlanItemStatus(
 
   revalidatePlan();
   return { message: status.data === 'blocked' ? 'Blocked, and taken back off Claude.' : 'Updated.' };
+}
+
+/** "1" puts something aside; anything else brings it back. */
+function dismissing(formData: FormData): boolean {
+  return String(formData.get('dismissed') ?? '') === '1';
+}
+
+/**
+ * Not right now, said about a question.
+ *
+ * The third way out of a decision, and the one that was missing. Answering it
+ * writes something every session beneath the feature builds against, so an
+ * answer you do not mean is the most expensive thing on this page. Withdrawing
+ * it says the question stopped mattering, which is a claim about the question
+ * rather than about your afternoon. This says neither: the question is still
+ * open and still unanswered, and it is out of the plan until you go and get
+ * it. #340 settled that it is hidden rather than closed, and the Dismissed
+ * view is where it is found.
+ *
+ * Only an open question. A settled one has an answer and a withdrawn one has
+ * a reason, and hiding either would be hiding the record rather than the ask.
+ */
+// latency: pending
+export async function dismissPlanDecision(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+  const aside = dismissing(formData);
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('number, kind, status')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+
+  if (aside && current.kind !== 'decision') {
+    return {
+      error:
+        `#${current.number} is a step, not a question. ` +
+        'A step you are not doing is dropped, with the reason.',
+    };
+  }
+  if (aside && isClosed(current.status as PlanStatus)) {
+    return { error: `#${current.number} is already settled.` };
+  }
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ dismissed_at: aside ? new Date().toISOString() : null })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return {
+    message: aside
+      ? `#${current.number} put aside. It is under Dismissed when you want it.`
+      : `#${current.number} is back.`,
+  };
+}
+
+/**
+ * The same, said about a patch of fog.
+ *
+ * Its own column rather than the row's, because a feature whose fog you have
+ * put aside is otherwise a live feature with live steps: dismissing the row
+ * would take the work with it. What it stops is the asking -- the patch leaves
+ * the page, leaves the Not specified view, is not written into any turn, and
+ * no longer holds the step open when you close it.
+ *
+ * Rewriting the patch brings it back, in `updatePlanItem` and in the CLI. A
+ * new admission is not one anybody has put aside yet.
+ */
+// latency: pending
+export async function dismissPlanFog(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+  const aside = dismissing(formData);
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('number, fog')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (!current.fog) return { error: `#${current.number} says nothing is unspecified.` };
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ fog_dismissed_at: aside ? new Date().toISOString() : null })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return {
+    message: aside
+      ? `#${current.number}'s fog put aside. It is under Dismissed when you want it.`
+      : `#${current.number}'s fog is back.`,
+  };
 }
 
 /**
@@ -625,8 +758,10 @@ export async function answerPlanDecision(
   if (!answered) return { message: 'Answered.' };
 
   const feature = featureOf(after, answered);
+  // A question put aside is not one the feature is still waiting on, so it
+  // does not hold the re-shape back for ever.
   const stillOpen = flatten([feature]).filter(
-    (step) => step.kind === 'decision' && !isClosed(step.status),
+    (step) => step.kind === 'decision' && !isClosed(step.status) && !isDismissed(step),
   ).length;
 
   if (stillOpen > 0) {
@@ -640,7 +775,11 @@ export async function answerPlanDecision(
 
   // A re-shape that will not start loses nothing: the answer is already
   // recorded, and the button is still there.
-  const started = await startReshape(after, feature);
+  const started = await startReshape(
+    after,
+    feature,
+    dismissedUnder(feature, await loadDismissedSuggestions(supabase, user.id, feature.id)),
+  );
   return {
     message: started.ok
       ? `Answered, and re-shaping #${feature.number} against everything settled under it. What comes back is proposed.`
@@ -952,6 +1091,8 @@ function featureOf(sections: readonly PlanSection[], node: PlanNode): PlanNode {
 async function startReshape(
   sections: readonly PlanSection[],
   node: PlanNode,
+  /** What has been put aside under this feature, written out. Empty for none. */
+  dismissed: string,
 ): Promise<FireRoutineResult> {
   // A feature that has already shipped does not take new rows. Re-shaping one
   // is legitimate -- an answer can land under it long after it closed -- but
@@ -990,10 +1131,11 @@ async function startReshape(
     'Everything you add is proposed and stays proposed. Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not re-propose something the ' +
     'feature already holds. Report what you proposed, what you dropped and why, and what ' +
-    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
+    `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
-    planBrief(sections, node);
+    planBrief(sections, node) +
+    (dismissed ? `\n${dismissed}` : '');
 
   const routine = planRoutine();
   return fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text });
@@ -1030,7 +1172,11 @@ export async function reshapePlanFeature(
     (step) => step.kind === 'decision' && step.status === 'done' && step.resolution,
   ).length;
 
-  const result = await startReshape(sections, node);
+  const result = await startReshape(
+    sections,
+    node,
+    dismissedUnder(node, await loadDismissedSuggestions(supabase, user.id, node.id)),
+  );
   if (!result.ok) return { error: result.error };
   return {
     message:

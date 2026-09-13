@@ -42,6 +42,23 @@ export function isClosed(status: PlanStatus): boolean {
   return status === 'done' || status === 'dropped';
 }
 
+/**
+ * Put aside as "not right now" — see migration 0062.
+ *
+ * Not a status, because nothing about the row has been settled: a dismissed
+ * question is still unanswered and a dismissed step is still unbuilt. It says
+ * only that you do not want to be asked again, so everything that asks —
+ * the page, the counts, a brief, a re-shape — reads this and leaves it out.
+ */
+export function isDismissed(item: { dismissedAt: string | null }): boolean {
+  return item.dismissedAt !== null;
+}
+
+/** Fog that is still being raised: written, and not put aside. */
+export function hasLiveFog(item: { fog: string | null; fogDismissedAt: string | null }): boolean {
+  return item.fog !== null && item.fogDismissedAt === null;
+}
+
 /** 1 next, 2 normal, 3 someday — the same three the notes queue uses. */
 export const PLAN_PRIORITIES = [1, 2, 3] as const;
 export type PlanPriority = (typeof PLAN_PRIORITIES)[number];
@@ -108,6 +125,15 @@ export type PlanItem = {
   fog: string | null;
   /** The answer a decision closed with, in the person's words. */
   resolution: string | null;
+  /**
+   * When you said "not right now" to this row. A dismissed question is not
+   * answered and not withdrawn: it is out of sight, off every count and out
+   * of every re-shape, and the Dismissed view is where it can be found and
+   * brought back. Null on everything you have not put aside.
+   */
+  dismissedAt: string | null;
+  /** The same for the fog patch alone, which outlives the row it sits on. */
+  fogDismissedAt: string | null;
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
   /**
@@ -143,7 +169,8 @@ export type PlanData = {
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
   'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
-  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at';
+  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at, ' +
+  'dismissed_at, fog_dismissed_at';
 
 /**
  * Every row of the account's plan, in one read. The whole tree is what the
@@ -215,6 +242,8 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     kind: isPlanKind(kind) ? kind : 'build',
     fog: (row.fog as string | null) ?? null,
     resolution: (row.resolution as string | null) ?? null,
+    dismissedAt: stamp(row.dismissed_at),
+    fogDismissedAt: stamp(row.fog_dismissed_at),
     comment: (row.comment as string | null) ?? null,
     thread: threadFrom(row.thread),
     priority: isPlanPriority(priority) ? priority : 2,
