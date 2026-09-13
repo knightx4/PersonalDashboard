@@ -21,6 +21,7 @@ import { formatMoney } from '@/lib/money';
 import { CLOSING_DAYS, HEALTH_ORDER, HEALTH_STATES, type HealthState } from '@/lib/health';
 import { DUE_SOON_DAYS } from '@/lib/returns/deadline';
 import { cn } from '@/lib/cn';
+import { displaySummary, LISTS_WITH_DISPLAY } from '@/lib/list-display-registry';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
@@ -1410,6 +1411,12 @@ export default function DevUiPage() {
 
       <Section id="finding" title="Finding one row in five hundred">
         <Rules items={C.FINDING} />
+        {/* The lists that actually answer the rule above, read off the
+            declarations the pages pass to the shared display module rather
+            than typed here a second time. */}
+        <Group title="Lists with display options">
+          <Rows rows={LISTS_WITH_DISPLAY.map(displaySummary)} labelWidth="sm:grid-cols-[9rem_1fr]" />
+        </Group>
       </Section>
 
       <Section

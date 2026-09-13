@@ -41,6 +41,9 @@ export const LEARN_OPERATIONS = [
   'concepts-from-prior',
   'concepts-from-brief',
   'branch-from-selection',
+  'name-opening-claims',
+  'write-opening-question',
+  'grade-opening-answer',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

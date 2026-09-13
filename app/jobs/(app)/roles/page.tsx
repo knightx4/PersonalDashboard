@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { Table2 } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/jobs/shell/search-field';
@@ -14,7 +17,17 @@ import {
   SOURCE_LABELS,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
-import { RolesTable, SORTS, hrefFor, sortRows, type SortKey } from './roles-table';
+import { RolesTable, hrefFor } from './roles-table';
+import { rolesDisplay } from '@/lib/jobs/roles-display';
+import {
+  groupRows,
+  listDisplayMenu,
+  NO_GROUP,
+  parseListDisplay,
+  sortRows,
+} from '@/lib/list-display';
+import { DisplayMenu } from '@/components/shell/display-menu';
+import { GroupHeader } from '@/components/shell/group-header';
 
 export const metadata = { title: 'Roles' };
 
@@ -28,7 +41,14 @@ export const metadata = { title: 'Roles' };
 export default async function RolesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; status?: string; source?: string; q?: string }>;
+  searchParams: Promise<{
+    sort?: string;
+    status?: string;
+    source?: string;
+    q?: string;
+    group?: string;
+    hide?: string | string[];
+  }>;
 }) {
   const user = await requireUser();
   const supabase = await createClient();
@@ -36,7 +56,13 @@ export default async function RolesPage({
 
   const rows = await loadPipeline(supabase, user.id);
 
-  const sort = (SORTS.find((s) => s.id === params.sort)?.id ?? 'activity') as SortKey;
+  const displaySpec = rolesDisplay();
+  const display = parseListDisplay(displaySpec, params);
+  const savedViews = await savedViewsFor(await createCoreClient(), displaySpec.pathname);
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+  const menu = listDisplayMenu(displaySpec, params, savedViews);
+
   const status = APPLICATION_STATUSES.find((s) => s === params.status);
   const source = APPLICATION_SOURCES.find((s) => s === params.source);
 
@@ -47,7 +73,17 @@ export default async function RolesPage({
   if (source) filtered = filtered.filter((row) => row.source === source);
   if (terms.length)
     filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
-  filtered = sortRows(filtered, sort);
+  const sections = groupRows(sortRows(filtered, display), display.groupBy);
+
+  /** A filter link that keeps the arrangement: narrowing is not rearranging. */
+  const railHref = (opts: { status?: string; source?: string }) =>
+    hrefFor({
+      q: params.q,
+      sort: display.sort === displaySpec.defaultSort ? undefined : display.sort,
+      group: display.group === NO_GROUP ? undefined : display.group,
+      hide: display.hidden.length > 0 ? display.hidden.join(',') : undefined,
+      ...opts,
+    });
 
   const statusCounts = new Map<ApplicationStatus, number>();
   for (const row of rows) statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
@@ -74,6 +110,7 @@ export default async function RolesPage({
         description={`${filtered.length} of ${rows.length} shown.`}
         actions={
           <>
+            <DisplayMenu menu={menu} />
             <SearchField />
             <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
               Add a role
@@ -87,7 +124,7 @@ export default async function RolesPage({
           <RailGroup label="Status">
             <RailItem
               label="All"
-              href={hrefFor({ sort: params.sort, source: params.source, q: params.q })}
+              href={railHref({ source: params.source })}
               active={!status}
               count={rows.length}
             />
@@ -95,12 +132,7 @@ export default async function RolesPage({
               <RailItem
                 key={entry}
                 label={entry.replace(/_/g, ' ')}
-                href={hrefFor({
-                  sort: params.sort,
-                  source: params.source,
-                  status: entry,
-                  q: params.q,
-                })}
+                href={railHref({ source: params.source, status: entry })}
                 active={status === entry}
                 count={statusCounts.get(entry)}
               />
@@ -110,27 +142,29 @@ export default async function RolesPage({
           <RailGroup label="Source">
             <RailItem
               label="All"
-              href={hrefFor({ sort: params.sort, status: params.status, q: params.q })}
+              href={railHref({ status: params.status })}
               active={!source}
             />
             {APPLICATION_SOURCES.filter((s) => rows.some((r) => r.source === s)).map((entry) => (
               <RailItem
                 key={entry}
                 label={SOURCE_LABELS[entry]}
-                href={hrefFor({
-                  sort: params.sort,
-                  status: params.status,
-                  source: entry,
-                  q: params.q,
-                })}
+                href={railHref({ status: params.status, source: entry })}
                 active={source === entry}
               />
             ))}
           </RailGroup>
         </LeftRail>
 
-        <div className="min-w-0 flex-1">
-          <RolesTable rows={filtered} sort={sort} params={params} />
+        <div className="min-w-0 flex-1 space-y-5">
+          {sections.map((section) => (
+            <div key={section.key} className="space-y-2">
+              {display.group !== NO_GROUP && (
+                <GroupHeader label={section.label} count={section.count} />
+              )}
+              <RolesTable rows={section.rows} sorts={menu.sorts} hidden={display.hidden} />
+            </div>
+          ))}
         </div>
       </div>
     </>

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  currentQuery,
   displayHref,
   groupRows,
+  listDisplayMenu,
+  sameView,
   hideableProperties,
   isHidden,
   NO_GROUP,
@@ -238,5 +241,55 @@ describe('toggleHidden', () => {
   it('adds and removes', () => {
     expect(toggleHidden([], 'person')).toEqual(['person']);
     expect(toggleHidden(['person', 'number'], 'person')).toEqual(['number']);
+  });
+});
+
+describe('a saved arrangement', () => {
+  /**
+   * A view is the whole query string, so recognising the one in force cannot
+   * depend on the order the parameters happen to be in: the same view reached
+   * from a link, from a filter click and from the saved view itself has to
+   * read as the same view.
+   */
+  const spec = {
+    pathname: '/shopping/orders',
+    sorts: [
+      { id: 'newest', label: 'Newest', compare: () => 0 },
+      { id: 'oldest', label: 'Oldest', compare: () => 0 },
+    ],
+  };
+
+  it('reads the query back in a stable order', () => {
+    expect(currentQuery({ sort: 'oldest', merchant: 'abc' })).toBe(
+      currentQuery({ merchant: 'abc', sort: 'oldest' }),
+    );
+  });
+
+  it('leaves out a parameter that is there but empty', () => {
+    expect(currentQuery({ q: '', sort: 'oldest' })).toBe('sort=oldest');
+  });
+
+  it('counts two orderings of the same parameters as one view', () => {
+    expect(sameView('sort=oldest&merchant=abc', 'merchant=abc&sort=oldest')).toBe(true);
+  });
+
+  it('does not count a different value as the same view', () => {
+    expect(sameView('sort=oldest', 'sort=newest')).toBe(false);
+  });
+
+  it('marks the view the URL is currently asking for', () => {
+    const menu = listDisplayMenu(spec, { sort: 'oldest' }, [
+      { id: 'a', name: 'Oldest first', query: 'sort=oldest', isDefault: false },
+      { id: 'b', name: 'Newest first', query: '', isDefault: true },
+    ]);
+
+    expect(menu.views.map((view) => view.inForce)).toEqual([true, false]);
+    expect(menu.views[0].href).toBe('/shopping/orders?sort=oldest');
+    expect(menu.views[1].href).toBe('/shopping/orders');
+    expect(menu.views[1].isDefault).toBe(true);
+  });
+
+  it('has no views on a list where none were saved', () => {
+    expect(listDisplayMenu(spec, {}).views).toEqual([]);
   });
 });

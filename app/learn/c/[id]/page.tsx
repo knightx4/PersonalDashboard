@@ -10,6 +10,7 @@ import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
+import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
 import { ReadAbout } from '@/app/learn/s/[id]/read-about';
 import { BranchFromClaim } from './branch-from-claim';
@@ -113,6 +114,10 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
   const { concept, subject, prerequisites, dependents, refersTo, referredToBy } = view;
   const probes = await probesFor(supabase, concept.id);
+  // The question asked before any of this subject existed, when there was one.
+  // It is where a state of known or shaky on a first chain came from, so a
+  // page showing the state has to be able to show what established it.
+  const opening = await openingQuestionFor(supabase, subject.id, concept.name);
 
   const connected =
     prerequisites.length > 0 ||
@@ -215,6 +220,22 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
               </Group>
             )}
           </div>
+        </CardSection>
+      )}
+
+      {opening && (
+        <CardSection
+          title="Asked before you started"
+          hint="Answered from memory, before anything about this subject was laid out."
+          className="mb-5"
+        >
+          <p className="text-ui text-ink">{opening.question}</p>
+          <p className="mt-1 text-ui text-ink-muted">
+            {opening.outcome === 'skipped'
+              ? 'You passed on it.'
+              : `You said: ${opening.response} — ${opening.outcome === 'right' ? 'right' : 'not quite'}.`}
+          </p>
+          <p className="mt-1 text-ui text-ink">{opening.expected}</p>
         </CardSection>
       )}
 

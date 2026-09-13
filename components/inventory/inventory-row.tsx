@@ -9,7 +9,7 @@ import {
 import { SelectionCheckbox, useSelectionRowClass } from '@/components/ui/selection';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { formatMoney } from '@/lib/money';
-import { displayNameOf } from '@/lib/inventory/sort-group';
+import { displayNameOf } from '@/lib/inventory/list-display';
 import { displayVariant } from '@/lib/inventory/display';
 import { cn } from '@/lib/cn';
 import { PersonBadge } from '@/components/people/person-badge';
@@ -51,10 +51,17 @@ export type InventoryRowItem = {
 export function InventoryRow({
   item,
   lists = [],
+  hidden = [],
 }: {
   item: InventoryRowItem;
   lists?: InventoryListOption[];
+  /**
+   * Property ids the list has been told to stop drawing, from the Display
+   * control. The name is never among them: a row with no name is not a row.
+   */
+  hidden?: readonly string[];
 }) {
+  const showing = (property: string) => !hidden.includes(property);
   const title = displayNameOf(item);
   const variant = displayVariant(item.variant);
   const accent = item.category_color ?? UNSET_SWATCH;
@@ -122,15 +129,23 @@ export function InventoryRow({
               </span>
             )}
           </p>
+          {/* Merchant and date can each be turned off, and the separator goes
+              with whichever one left, so a row never opens or ends on a dot. */}
           <p className="truncate text-ui text-ink-muted">
-            {[item.merchant_name, variant, item.acquired_at].filter(Boolean).join(' · ')}
+            {[
+              showing('merchant') ? item.merchant_name : null,
+              variant,
+              showing('acquired') ? item.acquired_at : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
         </div>
 
         {/* Category has its own column rather than sitting under the price:
             they are unrelated facts, and stacking them read as though the
             category were a caption on the number. */}
-        <div className="hidden w-28 shrink-0 sm:block">
+        <div className={cn('hidden w-28 shrink-0', showing('category') && 'sm:block')}>
           {item.category_name && (
             <span className="inline-flex items-center gap-1 truncate text-small text-ink-muted">
               <CategoryGlyph slug={item.category_slug} className="size-3 shrink-0" />
@@ -141,14 +156,17 @@ export function InventoryRow({
 
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           <p className="tabular font-medium text-ink">
-            {unitLabel}
+            {/* The count survives the price going: how many copies a row
+                stands for is not a price, and losing it would make a stack
+                look like one item. */}
+            {showing('price') && unitLabel}
             {quantity > 1 && (
               <span className="ml-1.5 rounded bg-sunken px-1.5 py-0.5 text-micro font-semibold text-ink-muted">
                 ×{quantity}
               </span>
             )}
           </p>
-          {quantity > 1 && (
+          {quantity > 1 && showing('price') && (
             <p className="tabular text-small text-ink-muted">
               {formatMoney(item.cost_cents)} total
             </p>

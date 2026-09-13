@@ -76,6 +76,71 @@ describe('RLS coverage', () => {
   });
 });
 
+describe('saved views', () => {
+  /**
+   * An arrangement of a list, kept on the account so it is there on the phone
+   * too. What it carries is what the person was looking at -- their filters,
+   * their search -- so it is as much theirs as anything else in here.
+   */
+  async function seedView(userId: string, name: string, isDefault = false): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into saved_views (user_id, list, name, query, is_default)
+      values (${userId}, '/shopping/orders', ${name}, 'group=merchant&sort=total_desc', ${isDefault})
+      returning id`;
+    return row.id;
+  }
+
+  it('shows the owner their own views and another user none of them', async () => {
+    const id = await seedView(userA, 'Big ones by merchant');
+
+    const mine = await asUser(userA, (tx) => tx`select id from saved_views where id = ${id}`);
+    expect(mine).toHaveLength(1);
+
+    const theirs = await asUser(userB, (tx) => tx`select id, query from saved_views`);
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('does not let another user rename or delete one', async () => {
+    const id = await seedView(userA, 'Renameable');
+
+    const renamed = await asUser(
+      userB,
+      (tx) => tx`update saved_views set name = 'Theirs now' where id = ${id} returning id`,
+    );
+    expect(renamed).toHaveLength(0);
+
+    const deleted = await asUser(
+      userB,
+      (tx) => tx`delete from saved_views where id = ${id} returning id`,
+    );
+    expect(deleted).toHaveLength(0);
+  });
+
+  it('refuses a second view with the same name on the same list', async () => {
+    await seedView(userA, 'Only one');
+    await expect(seedView(userA, 'only ONE')).rejects.toThrow();
+  });
+
+  it('lets two accounts each have a view of that name', async () => {
+    await seedView(userA, 'Shared name');
+    await expect(seedView(userB, 'Shared name')).resolves.toBeTruthy();
+  });
+
+  it('refuses a second default on one list', async () => {
+    await seedView(userA, 'First default', true);
+    await expect(seedView(userA, 'Second default', true)).rejects.toThrow();
+  });
+
+  it('takes a default per list', async () => {
+    await admin`
+      insert into saved_views (user_id, list, name, query, is_default)
+      values (${userA}, '/jobs/roles', 'Roles default', 'group=status', true)`;
+    const defaults = await admin<{ list: string }[]>`
+      select list from saved_views where user_id = ${userA} and is_default order by list`;
+    expect(defaults.map((row) => row.list)).toEqual(['/jobs/roles', '/shopping/orders']);
+  });
+});
+
 describe('cross-user reads', () => {
   it('shows the owner their mailbox, its jobs and its messages', async () => {
     const seen = await asUser(userA, async (tx) => ({

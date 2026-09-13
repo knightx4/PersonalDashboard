@@ -1,13 +1,26 @@
 'use client';
 
 import Link from 'next/link';
-import { useId, useRef, useState } from 'react';
-import { Check, SlidersHorizontal } from 'lucide-react';
+import { useActionState, useId, useRef, useState } from 'react';
+import { Check, Pin, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
-import type { DisplayChoice, DisplayToggle, ListDisplayMenu } from '@/lib/list-display';
+import { Input } from '@/components/ui/field';
+import {
+  defaultSavedView,
+  deleteSavedView,
+  renameSavedView,
+  saveCurrentView,
+  type ViewState,
+} from '@/lib/saved-views/actions';
+import type {
+  DisplayChoice,
+  DisplayToggle,
+  DisplayView,
+  ListDisplayMenu,
+} from '@/lib/list-display';
 
 /**
  * The Display button and its panel: how a list is sorted, how it is grouped,
@@ -84,11 +97,16 @@ export function DisplayMenu({
           aria-label="Display options"
           className="w-64 space-y-4"
         >
-          <Section title="Sort">
-            {menu.sorts.map((sort) => (
-              <ChoiceRow key={sort.id} choice={sort} />
-            ))}
-          </Section>
+          {/* Empty on a list whose order is not the reader's to set -- a
+            * search ranked by relevance, say. An empty heading would offer a
+            * choice that is not there. */}
+          {menu.sorts.length > 0 && (
+            <Section title="Sort">
+              {menu.sorts.map((sort) => (
+                <ChoiceRow key={sort.id} choice={sort} />
+              ))}
+            </Section>
+          )}
 
           {menu.groups.length > 0 && (
             <Section title="Group">
@@ -105,6 +123,8 @@ export function DisplayMenu({
               ))}
             </Section>
           )}
+
+          <Views menu={menu} />
         </Popover>
       )}
     </div>
@@ -167,5 +187,141 @@ function PropertyRow({ property }: { property: DisplayToggle }) {
         {property.hidden ? 'Hidden' : 'Shown'}
       </span>
     </Link>
+  );
+}
+
+
+/**
+ * Arrangements saved under a name, and the line that saves this one.
+ *
+ * A view is already a URL; what it is not is findable again. The list it
+ * belongs to is its pathname, so an orders view never turns up on the roles
+ * table -- the parameters in it name sorts and columns that list does not
+ * have.
+ */
+function Views({ menu }: { menu: ListDisplayMenu }) {
+  const [state, save] = useActionState<ViewState, FormData>(saveCurrentView, {});
+
+  return (
+    <Section title="Views">
+      {menu.views.map((view) => (
+        <ViewRow key={view.id} view={view} list={menu.pathname} />
+      ))}
+
+      <form action={save} className="flex items-center gap-1.5 pt-1">
+        <input type="hidden" name="list" value={menu.pathname} />
+        <input type="hidden" name="query" value={menu.query} />
+        <Input
+          name="name"
+          required
+          maxLength={60}
+          placeholder="Save this as…"
+          aria-label="Name for this view"
+          className="h-7 text-small"
+        />
+        <button
+          type="submit"
+          className="shrink-0 rounded px-1.5 py-1 text-small text-ink-muted hover:bg-sunken hover:text-ink"
+        >
+          Save
+        </button>
+      </form>
+      {state.error && <p className="text-small text-danger">{state.error}</p>}
+    </Section>
+  );
+}
+
+function ViewRow({ view, list }: { view: DisplayView; list: string }) {
+  const [renaming, setRenaming] = useState(false);
+  const [renameState, rename] = useActionState<ViewState, FormData>(renameSavedView, {});
+  const [, remove] = useActionState<ViewState, FormData>(deleteSavedView, {});
+  const [, makeDefault] = useActionState<ViewState, FormData>(defaultSavedView, {});
+
+  if (renaming) {
+    return (
+      <form
+        action={rename}
+        onSubmit={() => setRenaming(false)}
+        className="flex items-center gap-1.5 py-0.5"
+      >
+        <input type="hidden" name="list" value={list} />
+        <input type="hidden" name="id" value={view.id} />
+        <Input
+          name="name"
+          defaultValue={view.name}
+          required
+          maxLength={60}
+          aria-label={`Rename ${view.name}`}
+          className="h-7 text-small"
+          autoFocus
+        />
+        <button
+          type="submit"
+          className="shrink-0 rounded px-1.5 py-1 text-small text-ink-muted hover:bg-sunken hover:text-ink"
+        >
+          Rename
+        </button>
+        {renameState.error && <span className="text-small text-danger">{renameState.error}</span>}
+      </form>
+    );
+  }
+
+  return (
+    <div className="group/view flex items-center gap-1">
+      <Link
+        href={view.href}
+        className={cn(
+          'flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-ui hover:bg-sunken',
+          view.inForce ? 'text-ink' : 'text-ink-muted',
+        )}
+        aria-current={view.inForce ? 'true' : undefined}
+      >
+        <Check
+          className={cn('size-3.5 shrink-0', view.inForce ? 'text-accent' : 'opacity-0')}
+          strokeWidth={2.5}
+          aria-hidden
+        />
+        <span className="truncate">{view.name}</span>
+        {view.isDefault && <span className="shrink-0 text-small text-ink-muted">opens here</span>}
+      </Link>
+
+      {/* The three things you can do to a saved view. Shown on hover and on
+        * focus, never only on hover: keyboard users get to them by tabbing. */}
+      <form action={makeDefault} className="shrink-0">
+        <input type="hidden" name="list" value={list} />
+        <input type="hidden" name="id" value={view.id} />
+        {view.isDefault && <input type="hidden" name="clear" value="1" />}
+        <button
+          type="submit"
+          aria-label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
+          className={cn(
+            'rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover/view:opacity-100',
+            view.isDefault && 'text-accent opacity-100',
+          )}
+        >
+          <Pin className="size-3.5" strokeWidth={2} aria-hidden />
+        </button>
+      </form>
+
+      <form action={remove} className="shrink-0">
+        <input type="hidden" name="list" value={list} />
+        <input type="hidden" name="id" value={view.id} />
+        <button
+          type="submit"
+          aria-label={`Delete ${view.name}`}
+          className="rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
+        >
+          <Trash2 className="size-3.5" strokeWidth={2} aria-hidden />
+        </button>
+      </form>
+
+      <button
+        type="button"
+        onClick={() => setRenaming(true)}
+        className="shrink-0 rounded px-1.5 py-1 text-small text-ink-muted opacity-0 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover/view:opacity-100"
+      >
+        Rename
+      </button>
+    </div>
   );
 }

@@ -12,7 +12,7 @@ import { formatMoney, todayInTimezone } from '@/lib/money';
 import { deadlineLabel, daysBetween } from '@/lib/returns/deadline';
 import { PlanReturnButton } from '@/app/shopping/returns/plan-return-button';
 import { displayVariant } from '@/lib/inventory/display';
-import { displayNameOf } from '@/lib/inventory/sort-group';
+import { displayNameOf } from '@/lib/inventory/list-display';
 import { loadItemSellQuote } from '@/lib/sell/item-quote';
 import {
   fieldsForItem,

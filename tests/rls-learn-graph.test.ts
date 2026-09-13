@@ -28,6 +28,7 @@ let conceptA1 = '';
 let conceptA2 = '';
 let conceptA3 = '';
 let conceptB1 = '';
+let sweepA = '';
 
 async function seedSubject(userId: string, name: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -57,6 +58,29 @@ async function seedEdge(
   await admin`
     insert into concept_edges (user_id, subject_id, prerequisite_id, dependent_id, basis)
     values (${userId}, ${subjectId}, ${prerequisite}, ${dependent}, 'Seeded by the test.')`;
+}
+
+async function seedSweep(userId: string, asked: string, subjectName: string): Promise<string> {
+  const [row] = await admin<{ id: string }[]>`
+    insert into opening_sweeps (user_id, asked, subject_name)
+    values (${userId}, ${asked}, ${subjectName}) returning id`;
+  return row.id;
+}
+
+async function seedOpeningQuestion(
+  userId: string,
+  sweepId: string,
+  position: number,
+  claimName: string,
+): Promise<string> {
+  const [row] = await admin<{ id: string }[]>`
+    insert into opening_questions
+      (user_id, sweep_id, position, claim_name, claim, question, expected)
+    values (${userId}, ${sweepId}, ${position}, ${claimName},
+            'A claim somebody can be right or wrong about.',
+            'What does it rule out?', 'The model answer.')
+    returning id`;
+  return row.id;
 }
 
 async function seedMention(
@@ -114,6 +138,13 @@ beforeAll(async () => {
             ${admin.json(['It steepens', 'It vanishes', 'It inverts'])}, 1,
             'Once expectations catch up there is no surprise left to exploit.',
             0, now(), 1.0)`;
+
+  // A sweep sits outside the graph until a chain is approved -- no subject, no
+  // concepts -- which is why it needs its own seeding here rather than hanging
+  // off one of the rows above.
+  sweepA = await seedSweep(userA, 'keynesian economics', 'Economics');
+  await seedOpeningQuestion(userA, sweepA, 0, 'Wage stickiness');
+  await seedOpeningQuestion(userA, sweepA, 1, 'Liquidity trap');
 });
 
 afterAll(async () => {
@@ -141,6 +172,8 @@ describe('RLS coverage', () => {
       union all select 'goals', count(*)::int from goals
       union all select 'concept_state', count(*)::int from concept_state
       union all select 'probes', count(*)::int from probes
+      union all select 'opening_sweeps', count(*)::int from opening_sweeps
+      union all select 'opening_questions', count(*)::int from opening_questions
       order by 1`;
     for (const row of seeded) expect(row.rows).toBeGreaterThan(0);
   });
@@ -156,6 +189,8 @@ describe('cross-user reads', () => {
       goals: (await tx`select id from goals`).length,
       state: (await tx`select concept_id from concept_state`).length,
       probes: (await tx`select id from probes`).length,
+      sweeps: (await tx`select id from opening_sweeps`).length,
+      openingQuestions: (await tx`select id from opening_questions`).length,
     }));
     expect(seen).toEqual({
       subjects: 1,
@@ -165,6 +200,8 @@ describe('cross-user reads', () => {
       goals: 1,
       state: 1,
       probes: 1,
+      sweeps: 1,
+      openingQuestions: 2,
     });
   });
 
@@ -177,6 +214,8 @@ describe('cross-user reads', () => {
       goals: (await tx`select id from goals where subject_id = ${subjectA}`).length,
       state: (await tx`select concept_id from concept_state where concept_id = ${conceptA2}`).length,
       probes: (await tx`select id from probes where concept_id = ${conceptA2}`).length,
+      sweeps: (await tx`select id from opening_sweeps where id = ${sweepA}`).length,
+      openingQuestions: (await tx`select id from opening_questions where sweep_id = ${sweepA}`).length,
     }));
     expect(seen).toEqual({
       subjects: 0,
@@ -186,6 +225,8 @@ describe('cross-user reads', () => {
       goals: 0,
       state: 0,
       probes: 0,
+      sweeps: 0,
+      openingQuestions: 0,
     });
   });
 
@@ -460,5 +501,126 @@ describe('which concepts are doors into the subject', () => {
             values (${userA}, ${subjectA}, 'Maybe', 'A claim with a hedged mark.',
                     'Seeded by the test.', 'unsure')`,
     ).rejects.toThrow();
+  });
+});
+
+describe('the ten questions asked before a subject exists', () => {
+  /**
+   * A sweep is written before there is anything to attach it to, so the rules
+   * that keep it honest are all on its own two tables: an answer you cannot
+   * read is not an answer, a pass stores nothing, and the order is fixed at
+   * write time rather than left to how rows come back.
+   */
+  it('starts with no subject, and takes one once a chain is approved', async () => {
+    const id = await seedSweep(userA, 'the phillips curve', 'Economics');
+    const [before] = await admin<{ subject_id: string | null }[]>`
+      select subject_id from opening_sweeps where id = ${id}`;
+    expect(before.subject_id).toBeNull();
+
+    await admin`update opening_sweeps set subject_id = ${subjectA} where id = ${id}`;
+    const [after] = await admin<{ subject_id: string | null }[]>`
+      select subject_id from opening_sweeps where id = ${id}`;
+    expect(after.subject_id).toBe(subjectA);
+  });
+
+  it('reads a half-answered sweep back with the right number outstanding', async () => {
+    const id = await seedSweep(userA, 'monetary policy', 'Economics');
+    const first = await seedOpeningQuestion(userA, id, 0, 'One');
+    const second = await seedOpeningQuestion(userA, id, 1, 'Two');
+    await seedOpeningQuestion(userA, id, 2, 'Three');
+
+    // One answered, one passed, one not reached. A pass counts as reached:
+    // somebody who pressed past every question has finished the sweep.
+    await admin`update opening_questions
+                set response = 'Wages lag prices.', outcome = 'right', answered_at = now()
+                where id = ${first}`;
+    await admin`update opening_questions
+                set outcome = 'skipped', answered_at = now() where id = ${second}`;
+
+    const rows = await admin<{ position: number; outcome: string | null }[]>`
+      select position, outcome from opening_questions where sweep_id = ${id} order by position`;
+    expect(rows.map((r) => r.outcome)).toEqual(['right', 'skipped', null]);
+    expect(rows.filter((r) => r.outcome === null)).toHaveLength(1);
+  });
+
+  it('refuses a graded answer with nothing written', async () => {
+    const id = await seedSweep(userA, 'fiscal policy', 'Economics');
+    const question = await seedOpeningQuestion(userA, id, 0, 'One');
+    await expect(
+      admin`update opening_questions set outcome = 'wrong', answered_at = now()
+            where id = ${question}`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses a pass that carries an answer', async () => {
+    const id = await seedSweep(userA, 'trade', 'Economics');
+    const question = await seedOpeningQuestion(userA, id, 0, 'One');
+    await expect(
+      admin`update opening_questions
+            set response = 'Something', outcome = 'skipped', answered_at = now()
+            where id = ${question}`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses an outcome with no time it was answered', async () => {
+    const id = await seedSweep(userA, 'growth', 'Economics');
+    const question = await seedOpeningQuestion(userA, id, 0, 'One');
+    await expect(
+      admin`update opening_questions set response = 'A guess.', outcome = 'right'
+            where id = ${question}`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses two questions in the same place in the order', async () => {
+    const id = await seedSweep(userA, 'inflation', 'Economics');
+    await seedOpeningQuestion(userA, id, 0, 'One');
+    await expect(seedOpeningQuestion(userA, id, 0, 'Also one')).rejects.toThrow();
+  });
+
+  it('refuses a question with no model answer to grade against', async () => {
+    const id = await seedSweep(userA, 'unemployment', 'Economics');
+    await expect(
+      admin`insert into opening_questions
+              (user_id, sweep_id, position, claim_name, claim, question, expected)
+            values (${userA}, ${id}, 0, 'One', 'A claim.', 'A question?', '')`,
+    ).rejects.toThrow();
+  });
+
+  it('takes the sweep questions with it when it goes', async () => {
+    const id = await seedSweep(userA, 'money supply', 'Economics');
+    await seedOpeningQuestion(userA, id, 0, 'One');
+    await admin`delete from opening_sweeps where id = ${id}`;
+    const left = await admin`select id from opening_questions where sweep_id = ${id}`;
+    expect(left).toHaveLength(0);
+  });
+
+  it('does not let another user read what you could not answer', async () => {
+    const rows = await asUser(
+      userB,
+      (tx) => tx`select question, response from opening_questions where sweep_id = ${sweepA}`,
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  it('does not let another user add a question to your sweep', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into opening_questions
+                     (user_id, sweep_id, position, claim_name, claim, question, expected)
+                   values (${userB}, ${sweepA}, 9, 'Mallory', 'A claim.', 'A question?', 'An answer.')
+                   returning id`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('does not let another user answer for you', async () => {
+    const affected = await asUser(
+      userB,
+      (tx) => tx`update opening_questions
+                 set response = 'Not mine', outcome = 'right', answered_at = now()
+                 where sweep_id = ${sweepA} returning id`,
+    );
+    expect(affected).toHaveLength(0);
   });
 });

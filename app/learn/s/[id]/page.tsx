@@ -78,16 +78,41 @@ function GoalSection({
   );
 }
 
+/**
+ * What answering the opening questions did to this subject, shown once.
+ *
+ * Only after an approval that carried a sweep: the counts arrive in the URL
+ * from the approval, so reloading later is a page without them rather than a
+ * claim repeated out of context.
+ */
+function seededLine(known?: string, shaky?: string, unmatched?: string): string | null {
+  const settled = Number(known ?? '');
+  const wobbly = Number(shaky ?? '');
+  const missed = Number(unmatched ?? '');
+  if (!Number.isFinite(settled) || known === undefined) return null;
+
+  const parts: string[] = [];
+  if (settled > 0) parts.push(`${settled} you answered right ${settled === 1 ? 'starts' : 'start'} settled`);
+  if (wobbly > 0) parts.push(`${wobbly} you missed ${wobbly === 1 ? 'starts' : 'start'} shaky`);
+  if (parts.length === 0) parts.push('Nothing you answered matched a concept in this chain');
+  if (missed > 0) {
+    parts.push(`${missed} ${missed === 1 ? 'claim' : 'claims'} you were asked about did not turn up in it`);
+  }
+
+  return `From the opening questions: ${parts.join(', ')}.`;
+}
+
 export default async function SubjectPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ all?: string }>;
+  searchParams: Promise<{ all?: string; known?: string; shaky?: string; unmatched?: string }>;
 }) {
   const { id } = await params;
-  const { all } = await searchParams;
+  const { all, known, shaky, unmatched } = await searchParams;
   const showEverything = all === '1';
+  const seeded = seededLine(known, shaky, unmatched);
 
   const supabase = await createLearnClient();
   const subject = await loadSubject(supabase, id);
@@ -139,6 +164,11 @@ export default async function SubjectPage({
           ) : undefined
         }
       />
+
+      {/* What the opening questions established, said once on the way in. A
+          concept marked known is one this page deliberately stops showing, so
+          a claim that seeded nothing has to be visible rather than silent. */}
+      {seeded && <p className="mb-5 text-body text-ink-muted">{seeded}</p>}
 
       {subject.note && (
         <p className="mb-5 border-l-2 border-accent pl-3 text-body text-ink-muted">{subject.note}</p>

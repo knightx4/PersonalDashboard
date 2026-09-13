@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { generateChain } from '@/lib/learn/graph/generate';
+import { generateChain, type SweptClaim } from '@/lib/learn/graph/generate';
 import { conceptsFromPrior } from '@/lib/learn/graph/from-prior';
 import {
   approvedBriefSchema,
@@ -13,7 +13,18 @@ import {
   MAX_BRIEFING_CHARS,
 } from '@/lib/learn/graph/from-brief';
 import { declareKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
-import { loadSubject } from '@/lib/learn/graph/load';
+import { loadSubject, loadSubjects } from '@/lib/learn/graph/load';
+import { nameOpeningClaims } from '@/lib/learn/graph/opening-claims';
+import { MIN_CLAIMS } from '@/lib/learn/graph/opening-payload';
+import { writeOpeningQuestions } from '@/lib/learn/graph/opening-probe';
+import {
+  attachSweepToSubject,
+  loadSweep,
+  seedFromSweep,
+  sweepForGoal,
+  writeSweep,
+  type OpeningSweep,
+} from '@/lib/learn/graph/opening';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   approvedChainSchema,
@@ -50,7 +61,69 @@ const ProposeInput = z.object({
     .min(1, 'Say what you want to understand.')
     .max(300, 'Shorter is better here — the narrower the goal, the better this works.'),
   subjectId: z.string().uuid().nullable(),
+  /** Set once the opening questions have been asked, so they are not asked twice. */
+  sweepId: z.string().uuid().nullable(),
 });
+
+/** The answered questions from a sweep, as generation reads them. */
+function sweptClaims(sweep: OpeningSweep | null): SweptClaim[] {
+  if (!sweep) return [];
+  return sweep.questions
+    .filter((question) => question.outcome !== null)
+    .map((question) => ({
+      name: question.claimName,
+      claim: question.claim,
+      outcome: question.outcome as SweptClaim['outcome'],
+    }));
+}
+
+/**
+ * The ten questions, when this is a subject you have never worked on.
+ *
+ * Returns the sweep to send somebody to, or null to carry straight on to the
+ * chain. Null covers every ordinary reason not to ask: a goal typed inside a
+ * subject, a subject you already have, something too broad to have shared
+ * ground in it, and a call that came back with too little to ask about. None
+ * of those is worth stopping the person for -- the sweep is an addition to the
+ * flow that works today, not a gate in front of it.
+ */
+async function openingSweepFor(
+  supabase: Awaited<ReturnType<typeof createLearnClient>>,
+  userId: string,
+  goal: string,
+): Promise<string | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  const spend = collectSpend();
+  const named = await nameOpeningClaims({ asked: goal, anthropicApiKey: apiKey, onSpend: spend.sink });
+  await recordLearnSpend(userId, 'name-opening-claims', spend.reports);
+  if (!named.ok) return null;
+
+  // A subject already in the graph has a starting state already, and asking
+  // ten questions to establish one would be measuring what is on the screen.
+  const subjects = await loadSubjects(supabase);
+  if (subjects.some((subject) => subject.name.toLowerCase() === named.subject.toLowerCase())) {
+    return null;
+  }
+
+  const writing = collectSpend();
+  const written = await writeOpeningQuestions({
+    subject: named.subject,
+    claims: named.claims,
+    anthropicApiKey: apiKey,
+    onSpend: writing.sink,
+  });
+  await recordLearnSpend(userId, 'write-opening-question', writing.reports);
+  if (written.questions.length < MIN_CLAIMS) return null;
+
+  const sweep = await writeSweep(supabase, userId, {
+    asked: goal,
+    subjectName: named.subject,
+    questions: written.questions,
+  });
+  return sweep.id;
+}
 
 // latency: pending
 export async function proposeGoal(
@@ -60,9 +133,11 @@ export async function proposeGoal(
   const user = await requireUser();
 
   const raw = formData.get('subjectId');
+  const sweptRaw = formData.get('sweepId');
   const parsed = ProposeInput.safeParse({
     goal: formData.get('goal') ?? '',
     subjectId: typeof raw === 'string' && raw.length > 0 ? raw : null,
+    sweepId: typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Could not read that goal.' };
@@ -73,6 +148,14 @@ export async function proposeGoal(
 
   const supabase = await createLearnClient();
 
+  // Before anything is laid out for a subject you have never worked on: ten
+  // questions across it, answered from memory. Skipped when the goal was typed
+  // inside a subject, and skipped once the questions have been asked.
+  if (!parsed.data.subjectId && !parsed.data.sweepId) {
+    const sweepId = await openingSweepFor(supabase, user.id, parsed.data.goal);
+    if (sweepId) redirect(`/learn/opening/${sweepId}`);
+  }
+
   // Inside a subject, the generator is told what that subject already holds so
   // it does not propose it again. Outside one, it names the subject itself and
   // there is nothing yet to dedupe against.
@@ -81,11 +164,19 @@ export async function proposeGoal(
     : null;
   const existing = subject ? await existingConcepts(supabase, subject.id) : [];
 
+  // What they could produce about this before reading anything. Found by the
+  // words when the sweep id was not carried through, so a chain laid out days
+  // later still starts from where they were.
+  const swept = parsed.data.sweepId
+    ? await loadSweep(supabase, parsed.data.sweepId)
+    : await sweepForGoal(supabase, parsed.data.goal);
+
   const spend = collectSpend();
   const result = await generateChain({
     goal: parsed.data.goal,
     subject: subject?.name ?? null,
     existing,
+    swept: sweptClaims(swept),
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
@@ -123,6 +214,9 @@ export async function approveChain(
   const safe = approvedChainSchema.safeParse(payload);
   if (!safe.success) return { error: 'That proposal did not survive the trip. Ask again.' };
 
+  const sweptRaw = formData.get('sweepId');
+  const sweepId = typeof sweptRaw === 'string' && sweptRaw.length > 0 ? sweptRaw : null;
+
   const supabase = await createLearnClient();
   let subjectId: string;
   try {
@@ -132,9 +226,29 @@ export async function approveChain(
     return { error: error instanceof Error ? error.message : 'Could not save that chain.' };
   }
 
+  // What they showed before any of this was laid out becomes the state the
+  // subject starts in. Only ever on the way in: a claim that matches nothing
+  // changes nothing, and what it seeded is counted on the subject page rather
+  // than left in a log, because a concept marked known is one the views stop
+  // showing you.
+  let seeded = '';
+  const sweep = sweepId ? await loadSweep(supabase, sweepId) : await sweepForGoal(supabase, asked.data);
+  if (sweep) {
+    try {
+      const concepts = await existingConcepts(supabase, subjectId);
+      const result = await seedFromSweep(supabase, user.id, sweep, concepts);
+      await attachSweepToSubject(supabase, sweep.id, subjectId);
+      seeded = `?known=${result.known}&shaky=${result.shaky}&unmatched=${result.unmatched.length}`;
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'Could not record what you already knew.',
+      };
+    }
+  }
+
   revalidatePath('/learn/know');
   revalidatePath(`/learn/s/${subjectId}`);
-  redirect(`/learn/s/${subjectId}`);
+  redirect(`/learn/s/${subjectId}${seeded}`);
 }
 
 /**
