@@ -8,6 +8,7 @@ import { Field, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
+import { KindBadge } from '@/components/learn/kind-badge';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approvePrior, proposePrior, type PriorState } from './actions';
 
@@ -64,6 +65,7 @@ function ClaimRow({ node }: { node: ChainNode }) {
             New, and will be marked known
           </span>
         )}
+        {!node.existingId && <KindBadge kind={node.kind} />}
       </p>
 
       {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}

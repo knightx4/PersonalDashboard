@@ -6,6 +6,7 @@ import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { KindBadge } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import {
   answerQuestion,
@@ -122,7 +123,10 @@ function Floor({ subjectId, conceptId }: { subjectId: string; conceptId: string 
             .filter((node) => !node.existingId)
             .map((node) => (
               <li key={node.name}>
-                <span className="block text-ui font-medium text-ink">{node.name}</span>
+                <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="text-ui font-medium text-ink">{node.name}</span>
+                  <KindBadge kind={node.kind} />
+                </span>
                 <span className="block text-ui text-ink">{node.claim}</span>
                 <span className="block text-small text-ink-muted">{node.basis}</span>
                 <MasteryChecks checks={node.mastery} className="mt-1" />
