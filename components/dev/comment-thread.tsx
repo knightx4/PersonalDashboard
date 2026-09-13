@@ -83,6 +83,7 @@ export function CommentThread({
   label,
   submit,
   placeholder = 'A note on this row. Tag @dash to ask something, or to tell it to do something; without it nothing reads it.',
+  awaitingReply = false,
 }: {
   target: CommentTarget;
   /** The row being commented on, not the comment. */
@@ -93,6 +94,14 @@ export function CommentThread({
   /** Where the box writes, when it is not a plain comment. */
   submit?: CommentSubmit;
   placeholder?: string;
+  /**
+   * Draw the waiting line with nothing in flight, for the surface gallery.
+   *
+   * The line is up for the few seconds a tagged comment takes to come back,
+   * which is not long enough to photograph and not a state a fixture can
+   * otherwise reach. Left off everywhere in the app.
+   */
+  awaitingReply?: boolean;
 }) {
   const [state, action, pending] = useActionState(
     submit?.action ?? addComment,
@@ -126,7 +135,7 @@ export function CommentThread({
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
-  const asking = !submit && pending && mentionsDash(sent);
+  const asking = awaitingReply || (!submit && pending && mentionsDash(sent));
 
   return (
     <div className="space-y-2">
