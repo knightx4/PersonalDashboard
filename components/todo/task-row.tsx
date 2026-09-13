@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   GripVertical,
+  Pencil,
   Pin,
   Plus,
   RotateCcw,
@@ -30,9 +31,13 @@ import {
   pinTask,
   placeTask,
   removeTask,
+  renameTaskAction,
   reopenTask,
+  rescheduleTaskAction,
 } from '@/app/todo/actions';
 import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { InlineInput } from '@/components/ui/field';
+import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
@@ -357,22 +362,41 @@ export function TaskRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className={cn(
-                'text-left text-ui font-medium text-ink transition-colors duration-150 hover:text-accent',
-                (done || dropped) && 'text-ink-muted line-through',
-              )}
-            >
-              {task.title}
-            </button>
+            <TaskTitle
+              task={task}
+              struck={done || dropped}
+              onSave={(title) =>
+                run({
+                  patch: { title },
+                  write: () => renameTaskAction(task.id, title),
+                })
+              }
+            />
 
             {task.pinned && !done && !dropped && (
               <Pin className="size-3 text-accent" strokeWidth={1.75} aria-label="Pinned" />
             )}
 
-            <DueLabel task={task} timezone={timezone} />
+            <DueLabel
+              task={task}
+              timezone={timezone}
+              onSave={(day, time) =>
+                run({
+                  // Drawn before the write lands, which needs the two columns
+                  // resolved here the way `resolveDue` resolves them on the
+                  // server: a day with a time is an instant and clears the
+                  // plain date, a day without one is a date and clears the
+                  // instant. Getting this wrong would show the old date for
+                  // the fifth of a second before the revalidation, which is
+                  // exactly the flicker drawing ahead exists to avoid.
+                  patch: {
+                    dueOn: day && !time ? day : null,
+                    dueAt: day && time ? `${day}T${time}:00` : null,
+                  },
+                  write: () => rescheduleTaskAction(task.id, day, time),
+                })
+              }
+            />
 
             {anchor && (
               <a
@@ -464,6 +488,13 @@ export function TaskRow({
                 pointed at, so a task with no list looks as it always did. */}
               <IconButton label="Add an item" onClick={() => setAdding(true)}>
                 <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
+              {/* The whole form, for the parts of a task the row does not
+                show: the notes, and a date given to a task that has none.
+                The title and an existing date are edited in the row itself,
+                which is what this used to be the only way to do. */}
+              <IconButton label="Edit everything" onClick={() => setEditing(true)}>
+                <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
               {/* Last in the group, because it is the one action here that opens
                 something rather than doing something. `anchor` is what the
@@ -745,8 +776,136 @@ function IconButton({
  * Showing "00:00" for a task due "Tuesday" would invent a precision that is not
  * in the data, which is the failure the two columns exist to prevent.
  */
-function DueLabel({ task, timezone }: { task: Task; timezone: string }) {
+/**
+ * The title, typed where it is read.
+ *
+ * It used to be a button that swapped the whole row for a form with four
+ * fields and a Save button, to change the one string you were already looking
+ * at. Law 12: a value and its editor are the same object in the same place at
+ * the same size. `InlineInput` is that component, and this is a task's title
+ * in it.
+ *
+ * Enter and blur both commit, because both mean "done with this"; Escape puts
+ * the old words back. A title emptied is refused rather than saved, since a
+ * task with no title cannot be found again -- the row simply goes back to what
+ * it was, which is what somebody who selected all and hit delete meant to
+ * undo anyway.
+ */
+function TaskTitle({
+  task,
+  struck,
+  onSave,
+}: {
+  task: Task;
+  struck: boolean;
+  onSave: (title: string) => void;
+}) {
+  const [draft, setDraft] = useState(task.title);
+
+  // The saved title wins when it changes underneath -- a rename in another
+  // tab, or the server render after this one's own write. Re-seeded during
+  // render, the way the rest of the app does it.
+  const [seed, setSeed] = useState(task.title);
+  if (seed !== task.title) {
+    setSeed(task.title);
+    setDraft(task.title);
+  }
+
+  function commit() {
+    const next = draft.trim();
+    if (!next || next === task.title) {
+      setDraft(task.title);
+      return;
+    }
+    onSave(next);
+  }
+
+  return (
+    <InlineInput
+      value={draft}
+      aria-label="Title"
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          setDraft(task.title);
+          // Blur after the reset, so the commit on the way out sees the old
+          // words and does nothing.
+          requestAnimationFrame(() => event.currentTarget?.blur());
+        }
+      }}
+      className={cn(
+        'w-full max-w-full text-ui font-medium text-ink',
+        struck && 'text-ink-muted line-through',
+      )}
+    />
+  );
+}
+
+/**
+ * When it is due, changed where it is read.
+ *
+ * The same law as the title one line up, and the same complaint in the same
+ * note: the date was a label, and moving a task by a day meant opening the
+ * form. It is a date input sitting in the row now, at the size of the text it
+ * replaces, and a task with a time carries a time field beside it.
+ *
+ * A task with no date at all still shows nothing (law 1) -- an empty date
+ * field on every undated row would be an editor drawn over nothing, which is
+ * law 14. The form is still where a date is first given.
+ */
+function DueLabel({
+  task,
+  timezone,
+  onSave,
+}: {
+  task: Task;
+  timezone: string;
+  onSave: (day: string, time: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
   if (!task.dueOn && !task.dueAt) return null;
+
+  // What the two fields start on. `dueAt` is an instant, so the day and the
+  // clock it reads as are the reader's, not UTC's -- the same zone the label
+  // beside it is formatted in.
+  const day = task.dueAt ? dayIn(task.dueAt, timezone) : (task.dueOn ?? '');
+  const time = task.dueAt ? clockIn(task.dueAt, timezone) : '';
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <input
+          type="date"
+          autoFocus
+          aria-label="Due date"
+          defaultValue={day}
+          onChange={(event) => {
+            setEditing(false);
+            onSave(event.target.value, event.target.value ? time : '');
+          }}
+          className="tabular rounded-control bg-sunken px-1 py-0.5 text-small text-ink"
+        />
+        {time && (
+          <input
+            type="time"
+            aria-label="Due time"
+            defaultValue={time}
+            onChange={(event) => {
+              setEditing(false);
+              onSave(day, event.target.value);
+            }}
+            className="tabular rounded-control bg-sunken px-1 py-0.5 text-small text-ink"
+          />
+        )}
+      </span>
+    );
+  }
 
   const text = task.dueAt
     ? new Intl.DateTimeFormat('en-GB', {
@@ -762,5 +921,14 @@ function DueLabel({ task, timezone }: { task: Task; timezone: string }) {
         month: 'short',
       }).format(new Date(`${task.dueOn}T00:00:00Z`));
 
-  return <span className="tabular text-small text-ink-muted">{text}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      title="Change when it is due"
+      className="tabular press rounded-control px-1 py-0.5 text-small text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+    >
+      {text}
+    </button>
+  );
 }

@@ -80,3 +80,43 @@ export function nextHourSlot(now: Date, timezone: string): { start: string; end:
 
   return { start: clock(start), end: start === 23 ? '23:59' : clock(start + 1) };
 }
+
+/**
+ * The day and the clock an instant reads as, in a zone.
+ *
+ * For putting a stored `due_at` back into a date field and a time field. The
+ * label beside those fields is formatted in the account's zone, so the fields
+ * have to be too: read in Tokyo, a task due at 23:00 UTC is tomorrow, and a
+ * date input seeded from UTC would open on the wrong day and quietly move it
+ * a day back the moment anything else was changed.
+ *
+ * `formatToParts` rather than arithmetic on the Date, because the browser's
+ * own zone is not the one being asked about.
+ */
+function partsIn(iso: string, timezone: string): Record<string, string> {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso));
+
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+/** `YYYY-MM-DD`, as a date input wants it. */
+export function dayIn(iso: string, timezone: string): string {
+  const part = partsIn(iso, timezone);
+  return `${part.year}-${part.month}-${part.day}`;
+}
+
+/** `HH:MM`, as a time input wants it. */
+export function clockIn(iso: string, timezone: string): string {
+  const part = partsIn(iso, timezone);
+  // Midnight comes back as "24" from some ICU versions in en-GB with
+  // hour12: false, which no time input will accept.
+  return `${part.hour === '24' ? '00' : part.hour}:${part.minute}`;
+}

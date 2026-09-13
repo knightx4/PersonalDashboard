@@ -26,6 +26,7 @@ import {
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
+import { hasLiveClaim } from '@/lib/plan/elapsed';
 import { handStepToClaude } from '@/lib/plan/handover';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
@@ -934,7 +935,7 @@ export async function sendPlanFeatureToClaude(
   // The same one-at-a-time rule as the single send. A batch started on top of
   // a running session is the worse version of the same collision, since it
   // hands the whole feature to a second run.
-  const running = flatten([node]).find((step) => step.status === 'in_progress');
+  const running = flatten([node]).find((step) => hasLiveClaim(step, Date.now()));
   if (running) {
     return {
       error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
@@ -965,24 +966,22 @@ export async function sendPlanFeatureToClaude(
     revalidatePlan();
   }
 
-  // And every one of them underway, not only the feature at the top. The whole
-  // batch has been handed over in one press, so the plan should show the whole
-  // batch as work in hand rather than one step in progress over six that still
-  // read as untouched. A decision is left alone: it is a question put to the
-  // person, and nothing is in progress on it until they answer.
-  const toStart = open
-    .filter((step) => step.status === 'not_started' && step.kind !== 'decision')
-    .map((step) => step.id);
-  if (toStart.length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update({ status: 'in_progress' })
-      .in('id', toStart)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-    revalidatePlan();
-  }
-
+  // Handed over, and that is all. Nothing here is marked underway.
+  //
+  // This used to set every open step in the feature to `in_progress` on the
+  // press, so that the plan showed the batch as work in hand. What it actually
+  // showed was six lies and one truth: the session works the steps one at a
+  // time, and everything it had not reached yet -- everything it never reached,
+  // when a batch ran short or the run died -- sat there reading "in progress"
+  // with nothing on it. That is the bug behind note 60a0ad01, and there is no
+  // clock that fixes it, because the rows were never true in the first place.
+  //
+  // `in_progress` now means one thing: a session has claimed this step and is
+  // on it. The session sets it when it claims, one at a time, and clears it
+  // when it closes the step -- which is what the plan skill already tells it to
+  // do. "Handed to Claude" is a separate fact and has its own state:
+  // `assignee`, set above, which is exactly what this press changes and what
+  // the queue is built from.
   const steps = open.length - 1;
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
@@ -1149,10 +1148,11 @@ export async function reshapePlanFeature(
  * into the queue by pressing this, and pressing it twice sends the same queue
  * again.
  *
- * What it does change is the one thing that has become true: every step in the
- * batch is now work in hand, so the ones that had not been started are marked
- * in progress. `handedToClaude` has already left out the decisions and the
- * proposals, so what is left is exactly what a session will build.
+ * Nothing is marked in progress either. That is the session's to set, one step
+ * at a time as it claims them, and a press that marked the whole queue underway
+ * described eleven steps nothing was on. `handedToClaude` has already left out
+ * the decisions and the proposals, so what is left is exactly what a session
+ * will build.
  *
  * `handedToClaude` decides what is in it: open, approved, not a decision, most
  * urgent first. One routine works the lot in that order, because two sessions
@@ -1173,17 +1173,11 @@ export async function sendPlanQueueToClaude(
     return { error: 'Nothing is handed to Claude right now. Hand a step over and it lands here.' };
   }
 
-  const toStart = queue.filter((step) => step.status === 'not_started').map((step) => step.id);
-  if (toStart.length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update({ status: 'in_progress' })
-      .in('id', toStart)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-    revalidatePlan();
-  }
-
+  // Nothing is marked underway here either, for the reason the feature send
+  // gives: one session works the queue one step at a time, so marking all
+  // twelve on the press describes eleven steps nothing is on. The queue is
+  // built from `assignee`, which these steps already carry -- that is how they
+  // got into it -- so the press changes no state at all. It sends.
   const text =
     `Work the ${queue.length} plan ${queue.length === 1 ? 'step' : 'steps'} handed to Claude, ` +
     'following .claude/skills/plan/SKILL.md. Work them ONE AT A TIME in the order below, each ' +

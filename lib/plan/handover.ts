@@ -15,6 +15,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { hasLiveClaim } from './elapsed';
 import { planBrief } from './brief';
 import { loadPlan } from './load';
 import { buildPlanTree, findNode, flatten, isWaitingOnThePerson, topFeatureOf } from './tree';
@@ -77,8 +78,16 @@ export async function handStepToClaude(input: {
   // Two sessions were sent at #342 within moments of each other on 13
   // September, and both would have been editing the same files. Nothing but
   // timing kept them apart, because nothing here knew the other was running.
+  //
+  // Only a live claim refuses. A claim nothing has touched for two hours is a
+  // session that stopped without closing its step, and a guard that took the
+  // status at its word left the feature refusing work forever -- a lock
+  // outliving the run it was protecting is worse than the collision it was
+  // added for. The page has read the clock beside the status since it started
+  // calling these stalled; this reads the same clock.
   const feature = topFeatureOf(sections, node);
-  const underway = flatten([feature]).filter((step) => step.status === 'in_progress');
+  const now = Date.now();
+  const underway = flatten([feature]).filter((step) => hasLiveClaim(step, now));
   const other = underway.find((step) => step.id !== node.id);
   if (underway.some((step) => step.id === node.id)) {
     return {

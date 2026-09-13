@@ -17,6 +17,16 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import {
+  groupIdeas,
+  sortIdeas,
+  IDEA_GROUPINGS,
+  IDEA_GROUPING_LABEL,
+  IDEA_SORTS,
+  IDEA_SORT_LABEL,
+  type IdeaGrouping,
+  type IdeaSort,
+} from '@/lib/ideas/view';
 import { cardVariants } from '@/components/ui/card';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -268,18 +278,118 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
  * down" is a question this page has to answer. A dismissed idea is in the
  * fold under that one, for the same reason.
  */
-export function IdeasView({ ideas }: { ideas: IdeaList }) {
+/**
+ * How the list is arranged: grouped how, ordered which way.
+ *
+ * Links rather than buttons, which is the whole reason this is not the shared
+ * `Segmented`: that one is an onChange over a group of buttons, and an
+ * arrangement that only exists once JavaScript has run is one the back button
+ * cannot return to and nobody can paste into a note. These are hrefs onto the
+ * page's own search parameters -- law 5 for where the state lives and law 6 for
+ * it working before the bundle does.
+ *
+ * Drawn as two segmented rows and not labelled "Group" and "Sort". The labels
+ * on the segments are "By workspace" and "Newest first"; a caption saying
+ * "Group" over the first of those is the heading explained underneath itself
+ * (law 15).
+ */
+function ArrangeRow<T extends string>({
+  value,
+  options,
+  label,
+  href,
+}: {
+  value: T;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  label: string;
+  href: (next: T) => string;
+}) {
+  return (
+    <span
+      role="group"
+      aria-label={label}
+      className="inline-flex overflow-hidden rounded-control border border-control"
+    >
+      {options.map((option) => {
+        const on = option.value === value;
+        return (
+          <Link
+            key={option.value}
+            href={href(option.value)}
+            scroll={false}
+            aria-current={on ? 'true' : undefined}
+            className={cn(
+              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
+              'transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2',
+              on
+                ? 'bg-accent-tint text-accent'
+                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
+            )}
+          >
+            {option.label}
+          </Link>
+        );
+      })}
+    </span>
+  );
+}
+
+function Arrange({ grouping, sort }: { grouping: IdeaGrouping; sort: IdeaSort }) {
+  // The parameter being changed, with the other one carried through, so
+  // picking a sort does not quietly throw away the grouping.
+  const href = (next: { group?: IdeaGrouping; sort?: IdeaSort }) => {
+    const params = new URLSearchParams();
+    const group = next.group ?? grouping;
+    const order = next.sort ?? sort;
+    // The defaults are left out, so the plain URL is the plain page.
+    if (group !== 'workspace') params.set('group', group);
+    if (order !== 'newest') params.set('sort', order);
+    const query = params.toString();
+    return query ? `/dev/ideas?${query}` : '/dev/ideas';
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <ArrangeRow
+        label="How the ideas are grouped"
+        value={grouping}
+        options={IDEA_GROUPINGS.map((value) => ({ value, label: IDEA_GROUPING_LABEL[value] }))}
+        href={(group) => href({ group })}
+      />
+      <ArrangeRow
+        label="The order the ideas are in"
+        value={sort}
+        options={IDEA_SORTS.map((value) => ({ value, label: IDEA_SORT_LABEL[value] }))}
+        href={(order) => href({ sort: order })}
+      />
+    </div>
+  );
+}
+
+export function IdeasView({
+  ideas,
+  grouping,
+  sort,
+}: {
+  ideas: IdeaList;
+  grouping: IdeaGrouping;
+  sort: IdeaSort;
+}) {
   const { mine, suggested, shaped, dismissed } = ideas;
   const total = mine.length + suggested.length + shaped.length + dismissed.length;
 
-  const scopes: Array<ModuleId | null> = [
-    null,
-    ...MODULES.map((module) => module.id).filter((id) => mine.some((idea) => idea.module === id)),
-  ];
+  // Sorted once and grouped after, so the order asked for holds inside every
+  // section rather than only between them.
+  const groups = groupIdeas(sortIdeas(mine, sort), grouping);
 
   return (
     <div className="space-y-6">
       <AddIdea />
+
+      {/* Only where there is a list to arrange. Two controls over one idea is
+          more chrome than content (law 9), and over none of them they would be
+          controls that do nothing. */}
+      {mine.length > 1 && <Arrange grouping={grouping} sort={sort} />}
 
       {total === 0 && (
         // The shared empty state rather than a hand-drawn dashed paragraph:
@@ -303,45 +413,72 @@ export function IdeasView({ ideas }: { ideas: IdeaList }) {
         </p>
       )}
 
-      {scopes.map((scope) => {
-        const rows = mine.filter((idea) => idea.module === scope);
-        if (rows.length === 0) return null;
-        return (
-          <section key={scope ?? 'everything'} className="space-y-2">
-            <h2 className="text-body font-semibold text-ink">
-              {scopeLabel(scope)}{' '}
-              <span className="font-normal text-ink-muted">({rows.length})</span>
-            </h2>
-            <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-              {rows.map((idea) => (
+      {groups.map((group) =>
+        // Ungrouped is one list with no heading, so there is nothing to fold
+        // it by and nothing a fold would save.
+        group.label === '' ? (
+          <ul key={group.key} className={cn(cardVariants(), 'divide-y divide-border')}>
+            {group.rows.map((idea) => (
+              <IdeaCard key={idea.id} idea={idea} />
+            ))}
+          </ul>
+        ) : (
+          // Foldable, and open to start with (law 10). A workspace you are
+          // done thinking about should be one line, and the count on that line
+          // is what makes folding it a choice rather than losing track of it.
+          // `<details>` so it folds before JavaScript loads and a keyboard and
+          // a screen reader get it for nothing.
+          <details key={group.key} open className="group/section space-y-2">
+            <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
+              <ChevronRight
+                className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/section:rotate-90"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              {group.label} <span className="font-normal text-ink-muted">({group.rows.length})</span>
+            </summary>
+            <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+              {group.rows.map((idea) => (
                 <IdeaCard key={idea.id} idea={idea} />
               ))}
             </ul>
-          </section>
-        );
-      })}
+          </details>
+        ),
+      )}
 
       {/* Under your own list rather than mixed into it. A session working a
           feature can write several follow-ons in a night, and above the module
           headings they would be the first thing on the page. Not grouped by
           workspace: this list is the short one. */}
       {suggested.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="flex items-center gap-1.5 text-body font-semibold text-ink">
+        // Foldable like the rest of the page now, and open to start with: a
+        // night of follow-ons is the section most worth being able to put away
+        // in one click, and the count on the folded line says how many are
+        // waiting (law 10).
+        <details open className="group/suggested space-y-2">
+          <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested:rotate-90"
+              strokeWidth={1.75}
+              aria-hidden
+            />
             <Bot className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
             Suggested by Claude{' '}
             <span className="font-normal text-ink-muted">({suggested.length})</span>
-          </h2>
-          <p className="text-small text-ink-muted">
-            Follow-ons a session wrote down while building something else. Shape one into the
-            plan, or dismiss it and it stops being offered.
+          </summary>
+          {/* What to do with one, which the heading does not say. The sentence
+              that used to open this -- "follow-ons a session wrote down while
+              building something else" -- was the heading again in longer words
+              (law 15). */}
+          <p className="mt-2 text-small text-ink-muted">
+            Shape one into the plan, or dismiss it and it stops being offered.
           </p>
-          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-            {suggested.map((idea) => (
+          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {sortIdeas(suggested, sort).map((idea) => (
               <IdeaCard key={idea.id} idea={idea} />
             ))}
           </ul>
-        </section>
+        </details>
       )}
 
       {shaped.length > 0 && (
@@ -356,7 +493,7 @@ export function IdeasView({ ideas }: { ideas: IdeaList }) {
             <span className="font-normal text-ink-muted">({shaped.length})</span>
           </summary>
           <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
-            {shaped.map((idea) => (
+            {sortIdeas(shaped, sort).map((idea) => (
               <IdeaCard key={idea.id} idea={idea} />
             ))}
           </ul>
@@ -377,7 +514,7 @@ export function IdeasView({ ideas }: { ideas: IdeaList }) {
             Dismissed <span className="font-normal text-ink-muted">({dismissed.length})</span>
           </summary>
           <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
-            {dismissed.map((idea) => (
+            {sortIdeas(dismissed, sort).map((idea) => (
               <IdeaCard key={idea.id} idea={idea} dismissed />
             ))}
           </ul>

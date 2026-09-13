@@ -15,6 +15,8 @@ import {
   handedToClaude,
   summarize,
   workOrder,
+  searchSections,
+  countMatches,
 } from '@/lib/plan/tree';
 import { MODULES } from '@/lib/modules';
 
@@ -965,5 +967,82 @@ describe('planBands', () => {
 
     expect(section.bands).toEqual([]);
     expect(section.progress.fraction).toBeNull();
+  });
+});
+
+describe('searchSections', () => {
+  const plan = () =>
+    tree([
+      at('not_started', 'feature', { title: 'The shelf photo picker', number: 342 }),
+      at('not_started', 'pick', {
+        parentId: 'feature',
+        title: 'Pick a photo',
+        detail: 'Reads the camera roll',
+        number: 343,
+      }),
+      at('not_started', 'crop', { parentId: 'feature', title: 'Crop it', number: 344 }),
+      at('not_started', 'other', { title: 'Send the weekly digest', number: 400 }),
+    ]);
+
+  const titles = (sections: ReturnType<typeof plan>) =>
+    flattenSections(sections).map((node) => node.title);
+
+  it('gives every section back untouched for a blank query', () => {
+    expect(titles(searchSections(plan(), '   '))).toEqual(titles(plan()));
+  });
+
+  it('finds a step by a word in its title', () => {
+    expect(titles(searchSections(plan(), 'digest'))).toEqual(['Send the weekly digest']);
+  });
+
+  it('finds a step by a word in its detail', () => {
+    const found = searchSections(plan(), 'camera roll');
+    expect(flattenSections(found).filter((node) => node.matches).map((n) => n.title)).toEqual([
+      'Pick a photo',
+    ]);
+  });
+
+  it('finds a step by its number, with or without the hash', () => {
+    expect(countMatches(searchSections(plan(), '400'))).toBe(1);
+    expect(countMatches(searchSections(plan(), '#400'))).toBe(1);
+  });
+
+  it('requires every term, across any of the fields', () => {
+    expect(countMatches(searchSections(plan(), '343 photo'))).toBe(1);
+    expect(countMatches(searchSections(plan(), '343 digest'))).toBe(0);
+  });
+
+  // The parent is kept so a hit is read in its place rather than as a bare
+  // sub-step, and it is not itself a hit.
+  it('keeps the feature over a matching step, as context', () => {
+    const found = searchSections(plan(), 'crop');
+    const nodes = flattenSections(found);
+
+    expect(nodes.map((node) => node.title)).toEqual(['The shelf photo picker', 'Crop it']);
+    expect(nodes.map((node) => node.matches)).toEqual([false, true]);
+    expect(countMatches(found)).toBe(1);
+  });
+
+  // And the other way round: a feature that matches brings its steps, so
+  // finding it does not mean losing what is under it.
+  it('keeps the steps beneath a matching feature, as context', () => {
+    const found = searchSections(plan(), 'shelf');
+    const nodes = flattenSections(found);
+
+    expect(nodes.map((node) => node.title)).toEqual([
+      'The shelf photo picker',
+      'Pick a photo',
+      'Crop it',
+    ]);
+    // One hit, not three: the steps came along, they were not found.
+    expect(countMatches(found)).toBe(1);
+  });
+
+  it('drops a module with nothing in it', () => {
+    expect(searchSections(plan(), 'nothing matches this')).toEqual([]);
+  });
+
+  it('ignores case', () => {
+    expect(countMatches(searchSections(plan(), 'SHELF'))).toBe(1);
   });
 });

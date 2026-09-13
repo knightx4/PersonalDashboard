@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import {
   Bot,
@@ -73,8 +73,11 @@ import {
   PLAN_HEALTHS,
   PLAN_VIEWS,
   PLAN_VIEW_LABEL,
+  countMatches,
   flatten,
   healthOf as planHealthOf,
+  searchSections,
+  searchTerms,
   type PlanBand,
   type PlanHealth,
   type PlanNode,
@@ -1653,9 +1656,9 @@ const HEALTH: Record<PlanHealth, Health> = {
   dropped: { word: 'Dropped', tone: 'ghost' },
 };
 
-function healthOf(node: PlanNode): Health & { glyph: GlyphName } {
+function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {
   const health = planHealthOf(node);
-  const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health] };
+  const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health], name: health };
 
   // A row closed over open work reports what is open beneath it, so the word
   // is about a step further down and the fixed tooltip would be describing the
@@ -1885,6 +1888,7 @@ function PlanRow({
   catalog,
   canSend,
   view,
+  searching,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -1893,6 +1897,8 @@ function PlanRow({
   canSend: boolean;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
+  /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
+  searching: boolean;
 }) {
   // A question lives in its step's panel rather than as a row of its own, so
   // the Dismissed view would otherwise be a list of steps to open one at a
@@ -1904,7 +1910,11 @@ function PlanRow({
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [answering, setAnswering] = useState(false);
-  const [showChildren, setShowChildren] = useState(() => !isClosed(node.status));
+  // A closed feature keeps its steps folded, because finished work is
+  // consulted rather than read -- except under a search, where the row is only
+  // on the page because something inside it was found, and folding that away
+  // would be answering the search with a closed drawer.
+  const [showChildren, setShowChildren] = useState(() => searching || !isClosed(node.status));
 
   const [assignState, assignAction, assignPending] = useActionState(
     setPlanItemAssignee,
@@ -2259,7 +2269,16 @@ function PlanRow({
           )}
           trigger={
             <span className="inline-flex items-center gap-1.5" title={health.title}>
-              <StatusGlyph glyph={health.glyph} />
+              {/* No glyph on a dropped row. The slash was a third way of
+                  saying what the ghost tone and the struck-through title
+                  already say, on the one state nobody is scanning for -- so it
+                  read as clutter beside the rows that are still live, which is
+                  where the eye is actually going (law 15). Every other state
+                  keeps its shape: those are the ones being scanned, and the
+                  glyph is how they are told apart at a glance. The count
+                  beside the module heading keeps its slash too, because there
+                  a bare number would say nothing at all. */}
+              {health.name !== 'dropped' && <StatusGlyph glyph={health.glyph} />}
               <span className="truncate">{health.word}</span>
             </span>
           }
@@ -2532,6 +2551,7 @@ function PlanRow({
             catalog={catalog}
             canSend={canSend}
             view={view}
+            searching={searching}
           />
         ))}
 
@@ -2582,6 +2602,66 @@ function ImportTheBuildOrder() {
   );
 }
 
+/**
+ * Finding a step again.
+ *
+ * The plan outgrew being read: three hundred steps across nine modules, and
+ * the only ways to reach one were to know its module and scroll, or to know
+ * which view it happened to fall into. The number, the title and the detail
+ * are the three things somebody remembers about a step they are looking for,
+ * so all three are searched.
+ *
+ * It says how many it found rather than leaving you to count the rows, because
+ * the count is the answer to "is it in here at all" and the rows are the answer
+ * to "which one". Escape clears it, which is what Escape does in a field you
+ * are filtering with -- there is a button for the pointer beside it.
+ */
+function SearchThePlan({
+  query,
+  onQuery,
+  hits,
+  searching,
+}: {
+  query: string;
+  onQuery: (next: string) => void;
+  hits: number;
+  searching: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="relative min-w-0 flex-1 sm:max-w-xs">
+        <Input
+          type="search"
+          value={query}
+          onChange={(event) => onQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') onQuery('');
+          }}
+          placeholder="Search the plan — a number, a title, a phrase"
+          aria-label="Search the plan"
+          className="w-full"
+        />
+      </div>
+
+      {searching && (
+        <p className="tabular text-small text-ink-muted" role="status">
+          {hits === 0
+            ? 'Nothing matches'
+            : `${hits} ${hits === 1 ? 'step' : 'steps'} found`}
+          {' · '}
+          <button
+            type="button"
+            onClick={() => onQuery('')}
+            className="underline underline-offset-2 hover:text-ink"
+          >
+            clear
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PlanView({
   sections,
   summary,
@@ -2599,15 +2679,31 @@ export function PlanView({
   canSend: boolean;
   queued: number;
 }) {
+  const [query, setQuery] = useState('');
+  const searching = searchTerms(query).length > 0;
+
+  // The whole tree is already on the page, so the search runs here rather than
+  // as a round trip: a plan is tens of steps, and a filter you feel keeping up
+  // with you is a different tool from one you submit. The view stays a search
+  // parameter, because "the ready steps" is a thing worth keeping a link to and
+  // "the word I typed for ten seconds" is not.
+  const shown = useMemo(
+    () => (searching ? searchSections(sections, query) : sections),
+    [sections, query, searching],
+  );
+  const hits = useMemo(() => (searching ? countMatches(shown) : 0), [shown, searching]);
+
   if (empty) return <ImportTheBuildOrder />;
 
-  const nothingToShow = sections.every((section) => section.nodes.length === 0);
+  const nothingToShow = shown.every((section) => section.nodes.length === 0);
 
   return (
     <div className="space-y-6">
       <SummaryStrip summary={summary} view={view} queued={queued} />
 
-      {nothingToShow && EMPTY_VIEW[view] && (
+      <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
+
+      {!searching && nothingToShow && EMPTY_VIEW[view] && (
         <EmptyState
           tone="finished"
           title={EMPTY_VIEW[view].title}
@@ -2622,14 +2718,17 @@ export function PlanView({
           the right distance is smaller than that, and now that each one is a
           card it is the gap between cards rather than between headings. */}
       <div className="space-y-3">
-        {sections.map((section) => {
+        {shown.map((section) => {
           // What is finished is consulted, not read -- the same call the rows
           // make about a closed step's children. The progress stays on the
           // summary line either way, so a folded module still says how far it
           // got: law 10, a fold that hides its own count has moved the work.
           const finished = section.progress.live > 0 && section.progress.fraction === 1;
 
-          const canAdd = view === 'open' || view === 'all';
+          // Not while searching: a row offering to write a new step under
+          // every module is the page's furniture, and a page narrowed to four
+          // results should be four results.
+          const canAdd = !searching && (view === 'open' || view === 'all');
 
           return (
             // One card per module, header included, rather than a bar that
@@ -2640,8 +2739,15 @@ export function PlanView({
             // in both states now, and the only thing the fold animates is the
             // chevron -- which is the whole of what changed.
             <details
-              key={section.module ?? 'app'}
-              open={!finished}
+              // Keyed on whether a search is running, so starting or clearing
+              // one remounts the fold. A module you had collapsed by hand would
+              // otherwise stay collapsed over its own results, and the `open`
+              // prop below cannot push it back: React writes that attribute on
+              // a change of value, not on every render.
+              key={`${section.module ?? 'app'}${searching ? ':found' : ''}`}
+              // A search opens every module it kept, because it only kept the
+              // ones with something in them.
+              open={searching || !finished}
               className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
             >
               <summary
@@ -2685,6 +2791,7 @@ export function PlanView({
                       catalog={catalog}
                       canSend={canSend}
                       view={view}
+                      searching={searching}
                     />
                   ))}
                 </ul>
@@ -2720,7 +2827,8 @@ export function PlanView({
 
       {/* The app-wide list is not offered as a section until something is in
           it, so this is the only way to put the first thing there. */}
-      {(view === 'open' || view === 'all') &&
+      {!searching &&
+        (view === 'open' || view === 'all') &&
         !sections.some((section) => section.module === null) && (
           <section className="space-y-2">
             <h2 className="text-body font-semibold text-ink">The app as a whole</h2>

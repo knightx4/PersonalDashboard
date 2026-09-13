@@ -42,6 +42,7 @@ export function EditableProse({
   editLabel,
   placeholder,
   expandable = false,
+  startEditing = false,
   className,
 }: {
   value: string;
@@ -54,13 +55,23 @@ export function EditableProse({
   editLabel?: string;
   placeholder?: string;
   /**
+   * Open in the editor rather than at rest.
+   *
+   * For the one case where the read state would be a step backwards: the
+   * caller is here *because* somebody just pressed a button meaning "write
+   * one". Showing them an empty invitation to click again is the click they
+   * already made. Only the initial state -- cancelling still returns to the
+   * reading view, because from then on there is something to read.
+   */
+  startEditing?: boolean;
+  /**
    * Offer a full-screen view. For the pieces long enough that a column inside
    * a card is the wrong shape to read or write them in.
    */
   expandable?: boolean;
   className?: string;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<string | null>(null);
