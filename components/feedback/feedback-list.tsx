@@ -10,6 +10,7 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
@@ -229,6 +230,17 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           </div>
         </form>
       )}
+
+      {/* Under the note and its resolution note, above the row of buttons: what
+          was written after filing belongs with the report, not among the
+          controls for triaging it. A closed note keeps its thread, which is the
+          record of what was said while it was being fixed. */}
+      <CommentThread
+        target="note"
+        id={row.id}
+        thread={row.thread}
+        placeholder="Anything you have to add to this note since filing it. The run that picks it up reads it; tag @dash to ask about it."
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <form action={statusAction} className="flex items-center gap-2">
