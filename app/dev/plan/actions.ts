@@ -944,7 +944,7 @@ export async function sendPlanItemToClaude(
     'The brief is below; it is the plan as the app holds it right now, and the plan is the ' +
     'source of truth -- claim the step, build it, verify, commit with the step number in the ' +
     'subject, and close it with a note.\n\n' +
-    planBrief(sections, node);
+    planBrief(sections, node, { thread: true });
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({
@@ -1068,7 +1068,7 @@ export async function sendPlanFeatureToClaude(
     'Push once at the end of the batch and report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
-    planBrief(sections, node);
+    planBrief(sections, node, { thread: true });
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({
@@ -1168,7 +1168,7 @@ async function startReshape(
     `fog you cleared.\n\n${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
-    planBrief(sections, node) +
+    planBrief(sections, node, { thread: true }) +
     (dismissed ? `\n${dismissed}` : '');
 
   const routine = planRoutine();
@@ -1280,7 +1280,7 @@ export async function sendPlanQueueToClaude(
     'running short. Push once at the end and report every step you closed, by number and ' +
     'title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
     'plan is the source of truth.\n\n' +
-    planQueueBrief(sections, queue);
+    planQueueBrief(sections, queue, { thread: true });
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({
