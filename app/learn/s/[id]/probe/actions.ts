@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph } from '@/lib/learn/graph/load';
-import { writeProbe } from '@/lib/learn/graph/probe';
+import { PROBE_MODEL, writeProbe } from '@/lib/learn/graph/probe';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   answeredWeight,
@@ -54,8 +54,6 @@ export type AskState = {
     couldGoDeeper?: boolean;
   };
 };
-
-const MODEL_FOR_PROBES = 'claude-haiku-4-5';
 
 // latency: pending
 export async function askQuestion(_prev: AskState, formData: FormData): Promise<AskState> {
@@ -128,7 +126,7 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
   const probeId = await recordProbe(supabase, user.id, {
     conceptId: concept.id,
     probe: result.probe,
-    model: MODEL_FOR_PROBES,
+    model: PROBE_MODEL,
   });
 
   const weight = await answeredWeight(
