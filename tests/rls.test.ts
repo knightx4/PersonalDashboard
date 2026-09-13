@@ -171,6 +171,25 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_seed_imports = seedImport.id;
 
+  const [digest] = await admin<{ id: string }[]>`
+    insert into dev_digests (user_id, day, since, happened, attention)
+    values (
+      ${userId}, current_date, now() - interval '1 day',
+      ${admin.json([
+        {
+          kind: 'step',
+          title: `${tag} shipped a step`,
+          ref: '#1',
+          commit: null,
+          note: null,
+          at: '2026-03-02T09:00:00Z',
+        },
+      ])}::jsonb,
+      '[]'::jsonb
+    )
+    returning id`;
+  ids.dev_digests = digest.id;
+
   const [bookQuote] = await admin<{ id: string }[]>`
     insert into book_price_quotes (isbn_13, source, quoted_cents, vendor_name)
     values (

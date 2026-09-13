@@ -425,3 +425,40 @@ describe('which check a question was written against', () => {
     await expect(seedProbe('')).rejects.toThrow();
   });
 });
+
+describe('which concepts are doors into the subject', () => {
+  // Two values and no third, and the absence of one is what an unjudged
+  // concept looks like. A default here would say something nobody checked.
+  it('leaves a concept written without a mark unsaid', async () => {
+    const [row] = await admin<{ kind: string | null }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subjectA}, 'Unmarked', 'A claim nobody has judged.',
+              'Seeded by the test.')
+      returning kind`;
+    expect(row.kind).toBeNull();
+  });
+
+  it('stores a door and a consequence', async () => {
+    const [door] = await admin<{ kind: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, kind)
+      values (${userA}, ${subjectA}, 'Opportunity cost', 'Every choice costs the next best one.',
+              'Seeded by the test.', 'threshold')
+      returning kind`;
+    expect(door.kind).toBe('threshold');
+
+    const [downstream] = await admin<{ kind: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, kind)
+      values (${userA}, ${subjectA}, 'Sunk cost', 'Spent money is not a reason to continue.',
+              'Seeded by the test.', 'consequence')
+      returning kind`;
+    expect(downstream.kind).toBe('consequence');
+  });
+
+  it('refuses anything but those two', async () => {
+    await expect(
+      admin`insert into concepts (user_id, subject_id, name, claim, basis, kind)
+            values (${userA}, ${subjectA}, 'Maybe', 'A claim with a hedged mark.',
+                    'Seeded by the test.', 'unsure')`,
+    ).rejects.toThrow();
+  });
+});

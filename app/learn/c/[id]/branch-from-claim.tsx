@@ -6,6 +6,7 @@ import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { KindBadge } from '@/components/learn/kind-badge';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveBranch, proposeBranch, type BranchState } from './actions';
@@ -61,6 +62,7 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
             What you selected
           </span>
         )}
+        {!node.existingId && <KindBadge kind={node.kind} />}
       </p>
 
       {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}

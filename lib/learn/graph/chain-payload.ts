@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { CONCEPT_KINDS, type ConceptKind } from '@/lib/learn/graph/model';
+
 /**
  * The rules a proposed chain has to survive before anybody is shown it.
  *
@@ -59,6 +61,23 @@ export const masterySchema = z
   .default([])
   .transform(placeMastery);
 
+/**
+ * The door-or-consequence mark, taken only when it is one of the two.
+ *
+ * Anything else -- a third word the model invented, a node from a proposal
+ * written before the mark existed, a field left out -- reads as null, which is
+ * what an unjudged concept looks like everywhere else. Never a failure: the
+ * claim is the thing being proposed and the mark is one word said about it, so
+ * a bad mark costs the mark and not the node.
+ */
+export function placeKind(value: unknown): ConceptKind | null {
+  return typeof value === 'string' && (CONCEPT_KINDS as readonly string[]).includes(value)
+    ? (value as ConceptKind)
+    : null;
+}
+
+export const kindSchema = z.unknown().optional().transform(placeKind);
+
 export const proposedConceptSchema = z.object({
   /** Short, for the graph view. */
   name: z.string().trim().min(1).max(200),
@@ -72,6 +91,8 @@ export const proposedConceptSchema = z.object({
    * it is. A probe question is written against one of these.
    */
   mastery: masterySchema,
+  /** Whether this is a door into the subject, or something downstream of one. */
+  kind: kindSchema,
 });
 
 export const proposedEdgeSchema = z.object({
@@ -116,6 +137,8 @@ export type ChainNode = {
   basis: string;
   /** Two to four checks, or none. Never one -- see `placeMastery`. */
   mastery: string[];
+  /** A door into the subject, a consequence of one, or nothing said. */
+  kind: ConceptKind | null;
   /** The id it matched in the subject already, or null when it is new. */
   existingId: string | null;
 };
@@ -282,6 +305,7 @@ export function normaliseChain(
       claim: proposed.claim.trim(),
       basis: proposed.basis.trim(),
       mastery: proposed.mastery,
+      kind: proposed.kind,
       existingId,
     });
     if (nodes.length >= MAX_CHAIN) break;
@@ -298,6 +322,9 @@ export function normaliseChain(
         claim: '',
         basis: '',
         mastery: [],
+        // The node is already in the graph with whatever mark it has; this one
+        // is a stand-in carried so the chain reads, and it writes nothing.
+        kind: null,
         existingId,
       });
       seen.add(goalKey);
@@ -394,6 +421,9 @@ export function approvedChainSchemaWith(limits: {
           // Cut down again rather than trusted: the list went out to a browser
           // and came back, and the database takes two to four or nothing.
           mastery: masterySchema,
+          // Checked against the two values again for the same reason: it went
+          // out to a browser and came back.
+          kind: kindSchema,
           existingId: z.string().uuid().nullable(),
         }),
       )

@@ -8,6 +8,7 @@ import { Field, Input } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
+import { KindBadge } from '@/components/learn/kind-badge';
 import type { ChainNode, ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { approveChain, proposeGoal, type ApproveState, type ProposeState } from './actions';
 
@@ -61,6 +62,9 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
             What you asked for
           </span>
         )}
+        {/* Only on a new node: approving writes nothing for one the subject
+            already has, so the mark shown would not be the mark stored. */}
+        {!node.existingId && <KindBadge kind={node.kind} />}
       </p>
 
       {/* The claim, because it is the thing you can disagree with. A list of

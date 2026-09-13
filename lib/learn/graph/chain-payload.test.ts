@@ -325,6 +325,7 @@ describe('keeping only what was ticked', () => {
         claim: `${name} is the case.`,
         basis: 'The briefing says so.',
         mastery: [],
+        kind: null,
         existingId: existing.includes(name) ? `id-${name}` : null,
       }),
     ),
@@ -454,5 +455,72 @@ describe('what understanding a node looks like', () => {
       nodes: chain!.nodes.map((n, i) => (i === 0 ? { ...n, mastery: ['Only one.'] } : n)),
     };
     expect(approvedChainSchema.parse(tampered).nodes[0].mastery).toEqual([]);
+  });
+});
+
+describe('which nodes are doors', () => {
+  const withKind = (name: string, kind: unknown) => ({ ...node(name), kind });
+
+  const chainWith = (kind: unknown) =>
+    normaliseChain(
+      parse({
+        subject: 'Economics',
+        goal_concept: 'B',
+        concepts: [withKind('A', kind), node('B')],
+        edges: [edge('A', 'B')],
+      }),
+      nothingExists,
+    );
+
+  it('carries both marks through to the nodes', () => {
+    const chain = normaliseChain(
+      parse({
+        subject: 'Economics',
+        goal_concept: 'B',
+        concepts: [withKind('A', 'threshold'), withKind('B', 'consequence')],
+        edges: [edge('A', 'B')],
+      }),
+      nothingExists,
+    );
+
+    expect(chain!.nodes.map((n) => n.kind)).toEqual(['threshold', 'consequence']);
+  });
+
+  it('takes a payload written before the marks existed', () => {
+    // A proposal sitting in a tab from last week has no kind on any node, and
+    // it is still a proposal. Every node comes through unmarked.
+    const chain = normaliseChain(
+      parse({
+        subject: 'Economics',
+        goal_concept: 'B',
+        concepts: [node('A'), node('B')],
+        edges: [edge('A', 'B')],
+      }),
+      nothingExists,
+    );
+
+    expect(chain!.nodes.map((n) => n.name)).toEqual(['A', 'B']);
+    expect(chain!.nodes.map((n) => n.kind)).toEqual([null, null]);
+  });
+
+  it('drops a third word rather than the node', () => {
+    const chain = chainWith('important');
+    expect(chain!.nodes[0].kind).toBeNull();
+    expect(chain!.nodes.map((n) => n.name)).toEqual(['A', 'B']);
+  });
+
+  it('survives the trip out to the form and back', () => {
+    const chain = chainWith('threshold');
+    const back = approvedChainSchema.parse(JSON.parse(JSON.stringify(chain)));
+    expect(back.nodes[0].kind).toBe('threshold');
+  });
+
+  it('refuses a hand-edited mark on the way back', () => {
+    const chain = chainWith('threshold');
+    const tampered = {
+      ...chain,
+      nodes: chain!.nodes.map((n, i) => (i === 0 ? { ...n, kind: 'door' } : n)),
+    };
+    expect(approvedChainSchema.parse(tampered).nodes[0].kind).toBeNull();
   });
 });
