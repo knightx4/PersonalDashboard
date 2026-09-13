@@ -185,6 +185,16 @@ export function ProbeSession({
                   picked. That is what makes it worth reading. */}
               <p className="mt-1 text-body text-ink">{live.answered.reason}</p>
 
+              {!live.answered.correct && live.answered.weight === 0 && (
+                // A part of the idea you had already missed. Said out loud,
+                // because a bar that sits still after an honest answer reads
+                // as broken rather than as the rule working.
+                <p className="mt-3 text-ui text-ink-muted">
+                  The bar did not move: you had already missed this part of the idea, and getting
+                  it wrong again says nothing the first time did not.
+                </p>
+              )}
+
               {live.answered.misconception && (
                 // The same wrong answer twice. Said plainly, because a gap and
                 // a thing steering you wrong are different problems and only

@@ -3,12 +3,14 @@ import {
   barFraction,
   barPercent,
   probePayloadSchema,
+  standingOf,
   toProbe,
   weightFor,
   WEIGHT_INCONCLUSIVE,
   WEIGHT_REINFORCED,
   WEIGHT_SETTLED_NEW,
 } from './probe-payload';
+import type { CheckStanding } from './probe-payload';
 
 /**
  * Two things that must not be allowed to lie.
@@ -89,19 +91,89 @@ describe('a question thrown away', () => {
   });
 });
 
-describe('what an answer was worth', () => {
-  it('is a full point for settling something that was not settled', () => {
-    expect(weightFor({ wasSettled: false, conclusive: true })).toBe(WEIGHT_SETTLED_NEW);
+describe('where a check stands', () => {
+  const answered = (check: string | null, chosenIndex: number | null) => ({
+    masteryCheck: check,
+    chosenIndex,
+    correctIndex: 1,
   });
 
-  it('is a fraction for reinforcing something already settled', () => {
-    // What stops the bar rewarding ten easy questions about the same node.
-    expect(weightFor({ wasSettled: true, conclusive: true })).toBe(WEIGHT_REINFORCED);
+  it('is untouched when nothing has been answered about it', () => {
+    expect(standingOf('Explains the long run.', [])).toBe('untouched');
+    expect(standingOf('Explains the long run.', [answered('Explains the long run.', null)])).toBe(
+      'untouched',
+    );
+  });
+
+  it('ignores what was answered about a different check', () => {
+    expect(
+      standingOf('Explains the long run.', [
+        answered('Says what it rules out.', 0),
+        answered(null, 1),
+      ]),
+    ).toBe('untouched');
+  });
+
+  it('is missed after a wrong answer and nothing right', () => {
+    expect(standingOf('Explains the long run.', [answered('Explains the long run.', 0)])).toBe(
+      'missed',
+    );
+  });
+
+  it('is right once one answer got it right, whatever else happened', () => {
+    expect(
+      standingOf('Explains the long run.', [
+        answered('Explains the long run.', 0),
+        answered('Explains the long run.', 1),
+      ]),
+    ).toBe('right');
+  });
+});
+
+describe('what an answer was worth', () => {
+  const worth = (input: {
+    correct?: boolean;
+    standing?: CheckStanding | null;
+    wasSettled?: boolean;
+    conclusive?: boolean;
+  }) =>
+    weightFor({
+      conclusive: input.conclusive ?? true,
+      correct: input.correct ?? true,
+      standing: input.standing ?? null,
+      wasSettled: input.wasSettled ?? false,
+    });
+
+  it('is a full point for getting a check right that nobody had got right', () => {
+    expect(worth({ standing: 'untouched', correct: true })).toBe(WEIGHT_SETTLED_NEW);
+    expect(worth({ standing: 'missed', correct: true })).toBe(WEIGHT_SETTLED_NEW);
+  });
+
+  it('is a full point for a first miss on a check', () => {
+    // #352: the first wrong answer said something nobody knew either -- that
+    // the part was missing.
+    expect(worth({ standing: 'untouched', correct: false })).toBe(WEIGHT_SETTLED_NEW);
+  });
+
+  it('is a fraction for answering again about a check already got right', () => {
+    // What stops the bar rewarding ten easy questions about the same part.
+    expect(worth({ standing: 'right', correct: true })).toBe(WEIGHT_REINFORCED);
+    expect(worth({ standing: 'right', correct: false })).toBe(WEIGHT_REINFORCED);
     expect(WEIGHT_REINFORCED).toBeLessThan(WEIGHT_SETTLED_NEW);
   });
 
+  it('is nothing for missing a check that was already missed', () => {
+    expect(worth({ standing: 'missed', correct: false })).toBe(WEIGHT_INCONCLUSIVE);
+  });
+
+  it('falls back to the concept for a question written against no check', () => {
+    expect(worth({ standing: null, wasSettled: false })).toBe(WEIGHT_SETTLED_NEW);
+    expect(worth({ standing: null, wasSettled: true })).toBe(WEIGHT_REINFORCED);
+    expect(worth({ standing: null, wasSettled: false, correct: false })).toBe(WEIGHT_SETTLED_NEW);
+  });
+
   it('is nothing at all for an inconclusive answer', () => {
-    expect(weightFor({ wasSettled: false, conclusive: false })).toBe(WEIGHT_INCONCLUSIVE);
+    expect(worth({ standing: 'untouched', conclusive: false })).toBe(WEIGHT_INCONCLUSIVE);
   });
 });
 

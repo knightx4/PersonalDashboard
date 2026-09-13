@@ -3,7 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { Probe } from '@/lib/learn/graph/probe-payload';
-import { barPercent, weightFor } from '@/lib/learn/graph/probe-payload';
+import { barPercent, standingOf, weightFor } from '@/lib/learn/graph/probe-payload';
 import { inferredFrom, type Concept, type Graph } from '@/lib/learn/graph/model';
 
 /**
@@ -338,6 +338,11 @@ export async function recordAnswer(
     probeId: string;
     conceptId: string;
     chosenIndex: number;
+    /**
+     * Whether the concept was already settled. Read only for a question
+     * written against no check, since a concept that carries checks is weighed
+     * by what earlier answers did with the one this question aimed at.
+     */
     wasSettled: boolean;
     /** The subject's graph, so a correct answer can settle what is under it. */
     graph?: Graph;
@@ -345,7 +350,7 @@ export async function recordAnswer(
 ): Promise<AnswerOutcome> {
   const { data, error } = await supabase
     .from('probes')
-    .select('correct_index, reason, chosen_index')
+    .select('correct_index, reason, chosen_index, mastery_check')
     .eq('id', input.probeId)
     .maybeSingle();
 
@@ -353,14 +358,31 @@ export async function recordAnswer(
   if (error) throw fail('Reading the question', error);
   if (!data) throw new Error('That question is not there any more.');
 
-  const probe = data as { correct_index: number; reason: string; chosen_index: number | null };
+  const probe = data as {
+    correct_index: number;
+    reason: string;
+    chosen_index: number | null;
+    mastery_check: string | null;
+  };
   const correct = probe.correct_index === input.chosenIndex;
+
+  // Where the check this question aimed at stood before the answer, from the
+  // other questions asked about the same concept: they carry the check they
+  // were written against, what was picked and what was right. Null for a
+  // question written against no check, which is weighed the older way.
+  const standing =
+    probe.mastery_check === null
+      ? null
+      : standingOf(
+          probe.mastery_check,
+          (await probesFor(supabase, input.conceptId)).filter((row) => row.id !== input.probeId),
+        );
 
   // Answering the same row twice earns nothing. The first answer is the one
   // that carried information; a second is a person clicking again.
   const weight =
     probe.chosen_index === null
-      ? weightFor({ wasSettled: input.wasSettled, conclusive: true })
+      ? weightFor({ conclusive: true, correct, standing, wasSettled: input.wasSettled })
       : 0;
 
   const { error: answerError } = await supabase

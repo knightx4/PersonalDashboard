@@ -170,7 +170,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
           written against. Its own section rather than a line under the claim:
           it is a list, and the card above is about where the claim stands. */}
       <CardSection title="What understanding it looks like" className="mb-5">
-        <MasteryChecks checks={concept.mastery} />
+        <MasteryChecks checks={concept.mastery} answers={probes} />
       </CardSection>
 
       {connected && (

@@ -48,6 +48,8 @@ export type AskState = {
     reason: string;
     correctIndex: number;
     chosenIndex: number;
+    /** How far this answer moved the bar. Zero when it repeated a miss. */
+    weight: number;
     /** Named only when the same wrong answer has now been picked twice. */
     misconception?: string;
     /** True when this claim has nothing under it, so the floor can be looked for. */
@@ -173,7 +175,11 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       probeId: parsed.data.probeId,
       conceptId: parsed.data.conceptId,
       chosenIndex: parsed.data.chosenIndex,
-      wasSettled: concept?.state === 'known',
+      // Only for a concept with no checks. One that carries them is weighed by
+      // what earlier answers did with the check this question aimed at, and
+      // whether the concept as a whole was settled decides nothing.
+      wasSettled:
+        concept !== undefined && concept.mastery.length === 0 && concept.state === 'known',
       graph,
     });
   } catch (error) {
@@ -243,6 +249,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     answered: {
       correct: outcome.correct,
       reason: outcome.reason,
+      weight: outcome.weight,
       correctIndex: answeredRow?.correctIndex ?? -1,
       chosenIndex: parsed.data.chosenIndex,
       misconception,
