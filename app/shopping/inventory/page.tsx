@@ -2,10 +2,8 @@ import { ArrowUpDown, Layers, Package, Search, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
-import {
-  InventoryBulkBar,
-  InventorySelectionProvider,
-} from '@/components/inventory/inventory-selection';
+import { InventoryBulkBar } from '@/components/inventory/inventory-selection';
+import { SelectionProvider } from '@/components/ui/selection';
 import { LeftRail, RailGroup, RailItem, RailPicker } from '@/components/shell/left-rail';
 import { AttributeFilterPicker } from './attribute-filter-picker';
 import { PageHeader } from '@/components/shell/page-header';
@@ -54,8 +52,7 @@ const RANGES: { id: PresetRange | 'all'; label: string }[] = [
   { id: 'last_12_months', label: 'Last 12 months' },
 ];
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function parseListId(raw: string | undefined): string | undefined {
   const value = raw?.trim();
@@ -137,12 +134,15 @@ export default async function InventoryPage({
   const user = await requireUser();
   const supabase = await createClient();
   const params = await searchParams;
-  const q = (params.q ?? '').trim().replace(/[%_,*()]/g, ' ').replace(/\s+/g, ' ').trim();
+  const q = (params.q ?? '')
+    .trim()
+    .replace(/[%_,*()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const categoryId = params.category?.trim() || undefined;
   const merchantId = parseMerchantId(params.merchant);
   const listId = parseListId(params.list);
-  const range =
-    RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
+  const range = RANGES.find((entry) => entry.id === params.range)?.id ?? 'all';
   const sort = parseSortId(params.sort);
   const group = parseGroupId(params.group);
   const attrFilters = parseAttributeFilters(params.attr);
@@ -163,16 +163,8 @@ export default async function InventoryPage({
     { data: attributeTemplates },
     { data: groupRows },
   ] = await Promise.all([
-    supabase
-      .from('categories')
-      .select('id, name, color, slug')
-      .is('parent_id', null)
-      .order('name'),
-    supabase
-      .from('item_lists')
-      .select('id, name, color')
-      .eq('user_id', user.id)
-      .order('name'),
+    supabase.from('categories').select('id, name, color, slug').is('parent_id', null).order('name'),
+    supabase.from('item_lists').select('id, name, color').eq('user_id', user.id).order('name'),
     loadUserMerchants(supabase, user.id),
     supabase.from('profiles').select('timezone').eq('id', user.id).single(),
     supabase.from('category_attribute_templates').select('fields').eq('user_id', user.id),
@@ -189,9 +181,7 @@ export default async function InventoryPage({
 
   const timezone = profile?.timezone ?? 'UTC';
   const activeMerchant =
-    merchantId && merchants.some((entry) => entry.id === merchantId)
-      ? merchantId
-      : undefined;
+    merchantId && merchants.some((entry) => entry.id === merchantId) ? merchantId : undefined;
   const activeList =
     listId && (lists ?? []).some((entry) => entry.id === listId) ? listId : undefined;
   const period = range === 'all' ? null : periodFor(range, timezone);
@@ -280,10 +270,7 @@ export default async function InventoryPage({
       | { bgg_id: number | null; needs_confirmation: boolean }
       | { bgg_id: number | null; needs_confirmation: boolean }[]
       | null;
-    inventory_item_lists:
-      | { list_id: string }
-      | { list_id: string }[]
-      | null;
+    inventory_item_lists: { list_id: string } | { list_id: string }[] | null;
     categories:
       | { name: string; color: string | null; slug: string }
       | { name: string; color: string | null; slug: string }[]
@@ -462,8 +449,7 @@ export default async function InventoryPage({
           (value) =>
             !attrFilters.some(
               (filter) =>
-                filter.key === facet.key &&
-                filter.value.toLowerCase() === value.toLowerCase(),
+                filter.key === facet.key && filter.value.toLowerCase() === value.toLowerCase(),
             ),
         )
         .map((value) => [
@@ -496,35 +482,60 @@ export default async function InventoryPage({
    * blunt instrument and is offered separately.
    */
   const chips: FilterChip[] = [];
-  if (q) chips.push({ label: 'Search', value: q, clearHref: inventoryHref({ ...hrefBase, q: undefined }) });
+  if (q)
+    chips.push({
+      label: 'Search',
+      value: q,
+      clearHref: inventoryHref({ ...hrefBase, q: undefined }),
+    });
   if (categoryId) {
     const category = (categories ?? []).find((entry) => entry.id === categoryId);
     if (category) {
-      chips.push({ label: 'Category', value: category.name, clearHref: inventoryHref({ ...hrefBase, category: undefined }) });
+      chips.push({
+        label: 'Category',
+        value: category.name,
+        clearHref: inventoryHref({ ...hrefBase, category: undefined }),
+      });
     }
   }
   if (activeMerchant) {
     const merchant = merchants.find((entry) => entry.id === activeMerchant);
     if (merchant) {
-      chips.push({ label: 'Merchant', value: merchant.name, clearHref: inventoryHref({ ...hrefBase, merchant: undefined }) });
+      chips.push({
+        label: 'Merchant',
+        value: merchant.name,
+        clearHref: inventoryHref({ ...hrefBase, merchant: undefined }),
+      });
     }
   }
   if (activeList) {
     const list = (lists ?? []).find((entry) => entry.id === activeList);
     if (list) {
-      chips.push({ label: 'List', value: list.name, clearHref: inventoryHref({ ...hrefBase, list: undefined }) });
+      chips.push({
+        label: 'List',
+        value: list.name,
+        clearHref: inventoryHref({ ...hrefBase, list: undefined }),
+      });
     }
   }
   if (range !== 'all') {
     const entry = RANGES.find((option) => option.id === range);
     if (entry) {
-      chips.push({ label: 'Acquired', value: entry.label, clearHref: inventoryHref({ ...hrefBase, range: 'all' }) });
+      chips.push({
+        label: 'Acquired',
+        value: entry.label,
+        clearHref: inventoryHref({ ...hrefBase, range: 'all' }),
+      });
     }
   }
   if (personId) {
     const person = byPerson.get(personId);
     if (person) {
-      chips.push({ label: 'Whose', value: person.name, clearHref: inventoryHref({ ...hrefBase, person: undefined }) });
+      chips.push({
+        label: 'Whose',
+        value: person.name,
+        clearHref: inventoryHref({ ...hrefBase, person: undefined }),
+      });
     }
   }
   for (const filter of attrFilters) {
@@ -626,133 +637,137 @@ export default async function InventoryPage({
       </LeftRail>
 
       <div className="min-w-0 flex-1">
-        <PageHeader
-          title="Inventory"
-          description="Everything you currently own, so you can check before buying it again."
-          actions={
-            <>
-              <SendToShare
-                shares={shareOptions}
-                inventoryItemIds={finalItems.map((item) => item.id)}
+        {/*
+         * The provider wraps the header as well as the list, because a
+         * selection turns the header into the action bar over it.
+         */}
+        <SelectionProvider
+          rows={finalItems.map((item) => ({
+            key: item.id,
+            // Every copy the row stands for: ticking it means all of them.
+            ids: item.unit_ids ?? [item.id],
+          }))}
+        >
+          <PageHeader
+            title="Inventory"
+            description="Everything you currently own, so you can check before buying it again."
+            bulk={<InventoryBulkBar total={finalItems.length} />}
+            actions={
+              <>
+                <SendToShare
+                  shares={shareOptions}
+                  inventoryItemIds={finalItems.map((item) => item.id)}
+                />
+                <Link
+                  href="/shopping/inventory/add"
+                  className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                >
+                  Add new item
+                </Link>
+              </>
+            }
+          />
+
+          <FilterChips chips={chips} clearAllHref="/shopping/inventory" />
+
+          <form className="mb-4 space-y-3" action="/shopping/inventory" method="get">
+            {range !== 'all' && <input type="hidden" name="range" value={range} />}
+            {categoryId && <input type="hidden" name="category" value={categoryId} />}
+            {activeMerchant && <input type="hidden" name="merchant" value={activeMerchant} />}
+            {activeList && <input type="hidden" name="list" value={activeList} />}
+            {personId && <input type="hidden" name="person" value={personId} />}
+            {attrFilters.map((filter) => (
+              <input
+                key={`${filter.key}:${filter.value}`}
+                type="hidden"
+                name="attr"
+                value={serializeAttributeFilter(filter)}
               />
-              <Link
-                href="/shopping/inventory/add"
-                className={buttonVariants({ variant: 'primary', size: 'sm' })}
-              >
-                Add new item
-              </Link>
-            </>
-          }
-        />
+            ))}
 
-        <FilterChips chips={chips} clearAllHref="/shopping/inventory" />
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <Input
+                name="q"
+                defaultValue={q}
+                placeholder="Search what you own — try makeup, lipstick, kitchen…"
+                aria-label="Search inventory"
+                className="pl-9"
+              />
+            </div>
 
-        <form className="mb-4 space-y-3" action="/shopping/inventory" method="get">
-          {range !== 'all' && <input type="hidden" name="range" value={range} />}
-          {categoryId && <input type="hidden" name="category" value={categoryId} />}
-          {activeMerchant && (
-            <input type="hidden" name="merchant" value={activeMerchant} />
-          )}
-          {activeList && <input type="hidden" name="list" value={activeList} />}
-          {personId && <input type="hidden" name="person" value={personId} />}
-          {attrFilters.map((filter) => (
-            <input
-              key={`${filter.key}:${filter.value}`}
-              type="hidden"
-              name="attr"
-              value={serializeAttributeFilter(filter)}
-            />
-          ))}
-
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <Input
-              name="q"
-              defaultValue={q}
-              placeholder="Search what you own — try makeup, lipstick, kitchen…"
-              aria-label="Search inventory"
-              className="pl-9"
-            />
-          </div>
-
-          {/* Sort and group are chips rather than two 160px bordered selects
+            {/* Sort and group are chips rather than two 160px bordered selects
               with a glyph beside each. Their value is their own label -- "Most
               recent", "By category" -- so the caption they carried was
               sr-only already, and the glyph says which property it is. Two
               chips are a row where two boxed selects were a bar. Laws 9
               and 12, and the same shape as the filter chips above them. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <ChipSelect
-              name="sort"
-              defaultValue={sort}
-              aria-label="Sort inventory"
-              // Disabled while searching: relevance wins, and a disabled
-              // control submits nothing, so the sort falls back on its own.
-              disabled={Boolean(q)}
-              className={q ? 'opacity-50' : undefined}
-              icon={<ArrowUpDown className="size-3.5" strokeWidth={2} />}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </ChipSelect>
-            <ChipSelect
-              name="group"
-              defaultValue={group}
-              aria-label="Group inventory"
-              icon={<Layers className="size-3.5" strokeWidth={2} />}
-            >
-              {GROUP_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </ChipSelect>
-            <SubmitOnChange />
-            {/* Hidden once the selects submit themselves; still there, and
+            <div className="flex flex-wrap items-center gap-2">
+              <ChipSelect
+                name="sort"
+                defaultValue={sort}
+                aria-label="Sort inventory"
+                // Disabled while searching: relevance wins, and a disabled
+                // control submits nothing, so the sort falls back on its own.
+                disabled={Boolean(q)}
+                className={q ? 'opacity-50' : undefined}
+                icon={<ArrowUpDown className="size-3.5" strokeWidth={2} />}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </ChipSelect>
+              <ChipSelect
+                name="group"
+                defaultValue={group}
+                aria-label="Group inventory"
+                icon={<Layers className="size-3.5" strokeWidth={2} />}
+              >
+                {GROUP_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </ChipSelect>
+              <SubmitOnChange />
+              {/* Hidden once the selects submit themselves; still there, and
                 still the only way through, with JavaScript off. */}
-            <Button type="submit" variant="secondary" size="sm" data-fallback-submit>
-              Apply
-            </Button>
-            {q && (
-              <p className="text-small text-ink-muted">
-                Sorted by relevance while searching
-              </p>
-            )}
-          </div>
-        </form>
+              <Button type="submit" variant="secondary" size="sm" data-fallback-submit>
+                Apply
+              </Button>
+              {q && (
+                <p className="text-small text-ink-muted">Sorted by relevance while searching</p>
+              )}
+            </div>
+          </form>
 
-        {finalItems.length === 0 ? (
-          <EmptyState
-            icon={filtered ? SearchX : Package}
-            title={filtered ? 'No matching items' : 'Nothing in your inventory yet'}
-            description={
-              filtered
-                ? q
-                  ? 'Nothing matched that search across names, tags, and categories. You probably don’t own it.'
-                  : 'Try a different search, list, merchant, category, or date range.'
-                : 'Every item from an order lands here as its own entry, so you can search what you own, mark things returned, or record that you got rid of them.'
-            }
-            action={
-              filtered
-                ? { label: 'Clear filters', href: '/shopping/inventory' }
-                : { label: 'Add new item', href: '/shopping/inventory/add' }
-            }
-            secondaryAction={
-              filtered
-                ? undefined
-                : { label: 'Add an order', href: '/shopping/orders/new' }
-            }
-          />
-        ) : (
-          <InventorySelectionProvider>
-            <InventoryBulkBar allIds={finalItems.map((item) => item.id)} />
+          {finalItems.length === 0 ? (
+            <EmptyState
+              icon={filtered ? SearchX : Package}
+              title={filtered ? 'No matching items' : 'Nothing in your inventory yet'}
+              description={
+                filtered
+                  ? q
+                    ? 'Nothing matched that search across names, tags, and categories. You probably don’t own it.'
+                    : 'Try a different search, list, merchant, category, or date range.'
+                  : 'Every item from an order lands here as its own entry, so you can search what you own, mark things returned, or record that you got rid of them.'
+              }
+              action={
+                filtered
+                  ? { label: 'Clear filters', href: '/shopping/inventory' }
+                  : { label: 'Add new item', href: '/shopping/inventory/add' }
+              }
+              secondaryAction={
+                filtered ? undefined : { label: 'Add an order', href: '/shopping/orders/new' }
+              }
+            />
+          ) : (
             <div className="space-y-5">
               {groups.map((section) => {
                 const subtotal = section.items.reduce((sum, item) => sum + item.cost_cents, 0);
@@ -766,12 +781,15 @@ export default async function InventoryPage({
                             {section.items.length}
                           </span>
                         </h2>
-                        <p className="tabular text-small text-ink-muted">
-                          {formatMoney(subtotal)}
-                        </p>
+                        <p className="tabular text-small text-ink-muted">{formatMoney(subtotal)}</p>
                       </div>
                     )}
-                    <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
+                    <ul
+                      className={cn(
+                        cardVariants({ padding: 'none' }),
+                        'divide-y divide-border overflow-hidden',
+                      )}
+                    >
                       {section.items.map((item) => (
                         <InventoryRow
                           key={item.id}
@@ -787,8 +805,8 @@ export default async function InventoryPage({
                 );
               })}
             </div>
-          </InventorySelectionProvider>
-        )}
+          )}
+        </SelectionProvider>
       </div>
     </div>
   );
