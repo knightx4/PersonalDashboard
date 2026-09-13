@@ -173,7 +173,10 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       probeId: parsed.data.probeId,
       conceptId: parsed.data.conceptId,
       chosenIndex: parsed.data.chosenIndex,
-      wasSettled: concept?.state === 'known',
+      // Only for a concept with no checks. One that carries them is weighed by
+      // what earlier answers did with the check this question aimed at, and
+      // whether the concept as a whole was settled decides nothing.
+      wasSettled: concept !== undefined && concept.mastery.length === 0 && concept.state === 'known',
       graph,
     });
   } catch (error) {

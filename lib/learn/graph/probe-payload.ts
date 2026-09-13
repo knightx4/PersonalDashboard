@@ -124,9 +124,74 @@ export const WEIGHT_SETTLED_NEW = 1.0;
 export const WEIGHT_REINFORCED = 0.3;
 export const WEIGHT_INCONCLUSIVE = 0;
 
-export function weightFor(input: { wasSettled: boolean; conclusive: boolean }): number {
+/**
+ * What the answers already given about one check did with it.
+ *
+ * `right` means one of them got it right, whatever happened before or after:
+ * the check is covered from then on. `missed` means one of them got it wrong
+ * and none has got it right. `untouched` means it has never been answered,
+ * which includes a check that has been asked about and not answered.
+ */
+export type CheckStanding = 'right' | 'missed' | 'untouched';
+
+/**
+ * Where a check stands, from the questions already answered about it.
+ *
+ * Read off the rows rather than kept as a count, for the same reason the bar
+ * is: a column saying how many checks are covered would have to be right after
+ * every answer, and the answers themselves already say.
+ */
+export function standingOf(
+  check: string,
+  earlier: readonly {
+    masteryCheck: string | null;
+    chosenIndex: number | null;
+    correctIndex: number;
+  }[],
+): CheckStanding {
+  let missed = false;
+
+  for (const probe of earlier) {
+    if (probe.masteryCheck !== check || probe.chosenIndex === null) continue;
+    if (probe.chosenIndex === probe.correctIndex) return 'right';
+    missed = true;
+  }
+
+  return missed ? 'missed' : 'untouched';
+}
+
+/**
+ * What one answer was worth.
+ *
+ * A check you get right for the first time is worth the full amount, and so is
+ * a first answer about a check nobody has answered about, right or wrong: both
+ * said something that was not known before. A check somebody has already got
+ * right is worth the reinforced fraction however this answer goes, and missing
+ * a check that was already missed is worth nothing, because the second miss
+ * says exactly what the first one did.
+ *
+ * A concept with no checks has nothing to decide from, so it keeps the older
+ * rule: full for a concept that was not settled, the fraction for one that
+ * was.
+ */
+export function weightFor(input: {
+  conclusive: boolean;
+  /** Whether this answer was right. */
+  correct: boolean;
+  /** Where the check stood before this answer; null when there is no check. */
+  standing: CheckStanding | null;
+  /** Read only when there is no check: was the concept already settled. */
+  wasSettled: boolean;
+}): number {
   if (!input.conclusive) return WEIGHT_INCONCLUSIVE;
-  return input.wasSettled ? WEIGHT_REINFORCED : WEIGHT_SETTLED_NEW;
+  if (input.standing === null) {
+    return input.wasSettled ? WEIGHT_REINFORCED : WEIGHT_SETTLED_NEW;
+  }
+  if (input.standing === 'right') return WEIGHT_REINFORCED;
+  if (input.standing === 'missed') {
+    return input.correct ? WEIGHT_SETTLED_NEW : WEIGHT_INCONCLUSIVE;
+  }
+  return WEIGHT_SETTLED_NEW;
 }
 
 /** The decay the spec picked: fast at first, then slower and slower. */
