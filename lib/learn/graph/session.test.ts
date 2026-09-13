@@ -117,6 +117,57 @@ describe('what to ask about next', () => {
   });
 });
 
+describe('the turn a subject session gives back to old ground', () => {
+  const now = new Date('2026-09-13T09:00:00.000Z');
+  const daysAgo = (days: number) =>
+    new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  /** Settled by an answer somebody actually gave, on a date. */
+  function checked(id: string, testedAt: string): Concept {
+    return { ...concept(id, 'known'), established: 'tested', testedAt };
+  }
+
+  const frontier = concept('untouched', 'unknown');
+
+  it('asks about the claim checked longest ago on every fifth question', () => {
+    const picked = nextConcept(
+      [frontier, checked('recent', daysAgo(45)), checked('old', daysAgo(200))],
+      noneAsked,
+      { answered: 4, now },
+    );
+    expect(picked?.id).toBe('old');
+  });
+
+  it('goes back to the frontier on the turns in between', () => {
+    for (const answered of [0, 1, 2, 3, 5]) {
+      const picked = nextConcept([frontier, checked('old', daysAgo(200))], noneAsked, {
+        answered,
+        now,
+      });
+      expect([answered, picked?.id]).toEqual([answered, 'untouched']);
+    }
+  });
+
+  it('skips the turn when nothing has gone a month unchecked', () => {
+    const picked = nextConcept([frontier, checked('tuesday', daysAgo(5))], noneAsked, {
+      answered: 4,
+      now,
+    });
+    expect(picked?.id).toBe('untouched');
+  });
+
+  it('leaves out a claim settled by inference rather than by an answer', () => {
+    const inferred = { ...concept('inferred', 'known'), testedAt: daysAgo(200) };
+    const picked = nextConcept([frontier, inferred], noneAsked, { answered: 4, now });
+    expect(picked?.id).toBe('untouched');
+  });
+
+  it('picks as it always did when no cadence is passed', () => {
+    const picked = nextConcept([frontier, checked('old', daysAgo(200))], noneAsked);
+    expect(picked?.id).toBe('untouched');
+  });
+});
+
 describe('which check the next question is for', () => {
   const CHECKS = ['Rules out a pay freeze.', 'Applies at 4% inflation.', 'The Lucas objection.'];
 

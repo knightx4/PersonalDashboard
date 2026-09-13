@@ -30,23 +30,27 @@ export type SettledConcept = {
 };
 
 /**
- * The settled claims in one subject that somebody has actually answered about.
+ * Whether a claim is one a re-check could ask about.
  *
- * `known` and `established: 'tested'` both, and a date. A claim marked known by
- * inference, or because you said so, has no `tested_at` and is left out: there
- * is no date on something nobody has been asked about, and ordering by a
- * missing one would be inventing it. A row whose date is unparseable is left
+ * `known` and `established: 'tested'` both, and a date on it. A claim marked
+ * known by inference, or because you said so, has no `tested_at` and is left
+ * out: there is no date on something nobody has been asked about, and ordering
+ * by a missing one would be inventing it. A date that will not parse is left
  * out for the same reason.
  */
+export function isRecheckable(concept: Concept): boolean {
+  return (
+    isSettled(concept) &&
+    concept.established === 'tested' &&
+    concept.testedAt !== null &&
+    !Number.isNaN(new Date(concept.testedAt).getTime())
+  );
+}
+
+/** The settled claims in one subject that somebody has actually answered about. */
 export function settledInSubject(graph: Graph, subject: ReadySubject): SettledConcept[] {
   return graph.concepts
-    .filter(
-      (concept) =>
-        isSettled(concept) &&
-        concept.established === 'tested' &&
-        concept.testedAt !== null &&
-        !Number.isNaN(new Date(concept.testedAt).getTime()),
-    )
+    .filter(isRecheckable)
     .map((concept) => ({
       concept,
       subjectId: subject.id,
@@ -75,6 +79,11 @@ export function rankByLastChecked(rows: SettledConcept[]): SettledConcept[] {
   });
 }
 
+/** Long enough since it was last answered about to be worth asking again. */
+function oldEnough(testedAt: string, now: Date): boolean {
+  return new Date(testedAt).getTime() <= now.getTime() - RECHECK_AFTER_DAYS * 24 * 60 * 60 * 1000;
+}
+
 /**
  * Whether the next question is a re-check.
  *
@@ -95,7 +104,24 @@ export function isRecheckTurn(answered: number): boolean {
  * so a list read in any order gives the same question.
  */
 export function claimToRecheck(rows: SettledConcept[], now: Date): SettledConcept | null {
-  const cutoff = now.getTime() - RECHECK_AFTER_DAYS * 24 * 60 * 60 * 1000;
-  const old = rankByLastChecked(rows).filter((row) => new Date(row.testedAt).getTime() <= cutoff);
+  const old = rankByLastChecked(rows).filter((row) => oldEnough(row.testedAt, now));
+  return old[0] ?? null;
+}
+
+/**
+ * The same question inside one subject.
+ *
+ * A subject session already has the concepts and needs no subject name on
+ * them, so this answers in concepts rather than in rows. Same cutoff, same
+ * oldest-first order, same tie on the name.
+ */
+export function conceptToRecheck(concepts: Concept[], now: Date): Concept | null {
+  const old = concepts
+    .filter((concept) => isRecheckable(concept) && oldEnough(concept.testedAt!, now))
+    .sort((a, b) => {
+      const byDate = new Date(a.testedAt!).getTime() - new Date(b.testedAt!).getTime();
+      return byDate !== 0 ? byDate : a.name.localeCompare(b.name);
+    });
+
   return old[0] ?? null;
 }
