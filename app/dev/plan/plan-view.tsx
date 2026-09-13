@@ -2448,7 +2448,7 @@ function PlanRow({
               target="step"
               id={node.id}
               thread={node.thread}
-              placeholder="A note on this step. Tag @dash to get a reply; without it nothing reads it."
+              placeholder="A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it."
             />
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">

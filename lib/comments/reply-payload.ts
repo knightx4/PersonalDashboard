@@ -24,7 +24,7 @@ export const MAX_REPLY = 4000;
  * deleting anything. A name outside this list is refused by lib/comments/act.ts
  * with a sentence saying so, so a model inventing one changes nothing.
  */
-export const ACTIONS = ['file_idea', 'reword'] as const;
+export const ACTIONS = ['file_idea', 'reword', 'send_step'] as const;
 export type ActionName = (typeof ACTIONS)[number];
 
 /**

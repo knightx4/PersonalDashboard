@@ -22,6 +22,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isModuleId, MODULES } from '@/lib/modules';
+import { handStepToClaude } from '@/lib/plan/handover';
 import type { CommentTarget } from './load';
 import type { DashAction } from './reply-payload';
 
@@ -97,6 +98,8 @@ export async function carryOut(input: ActInput): Promise<ActOutcome> {
       return fileIdea(input);
     case 'reword':
       return reword(input);
+    case 'send_step':
+      return sendStep(input);
     default:
       return {
         ok: false,
@@ -219,4 +222,38 @@ async function reword(input: ActInput): Promise<ActOutcome> {
 /** What was written, and what was there before it. */
 function rewritten(what: string, now: string, was: string | null): string {
   return [`Rewrote ${what}:`, '', now, '', 'It said:', '', was ?? '(nothing)'].join('\n');
+}
+
+/**
+ * Hand the step the comment is on to a session, and start it now.
+ *
+ * The same rules as the button on the plan page, because they are the same
+ * function: a proposal is not work yet, a question and a blocked step are
+ * waiting on the person rather than on a session, and a feature already being
+ * worked takes one session and not two. Which of those refused it is what the
+ * thread says, so a comment that started nothing says why.
+ */
+async function sendStep(input: ActInput): Promise<ActOutcome> {
+  if (input.target !== 'step') {
+    return {
+      ok: false,
+      why: 'I can only send a plan step to be built, and this comment is not on one, so nothing was started.',
+    };
+  }
+
+  const sent = await handStepToClaude({
+    supabase: input.supabase,
+    userId: input.userId,
+    id: input.id,
+  });
+  if (!sent.ok) return { ok: false, why: `I did not send it: ${sent.error}` };
+
+  const withThem =
+    sent.beneath === 0
+      ? ''
+      : `, with the ${sent.beneath === 1 ? 'step' : `${sent.beneath} steps`} beneath it`;
+  return {
+    ok: true,
+    said: `Sent #${sent.number} ${sent.title} to be built${withThem}. ${sent.detail}`,
+  };
 }

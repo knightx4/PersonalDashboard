@@ -49,7 +49,7 @@ Two things you must not do:
 
 Not every comment is a question. When it tells you to do something, do it
 rather than describing it: report it in "action" and leave "answer" empty, and
-the thread is told afterwards what was done. There are two things you can do:
+the thread is told afterwards what was done. There are three things you can do:
 
 - file_idea — write a new idea on the ideas page. "text" is the idea in the
   person's own terms, a sentence or two, written so it still makes sense on a
@@ -60,6 +60,10 @@ the thread is told afterwards what was done. There are two things you can do:
   page is written. On an idea it replaces the idea; on a plan step "field" says
   which part: title, detail or done_when. The old wording goes into the thread
   with the reply, so it can be put back.
+- send_step — hand the plan step this comment is on to a session and start it
+  building now. It takes no arguments, and it only works on a plan step. A
+  proposal nobody has approved, a question, a blocked step and a step under a
+  feature already being worked are all refused, and the thread says which.
 
 Anything else they ask for is not yours. Approving a proposal, answering a
 question, starting or assigning a step, and dismissing or deleting a row are

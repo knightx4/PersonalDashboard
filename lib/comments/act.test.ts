@@ -189,6 +189,17 @@ describe('rewording the row a comment is on', () => {
   });
 });
 
+describe('sending a step to be built', () => {
+  it('will not start anything from a comment that is not on a plan step', async () => {
+    for (const target of ['idea', 'raise'] as const) {
+      const { writes, supabase } = db();
+      const outcome = await carryOut(input({ supabase, target, action: action({ name: 'send_step' }) }));
+      expect(writes).toHaveLength(0);
+      expect(outcome.ok === false && outcome.why).toContain('nothing was started');
+    }
+  });
+});
+
 describe('an instruction outside the list', () => {
   it('changes nothing and says whose move it is', async () => {
     for (const name of ['approve_step', 'answer_decision', 'dismiss', 'delete_row', 'set_status']) {
