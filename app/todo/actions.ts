@@ -12,8 +12,10 @@ import {
   createTask,
   deleteTask,
   itemInput,
+  renameTask,
   reopenTaskWithItems,
   reorderTasks,
+  rescheduleTask,
   setTaskPinned,
   setTaskStatus,
   snoozeTask,
@@ -121,6 +123,60 @@ export async function editTask(
 
   revalidateTodo();
   return { message: 'Saved.' };
+}
+
+/**
+ * Renaming and rescheduling from the row, without opening the form.
+ *
+ * A task is edited far more often than it is written, and almost always it is
+ * one of these two: the wording was not quite right, or it slipped a day.
+ * Going through `editTask` for either meant a form with four fields and a Save
+ * button opening in place of the row -- which is law 12 the wrong way round,
+ * and is what note 87a5991f is about.
+ *
+ * Each writes only the field it was given. That is the whole reason they exist
+ * rather than calling `editTask` with the rest of the row filled in from the
+ * client: a title sent back with a stale body would quietly overwrite an edit
+ * made in another tab, and the row does not know the body at all.
+ */
+// latency: instant -- the row draws the new title before this returns
+export async function renameTaskAction(
+  id: string,
+  title: string,
+): Promise<{ error: string | null }> {
+  if (!id) return { error: 'Which task?' };
+
+  const user = await requireUser();
+  const { error } = await renameTask(user.id, id, title);
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
+}
+
+// latency: instant -- the row draws the new date before this returns
+export async function rescheduleTaskAction(
+  id: string,
+  day: string,
+  time: string,
+): Promise<{ error: string | null }> {
+  if (!id) return { error: 'Which task?' };
+
+  const user = await requireUser();
+  const { timezone } = await loadAccountSettings(user.id);
+
+  const { error } = await rescheduleTask(
+    user.id,
+    id,
+    // The same relative words the capture panel sends, so "today" typed into
+    // the row means the account's today rather than the browser's.
+    { dueOn: resolveRelativeDay(day, todayIn(timezone)), dueTime: time },
+    timezone,
+  );
+  if (error) return { error };
+
+  revalidateTodo();
+  return { error: null };
 }
 
 /**

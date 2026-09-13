@@ -147,6 +147,62 @@ export async function updateTask(
 }
 
 /**
+ * The two one-field writes the list itself makes.
+ *
+ * `updateTask` writes every column a task has, because it backs a form that
+ * carries every one of them. Editing a title in the row cannot go through it:
+ * the row knows the title and nothing else, so a rename through that path would
+ * write a blank body and an unpinned pin over whatever was there. These write
+ * the field that was edited and leave the rest of the row alone.
+ *
+ * Same schema pieces as the form, so "not blank, not longer than 500" and
+ * "a date like 2026-03-10" are stated once and cannot drift between the two
+ * ways in.
+ */
+export const renameInput = taskInput.pick({ title: true });
+export const rescheduleInput = taskInput.pick({ dueOn: true, dueTime: true });
+
+export async function renameTask(
+  userId: string,
+  id: string,
+  title: string,
+): Promise<{ error: string | null }> {
+  const parsed = renameInput.safeParse({ title });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createTodoClient();
+  const { error } = await supabase
+    .from('tasks')
+    .update({ title: parsed.data.title })
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  return { error: error?.message ?? null };
+}
+
+export async function rescheduleTask(
+  userId: string,
+  id: string,
+  input: { dueOn: string; dueTime: string },
+  timezone: string,
+): Promise<{ error: string | null }> {
+  const parsed = rescheduleInput.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const supabase = await createTodoClient();
+  const { error } = await supabase
+    .from('tasks')
+    // Both columns every time, through the one function that decides which of
+    // them a day-and-maybe-a-time lands in. Clearing the date has to clear both
+    // or a task with a time keeps it after its day is taken away.
+    .update(resolveDue(parsed.data, timezone))
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  return { error: error?.message ?? null };
+}
+
+/**
  * Finish, drop, or reopen.
  *
  * `completed_at` and `dropped_at` are not set here. The database stamps them,
