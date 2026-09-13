@@ -6,7 +6,7 @@ import { suggestForDigest, type DigestContext } from '@/inngest/dev/suggest';
 import { oneLine, whatHappened, whatIsReady, withSuggestions } from '@/lib/digest/build';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { loadIdeas } from '@/lib/ideas/load';
-import { loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
+import { hasLiveFog, isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
 import { loadRaised } from '@/lib/raised/load';
 
 /**
@@ -59,6 +59,12 @@ function daysAgo(at: string, now: Date): number {
 /**
  * What the model is shown: the open state of the plan, and what closed
  * overnight so it does not report back what the page already says.
+ *
+ * Nothing dismissed is in it. A question put aside as not right now, or a
+ * patch of fog put aside, is exactly the thing a summary must not raise again
+ * -- that is what dismissing it was for. `workOrder` already drops them from
+ * the ready list; these lists are read straight off the rows, so they say so
+ * themselves.
  */
 async function contextFor(input: {
   supabase: SupabaseClient;
@@ -73,7 +79,9 @@ async function contextFor(input: {
     loadRaised(supabase, userId),
   ]);
 
-  const open = plan.items.filter((item) => item.status !== 'done' && item.status !== 'dropped');
+  const open = plan.items.filter(
+    (item) => item.status !== 'done' && item.status !== 'dropped' && !isDismissed(item),
+  );
 
   return {
     openDecisions: open
@@ -85,15 +93,16 @@ async function contextFor(input: {
       .slice(0, CONTEXT_LIMIT)
       .map((item) => `${ref(item)} — ${oneLine(item.comment ?? 'no reason recorded', 200)}`),
     fogPatches: open
-      .filter((item) => item.fog !== null)
+      .filter((item) => hasLiveFog(item))
       .slice(0, CONTEXT_LIMIT)
       .map((item) => `${ref(item)}: ${oneLine(item.fog as string, 300)}`),
     inProgress: open
       .filter((item) => item.status === 'in_progress')
       .slice(0, CONTEXT_LIMIT)
       .map(ref),
-    unshapedIdeas: ideas
-      .filter((idea) => idea.planItem === null)
+    // Yours and a session's own follow-ons, both unshaped and neither
+    // dismissed -- which is what `mine` and `suggested` already mean.
+    unshapedIdeas: [...ideas.mine, ...ideas.suggested]
       .slice(0, CONTEXT_LIMIT)
       .map((idea) => `${oneLine(idea.body)} (filed ${daysAgo(idea.createdAt, now)} days ago)`),
     openRaises: raised.open
