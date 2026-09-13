@@ -2,7 +2,13 @@
 
 import { useActionState, useState } from 'react';
 import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
-import { answerRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
+import {
+  answerRaise,
+  decideRaise,
+  dismissRaise,
+  reopenRaise,
+  type RaisedActionState,
+} from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
@@ -122,6 +128,54 @@ function AnswerRaise({ row }: { row: RaisedRow }) {
   );
 }
 
+/**
+ * Yes or no on a raise that said what a yes does.
+ *
+ * Yes runs the action it named and writes what happened into the thread, with
+ * no second press: #359 settled that what you asked for is done and reported.
+ * No wants a reason, because a raise that closes into nothing is what the #342
+ * raise did.
+ */
+function Decide({ row }: { row: RaisedRow }) {
+  const [state, action, pending] = useActionState(decideRaise, {} as RaisedActionState);
+  const [refusing, setRefusing] = useState(false);
+
+  if (refusing) {
+    return (
+      <form action={action} className="w-full space-y-2">
+        <input type="hidden" name="id" value={row.id} />
+        <input type="hidden" name="answer" value="no" />
+        <Textarea name="body" rows={2} autoFocus placeholder="Why not. It is what the raise closes on." />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" size="sm" variant="secondary" pending={pending}>
+            Close it
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setRefusing(false)}>
+            Cancel
+          </Button>
+          <FieldError>{state.error}</FieldError>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <form action={action}>
+        <input type="hidden" name="id" value={row.id} />
+        <input type="hidden" name="answer" value="yes" />
+        <Button type="submit" size="sm" pending={pending}>
+          Yes, do it
+        </Button>
+      </form>
+      <Button type="button" size="sm" variant="secondary" onClick={() => setRefusing(true)}>
+        No
+      </Button>
+      <FieldError>{state.error}</FieldError>
+    </div>
+  );
+}
+
 function RaiseCard({ row }: { row: RaisedRow }) {
   const [dismissState, dismissAction, dismissPending] = useActionState(
     dismissRaise,
@@ -175,6 +229,11 @@ function RaiseCard({ row }: { row: RaisedRow }) {
         label="Add a comment"
         placeholder="Something about this raise that is not the answer to it. Tag @dash to ask; it stays open."
       />
+
+      {/* Yes and no only while it is open and only when it named an action:
+          a raise that said nothing about what a yes does has nothing to run,
+          and the answer box below is the whole of what it can take. */}
+      {row.status === 'open' && row.consequence && <Decide row={row} />}
 
       <div className="flex flex-wrap items-center gap-2">
         {row.status !== 'dismissed' && <AnswerRaise row={row} />}
