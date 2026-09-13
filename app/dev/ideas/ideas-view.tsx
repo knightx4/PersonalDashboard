@@ -3,12 +3,20 @@
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { Bot, ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
-import { addIdea, deleteIdea, shapeIdea, updateIdea, type IdeaActionState } from './actions';
+import {
+  addIdea,
+  deleteIdea,
+  dismissIdea,
+  restoreIdea,
+  shapeIdea,
+  updateIdea,
+  type IdeaActionState,
+} from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import type { IdeaRow, IdeaSource } from '@/lib/ideas/load';
+import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
 import { cardVariants } from '@/components/ui/card';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -143,7 +151,7 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
   );
 }
 
-function IdeaCard({ idea }: { idea: IdeaRow }) {
+function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(
     updateIdea,
@@ -151,6 +159,10 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
   );
   const [deleteState, deleteAction, deletePending] = useActionState(
     deleteIdea,
+    {} as IdeaActionState,
+  );
+  const [asideState, asideAction, asidePending] = useActionState(
+    dismissed ? restoreIdea : dismissIdea,
     {} as IdeaActionState,
   );
 
@@ -163,16 +175,22 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
         {/* Only a suggestion is marked. Tagging your own ideas "me" would put a
             label on every row to distinguish the few that need one. */}
         {idea.source === 'claude' && (
-          <span
-            className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted"
-            title={idea.from ? `Suggested while working on #${idea.from.number} ${idea.from.title}` : 'Written by Claude'}
-          >
+          <span className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
             <Bot className="size-3" strokeWidth={2} aria-hidden />
             Suggested
           </span>
         )}
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
       </div>
+
+      {/* Which feature the session was working on when it wrote this. On its
+          own line rather than in the badge's tooltip: a suggestion with no
+          origin reads as a machine talking to itself. */}
+      {idea.source === 'claude' && idea.from && (
+        <p className="text-small text-ink-muted">
+          Came out of #{idea.from.number} {idea.from.title}
+        </p>
+      )}
 
       {editing ? (
         <form action={saveAction} className="space-y-2">
@@ -199,17 +217,30 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
             placeholder="What you think about this idea, or what you would want it to do. Shaping it does not read this."
           />
           <div className="flex flex-wrap items-center gap-2">
-            <ShapeIdea idea={idea} />
-            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
+            {/* A dismissed idea gets one move back into the list and nothing
+                else. Shaping or editing one from inside the fold would be
+                working on a row you have already said no to. */}
+            {!dismissed && (
+              <>
+                <ShapeIdea idea={idea} />
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+                  Edit
+                </Button>
+              </>
+            )}
+            <form action={asideAction}>
+              <input type="hidden" name="id" value={idea.id} />
+              <Button type="submit" size="sm" variant="ghost" pending={asidePending}>
+                {dismissed ? 'Bring back' : 'Dismiss'}
+              </Button>
+            </form>
             <form action={deleteAction}>
               <input type="hidden" name="id" value={idea.id} />
               <Button type="submit" size="sm" variant="ghost" disabled={deletePending}>
                 Delete
               </Button>
             </form>
-            <FieldError>{deleteState.error}</FieldError>
+            <FieldError>{deleteState.error ?? asideState.error}</FieldError>
           </div>
         </>
       )}
@@ -224,60 +255,33 @@ function IdeaCard({ idea }: { idea: IdeaRow }) {
  * the question it answers -- "what did I think of for the job search" -- is
  * answered by a heading without anyone having to work a control first.
  *
+ * Your own ideas are the grouping; what a session suggested sits in one
+ * section under them, so that a night of follow-ons cannot push the two
+ * thoughts you had off the top of the page.
+ *
  * An idea that has been shaped into the plan is out of that grouping entirely
  * and in its own section at the bottom, folded shut. It is finished as an idea
  * -- the thing to do about it now lives on the plan -- and left among the rest
  * it grew the list it was supposed to be leaving, until the page read as
  * mostly-done and the two or three still worth thinking about were the hard
  * part to find. Kept rather than hidden, because "did I already write that
- * down" is a question this page has to answer.
+ * down" is a question this page has to answer. A dismissed idea is in the
+ * fold under that one, for the same reason.
  */
-export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
-  // Whose ideas to show. A filter rather than a second grouping: the module
-  // headings already group the list, and a page grouped two ways reads as
-  // neither.
-  const [whose, setWhose] = useState<IdeaSource | 'all'>('all');
-
-  const unshaped = ideas.filter((idea) => !idea.planItem);
-  const suggested = unshaped.filter((idea) => idea.source === 'claude').length;
-  const open = unshaped.filter((idea) => whose === 'all' || idea.source === whose);
-  const shaped = ideas.filter((idea) => idea.planItem);
+export function IdeasView({ ideas }: { ideas: IdeaList }) {
+  const { mine, suggested, shaped, dismissed } = ideas;
+  const total = mine.length + suggested.length + shaped.length + dismissed.length;
 
   const scopes: Array<ModuleId | null> = [
     null,
-    ...MODULES.map((module) => module.id).filter((id) => open.some((idea) => idea.module === id)),
+    ...MODULES.map((module) => module.id).filter((id) => mine.some((idea) => idea.module === id)),
   ];
 
   return (
     <div className="space-y-6">
       <AddIdea />
 
-      {/* Offered only once there is something to separate. One kind of idea is
-          not two lists. */}
-      {suggested > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(
-            [
-              ['all', `Everything (${unshaped.length})`],
-              ['me', `Mine (${unshaped.length - suggested})`],
-              ['claude', `Suggested (${suggested})`],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={whose === value ? 'secondary' : 'ghost'}
-              aria-pressed={whose === value}
-              onClick={() => setWhose(value)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {ideas.length === 0 && (
+      {total === 0 && (
         // The shared empty state rather than a hand-drawn dashed paragraph:
         // this is the whole page when the list is empty, and law 1 says that
         // gets a real one. The dashed edge is the same dashed edge, drawn once
@@ -292,15 +296,15 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
       {/* Everything written down has been shaped. Not the empty state above:
           nothing is missing here, the list has simply been worked to the end,
           and an empty-handed illustration would be saying the opposite. */}
-      {ideas.length > 0 && open.length === 0 && (
+      {total > 0 && mine.length === 0 && suggested.length === 0 && (
         <p className="text-ui text-ink-muted">
-          Every idea written down has been shaped into the plan. The ones below are kept for
-          the record.
+          Every idea written down has been shaped into the plan or put aside. The ones below
+          are kept for the record.
         </p>
       )}
 
       {scopes.map((scope) => {
-        const rows = open.filter((idea) => idea.module === scope);
+        const rows = mine.filter((idea) => idea.module === scope);
         if (rows.length === 0) return null;
         return (
           <section key={scope ?? 'everything'} className="space-y-2">
@@ -317,6 +321,29 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
         );
       })}
 
+      {/* Under your own list rather than mixed into it. A session working a
+          feature can write several follow-ons in a night, and above the module
+          headings they would be the first thing on the page. Not grouped by
+          workspace: this list is the short one. */}
+      {suggested.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="flex items-center gap-1.5 text-body font-semibold text-ink">
+            <Bot className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
+            Suggested by Claude{' '}
+            <span className="font-normal text-ink-muted">({suggested.length})</span>
+          </h2>
+          <p className="text-small text-ink-muted">
+            Follow-ons a session wrote down while building something else. Shape one into the
+            plan, or dismiss it and it stops being offered.
+          </p>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+            {suggested.map((idea) => (
+              <IdeaCard key={idea.id} idea={idea} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       {shaped.length > 0 && (
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
@@ -331,6 +358,27 @@ export function IdeasView({ ideas }: { ideas: IdeaRow[] }) {
           <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
             {shaped.map((idea) => (
               <IdeaCard key={idea.id} idea={idea} />
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {/* Where a dismissal goes, which is why dismissing is not deleting.
+          Folded shut and out of every count above: the point of putting an
+          idea aside is not reading it again unless you come looking. */}
+      {dismissed.length > 0 && (
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            Dismissed <span className="font-normal text-ink-muted">({dismissed.length})</span>
+          </summary>
+          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+            {dismissed.map((idea) => (
+              <IdeaCard key={idea.id} idea={idea} dismissed />
             ))}
           </ul>
         </details>

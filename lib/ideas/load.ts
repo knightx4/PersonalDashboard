@@ -30,56 +30,99 @@ export type IdeaRow = {
   source: IdeaSource;
   /** The feature a suggestion came out of, when it came out of one. */
   from: { number: number; title: string } | null;
+  /** When it was put aside. Null while it is live. */
+  dismissedAt: string | null;
   /** What has been said about it, oldest first. */
   thread: DevComment[];
 };
 
 /**
+ * The four piles the page draws.
+ *
+ * Your own ideas are the list; a suggestion sits under them so that a session
+ * writing five follow-ons in a night cannot bury the two thoughts you had.
+ * Shaped and dismissed ideas are both behind a fold: one has become a plan
+ * feature, the other you said no to, and neither is something to read past on
+ * the way to the live list.
+ */
+export interface IdeaList {
+  mine: IdeaRow[];
+  suggested: IdeaRow[];
+  shaped: IdeaRow[];
+  dismissed: IdeaRow[];
+}
+
+/** Every column the app reads off an idea, and the two plan items it points at. */
+export const IDEA_COLUMNS =
+  'id, body, module, created_at, source, dismissed_at, ' +
+  // Two foreign keys point at plan_items, so both joins name theirs.
+  'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
+  'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title), ' +
+  `thread:dev_comments(${COMMENT_COLUMNS})`;
+
+/** A row as the app reads it. One shape leaves here, whoever selected it. */
+export function ideaRowFrom(row: Record<string, unknown>): IdeaRow {
+  const scope = row.module as string | null;
+  const linked = row.plan_item as Record<string, unknown> | null;
+  const origin = row.from_plan_item as Record<string, unknown> | null;
+  const source = row.source as string | null;
+  return {
+    id: row.id as string,
+    body: row.body as string,
+    // An unknown value reads as yours. The page separates suggestions out,
+    // and putting an idea you wrote into that pile is the worse mistake.
+    source: source && isIdeaSource(source) ? source : 'me',
+    from: origin ? { number: Number(origin.number), title: String(origin.title) } : null,
+    planItem: linked
+      ? {
+          id: String(linked.id),
+          number: Number(linked.number),
+          title: String(linked.title),
+          status: String(linked.status),
+        }
+      : null,
+    // A module removed from lib/modules leaves a harmless string in the
+    // column; it reads back as "the whole app" rather than as a workspace
+    // nothing can look up.
+    module: scope && isModuleId(scope) ? scope : null,
+    createdAt: row.created_at as string,
+    dismissedAt: (row.dismissed_at as string | null) ?? null,
+    thread: threadFrom(row.thread),
+  };
+}
+
+/**
+ * Dismissed first, because a dismissed idea is out of the page whatever else
+ * is true of it: that is what dismissing it was for.
+ */
+export function ideaListFrom(rows: readonly IdeaRow[]): IdeaList {
+  const dismissed = rows.filter((idea) => idea.dismissedAt);
+  const live = rows.filter((idea) => !idea.dismissedAt);
+  const open = live.filter((idea) => !idea.planItem);
+
+  return {
+    mine: open.filter((idea) => idea.source === 'me'),
+    suggested: open.filter((idea) => idea.source === 'claude'),
+    shaped: live.filter((idea) => idea.planItem),
+    dismissed,
+  };
+}
+
+/**
  * Newest first: the reason to open this page is usually the thought you had
  * last week, not the one you had in March.
  */
-export async function loadIdeas(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<IdeaRow[]> {
+export async function loadIdeas(supabase: SupabaseClient, userId: string): Promise<IdeaList> {
   const { data } = await supabase
     .from('ideas')
-    // Two foreign keys point at plan_items now, so both joins name theirs.
-    .select(
-      'id, body, module, created_at, source, ' +
-        'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
-        'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title), ' +
-        `thread:dev_comments(${COMMENT_COLUMNS})`,
-    )
+    .select(IDEA_COLUMNS)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
-    const scope = row.module as string | null;
-    const linked = row.plan_item as Record<string, unknown> | null;
-    const origin = row.from_plan_item as Record<string, unknown> | null;
-    const source = row.source as string | null;
-    return {
-      id: row.id as string,
-      body: row.body as string,
-      // An unknown value reads as yours. The page separates suggestions out,
-      // and putting an idea you wrote into that pile is the worse mistake.
-      source: source && isIdeaSource(source) ? source : 'me',
-      from: origin ? { number: Number(origin.number), title: String(origin.title) } : null,
-      planItem: linked
-        ? {
-            id: String(linked.id),
-            number: Number(linked.number),
-            title: String(linked.title),
-            status: String(linked.status),
-          }
-        : null,
-      // A module removed from lib/modules leaves a harmless string in the
-      // column; it reads back as "the whole app" rather than as a workspace
-      // nothing can look up.
-      module: scope && isModuleId(scope) ? scope : null,
-      createdAt: row.created_at as string,
-      thread: threadFrom(row.thread),
-    };
-  });
+  // Through `unknown`: the column list is built as an expression, so the
+  // client cannot infer a row shape from it and types the result as its
+  // error case instead.
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+
+  return ideaListFrom(rows.map(ideaRowFrom));
 }

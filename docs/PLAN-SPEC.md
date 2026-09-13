@@ -114,6 +114,25 @@ ready either, whatever its own status says. Nothing in the skill or the CLI
 moves a step out of `proposed` except the person's approve, on the page or
 with `scripts/plan.ts approve`.
 
+### Suggestions
+
+The other direction. Once fog stopped being the place to park a follow-on,
+those follow-ons needed somewhere to go, and `/dev/ideas` is it: a session
+writes one with `scripts/plan.ts idea`, which stamps `source = 'claude'` and
+`from_plan_item_id` with the step it came from.
+
+The page keeps the two apart. Your own ideas are the list, grouped by
+workspace; suggestions are one section beneath them, each saying which feature
+it came out of. A night of follow-ons therefore cannot push the two thoughts
+you had off the top of the page, and a suggestion is otherwise an idea like
+any other — Shape into a plan works on it the same way.
+
+**Dismissing** is the answer to a suggestion you do not want, and it is not
+deleting (#340). `dismissed_at` puts the row in the Dismissed fold at the
+bottom of the page, out of every count above it and out of `plan.ts ideas`,
+which is what stops the next session offering it again. Bring back returns it
+to the list. Delete is still there for a row that should not exist at all.
+
 ## Decisions and fog
 
 ### When a re-shape starts
@@ -392,7 +411,8 @@ Three ways in, all landing on the same rows.
 next [--claude]     what could be picked up, most urgent first
 list [--all]        the tree, per module
 show <n>            the brief
-ideas               ideas not yet shaped into the plan
+ideas               ideas not yet shaped into the plan, dismissals left out
+idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
                     [--fog "…"] [--kind decision]
 approve <n>         a person's move: the step and the proposed steps beneath it
