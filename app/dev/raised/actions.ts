@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { carryOut } from '@/lib/comments/act';
+import { askDash } from '@/lib/comments/ask';
 import { isModuleId } from '@/lib/modules';
 import { consequenceFrom } from '@/lib/raised/consequence';
 
@@ -20,7 +21,9 @@ const answerSchema = z.enum(['yes', 'no']);
  * One line in the thread, under the same account and marked as whose it is.
  *
  * Both halves are written by you: the marker is the only thing that says which
- * of them said it, the same as lib/comments/ask.ts.
+ * of them said it, the same as lib/comments/ask.ts. The id comes back because
+ * a line of yours that is also an instruction is handed to the comment path,
+ * which leaves it out of the history it reads.
  */
 async function say(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -28,13 +31,13 @@ async function say(
   id: string,
   author: 'me' | 'claude',
   body: string,
-): Promise<void> {
-  await supabase.from('dev_comments').insert({
-    user_id: userId,
-    raised_item_id: id,
-    author,
-    body,
-  });
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('dev_comments')
+    .insert({ user_id: userId, raised_item_id: id, author, body })
+    .select('id')
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
 }
 
 /**
@@ -49,6 +52,11 @@ async function say(
  * A yes whose action fails leaves the raise open: the thread says why, and a
  * raise closed over something that did not happen is the thing this exists to
  * stop.
+ *
+ * Words written beside a yes are not covered by the action it declared, so
+ * they go down the comment path afterwards and can file an idea, start a
+ * build or reword a row like any other instruction. A yes on its own costs no
+ * model call.
  *
  * A no closes it with the reason and does nothing else.
  */
@@ -102,7 +110,9 @@ export async function decideRaise(
     return { error: 'This raise never said what a yes would do, so there is nothing to run.' };
   }
 
-  await say(supabase, user.id, id.data, 'me', 'Yes.');
+  const extra = String(formData.get('body') ?? '').trim().slice(0, 4000);
+  const said = await say(supabase, user.id, id.data, 'me', extra ? `Yes — ${extra}` : 'Yes.');
+
   const outcome = await carryOut({
     supabase,
     userId: user.id,
@@ -112,17 +122,31 @@ export async function decideRaise(
   });
   await say(supabase, user.id, id.data, 'claude', outcome.ok ? outcome.said : outcome.why);
 
-  if (!outcome.ok) {
-    revalidatePath('/dev/raised');
-    return { error: outcome.why };
+  if (outcome.ok) {
+    const { error } = await close();
+    if (error) return { error: error.message };
+    if (outcome.redraw) revalidatePath(outcome.redraw);
   }
 
-  const { error } = await close();
-  if (error) return { error: error.message };
+  // What they wrote beyond the yes, handled as a comment on the same raise:
+  // the declared action covers the option and nothing else, and "take a look
+  // at the bug I just sent in too" is an instruction like any other.
+  const asked = extra && said
+    ? await askDash({
+        supabase,
+        userId: user.id,
+        target: 'raise',
+        id: id.data,
+        commentId: said,
+        question: extra,
+      })
+    : null;
+  if (asked?.ok && asked.redraw) revalidatePath(asked.redraw);
 
-  if (outcome.redraw) revalidatePath(outcome.redraw);
   revalidatePath('/dev/raised');
-  return { message: 'Done.' };
+  if (!outcome.ok) return { error: outcome.why };
+  if (asked && !asked.ok) return { error: asked.error };
+  return { message: asked ? `Done. ${asked.message}` : 'Done.' };
 }
 
 /**

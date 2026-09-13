@@ -57,6 +57,10 @@ describe('a raise on the page', () => {
     expect(html).toContain('Refuse a second session on a step already being worked');
     expect(html).toContain('Yes, do it');
     expect(html).toContain('>No</button>');
+    expect(html).toContain('Yes, and…');
+    // The box for those extra words is closed until it is asked for, so a page
+    // of raises is not a page of textareas.
+    expect(html).not.toContain('Anything the action above does not cover');
   });
 
   it('shows neither for a raise filed before it said what a yes does', () => {

@@ -135,12 +135,17 @@ function AnswerRaise({ row }: { row: RaisedRow }) {
  * no second press: #359 settled that what you asked for is done and reported.
  * No wants a reason, because a raise that closes into nothing is what the #342
  * raise did.
+ *
+ * "Yes, and…" opens a box for anything the declared action does not cover —
+ * "take a look at the bug I just sent in too" — which is read as a comment on
+ * the raise once the action has run. Closed until asked for (law 14): the
+ * common answer is one press.
  */
 function Decide({ row }: { row: RaisedRow }) {
   const [state, action, pending] = useActionState(decideRaise, {} as RaisedActionState);
-  const [refusing, setRefusing] = useState(false);
+  const [saying, setSaying] = useState<'nothing' | 'more' | 'why not'>('nothing');
 
-  if (refusing) {
+  if (saying === 'why not') {
     return (
       <form action={action} className="w-full space-y-2">
         <input type="hidden" name="id" value={row.id} />
@@ -150,7 +155,7 @@ function Decide({ row }: { row: RaisedRow }) {
           <Button type="submit" size="sm" variant="secondary" pending={pending}>
             Close it
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setRefusing(false)}>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSaying('nothing')}>
             Cancel
           </Button>
           <FieldError>{state.error}</FieldError>
@@ -160,19 +165,32 @@ function Decide({ row }: { row: RaisedRow }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <form action={action}>
-        <input type="hidden" name="id" value={row.id} />
-        <input type="hidden" name="answer" value="yes" />
+    <form action={action} className="w-full space-y-2">
+      <input type="hidden" name="id" value={row.id} />
+      <input type="hidden" name="answer" value="yes" />
+      {saying === 'more' && (
+        <Textarea
+          name="body"
+          rows={2}
+          autoFocus
+          placeholder="Anything the action above does not cover. It is read as a comment on this raise."
+        />
+      )}
+      <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" pending={pending}>
           Yes, do it
         </Button>
-      </form>
-      <Button type="button" size="sm" variant="secondary" onClick={() => setRefusing(true)}>
-        No
-      </Button>
-      <FieldError>{state.error}</FieldError>
-    </div>
+        <Button type="button" size="sm" variant="secondary" onClick={() => setSaying('why not')}>
+          No
+        </Button>
+        {saying === 'nothing' && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setSaying('more')}>
+            Yes, and…
+          </Button>
+        )}
+        <FieldError>{state.error}</FieldError>
+      </div>
+    </form>
   );
 }
 
