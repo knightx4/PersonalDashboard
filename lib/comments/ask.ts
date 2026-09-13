@@ -171,8 +171,17 @@ export async function askDash(input: AskInput): Promise<AskOutcome> {
     return { ok: false, error: why };
   }
 
-  // Needs the repository. The person hears why now and the answer lands here
-  // when the session that can read the code has written it.
+  // Needs the repository, so the session that can read the code is started and
+  // its answer is the next thing in the thread.
+  //
+  // It used to say so first: a `claude` comment reading "I have started a
+  // session on it; the answer will land here", and then the real answer under
+  // it. That is a thing nobody wrote, standing above every answer that ever
+  // took the slow path, and it is still there a week later when the only
+  // question is what the answer was. The thread keeps what was said, not the
+  // machinery that said it -- which route a question took is not part of the
+  // conversation. The page says something is coming while it is coming, and
+  // that line goes away when it arrives.
   const routine = planRoutine();
   const started = await fireFeatureRoutine({
     apiKey: routine.token,
@@ -180,12 +189,14 @@ export async function askDash(input: AskInput): Promise<AskOutcome> {
     text: sessionTurn(input, subject),
   });
 
+  // A failure is different, and it is still written down. This is the end of
+  // the question: nothing else is coming, and a thread that went quiet is the
+  // one outcome the person cannot tell from working.
   if (!started.ok) {
     const why = `${reply.why} I could not start a session to look: ${started.error}`;
     await say(input, why);
     return { ok: false, error: why };
   }
 
-  await say(input, `${reply.why} I have started a session on it; the answer will land here.`);
   return { ok: true, message: 'A session is reading the code. Its answer lands in this thread.' };
 }
