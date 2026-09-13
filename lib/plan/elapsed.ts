@@ -41,6 +41,27 @@ export function isStalledClaim(startedAt: string, now: number): boolean {
   return (now - new Date(startedAt).getTime()) / 60_000 >= STALLED_AFTER_MINUTES;
 }
 
+/**
+ * Whether a step is genuinely being worked right now.
+ *
+ * `in_progress` on its own does not answer that, because nothing releases the
+ * status when the session holding it stops. The page has read the clock
+ * alongside the status for a while; the guards that refuse a second session
+ * did not, so one dead run left a feature refusing work forever. Both read
+ * this now, and they agree about what "underway" means.
+ *
+ * A claim with no `startedAt` counts as live: the column is stamped by a
+ * trigger, so a row without one was claimed this instant.
+ */
+export function hasLiveClaim(
+  step: { status: string; startedAt: string | null },
+  now: number,
+): boolean {
+  if (step.status !== 'in_progress') return false;
+  if (!step.startedAt) return true;
+  return !isStalledClaim(step.startedAt, now);
+}
+
 export function elapsedSince(startedAt: string, now: number): string {
   const minutes = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 60_000));
   if (minutes < 1) return 'just now';
