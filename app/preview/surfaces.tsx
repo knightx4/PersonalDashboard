@@ -28,7 +28,9 @@ import {
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { ReadingCard } from '@/components/learn/reading-card';
+import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
+import type { Concept } from '@/lib/learn/graph/model';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -1091,6 +1093,64 @@ const readingRow = (
   ...row,
 });
 
+/**
+ * A subject's chain, with the doors in it. Four concepts is what one goal
+ * leaves standing; the point of the surface is the two groups and the size
+ * difference between them.
+ */
+const subjectConcepts: Concept[] = [
+  {
+    id: 'k1',
+    name: 'Opportunity cost',
+    claim:
+      'A choice costs you the next best thing you could have done with the same time or money, whether or not any of it changed hands.',
+    basis: 'Standard in any first-year sequence, and the one the rest of the chain rests on.',
+    kind: 'threshold',
+    state: 'shaky',
+    established: 'tested',
+    misconception: null,
+    mastery: [],
+    testedAt: '2026-09-02T09:00:00.000Z',
+  },
+  {
+    id: 'k2',
+    name: 'Marginal thinking',
+    claim:
+      'The question is always what one more unit costs and returns, not what the whole activity is worth on average.',
+    basis: 'Named in the goal, and every model after it assumes you have it.',
+    kind: 'threshold',
+    state: 'unknown',
+    established: 'inferred',
+    misconception: null,
+    mastery: [],
+    testedAt: null,
+  },
+  {
+    id: 'k3',
+    name: 'Sunk cost',
+    claim: 'Money already spent is not a reason to continue, because it is gone under either choice.',
+    basis: 'Follows from opportunity cost once the counterfactual is the comparison.',
+    kind: 'consequence',
+    state: 'misconception',
+    established: 'tested',
+    misconception: 'You treat the amount already spent as part of what continuing is worth.',
+    mastery: [],
+    testedAt: '2026-09-05T18:30:00.000Z',
+  },
+  {
+    id: 'k4',
+    name: 'Deadweight loss',
+    claim: 'A tax that changes behaviour destroys trades that both sides wanted, and that loss goes to nobody.',
+    basis: 'Inferred from the goal, not checked against a syllabus.',
+    kind: 'consequence',
+    state: 'unknown',
+    established: 'inferred',
+    misconception: null,
+    mastery: [],
+    testedAt: null,
+  },
+];
+
 const trackReadings: ReadingRow[] = [
   readingRow({
     id: 'rd1',
@@ -1435,6 +1495,17 @@ export const SURFACES: readonly Surface[] = [
           <ReadingCard key={reading.id} reading={reading} />
         ))}
       </ul>
+    ),
+  },
+  {
+    /* The chain a subject reads as: the doors it turns on, then everything
+     * downstream of them. The size difference is the surface. */
+    id: 'learn-subject-chain',
+    label: 'Subject · Doors and what follows',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <ConceptList concepts={subjectConcepts} nextId="k1" subjectId="s1" />
     ),
   },
   {

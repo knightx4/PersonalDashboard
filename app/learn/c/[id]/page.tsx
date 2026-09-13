@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
 import { ESTABLISHED_LABEL, STATE_LABEL, StateMark } from '@/components/learn/concept-state';
+import { KIND_LINE } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
@@ -146,6 +147,10 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         </p>
 
         {concept.misconception && <p className="mt-2 text-ui text-danger">{concept.misconception}</p>}
+
+        {/* Which kind of node it is, said only when somebody judged it: a
+            concept from before the marks existed says nothing here. */}
+        {concept.kind && <p className="mt-2 text-ui text-ink-muted">{KIND_LINE[concept.kind]}</p>}
 
         {/* Why the node is in this subject at all, which is a different claim
             from what you know about it. */}
