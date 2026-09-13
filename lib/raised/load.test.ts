@@ -7,11 +7,13 @@ const raise = (over: {
   status?: string;
   module?: string | null;
   ask?: string | null;
+  consequence?: unknown;
 }) => ({
   id: over.id,
   title: `raise ${over.id}`,
   detail: null,
   ask: over.ask === undefined ? 'Run the gate on the merge to main? I would.' : over.ask,
+  consequence: over.consequence ?? null,
   module: over.module === undefined ? 'dev' : over.module,
   source: 'the plan routine, step #199',
   status: over.status ?? 'open',
@@ -102,6 +104,7 @@ describe('a raise as the app reads it', () => {
     expect(selected).toContain('source');
     expect(selected).toContain('answered_at');
     expect(selected).toContain('ask');
+    expect(selected).toContain('consequence');
     expect(row.source).toBe('the plan routine, step #199');
     expect(row.answeredAt).toBeNull();
   });
@@ -115,6 +118,26 @@ describe('a raise as the app reads it', () => {
     );
     expect(
       raisedRowFrom(raise({ id: 'b', created_at: '2026-09-01T09:00:00Z', ask: null })).ask,
+    ).toBeNull();
+  });
+
+  // What a yes does, read off the column with the sentence the page shows. The
+  // raises filed before the column existed have none, and show none.
+  it('carries what answering yes does, and is null on a raise that named none', () => {
+    const named = raisedRowFrom(
+      raise({
+        id: 'a',
+        created_at: '2026-09-01T09:00:00Z',
+        consequence: { name: 'file_idea', text: 'Run the gate on the merge', module: null },
+      }),
+    );
+
+    expect(named.consequence?.action.name).toBe('file_idea');
+    expect(named.consequence?.said).toBe(
+      'Files this on the ideas page, about Dev: Run the gate on the merge',
+    );
+    expect(
+      raisedRowFrom(raise({ id: 'b', created_at: '2026-09-01T09:00:00Z' })).consequence,
     ).toBeNull();
   });
 });

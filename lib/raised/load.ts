@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
+import { consequenceFrom, type RaiseConsequence } from './consequence';
 
 /**
  * What sessions have raised, read for the dev pages.
@@ -25,6 +26,12 @@ export type RaisedRow = {
    * for it — everything raised from here carries one.
    */
   ask: string | null;
+  /**
+   * What answering yes does: the action itself, and the sentence the page
+   * shows under the ask. Null on the rows filed before there was a column for
+   * it — everything raised from here names one.
+   */
+  consequence: RaiseConsequence | null;
   /** The workspace it is about, or null for the app as a whole. */
   module: ModuleId | null;
   /** Which run raised it, and what it was doing. Free text from the session. */
@@ -50,21 +57,27 @@ export function isOpen(row: RaisedRow): boolean {
 
 /** Every column the app reads off a raise, and the thread under it. */
 export const RAISED_COLUMNS =
-  'id, title, detail, ask, module, source, status, created_at, answered_at, ' +
+  'id, title, detail, ask, consequence, module, source, status, created_at, answered_at, ' +
   `thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
-  const scope = row.module as string | null;
+  const raw = row.module as string | null;
+  // Named `scope` rather than `module`, which Next reserves. A module removed
+  // from lib/modules reads back as the whole app, and the consequence's
+  // sentence has to say the same thing, so it is read from what the row ends
+  // up with rather than from the column.
+  const scope = raw && isModuleId(raw) ? raw : null;
   return {
     id: row.id as string,
     title: row.title as string,
     detail: (row.detail as string | null) ?? null,
     ask: (row.ask as string | null) ?? null,
+    consequence: consequenceFrom(row.consequence, scope),
     // A module removed from lib/modules leaves a harmless string in the
     // column, and it reads back as the whole app rather than as a workspace
     // nothing can look up. Same as ideas.
-    module: scope && isModuleId(scope) ? scope : null,
+    module: scope,
     source: (row.source as string | null) ?? null,
     status: row.status as RaisedStatus,
     createdAt: row.created_at as string,

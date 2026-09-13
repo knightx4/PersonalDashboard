@@ -39,6 +39,23 @@ function Ask({ ask }: { ask: string }) {
 }
 
 /**
+ * What a yes does, said before you give it. The #342 raise was answered yes,
+ * closed, and produced nothing; reading the action first is what makes the
+ * answer worth something. A raise filed before there was a column for it shows
+ * nothing here.
+ */
+function Consequence({ said }: { said: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
+        Answering yes
+      </p>
+      <p className="whitespace-pre-wrap text-body text-ink-muted">{said}</p>
+    </div>
+  );
+}
+
+/**
  * The first sentence of the detail, for the closed line of the fold — law 10
  * wants the summary to say whether opening it is worth it.
  */
@@ -134,6 +151,7 @@ function RaiseCard({ row }: { row: RaisedRow }) {
       {row.ask ? (
         <>
           <Ask ask={row.ask} />
+          {row.consequence && <Consequence said={row.consequence.said} />}
           {row.detail && (
             <Disclosure title="Why it came up" meta={lead(row.detail)}>
               <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>

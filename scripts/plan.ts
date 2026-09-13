@@ -18,7 +18,8 @@
  *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
  *                                # file one follow-on, marked as your suggestion
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
- *   npx tsx scripts/plan.ts raise "<title>" [--detail "…"] [--module <id>]
+ *   npx tsx scripts/plan.ts raise "<title>" --ask "…" --consequence "<action>: <what>"
+ *                                [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
  *   npx tsx scripts/plan.ts raises                      # open raises, and answers not replied to
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
@@ -51,6 +52,7 @@ import postgres from 'postgres';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import { reshapeStamp } from '../lib/plan/origin';
+import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
 import {
   isClosed,
   isDismissed,
@@ -273,6 +275,7 @@ type RaisedListRow = {
   title: string;
   detail: string | null;
   ask: string | null;
+  consequence: unknown;
   module: string | null;
   source: string | null;
   status: string;
@@ -291,6 +294,8 @@ function printRaise(row: RaisedListRow): void {
   if (row.source) console.log(`  raised by ${row.source}`);
   // The ask above the story, the same order the page reads it in.
   if (row.ask) console.log(`  asks: ${row.ask.replace(/\s+/g, ' ')}`);
+  const consequence = consequenceFrom(row.consequence, scope);
+  if (consequence) console.log(`  a yes: ${consequence.said.replace(/\s+/g, ' ')}`);
   if (row.detail) console.log(`  ${row.detail.replace(/\s+/g, ' ')}`);
   for (const comment of row.comments ?? []) {
     console.log(`  ${comment.author === 'me' ? 'user' : 'claude'}: ${comment.body.replace(/\s+/g, ' ')}`);
@@ -407,7 +412,12 @@ async function main(): Promise<void> {
      */
     if (command === 'raise') {
       const title = target?.trim();
-      if (!title) fail('Give the raise: raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>].');
+      if (!title) {
+        fail(
+          'Give the raise: raise "…" --ask "…" --consequence "<action>: <what>"\n' +
+            '[--detail "…"] [--module <id>] [--from <n>].',
+        );
+      }
       if (title.length > 200) fail('A title is at most 200 characters.');
 
       const moduleArg = arg('--module');
@@ -431,16 +441,35 @@ async function main(): Promise<void> {
       }
       if (ask.length > 500) fail('An ask is at most 500 characters.');
 
+      /**
+       * What a yes does, named here rather than worked out when it is
+       * answered. The #342 raise was answered yes, closed, and produced
+       * nothing; a named action is what #365 runs, so a raise that cannot name
+       * one is a raise that is not ready to be asked.
+       */
+      const scope = moduleArg && isModuleId(moduleArg) ? moduleArg : null;
+      const consequenceArg = arg('--consequence')?.trim();
+      if (!consequenceArg) {
+        fail(
+          `A raise needs --consequence: what a yes does, written as "${CONSEQUENCE_SHAPE}".\n` +
+            'Say the action in the same words a comment instruction uses, so answering runs it\n' +
+            'rather than leaving you to. A yes that does nothing is what this column exists for.',
+        );
+      }
+      const consequence = parseConsequenceArg(consequenceArg, scope);
+      if (!consequence.ok) fail(consequence.why);
+
       const from = arg('--from');
       const step = from ? await byNumber(sql, userId, from) : null;
       const source = arg('--source') ?? (step ? `plan #${step.number}` : null);
 
       const [row] = await sql<{ id: string }[]>`
-        insert into raised_items (user_id, module, title, detail, ask, source)
-        values (${userId}, ${moduleArg && isModuleId(moduleArg) ? moduleArg : null}, ${title},
-                ${detail}, ${ask}, ${source})
+        insert into raised_items (user_id, module, title, detail, ask, consequence, source)
+        values (${userId}, ${scope}, ${title},
+                ${detail}, ${ask}, ${sql.json(consequence.action)}, ${source})
         returning id`;
       console.log(`${row.id.slice(0, 8)}  raised: ${title}`);
+      console.log(`a yes: ${consequence.said}`);
       console.log('It is on /dev/raised, and in the bell until it is answered or dismissed.');
       return;
     }
@@ -453,7 +482,8 @@ async function main(): Promise<void> {
      */
     if (command === 'raises') {
       const rows = await sql<RaisedListRow[]>`
-        select r.id, r.title, r.detail, r.ask, r.module, r.source, r.status, r.created_at,
+        select r.id, r.title, r.detail, r.ask, r.consequence, r.module, r.source, r.status,
+               r.created_at,
                (
                  select json_agg(
                           json_build_object('author', c.author, 'body', c.body)

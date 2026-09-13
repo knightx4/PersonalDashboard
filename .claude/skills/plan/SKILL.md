@@ -42,7 +42,8 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # user's own ideas. --from names the step
                                                # you were on when you thought of it.
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
-npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>]
+npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
+                                [--detail "…"] [--module <id>] [--from <n>]
                                                # ask the person something. Never answered by you.
 npx tsx scripts/plan.ts raises                 # open raises, and answers no session has replied to
 ```
@@ -226,7 +227,8 @@ idea. If it is none of those and it still needs the person, it is a raise.
 
 ```
 npx tsx scripts/plan.ts raises      # open ones, and answers no session has replied to
-npx tsx scripts/plan.ts raise "…" --ask "…" [--detail "…"] [--module <id>] [--from <n>]
+npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
+                                    [--detail "…"] [--module <id>] [--from <n>]
 ```
 
 An open raise is the person still waiting to be asked; an answered one carries
@@ -242,6 +244,16 @@ as a session narrating, the page fills with paragraphs nobody can clear, and
 the person cannot tell what is being asked. "Should the merge to main run tsc
 and next build before it lands? I would; it costs a minute and catches a broken
 main." — not "worth deciding whether the merge should run the gate."
+
+**`--consequence` is required too, and it is what a yes does.** Written as
+`<action>: <what it works on>`, using the same action names a comment
+instruction uses — `file_idea`, `reword`, `send_step`. Answering yes runs it,
+so the raise produces something rather than closing into a thread nobody reads
+back: `--consequence "file_idea: Refuse a second session on a step already
+being worked"`. A raise whose action you cannot name is one that is not ready
+to be asked. Where the answer is a piece of work rather than one of those three
+moves, name `file_idea` with what to do; it lands on the ideas page and is
+shaped from there.
 
 **A session never answers or dismisses a raise**, the same rule as never
 answering its own decision. Replying to an answer the person wrote is the
@@ -587,14 +599,20 @@ where id = '…';
 -- `ask` is the move you want back, in one sentence answerable in one line;
 -- the CLI refuses a raise without one and doing the insert by hand does not
 -- make it optional.
-insert into raised_items (user_id, module, title, detail, ask, source, status)
-values ('…', 'dev', '…', '…', '…', 'plan #<n>', 'open')
+-- `consequence` is what a yes does, in the shape lib/comments/act.ts carries
+-- out: {"name": "file_idea" | "reword" | "send_step", "text": "…",
+-- "module": "…" | null, "field": null}. The CLI refuses a raise without one
+-- and doing the insert by hand does not make it optional either.
+insert into raised_items (user_id, module, title, detail, ask, consequence, source, status)
+values ('…', 'dev', '…', '…', '…', '{"name": "file_idea", "text": "…"}'::jsonb,
+        'plan #<n>', 'open')
 returning id;
 
 -- what is outstanding in both directions: what the person has not answered,
 -- and what they answered that no session has replied to. Read at the start of
 -- a run.
-select r.id, r.title, r.detail, r.ask, r.module, r.source, r.status, r.created_at,
+select r.id, r.title, r.detail, r.ask, r.consequence, r.module, r.source, r.status,
+       r.created_at,
        (
          select json_agg(json_build_object('author', c.author, 'body', c.body)
                          order by c.created_at)
