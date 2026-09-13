@@ -29,6 +29,7 @@ import {
   StickyNote,
   Tag,
   Target,
+  Timer,
   Undo2,
   Users,
 } from 'lucide-react';
@@ -91,6 +92,10 @@ export const NAV_ICONS = {
   readNow: BookOpenCheck,
   know: Network,
   learnNext: Target,
+  // The five-minute session. A clock rather than a question mark: what
+  // separates it from Read now is how long it takes, and the question mark is
+  // already the dev workspace's raised tab.
+  fiveMinutes: Timer,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

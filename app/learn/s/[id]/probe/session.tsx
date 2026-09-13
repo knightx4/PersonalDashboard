@@ -2,11 +2,11 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
+import { ProbeOptions } from '@/components/learn/probe-options';
 import {
   answerQuestion,
   approveFloor,
@@ -58,30 +58,6 @@ function AskButton({ label }: { label: string }) {
     <Button type="submit" variant="secondary" disabled={pending}>
       {pending ? 'Writing a question…' : label}
     </Button>
-  );
-}
-
-function AnswerButton({ index, label, disabled }: { index: number; label: string; disabled: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      name="chosenIndex"
-      value={index}
-      disabled={pending || disabled}
-      className={cn(
-        // ui-ok: hand-rolled-box -- a control's own frame, not a frame around
-        // a group. Law 11 is about a border standing in for space, alignment
-        // or a ground; the edge of an answer option is the option. The shared
-        // Button does not fit: this is full width, left aligned, and wraps to
-        // as many lines as the answer needs, where Button is centred on one
-        // line at the dial's height. Same call as components/todo/task-form.
-        'w-full rounded-control border border-border px-4 py-3 text-left text-body text-ink',
-        'hover:border-accent hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-70',
-      )}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -193,27 +169,7 @@ export function ProbeSession({
             <input type="hidden" name="conceptId" value={live.conceptId} />
             <input type="hidden" name="subjectId" value={subjectId} />
 
-            {live.options.map((option, index) => (
-              <div key={option} className="relative">
-                <AnswerButton index={index} label={option} disabled={Boolean(live.answered)} />
-                {live.answered && index === live.answered.correctIndex && (
-                  <Check
-                    className="absolute right-3 top-3.5 size-4 text-ink-muted"
-                    strokeWidth={2}
-                    aria-label="The correct answer"
-                  />
-                )}
-                {live.answered &&
-                  index === live.answered.chosenIndex &&
-                  index !== live.answered.correctIndex && (
-                    <X
-                      className="absolute right-3 top-3.5 size-4 text-danger"
-                      strokeWidth={2}
-                      aria-label="What you picked"
-                    />
-                  )}
-              </div>
-            ))}
+            <ProbeOptions options={live.options} answered={live.answered ?? null} />
           </form>
 
           {live.answered && (
