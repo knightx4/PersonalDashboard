@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -31,6 +32,8 @@ export type IdeaRow = {
   from: { number: number; title: string } | null;
   /** When it was put aside. Null while it is live. */
   dismissedAt: string | null;
+  /** What has been said about it, oldest first. */
+  thread: DevComment[];
 };
 
 /**
@@ -54,7 +57,8 @@ export const IDEA_COLUMNS =
   'id, body, module, created_at, source, dismissed_at, ' +
   // Two foreign keys point at plan_items, so both joins name theirs.
   'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
-  'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title)';
+  'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title), ' +
+  `thread:dev_comments(${COMMENT_COLUMNS})`;
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function ideaRowFrom(row: Record<string, unknown>): IdeaRow {
@@ -83,6 +87,7 @@ export function ideaRowFrom(row: Record<string, unknown>): IdeaRow {
     module: scope && isModuleId(scope) ? scope : null,
     createdAt: row.created_at as string,
     dismissedAt: (row.dismissed_at as string | null) ?? null,
+    thread: threadFrom(row.thread),
   };
 }
 

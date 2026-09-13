@@ -598,14 +598,14 @@ select r.id, r.title, r.detail, r.ask, r.module, r.source, r.status, r.created_a
        (
          select json_agg(json_build_object('author', c.author, 'body', c.body)
                          order by c.created_at)
-         from raised_comments c where c.raised_item_id = r.id
+         from dev_comments c where c.raised_item_id = r.id
        ) as comments
 from raised_items r
 where r.user_id = '…' and r.status in ('open', 'answered')
 order by r.created_at desc;
 
 -- replying to an answer, which is how a raise takes a second round.
-insert into raised_comments (user_id, raised_item_id, author, body)
+insert into dev_comments (user_id, raised_item_id, author, body)
 values ('…', '<the raise>', 'claude', '…');
 ```
 

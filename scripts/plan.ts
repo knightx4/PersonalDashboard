@@ -459,7 +459,7 @@ async function main(): Promise<void> {
                           json_build_object('author', c.author, 'body', c.body)
                           order by c.created_at
                         )
-                 from raised_comments c where c.raised_item_id = r.id
+                 from dev_comments c where c.raised_item_id = r.id
                ) as comments
         from raised_items r
         where r.user_id = ${userId} and r.status in ('open', 'answered')

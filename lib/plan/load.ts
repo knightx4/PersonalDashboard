@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -135,6 +136,12 @@ export type PlanItem = {
   fogDismissedAt: string | null;
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
+  /**
+   * What has been said about it, oldest first: your notes and a session's
+   * replies. Not a column — it is read alongside the row — and empty on the
+   * paths that do not ask for it, the CLI's direct connection among them.
+   */
+  thread: DevComment[];
   priority: PlanPriority;
   size: PlanSize | null;
   assignee: PlanAssignee | null;
@@ -179,7 +186,11 @@ export async function loadPlan(
   const [{ data: rows }, { data: deps }] = await Promise.all([
     supabase
       .from('plan_items')
-      .select(ITEM_COLUMNS)
+      // The thread is read with the row rather than as a second query, the
+      // same as on a raise. It is not in ITEM_COLUMNS because an embedded
+      // select is PostgREST's and the CLI reads these columns over a direct
+      // connection.
+      .select(`${ITEM_COLUMNS}, thread:dev_comments(${COMMENT_COLUMNS})`)
       .eq('user_id', userId)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true }),
@@ -234,6 +245,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     dismissedAt: stamp(row.dismissed_at),
     fogDismissedAt: stamp(row.fog_dismissed_at),
     comment: (row.comment as string | null) ?? null,
+    thread: threadFrom(row.thread),
     priority: isPlanPriority(priority) ? priority : 2,
     size: size && isPlanSize(size) ? size : null,
     assignee: assignee && isPlanAssignee(assignee) ? assignee : null,
