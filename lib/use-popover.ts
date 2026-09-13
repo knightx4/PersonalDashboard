@@ -58,6 +58,11 @@ export function usePopover({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation();
+        // Back to the trigger now, while the panel is still mounted. The
+        // cleanup below cannot do it on this path: by the time it runs React
+        // has already removed the panel, so `activeElement` has fallen back to
+        // <body> and the check there sees focus as having left on its own.
+        if (panelRef.current?.contains(document.activeElement)) trigger?.focus();
         onCloseRef.current();
         return;
       }
