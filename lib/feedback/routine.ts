@@ -53,7 +53,7 @@ export function notesRoutine(): RoutineTarget {
   };
 }
 
-/** The routine that works the plan -- "Send to Claude" and "Shape into a plan". */
+/** The routine that works the plan -- "Send to Dash" and "Shape into a plan". */
 export function planRoutine(): RoutineTarget {
   return {
     id: firstSet(process.env.CLAUDE_PLAN_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID),

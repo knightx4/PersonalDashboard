@@ -115,7 +115,7 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
 
 const PRIORITY_LABEL: Record<PlanPriority, string> = { 1: 'Next', 2: 'Normal', 3: 'Someday' };
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
-const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Claude' };
+const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -305,7 +305,7 @@ function SendTheQueue({ count }: { count: number }) {
           title="Hand the whole queue to one routine, worked in order"
         >
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : `Send all ${count} to Claude`}
+          {pending ? 'Sending…' : `Send all ${count} to Dash`}
         </Button>
       </form>
       {(state.error ?? state.message) && (
@@ -348,8 +348,8 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
       'Shape an idea from the ideas page and its proposal will appear here for you to approve.',
   },
   claude: {
-    title: "Nothing of Claude's right now",
-    description: 'Hand a step to Claude from its menu, or send one straight to the routine.',
+    title: "Nothing of Dash's right now",
+    description: 'Hand a step to Dash from its menu, or send one straight to the routine.',
   },
   you: {
     title: 'Nothing waiting on you',
@@ -383,7 +383,7 @@ function SummaryStrip({
       ? [{ view: 'dismissed' as const, value: summary.dismissed, noun: 'dismissed' }]
       : []),
     { view: null, value: summary.inProgress, noun: 'underway' },
-    { view: 'claude', value: summary.claude, noun: "Claude's" },
+    { view: 'claude', value: summary.claude, noun: "Dash's" },
     { view: null, value: summary.done, noun: 'done' },
   ];
 
@@ -1353,8 +1353,8 @@ function Dependencies({
 function sendLabel(node: PlanNode): string {
   const beneath = flatten([node]).length - 1;
   return beneath === 0
-    ? `Send #${node.number} to Claude`
-    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Claude`;
+    ? `Send #${node.number} to Dash`
+    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Dash`;
 }
 
 /**
@@ -1412,7 +1412,7 @@ function SendToClaude({
             size="sm"
             variant="ghost"
             pending={batchPending}
-            title="Hand every open step beneath this one to Claude, worked in order"
+            title="Hand every open step beneath this one to Dash, worked in order"
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
@@ -1584,7 +1584,7 @@ function Underway({ startedAt, assignee }: { startedAt: string; assignee: string
       title={
         stalled
           ? `Claimed ${since} and untouched since. A session that stops without closing its step leaves it here — close it or put it back.`
-          : `${assignee === 'claude' ? 'Claude has been on this' : 'Underway'} since ${since}`
+          : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
@@ -2025,8 +2025,8 @@ function PlanRow({
   const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
   const handOver = node.assignee !== 'claude';
   const assignLabel = handOver
-    ? `Hand to Claude${beneath}`
-    : `Take back from Claude${beneath}`;
+    ? `Hand to Dash${beneath}`
+    : `Take back from Dash${beneath}`;
 
   const menu: ActionMenuItem[] = [
     {
@@ -2214,7 +2214,7 @@ function PlanRow({
                 * worth reading. */}
               {node.assignee === 'claude' && (
                 <span
-                  title="Handed to Claude"
+                  title="Handed to Dash"
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
                   {/* A bot and not a person. This mark said "handed over" with
@@ -2223,7 +2223,7 @@ function PlanRow({
                       went to Claude rather than onto your own list -- was the
                       one thing it did not. */}
                   <Bot className="size-3" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Handed to Claude</span>
+                  <span className="sr-only">Handed to Dash</span>
                 </span>
               )}
               {/* And how long it has been going.

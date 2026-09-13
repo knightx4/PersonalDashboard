@@ -399,7 +399,7 @@ export function IdeasView({
         <EmptyState
           icon={Lightbulb}
           title="Nothing written down yet"
-          description="An idea here becomes work when you have Claude shape it into the plan, and approve what it proposes there."
+          description="An idea here becomes work when you have Dash shape it into the plan, and approve what it proposes there."
         />
       )}
 
@@ -463,7 +463,7 @@ export function IdeasView({
               aria-hidden
             />
             <Bot className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
-            Suggested by Claude{' '}
+            Suggested by Dash{' '}
             <span className="font-normal text-ink-muted">({suggested.length})</span>
           </summary>
           {/* What to do with one, which the heading does not say. The sentence

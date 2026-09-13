@@ -139,7 +139,7 @@ export function CommentThread({
             >
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-small font-semibold text-ink">
-                  {comment.author === 'me' ? 'You' : 'Claude'}
+                  {comment.author === 'me' ? 'You' : 'Dash'}
                 </span>
                 <span className="tabular text-small text-ink-muted">
                   {comment.id === PENDING ? 'Sending…' : comment.createdAt.slice(0, 10)}
@@ -157,7 +157,7 @@ export function CommentThread({
               only there while you wait says the same thing and does not. */}
           {asking && (
             <li className="space-y-0.5" aria-live="polite">
-              <span className="text-small font-semibold text-ink-muted">Claude</span>
+              <span className="text-small font-semibold text-ink-muted">Dash</span>
               <p className="text-body text-ink-muted">Reading the row and replying…</p>
             </li>
           )}

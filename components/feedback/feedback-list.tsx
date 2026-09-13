@@ -44,7 +44,7 @@ const STATUS_STYLE: Record<FeedbackStatus, string> = {
  */
 const STATUS_LABEL: Record<FeedbackStatus, string> = {
   open: 'open',
-  in_progress: 'Claude is on this',
+  in_progress: 'Dash is on this',
   blocked: 'blocked',
   planned: 'planned',
   done: 'done',
