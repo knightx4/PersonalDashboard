@@ -107,6 +107,8 @@ describe('RLS coverage', () => {
       'concepts',
       'goals',
       'imports',
+      'opening_questions',
+      'opening_sweeps',
       'probes',
       'readings',
       'sources',
