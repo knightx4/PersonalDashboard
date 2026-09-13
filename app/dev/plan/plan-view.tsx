@@ -1656,9 +1656,9 @@ const HEALTH: Record<PlanHealth, Health> = {
   dropped: { word: 'Dropped', tone: 'ghost' },
 };
 
-function healthOf(node: PlanNode): Health & { glyph: GlyphName } {
+function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {
   const health = planHealthOf(node);
-  const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health] };
+  const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health], name: health };
 
   // A row closed over open work reports what is open beneath it, so the word
   // is about a step further down and the fixed tooltip would be describing the
@@ -2269,7 +2269,16 @@ function PlanRow({
           )}
           trigger={
             <span className="inline-flex items-center gap-1.5" title={health.title}>
-              <StatusGlyph glyph={health.glyph} />
+              {/* No glyph on a dropped row. The slash was a third way of
+                  saying what the ghost tone and the struck-through title
+                  already say, on the one state nobody is scanning for -- so it
+                  read as clutter beside the rows that are still live, which is
+                  where the eye is actually going (law 15). Every other state
+                  keeps its shape: those are the ones being scanned, and the
+                  glyph is how they are told apart at a glance. The count
+                  beside the module heading keeps its slash too, because there
+                  a bare number would say nothing at all. */}
+              {health.name !== 'dropped' && <StatusGlyph glyph={health.glyph} />}
               <span className="truncate">{health.word}</span>
             </span>
           }
