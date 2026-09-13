@@ -205,8 +205,35 @@ function sessionTurn(
  * Every outcome the person can see is written into the thread, including the
  * ones where no answer could be produced: a question that silently went
  * nowhere is worse than one answered with "I could not".
+ *
+ * Including the ones nothing here models. The reply and the routine both turn
+ * their failures into a sentence, so what is left to throw is the database
+ * under all of it -- and a throw here would reject the action that wrote the
+ * comment, which takes the comment off the screen it was just posted on and
+ * leaves nothing to say why. The comment is already written by the time any of
+ * this runs; the catch is what keeps that true on screen as well.
  */
 export async function askDash(input: AskInput): Promise<AskOutcome> {
+  try {
+    return await produceReply(input);
+  } catch (error) {
+    const why =
+      'Something went wrong on the way to a reply: ' +
+      `${error instanceof Error ? error.message : 'no reason given'}. Your comment is saved.`;
+    // The thread is where the reason belongs, and writing to it is one of the
+    // things that may have just failed. A second failure leaves the action's
+    // own message as the only copy, which is better than throwing on top of a
+    // throw.
+    try {
+      await say(input, why);
+    } catch {
+      /* nothing further to try */
+    }
+    return { ok: false, error: why };
+  }
+}
+
+async function produceReply(input: AskInput): Promise<AskOutcome> {
   const subject = await subjectOf(input);
   if (!subject) return { ok: false, error: 'That row no longer exists, so nothing was asked.' };
 
