@@ -1,13 +1,13 @@
 'use client';
 
-import { useActionState, useOptimistic, useState } from 'react';
+import { useActionState, useOptimistic, useRef, useState } from 'react';
 import { Bot, CircleUser, X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import { mentionsDash } from '@/lib/comments/mention';
+import { MENTION, mentionsDash } from '@/lib/comments/mention';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
@@ -164,7 +164,7 @@ export function CommentThread({
   thread,
   label,
   submit,
-  placeholder = 'A note on this row. Tag @dash to ask something, or to tell it to do something; without it nothing reads it.',
+  placeholder = 'A note on this row, or a question for Dash.',
   awaitingReply = false,
 }: {
   target: CommentTarget;
@@ -191,6 +191,7 @@ export function CommentThread({
   );
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState('');
+  const box = useRef<HTMLTextAreaElement>(null);
   /** Kept only so a failed write can hand the words back rather than lose them. */
   const [sent, setSent] = useState('');
 
@@ -218,6 +219,8 @@ export function CommentThread({
   // saying an answer is on its way would be describing a wait that is not
   // happening.
   const asking = awaitingReply || (!submit && pending && mentionsDash(sent));
+  /** Whether what is in the box right now would reach Dash. */
+  const tagged = mentionsDash(draft);
 
   return (
     <div className="space-y-2">
@@ -280,6 +283,7 @@ export function CommentThread({
           <input type="hidden" name="target" value={target} />
           <input type="hidden" name="id" value={id} />
           <Textarea
+            ref={box}
             name="body"
             rows={2}
             className="min-h-12"
@@ -288,6 +292,37 @@ export function CommentThread({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
           />
+
+          {/* Which of the two things you are writing, while you are writing it.
+              The only sign used to be the save button changing to Asking once
+              it was already sending, by which point the choice had been made.
+              Left off a box writing somewhere else: a note answering a blocked
+              bug goes back in the queue whatever is in it, and nothing here
+              would be reading the tag. */}
+          {!submit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-small text-ink-muted">
+                {tagged
+                  ? 'Dash will read this and reply in the thread.'
+                  : 'A note on the row. Nothing reads it.'}
+              </p>
+              {!tagged && (
+                <button
+                  type="button"
+                  // In front of what you have written, which is where a comment
+                  // addressed to somebody starts.
+                  onClick={() => {
+                    setDraft((current) => (current ? `${MENTION} ${current}` : `${MENTION} `));
+                    box.current?.focus();
+                  }}
+                  className="press rounded-control px-1.5 py-0.5 text-small text-ink-ghost hover:bg-sunken hover:text-ink"
+                >
+                  Tag {MENTION}
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-1">
             <Button type="submit" size="sm">
               {submit?.label ?? 'Save'}
