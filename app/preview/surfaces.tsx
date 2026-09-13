@@ -6,7 +6,7 @@ import DevUiPage from '@/app/dev/ui/page';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
-import { ReviewList } from '@/app/jobs/(app)/review/list';
+import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -19,7 +19,12 @@ import { TodayLists } from '@/app/jobs/(app)/today/lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
-import { monthDays, monthOf, type CalendarDay, type CalendarEntry } from '@/lib/todo/calendar/month';
+import {
+  monthDays,
+  monthOf,
+  type CalendarDay,
+  type CalendarEntry,
+} from '@/lib/todo/calendar/month';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -851,33 +856,150 @@ const CALENDAR_TODAY = '2026-09-10';
 
 const calendarEntries: Record<string, CalendarEntry[]> = {
   '2026-09-03': [
-    { key: 'task:c1', kind: 'task', at: null, end: null, eventId: null, title: 'Renew the travel insurance', href: null, done: true },
+    {
+      key: 'task:c1',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Renew the travel insurance',
+      href: null,
+      done: true,
+    },
   ],
   '2026-09-09': [
-    { key: 'item:c2', kind: 'item', at: '2026-09-09T08:30:00.000Z', end: null, eventId: null, title: 'Return window closes — Sony WH-1000XM5', href: '/shopping/returns', done: false },
+    {
+      key: 'item:c2',
+      kind: 'item',
+      at: '2026-09-09T08:30:00.000Z',
+      end: null,
+      eventId: null,
+      title: 'Return window closes — Sony WH-1000XM5',
+      href: '/shopping/returns',
+      done: false,
+    },
   ],
   '2026-09-10': [
-    { key: 'task:c3', kind: 'task', at: '2026-09-10T09:00:00.000Z', end: null, eventId: null, title: 'Send the reconciliation write-up to Dana', href: null, done: false },
-    { key: 'context:c4', kind: 'context', at: '2026-09-10T13:30:00.000Z', end: null, eventId: null, title: 'Dentist', href: null, done: false },
-    { key: 'task:c5', kind: 'task', at: null, end: null, eventId: null, title: 'Book the flights', href: null, done: false },
+    {
+      key: 'task:c3',
+      kind: 'task',
+      at: '2026-09-10T09:00:00.000Z',
+      end: null,
+      eventId: null,
+      title: 'Send the reconciliation write-up to Dana',
+      href: null,
+      done: false,
+    },
+    {
+      key: 'context:c4',
+      kind: 'context',
+      at: '2026-09-10T13:30:00.000Z',
+      end: null,
+      eventId: null,
+      title: 'Dentist',
+      href: null,
+      done: false,
+    },
+    {
+      key: 'task:c5',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Book the flights',
+      href: null,
+      done: false,
+    },
   ],
   '2026-09-11': [
-    { key: 'item:c6', kind: 'item', at: '2026-09-11T13:30:00.000Z', end: null, eventId: null, title: 'Marshall Wace · Technical', href: '/jobs/roles/role-p1', done: false },
+    {
+      key: 'item:c6',
+      kind: 'item',
+      at: '2026-09-11T13:30:00.000Z',
+      end: null,
+      eventId: null,
+      title: 'Marshall Wace · Technical',
+      href: '/jobs/roles/role-p1',
+      done: false,
+    },
   ],
   '2026-09-16': [
-    { key: 'item:c7', kind: 'item', at: '2026-09-16T08:00:00.000Z', end: null, eventId: null, title: 'The D. E. Shaw group · Final', href: '/jobs/roles/role-p2', done: false },
-    { key: 'task:c8', kind: 'task', at: null, end: null, eventId: null, title: 'Write the prep note', href: null, done: false },
-    { key: 'task:c9', kind: 'task', at: null, end: null, eventId: null, title: 'Chase the take-home feedback', href: null, done: false },
-    { key: 'task:c10', kind: 'task', at: null, end: null, eventId: null, title: 'Cancel the trial', href: null, done: false },
+    {
+      key: 'item:c7',
+      kind: 'item',
+      at: '2026-09-16T08:00:00.000Z',
+      end: null,
+      eventId: null,
+      title: 'The D. E. Shaw group · Final',
+      href: '/jobs/roles/role-p2',
+      done: false,
+    },
+    {
+      key: 'task:c8',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Write the prep note',
+      href: null,
+      done: false,
+    },
+    {
+      key: 'task:c9',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Chase the take-home feedback',
+      href: null,
+      done: false,
+    },
+    {
+      key: 'task:c10',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Cancel the trial',
+      href: null,
+      done: false,
+    },
     // Five in one square, which is where the phone stops drawing dots and says
     // how many are left. A state no tidy fixture would ever produce.
-    { key: 'task:c11', kind: 'task', at: null, end: null, eventId: null, title: 'Order the bike part', href: null, done: false },
+    {
+      key: 'task:c11',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Order the bike part',
+      href: null,
+      done: false,
+    },
   ],
   '2026-09-24': [
-    { key: 'task:c12', kind: 'task', at: null, end: null, eventId: null, title: 'Quarterly tax payment', href: null, done: false },
+    {
+      key: 'task:c12',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Quarterly tax payment',
+      href: null,
+      done: false,
+    },
   ],
   '2026-10-01': [
-    { key: 'task:c13', kind: 'task', at: null, end: null, eventId: null, title: 'Rent', href: null, done: false },
+    {
+      key: 'task:c13',
+      kind: 'task',
+      at: null,
+      end: null,
+      eventId: null,
+      title: 'Rent',
+      href: null,
+      done: false,
+    },
   ],
 };
 
@@ -1203,8 +1325,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => (
-      <ReviewList
+      <ReviewQueue
         rows={reviewRows}
+        counts={{
+          all: reviewRows.length,
+          messages: reviewRows.filter((row) => row.kind === 'message').length,
+          applications: reviewRows.filter((row) => row.kind === 'application').length,
+          events: reviewRows.filter((row) => row.kind === 'event').length,
+        }}
+        view="all"
         timezone="Europe/London"
         companyNames={knownCompanies.map((company) => company.name)}
         allRoles={allRoles}

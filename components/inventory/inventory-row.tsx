@@ -6,7 +6,7 @@ import {
   InventoryRowActions,
   type InventoryListOption,
 } from '@/components/inventory/inventory-row-actions';
-import { InventoryRowCheckbox } from '@/components/inventory/inventory-selection';
+import { SelectionCheckbox, useSelectionRowClass } from '@/components/ui/selection';
 import { CategoryGlyph } from '@/lib/categories/icons';
 import { formatMoney } from '@/lib/money';
 import { displayNameOf } from '@/lib/inventory/sort-group';
@@ -64,15 +64,17 @@ export function InventoryRow({
   // `cost_cents` on a stacked row is the whole stack, so the per-copy figure
   // comes from the range. A range only when the copies really did cost
   // different amounts — calling any one of them "the price" otherwise.
-  const unitLabel =
-    low === high ? formatMoney(low) : `${formatMoney(low)}–${formatMoney(high)}`;
+  const unitLabel = low === high ? formatMoney(low) : `${formatMoney(low)}–${formatMoney(high)}`;
+  // `group` as well as the selection's own group name: the row's other
+  // hover-revealed parts were written against the unnamed one.
+  const rowClass = useSelectionRowClass(item.id, 'group flex items-stretch hover:bg-canvas');
 
   return (
-    <li className="group flex items-stretch hover:bg-canvas">
-      <InventoryRowCheckbox
-        id={item.id}
-        ids={item.unit_ids}
+    <li className={rowClass}>
+      <SelectionCheckbox
+        rowKey={item.id}
         label={quantity > 1 ? `${title} (${quantity} copies)` : title}
+        className="pl-3 pr-0.5"
       />
       <Link
         href={`/shopping/inventory/${item.id}`}

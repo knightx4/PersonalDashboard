@@ -5,6 +5,8 @@ import {
   clickRule,
   extendRange,
   isRowSelected,
+  keyRule,
+  nextFocus,
   pruneSelection,
   rowIds,
   selectAllRows,
@@ -12,6 +14,7 @@ import {
   selectedRows,
   toggleRow,
   type SelectionClick,
+  type SelectionKeyPress,
   type SelectionRow,
   type SelectionState,
 } from './model';
@@ -82,36 +85,17 @@ describe('toggleRow', () => {
 
 describe('extendRange', () => {
   it('takes everything between the anchor and the row, inclusive', () => {
-    expect(ids(extendRange(state(['a'], 'a'), rows, 'c'))).toEqual([
-      'a',
-      'b',
-      'c1',
-      'c2',
-      'c3',
-    ]);
+    expect(ids(extendRange(state(['a'], 'a'), rows, 'c'))).toEqual(['a', 'b', 'c1', 'c2', 'c3']);
   });
 
   it('reads the same range upwards', () => {
-    expect(ids(extendRange(state(['d'], 'd'), rows, 'b'))).toEqual([
-      'b',
-      'c1',
-      'c2',
-      'c3',
-      'd',
-    ]);
+    expect(ids(extendRange(state(['d'], 'd'), rows, 'b'))).toEqual(['b', 'c1', 'c2', 'c3', 'd']);
   });
 
   it('leaves the anchor where it was, so the next one extends from there', () => {
     const first = extendRange(state(['a'], 'a'), rows, 'b');
     expect(first.anchor).toBe('a');
-    expect(ids(extendRange(first, rows, 'd'))).toEqual([
-      'a',
-      'b',
-      'c1',
-      'c2',
-      'c3',
-      'd',
-    ]);
+    expect(ids(extendRange(first, rows, 'd'))).toEqual(['a', 'b', 'c1', 'c2', 'c3', 'd']);
   });
 
   it('keeps what was selected outside the range', () => {
@@ -205,5 +189,83 @@ describe('clickRule', () => {
 
   it('takes the range when shift is held with ⌘', () => {
     expect(clickRule(click({ shiftKey: true, metaKey: true }))).toBe('range');
+  });
+});
+
+describe('keyRule', () => {
+  const press = (over: Partial<SelectionKeyPress> & { key: string }): SelectionKeyPress => ({
+    metaKey: false,
+    ctrlKey: false,
+    altKey: false,
+    target: null,
+    ...over,
+  });
+
+  it('moves on j, k and the arrows', () => {
+    expect(keyRule(press({ key: 'j' }), false)).toBe('down');
+    expect(keyRule(press({ key: 'ArrowDown' }), false)).toBe('down');
+    expect(keyRule(press({ key: 'k' }), false)).toBe('up');
+    expect(keyRule(press({ key: 'ArrowUp' }), false)).toBe('up');
+  });
+
+  it('ticks the highlighted row on x', () => {
+    expect(keyRule(press({ key: 'x' }), false)).toBe('toggle');
+  });
+
+  it('clears on Esc only when something is selected', () => {
+    expect(keyRule(press({ key: 'Escape' }), true)).toBe('clear');
+    expect(keyRule(press({ key: 'Escape' }), false)).toBeNull();
+  });
+
+  it('stays out of the way while something is being typed in', () => {
+    for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT']) {
+      expect(
+        keyRule(press({ key: 'x', target: { tagName, isContentEditable: false } }), true),
+      ).toBeNull();
+    }
+    expect(
+      keyRule(press({ key: 'j', target: { tagName: 'DIV', isContentEditable: true } }), true),
+    ).toBeNull();
+    expect(
+      keyRule(press({ key: 'j', target: { tagName: 'DIV', isContentEditable: false } }), true),
+    ).toBe('down');
+  });
+
+  it('leaves a press carrying a modifier to whatever owns it', () => {
+    expect(keyRule(press({ key: 'x', metaKey: true }), true)).toBeNull();
+    expect(keyRule(press({ key: 'ArrowDown', ctrlKey: true }), true)).toBeNull();
+    expect(keyRule(press({ key: 'k', altKey: true }), true)).toBeNull();
+  });
+
+  it('says nothing about a key it does not own', () => {
+    expect(keyRule(press({ key: 'e' }), true)).toBeNull();
+    expect(keyRule(press({ key: 'Enter' }), true)).toBeNull();
+  });
+});
+
+describe('nextFocus', () => {
+  const rows = [{ key: 'a' }, { key: 'b' }, { key: 'c' }];
+
+  it('starts at the first row from nowhere, in either direction', () => {
+    expect(nextFocus(rows, null, 'down')).toBe('a');
+    expect(nextFocus(rows, null, 'up')).toBe('a');
+  });
+
+  it('moves one row at a time', () => {
+    expect(nextFocus(rows, 'a', 'down')).toBe('b');
+    expect(nextFocus(rows, 'c', 'up')).toBe('b');
+  });
+
+  it('stops at both ends rather than wrapping', () => {
+    expect(nextFocus(rows, 'c', 'down')).toBe('c');
+    expect(nextFocus(rows, 'a', 'up')).toBe('a');
+  });
+
+  it('goes back to the first row when the focused one has left the list', () => {
+    expect(nextFocus(rows, 'gone', 'down')).toBe('a');
+  });
+
+  it('has nowhere to go on an empty list', () => {
+    expect(nextFocus([], null, 'down')).toBeNull();
   });
 });

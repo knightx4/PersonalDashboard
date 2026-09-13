@@ -47,10 +47,7 @@ export function isRowSelected(state: SelectionState, row: SelectionRow): boolean
   return rowIds(row).every((id) => state.selected.has(id));
 }
 
-function findRow(
-  rows: readonly SelectionRow[],
-  key: string,
-): SelectionRow | undefined {
+function findRow(rows: readonly SelectionRow[], key: string): SelectionRow | undefined {
   return rows.find((row) => row.key === key);
 }
 
@@ -95,10 +92,7 @@ export function extendRange(
   const to = rows.findIndex((row) => row.key === key);
   if (to < 0) return state;
 
-  const from =
-    state.anchor === null
-      ? -1
-      : rows.findIndex((row) => row.key === state.anchor);
+  const from = state.anchor === null ? -1 : rows.findIndex((row) => row.key === state.anchor);
   const start = from < 0 ? to : Math.min(from, to);
   const end = from < 0 ? to : Math.max(from, to);
 
@@ -141,8 +135,7 @@ export function pruneSelection(
   }
 
   const dropped = [...state.selected].some((id) => !present.has(id));
-  const anchorGone =
-    state.anchor !== null && !rows.some((row) => row.key === state.anchor);
+  const anchorGone = state.anchor !== null && !rows.some((row) => row.key === state.anchor);
   if (!dropped && !anchorGone) return state;
 
   return {
@@ -152,18 +145,12 @@ export function pruneSelection(
 }
 
 /** The selected rows, in the order the list draws them. */
-export function selectedRows(
-  state: SelectionState,
-  rows: readonly SelectionRow[],
-): SelectionRow[] {
+export function selectedRows(state: SelectionState, rows: readonly SelectionRow[]): SelectionRow[] {
   return rows.filter((row) => isRowSelected(state, row));
 }
 
 /** What a bulk action is run against: every id of every selected row. */
-export function selectedIds(
-  state: SelectionState,
-  rows: readonly SelectionRow[],
-): string[] {
+export function selectedIds(state: SelectionState, rows: readonly SelectionRow[]): string[] {
   return selectedRows(state, rows).flatMap((row) => [...rowIds(row)]);
 }
 
@@ -185,4 +172,75 @@ export type SelectionClick = {
  */
 export function clickRule(click: SelectionClick): 'range' | 'toggle' {
   return click.shiftKey ? 'range' : 'toggle';
+}
+
+/** A key press, as much of it as the rules need. */
+export type SelectionKeyPress = {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  /** Where the press landed, or null when it came from the page itself. */
+  target: { tagName: string; isContentEditable: boolean } | null;
+};
+
+/** What a press does to the selection. Null is "not ours, leave it alone". */
+export type SelectionKeyAction = 'down' | 'up' | 'toggle' | 'clear' | null;
+
+const TYPING_TAGS = ['INPUT', 'TEXTAREA', 'SELECT'];
+
+/** True while the press is going into something being typed in. */
+export function isTypingTarget(
+  target: { tagName: string; isContentEditable: boolean } | null,
+): boolean {
+  if (!target) return false;
+  return TYPING_TAGS.includes(target.tagName.toUpperCase()) || target.isContentEditable;
+}
+
+/**
+ * What a key press asks the selection to do.
+ *
+ * j and k move because that is the pair the rest of the app uses, and the
+ * arrows move because they are what somebody tries first. x ticks the row the
+ * keyboard is on. Esc clears, but only when there is something to clear —
+ * otherwise it is somebody backing out of a panel and the page's own handler
+ * should see it.
+ *
+ * A held ⌘, ctrl or alt means the press belongs to a shortcut somewhere else:
+ * ⌘X is cut and ⌘↓ is the end of the document, and neither should move a
+ * highlight. Holding ⌘ is also how the hints are shown, so the key pressed
+ * while reading them must do nothing.
+ */
+export function keyRule(press: SelectionKeyPress, hasSelection: boolean): SelectionKeyAction {
+  if (isTypingTarget(press.target)) return null;
+  if (press.metaKey || press.ctrlKey || press.altKey) return null;
+
+  if (press.key === 'j' || press.key === 'ArrowDown') return 'down';
+  if (press.key === 'k' || press.key === 'ArrowUp') return 'up';
+  if (press.key === 'x') return 'toggle';
+  if (press.key === 'Escape') return hasSelection ? 'clear' : null;
+  return null;
+}
+
+/**
+ * The row the highlight moves to, in list order.
+ *
+ * It stops at both ends rather than wrapping: a list worked top to bottom
+ * should stay still when it runs out, not jump back to the start under a key
+ * being held down. With nothing focused yet, either direction lands on the
+ * first row, because that is where somebody who just pressed a key is looking.
+ */
+export function nextFocus(
+  rows: readonly SelectionRow[],
+  focused: string | null,
+  direction: 'down' | 'up',
+): string | null {
+  if (rows.length === 0) return null;
+
+  const at = focused === null ? -1 : rows.findIndex((row) => row.key === focused);
+  if (at < 0) return rows[0].key;
+
+  const to = direction === 'down' ? at + 1 : at - 1;
+  const clamped = Math.max(0, Math.min(rows.length - 1, to));
+  return rows[clamped].key;
 }

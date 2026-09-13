@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { connectedAccountIds } from '@/lib/core/inbox/accounts';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/classify';
 import { excludableDomains } from '@/lib/jobs/review/exclusions';
@@ -212,9 +214,7 @@ export async function dismissMessage(messageId: string): Promise<{ error: string
 }
 
 // latency: pending
-export async function confirmApplication(
-  applicationId: string,
-): Promise<{ error: string | null }> {
+export async function confirmApplication(applicationId: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -411,4 +411,189 @@ export async function reopenApplication(
   revalidatePath('/jobs/review');
   revalidatePath('/jobs/pipeline');
   return { error: null };
+}
+
+/**
+ * The bulk half: one call for a whole selection, and the way back from it.
+ *
+ * Same contract as the shopping queue's bulk actions. `changed` is the rows the
+ * call actually moved rather than the rows it was asked about, so the toast
+ * counts what happened; `restore` carries what cannot be worked out afterwards,
+ * which for a dismissed message is everything the dismissal cleared.
+ */
+export type JobsBulkResult = {
+  changed: string[];
+  error?: string | null;
+};
+
+/** A message as it was before it was dismissed. */
+const dismissedMessage = z.object({
+  id: z.string().uuid(),
+  classification: z.string().max(60).nullable(),
+  parseStatus: z.enum(['parsed', 'needs_review', 'skipped', 'failed']),
+  applicationId: z.string().uuid().nullable(),
+  linkMethod: z.string().max(40).nullable(),
+  linkConfidence: z.number().nullable(),
+  error: z.string().nullable(),
+});
+
+export type DismissedMessage = z.infer<typeof dismissedMessage>;
+
+const jobsIdList = z.array(z.string().uuid()).min(1).max(200);
+
+const INVALID_SELECTION = 'That selection is not something we can act on.';
+
+/** Dismiss every selected message that is still waiting. */
+// latency: pending
+export async function dismissMessages(
+  ids: string[],
+): Promise<JobsBulkResult & { restore: DismissedMessage[] }> {
+  const parsed = jobsIdList.safeParse(ids);
+  if (!parsed.success) return { changed: [], restore: [], error: INVALID_SELECTION };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const core = await createCoreClient();
+  const accountIds = await connectedAccountIds(core, user.id);
+  if (accountIds.length === 0) return { changed: [], restore: [], error: 'No inbox connected.' };
+
+  const { data: messages, error: loadError } = await supabase
+    .from('inbox_messages')
+    .select(
+      'id, classification, parse_status, resulting_application_id, link_method, link_confidence, error',
+    )
+    .in('id', parsed.data)
+    .in('email_account_id', accountIds)
+    .eq('parse_status', 'needs_review');
+
+  if (loadError) return { changed: [], restore: [], error: loadError.message };
+
+  const restore: DismissedMessage[] = (messages ?? []).map((row) => ({
+    id: row.id as string,
+    classification: (row.classification as string | null) ?? null,
+    parseStatus: 'needs_review' as const,
+    applicationId: (row.resulting_application_id as string | null) ?? null,
+    linkMethod: (row.link_method as string | null) ?? null,
+    linkConfidence: (row.link_confidence as number | null) ?? null,
+    error: (row.error as string | null) ?? null,
+  }));
+  if (restore.length === 0) {
+    return { changed: [], restore: [], error: 'Those are dismissed already.' };
+  }
+
+  const changed = restore.map((row) => row.id);
+  const { error } = await supabase
+    .from('ingested_messages')
+    .update({
+      classification: 'not_relevant',
+      parse_status: 'skipped',
+      resulting_application_id: null,
+      link_method: null,
+      link_confidence: null,
+      error: null,
+    })
+    .in('id', changed)
+    .in('email_account_id', accountIds);
+
+  if (error) return { changed: [], restore: [], error: error.message };
+
+  revalidatePath('/jobs/review');
+  return { changed, restore };
+}
+
+/** The way back from a bulk dismiss: every column the dismissal cleared. */
+// latency: pending
+export async function restoreDismissedMessages(
+  restore: DismissedMessage[],
+): Promise<JobsBulkResult> {
+  const parsed = z.array(dismissedMessage).min(1).max(200).safeParse(restore);
+  if (!parsed.success) return { changed: [], error: INVALID_SELECTION };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const core = await createCoreClient();
+  const accountIds = await connectedAccountIds(core, user.id);
+  if (accountIds.length === 0) return { changed: [], error: 'No inbox connected.' };
+
+  // One statement per message: each goes back to its own classification and its
+  // own link. A selection is tens of rows, not thousands.
+  for (const message of parsed.data) {
+    const { error } = await supabase
+      .from('ingested_messages')
+      .update({
+        classification: message.classification,
+        parse_status: message.parseStatus,
+        resulting_application_id: message.applicationId,
+        link_method: message.linkMethod,
+        link_confidence: message.linkConfidence,
+        error: message.error,
+      })
+      .eq('id', message.id)
+      .in('email_account_id', accountIds);
+
+    if (error) return { changed: [], error: error.message };
+  }
+
+  revalidatePath('/jobs/review');
+  return { changed: parsed.data.map((row) => row.id) };
+}
+
+/** Acknowledge every selected event. They stay on the timeline; the flag goes. */
+// latency: pending
+export async function acknowledgeEvents(ids: string[]): Promise<JobsBulkResult> {
+  const parsed = jobsIdList.safeParse(ids);
+  if (!parsed.success) return { changed: [], error: INVALID_SELECTION };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: events, error: loadError } = await supabase
+    .from('application_events')
+    .select('id')
+    .in('id', parsed.data)
+    .eq('user_id', user.id)
+    .eq('needs_review', true);
+
+  if (loadError) return { changed: [], error: loadError.message };
+
+  const changed = (events ?? []).map((row) => row.id as string);
+  if (changed.length === 0) return { changed: [], error: 'Those are acknowledged already.' };
+
+  const { error } = await supabase
+    .from('application_events')
+    .update({ needs_review: false, acknowledged_at: new Date().toISOString() })
+    .in('id', changed)
+    .eq('user_id', user.id);
+
+  if (error) return { changed: [], error: error.message };
+
+  revalidatePath('/jobs/review');
+  return { changed };
+}
+
+/**
+ * The way back from a bulk acknowledge.
+ *
+ * Clearing `acknowledged_at` as well as the flag, because the flag on its own
+ * comes straight back off the sync trigger — the same reason acknowledging
+ * writes it in the first place.
+ */
+// latency: pending
+export async function unacknowledgeEvents(ids: readonly string[]): Promise<JobsBulkResult> {
+  const parsed = jobsIdList.safeParse([...ids]);
+  if (!parsed.success) return { changed: [], error: INVALID_SELECTION };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('application_events')
+    .update({ needs_review: true, acknowledged_at: null })
+    .in('id', parsed.data)
+    .eq('user_id', user.id);
+
+  if (error) return { changed: [], error: error.message };
+
+  revalidatePath('/jobs/review');
+  return { changed: [...parsed.data] };
 }
