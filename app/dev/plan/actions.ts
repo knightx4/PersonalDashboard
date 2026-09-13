@@ -895,6 +895,30 @@ export async function sendPlanItemToClaude(
     };
   }
 
+  // One session per feature at a time.
+  //
+  // Two sessions were sent at #342 within moments of each other on 13
+  // September, and both would have been editing the same files. Nothing but
+  // timing kept them apart, because nothing here knew the other was running.
+  //
+  // A step already underway refuses on its own account; another step under the
+  // same feature refuses because a batch run holds the whole feature and a
+  // second session would land in the middle of it. Taking the first one back
+  // (set it to not started) is how you override this when a session has died.
+  const feature = featureOf(sections, node);
+  const underway = flatten([feature]).filter((step) => step.status === 'in_progress');
+  const other = underway.find((step) => step.id !== node.id);
+  if (underway.some((step) => step.id === node.id)) {
+    return {
+      error: `#${node.number} is already underway. Put it back to not started first if the session that had it is gone.`,
+    };
+  }
+  if (other) {
+    return {
+      error: `#${other.number} ${other.title} is underway under the same feature. Wait for it, or put it back to not started if its session is gone.`,
+    };
+  }
+
   // Handed over and underway, in the one write. A step sent to Claude is being
   // built from the moment the routine wakes, and a plan still reading "not
   // started" while a session works it is the plan lying about itself -- the one
@@ -979,6 +1003,16 @@ export async function sendPlanFeatureToClaude(
 
   if (node.status === 'proposed') {
     return { error: `#${node.number} is only a proposal. Approve it first.` };
+  }
+
+  // The same one-at-a-time rule as the single send. A batch started on top of
+  // a running session is the worse version of the same collision, since it
+  // hands the whole feature to a second run.
+  const running = flatten([node]).find((step) => step.status === 'in_progress');
+  if (running) {
+    return {
+      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
+    };
   }
 
   // Itself included: a feature is closed when its steps are, and the session
