@@ -6,6 +6,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
+import { outstandingCount, unfinishedSweep } from '@/lib/learn/graph/opening';
 import { countStates } from '@/lib/learn/graph/model';
 import { MAX_BRIEFING_CHARS } from '@/lib/learn/graph/from-brief';
 import { BriefForm } from './brief-form';
@@ -44,6 +45,7 @@ function settledLine(counts: ReturnType<typeof countStates>): string {
 export default async function KnowPage() {
   const supabase = await createLearnClient();
   const subjects = await loadSubjects(supabase);
+  const unfinished = await unfinishedSweep(supabase);
 
   const rows = await Promise.all(
     subjects.map(async (subject) => ({
@@ -84,6 +86,27 @@ export default async function KnowPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* The way back into a set of opening questions somebody walked away
+          from. Without it the only route back is a URL on a tab that is
+          already closed. */}
+      {unfinished && (
+        <Link
+          href={`/learn/opening/${unfinished.id}`}
+          className={cn(
+            cardVariants({ padding: 'standard', interactive: true }),
+            'mt-6 block',
+          )}
+        >
+          <span className="block text-body font-medium text-ink">
+            Finish the questions on {unfinished.subjectName}
+          </span>
+          <span className="block text-ui text-ink-muted">
+            {outstandingCount(unfinished)} of {unfinished.questions.length} left, then the chain for
+            “{unfinished.asked}” gets laid out.
+          </span>
+        </Link>
       )}
 
       {/* Naming a goal is how a subject comes into being, so the form is here

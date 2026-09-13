@@ -220,6 +220,31 @@ export async function sweepForGoal(
 }
 
 /**
+ * The newest sweep this account has not finished, if there is one.
+ *
+ * What makes coming back possible when the tab that had the URL is gone. One
+ * unanswered question is enough: a sweep is finished when every question has
+ * been reached, whether it was answered or passed.
+ */
+export async function unfinishedSweep(
+  supabase: LearnSupabaseClient,
+): Promise<OpeningSweep | null> {
+  const { data, error } = await supabase
+    .from('opening_questions')
+    .select('sweep_id')
+    .is('outcome', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Looking for an unfinished sweep', error);
+  if (!data) return null;
+
+  return loadSweep(supabase, (data as { sweep_id: string }).sweep_id);
+}
+
+/**
  * Record what somebody wrote for one question, and how it was graded.
  *
  * One question at a time, so a closed tab loses at most the one being typed.

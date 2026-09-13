@@ -79,13 +79,22 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
   );
 }
 
-function Proposal({ chain, asked }: { chain: ProposedChain; asked: string }) {
+function Proposal({
+  chain,
+  asked,
+  sweepId,
+}: {
+  chain: ProposedChain;
+  asked: string;
+  sweepId?: string;
+}) {
   const [state, approve] = useActionState<ApproveState, FormData>(approveChain, {});
   const added = chain.nodes.filter((node) => !node.existingId).length;
 
   return (
     <form action={approve} className="mt-6">
       <input type="hidden" name="asked" value={asked} />
+      {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
       <input type="hidden" name="chain" value={JSON.stringify(chain)} />
 
       <p className="mb-2 text-body text-ink-muted">
@@ -122,16 +131,27 @@ function Proposal({ chain, asked }: { chain: ProposedChain; asked: string }) {
   );
 }
 
-export function GoalForm({ subjectId }: { subjectId?: string }) {
+export function GoalForm({
+  subjectId,
+  goal,
+  sweepId,
+}: {
+  subjectId?: string;
+  /** Filled in when the words were typed earlier, at the start of a sweep. */
+  goal?: string;
+  /** The opening questions this goal was asked about, when there were any. */
+  sweepId?: string;
+}) {
   const [state, propose] = useActionState<ProposeState, FormData>(proposeGoal, {});
 
   if (state.chain && state.asked) {
-    return <Proposal chain={state.chain} asked={state.asked} />;
+    return <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} />;
   }
 
   return (
     <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
+      {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
 
       <Field
         label="What do you want to understand?"
@@ -143,6 +163,7 @@ export function GoalForm({ subjectId }: { subjectId?: string }) {
           name="goal"
           required
           maxLength={300}
+          defaultValue={goal}
           placeholder="How raising a policy rate reaches the price of anything"
         />
       </Field>
