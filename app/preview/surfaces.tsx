@@ -14,6 +14,7 @@ import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { RolesTable } from '@/app/jobs/(app)/roles/roles-table';
+import { rolesDisplay } from '@/lib/jobs/roles-display';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/today/lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
@@ -248,6 +249,9 @@ const pipelineRow = (
   coverage: { covered: 0, total: 0, gaps: 0, rate: null },
   ...row,
 });
+
+/** The sort links the roles table draws, with nothing chosen but its default. */
+const rolesSortChoices = listDisplayMenu(rolesDisplay(), {}).sorts;
 
 const pipelineRows: PipelineRow[] = [
   pipelineRow({
@@ -1605,7 +1609,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Roles · The table',
     module: 'jobs',
     width: 'wide',
-    render: () => <RolesTable rows={pipelineRows} sort="activity" params={{}} />,
+    render: () => <RolesTable rows={pipelineRows} sorts={rolesSortChoices} />,
   },
   {
     id: 'jobs-today',
