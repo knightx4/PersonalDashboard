@@ -60,6 +60,81 @@ function toQuestion(row: QuestionRow): QuizQuestion {
   };
 }
 
+/** A quiz as the list shows it: what it was for, how it went, and when. */
+export type QuizListItem = {
+  id: string;
+  title: string;
+  preparingFor: string | null;
+  status: QuizStatus;
+  createdAt: string;
+  total: number;
+  right: number;
+  /** Questions not reached yet. What makes a quiz resumable from the list. */
+  left: number;
+};
+
+/** The most quizzes the list reads. Well past what anybody has. */
+const LIST_LIMIT = 100;
+
+/**
+ * Your quizzes, the unfinished ones first.
+ *
+ * Two reads and a count in memory rather than a view: PostgREST cannot count
+ * one column's values conditionally, and a quiz's questions are ten rows.
+ * Order is unfinished first so a half-done quiz has a way back into it, then
+ * newest, which is the only thing left to sort a finished one by.
+ */
+export async function loadQuizzes(supabase: LearnSupabaseClient): Promise<QuizListItem[]> {
+  const { data, error } = await supabase
+    .from('quizzes')
+    .select('id, title, preparing_for, status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(LIST_LIMIT);
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading your quizzes', error);
+
+  const rows = (data ?? []) as QuizRow[];
+  if (rows.length === 0) return [];
+
+  const { data: questions, error: questionError } = await supabase
+    .from('quiz_questions')
+    .select('quiz_id, outcome')
+    .in(
+      'quiz_id',
+      rows.map((row) => row.id),
+    );
+
+  assertSchemaExposed(questionError, LEARN_SCHEMA);
+  if (questionError) throw fail('Reading the quiz questions', questionError);
+
+  const tally = new Map<string, { total: number; right: number; left: number }>();
+  for (const row of (questions ?? []) as { quiz_id: string; outcome: QuizQuestion['outcome'] }[]) {
+    const count = tally.get(row.quiz_id) ?? { total: 0, right: 0, left: 0 };
+    count.total += 1;
+    if (row.outcome === 'right') count.right += 1;
+    if (row.outcome === null) count.left += 1;
+    tally.set(row.quiz_id, count);
+  }
+
+  return rows
+    .map((row) => {
+      const count = tally.get(row.id) ?? { total: 0, right: 0, left: 0 };
+      return {
+        id: row.id,
+        title: row.title,
+        preparingFor: row.preparing_for,
+        status: row.status,
+        createdAt: row.created_at,
+        ...count,
+      };
+    })
+    .sort((a, b) => {
+      const unfinished = Number(b.left > 0) - Number(a.left > 0);
+      return unfinished || b.createdAt.localeCompare(a.createdAt);
+    });
+}
+
 /** One quiz by id, with its material and its questions in order. */
 export async function loadQuiz(
   supabase: LearnSupabaseClient,
