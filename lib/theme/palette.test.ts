@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
-import { hexToOklch, oklchToHex } from '@/lib/theme/oklch';
+import { hexToOklch, oklchToHex, relativeLuminance } from '@/lib/theme/oklch';
 import { generatePalette } from '@/lib/theme/palette';
 import {
   ACCENT_TOKENS,
@@ -64,16 +64,59 @@ describe('generatePalette', () => {
     expect(generatePalette('dark', REFERENCE_HUE.dusk)).toEqual(REFERENCE_PALETTES.dusk);
   });
 
-  it('holds every lightness where the reference put it, all the way round the circle', () => {
+  it('reflects as much light as the reference did, all the way round the circle', () => {
+    // The property every contrast ratio in the app rests on, and the reason
+    // the generator holds luminance rather than OKLCH lightness: both sides of
+    // every pair are matched, so a generated palette measures exactly what the
+    // reference it came from measured. scripts/check-contrast.ts proves the
+    // consequence at these same hues; this is the cause.
     for (const mode of ['light', 'dark'] as const) {
-      const reference = REFERENCE_PALETTES[mode === 'light' ? 'paper' : 'dusk'];
+      const reference = mode === 'light' ? LIGHT_CAST : REFERENCE_PALETTES.dusk;
+      for (const hue of SWEEP) {
+        const palette = generatePalette(mode, hue);
+        for (const token of HUE_TOKENS) {
+          const drift = Math.abs(
+            relativeLuminance(palette[token]) - relativeLuminance(reference[token]),
+          );
+          // Rounding to eight bits a channel is what is left, and near white
+          // one of those steps is worth about six thousandths of luminance --
+          // which moves a contrast ratio by well under a percent. A hue that
+          // could not reach the luminance in gamut would fail here.
+          expect(`${mode} ${hue} ${token} ${drift < 0.008}`).toBe(`${mode} ${hue} ${token} true`);
+        }
+      }
+    }
+  });
+
+  it('keeps a light theme measuring what Paper measures, through both turns', () => {
+    // The light half takes two turns to get anywhere -- Paper to LIGHT_CAST,
+    // then LIGHT_CAST to the hue you asked for -- and each one rounds to eight
+    // bits at the end. So the allowance here is two of those steps rather than
+    // one, and the point of the test is that the two do not compound into
+    // something a reader would notice.
+    for (const hue of SWEEP) {
+      const palette = generatePalette('light', hue);
+      for (const token of HUE_TOKENS) {
+        const drift = Math.abs(
+          relativeLuminance(palette[token]) - relativeLuminance(REFERENCE_PALETTES.paper[token]),
+        );
+        expect(`${hue} ${token} ${drift < 0.016}`).toBe(`${hue} ${token} true`);
+      }
+    }
+  });
+
+  it('does not move a lightness further than it has to', () => {
+    // Luminance is held, so perceptual lightness gives a little where the hue
+    // is weighted differently. It must stay a little: a ground that visibly
+    // darkened on its way round the circle would be a different theme, not the
+    // same one in another colour.
+    for (const mode of ['light', 'dark'] as const) {
+      const reference = mode === 'light' ? LIGHT_CAST : REFERENCE_PALETTES.dusk;
       for (const hue of SWEEP) {
         const palette = generatePalette(mode, hue);
         for (const token of HUE_TOKENS) {
           const drift = Math.abs(hexToOklch(palette[token]).l - hexToOklch(reference[token]).l);
-          // Rounding to eight bits a channel is the only thing that moves it;
-          // a hue that needed a darker ground to stay in gamut would fail here.
-          expect(`${mode} ${hue} ${token} ${drift < 0.004}`).toBe(`${mode} ${hue} ${token} true`);
+          expect(`${mode} ${hue} ${token} ${drift < 0.06}`).toBe(`${mode} ${hue} ${token} true`);
         }
       }
     }

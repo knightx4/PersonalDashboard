@@ -6,6 +6,13 @@
  * the real values out of app/globals.css rather than a copy, so a token edited
  * without re-running it fails here rather than in someone's eyes.
  *
+ * Since #424 it measures the generated themes as well. Once any colour on the
+ * circle can be picked there is no longer a list of themes anybody could look
+ * at, so the script walks the circle instead: both modes at fifteen-degree
+ * steps, the same pairs, the same thresholds. A hue that fails is the
+ * generator's to fix -- by clamping chroma or moving lightness -- and never
+ * the threshold's.
+ *
  *   npx tsx scripts/check-contrast.ts
  *
  * Thresholds are WCAG 2.2 AA: 4.5:1 for text under 18px (which is every piece
@@ -14,6 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PAPER_SELECTOR, readTheme, THEME_SELECTORS, type Vars } from '../lib/theme/css';
+import { generatePalette } from '../lib/theme/palette';
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
@@ -22,9 +30,31 @@ const NON_TEXT = 3;
 
 const PAPER = readTheme(CSS, PAPER_SELECTOR);
 
-const THEMES: Record<string, Vars> = Object.fromEntries(
+const WRITTEN: Record<string, Vars> = Object.fromEntries(
   Object.entries(THEME_SELECTORS).map(([name, selector]) => [name, readTheme(CSS, selector)]),
 );
+
+/**
+ * How far apart the hues walked are.
+ *
+ * Fifteen degrees is twenty-four of them per mode, which is enough to catch a
+ * band of the circle going bad and cheap enough to run on every push. A
+ * failure between two steps is a failure at one of them as well: nothing in
+ * the generator changes faster than that, because every token moves by the
+ * same number of degrees.
+ */
+const HUE_STEP = 15;
+
+const GENERATED: Record<string, Vars> = Object.fromEntries(
+  (['light', 'dark'] as const).flatMap((mode) =>
+    Array.from({ length: 360 / HUE_STEP }, (_, step) => {
+      const hue = step * HUE_STEP;
+      return [`${mode} ${hue}°`, generatePalette(mode, hue) as Vars] as const;
+    }),
+  ),
+);
+
+const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED };
 
 type Rgb = [number, number, number];
 type Rgba = { rgb: Rgb; alpha: number };
@@ -263,4 +293,8 @@ if (failures > 0) {
   process.exit(1);
 }
 
-console.log(`✓ ${checked} text and non-text pairs clear WCAG AA across ${Object.keys(THEMES).length} themes.`);
+console.log(
+  `✓ ${checked} text and non-text pairs clear WCAG AA across ` +
+    `${Object.keys(WRITTEN).length} written themes and ` +
+    `${Object.keys(GENERATED).length} generated ones, every ${HUE_STEP}° of the circle.`,
+);

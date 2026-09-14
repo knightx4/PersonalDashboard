@@ -23,7 +23,7 @@
  * re-reads globals.css and fails if the two have drifted, which is the only
  * thing keeping this file honest.
  */
-import { hexToOklch, oklchToHex } from './oklch';
+import { hexToOklch, relativeLuminance, withLuminance } from './oklch';
 
 /** Which of the two written polarities a generated theme is a version of. */
 export type ThemeMode = 'light' | 'dark';
@@ -361,9 +361,10 @@ export const REFERENCE_HUE: Record<'paper' | 'dusk', number> = {
  * Paper with its accent moved onto Paper's own page hue.
  *
  * What light with a colour rotates, and the answer #454 gave. Every token
- * keeps the lightness and the chroma Paper wrote for it; only the accent
- * family turns, and it turns as a family, so the tint stays the four degrees
- * off the base that Paper put it.
+ * keeps the chroma Paper wrote for it and reflects as much light as Paper's
+ * did, so every contrast ratio in a light theme is the ratio Paper measured.
+ * Only the accent family turns, and it turns as a family, so the tint stays
+ * the four degrees off the base that Paper put it.
  *
  * The result is not a theme anybody sees on its own -- light with no colour is
  * Paper, untouched. It is the shape a light theme takes once the page and the
@@ -375,8 +376,12 @@ export const LIGHT_CAST: Palette = (() => {
 
   const cast: Palette = { ...paper };
   for (const token of ACCENT_TOKENS) {
-    const colour = hexToOklch(paper[token]!);
-    cast[token] = oklchToHex({ ...colour, h: colour.h + turn });
+    const value = paper[token]!;
+    const colour = hexToOklch(value);
+    // Luminance rather than lightness, the same as every other turn the
+    // generator makes: a hundred and eighty degrees is the largest move in the
+    // whole scheme, and it is the one where holding the wrong quantity shows.
+    cast[token] = withLuminance({ ...colour, h: colour.h + turn }, relativeLuminance(value));
   }
   return cast;
 })();

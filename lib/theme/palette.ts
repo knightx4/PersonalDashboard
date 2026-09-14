@@ -8,16 +8,23 @@
  * for delete -- where it was.
  *
  * The mechanism is a rotation in OKLCH. Each token of the reference palette is
- * read into a lightness, a chroma and a hue; the lightness and the chroma stay
- * exactly as written, and the hue moves by the same number of degrees for
- * every token, so the distance between the accent and the ground survives the
- * move. Lightness is what every contrast ratio in the app is a function of, so
- * holding it fixed is what makes a green theme as readable as a plum one.
+ * read into a lightness, a chroma and a hue; the chroma stays as written, the
+ * hue moves by the same number of degrees for every token so the distance
+ * between the accent and the ground survives the move, and the lightness is
+ * then nudged until the colour reflects as much light as the one it replaced.
+ *
+ * That last step is what makes a green theme exactly as readable as a plum
+ * one rather than nearly as readable. Contrast is a function of relative
+ * luminance, which weights green six times as heavily as blue, so holding
+ * OKLCH lightness -- how light a colour looks -- lets the measured ratio
+ * drift: a green link came out at 4.34:1 where the blue it replaced was 4.6:1.
+ * Matching luminance on both sides of every pair means every ratio in a
+ * generated palette is the ratio the reference had.
  *
  * No `server-only`: the layout writes the palette into the first byte and the
  * picker previews it under the cursor, so both sides need this.
  */
-import { hexToOklch, oklchToHex } from './oklch';
+import { hexToOklch, relativeLuminance, withLuminance } from './oklch';
 import {
   HUE_TOKENS,
   LIGHT_CAST,
@@ -56,6 +63,16 @@ export function generatePalette(mode: ThemeMode, hue: number | null): Palette {
   const reference = mode === 'light' ? LIGHT_CAST : REFERENCE_PALETTES.dusk;
   const turn = hue - REFERENCE_HUE[name];
 
+  // Asking for the reference's own hue is the reference, said outright rather
+  // than arrived at: Dusk has to come back hex for hex, and a bisection that
+  // lands a ten-thousandth away from where it started could round otherwise.
+  if (turn === 0) return { ...reference };
+
+  return rotate(reference, turn);
+}
+
+/** Every token that takes the colour, turned, and every one that does not, kept. */
+function rotate(reference: Palette, turn: number): Palette {
   const palette: Palette = {};
   for (const token of Object.keys(reference)) {
     const value = reference[token];
@@ -64,7 +81,7 @@ export function generatePalette(mode: ThemeMode, hue: number | null): Palette {
       continue;
     }
     const colour = hexToOklch(value);
-    palette[token] = oklchToHex({ ...colour, h: colour.h + turn });
+    palette[token] = withLuminance({ ...colour, h: colour.h + turn }, relativeLuminance(value));
   }
   return palette;
 }

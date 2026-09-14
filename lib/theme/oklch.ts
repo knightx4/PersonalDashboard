@@ -123,3 +123,49 @@ export function oklchToHex(colour: Oklch): string {
   const linear = oklabToLinear([l, c * Math.cos(radians), c * Math.sin(radians)]);
   return formatHex(linear.map(fromLinear) as Rgb);
 }
+
+/**
+ * WCAG relative luminance, 0 for black and 1 for white.
+ *
+ * The quantity every contrast ratio in the app is actually a function of. It
+ * is not OKLCH lightness: L is perceptual and even-handed across the circle,
+ * and relative luminance weights green six times as heavily as blue. Two
+ * colours at the same L, one blue and one green, differ by enough luminance to
+ * move a 4.5:1 pair either side of the line.
+ */
+export function relativeLuminance(hex: string): number {
+  const [r, g, b] = parseHex(hex).map(toLinear) as Rgb;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * The same hue and chroma, moved in lightness until it reflects as much light
+ * as the colour it is replacing.
+ *
+ * This is what makes "keep the contrast it has now" true rather than
+ * approximately true. Holding OKLCH lightness holds how light a colour *looks*
+ * and lets the measured ratio drift -- which is how a green link on a light
+ * theme came out at 4.34:1 where the blue it replaced was 4.6:1. Holding the
+ * luminance instead means every pair in the palette measures exactly what the
+ * reference pair measured, because both sides of every pair were matched.
+ *
+ * The perceptual lightness moves a little in exchange, and only for colours
+ * with real chroma in them: a near-grey ground barely shifts, since there is
+ * hardly any colour there for the hue to weight.
+ */
+export function withLuminance(colour: Oklch, target: number): string {
+  // Luminance rises with lightness at a fixed hue and chroma, including where
+  // gamut clamping pulls the chroma in, so a bisection finds the one answer.
+  let low = 0;
+  let high = 1;
+  let hex = oklchToHex(colour);
+
+  for (let step = 0; step < 24; step += 1) {
+    const middle = (low + high) / 2;
+    hex = oklchToHex({ ...colour, l: middle });
+    if (relativeLuminance(hex) < target) low = middle;
+    else high = middle;
+  }
+
+  return hex;
+}
