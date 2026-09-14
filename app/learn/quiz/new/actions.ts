@@ -12,6 +12,7 @@ import {
   MAX_QUIZ_NOTES,
   quizTitle,
 } from '@/lib/learn/quiz/model';
+import { MAX_QUIZ_FILE_BYTES, quizFileMessage, readQuizFile } from '@/lib/learn/quiz/file';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadNotesByIds } from '@/lib/vault/notes/load';
 
@@ -27,6 +28,11 @@ import { loadNotesByIds } from '@/lib/vault/notes/load';
  * vault's own session client before anything is written. That read is what
  * turns an id into a name for the title; the database refuses a note somebody
  * else owns either way, through the trigger on learn.quiz_sources.
+ *
+ * A file is read here too, and what it is is decided here rather than taken
+ * from the input's accept attribute -- that is a hint to a file chooser, and
+ * the browser is not where this gets to be settled. #446 says text and
+ * markdown, read as text and stored the way a paste is.
  */
 
 export type NewQuizState = { error?: string };
@@ -63,8 +69,25 @@ export async function startQuiz(
   const noteIds = [...new Set(parsed.data.noteIds)];
   const { paste, preparingFor } = parsed.data;
 
-  if (noteIds.length === 0 && paste.length === 0) {
-    return { error: 'Pick a note or paste something to be quizzed on.' };
+  const upload = formData.get('file');
+  const file = upload instanceof File && upload.size > 0 ? upload : null;
+
+  if (noteIds.length === 0 && paste.length === 0 && !file) {
+    return { error: 'Pick a note, paste something, or choose a file to be quizzed on.' };
+  }
+
+  let fromFile: string | null = null;
+  if (file) {
+    // Read only after the size is known to be sane, so a video chosen by
+    // mistake is refused rather than pulled into memory to be decoded.
+    const bytes =
+      file.size > MAX_QUIZ_FILE_BYTES
+        ? new Uint8Array()
+        : new Uint8Array(await file.arrayBuffer());
+
+    const read = readQuizFile({ name: file.name, size: file.size, bytes });
+    if (!read.ok) return { error: quizFileMessage(read.reason, file.name) };
+    fromFile = read.text;
   }
 
   const notes = await loadNotesByIds(await createVaultClient(), noteIds);
@@ -74,6 +97,7 @@ export async function startQuiz(
 
   const sources: NewQuizSource[] = notes.map((note) => ({ noteId: note.id }));
   if (paste.length > 0) sources.push({ body: paste });
+  if (fromFile) sources.push({ body: fromFile });
 
   const supabase = await createLearnClient();
   const quizId = await createQuiz(supabase, user.id, {

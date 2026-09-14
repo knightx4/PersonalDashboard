@@ -9,6 +9,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { MAX_QUIZ_NOTES } from '@/lib/learn/quiz/model';
+import { QUIZ_FILE_ACCEPT, QUIZ_FILE_KINDS } from '@/lib/learn/quiz/file';
 import { startQuiz, type NewQuizState } from './actions';
 
 /**
@@ -139,8 +140,9 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
   const [state, formAction] = useActionState<NewQuizState, FormData>(startQuiz, {});
   const [picked, setPicked] = useState<PickedNote[]>([]);
   const [paste, setPaste] = useState('');
+  const [file, setFile] = useState<string | null>(null);
 
-  const ready = picked.length > 0 || paste.trim().length > 0;
+  const ready = picked.length > 0 || paste.trim().length > 0 || file !== null;
 
   return (
     <form action={formAction} className={cn(cardVariants({ padding: 'standard' }))}>
@@ -207,6 +209,22 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
       </Field>
 
       <Field
+        label="Or a file"
+        id="quiz-file"
+        hint={`${QUIZ_FILE_KINDS} It is read as text and stored the same way a paste is, so the questions can quote it.`}
+        className="mt-4"
+      >
+        <input
+          id="quiz-file"
+          name="file"
+          type="file"
+          accept={QUIZ_FILE_ACCEPT}
+          onChange={(event) => setFile(event.target.files?.[0]?.name ?? null)}
+          className="block w-full text-ui text-ink file:mr-3 file:rounded-control file:border file:border-control file:bg-surface file:px-3 file:py-1 file:text-ui file:text-ink hover:file:bg-sunken"
+        />
+      </Field>
+
+      <Field
         label="What are you preparing for?"
         id="quiz-preparing-for"
         hint="Optional, and worth writing: it is what the questions get aimed at, and it is what tells two quizzes over the same notes apart."
@@ -224,7 +242,9 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
         <StartButton ready={ready} />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
         {!ready && (
-          <span className="text-ui text-ink-muted">Pick a note or paste something first.</span>
+          <span className="text-ui text-ink-muted">
+            Pick a note, paste something, or choose a file first.
+          </span>
         )}
       </div>
     </form>
