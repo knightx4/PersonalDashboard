@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DigestEvent, DigestEventKind, DigestPointer, DigestPointerKind } from '@/lib/digest/build';
+import type {
+  DigestEvent,
+  DigestEventKind,
+  DigestFeature,
+  DigestPointer,
+  DigestPointerKind,
+} from '@/lib/digest/build';
 
 /**
  * The morning summary, read for the top of /dev/raised.
@@ -16,6 +22,11 @@ export type Digest = {
   day: string;
   /** The start of the window it read. */
   since: string;
+  /**
+   * Two or three sentences on what the day amounted to. Null on a day the
+   * model call did not happen, and on every summary written before #442.
+   */
+  summary: string | null;
   happened: DigestEvent[];
   attention: DigestPointer[];
   createdAt: string;
@@ -26,6 +37,19 @@ const POINTER_KINDS: readonly DigestPointerKind[] = ['decision', 'ready', 'sugge
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * The feature an event closed under, where an older row has none. Read as
+ * defensively as everything else here: a summary that lost its grouping still
+ * renders, just flat.
+ */
+function featureFrom(value: unknown): DigestFeature | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const row = value as Record<string, unknown>;
+  const ref = text(row.ref);
+  const title = text(row.title);
+  return ref && title ? { ref, title } : null;
 }
 
 /**
@@ -51,6 +75,7 @@ function eventsFrom(value: unknown): DigestEvent[] {
         commit: text(row.commit),
         note: text(row.note),
         at: text(row.at) ?? '',
+        feature: featureFrom(row.feature),
       },
     ];
   });
@@ -73,6 +98,7 @@ export function digestFromRow(row: Record<string, unknown>): Digest {
     id: row.id as string,
     day: String(row.day ?? '').slice(0, 10),
     since: String(row.since ?? ''),
+    summary: text(row.summary),
     happened: eventsFrom(row.happened),
     attention: pointersFrom(row.attention),
     createdAt: String(row.created_at ?? ''),
@@ -87,7 +113,7 @@ export async function loadDigest(
 ): Promise<Digest | null> {
   const { data } = await supabase
     .from('dev_digests')
-    .select('id, day, since, happened, attention, created_at')
+    .select('id, day, since, summary, happened, attention, created_at')
     .eq('user_id', userId)
     .order('day', { ascending: false })
     .limit(1)
