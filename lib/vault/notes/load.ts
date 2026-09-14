@@ -205,6 +205,45 @@ export async function loadNotes(
   return ((data ?? []) as NoteRow[]).map(toSummary);
 }
 
+/**
+ * Notes named by id, with their bodies, in the order they were asked for.
+ *
+ * For a caller holding ids it was given earlier rather than a path somebody
+ * typed -- a quiz, which stores the notes it is over and reads them again when
+ * its questions are written. RLS decides what comes back, so an id belonging
+ * to somebody else is simply missing from the answer.
+ *
+ * A note deleted from the vault since is missing too, which is why this
+ * returns what it found rather than throwing: the material a quiz was written
+ * from can outlive one of its notes.
+ */
+export async function loadNotesByIds(
+  supabase: VaultSupabaseClient,
+  ids: readonly string[],
+): Promise<NoteDetail[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('notes')
+    .select('id, path, title, body, frontmatter, size_bytes, git_updated_at')
+    .in('id', [...ids])
+    .is('deleted_at', null);
+
+  assertSchemaExposed(error, VAULT_SCHEMA);
+  if (error) throw new Error(`Reading the vault failed: ${error.message}`);
+
+  const found = new Map(
+    ((data ?? []) as (NoteRow & { frontmatter: Record<string, unknown>; size_bytes: number })[]).map(
+      (row) => [
+        row.id,
+        { ...toSummary(row), body: row.body, frontmatter: row.frontmatter ?? {}, sizeBytes: row.size_bytes },
+      ],
+    ),
+  );
+
+  return ids.map((id) => found.get(id)).filter((note): note is NoteDetail => note !== undefined);
+}
+
 export async function loadNote(
   supabase: VaultSupabaseClient,
   path: string,

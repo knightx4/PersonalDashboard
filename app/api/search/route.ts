@@ -3,7 +3,8 @@ import { getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { allSearchSources } from '@/lib/search/registry';
 import { searchEverything } from '@/lib/search/search';
-import { MIN_QUERY } from '@/lib/search/sources';
+import { MIN_QUERY, type HitKind } from '@/lib/search/sources';
+import { QUIZ_HIT_KINDS } from '@/lib/learn/quiz/model';
 import { LINKABLE_HIT_KINDS } from '@/lib/todo/links/from-hit';
 
 export const dynamic = 'force-dynamic';
@@ -24,11 +25,18 @@ export const dynamic = 'force-dynamic';
  * No caching. A search over your own rows is as fresh as the rows, and a
  * cached one would show a thing you just deleted.
  *
- * `?for=link` narrows the answer to what a task can be about, for the todo
- * link picker. A named audience rather than a list of kinds in the query
+ * `?for=` narrows the answer to what one caller can use: `link` is what a task
+ * can be about, for the todo link picker, and `quiz` is what a quiz can be
+ * written from. A named audience rather than a list of kinds in the query
  * string: the browser says what it is for and the server decides what that
- * means, so the one list of linkable kinds stays in one place.
+ * means, so each list of kinds stays in the one place that owns it.
  */
+
+/** What each audience is allowed to see. Anything else gets the whole palette. */
+const FOR: Record<string, readonly HitKind[]> = {
+  link: LINKABLE_HIT_KINDS,
+  quiz: QUIZ_HIT_KINDS,
+};
 export async function GET(request: Request) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -46,7 +54,7 @@ export async function GET(request: Request) {
     query,
     sources: allSearchSources(),
     enabledModules: settings.enabledModules,
-    kinds: params.get('for') === 'link' ? LINKABLE_HIT_KINDS : undefined,
+    kinds: FOR[params.get('for') ?? ''],
   });
 
   // A source that fell over is a log line, not something for the box: the
