@@ -89,10 +89,10 @@ describe('RLS coverage', () => {
     expect(rows.map((r) => r.tablename)).toEqual([]);
   });
 
-  // The graph half of the schema is seeded and checked in
-  // rls-learn-graph.test.ts. It is listed here so this assertion keeps doing
-  // its job: a table that arrives with no isolation test anywhere breaks this
-  // line first.
+  // The graph half of the schema, and the quiz tables, are seeded and checked
+  // in rls-learn-graph.test.ts. They are listed here so this assertion keeps
+  // doing its job: a table that arrives with no isolation test anywhere breaks
+  // this line first.
   it('seeds every table, so a new one cannot skip the isolation check', async () => {
     const rows = await admin<{ tablename: string }[]>`
       select c.relname as tablename
@@ -110,6 +110,9 @@ describe('RLS coverage', () => {
       'opening_questions',
       'opening_sweeps',
       'probes',
+      'quiz_questions',
+      'quiz_sources',
+      'quizzes',
       'readings',
       'sources',
       'subjects',
