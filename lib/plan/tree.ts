@@ -108,7 +108,7 @@ export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   you: 'On you',
   ready: 'Ready',
   proposed: 'Proposed',
-  claude: "Claude's",
+  claude: "Dash's",
   blocked: 'Waiting',
   fog: 'Not specified',
   dismissed: 'Dismissed',

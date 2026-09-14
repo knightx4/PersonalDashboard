@@ -28,6 +28,7 @@ import {
   type IdeaSort,
 } from '@/lib/ideas/view';
 import { cardVariants } from '@/components/ui/card';
+import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
@@ -191,6 +192,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
           </span>
         )}
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
+        <CommentCount count={idea.thread.length} />
       </div>
 
       {/* Which feature the session was working on when it wrote this. On its
@@ -399,7 +401,7 @@ export function IdeasView({
         <EmptyState
           icon={Lightbulb}
           title="Nothing written down yet"
-          description="An idea here becomes work when you have Claude shape it into the plan, and approve what it proposes there."
+          description="An idea here becomes work when you have Dash shape it into the plan, and approve what it proposes there."
         />
       )}
 
@@ -463,7 +465,7 @@ export function IdeasView({
               aria-hidden
             />
             <Bot className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
-            Suggested by Claude{' '}
+            Suggested by Dash{' '}
             <span className="font-normal text-ink-muted">({suggested.length})</span>
           </summary>
           {/* What to do with one, which the heading does not say. The sentence

@@ -390,7 +390,7 @@ export async function setPlanItemStatus(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: status.data === 'blocked' ? 'Blocked, and taken back off Claude.' : 'Updated.' };
+  return { message: status.data === 'blocked' ? 'Blocked, and taken back off Dash.' : 'Updated.' };
 }
 
 /** "1" puts something aside; anything else brings it back. */
@@ -598,7 +598,7 @@ export async function setPlanItemAssignee(
 
   if (ids.length === 0) {
     return {
-      error: `#${node.number} is ${node.status === 'blocked' ? 'blocked' : 'a question nobody has answered'}, so it is waiting on you rather than on Claude.`,
+      error: `#${node.number} is ${node.status === 'blocked' ? 'blocked' : 'a question nobody has answered'}, so it is waiting on you rather than on Dash.`,
     };
   }
 
@@ -617,7 +617,7 @@ export async function setPlanItemAssignee(
   const left = skipped.length === 0 ? '' : ` ${skipped.length} left with you: ${skipped.map((step) => `#${step.number}`).join(', ')}.`;
   return {
     message:
-      (ids.length === 1 ? 'Handed to Claude.' : `Handed ${ids.length} steps to Claude.`) + left,
+      (ids.length === 1 ? 'Handed to Dash.' : `Handed ${ids.length} steps to Dash.`) + left,
   };
 }
 
@@ -1170,7 +1170,7 @@ export async function sendPlanQueueToClaude(
   const sections = buildPlanTree(await loadPlan(supabase, user.id));
   const queue = handedToClaude(sections);
   if (queue.length === 0) {
-    return { error: 'Nothing is handed to Claude right now. Hand a step over and it lands here.' };
+    return { error: 'Nothing is handed to Dash right now. Hand a step over and it lands here.' };
   }
 
   // Nothing is marked underway here either, for the reason the feature send

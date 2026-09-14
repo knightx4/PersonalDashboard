@@ -43,6 +43,8 @@ import {
   type ListDisplaySpec,
 } from '@/lib/list-display';
 import { formatMoney } from '@/lib/money';
+import { CommentThread } from '@/components/dev/comment-thread';
+import type { DevComment } from '@/lib/comments/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -1364,6 +1366,60 @@ const orderDisplayParams = {
   hide: 'inbox',
 };
 
+/**
+ * A thread on a plan step: a question of yours and the answer under it.
+ *
+ * The answer is long and has a list, a link and a block of code in it, because
+ * that is what a session writes back and it is the shape the thread has to lay
+ * out -- an answer that happens to be one short paragraph proves nothing. The
+ * times are counted back from now rather than written down, so the surface
+ * keeps showing what a thread looks like this week instead of one from
+ * whenever the fixture was typed.
+ */
+const commentThread: DevComment[] = [
+  {
+    id: 'fixture-1',
+    author: 'me',
+    body: "@dash the Dash's view is showing #412 and I never handed it over. Is the filter reading the row or the tree?",
+    createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'fixture-2',
+    author: 'claude',
+    body: `The filter reads \`assignee\` off the row itself. The tree only rolls it up for the counts in the strip at the top of the page, so the view and the count can disagree and neither is wrong.
+
+#412 is there because its parent was handed over, and handing a feature over cascades the same way approving does:
+
+- \`handStepToClaude\` sets the assignee on the step and on every open step beneath it.
+- The queue the send-all button works is \`handedToClaude\`, which leaves out decisions and anything already closed.
+- The badge on the row is the column and nothing else, which is why it appears on children you did not press anything on.
+
+If you want the child back, take it back from its own menu -- that writes the column on that one row and leaves the parent alone:
+
+\`\`\`ts
+const queue = handedToClaude(sections);
+\`\`\`
+
+The rule is written down in [the plan spec](https://example.com/docs/PLAN-SPEC.md), under how a feature is worked. Anything pasted in, <b>markup included</b>, is shown as the text it is.`,
+    createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    /* Two from Dash in a row: the answer, and then what the session that read
+     * the code did about it. The pair is here because a run from one author is
+     * what the shared header has to be looked at on. */
+    id: 'fixture-3',
+    author: 'claude',
+    body: 'Reworded the done-when on #412 to say the count and the view are read off different things, and put the old wording in the thread on that step.',
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'fixture-4',
+    author: 'me',
+    body: '@dash take #412 back off Dash then, and leave the feature where it is.',
+    createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
+  },
+];
+
 function SharedDisplayOptions() {
   const state = parseListDisplay(orderDisplay, orderDisplayParams);
   const groups = groupRows(sortRows(sampleOrders, state), state.groupBy, (rows) =>
@@ -1476,6 +1532,23 @@ export const SURFACES: readonly Surface[] = [
           weight: '3.9',
         }}
         searchAvailable
+      />
+    ),
+  },
+  {
+    /* The thread on a dev row, in the middle of an exchange. The waiting line
+     * is up as well: it is only on screen while a tagged comment is being
+     * answered, which is a few seconds nobody can hold still for a shot. */
+    id: 'dev-comment-thread',
+    label: 'Comments · a thread on a plan step',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <CommentThread
+        target="step"
+        id="00000000-0000-4000-8000-000000000412"
+        thread={commentThread}
+        awaitingReply
       />
     ),
   },

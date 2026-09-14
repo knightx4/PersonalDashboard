@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Bot,
@@ -37,7 +37,9 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
@@ -115,7 +117,7 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
 
 const PRIORITY_LABEL: Record<PlanPriority, string> = { 1: 'Next', 2: 'Normal', 3: 'Someday' };
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
-const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Claude' };
+const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -305,7 +307,7 @@ function SendTheQueue({ count }: { count: number }) {
           title="Hand the whole queue to one routine, worked in order"
         >
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : `Send all ${count} to Claude`}
+          {pending ? 'Sending…' : `Send all ${count} to Dash`}
         </Button>
       </form>
       {(state.error ?? state.message) && (
@@ -348,8 +350,8 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
       'Shape an idea from the ideas page and its proposal will appear here for you to approve.',
   },
   claude: {
-    title: "Nothing of Claude's right now",
-    description: 'Hand a step to Claude from its menu, or send one straight to the routine.',
+    title: "Nothing of Dash's right now",
+    description: 'Hand a step to Dash from its menu, or send one straight to the routine.',
   },
   you: {
     title: 'Nothing waiting on you',
@@ -383,7 +385,7 @@ function SummaryStrip({
       ? [{ view: 'dismissed' as const, value: summary.dismissed, noun: 'dismissed' }]
       : []),
     { view: null, value: summary.inProgress, noun: 'underway' },
-    { view: 'claude', value: summary.claude, noun: "Claude's" },
+    { view: 'claude', value: summary.claude, noun: "Dash's" },
     { view: null, value: summary.done, noun: 'done' },
   ];
 
@@ -1353,8 +1355,8 @@ function Dependencies({
 function sendLabel(node: PlanNode): string {
   const beneath = flatten([node]).length - 1;
   return beneath === 0
-    ? `Send #${node.number} to Claude`
-    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Claude`;
+    ? `Send #${node.number} to Dash`
+    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Dash`;
 }
 
 /**
@@ -1412,7 +1414,7 @@ function SendToClaude({
             size="sm"
             variant="ghost"
             pending={batchPending}
-            title="Hand every open step beneath this one to Claude, worked in order"
+            title="Hand every open step beneath this one to Dash, worked in order"
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
@@ -1485,51 +1487,6 @@ function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
 }
 
-/**
- * The wall clock, as something to subscribe to.
- *
- * One interval for the whole page rather than one per running step: a plan
- * with six steps underway should not be six timers waking the tab up out of
- * step with each other. It only runs while something is watching, and 30
- * seconds is as often as a figure rounded to the minute can change.
- *
- * Zero until the first subscriber arrives, which is what makes it safe to
- * render on the server: the elapsed time is the one value already different by
- * the time the HTML lands, so both sides render the placeholder and the figure
- * appears on the tick after mount.
- */
-const CLOCK_TICK_MS = 30_000;
-let clockNow = 0;
-let clockTimer: ReturnType<typeof setInterval> | null = null;
-const clockWatchers = new Set<() => void>();
-
-function subscribeToClock(onTick: () => void): () => void {
-  clockWatchers.add(onTick);
-  if (clockTimer === null) {
-    clockNow = Date.now();
-    clockTimer = setInterval(() => {
-      clockNow = Date.now();
-      for (const watcher of clockWatchers) watcher();
-    }, CLOCK_TICK_MS);
-  }
-  return () => {
-    clockWatchers.delete(onTick);
-    if (clockWatchers.size === 0 && clockTimer !== null) {
-      clearInterval(clockTimer);
-      clockTimer = null;
-    }
-  };
-}
-
-/** The wall clock as a number. Zero until the first tick after mount. */
-function useClockNow(): number {
-  return useSyncExternalStore(
-    subscribeToClock,
-    () => clockNow,
-    () => 0,
-  );
-}
-
 /** The clock on a step that is underway. */
 function Elapsed({ startedAt }: { startedAt: string }) {
   const now = useClockNow();
@@ -1584,7 +1541,7 @@ function Underway({ startedAt, assignee }: { startedAt: string; assignee: string
       title={
         stalled
           ? `Claimed ${since} and untouched since. A session that stops without closing its step leaves it here — close it or put it back.`
-          : `${assignee === 'claude' ? 'Claude has been on this' : 'Underway'} since ${since}`
+          : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
@@ -2025,8 +1982,8 @@ function PlanRow({
   const beneath = openBeneath > 0 ? `, with ${openBeneath} beneath` : '';
   const handOver = node.assignee !== 'claude';
   const assignLabel = handOver
-    ? `Hand to Claude${beneath}`
-    : `Take back from Claude${beneath}`;
+    ? `Hand to Dash${beneath}`
+    : `Take back from Dash${beneath}`;
 
   const menu: ActionMenuItem[] = [
     {
@@ -2203,6 +2160,8 @@ function PlanRow({
                   </span>
                 </span>
               )}
+              {/* And whether anything has been said about it. */}
+              <CommentCount count={node.thread.length} />
               {/* Whose it is, on the row.
                 * The "Who" column was dropped for being a column of dashes,
                 * and it was right to go -- but with it went any way of seeing
@@ -2214,7 +2173,7 @@ function PlanRow({
                 * worth reading. */}
               {node.assignee === 'claude' && (
                 <span
-                  title="Handed to Claude"
+                  title="Handed to Dash"
                   className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
                 >
                   {/* A bot and not a person. This mark said "handed over" with
@@ -2223,7 +2182,7 @@ function PlanRow({
                       went to Claude rather than onto your own list -- was the
                       one thing it did not. */}
                   <Bot className="size-3" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Handed to Claude</span>
+                  <span className="sr-only">Handed to Dash</span>
                 </span>
               )}
               {/* And how long it has been going.
