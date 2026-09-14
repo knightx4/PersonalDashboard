@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { carryOut } from '@/lib/comments/act';
 import { askDash } from '@/lib/comments/ask';
+import { isCommentTarget, type CommentTarget } from '@/lib/comments/load';
 import { isModuleId } from '@/lib/modules';
 import { consequenceFrom } from '@/lib/raised/consequence';
 
@@ -208,4 +209,40 @@ export async function reopenRaise(
 
   revalidatePath('/dev/raised');
   return { message: 'Reopened.' };
+}
+
+/**
+ * Opening a conversation is what marks it read — #432.
+ *
+ * Called from the list rather than submitted, and it redraws nothing: a
+ * revalidate here would fold the conversation shut again as you opened it. The
+ * line drops its own mark, and the date is what the next load reads.
+ *
+ * Upserted rather than inserted, because opening the same conversation twice
+ * is the ordinary case and the second one has to move the date forward.
+ */
+// latency: instant -- the line drops its own mark; the write is not waited on
+export async function markConversationRead(
+  target: CommentTarget,
+  id: string,
+): Promise<RaisedActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  if (!isCommentTarget(target)) return { error: 'Missing what was read.' };
+  const row = idSchema.safeParse(id);
+  if (!row.success) return { error: 'Missing what was read.' };
+
+  const { error } = await supabase.from('dev_comment_reads').upsert(
+    {
+      user_id: user.id,
+      target,
+      row_id: row.data,
+      read_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,target,row_id' },
+  );
+  if (error) return { error: error.message };
+
+  return { message: 'Read.' };
 }

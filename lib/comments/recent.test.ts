@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conversationsFrom } from '@/lib/comments/recent';
+import { conversationKey, conversationsFrom, readsFrom } from '@/lib/comments/recent';
 
 function comment(fields: Record<string, unknown>): Record<string, unknown> {
   return { id: 'c1', author: 'me', body: 'Something', created_at: '2026-09-13T09:00:00Z', ...fields };
@@ -107,5 +107,67 @@ describe('conversationsFrom', () => {
 
   it('ignores a comment that points at no row', () => {
     expect(conversationsFrom([comment({ id: 'c1' })])).toEqual([]);
+  });
+});
+
+describe('the unread mark', () => {
+  const dashAnswered = [
+    comment({ id: 'c1', plan_item_id: 'p1', step: { number: 412, title: 'A step' }, created_at: '2026-09-13T09:00:00Z' }),
+    comment({
+      id: 'c2',
+      author: 'claude',
+      plan_item_id: 'p1',
+      step: { number: 412, title: 'A step' },
+      created_at: '2026-09-13T10:00:00Z',
+    }),
+  ];
+
+  it('marks a conversation you have never opened', () => {
+    const [conversation] = conversationsFrom(dashAnswered);
+
+    expect(conversation.unread).toBe(true);
+  });
+
+  it('marks one Dash has written in since you read it', () => {
+    const reads = new Map([[conversationKey('step', 'p1'), '2026-09-13T09:30:00+00:00']]);
+
+    expect(conversationsFrom(dashAnswered, reads)[0].unread).toBe(true);
+  });
+
+  it('clears the mark once you have opened it since', () => {
+    const reads = new Map([[conversationKey('step', 'p1'), '2026-09-13T10:30:00+00:00']]);
+
+    expect(conversationsFrom(dashAnswered, reads)[0].unread).toBe(false);
+  });
+
+  it('never marks a conversation you spoke last in', () => {
+    const [conversation] = conversationsFrom([
+      comment({
+        id: 'c1',
+        author: 'claude',
+        idea_id: 'i1',
+        idea: { body: 'An idea' },
+        created_at: '2026-09-13T09:00:00Z',
+      }),
+      comment({ id: 'c2', idea_id: 'i1', idea: { body: 'An idea' }, created_at: '2026-09-13T10:00:00Z' }),
+    ]);
+
+    expect(conversation.unread).toBe(false);
+  });
+});
+
+describe('readsFrom', () => {
+  it('keys each mark by the row it is about', () => {
+    const reads = readsFrom([
+      { target: 'step', row_id: 'p1', read_at: '2026-09-13T10:00:00+00:00' },
+      { target: 'note', row_id: 'f1', read_at: '2026-09-12T10:00:00+00:00' },
+    ]);
+
+    expect(reads.get(conversationKey('step', 'p1'))).toBe('2026-09-13T10:00:00+00:00');
+    expect(reads.get(conversationKey('note', 'f1'))).toBe('2026-09-12T10:00:00+00:00');
+  });
+
+  it('drops a mark whose target is no longer a kind of row', () => {
+    expect(readsFrom([{ target: 'order', row_id: 'o1', read_at: '2026-09-13T10:00:00+00:00' }]).size).toBe(0);
   });
 });

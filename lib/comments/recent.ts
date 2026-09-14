@@ -4,6 +4,7 @@ import {
   COMMENT_TARGETS,
   TARGET_COLUMN,
   TARGET_PATH,
+  isCommentTarget,
   threadFrom,
   type CommentAuthor,
   type CommentTarget,
@@ -40,7 +41,52 @@ export type Conversation = {
   lastAt: string;
   /** Who wrote it. A conversation Dash spoke last in is one you may not have read. */
   lastAuthor: CommentAuthor;
+  /** Dash has written in it since you last opened it. */
+  unread: boolean;
 };
+
+/** When each conversation was last opened, by `conversationKey`. */
+export type ConversationReads = ReadonlyMap<string, string>;
+
+/** One conversation is one row, so the key is the two columns that name it. */
+export function conversationKey(target: CommentTarget, rowId: string): string {
+  return `${target}:${rowId}`;
+}
+
+/** The read marks, as the fold wants them. `dev_comment_reads`, one row each. */
+export function readsFrom(rows: readonly Record<string, unknown>[]): Map<string, string> {
+  const reads = new Map<string, string>();
+  for (const row of rows) {
+    const target = String(row.target ?? '');
+    const rowId = String(row.row_id ?? '');
+    if (!isCommentTarget(target) || !rowId) continue;
+    reads.set(conversationKey(target, rowId), String(row.read_at ?? ''));
+  }
+  return reads;
+}
+
+/**
+ * Whether the mark is on.
+ *
+ * Only Dash's last word can leave one: a thread you spoke last in is one you
+ * have obviously read, whatever the marks say. Never having opened it counts
+ * as not having read it, which is the case the whole thing is for -- an answer
+ * written overnight on a row you have not been back to. Compared as instants
+ * rather than as strings, because the two dates come from different columns
+ * and Postgres is free to render an offset either way.
+ */
+export function isUnread(
+  lastAuthor: CommentAuthor,
+  lastAt: string,
+  readAt: string | undefined,
+): boolean {
+  if (lastAuthor !== 'claude') return false;
+  if (!readAt) return true;
+  const read = Date.parse(readAt);
+  const last = Date.parse(lastAt);
+  if (Number.isNaN(read) || Number.isNaN(last)) return true;
+  return read < last;
+}
 
 /**
  * The comments, the columns that say which row each is about, and the row
@@ -111,9 +157,12 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
  * their row id, which is arbitrary but stable — a list that reshuffles between
  * two renders of the same data is worse than one in an odd order.
  */
-export function conversationsFrom(rows: readonly Record<string, unknown>[]): Conversation[] {
+export function conversationsFrom(
+  rows: readonly Record<string, unknown>[],
+  reads: ConversationReads = new Map(),
+): Conversation[] {
   type Gathered = {
-    conversation: Omit<Conversation, 'thread' | 'lastAt' | 'lastAuthor'>;
+    conversation: Omit<Conversation, 'thread' | 'lastAt' | 'lastAuthor' | 'unread'>;
     comments: Record<string, unknown>[];
   };
   const byRow = new Map<string, Gathered>();
@@ -123,7 +172,7 @@ export function conversationsFrom(rows: readonly Record<string, unknown>[]): Con
     if (!target) continue;
 
     const rowId = String(row[TARGET_COLUMN[target]]);
-    const key = `${target}:${rowId}`;
+    const key = conversationKey(target, rowId);
     const seen = byRow.get(key);
     if (seen) {
       seen.comments.push(row);
@@ -145,7 +194,18 @@ export function conversationsFrom(rows: readonly Record<string, unknown>[]): Con
     const thread = threadFrom(comments);
     const last = thread[thread.length - 1];
     if (!last) return [];
-    return [{ key, row: { ...conversation, thread, lastAt: last.createdAt, lastAuthor: last.author } }];
+    return [
+      {
+        key,
+        row: {
+          ...conversation,
+          thread,
+          lastAt: last.createdAt,
+          lastAuthor: last.author,
+          unread: isUnread(last.author, last.createdAt, reads.get(key)),
+        },
+      },
+    ];
   });
 
   found.sort((a, b) => b.row.lastAt.localeCompare(a.row.lastAt) || a.key.localeCompare(b.key));
@@ -158,19 +218,23 @@ export async function loadConversations(
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<Conversation[]> {
-  const { data } = await supabase
-    .from('dev_comments')
-    .select(CONVERSATION_COLUMNS)
-    .eq('user_id', userId)
-    // Newest first, so a cap this ever grows into drops the oldest messages
-    // rather than an arbitrary slice of them.
-    .order('created_at', { ascending: false })
-    .limit(500);
+  const [comments, marks] = await Promise.all([
+    supabase
+      .from('dev_comments')
+      .select(CONVERSATION_COLUMNS)
+      .eq('user_id', userId)
+      // Newest first, so a cap this ever grows into drops the oldest messages
+      // rather than an arbitrary slice of them.
+      .order('created_at', { ascending: false })
+      .limit(500),
+    supabase.from('dev_comment_reads').select('target, row_id, read_at').eq('user_id', userId),
+  ]);
 
   // Through `unknown`: the column list is built as an expression, so the
   // client cannot infer a row shape from it and types the result as its error
   // case instead.
-  const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+  const rows = (comments.data ?? []) as unknown as Array<Record<string, unknown>>;
+  const reads = (marks.data ?? []) as unknown as Array<Record<string, unknown>>;
 
-  return conversationsFrom(rows);
+  return conversationsFrom(rows, readsFrom(reads));
 }

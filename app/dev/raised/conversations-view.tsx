@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { markConversationRead } from './actions';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -22,6 +24,11 @@ import { useClockNow } from '@/lib/use-clock-now';
  *
  * Under the raises rather than above them: a raise is waiting on you and a
  * conversation usually is not.
+ *
+ * A conversation Dash has written in since you last opened it carries a mark.
+ * Opening it is what clears it -- #432 -- so the line drops its own mark on the
+ * press and the write goes off behind it. Nothing is redrawn: a revalidate here
+ * would fold the conversation shut as you opened it.
  */
 
 /** Enough to cover a week of talking without turning the page into an archive. */
@@ -36,13 +43,34 @@ const ELSEWHERE: Partial<Record<CommentTarget, string>> = {
 
 function Line({ conversation }: { conversation: Conversation }) {
   const now = useClockNow();
+  const [opened, setOpened] = useState(false);
   const who = conversation.lastAuthor === 'claude' ? 'Dash' : 'You';
   const elsewhere = ELSEWHERE[conversation.target];
+  const unread = conversation.unread && !opened;
 
   return (
     <li className="px-4 py-3">
       <Disclosure
-        title={conversation.about}
+        onToggle={(open) => {
+          if (!open) return;
+          setOpened(true);
+          void markConversationRead(conversation.target, conversation.rowId);
+        }}
+        title={
+          <span className="inline-flex items-baseline gap-1.5">
+            {/* Ink and a shape, no tint: whether you have read something is
+                none of the five things colour is allowed to claim. */}
+            {unread && (
+              <span
+                title="Dash has written here since you last opened it"
+                className="inline-flex size-1.5 shrink-0 translate-y-[-1px] rounded-full bg-ink"
+              >
+                <span className="sr-only">Unread</span>
+              </span>
+            )}
+            {conversation.about}
+          </span>
+        }
         meta={
           <>
             {who}{' '}

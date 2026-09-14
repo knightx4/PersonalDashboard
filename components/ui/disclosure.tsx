@@ -29,6 +29,7 @@ export function Disclosure({
   meta,
   defaultOpen = false,
   name,
+  onToggle,
   children,
   className,
 }: {
@@ -38,11 +39,23 @@ export function Disclosure({
   defaultOpen?: boolean;
   /** Shared across siblings to make them an accordion; only one stays open. */
   name?: string;
+  /**
+   * Opened or closed, for a caller that has to record it — a conversation is
+   * marked read by being opened. Only ever passed from a client component;
+   * without it this stays what it is, markup that folds before JavaScript
+   * loads.
+   */
+  onToggle?: (open: boolean) => void;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <details name={name} open={defaultOpen} className={cn('group/disc', className)}>
+    <details
+      name={name}
+      open={defaultOpen}
+      onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
+      className={cn('group/disc', className)}
+    >
       <summary
         className={cn(
           'press flex cursor-pointer list-none items-center gap-2 rounded-control py-1 text-ui',
