@@ -33,7 +33,7 @@ import {
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
-import { THEMES } from '@/lib/theme';
+import { ActivePalette } from './palette';
 import { LAW_GROUPS } from './laws';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
@@ -324,69 +324,6 @@ const PLAN_STATES = [
   ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
   ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],
 ] as const satisfies readonly (readonly [PlanHealth, string, string])[];
-
-/**
- * What each theme is made of, as a strip.
- *
- * `data-theme` on the wrapper is the real selector the layout puts on <html>,
- * so the strip is the theme rather than a picture of it. Only tokens the theme
- * block declares directly are shown: the scoped ones -- accent, page ink --
- * take their value from <body> and would show the outer theme's, which is the
- * inheritance trap the Swatch comment above describes. Lightbox shows its
- * bench as `bg-page` because that is the one theme where the page ground and
- * the well inside a card are different things.
- */
-const THEME_STRIPS: Record<(typeof THEMES)[number]['id'], readonly (readonly [string, string])[]> =
-  {
-    paper: [
-      ['bg-canvas', 'ground'],
-      ['bg-surface', 'sheet'],
-      ['bg-sunken', 'well'],
-      ['bg-border', 'hairline'],
-      ['bg-ink-ghost', 'ghost'],
-      ['bg-ink-muted', 'muted'],
-      ['bg-ink', 'ink'],
-    ],
-    ink: [
-      ['bg-canvas', 'ground'],
-      ['bg-surface', 'sheet'],
-      ['bg-raised', 'raised'],
-      ['bg-border', 'hairline'],
-      ['bg-ink-ghost', 'ghost'],
-      ['bg-ink-muted', 'muted'],
-      ['bg-ink', 'ink'],
-    ],
-    lightbox: [
-      ['bg-page', 'bench'],
-      ['bg-surface', 'sheet'],
-      ['bg-canvas', 'well'],
-      ['bg-border', 'hairline'],
-      ['bg-ink-ghost', 'ghost'],
-      ['bg-ink-muted', 'muted'],
-      ['bg-ink', 'ink'],
-    ],
-    dusk: [
-      ['bg-canvas', 'ground'],
-      ['bg-surface', 'sheet'],
-      ['bg-raised', 'raised'],
-      ['bg-border', 'hairline'],
-      ['bg-ink-ghost', 'ghost'],
-      ['bg-ink-muted', 'muted'],
-      ['bg-ink', 'ink'],
-    ],
-  };
-
-const HUE_STRIP = [
-  'bg-w-shopping',
-  'bg-w-jobs',
-  'bg-w-todo',
-  'bg-w-vault',
-  'bg-w-learn',
-  'bg-w-dev',
-  'bg-positive',
-  'bg-caution',
-  'bg-danger',
-] as const;
 
 const TYPE_SCALE = [
   ['text-micro', '11px', 'Dense table cells, badges, keycaps. The floor.'],
@@ -1062,35 +999,10 @@ export default function DevUiPage() {
       <Section
         id="themes"
         title="Themes"
-        lead="Four. Each strip is the theme itself, not a picture of it: the wrapper carries the same attribute the layout puts on the document."
+        lead="Light or dark and any colour on the circle, so there is no list to print. The strip is the theme you are in, drawn with the tokens every other surface reads."
       >
-        <Card padding="none">
-          <ul className="divide-y divide-border">
-            {THEMES.map((theme) => (
-              <li key={theme.id} className="card-pad-x row-pad space-y-1.5">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-ui font-medium text-ink">{theme.label}</p>
-                  <p className="text-small text-ink-muted">{theme.mood}</p>
-                </div>
-                <div data-theme={theme.id} className="space-y-1">
-                  <div className="flex h-7 overflow-hidden rounded-control">
-                    {THEME_STRIPS[theme.id].map(([cls, name]) => (
-                      <span key={cls} className={cn('flex-1', cls)} title={name} />
-                    ))}
-                  </div>
-                  <div className="flex h-3 overflow-hidden rounded-control">
-                    {HUE_STRIP.map((cls) => (
-                      <span key={cls} className={cn('flex-1', cls)} />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-small text-ink-ghost">
-                  {THEME_STRIPS[theme.id].map(([, name]) => name).join(' · ')} · then the six
-                  workspace hues and the three meanings
-                </p>
-              </li>
-            ))}
-          </ul>
+        <Card padding="standard">
+          <ActivePalette />
         </Card>
         <Rules items={C.THEME_RULES} />
       </Section>
