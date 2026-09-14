@@ -100,8 +100,11 @@ export type OpeningQuestionsResult = {
  *
  * Results come back in the order the items were given, whatever order the
  * calls finished in: the sweep is asked in the order the claims were named.
+ *
+ * Exported for the quiz writer, which has the same shape of problem -- several
+ * small calls behind one screen somebody is waiting in front of.
  */
-async function mapWithCap<T, R>(
+export async function mapWithCap<T, R>(
   items: T[],
   cap: number,
   run: (item: T, index: number) => Promise<R>,

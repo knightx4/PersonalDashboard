@@ -58,6 +58,7 @@ describe('the operation names', () => {
       'name-opening-claims',
       'write-opening-question',
       'grade-opening-answer',
+      'write-quiz-questions',
     ]);
   });
 });

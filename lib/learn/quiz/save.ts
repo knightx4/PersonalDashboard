@@ -54,3 +54,40 @@ export async function createQuiz(
 
   return quizId;
 }
+
+/** A question to store, before it has an id. */
+export type NewQuizQuestion = {
+  sourceId: string;
+  question: string;
+  expected: string;
+};
+
+/**
+ * Store a quiz's questions, in the order they will be asked.
+ *
+ * One insert, so a quiz either has its questions or has none of them. The
+ * status column follows from the rows through learn.sync_quiz_status(), which
+ * is why nothing here writes it.
+ */
+export async function writeQuizQuestions(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  quizId: string,
+  questions: readonly NewQuizQuestion[],
+): Promise<void> {
+  if (questions.length === 0) return;
+
+  const { error } = await supabase.from('quiz_questions').insert(
+    questions.map((question, position) => ({
+      user_id: userId,
+      quiz_id: quizId,
+      source_id: question.sourceId,
+      position,
+      question: question.question,
+      expected: question.expected,
+    })),
+  );
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Saving the quiz questions', error);
+}

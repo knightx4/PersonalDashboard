@@ -6,6 +6,8 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadQuiz } from '@/lib/learn/quiz/load';
 import { readQuizMaterial } from '@/lib/learn/quiz/material';
+import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
+import { WriteQuestions } from './write-questions';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,9 +61,13 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
         </ul>
 
         {quiz.questions.length === 0 && (
-          <p className="mt-3 text-body text-ink-muted">
-            No questions have been written for this yet.
-          </p>
+          <>
+            <p className="mt-3 text-body text-ink-muted">
+              No questions have been written for this yet. They are written once, from what the
+              material says right now, and then they stay put.
+            </p>
+            <WriteQuestions quizId={quiz.id} count={QUIZ_QUESTIONS} />
+          </>
         )}
       </div>
     </>
