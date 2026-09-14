@@ -34,6 +34,16 @@ import { useClockNow } from '@/lib/use-clock-now';
 /** Enough to cover a week of talking without turning the page into an archive. */
 export const CONVERSATIONS_SHOWN = 20;
 
+/**
+ * The start of the last message, for the closed line — law 10 wants the
+ * collapsed row to say whether opening it is worth it. Cut to one line: a
+ * comment is a paragraph and this is a list.
+ */
+function lead(body: string): string {
+  const flat = body.replace(/\s+/g, ' ').trim();
+  return flat.length > 60 ? `${flat.slice(0, 59).trimEnd()}…` : flat;
+}
+
 /** Where the row itself is, for the three that are not on this page. */
 const ELSEWHERE: Partial<Record<CommentTarget, string>> = {
   idea: 'Open it on the ideas page',
@@ -47,6 +57,7 @@ function Line({ conversation }: { conversation: Conversation }) {
   const who = conversation.lastAuthor === 'claude' ? 'Dash' : 'You';
   const elsewhere = ELSEWHERE[conversation.target];
   const unread = conversation.unread && !opened;
+  const last = conversation.thread[conversation.thread.length - 1];
 
   return (
     <li className="px-4 py-3">
@@ -72,16 +83,26 @@ function Line({ conversation }: { conversation: Conversation }) {
           </span>
         }
         meta={
-          <>
-            {who}{' '}
-            <time
-              dateTime={conversation.lastAt}
-              title={exactTime(conversation.lastAt)}
-              className="tabular"
-            >
-              {commentWhen(conversation.lastAt, now)}
-            </time>
-          </>
+          <span className="inline-flex min-w-0 items-baseline gap-1.5">
+            <span className="shrink-0">
+              {who}{' '}
+              <time
+                dateTime={conversation.lastAt}
+                title={exactTime(conversation.lastAt)}
+                className="tabular"
+              >
+                {commentWhen(conversation.lastAt, now)}
+              </time>
+            </span>
+            {/* What was last said, so the line says whether the answer is the
+                one you were waiting for. Off at phone width, where the two
+                things above it are already the whole row. */}
+            {last && (
+              <span className="hidden max-w-64 truncate text-ink-ghost sm:inline-block">
+                {lead(last.body)}
+              </span>
+            )}
+          </span>
         }
       >
         <div className="space-y-2">
