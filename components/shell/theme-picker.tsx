@@ -71,6 +71,12 @@ export function ThemePicker({ value }: { value: Theme }) {
   // so a change from the server cannot be silently ignored.
   const [override, setOverride] = useState<Theme | undefined>(undefined);
   const [preview, setPreview] = useState<Theme | undefined>(undefined);
+  /**
+   * A drag on the hue strip captures the pointer, so it keeps reporting after
+   * it has left the panel -- and the panel's own mouse-leave would then throw
+   * the preview away mid-drag and snap the page back. This is what stops it.
+   */
+  const [dragging, setDragging] = useState(false);
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -183,9 +189,20 @@ export function ThemePicker({ value }: { value: Theme }) {
   }
 
   function choose(next: Theme) {
+    save(next);
+    setOpen(false);
+  }
+
+  /**
+   * Take a choice without closing the panel.
+   *
+   * What releasing the hue strip does. Closing on every release would mean the
+   * panel shut the first time you let go of a drag, which is the moment you
+   * are most likely to want another go at it.
+   */
+  function save(next: Theme) {
     setOverride(next);
     setPreview(undefined);
-    setOpen(false);
     startTransition(() => {
       void setTheme(formatTheme(next));
     });
@@ -222,7 +239,9 @@ export function ThemePicker({ value }: { value: Theme }) {
           aria-modal="true"
           aria-label="Theme"
           tabIndex={-1}
-          onMouseLeave={() => setPreview(undefined)}
+          onMouseLeave={() => {
+            if (!dragging) setPreview(undefined);
+          }}
           padding="menu"
           className="sm:w-64"
         >
@@ -296,6 +315,14 @@ export function ThemePicker({ value }: { value: Theme }) {
               />
             ))}
           </div>
+
+          <HueStrip
+            mode={mode}
+            hue={hue}
+            onMove={(next) => setPreview(inHue(next))}
+            onRelease={(next) => save(inHue(next))}
+            onDragging={setDragging}
+          />
 
           <button
             type="button"
@@ -385,5 +412,85 @@ function Swatch({
       {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
       <span className="sr-only">{label}</span>
     </button>
+  );
+}
+
+/**
+ * The circle, past the presets.
+ *
+ * A strip rather than a ring, and it is the same thing: the hue circle cut at
+ * zero and laid flat, which is what every colour picker does and the only
+ * shape a finger, a mouse and an arrow key can all work. `input[type=range]`
+ * brings all three of those with it, plus the value in the accessibility tree,
+ * which a div with pointer handlers on it would have to be given by hand and
+ * usually is not.
+ *
+ * The track is painted in the colours it actually produces -- the accent at
+ * each hue, generated -- rather than a raw rainbow. A rainbow would promise
+ * colours this app will not give you: the saturated yellow at the top of an
+ * HSL gradient does not exist at the lightness the accent has to hold.
+ *
+ * Dragging repaints the whole app live, down the same preview path the
+ * swatches use, and releasing saves.
+ */
+function HueStrip({
+  mode,
+  hue,
+  onMove,
+  onRelease,
+  onDragging,
+}: {
+  mode: ThemeMode;
+  hue: number | null;
+  onMove: (hue: number) => void;
+  onRelease: (hue: number) => void;
+  onDragging: (dragging: boolean) => void;
+}) {
+  /**
+   * Where the handle sits when no colour is chosen.
+   *
+   * It has to sit somewhere, and the app's own accent is a blue, so that is
+   * the least surprising place for it to be waiting.
+   */
+  const at = hue ?? 260;
+
+  const track = useMemo(() => {
+    // Thirteen stops is every thirty degrees plus the wrap back to zero. The
+    // browser interpolates between them in sRGB, which is close enough over
+    // thirty degrees and far cheaper than a stop per degree.
+    const stops = Array.from({ length: 13 }, (_, step) => {
+      const degrees = (step * 30) % 360;
+      return `${generatePalette(mode, degrees)['--c-accent-base']} ${(step / 12) * 100}%`;
+    });
+    return `linear-gradient(to right, ${stops.join(', ')})`;
+  }, [mode]);
+
+  return (
+    <div className="px-2 pb-1 pt-1.5">
+      <input
+        type="range"
+        min={0}
+        max={359}
+        value={at}
+        aria-label="Colour"
+        onChange={(event) => onMove(Number(event.target.value))}
+        onPointerDown={() => onDragging(true)}
+        onPointerUp={(event) => {
+          onDragging(false);
+          onRelease(Number(event.currentTarget.value));
+        }}
+        onPointerCancel={(event) => {
+          onDragging(false);
+          onRelease(Number(event.currentTarget.value));
+        }}
+        onKeyUp={(event) => onRelease(Number(event.currentTarget.value))}
+        // ui-ok: hand-rolled-box -- the track is the colour circle itself, so
+        // its edge is the control rather than a frame drawn round one.
+        className="h-4 w-full cursor-pointer appearance-none rounded-pill border border-border-strong [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-surface [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-surface [&::-webkit-slider-thumb]:bg-transparent [&::-webkit-slider-thumb]:shadow-sm"
+        // The gradient is generated, so it cannot be a class: it is a hundred
+        // and eighty degrees of this app's own accent, not a stock rainbow.
+        style={{ backgroundImage: track }}
+      />
+    </div>
   );
 }
