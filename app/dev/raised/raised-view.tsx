@@ -9,6 +9,7 @@ import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
 import { cardVariants } from '@/components/ui/card';
+import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -175,6 +176,7 @@ function RaiseCard({ row }: { row: RaisedRow }) {
         </span>
         <span className="tabular text-small text-ink-muted">{row.createdAt.slice(0, 10)}</span>
         <StatusLabel row={row} />
+        <CommentCount count={row.thread.length} />
       </div>
 
       <p className="text-body font-semibold text-ink">{row.title}</p>

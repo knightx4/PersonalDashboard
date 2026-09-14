@@ -37,6 +37,7 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
@@ -2159,6 +2160,8 @@ function PlanRow({
                   </span>
                 </span>
               )}
+              {/* And whether anything has been said about it. */}
+              <CommentCount count={node.thread.length} />
               {/* Whose it is, on the row.
                 * The "Who" column was dropped for being a column of dashes,
                 * and it was right to go -- but with it went any way of seeing

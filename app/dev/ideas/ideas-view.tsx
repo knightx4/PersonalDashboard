@@ -28,6 +28,7 @@ import {
   type IdeaSort,
 } from '@/lib/ideas/view';
 import { cardVariants } from '@/components/ui/card';
+import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
@@ -191,6 +192,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
           </span>
         )}
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
+        <CommentCount count={idea.thread.length} />
       </div>
 
       {/* Which feature the session was working on when it wrote this. On its
