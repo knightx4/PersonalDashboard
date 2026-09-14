@@ -32,6 +32,7 @@ export function CalendarTimeGrid({
   timezone,
   newEventHref,
   eventHref,
+  feedEventHref,
 }: {
   days: CalendarDay[];
   timezone: string;
@@ -39,6 +40,8 @@ export function CalendarTimeGrid({
   newEventHref: (day: string) => string;
   /** Where an event you wrote opens. */
   eventHref: (id: string) => string;
+  /** Where a subscribed appointment opens, to be read. */
+  feedEventHref: (id: string) => string;
 }) {
   const hours = hoursOf(hourWindow(days, timezone));
 
@@ -80,7 +83,7 @@ export function CalendarTimeGrid({
                   className="min-w-0 space-y-0.5 border-l border-border p-1.5"
                 >
                   {allDay[index].map((entry) => (
-                    <Pill key={entry.key} entry={opensAt(entry, eventHref)} timezone={timezone} />
+                    <Pill key={entry.key} entry={opensAt(entry, eventHref, feedEventHref)} timezone={timezone} />
                   ))}
                 </div>
               ))}
@@ -157,7 +160,7 @@ export function CalendarTimeGrid({
                   {day.entries
                     .filter((entry) => entry.at && hourIn(entry.at, timezone) === hour)
                     .map((entry) => (
-                      <Pill key={entry.key} entry={opensAt(entry, eventHref)} timezone={timezone} />
+                      <Pill key={entry.key} entry={opensAt(entry, eventHref, feedEventHref)} timezone={timezone} />
                     ))}
                 </div>
               )),

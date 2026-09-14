@@ -5,6 +5,7 @@ import { Bot, CircleUser, X } from 'lucide-react';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { Button } from '@/components/ui/button';
+import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { MENTION, mentionsDash } from '@/lib/comments/mention';
@@ -214,6 +215,7 @@ export function CommentThread({
     }
   }
 
+  const now = useClockNow();
   const trigger = submit?.label ?? label ?? (thread.length === 0 ? 'Add a comment' : 'Add another');
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
@@ -222,8 +224,10 @@ export function CommentThread({
   /** Whether what is in the box right now would reach Dash. */
   const tagged = mentionsDash(draft);
 
-  return (
-    <div className="space-y-2">
+  const last = shown[shown.length - 1];
+
+  const messages = (
+    <>
       {shown.length > 0 && (
         <ul className="space-y-2.5">
           {shown.map((comment, index) => (
@@ -338,6 +342,31 @@ export function CommentThread({
       {/* The box is closed by the time a failure can arrive, so the reason has
           to have somewhere of its own to land. */}
       {!writing && state.error && <FieldError>{state.error}</FieldError>}
-    </div>
+    </>
+  );
+
+  // Nothing to fold and nothing to head: a row with no comments on it is the
+  // button that starts one, and a "0 comments" heading over it would be a
+  // section announcing that it has nothing to say -- laws 1 and 9.
+  if (shown.length === 0) return <div className="space-y-2">{messages}</div>;
+
+  // A thread reads as a thread: its own heading, its own indent, and a fold,
+  // which is what a card carrying a conversation twice as long as the idea
+  // above it needed. The closed line carries the count and the last turn, so
+  // opening it is a choice rather than a check -- law 10. Open by default,
+  // because a comment you cannot see is a comment nobody answers.
+  return (
+    <Disclosure
+      className="mt-1"
+      defaultOpen
+      title={`${shown.length} ${shown.length === 1 ? 'comment' : 'comments'}`}
+      meta={
+        last && last.id !== PENDING
+          ? `${AUTHOR_NAME[last.author]}, ${commentWhen(last.createdAt, now)}`
+          : undefined
+      }
+    >
+      <div className="space-y-2">{messages}</div>
+    </Disclosure>
   );
 }

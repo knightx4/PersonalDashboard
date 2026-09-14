@@ -30,6 +30,7 @@ export function CalendarMonthGrid({
   timezone,
   newEventHref,
   eventHref,
+  feedEventHref,
 }: {
   days: CalendarDay[];
   timezone: string;
@@ -37,6 +38,8 @@ export function CalendarMonthGrid({
   newEventHref: (day: string) => string;
   /** Where an event you wrote opens. */
   eventHref: (id: string) => string;
+  /** Where a subscribed appointment opens, to be read. */
+  feedEventHref: (id: string) => string;
 }) {
   return (
     <Card padding="none" className="mt-4 overflow-hidden">
@@ -116,7 +119,7 @@ export function CalendarMonthGrid({
             <ul className="mt-1 hidden space-y-0.5 sm:block">
               {day.entries.map((entry) => (
                 <li key={entry.key}>
-                  <Pill entry={opensAt(entry, eventHref)} timezone={timezone} />
+                  <Pill entry={opensAt(entry, eventHref, feedEventHref)} timezone={timezone} />
                 </li>
               ))}
             </ul>
@@ -130,14 +133,19 @@ export function CalendarMonthGrid({
 /**
  * Where an entry goes when it is clicked.
  *
- * Only an event gains one here: a task, an interview and a return deadline
- * keep the link they already had, which goes to the page that owns them.
+ * The two kinds of appointment gain one here, and they lead different places:
+ * an event you wrote opens the form that wrote it, and a subscribed one opens
+ * a card that only reads. A task, an interview and a return deadline keep the
+ * link they already had, which goes to the page that owns them.
  */
 export function opensAt(
   entry: CalendarEntry,
   eventHref: (id: string) => string,
+  feedEventHref: (id: string) => string,
 ): CalendarEntry {
-  return entry.eventId ? { ...entry, href: eventHref(entry.eventId) } : entry;
+  if (entry.eventId) return { ...entry, href: eventHref(entry.eventId) };
+  if (entry.feedEventId) return { ...entry, href: feedEventHref(entry.feedEventId) };
+  return entry;
 }
 
 const DOT: Record<CalendarEntry['kind'], string> = {

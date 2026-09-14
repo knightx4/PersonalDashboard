@@ -36,11 +36,18 @@ export interface CalendarEntry {
    */
   end: string | null;
   /**
-   * The row an event was drawn from, which is what opens it. Null for
-   * everything else: a task, an interview and a return deadline are opened
+   * The row an event was drawn from, which is what opens it for editing. Null
+   * for everything else: a task, an interview and a return deadline are opened
    * where they live, not here.
    */
   eventId: string | null;
+  /**
+   * The subscribed appointment this was drawn from, which is what opens it to
+   * be read. Separate from eventId rather than folded into it, because the two
+   * lead different places: one opens a form that writes, and this opens a card
+   * that cannot -- the row belongs to somebody else's calendar.
+   */
+  feedEventId: string | null;
   title: string;
   /** Where clicking it goes, when there is anywhere to go. */
   href: string | null;
@@ -173,6 +180,7 @@ export function collectEntries(
       at: task.dueAt,
       end: null,
       eventId: null,
+      feedEventId: null,
       title: task.title,
       href: null,
       done: task.status === 'done',
@@ -207,6 +215,7 @@ export function collectEntries(
         at,
         end,
         eventId: event.id,
+        feedEventId: null,
         title: event.title,
         href: null,
         done: false,
@@ -216,7 +225,9 @@ export function collectEntries(
 
   // Subscribed appointments cover their days exactly as your own events do --
   // the same first-day, middle-day, last-day split -- but carry no eventId, so
-  // nothing on the page offers to open or edit one.
+  // nothing on the page offers to edit one. They carry a feedEventId instead,
+  // which opens what the calendar said about the appointment and offers no way
+  // to change it.
   for (const event of input.feedEvents ?? []) {
     const days = eventDays(event, timezone);
     const last = days.length - 1;
@@ -239,6 +250,7 @@ export function collectEntries(
         at,
         end,
         eventId: null,
+        feedEventId: event.id,
         title: event.title,
         href: null,
         done: false,
@@ -255,6 +267,7 @@ export function collectEntries(
       at: item.at,
       end: null,
       eventId: null,
+      feedEventId: null,
       title: item.title,
       href: item.link?.href ?? null,
       done: false,
@@ -268,6 +281,7 @@ export function collectEntries(
       at: entry.at,
       end: null,
       eventId: null,
+      feedEventId: null,
       title: entry.label,
       href: entry.link?.href ?? null,
       done: false,
