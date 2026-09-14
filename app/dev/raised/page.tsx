@@ -2,6 +2,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { loadDigest } from '@/lib/digest/load';
+import { loadConversations } from '@/lib/comments/recent';
+import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { RaisedView } from './raised-view';
 
@@ -19,13 +21,18 @@ export const metadata = { title: 'Raised' };
  * Above the queue, the morning summary: what closed in the last day and what
  * is worth a look. It is written once a day by the cron rather than built
  * here, so opening this page never costs a model call.
+ *
+ * Under the queue, every conversation you have had, wherever it was started.
+ * A thread used to be visible only from the row it was written on, which meant
+ * finding an answer by remembering where the question was asked.
  */
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, digest] = await Promise.all([
+  const [queue, digest, conversations] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
+    loadConversations(supabase, user.id),
   ]);
 
   return (
@@ -36,6 +43,7 @@ export default async function DevRaisedPage() {
       />
       <DigestPanel digest={digest} />
       <RaisedView queue={queue} />
+      <ConversationsView conversations={conversations} />
     </div>
   );
 }

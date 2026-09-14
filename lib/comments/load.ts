@@ -44,6 +44,15 @@ export const TARGET_PATH: Record<CommentTarget, string> = {
 };
 
 /**
+ * The page that lists every conversation, whichever row it was started on.
+ *
+ * A comment written or deleted anywhere changes that list as well as the row's
+ * own page, so both are redrawn. Without it a reply written from the list is
+ * gone again the moment the optimistic row clears.
+ */
+export const CONVERSATIONS_PATH = '/dev/raised';
+
+/**
  * Who wrote it. 'me' is you on the page, 'claude' is a session — both write
  * with your account, so the column is what tells the two halves of the
  * conversation apart.

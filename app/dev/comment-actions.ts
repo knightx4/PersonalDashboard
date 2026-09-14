@@ -4,7 +4,13 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { askDash } from '@/lib/comments/ask';
-import { COMMENT_TARGETS, TARGET_COLUMN, TARGET_PATH } from '@/lib/comments/load';
+import {
+  COMMENT_TARGETS,
+  CONVERSATIONS_PATH,
+  TARGET_COLUMN,
+  TARGET_PATH,
+  type CommentTarget,
+} from '@/lib/comments/load';
 import { mentionsDash, questionFrom } from '@/lib/comments/mention';
 
 /**
@@ -21,6 +27,15 @@ export type CommentActionState = {
   error?: string;
   message?: string;
 };
+
+/**
+ * The row's own page, and the list of every conversation, which now shows the
+ * same thread.
+ */
+function redraw(target: CommentTarget) {
+  revalidatePath(TARGET_PATH[target]);
+  if (TARGET_PATH[target] !== CONVERSATIONS_PATH) revalidatePath(CONVERSATIONS_PATH);
+}
 
 const idSchema = z.string().uuid();
 const targetSchema = z.enum(COMMENT_TARGETS);
@@ -68,7 +83,7 @@ export async function addComment(
 
   // Untagged, so it is a note to yourself and this is the end of it.
   if (!mentionsDash(body.data)) {
-    revalidatePath(TARGET_PATH[target.data]);
+    redraw(target.data);
     return { message: 'Saved.' };
   }
 
@@ -85,7 +100,7 @@ export async function addComment(
   // arrive together. What comes back is a message rather than an error either
   // way: the comment is written, and when no reply could be produced the thread
   // says why.
-  revalidatePath(TARGET_PATH[target.data]);
+  redraw(target.data);
   // And the page an action wrote to, when that was somewhere else.
   if (asked.ok && asked.redraw) revalidatePath(asked.redraw);
   return { message: asked.ok ? asked.message : asked.error };
@@ -112,6 +127,6 @@ export async function deleteComment(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
-  revalidatePath(TARGET_PATH[target.data]);
+  redraw(target.data);
   return { message: 'Deleted.' };
 }
