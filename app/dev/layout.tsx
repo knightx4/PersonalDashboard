@@ -31,9 +31,10 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   ]);
 
   /**
-   * Raised is first because it is the only list that is waiting on you. A
-   * session writes there when it needs an answer it will not give itself, and
-   * a question nobody reads is a session that guessed.
+   * Dash is first because it is the page the day starts on: the summary of the
+   * last 24 hours, the questions a session needs answered before it can carry
+   * on, and every conversation you have had with Dash. A question nobody reads
+   * is a session that guessed.
    *
    * Then three lists, and the order is the point: what is wrong now, what was
    * decided and is being built, and what is only being thought about. A thing
@@ -57,7 +58,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * than in the middle of the things that still want doing.
    */
   const sections: NavSection[] = [
-    { href: '/dev/raised', label: 'Raised', icon: 'raised', badge: raised.length },
+    // The route stays /dev/raised, which keeps every link already written into
+    // a notification, a comment and an old summary working.
+    { href: '/dev/raised', label: 'Dash', icon: 'raised', badge: raised.length },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },

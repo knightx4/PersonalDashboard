@@ -116,8 +116,9 @@ async function contextFor(input: {
  * One account's summary, written if today's is not already there.
  *
  * Returns whether a row was written, so the cron can say what it did. The
- * suggestions are best-effort: without ANTHROPIC_API_KEY, and on any failure
- * inside the call, the factual half is still worth writing.
+ * account of the day and the suggestions are both best-effort: without
+ * ANTHROPIC_API_KEY, and on any failure inside the call, the factual half is
+ * still worth writing.
  */
 export async function writeDigestFor(
   supabase: SupabaseClient,
@@ -144,7 +145,7 @@ export async function writeDigestFor(
   const ready = whatIsReady(plan);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const suggestions = apiKey
+  const reading = apiKey
     ? await suggestForDigest({
         apiKey,
         context: await contextFor({
@@ -155,14 +156,15 @@ export async function writeDigestFor(
           shipped: happened.map((event) => [event.ref, event.title].filter(Boolean).join(' ')),
         }),
       })
-    : [];
+    : { summary: null, suggestions: [] };
 
   const { error } = await supabase.from('dev_digests').insert({
     user_id: userId,
     day,
     since,
+    summary: reading.summary,
     happened,
-    attention: withSuggestions(ready, suggestions),
+    attention: withSuggestions(ready, reading.suggestions),
   });
 
   // A second cron tick racing the first loses the insert and that is the

@@ -163,7 +163,7 @@ export function planEntries(
  * step. Guards against a cycle by refusing to visit a row twice: a parent
  * chain is data, and data can be wrong in ways that hang a page.
  */
-function featureAbove(
+export function featureAbove(
   parentId: string | null,
   byId: ReadonlyMap<string, PlanParentRow>,
 ): ChangelogIssue | null {

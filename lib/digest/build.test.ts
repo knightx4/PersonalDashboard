@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_HAPPENED,
   MAX_READY,
+  groupHappened,
   oneLine,
   whatHappened,
   whatIsReady,
   withSuggestions,
+  type DigestEvent,
   type DigestPointer,
 } from '@/lib/digest/build';
 import type { FeedbackRow } from '@/lib/feedback/load';
@@ -82,7 +85,15 @@ describe('whatHappened', () => {
     });
 
     expect(events).toEqual([
-      { kind: 'step', title: 'The panel', ref: '#42', commit: 'abc1234', note: null, at: '2026-03-02T09:00:00Z' },
+      {
+        kind: 'step',
+        title: 'The panel',
+        ref: '#42',
+        commit: 'abc1234',
+        note: null,
+        at: '2026-03-02T09:00:00Z',
+        feature: null,
+      },
     ]);
   });
 
@@ -145,6 +156,122 @@ describe('whatHappened', () => {
     });
 
     expect(events.map((event) => event.title)).toEqual(['Late', 'Early']);
+  });
+});
+
+describe('the feature a closed row belongs to', () => {
+  it('names the feature above a step, not the step above it', () => {
+    const feature = step({ id: 'f', number: 430, title: 'One tab for your day' });
+    const middle = step({ id: 'm', number: 435, title: 'A middle step', parentId: 'f' });
+    const leaf = step({ id: 'l', number: 439, title: 'Gather the conversations', parentId: 'm' });
+
+    const [event] = whatHappened({ plan: plan([feature, middle, leaf]), notes: [], since: SINCE }).filter(
+      (row) => row.ref === '#439',
+    );
+
+    expect(event.feature).toEqual({ ref: '#430', title: 'One tab for your day' });
+  });
+
+  it('names it on an answered question too', () => {
+    const feature = step({ id: 'f', number: 430, title: 'One tab for your day' });
+    const decision = step({
+      id: 'd',
+      number: 431,
+      kind: 'decision',
+      title: 'What should this tab be called?',
+      parentId: 'f',
+      resolution: 'A — Dash',
+    });
+
+    const [event] = whatHappened({ plan: plan([feature, decision]), notes: [], since: SINCE }).filter(
+      (row) => row.kind === 'decision',
+    );
+
+    expect(event.feature).toEqual({ ref: '#430', title: 'One tab for your day' });
+  });
+
+  it('leaves a note and a feature of its own with none', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'f', number: 430, title: 'A feature' })]),
+      notes: [note({ id: 'n' })],
+      since: SINCE,
+    });
+
+    expect(events.every((event) => event.feature === null)).toBe(true);
+  });
+});
+
+describe('groupHappened', () => {
+  function event(over: Partial<DigestEvent>): DigestEvent {
+    return {
+      kind: 'step',
+      title: 'A step',
+      ref: '#1',
+      commit: null,
+      note: null,
+      at: '2026-03-02T09:00:00Z',
+      feature: null,
+      ...over,
+    };
+  }
+
+  const under430 = { ref: '#430', title: 'One tab for your day' };
+
+  it('puts the steps of one feature under one heading', () => {
+    const { groups } = groupHappened([
+      event({ ref: '#441', feature: under430 }),
+      event({ ref: '#440', feature: under430 }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ label: 'One tab for your day', ref: '#430' });
+    expect(groups[0].events.map((row) => row.ref)).toEqual(['#441', '#440']);
+  });
+
+  it('puts the closed feature in with its own steps', () => {
+    const { groups } = groupHappened([
+      event({ ref: '#430', title: 'One tab for your day' }),
+      event({ ref: '#441', feature: under430 }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].events).toHaveLength(2);
+  });
+
+  it('gathers every note under one heading', () => {
+    const { groups } = groupHappened([
+      event({ kind: 'note', ref: null, title: 'The total was wrong' }),
+      event({ kind: 'note', ref: null, title: 'The button did nothing' }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ label: 'Bugs and requests', ref: null });
+  });
+
+  it('orders the headings by when their newest row landed', () => {
+    const { groups } = groupHappened([
+      event({ ref: '#441', feature: under430 }),
+      event({ kind: 'note', ref: null, title: 'A bug' }),
+      event({ ref: '#442', feature: under430 }),
+    ]);
+
+    expect(groups.map((group) => group.ref)).toEqual(['#430', null]);
+  });
+
+  it('shows fifteen and says how many more there were', () => {
+    const many = Array.from({ length: MAX_HAPPENED + 9 }, (_, index) =>
+      event({ ref: `#${index}`, feature: { ref: `#f${index}`, title: `Feature ${index}` } }),
+    );
+
+    const { groups, more } = groupHappened(many);
+
+    expect(groups).toHaveLength(MAX_HAPPENED);
+    expect(more).toBe(9);
+  });
+
+  it('has nothing more to report on a short day', () => {
+    expect(groupHappened([event({})]).more).toBe(0);
+    expect(groupHappened([])).toEqual({ groups: [], more: 0 });
   });
 });
 

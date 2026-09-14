@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import { CardSection } from '@/components/ui/card';
-import type { DigestEvent, DigestPointer } from '@/lib/digest/build';
+import { groupHappened, type DigestEvent, type DigestGroup, type DigestPointer } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
 
 /**
@@ -12,6 +13,11 @@ import type { Digest } from '@/lib/digest/load';
  * Nothing is drawn at all before the first one is written. An empty summary
  * would say "nothing happened" on a day nobody has looked at yet, which is a
  * different and stronger claim than the page has any evidence for.
+ *
+ * What closed opens with the written account of the day and is then grouped
+ * under the feature each row closed under, fifteen rows at most. Flat and
+ * uncapped it was fifty-four lines on a busy day, which is a list rather than
+ * a summary; the rest are on the changelog and the last line says how many.
  */
 
 const EVENT_LABEL: Record<DigestEvent['kind'], string> = {
@@ -54,7 +60,7 @@ function Ref({ value }: { value: string }) {
   return <span className="tabular shrink-0 text-small text-ink-ghost">{value}</span>;
 }
 
-function Happened({ events }: { events: DigestEvent[] }) {
+function Events({ events }: { events: DigestEvent[] }) {
   return (
     <ul className="space-y-1.5">
       {events.map((event, index) => (
@@ -74,6 +80,25 @@ function Happened({ events }: { events: DigestEvent[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * One feature and what closed under it. The heading is the feature rather than
+ * a line of its own, which is what stops six steps reading as six pieces of
+ * work.
+ */
+function Group({ group }: { group: DigestGroup }) {
+  return (
+    <section className="space-y-1">
+      <div className="flex flex-wrap items-baseline gap-2">
+        {group.ref && <Ref value={group.ref} />}
+        <h3 className="min-w-0 flex-1 text-body font-semibold text-ink">{group.label}</h3>
+      </div>
+      <div className="ml-0.5 border-l border-border pl-3">
+        <Events events={group.events} />
+      </div>
+    </section>
   );
 }
 
@@ -97,14 +122,39 @@ function Attention({ pointers }: { pointers: DigestPointer[] }) {
 export function DigestPanel({ digest }: { digest: Digest | null }) {
   if (!digest) return null;
 
+  const { groups, more } = groupHappened(digest.happened);
+
   return (
     <div className="space-y-3">
       <CardSection title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
-        {digest.happened.length > 0 ? (
-          <Happened events={digest.happened} />
-        ) : (
-          <p className="text-body text-ink-muted">Nothing closed.</p>
-        )}
+        <div className="space-y-3">
+          {/* The account of the day, above the rows it is an account of. Absent
+              on a summary written before there was one, and on a day the model
+              call did not happen. */}
+          {digest.summary && (
+            <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
+          )}
+
+          {groups.length > 0 ? (
+            <div className="space-y-3">
+              {groups.map((group) => (
+                <Group key={group.key} group={group} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-body text-ink-muted">Nothing closed.</p>
+          )}
+
+          {more > 0 && (
+            <p className="text-small text-ink-muted">
+              {more} more closed.{' '}
+              <Link href="/dev/changelog" className="underline underline-offset-2 hover:text-ink">
+                See the changelog
+              </Link>
+              .
+            </p>
+          )}
+        </div>
       </CardSection>
 
       {digest.attention.length > 0 && (

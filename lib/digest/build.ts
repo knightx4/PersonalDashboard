@@ -1,4 +1,4 @@
-import { changelogEntries, type PlanParentRow } from '@/lib/changelog/entries';
+import { changelogEntries, featureAbove, type PlanParentRow } from '@/lib/changelog/entries';
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { PlanData, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, workOrder } from '@/lib/plan/tree';
@@ -31,6 +31,30 @@ export type DigestEvent = {
   note: string | null;
   /** When it closed. ISO, as the row stored it. */
   at: string;
+  /**
+   * The feature it closed under, when it closed under one. Null on a note,
+   * which belongs to no feature, on a feature's own row, and on every summary
+   * written before there was a field for it.
+   */
+  feature: DigestFeature | null;
+};
+
+export type DigestFeature = { ref: string; title: string };
+
+/**
+ * What closed, under the feature it closed under.
+ *
+ * The flat list is one line per closed row, and a day of real work is fifty of
+ * them. Under the feature they belong to, the same fifty are six or seven
+ * headings you can read in the order they landed.
+ */
+export type DigestGroup = {
+  key: string;
+  /** The feature's title, or what to call the rows that belong to none. */
+  label: string;
+  /** The feature's `#430`. Null on the group of rows that belong to none. */
+  ref: string | null;
+  events: DigestEvent[];
 };
 
 export type DigestPointerKind = 'decision' | 'ready' | 'suggestion';
@@ -46,6 +70,12 @@ export type DigestPointer = {
 /** Long enough to recognise the row, short enough that ten of them are a list. */
 const TITLE_LIMIT = 120;
 const NOTE_LIMIT = 200;
+
+/**
+ * How many closed rows the summary prints before it stops and says how many
+ * more there were. Fifteen is about a screen; the changelog has the rest.
+ */
+export const MAX_HAPPENED = 15;
 
 /** How many of each kind the list is allowed. */
 export const MAX_READY = 5;
@@ -80,7 +110,11 @@ function shortSha(sha: string | null): string | null {
  * exactly what you want to be told: it is the thing that was waiting on you
  * yesterday and is not waiting on you today.
  */
-function answeredDecisions(items: readonly PlanItem[], since: string): DigestEvent[] {
+function answeredDecisions(
+  items: readonly PlanItem[],
+  since: string,
+  byId: ReadonlyMap<string, PlanParentRow>,
+): DigestEvent[] {
   return items
     .filter(
       (item) =>
@@ -96,7 +130,13 @@ function answeredDecisions(items: readonly PlanItem[], since: string): DigestEve
       commit: null,
       note: item.resolution ? oneLine(item.resolution, NOTE_LIMIT) : null,
       at: item.completedAt as string,
+      feature: featureFrom(featureAbove(item.parentId, byId)),
     }));
+}
+
+/** The feature as an event carries it: what a heading needs and nothing else. */
+function featureFrom(issue: { number: number; title: string } | null): DigestFeature | null {
+  return issue ? { ref: `#${issue.number}`, title: oneLine(issue.title) } : null;
 }
 
 /** Every plan row, thin, so a shipped step can name the feature above it. */
@@ -134,11 +174,56 @@ export function whatHappened(input: {
       commit: shortSha(entry.commitSha),
       note: entry.source === 'note' && entry.detail ? oneLine(entry.detail, NOTE_LIMIT) : null,
       at: entry.at,
+      feature: featureFrom(entry.issue),
     }));
 
-  return [...shipped, ...answeredDecisions(input.plan.items, input.since)].sort((a, b) =>
+  const byId = new Map(parentsOf(input.plan.items).map((row) => [row.id, row]));
+
+  return [...shipped, ...answeredDecisions(input.plan.items, input.since, byId)].sort((a, b) =>
     b.at.localeCompare(a.at),
   );
+}
+
+/**
+ * Which heading an event sits under.
+ *
+ * A step goes under its feature. A feature's own closed row keys on itself, so
+ * the feature and the steps that shipped it land in one group rather than in
+ * two -- the same merge the changelog makes, and for the same reason. A note
+ * belongs to no feature and every note goes in one group, because one heading
+ * per bug report is the flat list again with more furniture.
+ */
+function groupOf(event: DigestEvent): Omit<DigestGroup, 'events'> {
+  if (event.feature) {
+    return { key: event.feature.ref, label: event.feature.title, ref: event.feature.ref };
+  }
+  if (event.kind === 'note') return { key: 'notes', label: 'Bugs and requests', ref: null };
+  if (event.ref) return { key: event.ref, label: event.title, ref: event.ref };
+  return { key: 'loose', label: 'Everything else', ref: null };
+}
+
+/**
+ * The first `limit` events, under their headings, and how many were left.
+ *
+ * Cut before grouping rather than after, so the number the page prints is the
+ * number of rows it is not showing you. The groups come back in the order
+ * their newest event landed, which is the order the events were already in.
+ */
+export function groupHappened(
+  events: readonly DigestEvent[],
+  limit = MAX_HAPPENED,
+): { groups: DigestGroup[]; more: number } {
+  const shown = events.slice(0, limit);
+  const groups = new Map<string, DigestGroup>();
+
+  for (const event of shown) {
+    const heading = groupOf(event);
+    const found = groups.get(heading.key);
+    if (found) found.events.push(event);
+    else groups.set(heading.key, { ...heading, events: [event] });
+  }
+
+  return { groups: [...groups.values()], more: Math.max(0, events.length - shown.length) };
 }
 
 /**
