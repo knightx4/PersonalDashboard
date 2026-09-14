@@ -50,6 +50,26 @@ export type Quiz = {
   questions: QuizQuestion[];
 };
 
+/**
+ * How many of a quiz's questions have not been reached.
+ *
+ * A pass counts as reached. Somebody who pressed past all ten has finished the
+ * quiz, in the only sense the screen cares about.
+ */
+export function outstandingCount(quiz: Pick<Quiz, 'questions'>): number {
+  return quiz.questions.filter((question) => question.outcome === null).length;
+}
+
+/** The next question to put on the screen, or null when the quiz is finished. */
+export function nextQuestion(quiz: Pick<Quiz, 'questions'>): QuizQuestion | null {
+  return quiz.questions.find((question) => question.outcome === null) ?? null;
+}
+
+/** How many were marked right. What the result page leads with. */
+export function rightCount(quiz: Pick<Quiz, 'questions'>): number {
+  return quiz.questions.filter((question) => question.outcome === 'right').length;
+}
+
 /** What the search box answers with when it is being asked for quiz material. */
 export const QUIZ_HIT_KINDS: readonly HitKind[] = ['note'];
 

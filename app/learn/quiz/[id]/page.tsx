@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadQuiz } from '@/lib/learn/quiz/load';
+import { outstandingCount } from '@/lib/learn/quiz/model';
 import { readQuizMaterial } from '@/lib/learn/quiz/material';
 import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
 import { WriteQuestions } from './write-questions';
@@ -26,6 +28,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   if (!quiz) notFound();
 
   const material = await readQuizMaterial(quiz.sources);
+  const left = outstandingCount(quiz);
 
   return (
     <>
@@ -60,7 +63,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
           ))}
         </ul>
 
-        {quiz.questions.length === 0 && (
+        {quiz.questions.length === 0 ? (
           <>
             <p className="mt-3 text-body text-ink-muted">
               No questions have been written for this yet. They are written once, from what the
@@ -68,6 +71,14 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
             </p>
             <WriteQuestions quizId={quiz.id} count={QUIZ_QUESTIONS} />
           </>
+        ) : (
+          left > 0 && (
+            <p className="mt-4">
+              <Link href={`/learn/quiz/${quiz.id}/take`} className={buttonVariants()}>
+                {left === quiz.questions.length ? 'Start the quiz' : `Carry on — ${left} left`}
+              </Link>
+            </p>
+          )
         )}
       </div>
     </>

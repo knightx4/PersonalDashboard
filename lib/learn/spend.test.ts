@@ -59,6 +59,7 @@ describe('the operation names', () => {
       'write-opening-question',
       'grade-opening-answer',
       'write-quiz-questions',
+      'grade-quiz-answer',
     ]);
   });
 });

@@ -229,27 +229,36 @@ export async function writeOpeningQuestions(input: {
   };
 }
 
-export type OpeningGrade =
+export type WrittenGrade =
   | { ok: true; correct: boolean; why: string }
   | { ok: false; detail: string };
 
+/** The sweep's own name for it, kept so its callers read the same as before. */
+export type OpeningGrade = WrittenGrade;
+
 /**
- * Grade one written answer against the claim it was asked about. Never throws.
+ * Grade one written answer. Never throws.
  *
- * Right or wrong and nothing between, which is what the sweep's three outcomes
- * allow and what #319 asked for: half credit would seed a concept as known on
- * the strength of a guess, and a concept marked known is one the views stop
+ * Right or wrong and nothing between, which is what the three outcomes allow
+ * and what #319 asked for: half credit would seed a concept as known on the
+ * strength of a guess, and a concept marked known is one the views stop
  * showing you.
+ *
+ * The caller brings its own system prompt and its own lines of context, so a
+ * quiz over your notes and a sweep over a subject are graded by one call with
+ * one schema rather than by two graders that drift apart.
  */
-export async function gradeOpeningAnswer(input: {
-  claim: OpeningClaim;
+export async function gradeWrittenAnswer(input: {
+  system: string;
+  /** What the question was about, above the question itself. May be empty. */
+  context: readonly string[];
   question: string;
   expected: string;
   response: string;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
-}): Promise<OpeningGrade> {
+}): Promise<WrittenGrade> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
   let response;
@@ -257,11 +266,11 @@ export async function gradeOpeningAnswer(input: {
     response = await client.messages.create({
       model: OPENING_MODEL,
       max_tokens: 512,
-      system: GRADE_SYSTEM,
+      system: input.system,
       tools: [
         {
           name: GRADE_TOOL,
-          description: 'Report whether the written answer holds the claim.',
+          description: 'Report whether the written answer is the one expected.',
           input_schema: {
             type: 'object',
             properties: {
@@ -276,8 +285,7 @@ export async function gradeOpeningAnswer(input: {
         {
           role: 'user',
           content: [
-            `Concept: ${input.claim.name}`,
-            `The claim: ${input.claim.claim}`,
+            ...input.context,
             '',
             `Question asked: ${input.question}`,
             `Answer expected: ${input.expected}`,
@@ -304,4 +312,21 @@ export async function gradeOpeningAnswer(input: {
   if (!safe.success) return { ok: false, detail: 'The grade came back malformed.' };
 
   return { ok: true, correct: safe.data.correct, why: safe.data.why };
+}
+
+/** Grade one answer from the opening sweep, against the claim it was asked about. */
+export async function gradeOpeningAnswer(input: {
+  claim: OpeningClaim;
+  question: string;
+  expected: string;
+  response: string;
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+}): Promise<OpeningGrade> {
+  return gradeWrittenAnswer({
+    ...input,
+    system: GRADE_SYSTEM,
+    context: [`Concept: ${input.claim.name}`, `The claim: ${input.claim.claim}`],
+  });
 }
