@@ -4,7 +4,19 @@ import { describe, expect, it } from 'vitest';
 import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
 import { hexToOklch, oklchToHex } from '@/lib/theme/oklch';
 import { generatePalette } from '@/lib/theme/palette';
-import { HUE_TOKENS, REFERENCE_HUE, REFERENCE_PALETTES } from '@/lib/theme/reference';
+import {
+  ACCENT_TOKENS,
+  HUE_TOKENS,
+  LIGHT_CAST,
+  REFERENCE_HUE,
+  REFERENCE_PALETTES,
+} from '@/lib/theme/reference';
+
+/** The shortest way round the circle between two hues, in degrees. */
+function apart(a: number, b: number): number {
+  const gap = Math.abs(((a - b) % 360) + 360) % 360;
+  return gap > 180 ? 360 - gap : gap;
+}
 
 /** Every fifteen degrees is twenty-four hues, which is the same sweep the contrast check walks. */
 const SWEEP = Array.from({ length: 24 }, (_, step) => step * 15);
@@ -77,6 +89,46 @@ describe('generatePalette', () => {
         }
       }
     }
+  });
+
+  it('puts a light theme\'s accent on the colour that was asked for', () => {
+    // What #454 settled. Paper's page and Paper's accent sit a hundred and
+    // eighty apart, so a light theme that rotated Paper as one thing would
+    // answer green with a green page and magenta links.
+    for (const hue of SWEEP) {
+      const accent = hexToOklch(generatePalette('light', hue)['--c-accent-base']);
+      expect(`${hue} ${apart(accent.h, hue) < 2}`).toBe(`${hue} true`);
+    }
+  });
+
+  it('brings Paper\'s accent onto Paper\'s page hue, where it was opposite it', () => {
+    const page = hexToOklch(REFERENCE_PALETTES.paper['--c-page']).h;
+    expect(apart(hexToOklch(REFERENCE_PALETTES.paper['--c-accent-base']).h, page)).toBeGreaterThan(
+      150,
+    );
+    expect(apart(hexToOklch(LIGHT_CAST['--c-accent-base']).h, page)).toBeLessThan(2);
+  });
+
+  it('keeps the accent a real colour at every hue, and no louder than Paper asked', () => {
+    // Lightness is held, so a hue whose chroma does not fit sRGB at that
+    // lightness gives chroma up rather than going darker -- which is the trade
+    // that keeps every theme as readable as Paper. What must not happen is the
+    // accent washing out to a grey, or coming back more saturated than the one
+    // colour in this palette anybody chose.
+    const asked = hexToOklch(REFERENCE_PALETTES.paper['--c-accent-base']).c;
+    for (const hue of SWEEP) {
+      const accent = hexToOklch(generatePalette('light', hue)['--c-accent-base']);
+      expect(`${hue} floor ${accent.c > 0.08}`).toBe(`${hue} floor true`);
+      expect(`${hue} ceiling ${accent.c <= asked + 0.002}`).toBe(`${hue} ceiling true`);
+    }
+  });
+
+  it('rotates light about LIGHT_CAST, which is Paper everywhere but the accent', () => {
+    for (const token of Object.keys(REFERENCE_PALETTES.paper)) {
+      if (ACCENT_TOKENS.includes(token)) continue;
+      expect(`${token} ${LIGHT_CAST[token]}`).toBe(`${token} ${REFERENCE_PALETTES.paper[token]}`);
+    }
+    expect(generatePalette('light', REFERENCE_HUE.paper)).toEqual(LIGHT_CAST);
   });
 
   it('reads a hue outside 0-360 as the same place on the circle', () => {

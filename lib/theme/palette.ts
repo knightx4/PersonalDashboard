@@ -20,6 +20,7 @@
 import { hexToOklch, oklchToHex } from './oklch';
 import {
   HUE_TOKENS,
+  LIGHT_CAST,
   REFERENCE_HUE,
   REFERENCE_PALETTES,
   type Palette,
@@ -38,9 +39,11 @@ const HUE_TOKEN_SET = new Set(HUE_TOKENS);
  * mode that many degrees around the circle, measured from the hue the
  * reference's own page ground carries.
  *
- * Dark is finished. Light with a hue rotates Paper, which is not yet the right
- * answer -- Paper's accent sits opposite its page, so it turns the wrong way --
- * and waits on plan #454.
+ * The cast reference is Dusk for dark and LIGHT_CAST for light -- Paper with
+ * its accent moved onto Paper's own page hue, which is what #454 settled.
+ * Paper's page and Paper's accent were chosen independently and sit a hundred
+ * and eighty apart, so rotating Paper as one thing would answer a request for
+ * green with a faintly green page and magenta links.
  *
  * `hue` is in degrees and may be anything; it is wrapped, so 400 is 40.
  */
@@ -50,7 +53,7 @@ export function generatePalette(mode: ThemeMode, hue: number | null): Palette {
   }
 
   const name = mode === 'light' ? 'paper' : 'dusk';
-  const reference = REFERENCE_PALETTES[name];
+  const reference = mode === 'light' ? LIGHT_CAST : REFERENCE_PALETTES.dusk;
   const turn = hue - REFERENCE_HUE[name];
 
   const palette: Palette = {};
