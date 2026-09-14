@@ -8,12 +8,13 @@
  * Dusk -- a dark already cast towards plum -- is the shape a dark theme takes
  * once a colour is chosen.
  *
- * There is no reference yet for light with a colour. Dusk rotates as one thing
- * because every colour in it sits within five degrees of its ground; Paper's
- * page and Paper's accent are a hundred and eighty apart, so rotating Paper as
- * one thing sends the accent the wrong way. Plan #454 is the question of what
- * light should rotate around, and until it is answered the light path here is
- * only correct with no colour chosen.
+ * Light with a colour rotates around LIGHT_CAST rather than around Paper
+ * itself. Dusk rotates as one thing because every colour in it sits within
+ * five degrees of its ground; Paper's page and Paper's accent are a hundred
+ * and eighty apart, because the two were chosen independently, so rotating
+ * Paper as one thing would send the accent the wrong way -- ask for green and
+ * get a faintly green page with magenta links. #454 settled it: put Paper's
+ * accent on Paper's own page hue, and rotate from there.
  *
  * These tables are a copy of what globals.css says, flattened -- `--c-page:
  * var(--c-canvas)` is resolved to the hex it lands on -- because the browser
@@ -22,7 +23,7 @@
  * re-reads globals.css and fails if the two have drifted, which is the only
  * thing keeping this file honest.
  */
-import { hexToOklch } from './oklch';
+import { hexToOklch, relativeLuminance, withLuminance } from './oklch';
 
 /** Which of the two written polarities a generated theme is a version of. */
 export type ThemeMode = 'light' | 'dark';
@@ -332,6 +333,19 @@ export const HUE_TOKENS: readonly string[] = [
 ];
 
 /**
+ * The tokens carrying the app's own accent -- links, active state, the primary
+ * button and its tint. A subset of HUE_TOKENS, named on its own because light
+ * has to move them before it rotates anything.
+ */
+export const ACCENT_TOKENS: readonly string[] = [
+  '--c-accent-base',
+  '--c-accent-hover',
+  '--c-accent-tint-base',
+  '--c-accent-base-lit',
+  '--c-accent-hover-lit',
+];
+
+/**
  * The hue a reference is already cast towards, read off its own page ground.
  *
  * Computed rather than written down so that generating at exactly this hue is
@@ -342,3 +356,41 @@ export const REFERENCE_HUE: Record<'paper' | 'dusk', number> = {
   paper: hexToOklch(REFERENCE_PALETTES.paper['--c-canvas']).h,
   dusk: hexToOklch(REFERENCE_PALETTES.dusk['--c-canvas']).h,
 };
+
+/**
+ * Paper with its accent moved onto Paper's own page hue.
+ *
+ * What light with a colour rotates, and the answer #454 gave. Every token
+ * keeps the chroma Paper wrote for it and reflects as much light as Paper's
+ * did, so every contrast ratio in a light theme is the ratio Paper measured.
+ * Only the accent family turns, and it turns as a family, so the tint stays
+ * the four degrees off the base that Paper put it.
+ *
+ * The result is not a theme anybody sees on its own -- light with no colour is
+ * Paper, untouched. It is the shape a light theme takes once the page and the
+ * accent have to agree about which colour was asked for.
+ */
+export const LIGHT_CAST: Palette = (() => {
+  const paper = REFERENCE_PALETTES.paper;
+  const turn = REFERENCE_HUE.paper - hexToOklch(paper['--c-accent-base']!).h;
+
+  const cast: Palette = { ...paper };
+  for (const token of ACCENT_TOKENS) {
+    const value = paper[token]!;
+    const colour = hexToOklch(value);
+    // Luminance rather than lightness, the same as every other turn the
+    // generator makes: a hundred and eighty degrees is the largest move in the
+    // whole scheme, and it is the one where holding the wrong quantity shows.
+    cast[token] = withLuminance({ ...colour, h: colour.h + turn }, relativeLuminance(value));
+  }
+  return cast;
+})();
+
+/**
+ * Every token a palette carries, by name.
+ *
+ * What a caller clearing a generated theme off the document has to remove:
+ * the picker writes these as inline custom properties to preview a colour,
+ * and going back to a written theme means taking every one of them off again.
+ */
+export const TOKEN_NAMES: readonly string[] = Object.keys(REFERENCE_PALETTES.paper);

@@ -88,6 +88,17 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       badge: readyToLearn,
     },
+    // Quizzes are not a deeper view of anything else here: they are over
+    // material you chose out of the vault rather than over a subject the graph
+    // holds, and they are where you go when there is a date in the diary. One
+    // quiz and the screen you answer it on are both reached through the list.
+    {
+      href: '/learn/quiz',
+      label: 'Quizzes',
+      icon: 'quiz',
+      exact: true,
+      alsoMatches: ['/learn/quiz/'],
+    },
     // The other half of the module. A subject is reached through here, and a
     // single concept through a subject, so both are alsoMatches rather than
     // tabs of their own.

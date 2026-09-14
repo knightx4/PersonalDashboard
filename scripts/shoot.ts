@@ -22,6 +22,8 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatTheme, parseTheme, type Theme } from '../lib/theme';
+import { themeAttribute, themeStyle } from '../lib/theme/apply';
 
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PORT = process.env.PREVIEW_PORT ?? '3400';
@@ -50,19 +52,58 @@ const WIDTHS = [
   { name: 'laptop', width: 1280, height: 900 },
 ] as const;
 
-/** Paper and Ink: the two poles. A surface right in both is right in Dusk. */
 /**
- * Paper and ink by default: the two themes most people are in, and shooting
- * all four doubles a run for a difference that is usually nothing.
+ * Light and dark with no colour by default: the two poles, and a surface right
+ * in both is right in a coloured one. Shooting more doubles a run for a
+ * difference that is usually nothing.
  *
- * Overridable because a theme nobody can photograph is a theme nobody can
- * judge, and the two experimental ones are exactly where judgement is needed:
- * `SHOOT_THEMES=lightbox npm run shoot -- <surface>`.
+ * Any stored theme value works, because these are read the way the app reads
+ * them -- a written theme's name, a mode, or a mode and a hue:
+ *
+ *   SHOOT_THEMES=lightbox npm run shoot -- <surface>
+ *   SHOOT_THEMES=light,dark:284 npm run shoot -- <surface>
+ *
+ * A theme nobody can photograph is a theme nobody can judge, and since #420
+ * the set of them is the whole circle.
  */
-const THEMES = (process.env.SHOOT_THEMES ?? 'paper,ink')
+const THEMES = (process.env.SHOOT_THEMES ?? 'light,dark')
   .split(',')
-  .map((theme) => theme.trim())
-  .filter(Boolean);
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => {
+    const theme = parseTheme(value);
+    if (theme.kind === 'system') {
+      throw new Error(`SHOOT_THEMES: ${value} is not a theme this app can read`);
+    }
+    return theme;
+  });
+
+/** A theme's name, safe to put in a filename: `dark:284` is `dark-284`. */
+function slug(theme: Theme): string {
+  return (formatTheme(theme) ?? 'system').replace(':', '-');
+}
+
+/**
+ * The expression that puts a theme on the page, built here rather than there.
+ *
+ * The browser has no module loader in a CDP evaluate, so the palette is
+ * generated in Node and the values travel as literals. Same two halves the
+ * root layout writes: the attribute for the polarity, the tokens for the
+ * colour.
+ */
+function applyExpression(theme: Theme): string {
+  const attribute = themeAttribute(theme);
+  const style = themeStyle(theme) ?? {};
+  const declarations = Object.entries(style)
+    .map(([token, value]) => `${token}:${value}`)
+    .join(';');
+
+  return [
+    'var r=document.documentElement;',
+    attribute ? `r.setAttribute('data-theme','${attribute}');` : "r.removeAttribute('data-theme');",
+    `r.setAttribute('style',${JSON.stringify(declarations)});`,
+  ].join('');
+}
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -163,7 +204,7 @@ async function main() {
         });
         await wait(2200);
         await send('Runtime.evaluate', {
-          expression: `document.documentElement.setAttribute('data-theme','${theme}')`,
+          expression: applyExpression(theme),
         });
         await wait(400);
 
@@ -196,7 +237,7 @@ async function main() {
           format: 'png',
           captureBeyondViewport: true,
         });
-        const name = `${surfaceId}--${size.name}-${theme}.png`;
+        const name = `${surfaceId}--${size.name}-${slug(theme)}.png`;
         writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));
         console.log(`  ${name}`);
         shot += 1;

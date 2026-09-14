@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { NavSection } from '@/components/shell/app-shell';
+import { SYSTEM_THEME } from '@/lib/theme';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
@@ -27,7 +28,7 @@ function render(sections: NavSection[], settingsHref?: string) {
       settingsHref={settingsHref}
       displayName="Sam"
       email="sam@example.com"
-      theme={null}
+      theme={SYSTEM_THEME}
     >
       <p>The page</p>
     </AppShell>,

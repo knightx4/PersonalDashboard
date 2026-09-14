@@ -26,7 +26,7 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
-import type { ThemeChoice } from '@/lib/theme';
+import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { Brief } from '@/lib/shell/brief';
 
@@ -100,7 +100,7 @@ export function AppShell({
   email: string;
   enabledModules?: readonly ModuleId[];
   counts?: SwitcherCounts;
-  theme: ThemeChoice;
+  theme: Theme;
   /** Rendered above the page, inside the content column. */
   banner?: React.ReactNode;
   /** The one thing this workspace would say if it could say only one thing. */
@@ -676,7 +676,12 @@ export function AppShell({
         onClose={() => setSwitcher(false)}
       />
 
-      <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
+      <CommandPalette
+        module={module}
+        sections={sections}
+        enabledModules={enabledModules}
+        theme={theme}
+      />
     </div>
     </CaptureProvider>
     </ToastProvider>

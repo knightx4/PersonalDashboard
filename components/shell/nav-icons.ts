@@ -21,6 +21,7 @@ import {
   ListTodo,
   Map,
   Network,
+  PencilLine,
   MessageCircleQuestion,
   MessageSquareText,
   Receipt,
@@ -96,6 +97,9 @@ export const NAV_ICONS = {
   // separates it from Read now is how long it takes, and the question mark is
   // already the dev workspace's raised tab.
   fiveMinutes: Timer,
+  // A quiz is answered in writing, which is the whole of what separates it
+  // from being asked to recognise something, so it gets the pencil.
+  quiz: PencilLine,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;
