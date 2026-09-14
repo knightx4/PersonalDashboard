@@ -7,24 +7,25 @@ import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { RaisedView } from './raised-view';
 
-export const metadata = { title: 'Raised' };
+export const metadata = { title: 'Dash' };
 
 /**
- * What Claude needs from you.
+ * The page you open in the morning: your day, and your conversations.
  *
- * A session that runs into something outside the step it is building has
- * nowhere to put it, so it says it in the transcript and you find out by
- * opening Claude. It writes a row here instead. Not the notes queue next door,
- * which is what you report as wrong, and not a plan decision, which belongs to
- * one feature: this is for what has no other home.
+ * Three sections, in the order you want them. The summary of the last 24 hours
+ * is written once a day by the cron rather than built here, so opening the page
+ * never costs a model call. Then what sessions have raised: a session that runs
+ * into something outside the step it is building would otherwise say it in the
+ * transcript, where you find it by opening Claude. Not the notes queue next
+ * door, which is what you report as wrong, and not a plan decision, which
+ * belongs to one feature.
  *
- * Above the queue, the morning summary: what closed in the last day and what
- * is worth a look. It is written once a day by the cron rather than built
- * here, so opening this page never costs a model call.
+ * Then every conversation you have had, wherever it was started. A thread used
+ * to be visible only from the row it was written on, which meant finding an
+ * answer by remembering where the question was asked.
  *
- * Under the queue, every conversation you have had, wherever it was started.
- * A thread used to be visible only from the row it was written on, which meant
- * finding an answer by remembering where the question was asked.
+ * The route stays /dev/raised though the tab is called Dash -- #431 -- because
+ * every notification, comment and old summary already links to it.
  */
 export default async function DevRaisedPage() {
   const user = await requireUser();
@@ -38,8 +39,8 @@ export default async function DevRaisedPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="Raised"
-        description="Questions and risks a session has put to you. Answer one and the next run reads it; dismiss one it did not need to ask."
+        title="Dash"
+        description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
       />
       <DigestPanel digest={digest} />
       <RaisedView queue={queue} />
