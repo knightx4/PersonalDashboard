@@ -486,7 +486,7 @@ function HueStrip({
         onKeyUp={(event) => onRelease(Number(event.currentTarget.value))}
         // ui-ok: hand-rolled-box -- the track is the colour circle itself, so
         // its edge is the control rather than a frame drawn round one.
-        className="h-4 w-full cursor-pointer appearance-none rounded-pill border border-border-strong [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-surface [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-surface [&::-webkit-slider-thumb]:bg-transparent [&::-webkit-slider-thumb]:shadow-sm"
+        className="h-4 w-full cursor-pointer appearance-none rounded-pill border border-border-strong [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-surface [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-surface [&::-webkit-slider-thumb]:bg-transparent"
         // The gradient is generated, so it cannot be a class: it is a hundred
         // and eighty degrees of this app's own accent, not a stock rainbow.
         style={{ backgroundImage: track }}
