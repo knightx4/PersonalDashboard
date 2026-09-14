@@ -66,6 +66,7 @@ import {
   linkReminderMessage,
   linkRoundMessage,
   matchRoleRequirements,
+  rebuildRequirementMap,
   removeInterviewer,
   saveInterview,
   saveInterviewGroup,
@@ -852,6 +853,37 @@ function Posting({
   const [matchError, setMatchError] = useState<string | null>(null);
   const [, startMatch] = useTransition();
 
+  // The map itself, which the page can now rebuild without the description
+  // being retyped. Held here for the same reason the matches are: the answer
+  // comes back from the action and the panel should not need a reload to draw
+  // it.
+  const [lines, setLines] = useState(requirements);
+  const [reading, setReading] = useState(false);
+  const [readNote, setReadNote] = useState<string | null>(null);
+  const [, startRead] = useTransition();
+
+  const rebuild = () => {
+    setReading(true);
+    setReadNote(null);
+    setMatchError(null);
+    startRead(async () => {
+      const result = await rebuildRequirementMap({ roleId });
+      setReading(false);
+      if (result.error || !result.requirements) {
+        setMatchError(result.error ?? 'The description could not be read.');
+        return;
+      }
+      setLines(result.requirements);
+      // A parser that found nothing has to say so. Silence here is what made
+      // the empty map look like a stale one.
+      setReadNote(
+        result.requirements.length === 0
+          ? 'Read the description and found no requirement lines in it.'
+          : `Read ${result.requirements.length} line${result.requirements.length === 1 ? '' : 's'} out of the description.`,
+      );
+    });
+  };
+
   // Keyed by text, because the map is stored as its own list and a description
   // re-extracted since the match can have moved, added or dropped a line. A
   // line with no entry simply renders unmatched, which is the honest reading.
@@ -867,30 +899,42 @@ function Posting({
             : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'
         }
         action={
-          requirements.length > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              pending={matching}
-              onClick={() => {
-                setMatching(true);
-                setMatchError(null);
-                startMatch(async () => {
-                  const result = await matchRoleRequirements({ roleId });
-                  setMatching(false);
-                  if (result.error || !result.matches) {
-                    setMatchError(result.error ?? 'The match came back empty.');
-                    return;
-                  }
-                  setMatches(result.matches);
-                  setStale(false);
-                });
-              }}
-            >
-              {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
-            </Button>
-          )
+          <div className="flex items-center gap-1">
+            {/* Reading the description again is free and is the only way back
+                from an empty map -- a parser that could not read a posting
+                when it was pasted may well read it now. Offered whenever
+                there is a description, and named for what it does to the map
+                rather than for the paragraph it reads. */}
+            {jdText.trim() && (
+              <Button type="button" size="sm" variant="ghost" pending={reading} onClick={rebuild}>
+                {reading ? 'Reading…' : lines.length === 0 ? 'Build the map' : 'Read it again'}
+              </Button>
+            )}
+            {lines.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                pending={matching}
+                onClick={() => {
+                  setMatching(true);
+                  setMatchError(null);
+                  startMatch(async () => {
+                    const result = await matchRoleRequirements({ roleId });
+                    setMatching(false);
+                    if (result.error || !result.matches) {
+                      setMatchError(result.error ?? 'The match came back empty.');
+                      return;
+                    }
+                    setMatches(result.matches);
+                    setStale(false);
+                  });
+                }}
+              >
+                {matching ? 'Matching…' : matches ? 'Match again' : 'Match my evidence'}
+              </Button>
+            )}
+          </div>
         }
       >
         {matches && requirementMatchesAt && !stale && (
@@ -914,16 +958,22 @@ function Posting({
             </Link>
           </p>
         )}
+        {readNote && <p className="mt-1 text-small text-ink-muted">{readNote}</p>}
         <FieldError>{matchError}</FieldError>
 
-        {requirements.length === 0 ? (
+        {lines.length === 0 ? (
+          // Two different nothings, and calling both of them "no description"
+          // is how a role with six thousand characters of posting on the same
+          // page came to be reported as missing one -- law 2.
           <p className="mt-3 text-ui text-ink-muted">
-            No description saved yet, so there is nothing to map.
+            {jdText.trim()
+              ? 'The description is saved but no requirement lines have been read out of it. Build the map to read it again.'
+              : 'No description saved yet, so there is nothing to map.'}
           </p>
         ) : (
           <div className="mt-3 space-y-3">
             {groups.map((group) => {
-              const items = requirements.filter((r) => r.kind === group.kind);
+              const items = lines.filter((r) => r.kind === group.kind);
               if (items.length === 0) return null;
               return (
                 <div key={group.kind}>

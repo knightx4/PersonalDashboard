@@ -223,6 +223,9 @@ export async function refreshStaleFeeds(
     .from('calendar_feeds')
     .select('id')
     .eq('user_id', userId)
+    // A subscription nobody is drawing is not worth somebody else's server: it
+    // is re-read the moment it is switched back on, by this same call.
+    .eq('shown', true)
     .or(`last_read_at.is.null,last_read_at.lt.${staleBefore}`);
 
   if (error || !data || data.length === 0) return;

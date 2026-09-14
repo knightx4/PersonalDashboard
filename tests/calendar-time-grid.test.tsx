@@ -18,6 +18,7 @@ function entry(over: Partial<CalendarEntry> = {}): CalendarEntry {
     at: null,
     end: null,
     eventId: 'e1',
+    feedEventId: null,
     title: 'An event',
     href: null,
     done: false,
@@ -36,6 +37,7 @@ function render(days: CalendarDay[]) {
       timezone="UTC"
       newEventHref={(day) => `/todo/calendar?new=${day}`}
       eventHref={(id) => `/todo/calendar?event=${id}`}
+      feedEventHref={(id) => `/todo/calendar?feedEvent=${id}`}
     />,
   );
 }
@@ -140,6 +142,28 @@ describe('CalendarTimeGrid', () => {
     expect(html).toContain('20:00');
     expect(html).not.toContain('21:00');
     expect(blocks(html)).toEqual([{ row: '10 / 14', width: '100%', marginLeft: '0%' }]);
+  });
+
+  it('opens a subscribed appointment to be read, not to be edited', () => {
+    // The two kinds of appointment lead different places, and the difference
+    // is the whole point: one opens the form that wrote it, the other a card
+    // that cannot write at all.
+    const html = render([
+      day([
+        entry({
+          key: 'feed:f1',
+          kind: 'feed',
+          eventId: null,
+          feedEventId: 'f1',
+          title: 'Sprint review',
+          at: '2026-03-10T10:00:00.000Z',
+          end: '2026-03-10T11:00:00.000Z',
+        }),
+      ]),
+    ]);
+
+    expect(html).toContain('/todo/calendar?feedEvent=f1');
+    expect(html).not.toContain('/todo/calendar?event=f1');
   });
 
   it('scrolls a week sideways rather than shrinking it to seven columns', () => {

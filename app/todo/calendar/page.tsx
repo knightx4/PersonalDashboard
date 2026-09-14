@@ -18,11 +18,14 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
+import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
 import { eventFields } from '@/lib/todo/events/model';
 import { nextHourSlot } from '@/lib/todo/time';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
 import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
 import { EventForm, type EventDraft } from '@/components/todo/event-form';
+import { FeedEventCard } from '@/components/todo/feed-event-card';
+import { CalendarPicker } from '@/components/todo/calendar-picker';
 
 export const metadata = { title: 'Calendar' };
 
@@ -47,6 +50,7 @@ export default async function TodoCalendarPage({
     month?: string;
     new?: string;
     event?: string;
+    feedEvent?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -64,7 +68,12 @@ export default async function TodoCalendarPage({
         ? `${params.month}-01`
         : undefined;
 
-  const calendar = await loadCalendar(user.id, view, anchor);
+  // The subscriptions, for the Calendars button: which of them the page is
+  // drawing is a stored choice, so nothing about it is in the URL.
+  const [calendar, feeds] = await Promise.all([
+    loadCalendar(user.id, view, anchor),
+    loadFeeds(user.id),
+  ]);
   const nothing = calendar.days.every((day) => day.entries.length === 0);
 
   // `?new=<day>` opens an empty form on that day and `?event=<id>` opens a
@@ -75,6 +84,10 @@ export default async function TodoCalendarPage({
   // An id that is not yours, or is not there, comes back null and the page is
   // simply the calendar. Nothing was found, which is not an error.
   const editing = params.event ? await loadEvent(user.id, params.event) : null;
+  // `?feedEvent=<id>` opens a subscribed appointment the same way, and it only
+  // reads: the row came from somebody else's calendar and a refresh replaces
+  // it, so there is nothing here to edit or delete.
+  const reading = params.feedEvent ? await loadFeedEvent(user.id, params.feedEvent) : null;
 
   // What "New event" means with nothing else said: today when you can see it,
   // and otherwise the day the view is anchored on.
@@ -83,6 +96,8 @@ export default async function TodoCalendarPage({
     `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, new: day })}`;
   const eventHref = (id: string) =>
     `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, event: id })}`;
+  const feedEventHref = (id: string) =>
+    `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, feedEvent: id })}`;
 
   const slot = nextHourSlot(new Date(), calendar.timezone);
   const draft: EventDraft | null = editing
@@ -155,6 +170,11 @@ export default async function TodoCalendarPage({
           New event
         </Link>
 
+        {/* Nothing at all until there is a subscription to switch off. */}
+        <CalendarPicker
+          calendars={feeds.map((feed) => ({ id: feed.id, name: feed.name, shown: feed.shown }))}
+        />
+
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
         <nav aria-label="View" className="ml-auto flex items-center gap-1">
@@ -190,12 +210,22 @@ export default async function TodoCalendarPage({
 
       {draft && <EventForm draft={draft} view={calendar.view} anchor={calendar.anchor} />}
 
+      {reading && (
+        <FeedEventCard
+          detail={reading}
+          view={calendar.view}
+          anchor={calendar.anchor}
+          timezone={calendar.timezone}
+        />
+      )}
+
       {calendar.view === 'month' ? (
         <CalendarMonthGrid
           days={calendar.days}
           timezone={calendar.timezone}
           newEventHref={newHref}
           eventHref={eventHref}
+          feedEventHref={feedEventHref}
         />
       ) : (
         <CalendarTimeGrid
@@ -203,6 +233,7 @@ export default async function TodoCalendarPage({
           timezone={calendar.timezone}
           newEventHref={newHref}
           eventHref={eventHref}
+          feedEventHref={feedEventHref}
         />
       )}
 

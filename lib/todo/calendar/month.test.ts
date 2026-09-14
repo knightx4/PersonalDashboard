@@ -351,10 +351,10 @@ describe('buildMonth', () => {
     ]);
   });
 
-  it('never offers to open a subscribed appointment', () => {
-    // eventId is what the page turns into a link to the edit form. A
-    // subscribed appointment is somebody else's row and this app writes
-    // nothing back to it, so there is nothing to open.
+  it('offers to read a subscribed appointment, never to edit one', () => {
+    // eventId is what the page turns into a link to the edit form, and a
+    // subscribed appointment is somebody else's row: this app writes nothing
+    // back to it. feedEventId is the other door -- the card that only reads.
     const month = build({
       feedEvents: [
         event({
@@ -367,6 +367,8 @@ describe('buildMonth', () => {
 
     const [entry] = dayIn(month, '2026-03-10').entries;
     expect(entry.eventId).toBeNull();
+    expect(entry.feedEventId).toBe('theirs');
+    // The pure model names no URLs; the page is what turns an id into one.
     expect(entry.href).toBeNull();
   });
 
