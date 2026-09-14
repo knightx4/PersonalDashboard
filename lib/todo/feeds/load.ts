@@ -125,7 +125,11 @@ export async function loadFeedEventsInWindow(
   assertSchemaExposed(error, TODO_SCHEMA);
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => ({
+  return (data ?? []).map(toSubscribedEvent);
+}
+
+function toSubscribedEvent(row: Record<string, unknown>): SubscribedEvent {
+  return {
     id: row.id as string,
     title: row.title as string,
     body: (row.body as string | null) ?? null,
@@ -136,5 +140,62 @@ export async function loadFeedEventsInWindow(
     endsAt: (row.ends_at as string | null) ?? null,
     createdAt: row.created_at as string,
     feedId: row.feed_id as string,
-  }));
+  };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** One subscribed appointment, and the name of the calendar it came from. */
+export interface SubscribedEventDetail {
+  event: SubscribedEvent;
+  /** What you called the subscription. Never its address, which is a credential. */
+  feedName: string;
+}
+
+/**
+ * One subscribed appointment, if it is yours. Null when it is not, or is gone.
+ *
+ * The id comes off a query string, so it is checked for being an id before it
+ * is asked about, exactly as loadEvent does it next door: a malformed uuid
+ * reaches Postgres as an error rather than as the nothing it actually is.
+ *
+ * A row can also simply vanish -- a refresh replaces the appointments of a
+ * subscription rather than editing them, so an occurrence the calendar dropped
+ * is no longer there. That is nothing found, not a failure.
+ *
+ * Two reads rather than an embed: the foreign key to calendar_feeds is over
+ * (feed_id, user_id), and asking for the name directly is clearer than naming
+ * a composite relationship.
+ */
+export async function loadFeedEvent(
+  userId: string,
+  id: string,
+): Promise<SubscribedEventDetail | null> {
+  if (!UUID.test(id)) return null;
+
+  const supabase = await createTodoClient();
+
+  const { data, error } = await supabase
+    .from('feed_events')
+    .select(`${EVENT_COLUMNS}, feed_id`)
+    .eq('user_id', userId)
+    .eq('id', id)
+    .maybeSingle();
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const event = toSubscribedEvent(data);
+
+  const { data: feed, error: feedError } = await supabase
+    .from('calendar_feeds')
+    .select('name')
+    .eq('user_id', userId)
+    .eq('id', event.feedId)
+    .maybeSingle();
+
+  if (feedError) throw new Error(feedError.message);
+
+  return { event, feedName: (feed?.name as string | undefined) ?? 'a calendar you subscribe to' };
 }

@@ -107,6 +107,42 @@ function clockIn(iso: string, timezone: string): string {
   }).format(new Date(iso));
 }
 
+/** A day, written the way a person says it. */
+function dayLabel(day: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
+/**
+ * When an event is, in one line.
+ *
+ * For reading rather than for editing: the form next door splits the same
+ * facts into the fields that wrote them, and this says them the way you would
+ * say them out loud. A day is only named twice when the event actually runs
+ * over two of them, which is the difference between a meeting that ends at
+ * one in the morning and a holiday.
+ */
+export function spanLabel(event: Event, timezone: string): string {
+  const first = startDay(event, timezone);
+  const last = endDay(event, timezone);
+
+  if (isAllDay(event)) {
+    return first === last ? `${dayLabel(first)}, all day` : `${dayLabel(first)} – ${dayLabel(last)}`;
+  }
+
+  const from = clockIn(event.startsAt as string, timezone);
+  const to = clockIn(event.endsAt as string, timezone);
+
+  return first === last
+    ? `${dayLabel(first)}, ${from} – ${to}`
+    : `${dayLabel(first)}, ${from} – ${dayLabel(last)}, ${to}`;
+}
+
 /** What the form shows when an event is opened to be changed. */
 export interface EventFields {
   allDay: boolean;
