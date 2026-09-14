@@ -84,6 +84,12 @@ function FeedRow({ feed, timezone }: { feed: Feed; timezone: string }) {
         {feed.lastReadAt ? `read ${when(feed.lastReadAt, timezone)}` : 'not read yet'}
       </span>
 
+      {/* Switched off from the Calendars button on the calendar itself. Said
+          here as well, because a subscription listed as though it were being
+          drawn, on the page where you would come to ask why it is not, is a
+          settings page that lies. */}
+      {!feed.shown && <span className="text-small text-ink-ghost">hidden on the calendar</span>}
+
       {/* The two are shown together on purpose: the appointments on the page
           are from the last good read, and this says why there is nothing
           newer. Dropping them on a failure would be a calendar that quietly

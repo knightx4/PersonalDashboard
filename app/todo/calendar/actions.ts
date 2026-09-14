@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createEvent, deleteEvent, eventInput, updateEvent } from '@/lib/todo/events/write';
+import { setFeedShown } from '@/lib/todo/feeds/write';
 import { isCalendarView, isDay } from '@/lib/todo/calendar/range';
 
 /**
@@ -110,4 +111,38 @@ export async function removeEvent(
 
   revalidatePath('/todo/calendar');
   redirect(backTo(formData));
+}
+
+export interface CalendarPickerState {
+  error?: string;
+}
+
+/**
+ * Draw a subscribed calendar, or stop drawing it.
+ *
+ * No redirect, unlike the writes above: the panel this is submitted from stays
+ * open and the page behind it is re-rendered, so switching three calendars off
+ * is three clicks rather than three round trips through the month. The agenda
+ * is revalidated too -- a calendar switched off here is off there as well, and
+ * a stale agenda would put it back.
+ *
+ * The write is scoped to the account, so an id belonging to somebody else
+ * changes nothing rather than being refused.
+ */
+// latency: pending
+export async function toggleCalendar(
+  _prev: CalendarPickerState,
+  formData: FormData,
+): Promise<CalendarPickerState> {
+  const user = await requireUser();
+
+  const id = String(formData.get('id') ?? '');
+  if (!id) return { error: 'Which calendar is this?' };
+
+  const { error } = await setFeedShown(user.id, id, formData.get('shown') === 'on');
+  if (error) return { error };
+
+  revalidatePath('/todo/calendar');
+  revalidatePath('/todo');
+  return {};
 }

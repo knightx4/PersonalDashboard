@@ -64,6 +64,30 @@ export async function createFeed(
   return { id: (data?.id as string) ?? null, error: error?.message ?? null };
 }
 
+/**
+ * Draw a subscription, or stop drawing it.
+ *
+ * The other switch a subscription has, and the reason it needed one: turning a
+ * noisy calendar off used to mean deleting it and pasting the address back in
+ * afterwards. Nothing is removed here -- the appointments stay in the table
+ * and simply are not read, so switching it back on costs no re-fetch.
+ */
+export async function setFeedShown(
+  userId: string,
+  id: string,
+  shown: boolean,
+): Promise<{ error: string | null }> {
+  const supabase = await createTodoClient();
+
+  const { error } = await supabase
+    .from('calendar_feeds')
+    .update({ shown })
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  return { error: error?.message ?? null };
+}
+
 /** Remove a subscription. Its appointments go with it, by the foreign key. */
 export async function deleteFeed(userId: string, id: string): Promise<{ error: string | null }> {
   const supabase = await createTodoClient();

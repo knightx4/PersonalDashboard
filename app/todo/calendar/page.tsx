@@ -18,13 +18,14 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
-import { loadFeedEvent } from '@/lib/todo/feeds/load';
+import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
 import { eventFields } from '@/lib/todo/events/model';
 import { nextHourSlot } from '@/lib/todo/time';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
 import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
 import { EventForm, type EventDraft } from '@/components/todo/event-form';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
+import { CalendarPicker } from '@/components/todo/calendar-picker';
 
 export const metadata = { title: 'Calendar' };
 
@@ -67,7 +68,12 @@ export default async function TodoCalendarPage({
         ? `${params.month}-01`
         : undefined;
 
-  const calendar = await loadCalendar(user.id, view, anchor);
+  // The subscriptions, for the Calendars button: which of them the page is
+  // drawing is a stored choice, so nothing about it is in the URL.
+  const [calendar, feeds] = await Promise.all([
+    loadCalendar(user.id, view, anchor),
+    loadFeeds(user.id),
+  ]);
   const nothing = calendar.days.every((day) => day.entries.length === 0);
 
   // `?new=<day>` opens an empty form on that day and `?event=<id>` opens a
@@ -163,6 +169,11 @@ export default async function TodoCalendarPage({
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           New event
         </Link>
+
+        {/* Nothing at all until there is a subscription to switch off. */}
+        <CalendarPicker
+          calendars={feeds.map((feed) => ({ id: feed.id, name: feed.name, shown: feed.shown }))}
+        />
 
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
