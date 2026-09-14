@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { getUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { isThemeId, THEME_COOKIE, THEME_COOKIE_MAX_AGE, type ThemeChoice } from '@/lib/theme';
+import { formatTheme, parseTheme, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from '@/lib/theme';
 
 /**
  * Store the chosen theme.
@@ -18,10 +18,16 @@ import { isThemeId, THEME_COOKIE, THEME_COOKIE_MAX_AGE, type ThemeChoice } from 
  *
  * Null clears both, which is not the same as choosing light: it means follow
  * the system again.
+ *
+ * The value is a theme's name, or a mode and a colour held as one string --
+ * `dark`, or `dark:284`. One column and one cookie, both unchanged in shape.
  */
 // latency: instant -- the picker recolours the page itself and does not wait for the write
 export async function setTheme(next: string | null): Promise<void> {
-  const theme: ThemeChoice = isThemeId(next) ? next : null;
+  // Read and written back rather than stored as typed: the value that lands in
+  // the cookie and the column is the one this app can read again, so a hue of
+  // 400 comes back as 40 and anything meaningless comes back as no choice.
+  const theme = formatTheme(parseTheme(next));
 
   const jar = await cookies();
   if (theme) {

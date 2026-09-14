@@ -62,8 +62,74 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
   return THEMES.some((theme) => theme.id === value);
 }
 
-export function parseTheme(value: string | null | undefined): ThemeChoice {
-  return isThemeId(value) ? value : null;
+/**
+ * Which of the two written polarities a generated theme is a version of.
+ *
+ * Re-exported rather than restated: the generator owns it, and a type-only
+ * import costs nothing at build time, so the picker can name a mode without
+ * pulling a hundred hex values into the browser.
+ */
+import type { ThemeMode } from '@/lib/theme/reference';
+
+export type { ThemeMode };
+
+/**
+ * What somebody chose, read out of the one string that holds it.
+ *
+ * Three shapes, because there are three different things a person can have
+ * chosen and one column to keep them in:
+ *
+ *   `system`    -- nothing chosen. Follow the machine, which is not the same
+ *                  as choosing light.
+ *   `written`   -- one of the four palettes written out in app/globals.css.
+ *                  Lightbox is the reason this shape survives: its page and
+ *                  its cards are opposite polarities, so it cannot be said as
+ *                  a mode and a colour at all. Paper, Ink and Dusk stay here
+ *                  too, so an account holding one renders exactly as it did.
+ *   `generated` -- a mode and a colour, or a mode and none. What the picker
+ *                  writes from now on.
+ *
+ * The string is `dark`, or `dark:284`, or a theme's name. One column, and a
+ * cookie that keeps working, because widening the column would have meant a
+ * migration for something that is already a short piece of text.
+ */
+export type Theme =
+  | { kind: 'system' }
+  | { kind: 'written'; id: ThemeId }
+  | { kind: 'generated'; mode: ThemeMode; hue: number | null };
+
+export const SYSTEM_THEME: Theme = { kind: 'system' };
+
+/** Degrees, on the circle, as a whole number. */
+function wrapHue(value: number): number {
+  return Math.round(((value % 360) + 360) % 360) % 360;
+}
+
+export function parseTheme(value: string | null | undefined): Theme {
+  if (!value) return SYSTEM_THEME;
+
+  const text = value.trim().toLowerCase();
+  if (isThemeId(text)) return { kind: 'written', id: text };
+
+  const [mode, hue] = text.split(':');
+  if (mode !== 'light' && mode !== 'dark') return SYSTEM_THEME;
+  if (hue === undefined) return { kind: 'generated', mode, hue: null };
+
+  const degrees = Number(hue);
+  if (!Number.isFinite(degrees)) return SYSTEM_THEME;
+  return { kind: 'generated', mode, hue: wrapHue(degrees) };
+}
+
+/** The string to store. Null means store nothing: follow the system. */
+export function formatTheme(theme: Theme): string | null {
+  if (theme.kind === 'system') return null;
+  if (theme.kind === 'written') return theme.id;
+  return theme.hue === null ? theme.mode : `${theme.mode}:${wrapHue(theme.hue)}`;
+}
+
+/** The written theme this is, if it is one. Null for the system and for a hue. */
+export function writtenId(theme: Theme): ThemeId | null {
+  return theme.kind === 'written' ? theme.id : null;
 }
 
 /**

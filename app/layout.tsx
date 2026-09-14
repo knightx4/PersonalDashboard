@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Inter } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
+import { themeAttribute, themeStyle } from '@/lib/theme/apply';
 import { DENSITY_COOKIE, parseDensity } from '@/lib/density';
 
 // Inter does all the work. Bricolage Grotesque is the voice: page titles, the
@@ -58,6 +59,11 @@ export const viewport: Viewport = {
  * No cookie means no choice has been made, which is not the same as choosing
  * light: the attribute is left off entirely and globals.css falls through to
  * `prefers-color-scheme`.
+ *
+ * A chosen colour rides in the same byte, as an inline style holding the
+ * generated `--c-*` values. Inline rather than a stylesheet so it wins over
+ * the written block underneath it without a specificity argument, and because
+ * a theme applied after hydration is a theme you watch arrive.
  */
 export default async function RootLayout({
   children,
@@ -71,7 +77,8 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      data-theme={theme ?? undefined}
+      data-theme={themeAttribute(theme)}
+      style={themeStyle(theme)}
       data-density={density === 'comfortable' ? undefined : density}
       className={`${inter.variable} ${display.variable} h-full`}
     >

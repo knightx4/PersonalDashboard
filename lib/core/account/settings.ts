@@ -3,7 +3,7 @@ import 'server-only';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { normalizeTimeZone } from '@/lib/core/timezone';
 import { MODULE_IDS, isModuleId, type ModuleId } from '@/lib/modules';
-import { parseTheme, type ThemeChoice } from '@/lib/theme';
+import { parseTheme, SYSTEM_THEME, type Theme } from '@/lib/theme';
 
 /**
  * The settings that belong to the account rather than to a workspace.
@@ -30,8 +30,8 @@ export interface AccountSettings {
   timezone: string;
   displayCurrency: string;
   enabledModules: ModuleId[];
-  /** Null means follow the system, which is not the same as choosing light. */
-  theme: ThemeChoice;
+  /** A written theme, or a mode and a colour, or following the system. */
+  theme: Theme;
 }
 
 /**
@@ -46,7 +46,7 @@ export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
   timezone: 'UTC',
   displayCurrency: 'USD',
   enabledModules: [...MODULE_IDS],
-  theme: null,
+  theme: SYSTEM_THEME,
 };
 
 function toModuleIds(raw: unknown): ModuleId[] {
