@@ -385,3 +385,12 @@ export const LIGHT_CAST: Palette = (() => {
   }
   return cast;
 })();
+
+/**
+ * Every token a palette carries, by name.
+ *
+ * What a caller clearing a generated theme off the document has to remove:
+ * the picker writes these as inline custom properties to preview a colour,
+ * and going back to a written theme means taking every one of them off again.
+ */
+export const TOKEN_NAMES: readonly string[] = Object.keys(REFERENCE_PALETTES.paper);

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Inter } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
-import { parseTheme, THEME_COOKIE } from '@/lib/theme';
+import { formatTheme, parseTheme, THEME_CHOICE_ATTRIBUTE, THEME_COOKIE } from '@/lib/theme';
 import { themeAttribute, themeStyle } from '@/lib/theme/apply';
 import { DENSITY_COOKIE, parseDensity } from '@/lib/density';
 
@@ -78,6 +78,9 @@ export default async function RootLayout({
     <html
       lang="en"
       data-theme={themeAttribute(theme)}
+      // The whole choice, so the picker and the palette can read back what is
+      // on screen instead of keeping a second copy that can disagree with it.
+      {...{ [THEME_CHOICE_ATTRIBUTE]: formatTheme(theme) ?? undefined }}
       style={themeStyle(theme)}
       data-density={density === 'comfortable' ? undefined : density}
       className={`${inter.variable} ${display.variable} h-full`}

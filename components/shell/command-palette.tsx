@@ -13,7 +13,8 @@ import { useCapture } from '@/components/shell/capture';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { THEMES } from '@/lib/theme';
+import { formatTheme, hueOf, modeOf, THEME_COLOURS, type Theme } from '@/lib/theme';
+import { applyTheme } from '@/lib/theme/apply';
 import type { NavSection } from '@/components/shell/app-shell';
 
 /**
@@ -53,14 +54,74 @@ type Command = {
 };
 
 
+/** Applying a theme from the palette: the document first, the account behind it. */
+function applying(next: Theme): Command['run'] {
+  return () => {
+    applyTheme(document.documentElement, next);
+    void setTheme(formatTheme(next));
+  };
+}
+
+/**
+ * The theme commands, built from what is on screen.
+ *
+ * A colour is applied to the polarity you are already in, which is what makes
+ * "Theme: Green" one command rather than two: the switch and the swatches are
+ * separate choices in the picker and they stay separate here.
+ */
+function themeCommands(theme: Theme): Command[] {
+  const mode = modeOf(theme);
+  const hue = hueOf(theme);
+
+  return [
+    ...(['light', 'dark'] as const).map((option) => ({
+      id: `theme:${option}`,
+      label: `Theme: ${option === 'light' ? 'Light' : 'Dark'}`,
+      hint: 'Keeps the colour you are in',
+      icon: 'theme' as const,
+      run: applying({ kind: 'generated', mode: option, hue }),
+    })),
+    ...THEME_COLOURS.map((colour) => ({
+      id: `theme:${colour.id}`,
+      label: `Theme: ${colour.label}`,
+      hint: mode === 'light' ? 'Light' : 'Dark',
+      icon: 'theme' as const,
+      run: applying({ kind: 'generated', mode, hue: colour.hue }),
+    })),
+    {
+      id: 'theme:none',
+      label: 'Theme: no colour',
+      hint: mode === 'light' ? 'Paper' : 'Ink',
+      icon: 'theme' as const,
+      run: applying({ kind: 'generated', mode, hue: null }),
+    },
+    {
+      id: 'theme:lightbox',
+      label: 'Theme: Lightbox',
+      hint: 'Lit sheets, blue-black bench',
+      icon: 'theme' as const,
+      run: applying({ kind: 'written', id: 'lightbox' }),
+    },
+    {
+      id: 'theme:system',
+      label: 'Theme: follow the system',
+      icon: 'theme' as const,
+      run: applying({ kind: 'system' }),
+    },
+  ];
+}
+
 export function CommandPalette({
   module,
   sections,
   enabledModules,
+  theme,
 }: {
   module: ModuleId | null;
   sections: readonly NavSection[];
   enabledModules?: readonly ModuleId[];
+  /** What is on screen now, so a colour can be applied to the mode you are in. */
+  theme: Theme;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -114,27 +175,13 @@ export function CommandPalette({
         module: null,
         run: () => router.push('/account'),
       },
-      ...THEMES.map((theme) => ({
-        id: `theme:${theme.id}`,
-        label: `Theme: ${theme.label}`,
-        hint: theme.mood,
-        icon: 'theme' as const,
-        run: () => {
-          document.documentElement.setAttribute('data-theme', theme.id);
-          void setTheme(theme.id);
-        },
-      })),
-      {
-        id: 'theme:system',
-        label: 'Theme: follow the system',
-        icon: 'theme' as const,
-        run: () => {
-          document.documentElement.removeAttribute('data-theme');
-          void setTheme(null);
-        },
-      },
+      // The same set the picker offers, one command per control: the two
+      // polarities, the five colours applied to whichever polarity you are in,
+      // Lightbox, and following the system. A command per combination would be
+      // twelve rows of theme in a list you came to for something else.
+      ...themeCommands(theme),
     ];
-  }, [sections, module, enabledModules, router]);
+  }, [sections, module, enabledModules, router, theme]);
 
   /**
    * The things you can make, when what you typed names one.

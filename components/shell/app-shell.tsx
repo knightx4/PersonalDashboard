@@ -26,7 +26,7 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
-import { writtenId, type Theme } from '@/lib/theme';
+import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { Brief } from '@/lib/shell/brief';
 
@@ -600,7 +600,7 @@ export function AppShell({
                 see sidebarInner. */}
             <div className="flex shrink-0 items-center gap-0.5">
               <CaptureButton />
-              <ThemePicker value={writtenId(theme)} />
+              <ThemePicker value={theme} />
               <NotificationsButton notifications={notifications} />
               <FeedbackButton allHref={feedbackHref} />
 
@@ -676,7 +676,12 @@ export function AppShell({
         onClose={() => setSwitcher(false)}
       />
 
-      <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
+      <CommandPalette
+        module={module}
+        sections={sections}
+        enabledModules={enabledModules}
+        theme={theme}
+      />
     </div>
     </CaptureProvider>
     </ToastProvider>

@@ -98,6 +98,9 @@ export type Theme =
   | { kind: 'written'; id: ThemeId }
   | { kind: 'generated'; mode: ThemeMode; hue: number | null };
 
+/** The shape the picker works in: a polarity, and a colour or none. */
+export type GeneratedTheme = Extract<Theme, { kind: 'generated' }>;
+
 export const SYSTEM_THEME: Theme = { kind: 'system' };
 
 /** Degrees, on the circle, as a whole number. */
@@ -131,6 +134,46 @@ export function formatTheme(theme: Theme): string | null {
 export function writtenId(theme: Theme): ThemeId | null {
   return theme.kind === 'written' ? theme.id : null;
 }
+
+/**
+ * Which polarity a theme is, whatever shape it is stored in.
+ *
+ * A written theme reports the one it declares -- Lightbox says dark, because
+ * its bench is what the room is -- and a theme nobody has chosen reports
+ * light, which is what the switch should be sitting on before the machine's
+ * own preference is readable.
+ */
+export function modeOf(theme: Theme): ThemeMode {
+  if (theme.kind === 'generated') return theme.mode;
+  if (theme.kind === 'system') return 'light';
+  return THEMES.find((written) => written.id === theme.id)?.scheme ?? 'light';
+}
+
+/** The colour a theme is, in degrees, or null for one with no colour. */
+export function hueOf(theme: Theme): number | null {
+  return theme.kind === 'generated' ? theme.hue : null;
+}
+
+/**
+ * The five colours the picker offers.
+ *
+ * Presets rather than the only choices: the wheel in #427 writes the same
+ * value these do, and these are here because most people want a colour rather
+ * than a particular colour. Plum is Dusk's own hue, so dark with plum is the
+ * theme that shipped, to within a rounding step.
+ */
+export const THEME_COLOURS = [
+  { id: 'plum', label: 'Plum', hue: 298 },
+  { id: 'blue', label: 'Blue', hue: 260 },
+  { id: 'green', label: 'Green', hue: 155 },
+  { id: 'orange', label: 'Orange', hue: 65 },
+  { id: 'red', label: 'Red', hue: 25 },
+] as const;
+
+export type ThemeColourId = (typeof THEME_COLOURS)[number]['id'];
+
+/** The attribute holding the whole choice, so a client can read it back. */
+export const THEME_CHOICE_ATTRIBUTE = 'data-theme-choice';
 
 /**
  * A year. The cookie is a mirror of the stored setting, not the source of

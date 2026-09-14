@@ -1,5 +1,6 @@
 import { generatePalette } from '@/lib/theme/palette';
-import type { Theme, ThemeId } from '@/lib/theme';
+import { formatTheme, parseTheme, THEME_CHOICE_ATTRIBUTE, type Theme, type ThemeId } from '@/lib/theme';
+import { TOKEN_NAMES } from '@/lib/theme/reference';
 
 /**
  * Putting a chosen theme onto the document.
@@ -38,4 +39,43 @@ export function themeAttribute(theme: Theme): ThemeId | undefined {
 export function themeStyle(theme: Theme): Record<string, string> | undefined {
   if (theme.kind !== 'generated' || theme.hue === null) return undefined;
   return generatePalette(theme.mode, theme.hue);
+}
+
+/**
+ * Put a theme onto the live document.
+ *
+ * The document is the store, the same arrangement the density dial already
+ * uses: the server rendered the choice onto <html>, this writes over it, and
+ * anything that wants to know what is on screen reads it back from there
+ * rather than from a second copy that can disagree.
+ *
+ * Every token is cleared before the new ones go on, so leaving a previewed
+ * colour and landing on a written theme takes the colour off rather than
+ * leaving half of it behind.
+ */
+export function applyTheme(root: HTMLElement, theme: Theme): void {
+  const attribute = themeAttribute(theme);
+  if (attribute) root.setAttribute('data-theme', attribute);
+  else root.removeAttribute('data-theme');
+
+  const choice = formatTheme(theme);
+  if (choice) root.setAttribute(THEME_CHOICE_ATTRIBUTE, choice);
+  else root.removeAttribute(THEME_CHOICE_ATTRIBUTE);
+
+  const style = themeStyle(theme);
+  for (const token of TOKEN_NAMES) {
+    const value = style?.[token];
+    if (value) root.style.setProperty(token, value);
+    else root.style.removeProperty(token);
+  }
+}
+
+/**
+ * What is on the document right now. The picker's starting point after mount.
+ *
+ * Named for the document rather than for the theme because lib/theme/css.ts
+ * already has a readTheme, and that one reads a stylesheet.
+ */
+export function themeOnDocument(root: HTMLElement): Theme {
+  return parseTheme(root.getAttribute(THEME_CHOICE_ATTRIBUTE));
 }
