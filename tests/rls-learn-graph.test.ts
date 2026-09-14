@@ -29,6 +29,10 @@ let conceptA2 = '';
 let conceptA3 = '';
 let conceptB1 = '';
 let sweepA = '';
+let noteA = '';
+let noteB = '';
+let quizA = '';
+let quizSourceA = '';
 
 async function seedSubject(userId: string, name: string): Promise<string> {
   const [row] = await admin<{ id: string }[]>`
@@ -94,6 +98,60 @@ async function seedMention(
     values (${userId}, ${subjectId}, ${source}, ${target}, 'Seeded by the test.')`;
 }
 
+/**
+ * A note in the vault, which a quiz source names by id and never copies.
+ *
+ * Schema-qualified because this file's search_path is the learn schema: the
+ * only rows it reaches for outside it are the ones a quiz points at.
+ */
+async function seedNote(userId: string, path: string): Promise<string> {
+  const [connection] = await admin<{ id: string }[]>`
+    insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch)
+    values (${userId}, 'someone', 'vault', 'main')
+    returning id`;
+  const [note] = await admin<{ id: string }[]>`
+    insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha)
+    values (${userId}, ${connection.id}, ${path}, 'A note', 'What the note says.', 'abc123')
+    returning id`;
+  return note.id;
+}
+
+async function seedQuiz(userId: string, title: string): Promise<string> {
+  const [row] = await admin<{ id: string }[]>`
+    insert into quizzes (user_id, title, preparing_for)
+    values (${userId}, ${title}, 'An interview on Thursday') returning id`;
+  return row.id;
+}
+
+/** Material: a note by id, or text with nowhere else to live. */
+async function seedQuizSource(
+  userId: string,
+  quizId: string,
+  position: number,
+  material: { noteId: string } | { body: string },
+): Promise<string> {
+  const noteId = 'noteId' in material ? material.noteId : null;
+  const body = 'body' in material ? material.body : null;
+  const [row] = await admin<{ id: string }[]>`
+    insert into quiz_sources (user_id, quiz_id, position, note_id, body)
+    values (${userId}, ${quizId}, ${position}, ${noteId}, ${body}) returning id`;
+  return row.id;
+}
+
+async function seedQuizQuestion(
+  userId: string,
+  quizId: string,
+  sourceId: string,
+  position: number,
+): Promise<string> {
+  const [row] = await admin<{ id: string }[]>`
+    insert into quiz_questions (user_id, quiz_id, source_id, position, question, expected)
+    values (${userId}, ${quizId}, ${sourceId}, ${position},
+            'What does the note rule out?', 'The model answer.')
+    returning id`;
+  return row.id;
+}
+
 beforeAll(async () => {
   await truncateAll();
   userA = await createUser('learn-graph-a@example.com');
@@ -104,9 +162,24 @@ beforeAll(async () => {
   // uniqueness is scoped accordingly.
   subjectB = await seedSubject(userB, 'Economics');
 
-  conceptA1 = await seedConcept(userA, subjectA, 'Wage stickiness', 'Wages adjust more slowly than prices.');
-  conceptA2 = await seedConcept(userA, subjectA, 'Short-run tradeoff', 'Inflation and unemployment trade off while expectations lag.');
-  conceptA3 = await seedConcept(userA, subjectA, 'Expectations catch up', 'The tradeoff disappears once expectations adjust.');
+  conceptA1 = await seedConcept(
+    userA,
+    subjectA,
+    'Wage stickiness',
+    'Wages adjust more slowly than prices.',
+  );
+  conceptA2 = await seedConcept(
+    userA,
+    subjectA,
+    'Short-run tradeoff',
+    'Inflation and unemployment trade off while expectations lag.',
+  );
+  conceptA3 = await seedConcept(
+    userA,
+    subjectA,
+    'Expectations catch up',
+    'The tradeoff disappears once expectations adjust.',
+  );
   conceptB1 = await seedConcept(userB, subjectB, 'Bob knows a thing', 'Bob has his own claim.');
 
   await seedEdge(userA, subjectA, conceptA1, conceptA2);
@@ -145,6 +218,16 @@ beforeAll(async () => {
   sweepA = await seedSweep(userA, 'keynesian economics', 'Economics');
   await seedOpeningQuestion(userA, sweepA, 0, 'Wage stickiness');
   await seedOpeningQuestion(userA, sweepA, 1, 'Liquidity trap');
+
+  // A quiz hangs off no subject either: it is over material you picked, and it
+  // never reaches the graph.
+  noteA = await seedNote(userA, 'interviews/thursday.md');
+  noteB = await seedNote(userB, 'bob/notes.md');
+  quizA = await seedQuiz(userA, 'Thursday interview');
+  quizSourceA = await seedQuizSource(userA, quizA, 0, { noteId: noteA });
+  await seedQuizSource(userA, quizA, 1, { body: 'Pasted from the job description.' });
+  await seedQuizQuestion(userA, quizA, quizSourceA, 0);
+  await seedQuizQuestion(userA, quizA, quizSourceA, 1);
 });
 
 afterAll(async () => {
@@ -163,7 +246,7 @@ describe('RLS coverage', () => {
     expect(rows.map((r) => r.tablename)).toEqual([]);
   });
 
-  it('seeds every graph table, so a new one cannot skip the isolation check', async () => {
+  it('seeds every table in the schema, so a new one cannot skip the isolation check', async () => {
     const seeded = await admin<{ table_name: string; rows: number }[]>`
       select 'subjects' as table_name, count(*)::int as rows from subjects
       union all select 'concepts', count(*)::int from concepts
@@ -174,6 +257,9 @@ describe('RLS coverage', () => {
       union all select 'probes', count(*)::int from probes
       union all select 'opening_sweeps', count(*)::int from opening_sweeps
       union all select 'opening_questions', count(*)::int from opening_questions
+      union all select 'quizzes', count(*)::int from quizzes
+      union all select 'quiz_sources', count(*)::int from quiz_sources
+      union all select 'quiz_questions', count(*)::int from quiz_questions
       order by 1`;
     for (const row of seeded) expect(row.rows).toBeGreaterThan(0);
   });
@@ -212,10 +298,12 @@ describe('cross-user reads', () => {
       edges: (await tx`select id from concept_edges where subject_id = ${subjectA}`).length,
       mentions: (await tx`select id from concept_mentions where subject_id = ${subjectA}`).length,
       goals: (await tx`select id from goals where subject_id = ${subjectA}`).length,
-      state: (await tx`select concept_id from concept_state where concept_id = ${conceptA2}`).length,
+      state: (await tx`select concept_id from concept_state where concept_id = ${conceptA2}`)
+        .length,
       probes: (await tx`select id from probes where concept_id = ${conceptA2}`).length,
       sweeps: (await tx`select id from opening_sweeps where id = ${sweepA}`).length,
-      openingQuestions: (await tx`select id from opening_questions where sweep_id = ${sweepA}`).length,
+      openingQuestions: (await tx`select id from opening_questions where sweep_id = ${sweepA}`)
+        .length,
     }));
     expect(seen).toEqual({
       subjects: 0,
@@ -241,10 +329,7 @@ describe('cross-user reads', () => {
   });
 
   it('never leaks what somebody answered', async () => {
-    const rows = await asUser(
-      userB,
-      (tx) => tx`select question, chosen_index from probes`,
-    );
+    const rows = await asUser(userB, (tx) => tx`select question, chosen_index from probes`);
     expect(rows).toHaveLength(0);
   });
 
@@ -622,5 +707,156 @@ describe('the ten questions asked before a subject exists', () => {
                  where sweep_id = ${sweepA} returning id`,
     );
     expect(affected).toHaveLength(0);
+  });
+});
+
+describe('a quiz over material you chose', () => {
+  /**
+   * A quiz is the one thing in this schema that points outside it: a source
+   * names a note in the vault rather than copying its body. So the isolation
+   * that matters here is both the ordinary kind -- nobody else reads your
+   * quiz -- and the kind a foreign key cannot give you, since referential
+   * integrity bypasses RLS and would accept somebody else's note happily.
+   */
+  it('does not let another user read your quiz, its material or its questions', async () => {
+    const seen = await asUser(userB, async (tx) => ({
+      quizzes: (await tx`select id from quizzes where id = ${quizA}`).length,
+      sources: (await tx`select id from quiz_sources where quiz_id = ${quizA}`).length,
+      questions: (await tx`select id from quiz_questions where quiz_id = ${quizA}`).length,
+    }));
+    expect(seen).toEqual({ quizzes: 0, sources: 0, questions: 0 });
+  });
+
+  it('shows the owner their own quiz', async () => {
+    const seen = await asUser(userA, async (tx) => ({
+      quizzes: (await tx`select id from quizzes where id = ${quizA}`).length,
+      sources: (await tx`select id from quiz_sources where quiz_id = ${quizA}`).length,
+      questions: (await tx`select id from quiz_questions where quiz_id = ${quizA}`).length,
+    }));
+    expect(seen).toEqual({ quizzes: 1, sources: 2, questions: 2 });
+  });
+
+  it('does not let another user add a question to your quiz', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into quiz_questions
+                     (user_id, quiz_id, source_id, position, question, expected)
+                   values (${userB}, ${quizA}, ${quizSourceA}, 9, 'A question?', 'An answer.')
+                   returning id`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('does not let another user answer for you', async () => {
+    const affected = await asUser(
+      userB,
+      (tx) => tx`update quiz_questions
+                 set response = 'Not mine', outcome = 'right', answered_at = now()
+                 where quiz_id = ${quizA} returning id`,
+    );
+    expect(affected).toHaveLength(0);
+  });
+
+  it('does not let another user delete your quiz', async () => {
+    const deleted = await asUser(
+      userB,
+      (tx) => tx`delete from quizzes where id = ${quizA} returning id`,
+    );
+    expect(deleted).toHaveLength(0);
+  });
+
+  it("refuses material that names somebody else's note", async () => {
+    await expect(seedQuizSource(userA, quizA, 9, { noteId: noteB })).rejects.toThrow(
+      /note its owner owns/,
+    );
+  });
+
+  it('refuses material that names a note nobody owns', async () => {
+    await expect(
+      seedQuizSource(userA, quizA, 9, { noteId: '00000000-0000-0000-0000-000000000000' }),
+    ).rejects.toThrow();
+  });
+
+  it('refuses the same note twice in one quiz', async () => {
+    await expect(seedQuizSource(userA, quizA, 8, { noteId: noteA })).rejects.toThrow();
+  });
+
+  it('refuses material that is neither a note nor a paste', async () => {
+    await expect(
+      admin`insert into quiz_sources (user_id, quiz_id, position) values (${userA}, ${quizA}, 7)`,
+    ).rejects.toThrow(/quiz_sources_exactly_one_ck/);
+  });
+
+  it('refuses material that is both at once', async () => {
+    await expect(
+      admin`insert into quiz_sources (user_id, quiz_id, position, note_id, body)
+            values (${userA}, ${quizA}, 7, ${noteA}, 'And a paste as well.')`,
+    ).rejects.toThrow(/quiz_sources_exactly_one_ck/);
+  });
+
+  it('refuses a graded answer with nothing written', async () => {
+    const quiz = await seedQuiz(userA, 'Grading');
+    const source = await seedQuizSource(userA, quiz, 0, { body: 'Material.' });
+    const question = await seedQuizQuestion(userA, quiz, source, 0);
+    await expect(
+      admin`update quiz_questions set outcome = 'wrong', answered_at = now()
+            where id = ${question}`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses a pass that carries an answer', async () => {
+    const quiz = await seedQuiz(userA, 'Passing');
+    const source = await seedQuizSource(userA, quiz, 0, { body: 'Material.' });
+    const question = await seedQuizQuestion(userA, quiz, source, 0);
+    await expect(
+      admin`update quiz_questions
+            set response = 'Something', outcome = 'skipped', answered_at = now()
+            where id = ${question}`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses two questions in the same place in the order', async () => {
+    const quiz = await seedQuiz(userA, 'Ordering');
+    const source = await seedQuizSource(userA, quiz, 0, { body: 'Material.' });
+    await seedQuizQuestion(userA, quiz, source, 0);
+    await expect(seedQuizQuestion(userA, quiz, source, 0)).rejects.toThrow();
+  });
+
+  it('moves from unanswered to part done to finished as questions are answered', async () => {
+    const quiz = await seedQuiz(userA, 'Progress');
+    const source = await seedQuizSource(userA, quiz, 0, { body: 'Material.' });
+    const first = await seedQuizQuestion(userA, quiz, source, 0);
+    const second = await seedQuizQuestion(userA, quiz, source, 1);
+
+    async function statusOf(): Promise<{ status: string; completed_at: Date | null }> {
+      const [row] = await admin<{ status: string; completed_at: Date | null }[]>`
+        select status, completed_at from quizzes where id = ${quiz}`;
+      return row;
+    }
+
+    expect((await statusOf()).status).toBe('unanswered');
+
+    await admin`update quiz_questions
+                set response = 'What the note says.', outcome = 'right', answered_at = now()
+                where id = ${first}`;
+    expect((await statusOf()).status).toBe('part_done');
+
+    // A pass counts as answered: pressing past a question is a thing you did.
+    await admin`update quiz_questions set outcome = 'skipped', answered_at = now()
+                where id = ${second}`;
+    const finished = await statusOf();
+    expect(finished.status).toBe('finished');
+    expect(finished.completed_at).not.toBeNull();
+  });
+
+  it('takes its material and its questions with it when the quiz goes', async () => {
+    const quiz = await seedQuiz(userA, 'Going');
+    const source = await seedQuizSource(userA, quiz, 0, { body: 'Material.' });
+    await seedQuizQuestion(userA, quiz, source, 0);
+
+    await admin`delete from quizzes where id = ${quiz}`;
+    expect(await admin`select id from quiz_sources where quiz_id = ${quiz}`).toHaveLength(0);
+    expect(await admin`select id from quiz_questions where quiz_id = ${quiz}`).toHaveLength(0);
   });
 });
