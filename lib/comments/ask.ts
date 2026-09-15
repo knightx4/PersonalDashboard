@@ -149,13 +149,17 @@ const QUESTION_RULE =
 
 const INSTRUCTION_RULE =
   'This is an instruction, so do it rather than describe it, and then say in the thread what ' +
-  'you did. Three things are yours to do: file an idea on the ideas page (it lands as a ' +
-  'suggestion, under their own), reword the row this was written on (an idea\'s text, or a ' +
-  'plan step\'s title, detail or done-when -- put the old wording in the thread with the new), ' +
-  'and hand a plan step over to be built. Anything else is theirs, made on the page: never ' +
-  'approve a proposal, never answer a decision, never set a status or an assignee by hand, ' +
-  'and never dismiss or delete anything. Asked for one of those, change nothing and say in ' +
-  'the thread that it was not done and why. Do not commit anything either way.';
+  'you did. Do not write back that you cannot: you have the repository, the plan and the notes ' +
+  'queue in front of you, and what a comment asks for is nearly always something your skills ' +
+  'already cover -- adding or re-shaping steps under a feature, writing something up as a bug ' +
+  'note or an idea, rewording a row (put the old wording in the thread with the new), handing a ' +
+  'step over to be built. Use them. Six moves are theirs and stay theirs however it was ' +
+  'phrased: approving a proposal, answering a question put to them, answering or dismissing a ' +
+  'raise, setting a status, assigning a step, and deleting anything. Asked for one of those, ' +
+  'change nothing and say in the thread that it is theirs and where on the page it is made. If ' +
+  'what they asked for is real but too large to finish in this run, it still does not come back ' +
+  'as a refusal: file it as a note or raise it, and say in the thread where it now lives and ' +
+  'what it is waiting on. Do not commit anything either way.';
 
 /**
  * The turn the slow path is started with.
@@ -270,6 +274,16 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
       id: input.id,
       action: reply.action,
     });
+
+    // Told to do something this call has no way to do, and that is not the
+    // person's own move either. Refusing it here is the dead end the note in
+    // this batch was about: "I asked it to update my plan and it said it
+    // couldn't." A session can read the code and do it, so it goes there
+    // instead of into the thread as a no.
+    if (!outcome.ok && outcome.route) {
+      return handToSession(input, subject, history, true, outcome.why);
+    }
+
     await say(input, outcome.ok ? outcome.said : outcome.why);
     return outcome.ok
       ? { ok: true, message: 'Done, and said in the thread.', redraw: outcome.redraw }
@@ -284,29 +298,43 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
 
   // Needs the repository, so the session that can read the code is started and
   // its answer is the next thing in the thread.
-  //
-  // It used to say so first: a `claude` comment reading "I have started a
-  // session on it; the answer will land here", and then the real answer under
-  // it. That is a thing nobody wrote, standing above every answer that ever
-  // took the slow path, and it is still there a week later when the only
-  // question is what the answer was. The thread keeps what was said, not the
-  // machinery that said it -- which route a question took is not part of the
-  // conversation. The page says something is coming while it is coming, and
-  // that line goes away when it arrives.
+  return handToSession(input, subject, history, reply.instruction, reply.why);
+}
+
+/**
+ * Start the session that can read the code, and say which of the two is coming.
+ *
+ * Both ways of arriving here end the same: the fast reply could not do it from
+ * the message alone, and the thing that can is a session. It used to say so
+ * first -- a `claude` comment reading "I have started a session on it; the
+ * answer will land here", and then the real answer under it. That is a thing
+ * nobody wrote, standing above every answer that ever took the slow path, and
+ * it is still there a week later when the only question is what the answer was.
+ * The thread keeps what was said, not the machinery that said it -- which route
+ * a question took is not part of the conversation. The page says something is
+ * coming while it is coming, and that line goes away when it arrives.
+ */
+async function handToSession(
+  input: AskInput,
+  subject: Subject,
+  history: readonly DevComment[],
+  instruction: boolean,
+  why: string,
+): Promise<AskOutcome> {
   const routine = planRoutine();
   const started = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: sessionTurn(input, subject, history, reply.instruction),
+    text: sessionTurn(input, subject, history, instruction),
   });
 
   // A failure is different, and it is still written down. This is the end of
   // the question: nothing else is coming, and a thread that went quiet is the
   // one outcome the person cannot tell from working.
   if (!started.ok) {
-    const why = `${reply.why} I could not start a session to look: ${started.error}`;
-    await say(input, why);
-    return { ok: false, error: why };
+    const said = `${why} I could not start a session to look: ${started.error}`;
+    await say(input, said);
+    return { ok: false, error: said };
   }
 
   // The page is told which of the two is coming, because "what it did" and
@@ -315,7 +343,7 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
   // the thread, where it would outlive the wait it was describing.
   return {
     ok: true,
-    message: reply.instruction
+    message: instruction
       ? 'A session is reading the code. What it did lands in this thread.'
       : 'A session is reading the code. Its answer lands in this thread.',
   };

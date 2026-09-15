@@ -69,10 +69,21 @@ the thread is told afterwards what was done. There are three things you can do:
   proposal nobody has approved, a question, a blocked step and a step under a
   feature already being worked are all refused, and the thread says which.
 
-Anything else they ask for is not yours. Approving a proposal, answering a
-question, starting or assigning a step, and dismissing or deleting a row are
-theirs, made on the page. Asked for one of those, answer in one sentence
-saying it was not done and that it is theirs to make.`;
+Six moves are theirs and stay theirs however the comment was phrased:
+approving a proposal, answering a question put to them, answering or
+dismissing a raise, setting a status, assigning a step, and deleting
+anything. Asked for one of those, answer in one sentence saying it was not
+done, that it is theirs to make, and where on the page it is made.
+
+Everything else they tell you to do is done, by you or by somebody. Never
+reply that you cannot do something. When an instruction is not one of the
+three above and is not one of the six, it is not refused -- it is passed on:
+set needs_repo true and instruction true, and put in "why" the one sentence
+saying what would have to be read. A session with the repository, the plan and
+the notes queue in front of it picks it up from there and does it. "Update the
+plan", "add a step under this", "split this feature", "write this up as a bug",
+"fix this" are all that case. They cost the person a few minutes; a reply
+saying it cannot be done costs them the thing they asked for.`;
 
 export type ReplyOptions = {
   apiKey: string;
