@@ -49,10 +49,23 @@ function getDensityServerSnapshot(): Density {
  * the switch as its own button, because its page and its cards are opposite
  * polarities and it cannot be said as a mode and a colour at all -- #422.
  *
- * Everything previews live on hover -- you see the theme before you move into
- * it -- and applying is instant on the document, with the server action
- * following behind. Waiting a round trip to find out whether a colour scheme
- * took is the kind of latency that makes a preference feel broken.
+ * Nothing happens until you click. Hovering a swatch used to repaint the whole
+ * app, so that you saw a theme before you moved into it; note c0cfc6ae asked
+ * for that back, and the reason is what the preview costs on the way to
+ * something else -- crossing the panel to reach the colour you want flickers
+ * the app through every option you passed over, and the one you are trying to
+ * compare against is the one you can never see. Dragging the hue strip still
+ * repaints live, because a slider with no live feedback is not a slider, and
+ * that is a press rather than a passing pointer.
+ *
+ * Choosing does not close the panel either. Colour, polarity and density are
+ * settings people arrive at by trying two or three, and a panel that shut on
+ * the first click made each attempt cost a reopen. It closes on a click
+ * outside it, or on Escape -- `usePopover` holds both.
+ *
+ * Applying is instant on the document, with the server action following
+ * behind. Waiting a round trip to find out whether a colour scheme took is the
+ * kind of latency that makes a preference feel broken.
  *
  * "Follow the system" is a real option and the default. It is not the same as
  * choosing light, and a person who has never opened this should get whatever
@@ -70,13 +83,11 @@ export function ThemePicker({ value }: { value: Theme }) {
   // made on this page since it loaded. Derived rather than copied into state,
   // so a change from the server cannot be silently ignored.
   const [override, setOverride] = useState<Theme | undefined>(undefined);
-  const [preview, setPreview] = useState<Theme | undefined>(undefined);
   /**
-   * A drag on the hue strip captures the pointer, so it keeps reporting after
-   * it has left the panel -- and the panel's own mouse-leave would then throw
-   * the preview away mid-drag and snap the page back. This is what stops it.
+   * What a drag on the hue strip is showing, before it is let go of. The only
+   * thing that previews now: every other control writes its choice on click.
    */
-  const [dragging, setDragging] = useState(false);
+  const [preview, setPreview] = useState<Theme | undefined>(undefined);
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -104,7 +115,7 @@ export function ThemePicker({ value }: { value: Theme }) {
 
   const chosen = override !== undefined ? override : value;
   const showing = preview !== undefined ? preview : chosen;
-  /** Has anything happened *on this page* -- a hover, or a click? */
+  /** Has anything happened *on this page* -- a drag, or a click? */
   const touched = preview !== undefined || override !== undefined;
 
   /** The polarity and the colour the swatches and the switch are built from. */
@@ -156,49 +167,19 @@ export function ThemePicker({ value }: { value: Theme }) {
 
   usePopover({ open, onClose: close, panelRef, triggerRef });
 
-  /**
-   * Whether a focus landing on a control is the person's doing.
-   *
-   * Opening the panel moves focus into it, and the first thing in it is the
-   * light switch -- so previewing on focus meant that merely tapping the
-   * palette repainted the whole app light, whatever theme you were in. On a
-   * pointer there is a hover afterwards to correct it, which is why this
-   * survived on a desktop and was reported from a phone.
-   *
-   * Declared after `usePopover` so its effect runs after the one that moves
-   * focus: by the time this flips, the opening focus has already been and
-   * gone. Every focus after it is a Tab or an arrow, and those should preview.
-   */
-  const settled = useRef(false);
-  useEffect(() => {
-    if (!open) {
-      settled.current = false;
-      return;
-    }
-    settled.current = true;
-  }, [open]);
-
-  /** A focus is a preview only once the panel has finished opening. */
-  function previewOnFocus(next: Theme) {
-    if (settled.current) setPreview(next);
-  }
-
   function close() {
     setOpen(false);
     setPreview(undefined);
   }
 
-  function choose(next: Theme) {
-    save(next);
-    setOpen(false);
-  }
-
   /**
-   * Take a choice without closing the panel.
+   * Take a choice, and leave the panel up.
    *
-   * What releasing the hue strip does. Closing on every release would mean the
-   * panel shut the first time you let go of a drag, which is the moment you
-   * are most likely to want another go at it.
+   * What every control in here does, and what releasing the hue strip does.
+   * Closing on a choice would mean the panel shut the first time you let go of
+   * a drag -- the moment you are most likely to want another go at it -- and
+   * the same is true of the swatches: the second colour is usually chosen
+   * against the first.
    */
   function save(next: Theme) {
     setOverride(next);
@@ -239,9 +220,6 @@ export function ThemePicker({ value }: { value: Theme }) {
           aria-modal="true"
           aria-label="Theme"
           tabIndex={-1}
-          onMouseLeave={() => {
-            if (!dragging) setPreview(undefined);
-          }}
           padding="menu"
           className="sm:w-64"
         >
@@ -256,9 +234,7 @@ export function ThemePicker({ value }: { value: Theme }) {
                 type="button"
                 role="radio"
                 aria-checked={showing.kind === 'generated' && mode === option}
-                onClick={() => choose(inMode(option))}
-                onMouseEnter={() => setPreview(inMode(option))}
-                onFocus={() => previewOnFocus(inMode(option))}
+                onClick={() => save(inMode(option))}
                 className={cn(
                   'press flex-1 rounded-md px-2 py-1.5 text-small font-medium capitalize transition-colors',
                   showing.kind === 'generated' && mode === option
@@ -275,9 +251,7 @@ export function ThemePicker({ value }: { value: Theme }) {
             <button
               type="button"
               aria-pressed={showing.kind === 'written' && showing.id === 'lightbox'}
-              onClick={() => choose({ kind: 'written', id: 'lightbox' })}
-              onMouseEnter={() => setPreview({ kind: 'written', id: 'lightbox' })}
-              onFocus={() => previewOnFocus({ kind: 'written', id: 'lightbox' })}
+              onClick={() => save({ kind: 'written', id: 'lightbox' })}
               title="Lit sheets on a blue-black bench"
               className={cn(
                 'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
@@ -299,9 +273,7 @@ export function ThemePicker({ value }: { value: Theme }) {
               theme={inHue(null)}
               label="No colour"
               chosen={same(showing, inHue(null))}
-              onChoose={choose}
-              onPreview={setPreview}
-              onPreviewFocus={previewOnFocus}
+              onChoose={save}
             />
             {THEME_COLOURS.map((colour) => (
               <Swatch
@@ -309,9 +281,7 @@ export function ThemePicker({ value }: { value: Theme }) {
                 theme={inHue(colour.hue)}
                 label={colour.label}
                 chosen={same(showing, inHue(colour.hue))}
-                onChoose={choose}
-                onPreview={setPreview}
-                onPreviewFocus={previewOnFocus}
+                onChoose={save}
               />
             ))}
           </div>
@@ -321,14 +291,11 @@ export function ThemePicker({ value }: { value: Theme }) {
             hue={hue}
             onMove={(next) => setPreview(inHue(next))}
             onRelease={(next) => save(inHue(next))}
-            onDragging={setDragging}
           />
 
           <button
             type="button"
-            onClick={() => choose({ kind: 'system' })}
-            onMouseEnter={() => setPreview({ kind: 'system' })}
-            onFocus={() => previewOnFocus({ kind: 'system' })}
+            onClick={() => save({ kind: 'system' })}
             aria-pressed={showing.kind === 'system'}
             className={cn(
               'mt-1 flex w-full items-center gap-2.5 rounded-lg border-t border-border px-2 pb-1.5 pt-2 text-left text-ui transition-colors',
@@ -379,15 +346,11 @@ function Swatch({
   label,
   chosen,
   onChoose,
-  onPreview,
-  onPreviewFocus,
 }: {
   theme: GeneratedTheme;
   label: string;
   chosen: boolean;
   onChoose: (theme: Theme) => void;
-  onPreview: (theme: Theme) => void;
-  onPreviewFocus: (theme: Theme) => void;
 }) {
   const fill = useMemo(() => {
     const palette = generatePalette(theme.mode, theme.hue);
@@ -398,8 +361,6 @@ function Swatch({
     <button
       type="button"
       onClick={() => onChoose(theme)}
-      onMouseEnter={() => onPreview(theme)}
-      onFocus={() => onPreviewFocus(theme)}
       aria-pressed={chosen}
       title={label}
       // ui-ok: hand-rolled-box -- a user's colour against a like ground needs
@@ -438,13 +399,11 @@ function HueStrip({
   hue,
   onMove,
   onRelease,
-  onDragging,
 }: {
   mode: ThemeMode;
   hue: number | null;
   onMove: (hue: number) => void;
   onRelease: (hue: number) => void;
-  onDragging: (dragging: boolean) => void;
 }) {
   /**
    * Where the handle sits when no colour is chosen.
@@ -474,15 +433,8 @@ function HueStrip({
         value={at}
         aria-label="Colour"
         onChange={(event) => onMove(Number(event.target.value))}
-        onPointerDown={() => onDragging(true)}
-        onPointerUp={(event) => {
-          onDragging(false);
-          onRelease(Number(event.currentTarget.value));
-        }}
-        onPointerCancel={(event) => {
-          onDragging(false);
-          onRelease(Number(event.currentTarget.value));
-        }}
+        onPointerUp={(event) => onRelease(Number(event.currentTarget.value))}
+        onPointerCancel={(event) => onRelease(Number(event.currentTarget.value))}
         onKeyUp={(event) => onRelease(Number(event.currentTarget.value))}
         // ui-ok: hand-rolled-box -- the track is the colour circle itself, so
         // its edge is the control rather than a frame drawn round one.
