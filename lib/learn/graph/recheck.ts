@@ -80,7 +80,7 @@ export function rankByLastChecked(rows: SettledConcept[]): SettledConcept[] {
 }
 
 /** Long enough since it was last answered about to be worth asking again. */
-function oldEnough(testedAt: string, now: Date): boolean {
+export function oldEnough(testedAt: string, now: Date): boolean {
   return new Date(testedAt).getTime() <= now.getTime() - RECHECK_AFTER_DAYS * 24 * 60 * 60 * 1000;
 }
 

@@ -20,6 +20,12 @@ import {
   READY_LIMIT,
   type ReadyConcept,
 } from '@/lib/learn/graph/ready';
+import {
+  rankNext,
+  NEXT_LIMIT,
+  type NextRow,
+  type QueuedReading,
+} from '@/lib/learn/next/rank';
 
 /**
  * Reading a subject's graph.
@@ -266,43 +272,116 @@ export async function loadGoals(
   }));
 }
 
+type QueuedReadingRow = {
+  id: string;
+  title: string | null;
+  concept_id: string;
+  created_at: string;
+  sources: { title: string } | null;
+};
+
 /**
- * Everything you could start on and everything you have settled, in every
- * subject.
+ * The readings you queued about a claim and have not opened.
+ *
+ * One query for every track at once, because a reading belongs to a track and
+ * a track belongs to no subject -- there is nothing per-subject to fold this
+ * into. `queued` and nothing else: a reading you have started, finished or
+ * put down is not a thing to offer you again. A reading with no `concept_id`
+ * is one you wrote down yourself, and it cannot say which claim it is about,
+ * so it is left out rather than shown with a blank reason.
+ */
+async function loadQueuedAboutAClaim(
+  supabase: LearnSupabaseClient,
+): Promise<QueuedReadingRow[]> {
+  const { data, error } = await supabase
+    .from('readings')
+    .select('id, title, concept_id, created_at, sources!readings_source_fk ( title )')
+    .eq('status', 'queued')
+    .not('concept_id', 'is', null)
+    .order('created_at');
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading what you queued', error);
+
+  return (data ?? []) as unknown as QueuedReadingRow[];
+}
+
+/**
+ * Everything you could start on, everything you have settled, and everything
+ * you queued and left, in every subject.
  *
  * One read per subject, the same four queries `/learn/know` already runs in a
- * loop, and no model call anywhere in it. A goal counts as one you named
- * unless you abandoned it, which is the rule the subject page uses to decide
- * what to draw a chain for. Both lists come out of the same walk because the
- * five-minute screen needs both to pick one question, and walking twice would
- * be the same graphs read twice.
+ * loop, plus one for the queue, and no model call anywhere in it. A goal
+ * counts as one you named unless you abandoned it, which is the rule the
+ * subject page uses to decide what to draw a chain for. The three lists come
+ * out of the same walk because the five-minute screen needs all of them to
+ * pick one row, and walking twice would be the same graphs read twice.
  */
-async function everywhere(
-  supabase: LearnSupabaseClient,
-): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
+async function everywhere(supabase: LearnSupabaseClient): Promise<{
+  ready: ReadyConcept[];
+  settled: SettledConcept[];
+  readings: QueuedReading[];
+}> {
   const subjects = await loadSubjects(supabase);
 
-  const perSubject = await Promise.all(
-    subjects.map(async (subject) => {
-      const [graph, goals] = await Promise.all([
-        loadGraph(supabase, subject.id),
-        loadGoals(supabase, subject.id),
-      ]);
+  const [perSubject, queued] = await Promise.all([
+    Promise.all(
+      subjects.map(async (subject) => {
+        const [graph, goals] = await Promise.all([
+          loadGraph(supabase, subject.id),
+          loadGoals(supabase, subject.id),
+        ]);
 
-      const goalConceptIds = goals
-        .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
-        .map((goal) => goal.conceptId!);
+        const goalConceptIds = goals
+          .filter((goal) => goal.status !== 'abandoned' && goal.conceptId !== null)
+          .map((goal) => goal.conceptId!);
 
-      return {
-        ready: readyInSubject(graph, subject, goalConceptIds),
-        settled: settledInSubject(graph, subject),
-      };
-    }),
-  );
+        return {
+          subject,
+          concepts: graph.concepts,
+          ready: readyInSubject(graph, subject, goalConceptIds),
+          settled: settledInSubject(graph, subject),
+        };
+      }),
+    ),
+    loadQueuedAboutAClaim(supabase),
+  ]);
+
+  // Which subject each claim belongs to, off the graphs already in hand. A
+  // reading whose claim has since been deleted is dropped: it cannot say what
+  // it is about, and a row that links nowhere is worse than one row fewer.
+  const home = new Map<string, { name: string; subjectId: string; subjectName: string }>();
+  for (const { subject, concepts } of perSubject) {
+    for (const concept of concepts) {
+      home.set(concept.id, {
+        name: concept.name,
+        subjectId: subject.id,
+        subjectName: subject.name,
+      });
+    }
+  }
+
+  const readings: QueuedReading[] = [];
+  for (const row of queued) {
+    const claim = home.get(row.concept_id);
+    if (!claim) continue;
+    readings.push({
+      id: row.id,
+      // The same rule `tracks/load.ts` uses: the source's title when one has
+      // been found, your own words when it has not.
+      title: row.sources?.title ?? row.title ?? 'Untitled',
+      conceptId: row.concept_id,
+      conceptName: claim.name,
+      subjectId: claim.subjectId,
+      subjectName: claim.subjectName,
+      queuedAt: row.created_at,
+    });
+  }
 
   return {
     ready: perSubject.flatMap((subject) => subject.ready),
     settled: perSubject.flatMap((subject) => subject.settled),
+    readings,
   };
 }
 
@@ -327,6 +406,23 @@ export async function loadReadyAndSettled(
 ): Promise<{ ready: ReadyConcept[]; settled: SettledConcept[] }> {
   const { ready, settled } = await everywhere(supabase);
   return { ready: rankReady(ready, limit), settled: rankByLastChecked(settled) };
+}
+
+/**
+ * What Learn next shows: the three kinds of row, ranked into one list.
+ *
+ * The same walk as everything else on this page, and the ordering itself is in
+ * `lib/learn/next/rank.ts` where it can be tested against rows written by
+ * hand. `now` is a parameter for the same reason: what counts as long enough
+ * since a claim was answered is a comparison against the clock, and a function
+ * that reads the clock itself cannot be tested.
+ */
+export async function loadNext(
+  supabase: LearnSupabaseClient,
+  limit: number = NEXT_LIMIT,
+  now: Date = new Date(),
+): Promise<NextRow[]> {
+  return rankNext(await everywhere(supabase), now, limit);
 }
 
 /** How many are ready in total -- for the tab's badge. */
