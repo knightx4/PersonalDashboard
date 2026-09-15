@@ -243,13 +243,37 @@ describe('sending a step to be built', () => {
 
 describe('an instruction outside the list', () => {
   it('changes nothing and says whose move it is', async () => {
-    for (const name of ['approve_step', 'answer_decision', 'dismiss', 'delete_row', 'set_status']) {
+    for (const name of [
+      'approve_step',
+      'answer_decision',
+      'dismiss',
+      'delete_row',
+      'set_status',
+      'assign_step',
+      'close_note',
+    ]) {
       const { writes, supabase } = db();
       const outcome = await carryOut(input({ supabase, action: action({ name }) }));
       expect(writes).toHaveLength(0);
       expect(outcome.ok).toBe(false);
       expect(outcome.ok === false && outcome.why).toContain(name);
       expect(outcome.ok === false && outcome.why).toContain('yours to make on the page');
+      // Theirs is an answer, not a dead end: nothing is handed on.
+      expect(outcome.ok === false && outcome.route).toBeUndefined();
+    }
+  });
+
+  // The other half of outside-the-list, and the one note 5785ad63 was about:
+  // asked to update the plan it said it could not, when the thing it could not
+  // do is only this call, with one message and no repository.
+  it('hands on anything that is neither its own nor the person\'s', async () => {
+    for (const name of ['update_plan', 'add_step', 'split_feature', 'write_note', 'fix_bug']) {
+      const { writes, supabase } = db();
+      const outcome = await carryOut(input({ supabase, action: action({ name }) }));
+      expect(writes).toHaveLength(0);
+      expect(outcome.ok).toBe(false);
+      expect(outcome.ok === false && outcome.route).toBe(true);
+      expect(outcome.ok === false && outcome.why).toContain(name);
     }
   });
 });

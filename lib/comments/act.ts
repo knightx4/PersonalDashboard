@@ -38,7 +38,14 @@ type Db = SupabaseClient<any, 'public'>;
  */
 export type ActOutcome =
   | { ok: true; said: string; redraw?: string }
-  | { ok: false; why: string };
+  /**
+   * `route` marks a refusal that is only this call's. The thing asked for is
+   * not one of the three below and is not the person's either -- "add a step
+   * under this", "write this up as a note" -- so saying no to it is a dead end
+   * rather than an answer. The caller hands those to a session that can read
+   * the code and do it, instead of writing the refusal into the thread.
+   */
+  | { ok: false; why: string; route?: true };
 
 export type ActInput = {
   supabase: Db;
@@ -87,6 +94,39 @@ const MAX_TITLE = 200;
 const MAX_DETAIL = 4000;
 
 /**
+ * The words that mark a move as the person's own.
+ *
+ * Matched against the name an instruction came back under, because the names
+ * outside `ACTIONS` are not a fixed set -- they are whatever the instruction
+ * was. Two kinds arrive here and they end very differently: approving,
+ * answering, assigning, setting a status, dismissing and deleting are refused,
+ * because doing them on an assistant's own word takes them away from the
+ * person. Everything else -- adding a step, splitting a feature, writing a note
+ * up -- is refused only by *this* call, which has one message and no
+ * repository, and is handed to a session that has both.
+ */
+const RESERVED = [
+  'approve',
+  'answer',
+  'assign',
+  'status',
+  'dismiss',
+  'delete',
+  'remove',
+  'reject',
+  'decline',
+  'priority',
+  'complete',
+  'close',
+];
+
+/** Whether the instruction names a move that stays the person's. */
+function isReserved(name: string): boolean {
+  const words = name.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  return words.some((word) => RESERVED.some((held) => word.startsWith(held)));
+}
+
+/**
  * Carry out one instruction, or say why it was not carried out.
  *
  * Nothing is done twice and nothing is done part way: each action is a single
@@ -101,12 +141,20 @@ export async function carryOut(input: ActInput): Promise<ActOutcome> {
     case 'send_step':
       return sendStep(input);
     default:
+      if (isReserved(input.action.name)) {
+        return {
+          ok: false,
+          why:
+            `I did not do that: "${input.action.name}" is yours to make on the page. Approving a ` +
+            'proposal, answering a question, starting or assigning a step, setting a status, and ' +
+            'dismissing or deleting a row are the moves I leave alone on purpose — the buttons ' +
+            'for them are on the row itself.',
+        };
+      }
       return {
         ok: false,
-        why:
-          `I did not do that: "${input.action.name}" is not one of the things I can do from a ` +
-          'comment. Approving a proposal, answering a question, starting or assigning a step, ' +
-          'and dismissing or deleting a row are yours to make on the page.',
+        route: true,
+        why: `"${input.action.name}" needs the code read before it can be done.`,
       };
   }
 }

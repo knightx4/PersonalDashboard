@@ -50,10 +50,26 @@ Two things, in one call.
 
 The summary is two or three sentences saying what the day amounted to. It goes
 above the list of what closed, which on a busy day is fifty lines nobody reads
-to the bottom of. Say what the work was -- which features moved and how far,
-what was answered, what was fixed -- rather than counting rows. Name features by
-their #number where it helps. A day with nothing closed is one sentence saying
-so. Never open with "Yesterday" or "Today"; the page already prints the date.
+to the bottom of.
+
+Write it the way you would tell them over a coffee. Lead with where the work
+was -- each closed line below says which workspace it was in -- and then say in
+their own words what got built there: "Mostly Learn: importing a document now
+keeps its headings, and you can take a quiz on material you choose. Also a
+colour picker on the dev pages." Which workspaces moved, and what each can now
+do that it could not yesterday.
+
+A #number never does the work of a name. They do not know what #341 is, and a
+summary that says "#341 and #342 shipped" has told them nothing. Say the thing,
+and put the number after it in brackets only where they would plausibly go and
+open it. Never a bare list of numbers.
+
+Stay at the height they think at. What the feature does, not how it was done:
+no file names, no function or column names, no describing the mechanism. "The
+theme picker waits for a click now", not "the hover handler was removed".
+
+A day with nothing closed is one sentence saying so. Never open with
+"Yesterday" or "Today"; the page already prints the date.
 
 The suggestions are the "worth a look" list. Say only what the two lists below
 them do not already say. A step that is ready is already on the page; repeating
@@ -67,10 +83,12 @@ At most ${MAX_SUGGESTIONS}, and fewer is better. An empty list is a good
 answer and a common one -- most mornings there is nothing to notice, and a
 list padded to three teaches them to stop reading it.
 
-Each one: the title says what you noticed in one sentence, naming the rows by
-their #number. The detail says what to do about it, in one sentence. Do not
-recommend building anything specific -- that is what the plan is for. Do not
-speculate about what the code does; you have not seen it.
+Each one: the title says what you noticed in one sentence. Name a row by what
+it is and put its #number after it, the same rule as the summary -- "the import
+question nobody has answered (#341)", never "#341". The detail says what to do
+about it, in one sentence. Do not recommend building anything specific -- that
+is what the plan is for. Do not speculate about what the code does; you have
+not seen it.
 
 Write plainly. No stock phrases, no "consider whether", no claims that
 something matters.`;
@@ -100,10 +118,14 @@ export function buildPrompt(context: DigestContext): string {
     ...section('Ideas filed and not yet shaped, with how long ago:', context.unshapedIdeas),
     ...section('Raised and not yet answered:', context.openRaises),
     ...section('Underway right now:', context.inProgress),
-    ...section('Closed in the last day, which they can already see:', context.shipped),
+    ...section(
+      'Closed in the last day, which they can already see. Each line is the workspace it was in, then what it was:',
+      context.shipped,
+    ),
     '',
-    `Call ${TOOL_NAME}. Write the summary from what closed in the last day. Return`,
-    'no suggestions if nothing here is worth their morning.',
+    `Call ${TOOL_NAME}. Write the summary from what closed in the last day: where the`,
+    'work was, and what those workspaces can do now that they could not. Return no',
+    'suggestions if nothing here is worth their morning.',
   ];
   return lines.join('\n');
 }

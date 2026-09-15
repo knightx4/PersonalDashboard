@@ -1,5 +1,6 @@
 import { changelogEntries, featureAbove, type PlanParentRow } from '@/lib/changelog/entries';
 import type { FeedbackRow } from '@/lib/feedback/load';
+import type { ModuleId } from '@/lib/modules';
 import type { PlanData, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, workOrder } from '@/lib/plan/tree';
 
@@ -37,6 +38,17 @@ export type DigestEvent = {
    * written before there was a field for it.
    */
   feature: DigestFeature | null;
+  /**
+   * The workspace the work was in -- learn, vault, dev -- or null for the app
+   * as a whole.
+   *
+   * A step carries its own where it has one and inherits the feature's where
+   * it does not; a note is placed by the page it was filed from. It is what
+   * lets the written account of the day say "mostly Learn" instead of a row of
+   * numbers, which is the whole of note 8d08f577. Null on every summary
+   * written before there was a field for it.
+   */
+  module: ModuleId | null;
 };
 
 export type DigestFeature = { ref: string; title: string };
@@ -114,6 +126,7 @@ function answeredDecisions(
   items: readonly PlanItem[],
   since: string,
   byId: ReadonlyMap<string, PlanParentRow>,
+  moduleById: ReadonlyMap<string, ModuleId | null>,
 ): DigestEvent[] {
   return items
     .filter(
@@ -123,15 +136,34 @@ function answeredDecisions(
         item.completedAt !== null &&
         item.completedAt >= since,
     )
-    .map((item) => ({
-      kind: 'decision' as const,
-      title: oneLine(item.title),
-      ref: `#${item.number}`,
-      commit: null,
-      note: item.resolution ? oneLine(item.resolution, NOTE_LIMIT) : null,
-      at: item.completedAt as string,
-      feature: featureFrom(featureAbove(item.parentId, byId)),
-    }));
+    .map((item) => {
+      const feature = featureAbove(item.parentId, byId);
+      return {
+        kind: 'decision' as const,
+        title: oneLine(item.title),
+        ref: `#${item.number}`,
+        commit: null,
+        note: item.resolution ? oneLine(item.resolution, NOTE_LIMIT) : null,
+        at: item.completedAt as string,
+        feature: featureFrom(feature),
+        module: item.module ?? inherited(feature, moduleById),
+      };
+    });
+}
+
+/**
+ * The workspace a row belongs to when its own column is empty.
+ *
+ * A step written under a feature usually leaves `module` unset and takes the
+ * feature's, which is the answer anybody reading the plan would give. Nothing
+ * above the feature is consulted: a feature with no workspace is app-wide, and
+ * that is a real answer rather than a missing one.
+ */
+function inherited(
+  feature: { id: string } | null,
+  moduleById: ReadonlyMap<string, ModuleId | null>,
+): ModuleId | null {
+  return feature ? (moduleById.get(feature.id) ?? null) : null;
 }
 
 /** The feature as an event carries it: what a heading needs and nothing else. */
@@ -161,6 +193,8 @@ export function whatHappened(input: {
   notes: readonly FeedbackRow[];
   since: string;
 }): DigestEvent[] {
+  const moduleById = new Map(input.plan.items.map((item) => [item.id, item.module]));
+
   const shipped = changelogEntries({
     plan: input.plan.items,
     planParents: parentsOf(input.plan.items),
@@ -175,13 +209,15 @@ export function whatHappened(input: {
       note: entry.source === 'note' && entry.detail ? oneLine(entry.detail, NOTE_LIMIT) : null,
       at: entry.at,
       feature: featureFrom(entry.issue),
+      module: entry.module ?? inherited(entry.issue, moduleById),
     }));
 
   const byId = new Map(parentsOf(input.plan.items).map((row) => [row.id, row]));
 
-  return [...shipped, ...answeredDecisions(input.plan.items, input.since, byId)].sort((a, b) =>
-    b.at.localeCompare(a.at),
-  );
+  return [
+    ...shipped,
+    ...answeredDecisions(input.plan.items, input.since, byId, moduleById),
+  ].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 /**

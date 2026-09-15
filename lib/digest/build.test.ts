@@ -93,6 +93,7 @@ describe('whatHappened', () => {
         note: null,
         at: '2026-03-02T09:00:00Z',
         feature: null,
+        module: 'dev',
       },
     ]);
   });
@@ -201,6 +202,70 @@ describe('the feature a closed row belongs to', () => {
   });
 });
 
+// The written account of the day says where the work was — note 8d08f577 —
+// and it can only say that if every closed row knows which workspace it was in.
+describe('the workspace a closed row belongs to', () => {
+  it('takes the feature\'s where a step has none of its own', () => {
+    const feature = step({ id: 'f', number: 430, module: 'learn', title: 'Take a quiz' });
+    const leaf = step({ id: 'l', number: 439, module: null, parentId: 'f' });
+
+    const [event] = whatHappened({ plan: plan([feature, leaf]), notes: [], since: SINCE }).filter(
+      (row) => row.ref === '#439',
+    );
+
+    expect(event.module).toBe('learn');
+  });
+
+  it('keeps a step\'s own workspace over the feature\'s', () => {
+    const feature = step({ id: 'f', number: 430, module: 'learn' });
+    const leaf = step({ id: 'l', number: 439, module: 'vault', parentId: 'f' });
+
+    const [event] = whatHappened({ plan: plan([feature, leaf]), notes: [], since: SINCE }).filter(
+      (row) => row.ref === '#439',
+    );
+
+    expect(event.module).toBe('vault');
+  });
+
+  it('places a note by the page it was filed from', () => {
+    const events = whatHappened({
+      plan: plan([]),
+      notes: [note({ id: 'n', pagePath: '/vault/n/recipes' })],
+      since: SINCE,
+    });
+
+    expect(events[0].module).toBe('vault');
+  });
+
+  it('leaves a row that belongs to no workspace with none', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'a', module: null })]),
+      notes: [],
+      since: SINCE,
+    });
+
+    expect(events[0].module).toBeNull();
+  });
+
+  it('carries it on an answered question, from the feature above it', () => {
+    const feature = step({ id: 'f', number: 430, module: 'learn' });
+    const decision = step({
+      id: 'd',
+      number: 431,
+      kind: 'decision',
+      module: null,
+      parentId: 'f',
+      resolution: 'A',
+    });
+
+    const [event] = whatHappened({ plan: plan([feature, decision]), notes: [], since: SINCE }).filter(
+      (row) => row.kind === 'decision',
+    );
+
+    expect(event.module).toBe('learn');
+  });
+});
+
 describe('groupHappened', () => {
   function event(over: Partial<DigestEvent>): DigestEvent {
     return {
@@ -211,6 +276,7 @@ describe('groupHappened', () => {
       note: null,
       at: '2026-03-02T09:00:00Z',
       feature: null,
+      module: null,
       ...over,
     };
   }

@@ -6,6 +6,7 @@ import type {
   DigestPointer,
   DigestPointerKind,
 } from '@/lib/digest/build';
+import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
  * The morning summary, read for the top of /dev/raised.
@@ -52,6 +53,11 @@ function featureFrom(value: unknown): DigestFeature | null {
   return ref && title ? { ref, title } : null;
 }
 
+/** A workspace this deploy still knows about, or nothing. */
+function moduleFrom(value: unknown): ModuleId | null {
+  return typeof value === 'string' && isModuleId(value) ? value : null;
+}
+
 /**
  * Each entry read on its own, and a malformed one dropped.
  *
@@ -76,6 +82,9 @@ function eventsFrom(value: unknown): DigestEvent[] {
         note: text(row.note),
         at: text(row.at) ?? '',
         feature: featureFrom(row.feature),
+        // Absent on every summary written before the field existed, and on a
+        // row that belonged to the app as a whole. Both read back as null.
+        module: moduleFrom(row.module),
       },
     ];
   });

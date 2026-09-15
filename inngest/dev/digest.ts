@@ -3,9 +3,10 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { suggestForDigest, type DigestContext } from '@/inngest/dev/suggest';
-import { oneLine, whatHappened, whatIsReady, withSuggestions } from '@/lib/digest/build';
+import { oneLine, whatHappened, whatIsReady, withSuggestions, type DigestEvent } from '@/lib/digest/build';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { loadIdeas } from '@/lib/ideas/load';
+import { moduleById } from '@/lib/modules';
 import { hasLiveFog, isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
 import { loadRaised } from '@/lib/raised/load';
 
@@ -50,6 +51,21 @@ async function usersWithAPlan(supabase: SupabaseClient): Promise<string[]> {
 /** `#12 The title`, the way a person refers to a step out loud. */
 function ref(item: Pick<PlanItem, 'number' | 'title'>): string {
   return `#${item.number} ${oneLine(item.title)}`;
+}
+
+/**
+ * One closed row, said the way the summary has to be able to say it.
+ *
+ * The workspace first, then what it was, and the number last and in brackets.
+ * It used to be `#12 The title`, and a summary written from that reads back as
+ * a row of numbers -- note 8d08f577: "I have no idea what those represent."
+ * The model cannot say the work was mostly in Learn unless the lines it is
+ * given say which workspace each one was in, so they do.
+ */
+function shippedLine(event: DigestEvent): string {
+  const where = moduleById(event.module)?.label ?? 'The app as a whole';
+  const what = [event.title, event.note].filter(Boolean).join(' — ');
+  return `${where}: ${what}${event.ref ? ` (${event.ref})` : ''}`;
 }
 
 function daysAgo(at: string, now: Date): number {
@@ -153,7 +169,7 @@ export async function writeDigestFor(
           userId,
           now,
           plan,
-          shipped: happened.map((event) => [event.ref, event.title].filter(Boolean).join(' ')),
+          shipped: happened.map(shippedLine),
         }),
       })
     : { summary: null, suggestions: [] };

@@ -90,6 +90,8 @@ describe('writeDigestFor', () => {
         commit: 'abc1234',
         note: null,
         at: '2026-03-02T09:00:00Z',
+        feature: null,
+        module: 'dev',
       },
     ]);
   });
