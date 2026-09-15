@@ -1,8 +1,8 @@
 /**
  * Turning a missing Exposed-schemas entry into a sentence.
  *
- * Six schemas back this app -- `public`, `job_search`, `core`, `obsidian`
- * (the vault workspace), `todo` and `learn` -- but
+ * Seven schemas back this app -- `public`, `job_search`, `core`, `obsidian`
+ * (the vault workspace), `todo`, `learn` and `news` -- but
  * PostgREST only serves the ones listed under Settings -> API -> Exposed
  * schemas in the Supabase dashboard. That list is not in version control and
  * does not survive a project restore, so it is the step that gets forgotten.
@@ -30,7 +30,15 @@ const SCHEMA_NOT_EXPOSED = 'PGRST106';
  * and todo", which is a list the schema it was complaining about is not in.
  * Being told to check for the wrong thing is worse than being told nothing.
  */
-const EXPOSED_SCHEMAS = ['public', 'job_search', 'core', 'obsidian', 'todo', 'learn'] as const;
+const EXPOSED_SCHEMAS = [
+  'public',
+  'job_search',
+  'core',
+  'obsidian',
+  'todo',
+  'learn',
+  'news',
+] as const;
 
 type PostgrestErrorish = { code?: string | null; message?: string | null } | null;
 

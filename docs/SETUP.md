@@ -75,7 +75,8 @@ schemas, so the join has to be in the database.
 ### The one step that is not in this repository
 
 In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search`, `core`, `obsidian` and `todo`** alongside `public`.
+must include **`job_search`, `core`, `obsidian`, `todo`, `learn` and `news`**
+alongside `public`.
 
 Without it PostgREST refuses every request against the missing schema with
 *"The schema must be one of the following"*, and because it is a dashboard
@@ -96,7 +97,7 @@ called Vault and lives in `obsidian` for exactly this reason.
 
 ### Migrations
 
-Five directories, and the order is **not** directory by directory:
+Six directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
@@ -104,9 +105,10 @@ Five directories, and the order is **not** directory by directory:
 | `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
 | `supabase/migrations-vault` | `obsidian` | `0001` |
 | `supabase/migrations-learn` | `learn` | `0001`–`0007` |
+| `supabase/migrations-news` | `news` | `0001` |
 | `supabase/migrations-todo` | `todo` | `0001`–`0004` |
 
-`migrations-todo` goes **last**, after all four of the others. Its
+`migrations-todo` goes **last**, after all five of the others. Its
 `task_links` table carries foreign keys into `job_search` and `obsidian` from
 `0001`, and into `public` and `learn` from `0004`, so applying it earlier fails
 on a table that does not exist yet. `scripts/db-reset.sh` already sequences the
