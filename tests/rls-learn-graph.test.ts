@@ -695,6 +695,54 @@ describe('which concepts are doors into the subject', () => {
   });
 });
 
+describe('a claim you rewrote in your own words', () => {
+  // Nothing is backfilled, so a concept written before the rewrite existed has
+  // to read as one nobody has rewritten rather than as one whose original is
+  // missing.
+  it('reads a concept nobody has rewritten as still the app’s wording', async () => {
+    const [row] = await admin<{ claim_original: string | null; claim_rewritten_at: Date | null }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subjectA}, 'Untouched', 'A claim as the app wrote it.',
+              'Seeded by the test.')
+      returning claim_original, claim_rewritten_at`;
+    expect(row.claim_original).toBeNull();
+    expect(row.claim_rewritten_at).toBeNull();
+  });
+
+  it('keeps the old wording beside the new one', async () => {
+    const id = await seedConcept(userA, subjectA, 'Rewritten', 'What the app wrote.');
+
+    await admin`
+      update concepts
+         set claim = 'What I would say instead.',
+             claim_original = 'What the app wrote.',
+             claim_rewritten_at = now()
+       where id = ${id}`;
+
+    const [row] = await admin<
+      { claim: string; claim_original: string; claim_rewritten_at: Date }[]
+    >`select claim, claim_original, claim_rewritten_at from concepts where id = ${id}`;
+    expect(row.claim).toBe('What I would say instead.');
+    expect(row.claim_original).toBe('What the app wrote.');
+    expect(row.claim_rewritten_at).not.toBeNull();
+  });
+
+  it('refuses half of the fact', async () => {
+    const id = await seedConcept(userA, subjectA, 'Half', 'What the app wrote.');
+
+    await expect(
+      admin`update concepts set claim_rewritten_at = now() where id = ${id}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update concepts set claim_original = 'What the app wrote.' where id = ${id}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update concepts set claim_original = '', claim_rewritten_at = now()
+            where id = ${id}`,
+    ).rejects.toThrow();
+  });
+});
+
 describe('the ten questions asked before a subject exists', () => {
   /**
    * A sweep is written before there is anything to attach it to, so the rules
