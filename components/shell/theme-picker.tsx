@@ -11,13 +11,14 @@ import {
   formatTheme,
   hueOf,
   modeOf,
+  THEME_CHOICE_ATTRIBUTE,
   THEME_COLOURS,
   THEME_MODES,
   type GeneratedTheme,
   type Theme,
   type ThemeMode,
 } from '@/lib/theme';
-import { applyTheme } from '@/lib/theme/apply';
+import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
 
@@ -153,15 +154,20 @@ export function ThemePicker({ value }: { value: Theme }) {
    * On a machine that has never seen this account the cookie is absent, so the
    * server rendered the system default and the first paint was the wrong
    * theme. Apply it and repair the cookie, so this page is right and so is the
-   * next one. Only ever for a real stored choice: following the system is not
-   * evidence that the account wants the system default, only that it is not
-   * saying.
+   * next one.
+   *
+   * Only when the document is carrying no choice at all, though -- not merely
+   * a different one. `value` arrives from a render, and saving a theme starts
+   * a render, so the value that comes back can be the one from before the
+   * write; a disagreement is as likely to be this effect holding the stale
+   * copy as the document holding it. `shouldRepairTheme` is where that rule
+   * and the reason for it live.
    */
   const stored = formatTheme(value);
   useEffect(() => {
     if (!stored) return;
     const root = document.documentElement;
-    if (root.getAttribute('data-theme-choice') === stored) return;
+    if (!shouldRepairTheme(root.getAttribute(THEME_CHOICE_ATTRIBUTE), stored)) return;
     applyTheme(root, value);
     startTransition(() => {
       void setTheme(stored);

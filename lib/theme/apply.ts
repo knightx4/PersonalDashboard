@@ -83,3 +83,34 @@ export function applyTheme(root: HTMLElement, theme: Theme): void {
 export function themeOnDocument(root: HTMLElement): Theme {
   return parseTheme(root.getAttribute(THEME_CHOICE_ATTRIBUTE));
 }
+
+/**
+ * Whether the account's stored theme should be written onto the document.
+ *
+ * There is exactly one thing this repair is for, and it is worth saying
+ * narrowly because saying it broadly is what broke the picker: a device that
+ * has never seen this account has no cookie, so the server rendered no choice
+ * at all and the first paint is the system default rather than the theme the
+ * account holds. Putting it on -- and writing the cookie back -- makes this
+ * page right and the next one too.
+ *
+ * A document that already carries a choice is a different situation, and not
+ * one the account gets to settle from here. The cookie is written on the same
+ * tick as the click, while `stored` comes from a render that can be older than
+ * the write it is answering; so when the two disagree, the document is the
+ * newer fact and overwriting it puts the previous theme back a moment after
+ * the person chose against it. That is the whole of note bce3f7e5: every
+ * choice snapping straight back to Lightbox, because the stale value was not
+ * only re-applied but re-saved, to the cookie and to the account.
+ *
+ * The cost is that a theme chosen on another device no longer reaches this one
+ * while its own cookie still holds a real choice. That is the right way round:
+ * a device keeping the theme it was last given is a year-old mirror being
+ * slow, and the alternative is a picker that cannot be used at all.
+ */
+export function shouldRepairTheme(onDocument: string | null, stored: string | null): boolean {
+  // Following the system is not a stored choice -- it is the account declining
+  // to say, which is no reason to touch a document that may know better.
+  if (!stored) return false;
+  return onDocument === null;
+}
