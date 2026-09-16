@@ -156,14 +156,18 @@ describe('generatePalette', () => {
     // eighty apart, so a light theme that rotated Paper as one thing would
     // answer green with a green page and magenta links.
     //
-    // 165 is the one hue in this sweep the accent does not land on: it is
-    // inside light's green stretch, so #469 has it step off by eight degrees.
-    // The page still goes exactly where it was pointed.
+    // 165 used to be the one hue in this sweep the accent did not land on: it
+    // sat inside light's green stretch and #469 had it step off by eight
+    // degrees. It no longer does. Giving the page a ground of its own moved
+    // REFERENCE_HUE.paper -- which is read off that ground -- a few degrees
+    // warm, and at the new reference the accent generated for 165 clears the
+    // saved-green by more than MEANING_FLOOR on its own. Nothing was relaxed:
+    // the separation check still walks all 360 degrees and passes.
     for (const hue of SWEEP) {
       const accent = hexToOklch(generatePalette('light', hue)['--c-accent-base']);
       const landed = accentHueFor('light', hue);
       expect(`${hue} on ${apart(accent.h, landed) < 2}`).toBe(`${hue} on true`);
-      expect(`${hue} asked ${landed - hue}`).toBe(`${hue} asked ${hue === 165 ? 8 : 0}`);
+      expect(`${hue} asked ${landed - hue}`).toBe(`${hue} asked 0`);
     }
   });
 

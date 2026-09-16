@@ -101,7 +101,7 @@ const RATE_SYNTAX = `export function rate(rows: unknown[], hits: number) {
 const OFF_SCALE_TYPE = `export const heading = 'font-display text-2xl font-semibold';
 `;
 
-const ON_SCALE_TYPE = `export const heading = 'font-display text-title font-semibold sm:text-figure-lg text-lead text-small';
+const ON_SCALE_TYPE = `export const heading = 'font-display text-title font-semibold sm:text-figure-lg text-body text-small';
 `;
 
 const ARBITRARY_WIDTH = `export const page = 'mx-auto max-w-[1100px] px-6';
@@ -121,7 +121,7 @@ const RAW_PALETTE = `export const chip = 'rounded bg-emerald-50 text-emerald-700
  *
  * Each probe is a string that was actually in the tree before the rule
  * existed. The passing cases matter as much as the failing ones: a rule that
- * also bites `text-lead` or `max-w-[1400px]` is a rule people disable.
+ * also bites `text-body` or `max-w-[1400px]` is a rule people disable.
  */
 describe('the design-language rules', () => {
   it('blocks an off-scale type size', () => {

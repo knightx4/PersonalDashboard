@@ -67,7 +67,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       />
 
       <div className="max-w-2xl">
-        <h2 className="mb-2 text-lead font-semibold text-ink">What it is over</h2>
+        <h2 className="mb-2 text-body font-semibold text-ink">What it is over</h2>
 
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {material.map((piece) => (
@@ -108,7 +108,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
 
             {answered > 0 && (
               <>
-                <h2 className="mb-2 mt-8 text-lead font-semibold text-ink">How it went</h2>
+                <h2 className="mb-2 mt-8 text-body font-semibold text-ink">How it went</h2>
 
                 <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
                   {quiz.questions

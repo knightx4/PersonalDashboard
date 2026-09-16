@@ -4,9 +4,15 @@ import { cn } from '@/lib/cn';
 /**
  * The container.
  *
- * There is no shadow at rest: depth is a 1px border on a surface over a
- * canvas. Shadow belongs only to things genuinely floating -- menus and
- * popovers -- and transiently on `lift` hover.
+ * No shadow and no border at rest: depth is tone. A surface sits six percent
+ * above the canvas it lies on, which is enough to be an object without
+ * anything being drawn round it. It used to be three percent, and a 1px
+ * border was doing the work that difference could not -- the whole app wearing
+ * an edge because one theme's two greys were too close together. See the
+ * `--c-canvas` note in app/globals.css.
+ *
+ * Shadow still belongs only to things genuinely floating -- menus, popovers,
+ * and the page pane itself -- and transiently on `lift` hover.
  *
  * Lightbox is the one exception and it is handled by `sheet`, not here: on a
  * black bench a card is an object, and an object has an edge. In the other
@@ -20,7 +26,7 @@ import { cn } from '@/lib/cn';
  * p-8 depending on who wrote the file. Both variants derive from the density
  * dial, so the whole app tightens together.
  */
-const card = cva('sheet rounded-card border bg-surface', {
+const card = cva('sheet rounded-card bg-surface', {
   variants: {
     /** standard: a card the eye rests on. dense: a card holding a list. */
     padding: { standard: 'card-pad', dense: 'card-pad-dense', none: '' },

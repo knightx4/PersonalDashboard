@@ -2858,7 +2858,7 @@ export function PlanView({
                   'group-open/section:border-b group-open/section:border-border',
                 )}
               >
-                <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
+                <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
                   <ChevronRight
                     aria-hidden
                     strokeWidth={2}
@@ -2940,7 +2940,7 @@ export function PlanView({
               'group-open/section:border-b group-open/section:border-border',
             )}
           >
-            <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
+            <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
               <ChevronRight
                 aria-hidden
                 strokeWidth={2}
