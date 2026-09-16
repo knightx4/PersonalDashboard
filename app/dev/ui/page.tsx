@@ -239,6 +239,7 @@ const WORKSPACE_HUES: Record<(typeof MODULES)[number]['id'], string> = {
   todo: 'bg-w-todo',
   vault: 'bg-w-vault',
   learn: 'bg-w-learn',
+  news: 'bg-w-news',
   dev: 'bg-w-dev',
 };
 

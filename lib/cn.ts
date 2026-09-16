@@ -48,6 +48,8 @@ const COLOURS = [
   'w-vault-tint',
   'w-learn',
   'w-learn-tint',
+  'w-news',
+  'w-news-tint',
   'w-dev',
   'w-dev-tint',
   'page',

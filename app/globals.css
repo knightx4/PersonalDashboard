@@ -65,6 +65,8 @@
   --c-w-vault-tint: #fcecfd;
   --c-w-learn: #0f6b62;
   --c-w-learn-tint: #e4f4f1;
+  --c-w-news: #806500;
+  --c-w-news-tint: #f6f1e2;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -151,6 +153,7 @@
   --c-w-todo-lit: var(--c-w-todo);
   --c-w-vault-lit: var(--c-w-vault);
   --c-w-learn-lit: var(--c-w-learn);
+  --c-w-news-lit: var(--c-w-news);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -209,6 +212,8 @@
   --c-w-vault-tint: #2a1430;
   --c-w-learn: #4fd1c5;
   --c-w-learn-tint: #0a2420;
+  --c-w-news: #d8b23d;
+  --c-w-news-tint: #281e03;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -328,6 +333,7 @@
   --c-w-todo-lit: #6ccdf5;
   --c-w-vault-lit: #eda6f6;
   --c-w-learn-lit: #6fdcd2;
+  --c-w-news-lit: #debf69;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -432,6 +438,8 @@
   --c-w-vault-tint: #f2def2;
   --c-w-learn: #0a5d54;
   --c-w-learn-tint: #d8ebe7;
+  --c-w-news: #6e5600;
+  --c-w-news-tint: #ece4cf;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -507,6 +515,8 @@
   --c-w-vault-tint: #301a3a;
   --c-w-learn: #74dccf;
   --c-w-learn-tint: #102c29;
+  --c-w-news: #dcb956;
+  --c-w-news-tint: #2c2205;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -576,6 +586,8 @@
     --c-w-vault-tint: #2a1430;
     --c-w-learn: #4fd1c5;
     --c-w-learn-tint: #0a2420;
+    --c-w-news: #d8b23d;
+    --c-w-news-tint: #281e03;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -644,6 +656,11 @@
   --c-sheet-accent: var(--c-w-learn);
   --c-page-accent: var(--c-w-learn-lit);
   --c-accent-tint: var(--c-w-learn-tint);
+}
+[data-workspace='news'] {
+  --c-sheet-accent: var(--c-w-news);
+  --c-page-accent: var(--c-w-news-lit);
+  --c-accent-tint: var(--c-w-news-tint);
 }
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
@@ -809,6 +826,8 @@ body,
   --color-w-vault-tint: var(--c-w-vault-tint);
   --color-w-learn: var(--c-w-learn);
   --color-w-learn-tint: var(--c-w-learn-tint);
+  --color-w-news: var(--c-w-news);
+  --color-w-news-tint: var(--c-w-news-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
 
