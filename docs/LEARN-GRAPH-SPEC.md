@@ -212,6 +212,62 @@ Weighting by information rather than by questions answered is what stops the
 bar rewarding you for answering ten easy questions about the same node, or ten
 about the same part of one.
 
+## What to do next
+
+`/learn/next` answers "what is the one next thing worth learning" once, across
+every subject, instead of a subject and a goal at a time. It is read straight
+off the graphs and the reading queue — one pass over the subjects, no model
+call — so it is a page you can open out of idleness.
+
+Three kinds of row can appear on it:
+
+- **A claim you are ready for.** Nothing is missing underneath it, which is the
+  same set the subject screen offers and the same ordering: nearest to a goal
+  you named first.
+- **A claim worth asking about again.** Settled, and last answered more than a
+  month ago — the same cutoff the one-question-in-five re-check uses inside a
+  probe session. Longest unasked first.
+- **A reading you queued about a claim and never opened.** Only the ones that
+  name the concept they were queued to close, because only those can say what
+  they are about. Longest in the queue first.
+
+Each kind's own order is right about its own kind and says nothing about the
+other two, so the three are not scored against each other: two steps from a
+goal and seven months unchecked are not comparable numbers. The list takes one
+row from each kind in turn and skips a kind that has run out, which puts one of
+each at the top when all three exist and collapses to a single kind's order
+when only one does. Eight rows, the same cut the tab badge counts, so the
+number and the page cannot disagree.
+
+**Every row says in one line why it is there.** Three kinds mixed into one list
+are unreadable without it.
+
+Before the turns are taken, what you have already done moves each kind's order.
+`next_outcomes` holds one row per thing you did with something this page
+offered, and there are exactly three: a question answered about a claim, a
+reading marked read, and a row pushed aside with Not now. A row you pushed
+aside goes to the back of its kind for three weeks and says so on the row when
+it comes back; a subject you have been finishing things in comes before one you
+have not touched. The record is read sixty days back, which is long enough to
+hold a Not now through its three weeks and still show where it came from
+afterwards.
+
+**Nothing records that a row was shown, that it was clicked, or how long
+anybody looked at the page.** That is a rule about this page and not an
+omission: the order is computed from what is in the record, so a signal that
+cannot be written cannot be weighed. The three outcomes are all things you did
+on purpose, and they are written from the places they already happen — the
+probe answer, the reading's status, the Not now button — never from a page
+render. Opening this page and closing it leaves nothing behind.
+
+When none of the five growth triggers has fired for a while and all three lists
+are empty, the page does not show an empty box and does not generate anything
+on its own. It offers the one thing that would give it something: name a goal,
+which is trigger 1, costs a call only when you press it, and goes through the
+same approval screen as every other way into the graph. An account with
+subjects to extend and an account with no subjects at all reach that state for
+different reasons and are told so differently.
+
 ## What it costs, and the one decision that decides it
 
 **All state lives in Postgres, and every model call is short and independent.**
@@ -262,6 +318,7 @@ than merely unlikely.
 | `goals` | what you typed, the concept it resolved to, and its status |
 | `concept_state` | one row per concept: state, how established, when tested, any named misconception |
 | `probes` | every question asked: the check it tested, options, correct index, its reason, what you chose, the weight it earned |
+| `next_outcomes` | what came of a row Learn next offered: a question answered, a reading read, or a Not now |
 
 `concept_mentions` is the one relation nothing walks. An edge says you cannot
 understand this without that first; a mention says this claim brings that one
@@ -285,6 +342,7 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/s/[id]` | one subject: the graph, its goals, what you know and what is shaky |
 | `/learn/s/[id]/probe` | a probe session: one question, the bar, the reason afterwards |
 | `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
+| `/learn/next` | what to do next across every subject: a claim to start, one worth checking again, a reading you left |
 
 Same shell and design system as the other four workspaces. The graph view shows
 the pruned graph by default with a toggle for everything, because the pruned one
