@@ -21,10 +21,14 @@ import { TOKEN_NAMES } from '@/lib/theme/reference';
 export function themeAttribute(theme: Theme): ThemeId | undefined {
   if (theme.kind === 'system') return undefined;
   if (theme.kind === 'written') return theme.id;
-  // A generated theme borrows the written block of its own polarity: light is
-  // Paper's and dark is Ink's. With no colour that is the whole story and
-  // nothing else is written; with a colour the tokens below paint over it.
-  return theme.mode === 'light' ? 'paper' : 'ink';
+  // A generated theme borrows the written block of its own mode: light is
+  // Paper's, dark is Ink's and lightbox is Lightbox's. With no colour that is
+  // the whole story and nothing else is written; with a colour the tokens
+  // below paint over it. Lightbox needs its block for more than the polarity
+  // -- the glow round a sheet, the wash across the bench and the two
+  // colour-schemes are all in there, and none of them are `--c-*` tokens.
+  if (theme.mode === 'light') return 'paper';
+  return theme.mode === 'dark' ? 'ink' : 'lightbox';
 }
 
 /**
@@ -32,9 +36,9 @@ export function themeAttribute(theme: Theme): ThemeId | undefined {
  * none to write.
  *
  * Undefined for the system and for a written theme, and for a mode with no
- * colour -- light with no colour is Paper and dark with no colour is Ink, both
- * of which globals.css already says better than a hundred inline declarations
- * would.
+ * colour -- light with no colour is Paper, dark with no colour is Ink and
+ * lightbox with no colour is Lightbox, all three of which globals.css already
+ * says better than a hundred inline declarations would.
  */
 export function themeStyle(theme: Theme): Record<string, string> | undefined {
   if (theme.kind !== 'generated' || theme.hue === null) return undefined;

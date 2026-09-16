@@ -8,7 +8,7 @@
  *
  * Since #424 it measures the generated themes as well. Once any colour on the
  * circle can be picked there is no longer a list of themes anybody could look
- * at, so the script walks the circle instead: both modes at fifteen-degree
+ * at, so the script walks the circle instead: every mode at fifteen-degree
  * steps, the same pairs, the same thresholds. A hue that fails is the
  * generator's to fix -- by clamping chroma or moving lightness -- and never
  * the threshold's.
@@ -46,7 +46,7 @@ const WRITTEN: Record<string, Vars> = Object.fromEntries(
 const HUE_STEP = 15;
 
 const GENERATED: Record<string, Vars> = Object.fromEntries(
-  (['light', 'dark'] as const).flatMap((mode) =>
+  (['light', 'dark', 'lightbox'] as const).flatMap((mode) =>
     Array.from({ length: 360 / HUE_STEP }, (_, step) => {
       const hue = step * HUE_STEP;
       return [`${mode} ${hue}°`, generatePalette(mode, hue) as Vars] as const;
