@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextConcept, nextMasteryCheck } from './session';
+import { nextConcept, nextMasteryCheck, nextRung, type AskedRung } from './session';
 import type { Concept, KnowledgeState } from './model';
 
 /**
@@ -199,5 +199,90 @@ describe('which check the next question is for', () => {
   it('has nothing to aim at on a concept with no checks', () => {
     // That concept is probed against its claim, the way everything was before.
     expect(nextMasteryCheck([], [])).toBeNull();
+  });
+});
+
+describe('which rung the next question is asked at', () => {
+  const CHECKS = ['Rules out a pay freeze.', 'Applies at 4% inflation.', 'The Lucas objection.'];
+
+  /** A multiple-choice question, answered right, wrong, or not at all. */
+  function picked(check: string | null, answer: 'right' | 'wrong' | 'none'): AskedRung {
+    return {
+      rung: 'recognise',
+      masteryCheck: check,
+      chosenIndex: answer === 'none' ? null : answer === 'right' ? 1 : 2,
+      correctIndex: 1,
+      responseCorrect: null,
+    };
+  }
+
+  /** An applied case, graded or still open. */
+  function typed(check: string | null, answer: 'right' | 'wrong' | 'none'): AskedRung {
+    return {
+      rung: 'apply',
+      masteryCheck: check,
+      chosenIndex: null,
+      correctIndex: null,
+      responseCorrect: answer === 'none' ? null : answer === 'right',
+    };
+  }
+
+  it('starts at the bottom of the ladder', () => {
+    expect(nextRung(CHECKS, [])).toEqual({ rung: 'recognise', check: CHECKS[0] });
+  });
+
+  it('stays on multiple choice while a check has not been answered', () => {
+    // Two of three right is not the concept passed. Recognising an idea in one
+    // place and not another is the gap the rung above is there to find.
+    const earlier = [picked(CHECKS[0], 'right'), picked(CHECKS[1], 'right')];
+    expect(nextRung(CHECKS, earlier)).toEqual({ rung: 'recognise', check: CHECKS[2] });
+  });
+
+  it('stays on multiple choice while a check has been missed', () => {
+    const earlier = [picked(CHECKS[0], 'right'), picked(CHECKS[1], 'right'), picked(CHECKS[2], 'wrong')];
+    expect(nextRung(CHECKS, earlier).rung).toBe('recognise');
+  });
+
+  it('does not count a question that was never answered', () => {
+    const earlier = [picked(CHECKS[0], 'right'), picked(CHECKS[1], 'right'), picked(CHECKS[2], 'none')];
+    expect(nextRung(CHECKS, earlier).rung).toBe('recognise');
+  });
+
+  it('moves up once every check has been got right', () => {
+    const earlier = CHECKS.map((check) => picked(check, 'right'));
+    expect(nextRung(CHECKS, earlier)).toEqual({ rung: 'apply', check: CHECKS[0] });
+  });
+
+  it('aims the case at the check that was missed most', () => {
+    // #391: one case for the concept, against whatever the multiple-choice
+    // answers left weakest.
+    const earlier = [
+      picked(CHECKS[0], 'right'),
+      picked(CHECKS[1], 'wrong'),
+      picked(CHECKS[1], 'wrong'),
+      picked(CHECKS[1], 'right'),
+      picked(CHECKS[2], 'wrong'),
+      picked(CHECKS[2], 'right'),
+    ];
+    expect(nextRung(CHECKS, earlier)).toEqual({ rung: 'apply', check: CHECKS[1] });
+  });
+
+  it('asks another case after one was got wrong', () => {
+    const earlier = [...CHECKS.map((check) => picked(check, 'right')), typed(CHECKS[2], 'wrong')];
+    expect(nextRung(CHECKS, earlier)).toEqual({ rung: 'apply', check: CHECKS[2] });
+  });
+
+  it('stays on applied cases after one was got right', () => {
+    // The rung above is the defence, which is not built, so a concept that
+    // comes round again gets another case rather than the questions it has
+    // already answered.
+    const earlier = [...CHECKS.map((check) => picked(check, 'right')), typed(CHECKS[0], 'right')];
+    expect(nextRung(CHECKS, earlier).rung).toBe('apply');
+  });
+
+  it('moves a concept with no checks up on one right answer', () => {
+    expect(nextRung([], [])).toEqual({ rung: 'recognise', check: null });
+    expect(nextRung([], [picked(null, 'wrong')])).toEqual({ rung: 'recognise', check: null });
+    expect(nextRung([], [picked(null, 'right')])).toEqual({ rung: 'apply', check: null });
   });
 });
