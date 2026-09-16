@@ -3,11 +3,15 @@ import type { Concept, KnowledgeState } from '@/lib/learn/graph/model';
 import type { ReadyConcept } from '@/lib/learn/graph/ready';
 import type { SettledConcept } from '@/lib/learn/graph/recheck';
 import {
+  PUSHED_ASIDE_DAYS,
+  pushedAsideNote,
   rankNext,
   rankQueuedReadings,
   readingReason,
   readyReason,
   recheckReason,
+  RECORD_WINDOW_DAYS,
+  type NextRecord,
   type NextRow,
   type QueuedReading,
 } from './rank';
@@ -22,6 +26,12 @@ import {
 
 const NOW = new Date('2026-09-15T12:00:00Z');
 const subject = { id: 'subject-1', name: 'Optics' };
+const other = { id: 'subject-2', name: 'Tides' };
+
+/** A date that many days before NOW, for a record written by hand. */
+function daysAgo(days: number): string {
+  return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+}
 
 function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string | null = null): Concept {
   return {
@@ -40,32 +50,72 @@ function concept(id: string, state: KnowledgeState = 'unknown', testedAt: string
   };
 }
 
-function ready(id: string, stepsToGoal: number | null): ReadyConcept {
-  return { concept: concept(id), subjectId: subject.id, subjectName: subject.name, stepsToGoal };
+function ready(id: string, stepsToGoal: number | null, where = subject): ReadyConcept {
+  return { concept: concept(id), subjectId: where.id, subjectName: where.name, stepsToGoal };
 }
 
-function settled(id: string, testedAt: string): SettledConcept {
+function settled(id: string, testedAt: string, where = subject): SettledConcept {
   return {
     concept: concept(id, 'known', testedAt),
-    subjectId: subject.id,
-    subjectName: subject.name,
+    subjectId: where.id,
+    subjectName: where.name,
     testedAt,
   };
 }
 
-function queued(id: string, queuedAt: string, conceptName = 'refraction'): QueuedReading {
+function queued(
+  id: string,
+  queuedAt: string,
+  conceptName = 'refraction',
+  where = subject,
+): QueuedReading {
   return {
     id,
     title: `A paper called ${id}`,
     conceptId: conceptName,
     conceptName,
-    subjectId: subject.id,
-    subjectName: subject.name,
+    subjectId: where.id,
+    subjectName: where.name,
     queuedAt,
   };
 }
 
-const empty = { ready: [], settled: [], readings: [] };
+/** A question answered, which is one of the two ways of finishing something. */
+function answered(where: { id: string }, days: number): NextRecord {
+  return {
+    outcome: 'answered',
+    conceptId: `answered-${days}`,
+    readingId: null,
+    subjectId: where.id,
+    happenedAt: daysAgo(days),
+  };
+}
+
+/** A reading marked read, which is the other. */
+function read(where: { id: string }, days: number): NextRecord {
+  return {
+    outcome: 'read',
+    conceptId: `read-about-${days}`,
+    readingId: `read-${days}`,
+    subjectId: where.id,
+    happenedAt: daysAgo(days),
+  };
+}
+
+function pushedAside(
+  target: { conceptId?: string; readingId?: string },
+  days: number,
+): NextRecord {
+  return {
+    outcome: 'not_now',
+    conceptId: target.conceptId ?? null,
+    readingId: target.readingId ?? null,
+    subjectId: subject.id,
+    happenedAt: daysAgo(days),
+  };
+}
+
+const empty = { ready: [], settled: [], readings: [], record: [] };
 const keys = (rows: NextRow[]) => rows.map((row) => row.key);
 
 describe('one kind at a time', () => {
@@ -105,6 +155,7 @@ describe('the three kinds together', () => {
     ready: [ready('r1', 1), ready('r2', 2), ready('r3', 3)],
     settled: [settled('s1', '2025-01-01T12:00:00Z'), settled('s2', '2025-06-01T12:00:00Z')],
     readings: [queued('q1', '2026-01-01T12:00:00Z')],
+    record: [],
   };
 
   it('takes one of each kind in turn', () => {
@@ -181,5 +232,119 @@ describe('the queue order', () => {
     const same = '2026-03-01T12:00:00Z';
     const rows = rankQueuedReadings([queued('b', same), queued('a', same)]);
     expect(rows.map((row) => row.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('what you have done moves the order', () => {
+  // One claim in each of two subjects, the same distance from a goal and in
+  // the same state, so with nothing recorded the tie falls to the name and
+  // Optics comes first. Everything below changes the record and nothing else.
+  const twoSubjects = {
+    ...empty,
+    ready: [ready('optics-claim', 2), ready('tides-claim', 2, other)],
+  };
+
+  it('returns two orders for one graph and two records', () => {
+    const quiet = keys(rankNext(twoSubjects, NOW));
+    const workingOnTides = keys(
+      rankNext({ ...twoSubjects, record: [answered(other, 2), read(other, 5)] }, NOW),
+    );
+
+    expect(quiet).toEqual(['ready:optics-claim', 'ready:tides-claim']);
+    // tides-claim moved to the top: two things finished in Tides in the last
+    // week, and nothing in Optics.
+    expect(workingOnTides).toEqual(['ready:tides-claim', 'ready:optics-claim']);
+  });
+
+  it('counts a reading read as getting through a subject, like a question answered', () => {
+    const rows = rankNext({ ...twoSubjects, record: [read(other, 3)] }, NOW);
+    expect(keys(rows)[0]).toBe('ready:tides-claim');
+  });
+
+  it('weighs a subject by how much was finished in it, not by which came last', () => {
+    const rows = rankNext(
+      { ...twoSubjects, record: [answered(other, 30), answered(subject, 1), answered(subject, 2)] },
+      NOW,
+    );
+    expect(keys(rows)[0]).toBe('ready:optics-claim');
+  });
+
+  it('forgets what was finished before the window', () => {
+    const rows = rankNext(
+      { ...twoSubjects, record: [answered(other, RECORD_WINDOW_DAYS + 1)] },
+      NOW,
+    );
+    expect(keys(rows)).toEqual(['ready:optics-claim', 'ready:tides-claim']);
+  });
+});
+
+describe('a row you pushed aside', () => {
+  const twoClaims = { ...empty, ready: [ready('a-claim', 1), ready('b-claim', 2)] };
+
+  it('sinks below the rest of its kind while the few weeks last', () => {
+    const rows = rankNext(
+      { ...twoClaims, record: [pushedAside({ conceptId: 'a-claim' }, 3)] },
+      NOW,
+    );
+    expect(keys(rows)).toEqual(['ready:b-claim', 'ready:a-claim']);
+  });
+
+  it('comes back in its own order once they are up', () => {
+    const rows = rankNext(
+      { ...twoClaims, record: [pushedAside({ conceptId: 'a-claim' }, PUSHED_ASIDE_DAYS + 1)] },
+      NOW,
+    );
+    expect(keys(rows)).toEqual(['ready:a-claim', 'ready:b-claim']);
+  });
+
+  it('says on the row that you pushed it aside', () => {
+    const [row] = rankNext(
+      { ...empty, ready: [ready('a-claim', 1)], record: [pushedAside({ conceptId: 'a-claim' }, 4)] },
+      NOW,
+    );
+    expect(row.reason).toBe(`${readyReason(1)} ${pushedAsideNote(4)}`);
+    expect(pushedAsideNote(4)).toBe('You pushed this aside 4 days ago.');
+    expect(pushedAsideNote(0)).toBe('You pushed this aside today.');
+  });
+
+  it('holds down the reading it was pressed on and no other', () => {
+    const rows = rankNext(
+      {
+        ...empty,
+        readings: [queued('old', '2026-02-01T12:00:00Z'), queued('new', '2026-08-01T12:00:00Z')],
+        record: [pushedAside({ readingId: 'old' }, 1)],
+      },
+      NOW,
+    );
+    expect(keys(rows)).toEqual(['reading:new', 'reading:old']);
+  });
+
+  it('counts the most recent time you pushed it aside', () => {
+    const rows = rankNext(
+      {
+        ...twoClaims,
+        record: [
+          pushedAside({ conceptId: 'a-claim' }, PUSHED_ASIDE_DAYS + 10),
+          pushedAside({ conceptId: 'a-claim' }, 2),
+        ],
+      },
+      NOW,
+    );
+    expect(keys(rows)).toEqual(['ready:b-claim', 'ready:a-claim']);
+  });
+
+  it('holds a settled claim down the same way', () => {
+    const rows = rankNext(
+      {
+        ...empty,
+        settled: [
+          settled('older', '2025-01-01T12:00:00Z'),
+          settled('newer', '2025-06-01T12:00:00Z'),
+        ],
+        record: [pushedAside({ conceptId: 'older' }, 5)],
+      },
+      NOW,
+    );
+    expect(keys(rows)).toEqual(['recheck:newer', 'recheck:older']);
   });
 });

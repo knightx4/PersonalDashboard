@@ -15,6 +15,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadNext } from '@/lib/learn/graph/load';
 import type { NextReading, NextRecheck, NextReady } from '@/lib/learn/next/rank';
 import { ReadAbout } from '../s/[id]/read-about';
+import { NotNow } from './not-now';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Learn next' };
@@ -85,6 +86,7 @@ function ConceptRow({ row, timezone }: { row: NextReady | NextRecheck; timezone:
             {row.kind === 'ready' ? 'Probe this claim' : 'Ask about this again'}
           </Link>
           {row.kind === 'ready' && <ReadAbout concept={concept} subjectId={subjectId} anyState />}
+          <NotNow row={row} />
         </div>
       </div>
     </li>
@@ -120,6 +122,7 @@ function ReadingRow({ row }: { row: NextReading }) {
           <Link href={row.href} className={LINK}>
             Open this reading
           </Link>
+          <NotNow row={row} />
         </div>
       </div>
     </li>
