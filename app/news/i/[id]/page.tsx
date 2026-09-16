@@ -1,16 +1,19 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { requireUser } from '@/lib/auth/server';
+import { cn } from '@/lib/cn';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { loadIssue } from '@/lib/news/issues/load';
 import { formatArrival, senderLabel } from '@/lib/news/issues/list';
 import { markRead } from '@/lib/news/issues/read';
+import { cleanIssueHtml } from '@/lib/news/issues/sanitize';
 import { markIssueUnread } from './actions';
+import { IssueFrame } from './issue-frame';
 
 export const metadata = { title: 'Newsletter' };
 export const dynamic = 'force-dynamic';
@@ -23,12 +26,22 @@ export const dynamic = 'force-dynamic';
  * at. "Mark unread" is on the page for the issue you opened by mistake or want
  * to come back to.
  *
- * The body here is the plain-text half of the message. The formatted half is
- * shown the way #445 settled -- inside a sandboxed frame -- and that frame is
- * #460, which cleans the HTML first.
+ * Pictures are a link rather than a switch, so the choice survives a reload
+ * and costs no script: `?pictures=1` is the reader asking for them, and until
+ * it is there nothing in the issue is fetched from the sender. That is what
+ * keeps a tracking pixel from reporting the issue as opened.
+ *
+ * An issue with no HTML half is shown as the text it was sent as.
  */
-export default async function IssuePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function IssuePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ pictures?: string }>;
+}) {
   const { id } = await params;
+  const { pictures } = await searchParams;
   const user = await requireUser();
   const client = await createNewsClient();
 
@@ -42,6 +55,8 @@ export default async function IssuePage({ params }: { params: Promise<{ id: stri
 
   const sender = issue.sender;
   const from = sender ? senderLabel(sender) : 'Unknown sender';
+  const wanted = pictures === '1';
+  const { html, blockedImages } = cleanIssueHtml(issue.htmlBody, wanted);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -59,29 +74,43 @@ export default async function IssuePage({ params }: { params: Promise<{ id: stri
         title={issue.subject ?? 'No subject'}
         description={`${from} · ${formatArrival(issue.receivedAt, settings.timezone)}`}
         actions={
-          <form action={markIssueUnread}>
-            <input type="hidden" name="issueId" value={issue.id} />
-            <Button type="submit" size="sm" variant="secondary">
-              Mark unread
-            </Button>
-          </form>
+          <>
+            {blockedImages > 0 && (
+              <Link
+                href={`/news/i/${issue.id}?pictures=1`}
+                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
+              >
+                <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+                {blockedImages === 1 ? 'Show 1 picture' : `Show ${blockedImages} pictures`}
+              </Link>
+            )}
+            <form action={markIssueUnread}>
+              <input type="hidden" name="issueId" value={issue.id} />
+              <Button type="submit" size="sm" variant="secondary">
+                Mark unread
+              </Button>
+            </form>
+          </>
         }
       />
 
-      <Card>
-        <CardBody>
-          {issue.textBody ? (
-            <div className="whitespace-pre-wrap break-words text-body leading-relaxed text-ink">
-              {issue.textBody}
-            </div>
-          ) : (
-            <p className="text-body text-ink-muted">
-              This one was sent as formatted mail with no plain-text half, so there is nothing to
-              show here until the reading frame is in.
-            </p>
-          )}
-        </CardBody>
-      </Card>
+      {html ? (
+        <IssueFrame html={html} />
+      ) : (
+        <Card>
+          <CardBody>
+            {issue.textBody ? (
+              <div className="whitespace-pre-wrap break-words text-body leading-relaxed text-ink">
+                {issue.textBody}
+              </div>
+            ) : (
+              <p className="text-body text-ink-muted">
+                This one arrived with nothing in it to show.
+              </p>
+            )}
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }
