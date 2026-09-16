@@ -190,7 +190,14 @@ const COMMON = new Set([
   'were', 'what', 'when', 'where', 'which', 'while', 'will', 'with', 'would',
 ]);
 
-function contentWords(text: string): string[] {
+/**
+ * The words in a piece of text distinctive enough to compare two pieces by.
+ *
+ * Exported for the applied case's own rules, which ask the same kind of
+ * question of a different pair of strings: whether the case says anything the
+ * claim did not.
+ */
+export function contentWords(text: string): string[] {
   return Array.from(
     new Set(
       text
