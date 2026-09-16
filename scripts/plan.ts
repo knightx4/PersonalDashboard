@@ -664,7 +664,17 @@ async function main(): Promise<void> {
             `person: on /dev/plan, or with plan.ts answer ${item.number} --note "…".`,
         );
       }
-      await sql`update plan_items set status = 'in_progress' where id = ${item.id} and user_id = ${userId}`;
+      // Claimed, and in Claude's queue if it was in nobody's.
+      //
+      // `in_progress` means a session has this step in hand, and the daily
+      // cron puts back a claim with no assignee because nothing is working it.
+      // A session claiming a sub-step nobody handed over made exactly that
+      // row. `coalesce` rather than a plain set, so a step you had marked as
+      // yours stays yours.
+      await sql`
+        update plan_items
+        set status = 'in_progress', assignee = coalesce(assignee, 'claude')
+        where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} in progress.`);
       return;
     }

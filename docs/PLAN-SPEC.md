@@ -348,6 +348,29 @@ between its steps, so a step that gets something wrong early has the rest
 built on top of it before anybody looks. Send a migration on its own; batch
 the rest once you have seen what it did.
 
+### Claims, and giving them back
+
+`in_progress` means one thing: somebody has this step in hand right now. A
+session writes it when it claims a step and clears it when it closes one, and
+a session that dies does neither — so the row went on saying underway for the
+rest of the day, which is note 60a0ad01 and the reason #494 exists.
+
+Two halves. `lib/plan/elapsed.ts` reads the clock beside the status, so the
+page stops drawing a two-hour-old claim as live and the send guard stops
+refusing work under a feature nothing is touching. `inngest/dev/claims.ts` is
+the other half: a stage of the daily cron that writes those rows back to
+`not_started` with a dated line in `comment` saying the claim expired. Without
+it the reading is only on the page, and the CLI, the brief and the next session
+all still take the status at its word.
+
+A claim is taken back for one of two reasons, both in `lib/plan/claims.ts`:
+nothing has touched it for two hours, or it has no assignee at all. The second
+is why both the page's status control and `plan.ts start` now name who holds a
+step they mark underway — a claim nobody is on is one nothing is working.
+
+Two hours is a threshold and not evidence, and a long batch is called stale
+while it is still going. #499 replaces it with the run itself.
+
 ## The reading
 
 `lib/plan/tree.ts` turns the rows into what the page and the CLI show. It is

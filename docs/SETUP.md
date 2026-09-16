@@ -433,10 +433,13 @@ environment you are actually visiting.
 
 ## Cron
 
-`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs two
-things in order: the inbox sync — one pass over the mailbox, offered to both
-workspaces — and then the job sweep that re-derives ghosted status and
-generates reminders.
+`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs its
+stages in order: the inbox sync — one pass over the mailbox, offered to both
+workspaces — then the job sweep that re-derives ghosted status and generates
+reminders, the JD backfill, the vault sync, the plan's claim sweep, and the
+dev digest. The claim sweep puts a plan step whose session died back to not
+started; it is before the digest so the morning summary reports the corrected
+rows.
 
 **One route rather than three, because the Hobby plan caps cron jobs per
 project.** The order is not incidental either — a message that arrives in the
