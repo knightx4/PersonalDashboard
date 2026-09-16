@@ -40,5 +40,11 @@ export async function GET() {
     console.error(`[search] no answer from ${failed.join(', ')}`);
   }
 
-  return NextResponse.json({ hits, truncated }, { headers: { 'cache-control': 'no-store' } });
+  // The account goes back with the rows so the browser can stamp what it
+  // holds: signing out and in again in the same tab is a client-side
+  // navigation, and a list loaded for somebody else must not be searched.
+  return NextResponse.json(
+    { account: user.id, hits, truncated },
+    { headers: { 'cache-control': 'no-store' } },
+  );
 }

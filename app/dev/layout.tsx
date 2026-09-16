@@ -72,6 +72,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   return (
     <div data-workspace="dev">
       <AppShell
+        account={user.id}
         module="dev"
         sections={sections}
         feedbackHref="/dev/bugs"

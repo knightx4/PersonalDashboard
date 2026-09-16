@@ -134,6 +134,7 @@ export default async function SpendPage() {
   return (
     <div className="min-h-full">
       <AppShell
+        account={user.id}
         module={null}
         sections={[]}
         displayName={settings.displayName}
