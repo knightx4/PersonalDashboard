@@ -78,6 +78,7 @@ import {
   countMatches,
   flatten,
   healthOf as planHealthOf,
+  searchNodes,
   searchSections,
   searchTerms,
   type PlanBand,
@@ -2623,6 +2624,7 @@ function SearchThePlan({
 
 export function PlanView({
   sections,
+  finished,
   summary,
   view,
   catalog,
@@ -2631,6 +2633,8 @@ export function PlanView({
   queued,
 }: {
   sections: PlanSection[];
+  /** The finished features, for the fold at the foot of Everything. */
+  finished: PlanNode[];
   summary: PlanSummary;
   view: View;
   catalog: PlanCatalogEntry[];
@@ -2650,11 +2654,21 @@ export function PlanView({
     () => (searching ? searchSections(sections, query) : sections),
     [sections, query, searching],
   );
-  const hits = useMemo(() => (searching ? countMatches(shown) : 0), [shown, searching]);
+  // The archive searches with everything else. "Did I already plan that" is
+  // the question a finished feature gets asked, and it is asked by typing.
+  const found = useMemo(
+    () => (searching ? searchNodes(finished, query) : finished),
+    [finished, query, searching],
+  );
+  const hits = useMemo(
+    () => (searching ? countMatches(shown) + flatten(found).filter((n) => n.matches).length : 0),
+    [shown, found, searching],
+  );
 
   if (empty) return <ImportTheBuildOrder />;
 
-  const nothingToShow = shown.every((section) => section.nodes.length === 0);
+  const nothingToShow =
+    shown.every((section) => section.nodes.length === 0) && found.length === 0;
 
   return (
     <div className="space-y-6">
@@ -2784,10 +2798,62 @@ export function PlanView({
         })}
       </div>
 
+      {/* What is finished, out of the way but not gone. Folded shut, newest
+          first, and only on Everything -- every other view dropped these rows
+          before the page saw them. A search opens it, because "did I already
+          plan that" is the question it exists to answer. */}
+      {found.length > 0 && (
+        <details
+          key={searching ? 'finished:found' : 'finished'}
+          open={searching}
+          className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
+        >
+          <summary
+            className={cn(
+              'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
+              'px-3 py-2.5 [&::-webkit-details-marker]:hidden',
+              'transition-colors duration-150 hover:bg-sunken',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2',
+              'group-open/section:border-b group-open/section:border-border',
+            )}
+          >
+            <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
+              <ChevronRight
+                aria-hidden
+                strokeWidth={2}
+                className="size-4 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
+              />
+              Finished
+            </h2>
+            <span className="text-ui text-ink-muted">
+              <span className="tabular font-semibold text-ink">{found.length}</span>{' '}
+              {found.length === 1 ? 'feature' : 'features'}
+            </span>
+          </summary>
+          <ul className="divide-y divide-border">
+            <ColumnHeader />
+            {found.map((node) => (
+              <PlanRow
+                key={node.id}
+                node={node}
+                trail={[]}
+                catalog={catalog}
+                canSend={canSend}
+                view={view}
+                searching={searching}
+              />
+            ))}
+          </ul>
+        </details>
+      )}
+
       {/* The app-wide list is not offered as a section until something is in
-          it, so this is the only way to put the first thing there. */}
+          it, so this is the only way to put the first thing there. Only on
+          Everything, which is where the empty sections live now: drawing this
+          heading over the open view would put back the one thing dropping
+          them took away. */}
       {!searching &&
-        (view === 'open' || view === 'all') &&
+        view === 'all' &&
         !sections.some((section) => section.module === null) && (
           <section className="space-y-2">
             <h2 className="text-body font-semibold text-ink">The app as a whole</h2>

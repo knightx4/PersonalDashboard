@@ -4,6 +4,9 @@ import {
   ancestorsOf,
   applyView,
   buildPlanTree,
+  splitFinished,
+  searchNodes,
+  touchedAt,
   findNode,
   flattenSections,
   isReady,
@@ -47,6 +50,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -395,10 +399,104 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
   });
 
-  it('keeps every module under "open", because that is where a plan gets written', () => {
-    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(
+  it('drops a module with nothing open from "open" as well', () => {
+    // 'jobs' holds one finished feature and one step waiting on another, so it
+    // stays; the modules with nothing at all in them go.
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['shopping', 'jobs']);
+  });
+
+  it('keeps every module under "all", because that is where a plan gets written', () => {
+    expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
+  });
+});
+
+describe('ordering by what was touched last', () => {
+  const fixture = () =>
+    tree([
+      item({ id: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'first-step', parentId: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'second', position: 20, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'third', position: 30, updatedAt: '2026-01-15T00:00:00Z' }),
+      // The step was closed this morning; its feature is the one being worked.
+      at('done', 'third-step', {
+        parentId: 'third',
+        position: 10,
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'third-next', parentId: 'third', position: 20, updatedAt: '2026-01-15T00:00:00Z' }),
+    ]);
+
+  it('puts the feature worked most recently at the top of a working view', () => {
+    expect(shopping(applyView(fixture(), 'open')).nodes.map((node) => node.id)).toEqual([
+      'third',
+      'second',
+      'first',
+    ]);
+  });
+
+  it('leaves the steps under a feature in the order they are built in', () => {
+    const third = shopping(applyView(fixture(), 'open')).nodes[0];
+    expect(third.children.map((node) => node.id)).toEqual(['third-next']);
+    expect(shopping(applyView(fixture(), 'all')).nodes[2].children.map((n) => n.id)).toEqual([
+      'third-step',
+      'third-next',
+    ]);
+  });
+
+  it('leaves "all" in the plan’s own order', () => {
+    expect(shopping(applyView(fixture(), 'all')).nodes.map((node) => node.id)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('reads a feature’s recency off the newest step beneath it', () => {
+    const third = findNode(applyView(fixture(), 'all'), 'third')!;
+    expect(touchedAt(third)).toBe('2026-03-01T00:00:00Z');
+  });
+});
+
+describe('splitFinished', () => {
+  const fixture = () =>
+    tree([
+      at('done', 'shipped', { position: 10, completedAt: '2026-02-01T00:00:00Z' }),
+      at('done', 'shipped-step', { parentId: 'shipped' }),
+      at('done', 'older', { position: 20, completedAt: '2026-01-01T00:00:00Z' }),
+      at('dropped', 'abandoned', { position: 30, completedAt: '2026-03-01T00:00:00Z' }),
+      at('done', 'half', { position: 40, completedAt: '2026-02-15T00:00:00Z' }),
+      at('not_started', 'half-step', { parentId: 'half' }),
+      item({ id: 'live', position: 50 }),
+    ]);
+
+  it('lifts the features with nothing left in them, newest first', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    expect(finished.map((node) => node.id)).toEqual(['abandoned', 'shipped', 'older']);
+  });
+
+  it('leaves the modules holding what is still being worked', () => {
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.flatMap((section) => section.nodes).map((node) => node.id)).toEqual([
+      'half',
+      'live',
+    ]);
+  });
+
+  it('leaves a module its progress, which is over the whole module either way', () => {
+    const before = shopping(fixture()).progress;
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.find((section) => section.module === 'shopping')!.progress).toEqual(before);
+  });
+
+  it('finds a folded feature by number, title or detail', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    const shipped = finished.find((node) => node.id === 'shipped')!;
+    expect(searchNodes(finished, `#${shipped.number}`).map((node) => node.id)).toEqual(['shipped']);
+    // Every term has to match the same row, as it does in a module section.
+    expect(searchNodes(finished, 'shipped older').map((node) => node.id)).toEqual([]);
+    expect(searchNodes(finished, '').map((node) => node.id)).toEqual(finished.map((n) => n.id));
   });
 });
 

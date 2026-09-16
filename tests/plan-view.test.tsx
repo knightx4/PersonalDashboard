@@ -14,6 +14,7 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import {
   applyView,
   buildPlanTree,
+  splitFinished,
   flattenSections,
   handedToClaude,
   summarize,
@@ -72,6 +73,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -113,9 +115,15 @@ const catalog = flattenSections(whole).map((node) => ({
 }));
 
 function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked', empty = false) {
+  const narrowed = applyView(whole, view);
+  // The page splits the finished features out of Everything before it renders;
+  // this has to do the same or the fold is never under test.
+  const { sections, finished } =
+    view === 'all' ? splitFinished(narrowed) : { sections: narrowed, finished: [] };
   return renderToStaticMarkup(
     <PlanView
-      sections={applyView(whole, view)}
+      sections={sections}
+      finished={finished}
       summary={summarize(whole)}
       view={view}
       catalog={catalog}
@@ -137,6 +145,63 @@ describe('PlanView', () => {
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
     expect(render('all')).toContain('Schema and RPCs');
+  });
+
+  it('gathers the finished features into the fold at the foot of Everything', () => {
+    const closed = buildPlanTree({
+      items: [
+        item({
+          id: 'shipped',
+          title: 'Share links',
+          status: 'done',
+          completedAt: '2026-02-01T00:00:00Z',
+        }),
+        item({ id: 'shipped-step', title: 'The RPCs', parentId: 'shipped', status: 'done' }),
+        item({
+          id: 'older',
+          title: 'Receipts by photo',
+          status: 'done',
+          completedAt: '2026-01-01T00:00:00Z',
+        }),
+        item({ id: 'live', title: 'Outlook ingestion' }),
+      ],
+      dependencies: [],
+    });
+    const narrowed = applyView(closed, 'all');
+    const { sections, finished } = splitFinished(narrowed);
+    expect(finished.map((node) => node.title)).toEqual(['Share links', 'Receipts by photo']);
+
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={sections}
+        finished={finished}
+        summary={summarize(closed)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        queued={0}
+      />,
+    );
+    // The fold says how many it is holding, so shutting it does not hide the
+    // count, and the rows are in it rather than in the module above.
+    expect(html).toContain('Finished');
+    expect(html).toContain('2</span> features');
+    expect(html).toContain('Share links');
+    expect(html).toContain('Outlook ingestion');
+  });
+
+  it('leaves a module with nothing open off the open view, and keeps it on all', () => {
+    // Four of the seven modules have nothing open, so on the working view they
+    // are headings between you and the work. The invitation to plan one is on
+    // Everything, along with the offer to start the app-wide list.
+    const open = render('open');
+    expect(open).not.toContain('Vault');
+    expect(open).not.toContain('The app as a whole');
+
+    const all = render('all');
+    expect(all).toContain('Vault');
+    expect(all).toContain('The app as a whole');
   });
 
   it('puts the facts that decide what is next on the line', () => {
@@ -210,6 +275,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(nobodys, 'all')}
+        finished={[]}
         summary={summarize(nobodys)}
         view="all"
         catalog={[]}
@@ -239,6 +305,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(reshaped, 'all')}
+        finished={[]}
         summary={summarize(reshaped)}
         view="all"
         catalog={[]}
@@ -265,6 +332,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(nothing, 'ready')}
+        finished={[]}
         summary={summarize(nothing)}
         view="ready"
         catalog={[]}
@@ -292,6 +360,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(withDecision, 'all')}
+        finished={[]}
         summary={summarize(withDecision)}
         view="all"
         catalog={[]}
@@ -331,6 +400,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(withQuestions, 'all')}
+        finished={[]}
         summary={summarize(withQuestions)}
         view="all"
         catalog={[]}
@@ -368,6 +438,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(foggy, 'all')}
+        finished={[]}
         summary={summarize(foggy)}
         view="all"
         catalog={[]}
@@ -403,6 +474,7 @@ describe('PlanView', () => {
       renderToStaticMarkup(
         <PlanView
           sections={applyView(aside, view)}
+          finished={[]}
           summary={summarize(aside)}
           view={view}
           catalog={[]}
@@ -436,6 +508,7 @@ describe('PlanView', () => {
       renderToStaticMarkup(
         <PlanView
           sections={applyView(aside, view)}
+          finished={[]}
           summary={summarize(aside)}
           view={view}
           catalog={[]}
