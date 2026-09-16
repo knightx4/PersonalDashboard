@@ -23,7 +23,14 @@ type Write = { table: string; op: 'insert' | 'update'; row: Record<string, unkno
  * something reads, and can be made to fail. Enough for the two things an
  * action does: read what is there and write what was asked for.
  */
-function db(options: { row?: Record<string, unknown> | null; error?: { message: string } } = {}) {
+function db(
+  options: {
+    row?: Record<string, unknown> | null;
+    /** What a list read hands back -- the sibling a new step is positioned after. */
+    rows?: Record<string, unknown>[];
+    error?: { message: string };
+  } = {},
+) {
   const writes: Write[] = [];
   const error = options.error ?? null;
   const supabase = {
@@ -35,9 +42,14 @@ function db(options: { row?: Record<string, unknown> | null; error?: { message: 
         },
         select() {
           // `eq` chains, because a lookup by number filters on the account as
-          // well: eq('user_id').eq('number').maybeSingle().
+          // well: eq('user_id').eq('number').maybeSingle(). `is` and `order`
+          // chain for the same reason: finding the end of a sibling list ends
+          // in `limit`, and everything before it narrows.
           const filtered = {
             eq: () => filtered,
+            is: () => filtered,
+            order: () => filtered,
+            limit: () => Promise.resolve({ data: options.rows ?? [] }),
             maybeSingle: () => Promise.resolve({ data: options.row ?? null }),
           };
           return filtered;
@@ -53,7 +65,14 @@ function db(options: { row?: Record<string, unknown> | null; error?: { message: 
 }
 
 function action(over: Partial<DashAction> & { name: string }): DashAction {
-  return { text: null, module: null, field: null, ...over };
+  return {
+    name: over.name,
+    text: over.text ?? null,
+    module: over.module ?? null,
+    field: over.field ?? null,
+    detail: over.detail ?? null,
+    kind: over.kind ?? null,
+  };
 }
 
 function input(over: Partial<ActInput> & { action: DashAction }): ActInput {
@@ -191,18 +210,188 @@ describe('rewording the row a comment is on', () => {
     expect(outcome.ok === false && outcome.why).toContain('200 characters');
   });
 
-  it('will not reword a raise or a bug note', async () => {
-    for (const [target, said] of [
-      ['raise', 'a raise'],
-      ['note', 'a bug note'],
-    ] as const) {
-      const { writes, supabase } = db({ row: { title: 'A row' } });
-      const outcome = await carryOut(
-        input({ supabase, target, action: action({ name: 'reword', text: 'Something else' }) }),
-      );
-      expect(writes).toHaveLength(0);
-      expect(outcome.ok === false && outcome.why).toContain(said);
+  it('rewrites a bug note and carries the old report back', async () => {
+    const { writes, supabase } = db({ row: { body: 'The picker is broken.' } });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'note',
+        action: action({ name: 'reword', text: 'The shelf photo picker opens on the wrong shelf.' }),
+      }),
+    );
+
+    expect(writes).toEqual([
+      {
+        table: 'feedback_items',
+        op: 'update',
+        row: { body: 'The shelf photo picker opens on the wrong shelf.' },
+      },
+    ]);
+    expect(outcome.ok && outcome.said).toContain('The picker is broken.');
+  });
+
+  // The status, the priority and the resolution are the queue's record of the
+  // work, not the report of the problem.
+  it('touches nothing on a note but its body', async () => {
+    const { writes, supabase } = db({ row: { body: 'Was' } });
+    await carryOut(input({ supabase, target: 'note', action: action({ name: 'reword', text: 'Now' }) }));
+    expect(Object.keys(writes[0].row)).toEqual(['body']);
+  });
+
+  it('will not reword a raise', async () => {
+    const { writes, supabase } = db({ row: { title: 'A row' } });
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', action: action({ name: 'reword', text: 'Something else' }) }),
+    );
+    expect(writes).toHaveLength(0);
+    expect(outcome.ok === false && outcome.why).toContain('a raise');
+  });
+});
+
+describe('filing a note from a comment', () => {
+  it('files a bug on the queue, open, with the page it came from', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(
+      input({
+        supabase,
+        action: action({ name: 'file_note', kind: 'bug', text: 'The shelf picker opens on the wrong shelf.' }),
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(writes).toEqual([
+      {
+        table: 'feedback_items',
+        op: 'insert',
+        row: {
+          user_id: 'user-1',
+          kind: 'bug',
+          body: 'The shelf picker opens on the wrong shelf.',
+          page_path: '/dev/plan',
+        },
+      },
+    ]);
+    expect(outcome.ok && outcome.redraw).toBe('/dev/bugs');
+  });
+
+  it('files a feature request when it was told it was one', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(
+      input({ supabase, target: 'idea', action: action({ name: 'file_note', kind: 'feature', text: 'A keyboard shortcut.' }) }),
+    );
+    expect(writes[0].row).toMatchObject({ kind: 'feature', page_path: '/dev/ideas' });
+    expect(outcome.ok && outcome.said).toContain('a feature request');
+  });
+
+  // Both are one queue and the kind is a dropdown away from right; a note
+  // refused over its heading is a note that does not exist.
+  it('files anything it was not told the kind of as a bug', async () => {
+    for (const kind of [null, 'defect', 'PROBLEM']) {
+      const { writes, supabase } = db();
+      await carryOut(input({ supabase, action: action({ name: 'file_note', kind, text: 'Something is wrong.' }) }));
+      expect(writes[0].row.kind).toBe('bug');
     }
+  });
+
+  // Nothing here ranks a note or closes one: the queue is worked in order and
+  // a priority read out of a sentence would outrank the ones they set.
+  it('sets no priority, no status and no resolution', async () => {
+    const { writes, supabase } = db();
+    await carryOut(input({ supabase, action: action({ name: 'file_note', text: 'Something.' }) }));
+    expect(Object.keys(writes[0].row).sort()).toEqual(['body', 'kind', 'page_path', 'user_id']);
+  });
+
+  it('writes nothing when it cannot tell what to write up', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(input({ supabase, action: action({ name: 'file_note' }) }));
+    expect(writes).toHaveLength(0);
+    expect(outcome.ok === false && outcome.why).toContain('no note was filed');
+  });
+
+  it('says so when the write itself fails', async () => {
+    const { supabase } = db({ error: { message: 'new row violates row-level security policy' } });
+    const outcome = await carryOut(input({ supabase, action: action({ name: 'file_note', text: 'Anything.' }) }));
+    expect(outcome.ok === false && outcome.why).toContain('row-level security');
+  });
+});
+
+describe('adding a step from a comment', () => {
+  it('adds it under the step the comment is on, in that step\'s workspace', async () => {
+    const { writes, supabase } = db({ row: { module: 'shopping' }, rows: [{ position: 40 }] });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        action: action({ name: 'add_step', text: 'Crop the photo', detail: 'Square, and centred on the shelf.' }),
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(writes).toEqual([
+      {
+        table: 'plan_items',
+        op: 'insert',
+        row: {
+          user_id: 'user-1',
+          module: 'shopping',
+          parent_id: 'row-1',
+          title: 'Crop the photo',
+          detail: 'Square, and centred on the shelf.',
+          status: 'proposed',
+          kind: 'build',
+          position: 50,
+        },
+      },
+    ]);
+    expect(outcome.ok && outcome.said).toContain('under this one');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
+  });
+
+  // The whole of why this is safe to do on an instruction: a proposal is not
+  // work, and approving it stays theirs.
+  it('adds it as a proposal, with nobody on it', async () => {
+    const { writes, supabase } = db({ row: { module: null } });
+    await carryOut(input({ supabase, action: action({ name: 'add_step', text: 'A step' }) }));
+    expect(writes[0].row.status).toBe('proposed');
+    expect(writes[0].row).not.toHaveProperty('assignee');
+    expect(writes[0].row).not.toHaveProperty('priority');
+  });
+
+  it('adds a feature at the top of a workspace when the comment is not on a step', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'idea',
+        action: action({ name: 'add_step', text: 'Shelf photos', module: 'vault' }),
+      }),
+    );
+    expect(writes[0].row).toMatchObject({ parent_id: null, module: 'vault', position: 10 });
+    expect(outcome.ok && outcome.said).toContain('Vault');
+  });
+
+  it('adds nothing when it cannot tell what to call it', async () => {
+    const { writes, supabase } = db({ row: { module: null } });
+    const outcome = await carryOut(input({ supabase, action: action({ name: 'add_step' }) }));
+    expect(writes).toHaveLength(0);
+    expect(outcome.ok === false && outcome.why).toContain('no step was added');
+  });
+
+  it('refuses a name longer than the column holds', async () => {
+    const { writes, supabase } = db({ row: { module: null } });
+    const outcome = await carryOut(
+      input({ supabase, action: action({ name: 'add_step', text: 'x'.repeat(201) }) }),
+    );
+    expect(writes).toHaveLength(0);
+    expect(outcome.ok === false && outcome.why).toContain('200 characters');
+  });
+
+  it('adds nothing when the step it would hang under has gone', async () => {
+    const { writes, supabase } = db({ row: null });
+    const outcome = await carryOut(
+      input({ supabase, action: action({ name: 'add_step', text: 'A step' }) }),
+    );
+    expect(writes).toHaveLength(0);
+    expect(outcome.ok === false && outcome.why).toContain('not there any more');
   });
 });
 
@@ -267,7 +456,7 @@ describe('an instruction outside the list', () => {
   // asked to update the plan it said it could not, when the thing it could not
   // do is only this call, with one message and no repository.
   it('hands on anything that is neither its own nor the person\'s', async () => {
-    for (const name of ['update_plan', 'add_step', 'split_feature', 'write_note', 'fix_bug']) {
+    for (const name of ['update_plan', 'split_feature', 'rename_module', 'fix_bug']) {
       const { writes, supabase } = db();
       const outcome = await carryOut(input({ supabase, action: action({ name }) }));
       expect(writes).toHaveLength(0);
