@@ -39,7 +39,7 @@ line that meant something at the time.
 **Be rigid about the shape of a fact. Be loose about which facts exist.**
 
 Every design question below resolves with that sentence. The schema is strict
-and closed: four node kinds, four edge types, one lifecycle for a
+and closed: four node kinds, six edge types, one lifecycle for a
 disagreement. What populates the schema is entirely discovered and expected to
 churn.
 
@@ -114,32 +114,104 @@ Every node also carries:
 
 ## What an edge is
 
-A closed set of four types, fixed. Each earns its place by doing a job nothing
-else does.
+A closed set of six types, plus a free-text description on every edge.
 
-**`requires`** — you cannot understand B at all without A.
-This is the only edge with structural teeth: it must be acyclic, enforced by a
-database trigger rather than by convention, and it is the only edge the "what
-should I learn next" computation reads.
+### The rule for adding one
 
-It is also deliberately **rare**. The bar is *cannot understand at all*, which
-most relationships do not clear. Parking minimums are not a prerequisite for
+Not *does the vocabulary capture reality* — it never will, and a vocabulary
+built to try becomes thirty types nobody maintains. The rule is: **some feature
+has to read it.** An edge type with no consumer is decoration.
+
+| type | means | what reads it |
+| --- | --- | --- |
+| `requires` | you cannot understand B at all without A | the frontier computation |
+| `supports` | B is true partly because A is true | the defend rung — *why do you hold this?* |
+| `qualifies` | A bounds or conditions B | contradiction resolution; *under what conditions?* probes |
+| `contradicts` | these two cannot both stand | tension cards |
+| `example-of` | a concrete case of something more abstract | the abstraction ladder, and zoom |
+| `same-as` | one idea wearing two names | reconciliation |
+
+A seventh would have to name its consumer before it gets added.
+
+### The two with teeth
+
+**`requires`** is the only edge with structural consequences: it must be
+acyclic, enforced by a database trigger rather than by convention, and it is
+the only edge the frontier computation reads.
+
+It is deliberately **rare**. The bar is *cannot understand at all*, which most
+relationships do not clear. Parking minimums are not a prerequisite for
 understanding incentive misalignment; they are an example of it. Keeping this
-edge thin is what stops the frontier computation from deciding that everything
-depends on everything.
+edge thin is what stops the frontier deciding that everything depends on
+everything.
 
-**`contradicts`** — these two cannot both stand.
-Where the sharpening happens. See *When things disagree* below.
+**`supports`** is the backbone of everything the module is for, and it is easy
+to confuse with `requires`. They are different questions:
 
-**`example-of`** — a concrete case of something more abstract.
-Cheap to extract and it does more work than it looks like: this is the
-abstraction ladder (see *Zoom*), and it is what makes an explanation land.
+- `requires` is about **comprehension**. Can you follow B without A?
+- `supports` is about **justification**. Is B true partly because A is?
 
-**`same-as`** — one idea wearing two names.
-The merge edge. Marginal thinking in economics and in decision theory are the
-same idea, and the map should say so rather than holding two copies.
+In `Bulk/Bulk - Ideas/On labor, jobs and working.md`, *"value created for
+yourself still counts as value"* is a premise of the twenty-hour work-split
+argument. You can follow the argument perfectly well without the premise, so it
+is not `requires` — but the argument stands or falls on it. In a map made mostly
+of positions, this is the structure that makes a position defensible rather than
+merely held, and the defend rung has nothing to read without it.
 
-Four types forever. Which nodes carry which edges is entirely discovered.
+> **Added after the 30-note trial.** `supports` and `qualifies` were not in the
+> first draft, and the trial found both by forcing relations into boxes they did
+> not fit. Premises went into `example-of` and `requires`; boundary conditions —
+> *"regulate on principle, not prescription"* qualified by *"except fire code,
+> where the expert knows better than the user"* — had nowhere to go at all.
+>
+> `qualifies` also fixes an inconsistency the spec had with itself. The
+> contradiction-resolution procedure below **produces** boundary nodes by
+> design: *"upzoning lowers rents metro-wide over years; new construction
+> correlates with local rent rises because it is built where demand is
+> climbing"* is a scope qualifier over two existing nodes, and four edge types
+> could not attach it.
+
+### Every edge carries an optional description
+
+One short free-text line saying what the relation actually is, beside the type.
+
+The type is closed; the description is not. When the extractor cannot type a
+relation cleanly it still records what the relation *was*, which means two
+things. A relation that does not fit is degraded rather than lost. And after a
+few hundred of them, reading the descriptions on edges whose type sat awkwardly
+is how a seventh type gets discovered — from evidence, rather than from
+somebody in a document guessing today.
+
+That is the honest answer to *will six hold forever*. Probably not, and the
+point is being able to tell.
+
+### What was rejected, and why
+
+- **`causes`.** Tempting, because a lot of this material is causal — AV fleets
+  reduce parking demand, which makes redevelopment profitable. But a causal
+  chain is usually better as one node stating the mechanism, and the type
+  invites modelling the causal structure of the world, which has no floor.
+- **`contrasts-with`.** Already handled, by a node *kind* rather than an edge.
+  "Adverse selection is hidden type, moral hazard is hidden action" is one
+  `distinction` node, not two nodes and a relation between them.
+- **`applies-to`**, for frames. Too thin. `example-of` covers it.
+
+### Be paranoid about nodes, relaxed about edges
+
+Worth stating because the instinct runs the other way. A wrong node pollutes
+everything downstream of it. A wrong edge type is one bad line in one view,
+fixed in a tap — and only `requires` has structural consequences, so only
+`requires` deserves real suspicion.
+
+The genuine unknown is not the vocabulary but **cross-note edge extraction**,
+which the trial did not test. Every relation it found was stated inside a single
+note — *"Argument Against… Counterpoint…"*, *"My example of this could be a
+Rubik's cube"* — which is the easy case. Most real edges will be inferred
+between concepts that never appeared on the same page, and that is what the
+wikilink prior in Stage 4 exists to make easier.
+
+Which nodes carry which edges is entirely discovered. Only the six names and
+their meanings are fixed.
 
 ### Hubs are a feature, with one guard
 
@@ -305,6 +377,10 @@ distinction that separates them.
 >
 > **Resolution:** *Upzoning lowers rents metro-wide over years; new construction
 > correlates with local rent rises because it is built where demand is rising.*
+>
+> The resolution is a new node, joined to both originals by `qualifies`. That
+> edge type exists because of this procedure: a scope or level mismatch always
+> resolves into a boundary, and a boundary needs somewhere to attach.
 
 That third node is worth more than either of the first two, and producing it is
 the move that separates somebody who has read about housing from somebody who is
@@ -423,7 +499,8 @@ One call per chunk. Haiku, tool-shaped output, returning candidates:
   you wrote in your own words is evidence you hold a position. A clipping is
   evidence you were interested, which is a different and still useful fact.
 - `confidence`
-- candidate edges **within this chunk**, typed
+- candidate edges **within this chunk**: a type from the six, and a one-line
+  description of what the relation actually is
 
 Every candidate must pass the node test. The prompt states it as a refusal: if
 you cannot write a question that separates somebody who holds this from somebody
@@ -456,8 +533,9 @@ Three sources, in order of how much they are trusted:
 
 1. **Your wikilinks.** If node A came from note N, node B came from note M, and
    N links to M, that pair is a strong edge candidate. **2,791 of these already
-   exist.** You drew them. The model's job shrinks to naming which of the four
-   types it is, which is a much easier question than inventing the relation.
+   exist.** You drew them. The model's job shrinks to naming which of the six
+   types it is and describing it in a line, which is a much easier question
+   than inventing the relation from nothing.
 2. **Co-occurrence** within a chunk, already captured in Stage 2.
 3. **Inference** within a neighbourhood, for the rest.
 
@@ -551,6 +629,9 @@ Agreed before anything runs, so the result can be judged rather than admired.
 - **At least a handful of disagreements**, and on inspection most of them should
   be scope or level mismatches rather than real contradictions. If they are all
   flagged as genuine conflicts, the classifier is too eager.
+- **The edge types should be spread, not collapsed.** If nearly everything is
+  `example-of`, typing is not happening and the descriptions are where to look
+  for why. `requires` should be the rarest of the six by a wide margin.
 - **The top twenty by centrality should be recognisable** as the things you
   actually think about. If they are not, the map is wrong in a way no metric
   will catch, and that is the real test.
