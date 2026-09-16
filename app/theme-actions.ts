@@ -20,7 +20,8 @@ import { formatTheme, parseTheme, THEME_COOKIE, THEME_COOKIE_MAX_AGE } from '@/l
  * the system again.
  *
  * The value is a theme's name, or a mode and a colour held as one string --
- * `dark`, or `dark:284`. One column and one cookie, both unchanged in shape.
+ * `dark`, `dark:284`, or `lightbox:155`. One column and one cookie, both
+ * unchanged in shape.
  */
 // latency: instant -- the picker recolours the page itself and does not wait for the write
 export async function setTheme(next: string | null): Promise<void> {

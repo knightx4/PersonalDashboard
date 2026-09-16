@@ -35,8 +35,9 @@ export const THEMES = [
     id: 'lightbox',
     label: 'Lightbox',
     mood: 'Lit sheets, blue-black bench',
-    // The one theme whose page and cards disagree: the bench is dark, so the
-    // picker's swatch and the scheme it reports both describe the bench.
+    // The one theme whose page and cards disagree, which is why it is a mode
+    // of its own rather than a dark. `scheme` is what the browser is told to
+    // paint its own widgets in, and that is the bench.
     scheme: 'dark',
     swatch: '#0d1219',
     ink: '#e7ebf1',
@@ -82,16 +83,19 @@ export type { ThemeMode };
  *   `system`    -- nothing chosen. Follow the machine, which is not the same
  *                  as choosing light.
  *   `written`   -- one of the four palettes written out in app/globals.css.
- *                  Lightbox is the reason this shape survives: its page and
- *                  its cards are opposite polarities, so it cannot be said as
- *                  a mode and a colour at all. Paper, Ink and Dusk stay here
- *                  too, so an account holding one renders exactly as it did.
+ *                  An account holding one renders exactly as it did, which is
+ *                  what this shape is for.
  *   `generated` -- a mode and a colour, or a mode and none. What the picker
  *                  writes from now on.
  *
- * The string is `dark`, or `dark:284`, or a theme's name. One column, and a
- * cookie that keeps working, because widening the column would have meant a
- * migration for something that is already a short piece of text.
+ * The string is `dark`, or `dark:284`, or `lightbox:155`, or a theme's name.
+ * One column, and a cookie that keeps working, because widening the column
+ * would have meant a migration for something that is already a short piece of
+ * text.
+ *
+ * A mode with no colour and the written theme it equals are the same string --
+ * `lightbox` reads back as the written one -- because they are the same
+ * palette, and two spellings of one theme would be two things to keep in step.
  */
 export type Theme =
   | { kind: 'system' }
@@ -115,7 +119,7 @@ export function parseTheme(value: string | null | undefined): Theme {
   if (isThemeId(text)) return { kind: 'written', id: text };
 
   const [mode, hue] = text.split(':');
-  if (mode !== 'light' && mode !== 'dark') return SYSTEM_THEME;
+  if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox') return SYSTEM_THEME;
   if (hue === undefined) return { kind: 'generated', mode, hue: null };
 
   const degrees = Number(hue);
@@ -136,16 +140,18 @@ export function writtenId(theme: Theme): ThemeId | null {
 }
 
 /**
- * Which polarity a theme is, whatever shape it is stored in.
+ * Which mode a theme is, whatever shape it is stored in.
  *
- * A written theme reports the one it declares -- Lightbox says dark, because
- * its bench is what the room is -- and a theme nobody has chosen reports
- * light, which is what the switch should be sitting on before the machine's
- * own preference is readable.
+ * A written theme reports the one it belongs to: Paper is light, Ink and Dusk
+ * are dark, and Lightbox is its own, because a bench of one polarity under
+ * sheets of the other is neither. A theme nobody has chosen reports light,
+ * which is what the switch should be sitting on before the machine's own
+ * preference is readable.
  */
 export function modeOf(theme: Theme): ThemeMode {
   if (theme.kind === 'generated') return theme.mode;
   if (theme.kind === 'system') return 'light';
+  if (theme.id === 'lightbox') return 'lightbox';
   return THEMES.find((written) => written.id === theme.id)?.scheme ?? 'light';
 }
 
@@ -153,6 +159,20 @@ export function modeOf(theme: Theme): ThemeMode {
 export function hueOf(theme: Theme): number | null {
   return theme.kind === 'generated' ? theme.hue : null;
 }
+
+/**
+ * The three rooms the switch offers.
+ *
+ * Light and dark are the two polarities. Lightbox is the third because it is
+ * both at once -- lit sheets on a dark bench -- and so cannot be reached by
+ * switching one of them. All three take a colour: what the colour moves
+ * differs, and lib/theme/reference.ts says how.
+ */
+export const THEME_MODES: readonly { id: ThemeMode; label: string; mood: string }[] = [
+  { id: 'light', label: 'Light', mood: 'Warm, printed, quiet' },
+  { id: 'dark', label: 'Dark', mood: 'Near-black, low chroma' },
+  { id: 'lightbox', label: 'Lightbox', mood: 'Lit sheets on a dark bench' },
+];
 
 /**
  * The five colours the picker offers.

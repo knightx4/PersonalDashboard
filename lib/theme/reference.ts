@@ -1,12 +1,12 @@
 /**
- * The three palettes every generated theme is built from.
+ * The palettes every generated theme is built from.
  *
- * Paper, Ink and Dusk are written by hand in app/globals.css and have been
- * contrast-checked as they stand. Rather than invent colours, the generator
- * borrows theirs: it keeps each token's lightness and chroma and moves only
- * the hue. So Paper is what light is, Ink is what dark with no colour is, and
- * Dusk -- a dark already cast towards plum -- is the shape a dark theme takes
- * once a colour is chosen.
+ * Paper, Ink, Dusk and Lightbox are written by hand in app/globals.css and
+ * have been contrast-checked as they stand. Rather than invent colours, the
+ * generator borrows theirs: it keeps each token's lightness and chroma and
+ * moves only the hue. So Paper is what light is, Ink is what dark with no
+ * colour is, Dusk -- a dark already cast towards plum -- is the shape a dark
+ * theme takes once a colour is chosen, and Lightbox is its own shape again.
  *
  * Light with a colour rotates around LIGHT_CAST rather than around Paper
  * itself. Dusk rotates as one thing because every colour in it sits within
@@ -25,13 +25,20 @@
  */
 import { hexToOklch, relativeLuminance, withLuminance } from './oklch';
 
-/** Which of the two written polarities a generated theme is a version of. */
-export type ThemeMode = 'light' | 'dark';
+/**
+ * Which written palette a generated theme is a version of.
+ *
+ * Light and dark are the switch. Lightbox is the third, and it is a mode
+ * rather than a fourth preset because its page and its cards are opposite
+ * polarities: lit sheets on a dark bench cannot be said as light or as dark,
+ * but it rotates around a hue the same way the other two do.
+ */
+export type ThemeMode = 'light' | 'dark' | 'lightbox';
 
 /** Every `--c-*` colour token, by name, as `#rrggbb`. */
 export type Palette = Record<string, string>;
 
-export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk', Palette> = {
+export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', Palette> = {
   paper: {
     '--c-canvas': '#faf9f6',
     '--c-surface': '#ffffff',
@@ -278,6 +285,97 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk', Palette> = {
     '--c-sheet-caution': '#f2b25a',
     '--c-sheet-danger': '#ff96a4',
   },
+  /**
+   * Lightbox, and the reason it is a mode of its own.
+   *
+   * Two polarities on screen at once: a mid-dark bench, and lit sheets laid on
+   * it. The four sheet grounds are written with alpha so a card picks up the
+   * bench beneath it, which is why four values here are `rgb(... / a)` rather
+   * than hex -- they are composited before anything is measured against them,
+   * and the generator leaves them alone.
+   */
+  lightbox: {
+    '--c-canvas': 'rgb(231 236 242 / 0.92)',
+    '--c-surface': 'rgb(253 252 249 / 0.96)',
+    '--c-raised': 'rgb(255 254 250 / 0.97)',
+    '--c-sunken': 'rgb(228 234 241 / 0.92)',
+    '--c-border': '#d0d9e3',
+    '--c-border-strong': '#a6b1bf',
+    '--c-shell': '#2b3644',
+    '--c-shell-ink': '#eef2f7',
+    '--c-shell-muted': '#b6c1ce',
+    '--c-shell-border': '#3d4b5c',
+    '--c-shell-hover': '#364354',
+    '--c-ink': '#10141a',
+    '--c-ink-muted': '#464f59',
+    '--c-ink-ghost': '#626c78',
+    '--c-border-control': '#626c78',
+    '--c-accent-base': '#32459f',
+    '--c-accent-hover': '#28377f',
+    '--c-accent-tint-base': '#e0e5f6',
+    '--c-w-shopping': '#a30f46',
+    '--c-w-shopping-tint': '#f6dde6',
+    '--c-w-jobs': '#6420cf',
+    '--c-w-jobs-tint': '#e8dffa',
+    '--c-w-todo': '#035b79',
+    '--c-w-todo-tint': '#d9e9f1',
+    '--c-w-vault': '#891489',
+    '--c-w-vault-tint': '#f2def2',
+    '--c-w-learn': '#0a5d54',
+    '--c-w-learn-tint': '#d8ebe7',
+    '--c-w-dev': '#434e5f',
+    '--c-w-dev-tint': '#e6eaf0',
+    '--c-positive': '#17624a',
+    '--c-positive-tint': '#d8ece4',
+    '--c-caution': '#8a480a',
+    '--c-caution-fill': '#e8992f',
+    '--c-caution-tint': '#f2e6d6',
+    '--c-danger': '#9e1a1a',
+    '--c-danger-tint': '#f5dcdc',
+    '--c-status-lead': '#4f5862',
+    '--c-status-lead-tint': '#e3e8ee',
+    '--c-status-submitted': '#1a48cc',
+    '--c-status-submitted-tint': '#dde4fa',
+    '--c-status-process': '#8a480a',
+    '--c-status-process-tint': '#f2e6d6',
+    '--c-status-final': '#6420cf',
+    '--c-status-final-tint': '#e8dffa',
+    '--c-status-offer': '#17624a',
+    '--c-status-offer-tint': '#d8ece4',
+    '--c-status-rejected': '#9e1a1a',
+    '--c-status-rejected-tint': '#f5dcdc',
+    '--c-status-ghosted': '#515a64',
+    '--c-status-ghosted-tint': '#dfe5eb',
+    '--c-sheet-outline': 'rgb(18 24 34 / 0.42)',
+    '--c-caution-fill-ink': '#14100a',
+    '--c-page': '#2b3644',
+    '--c-page-ink': '#eef2f7',
+    '--c-page-ink-muted': '#b6c1ce',
+    '--c-page-ink-ghost': '#8a97a7',
+    '--c-page-border': '#3d4b5c',
+    '--c-page-border-strong': '#6d8098',
+    '--c-page-border-control': '#8a97a7',
+    '--c-page-positive': '#6fe0b0',
+    '--c-page-caution': '#f5b459',
+    '--c-page-danger': '#ff9d9d',
+    '--c-accent-base-lit': '#a6b4ff',
+    '--c-accent-hover-lit': '#bcc6ff',
+    '--c-w-shopping-lit': '#ffa3b8',
+    '--c-w-jobs-lit': '#c3b0ff',
+    '--c-w-todo-lit': '#6ccdf5',
+    '--c-w-vault-lit': '#eda6f6',
+    '--c-w-learn-lit': '#6fdcd2',
+    '--c-w-dev-lit': '#bcc7d6',
+    '--c-sheet-ink': '#10141a',
+    '--c-sheet-ink-muted': '#464f59',
+    '--c-sheet-ink-ghost': '#626c78',
+    '--c-sheet-border': '#d0d9e3',
+    '--c-sheet-border-strong': '#a6b1bf',
+    '--c-sheet-border-control': '#626c78',
+    '--c-sheet-positive': '#17624a',
+    '--c-sheet-caution': '#8a480a',
+    '--c-sheet-danger': '#9e1a1a',
+  },
 };
 
 /**
@@ -333,6 +431,51 @@ export const HUE_TOKENS: readonly string[] = [
 ];
 
 /**
+ * The tokens a chosen colour moves on Lightbox: the bench, and everything
+ * written on it.
+ *
+ * A shorter list than the other two modes get, and that is what #467 settled.
+ * Lightbox has two polarities on screen at once, and only one of them is the
+ * room: the bench, the text on it, its borders, the line where a sheet ends,
+ * and the app's accent in its lit form, which is the one that lands on the
+ * bench. Every one of those sits within three degrees of the bench's own hue,
+ * so they rotate as one thing the way Dusk does.
+ *
+ * What is left out is the sheet. Its grounds stay the warm near-white they
+ * are, its ink stays near-black, and its own accent stays where it was written
+ * -- a sheet is paper under a lamp, and paper does not take the colour of the
+ * room it is in. The glow around a sheet and the wash across the bench stay
+ * too: both are written as gradients and shadow stacks rather than as flat
+ * tokens, so the generator cannot read them at all.
+ */
+export const LIGHTBOX_HUE_TOKENS: readonly string[] = [
+  // The bench, which is the page ground and the sidebar at the same value.
+  '--c-page',
+  '--c-shell',
+  '--c-shell-hover',
+  // Its text, in both scopes that land on it.
+  '--c-page-ink',
+  '--c-page-ink-muted',
+  '--c-page-ink-ghost',
+  '--c-shell-ink',
+  '--c-shell-muted',
+  // Its borders, and the outline that separates a sheet from it.
+  '--c-page-border',
+  '--c-page-border-strong',
+  '--c-page-border-control',
+  '--c-shell-border',
+  '--c-sheet-outline',
+  // The app's own accent, in the lit form that clears the bench.
+  '--c-accent-base-lit',
+  '--c-accent-hover-lit',
+];
+
+/** Which tokens take the colour in one mode. */
+export function hueTokensFor(mode: ThemeMode): readonly string[] {
+  return mode === 'lightbox' ? LIGHTBOX_HUE_TOKENS : HUE_TOKENS;
+}
+
+/**
  * The tokens carrying the app's own accent -- links, active state, the primary
  * button and its tint. A subset of HUE_TOKENS, named on its own because light
  * has to move them before it rotates anything.
@@ -352,9 +495,12 @@ export const ACCENT_TOKENS: readonly string[] = [
  * the identity: Dusk asked for its own hue comes back as Dusk, hex for hex,
  * rather than a rounding away from it.
  */
-export const REFERENCE_HUE: Record<'paper' | 'dusk', number> = {
+export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox', number> = {
   paper: hexToOklch(REFERENCE_PALETTES.paper['--c-canvas']).h,
   dusk: hexToOklch(REFERENCE_PALETTES.dusk['--c-canvas']).h,
+  // Lightbox's canvas is a sheet rather than the room, so its own hue is read
+  // off the bench -- which is what --c-page is in a two-polarity theme.
+  lightbox: hexToOklch(REFERENCE_PALETTES.lightbox['--c-page']).h,
 };
 
 /**

@@ -6,7 +6,9 @@ import { generatePalette } from '@/lib/theme/palette';
 /**
  * One string holds three different things, so the reading of it is where this
  * can go wrong: an account that has chosen nothing, an account holding one of
- * the four written themes, and an account holding a mode and a colour.
+ * the four written themes, and an account holding a mode and a colour. The
+ * third now has three modes in it rather than two -- Lightbox takes a colour
+ * as well, on its bench.
  */
 
 describe('parseTheme', () => {
@@ -25,10 +27,14 @@ describe('parseTheme', () => {
   it('reads a mode on its own', () => {
     expect(parseTheme('light')).toEqual({ kind: 'generated', mode: 'light', hue: null });
     expect(parseTheme('dark')).toEqual({ kind: 'generated', mode: 'dark', hue: null });
+    // Lightbox with no colour is the written Lightbox, which is the same
+    // palette under a name that already existed.
+    expect(parseTheme('lightbox')).toEqual({ kind: 'written', id: 'lightbox' });
   });
 
   it('reads a mode and a colour', () => {
     expect(parseTheme('dark:284')).toEqual({ kind: 'generated', mode: 'dark', hue: 284 });
+    expect(parseTheme('lightbox:155')).toEqual({ kind: 'generated', mode: 'lightbox', hue: 155 });
   });
 
   it('brings a hue back onto the circle', () => {
@@ -40,7 +46,7 @@ describe('parseTheme', () => {
   it('reads anything it does not understand as no choice at all', () => {
     // Better than guessing light: a value this app cannot read is not evidence
     // of what somebody wanted.
-    for (const value of ['riso', 'sideways', 'dark:pink', 'dark:NaN', ':90']) {
+    for (const value of ['riso', 'sideways', 'dark:pink', 'dark:NaN', ':90', 'lightbox:pink']) {
       expect(parseTheme(value)).toEqual(SYSTEM_THEME);
     }
   });
@@ -48,7 +54,16 @@ describe('parseTheme', () => {
 
 describe('formatTheme', () => {
   it('round-trips everything that can be stored', () => {
-    for (const value of ['paper', 'ink', 'lightbox', 'dusk', 'light', 'dark', 'dark:284']) {
+    for (const value of [
+      'paper',
+      'ink',
+      'lightbox',
+      'dusk',
+      'light',
+      'dark',
+      'dark:284',
+      'lightbox:155',
+    ]) {
       expect(formatTheme(parseTheme(value))).toBe(value);
     }
   });
@@ -77,6 +92,14 @@ describe('putting a theme on the document', () => {
     expect(themeAttribute(parseTheme('dark'))).toBe('ink');
     expect(themeStyle(parseTheme('light'))).toBeUndefined();
     expect(themeStyle(parseTheme('dark'))).toBeUndefined();
+  });
+
+  it('renders a coloured Lightbox on Lightbox\'s own block', () => {
+    // The block carries what no token can: the glow round a sheet, the wash
+    // across the bench, and the two colour-schemes a two-polarity theme needs.
+    const theme = parseTheme('lightbox:155');
+    expect(themeAttribute(theme)).toBe('lightbox');
+    expect(themeStyle(theme)).toEqual(generatePalette('lightbox', 155));
   });
 
   it('writes the generated tokens for a mode with a colour', () => {
