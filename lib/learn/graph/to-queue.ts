@@ -59,7 +59,38 @@ async function trackForSubject(
 }
 
 /**
+ * The reading already queued for this gap, when there is one you have not
+ * finished with.
+ *
+ * `queued` and `reading` count; `read` and `abandoned` do not. Wanting to read
+ * more about a claim you have read about once is ordinary, and so is coming
+ * back to a claim you gave up on -- both of those are a new reading. What is
+ * not ordinary is pressing the button twice and ending up with the row twice.
+ */
+async function unfinishedReadingFor(
+  supabase: LearnSupabaseClient,
+  conceptId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('readings')
+    .select('id')
+    .eq('concept_id', conceptId)
+    .in('status', ['queued', 'reading'])
+    .order('created_at')
+    .limit(1)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Looking for what you already queued', error);
+  return data ? (data as { id: string }).id : null;
+}
+
+/**
  * Put a concept in the queue, and hand back the reading to open.
+ *
+ * Pressing the button on a gap you already queued hands back the reading you
+ * already have rather than a second copy of it, so the queue holds one row per
+ * gap you are working on.
  *
  * The reading carries the concept's name as its subject and the claim as its
  * reason, so the reading page reads as what it is -- a thing you are trying to
@@ -70,6 +101,9 @@ export async function queueConcept(
   userId: string,
   input: { subjectName: string; concept: Concept },
 ): Promise<string> {
+  const existing = await unfinishedReadingFor(supabase, input.concept.id);
+  if (existing) return existing;
+
   const trackId = await trackForSubject(supabase, userId, input.subjectName);
 
   return addManualReading(supabase, userId, {
