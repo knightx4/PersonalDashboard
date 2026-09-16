@@ -24,6 +24,7 @@ import {
   setReadingNote,
   setReadingStatus,
 } from '@/lib/learn/tracks/save';
+import { recordOutcome } from '@/lib/learn/next/record';
 
 /**
  * What you can do to a reading.
@@ -208,7 +209,7 @@ export async function updateStatus(
   _prev: ReadingActionState,
   formData: FormData,
 ): Promise<ReadingActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const parsed = StatusInput.safeParse({
     readingId: formData.get('readingId'),
@@ -219,6 +220,19 @@ export async function updateStatus(
   const supabase = await createLearnClient();
   try {
     await setReadingStatus(supabase, parsed.data.readingId, parsed.data.status);
+
+    // Finishing it is what Learn next orders from -- #479 settled that reading
+    // it counts and giving up on it does not. Written here rather than when the
+    // page drew the row, so opening Learn next and closing it again leaves
+    // nothing behind. A reading finished twice is one fact, and the unique
+    // index on the table is what says so, rather than a read of the row first.
+    if (parsed.data.status === 'read') {
+      await recordOutcome(supabase, user.id, {
+        kind: 'reading',
+        readingId: parsed.data.readingId,
+        outcome: 'read',
+      });
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not update that.' };
   }

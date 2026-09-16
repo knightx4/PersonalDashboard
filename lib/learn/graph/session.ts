@@ -337,6 +337,12 @@ export type AnswerOutcome = {
   state: 'known' | 'shaky';
   /** How many nodes underneath were marked known by inference. */
   inferred: number;
+  /**
+   * Whether this was the first answer to this question. False when the row had
+   * already been answered, which earns no weight and is not a second thing
+   * done about the claim either.
+   */
+  first: boolean;
 };
 
 /**
@@ -432,10 +438,10 @@ export async function recordAnswer(
 
   // Answering the same row twice earns nothing. The first answer is the one
   // that carried information; a second is a person clicking again.
-  const weight =
-    probe.chosen_index === null
-      ? weightFor({ conclusive: true, correct, standing, wasSettled: input.wasSettled })
-      : 0;
+  const first = probe.chosen_index === null;
+  const weight = first
+    ? weightFor({ conclusive: true, correct, standing, wasSettled: input.wasSettled })
+    : 0;
 
   const { error: answerError } = await supabase
     .from('probes')
@@ -476,5 +482,5 @@ export async function recordAnswer(
       ? await markInferred(supabase, userId, inferredFrom(input.graph, input.conceptId))
       : 0;
 
-  return { correct, reason: probe.reason, weight, state, inferred };
+  return { correct, reason: probe.reason, weight, state, inferred, first };
 }
