@@ -2,7 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import type { NextKind } from '@/lib/learn/next/rank';
+import type { NextKind, NextOutcome } from '@/lib/learn/next/rank';
 
 /**
  * Keeping what came of the things Learn next offered.
@@ -18,7 +18,7 @@ import type { NextKind } from '@/lib/learn/next/rank';
  * comment says why it exists beside the probes and the reading queue.
  */
 
-export type NextOutcome = 'answered' | 'read' | 'not_now';
+export type { NextOutcome };
 
 /** What you did, and what you did it to. */
 export type NextOutcomeInput =
