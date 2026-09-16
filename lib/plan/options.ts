@@ -25,14 +25,21 @@ export type PlanOption = {
 };
 
 /**
- * `(a) …`, `[a] …`, `A) …`, `A. …`, `A: …`, `A — …`, `A - …`.
+ * `(a) …`, `[a] …`, `A) …`, `A. …`, `A: …`, `A — …`, `A - …`, `A -- …`.
  *
  * The bracketed forms need no separator after them, because the bracket is
  * one. The bare letter does, which is the whole reason a paragraph opening
  * "A fired session…" is prose and not option A.
+ *
+ * The dash run is one or two characters because `--` is what a keyboard types
+ * when an em dash is meant, and it is what the decisions on the plan are
+ * actually written with: eighteen of them reached the page as a paragraph
+ * rather than as buttons purely because the separator had a second dash in it.
+ * Not three or more: `---` on its own line is a rule, and a rule after a
+ * letter is likelier a typo than a choice.
  */
 const MARKER =
-  /^(?:\(([A-Za-z])\)|\[([A-Za-z])\]|([A-Za-z])[).:]|([A-Za-z])\s*[—–-])\s+(\S.*)$/;
+  /^(?:\(([A-Za-z])\)|\[([A-Za-z])\]|([A-Za-z])[).:]|([A-Za-z])\s*(?:[—–]|-{1,2}))\s+(\S.*)$/;
 
 /** Long enough to say which option it is, short enough to sit on a button. */
 const LABEL_MAX = 120;

@@ -36,6 +36,30 @@ describe('planOptions', () => {
     ]);
   });
 
+  // What most of the plan's decisions are actually written with: a double
+  // dash where an em dash was meant. Taken from #208, whose opening paragraph
+  // also starts with a bare "A" and must stay prose.
+  it('reads the "A -- " form, and leaves the paragraph above it alone', () => {
+    const detail = [
+      'A standard calendar app lets you say "every Tuesday". Personal admin is full of that.',
+      '',
+      'A -- No repeats. Each event is one event, typed once.',
+      '',
+      'B -- One repeat rule per event: every day, every week or every month.',
+    ].join('\n');
+
+    expect(planOptions(detail)).toEqual([
+      { letter: 'A', label: 'No repeats' },
+      { letter: 'B', label: 'One repeat rule per event: every day, every week or every month' },
+    ]);
+  });
+
+  // Two dashes are a typed em dash; three are a rule, and a rule after a
+  // letter is a typo rather than a choice.
+  it('stops at two dashes', () => {
+    expect(planOptions('A --- First\nB --- Second')).toEqual([]);
+  });
+
   it('accepts "A)" and "A." and a tight list', () => {
     expect(planOptions('A) One thing\nB. Another thing')).toEqual([
       { letter: 'A', label: 'One thing' },
