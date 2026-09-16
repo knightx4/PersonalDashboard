@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { markConversationRead } from './actions';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { cardVariants } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { CommentTarget } from '@/lib/comments/load';
 import type { Conversation } from '@/lib/comments/recent';
@@ -131,14 +131,10 @@ export function ConversationsView({ conversations }: { conversations: Conversati
   const shown = conversations.slice(0, CONVERSATIONS_SHOWN);
 
   return (
-    <section className="space-y-2">
-      <h2 className="text-body font-semibold text-ink">
-        Conversations{' '}
-        {conversations.length > 0 && (
-          <span className="font-normal text-ink-muted">({conversations.length})</span>
-        )}
-      </h2>
-
+    <SectionFold
+      title="Conversations"
+      count={conversations.length > 0 ? conversations.length : undefined}
+    >
       {shown.length === 0 ? (
         <p className="text-small text-ink-muted">
           Nothing said yet. Anything written on an idea, a plan step, a raise or a bug note shows
@@ -159,6 +155,6 @@ export function ConversationsView({ conversations }: { conversations: Conversati
           )}
         </>
       )}
-    </section>
+    </SectionFold>
   );
 }

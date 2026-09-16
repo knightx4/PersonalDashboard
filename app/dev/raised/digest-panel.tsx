@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { CardSection } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { SectionFold } from '@/components/ui/disclosure';
 import { groupHappened, type DigestEvent, type DigestGroup, type DigestPointer } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
 
@@ -126,41 +127,52 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
 
   return (
     <div className="space-y-3">
-      <CardSection title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
-        <div className="space-y-3">
-          {/* The account of the day, above the rows it is an account of. Absent
-              on a summary written before there was one, and on a day the model
-              call did not happen. */}
-          {digest.summary && (
-            <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
-          )}
+      {/* Folded by its own heading rather than drawn open forever. This is the
+          longest thing on the page -- an account of the day plus fifteen rows
+          grouped under their features -- and it is also the part you are done
+          with first: you read the summary, and then you want the questions
+          underneath it. The day is on the closed line, because a cron that
+          failed overnight leaves yesterday's summary here and the date is how
+          you tell. Law 10. */}
+      <Card padding="dense">
+        <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
+          <div className="space-y-3">
+            {/* The account of the day, above the rows it is an account of. Absent
+                on a summary written before there was one, and on a day the model
+                call did not happen. */}
+            {digest.summary && (
+              <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
+            )}
 
-          {groups.length > 0 ? (
-            <div className="space-y-3">
-              {groups.map((group) => (
-                <Group key={group.key} group={group} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-body text-ink-muted">Nothing closed.</p>
-          )}
+            {groups.length > 0 ? (
+              <div className="space-y-3">
+                {groups.map((group) => (
+                  <Group key={group.key} group={group} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-body text-ink-muted">Nothing closed.</p>
+            )}
 
-          {more > 0 && (
-            <p className="text-small text-ink-muted">
-              {more} more closed.{' '}
-              <Link href="/dev/changelog" className="underline underline-offset-2 hover:text-ink">
-                See the changelog
-              </Link>
-              .
-            </p>
-          )}
-        </div>
-      </CardSection>
+            {more > 0 && (
+              <p className="text-small text-ink-muted">
+                {more} more closed.{' '}
+                <Link href="/dev/changelog" className="underline underline-offset-2 hover:text-ink">
+                  See the changelog
+                </Link>
+                .
+              </p>
+            )}
+          </div>
+        </SectionFold>
+      </Card>
 
       {digest.attention.length > 0 && (
-        <CardSection title="Worth a look">
-          <Attention pointers={digest.attention} />
-        </CardSection>
+        <Card padding="dense">
+          <SectionFold title="Worth a look" count={digest.attention.length}>
+            <Attention pointers={digest.attention} />
+          </SectionFold>
+        </Card>
       )}
     </div>
   );

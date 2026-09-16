@@ -92,8 +92,14 @@ export default async function DevPlanPage({
     closed: node.status === 'done' || node.status === 'dropped',
   }));
 
+  // Wider than the other dev pages, which are prose and lists at max-w-3xl.
+  // This one is a table with six columns and a tree indenting the first of
+  // them, and the Status column took the last of the room the titles had: at
+  // 3xl a third-level step's title truncated after about two words. The page
+  // earns the extra width by being the only one here that is a grid rather
+  // than a column of text.
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Plan"
         description="Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next."

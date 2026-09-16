@@ -37,6 +37,7 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { planRowId } from '@/lib/comments/refs';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -59,7 +60,7 @@ import {
   Textarea,
 } from '@/components/ui/field';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
-import { DEV_STATE_WORD } from '@/lib/dev/words';
+import { DEV_STATE_WORD, PLAN_MOVE_WORD } from '@/lib/dev/words';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
@@ -81,11 +82,13 @@ import {
   countMatches,
   flatten,
   healthOf as planHealthOf,
+  moveOf as planMoveOf,
   searchNodes,
   searchSections,
   searchTerms,
   type PlanBand,
   type PlanHealth,
+  type PlanMove,
   type PlanNode,
   type PlanProgress,
   type PlanSection,
@@ -1698,6 +1701,57 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth
 }
 
 /**
+ * The Status column, worded and toned.
+ *
+ * "Needs you" takes caution, which is the tone every dev queue already spends
+ * on a row stopped on the person. "With Dash" takes the accent because a
+ * session running right now is the one thing on this page that is changing
+ * while you look at it. "For Dash" takes the same blue "Ready" does in the
+ * health column beside it -- the two are saying the same thing from two sides,
+ * and a step that is ready and handed over should not read as two unrelated
+ * facts. The rest are ink: nothing is claimed about work that is simply yours
+ * or simply waiting its turn.
+ *
+ * The tooltip is where the rollup is explained. A feature reporting "With Dash"
+ * because its third step is with a session would otherwise be a word with no
+ * visible cause, which is the complaint the whole column exists to answer.
+ */
+const MOVE_TONE: Record<PlanMove, Health['tone']> = {
+  on_you: 'caution',
+  with_dash: 'accent',
+  for_dash: 'info',
+  waiting: 'quiet',
+  yours: 'quiet',
+  settled: 'ghost',
+};
+
+const MOVE_TITLE: Record<PlanMove, string> = {
+  on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
+  with_dash: 'A session is working on this now.',
+  for_dash: 'Handed to Dash, waiting for a session to pick it up.',
+  waiting: 'Held up by another step that has not closed.',
+  yours: 'Nobody has handed this anywhere. It is yours to pick up or hand over.',
+  settled: 'Nothing left to do on this one.',
+};
+
+function moveFor(node: PlanNode): { word: string; tone: Health['tone']; title?: string } {
+  const move = planMoveOf(node);
+  const own = ownMoveWord(node);
+  return {
+    word: PLAN_MOVE_WORD[move],
+    tone: MOVE_TONE[move],
+    // Said only where it is not obvious from the row itself: a leaf reporting
+    // its own move needs no explanation of where the word came from.
+    title: own === move ? MOVE_TITLE[move] : `${MOVE_TITLE[move]} (from a step beneath this one.)`,
+  };
+}
+
+/** What this row alone would say, to tell a rollup from a row's own state. */
+function ownMoveWord(node: PlanNode): PlanMove {
+  return planMoveOf({ ...node, children: [] });
+}
+
+/**
  * A module's steps, counted by state, beside its heading.
  *
  * The progress bar next to this answers "how far through", which is one
@@ -1771,9 +1825,12 @@ const TONE_DOT: Record<Health['tone'], string> = {
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
 // because a column that widens under the pointer moves every row beside it.
+// Status sits directly after Health, because the two are read together -- "how
+// far along, and who has it" is one question asked twice -- and a column
+// between them would make that a comparison across the row.
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_8rem]';
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
 const LEVEL = 'w-5';
@@ -1789,6 +1846,7 @@ function ColumnHeader() {
     >
       <span>Step</span>
       <span>Health</span>
+      <span className="hidden sm:block">Status</span>
       <span className="hidden sm:block">Priority</span>
       <span className="hidden sm:block">Steps</span>
       <span />
@@ -1952,6 +2010,7 @@ function PlanRow({
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
   const health = healthOf(node);
+  const move = moveFor(node);
 
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
@@ -2094,10 +2153,13 @@ function PlanRow({
 
   return (
     <>
+      {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
+          the row clear of the pinned header it would otherwise arrive under. */}
       <li
+        id={planRowId(node.number)}
         className={cn(
           ROW_GRID,
-          'group px-3',
+          'group scroll-mt-24 px-3',
           gloss && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
           closed && 'opacity-70',
@@ -2283,6 +2345,27 @@ function PlanRow({
             />
           }
         />
+
+        {/* Whose move it is, beside how far along it is.
+
+            A word and a tone, and deliberately no glyph: the hexagons belong to
+            health, they are a scale from empty to full, and a second column of
+            shapes beside them would read as a second position on the same scale
+            rather than as an answer to a different question. Law 4 -- if none
+            of the meanings is true, use ink and a shape, and here the shape is
+            the column itself.
+
+            Not a menu, where health is one. Health is set by hand; this is
+            derived from what is already true of the row -- who it is assigned
+            to, what it waits on, whether it is a question -- so there is
+            nothing here to pick. Changing it means handing the step over or
+            answering what it asks, which are the buttons already on the row. */}
+        <span
+          className={cn('hidden truncate text-small sm:block', TONE_TEXT[move.tone])}
+          title={move.title}
+        >
+          {move.word}
+        </span>
 
         <span className="hidden truncate text-small sm:block">
           {node.priority === 1 && <span className="text-accent">Next</span>}

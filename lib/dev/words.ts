@@ -29,7 +29,7 @@ import type {
   IdeaHealth,
   RaisedHealth,
 } from '@/lib/dev/health';
-import type { PlanHealth } from '@/lib/plan/tree';
+import type { PlanHealth, PlanMove } from '@/lib/plan/tree';
 
 /** The five states every dev queue has, whatever it calls them in its column. */
 export const DEV_STATES = ['waiting', 'ready', 'working', 'done', 'dropped'] as const;
@@ -70,6 +70,36 @@ export const DEV_STATE_WORD: Record<DevState, string> = {
  * inventing a fifth.
  */
 export const DISMISSED_WORD = 'Dismissed';
+
+/**
+ * What the plan's Status column says -- whose move it is, not how far along.
+ *
+ * None of these is one of the five shared states, and that is the point: every
+ * word above answers "how far through is this", and every word here answers
+ * "who has to act next". A row is in exactly one of each, which is why the two
+ * are now two columns.
+ *
+ * "Needs you" and "Yours" are both you and they are not the same thing. Needs
+ * you is a stop: a question to answer, a proposal to approve, a step blocked on
+ * a credential -- until you do something, nothing can. Yours is ordinary work
+ * in your court that nobody has handed anywhere.
+ *
+ * "Held up" rather than a second "waiting": the shared vocabulary already
+ * spends "Waiting on you" on the person, and this one means the opposite --
+ * another step is in the way and you are not what it needs.
+ *
+ * A settled row says nothing at all. It has no next move, and an em dash in
+ * the column would be a fact nobody needed on the rows nobody is scanning
+ * (law 1).
+ */
+export const PLAN_MOVE_WORD: Record<PlanMove, string> = {
+  on_you: 'Needs you',
+  with_dash: 'With Dash',
+  for_dash: 'For Dash',
+  waiting: 'Held up',
+  yours: 'Yours',
+  settled: '',
+};
 
 /**
  * What a note in the bugs queue is called.

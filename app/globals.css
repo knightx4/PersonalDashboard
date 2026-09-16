@@ -1462,3 +1462,13 @@ form[data-auto-submit] [data-fallback-submit] {
   font-weight: 500;
   padding: 0.05em 0.25em;
 }
+
+/* A step number, drawn as the link it now is. Tabular, because these arrive in
+ * runs -- "#500, #501 and #505" -- and proportional digits make a run of them
+ * ragged. It takes the ordinary link colour rather than a mark of its own: it
+ * goes somewhere, which is exactly what a link already means here. */
+.comment-ref {
+  font-variant-numeric: tabular-nums;
+  text-decoration-thickness: from-font;
+  white-space: nowrap;
+}

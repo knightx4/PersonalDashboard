@@ -16,6 +16,7 @@ import {
   isWaitingOnThePerson,
   leavesOf,
   healthOf,
+  moveOf,
   planProgress,
   subtreeIds,
   handedToClaude,
@@ -1212,5 +1213,157 @@ describe('searchSections', () => {
 
   it('ignores case', () => {
     expect(countMatches(searchSections(plan(), 'SHELF'))).toBe(1);
+  });
+});
+
+/**
+ * Health says how far along; the move says whose it is. The two were one word
+ * until #fa32dfaa, and these are the cases that separate them.
+ */
+describe('healthOf, over a subtree that has started', () => {
+  const feature = (children: PlanItem[]) =>
+    shopping(tree([at('not_started', 'f'), ...children]));
+
+  it('calls a feature in progress once a step beneath it is done', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+
+  it('calls it in progress while a step beneath it is being worked', () => {
+    const sections = feature([at('in_progress', 's1', { parentId: 'f' })]);
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+
+  it('leaves a feature nobody has touched not started', () => {
+    const sections = feature([
+      at('not_started', 's1', { parentId: 'f' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  // Answering the opening question is not building the thing.
+  it('does not count an answered question as work started', () => {
+    const sections = feature([
+      at('done', 'q', { parentId: 'f', kind: 'decision' }),
+      at('not_started', 's1', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  // 'ready' rather than 'not_started' because a feature with no live work
+  // beneath it is startable; what matters here is that it is not in_progress.
+  it('does not count a step that was put aside', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f', dismissedAt: '2026-01-02T00:00:00Z' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('ready');
+  });
+
+  it('leaves a leaf step alone', () => {
+    expect(healthOf(shopping(tree([at('not_started', 'a')])).nodes[0])).toBe('ready');
+  });
+});
+
+describe('moveOf', () => {
+  const only = (items: PlanItem[]) => shopping(tree(items)).nodes[0];
+
+  it('is yours when nobody has handed it anywhere', () => {
+    expect(moveOf(only([at('not_started', 'a')]))).toBe('yours');
+  });
+
+  it('is for Dash once it is assigned', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('for_dash');
+  });
+
+  it('is with Dash while a session is on it', () => {
+    expect(moveOf(only([at('in_progress', 'a', { assignee: 'claude' })]))).toBe('with_dash');
+  });
+
+  it('is still yours when you are the one working on it', () => {
+    expect(moveOf(only([at('in_progress', 'a')]))).toBe('yours');
+  });
+
+  it('needs you for a question nobody has answered', () => {
+    expect(moveOf(only([at('not_started', 'a', { kind: 'decision' })]))).toBe('on_you');
+  });
+
+  it('needs you for a proposal nobody has approved', () => {
+    expect(moveOf(only([at('proposed', 'a')]))).toBe('on_you');
+  });
+
+  // Assigned to Dash and blocked is still yours: a session sent there would
+  // sit in front of the same wall. Same rule `isWaitingOnThePerson` enforces.
+  it('needs you for a blocked step even when it is assigned to Dash', () => {
+    expect(moveOf(only([at('blocked', 'a', { assignee: 'claude' })]))).toBe('on_you');
+  });
+
+  it('is held up when another step is in the way', () => {
+    const sections = shopping(
+      tree([at('not_started', 'a'), at('not_started', 'b')], [dep('a', 'b')]),
+    );
+    expect(moveOf(findNode([sections], 'a')!)).toBe('waiting');
+  });
+
+  it('is settled once it closes', () => {
+    expect(moveOf(only([at('done', 'a')]))).toBe('settled');
+    expect(moveOf(only([at('dropped', 'a')]))).toBe('settled');
+  });
+
+  describe('over a subtree', () => {
+    const feature = (children: PlanItem[]) =>
+      shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
+
+    it('reports a session working beneath it', () => {
+      expect(
+        moveOf(feature([at('in_progress', 's1', { parentId: 'f', assignee: 'claude' })])),
+      ).toBe('with_dash');
+    });
+
+    it('reports the most pressing of several', () => {
+      expect(
+        moveOf(
+          feature([
+            at('in_progress', 's1', { parentId: 'f', assignee: 'claude' }),
+            at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+          ]),
+        ),
+      ).toBe('on_you');
+    });
+
+    // The same rule healthOf keeps: closed on top of something open is not
+    // closed, and a question added under a shipped feature is still a question.
+    it('reports a question added under a finished feature', () => {
+      const sections = shopping(
+        tree([
+          at('done', 'f'),
+          at('done', 's1', { parentId: 'f' }),
+          at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+        ]),
+      );
+      expect(moveOf(sections.nodes[0])).toBe('on_you');
+    });
+
+    it('is settled when everything beneath it is', () => {
+      const sections = shopping(tree([at('done', 'f'), at('done', 's1', { parentId: 'f' })]));
+      expect(moveOf(sections.nodes[0])).toBe('settled');
+    });
+
+    it('ignores a step that was put aside', () => {
+      expect(
+        moveOf(
+          feature([
+            at('not_started', 'q', {
+              parentId: 'f',
+              kind: 'decision',
+              dismissedAt: '2026-01-02T00:00:00Z',
+            }),
+          ]),
+        ),
+      ).toBe('yours');
+    });
   });
 });
