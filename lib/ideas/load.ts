@@ -37,6 +37,23 @@ export type IdeaRow = {
 };
 
 /**
+ * Where an idea stands.
+ *
+ * There is no status column -- an idea is a sentence, and the two things that
+ * can happen to it are being shaped into the plan and being put aside. Both are
+ * facts about other columns, so the state is read rather than stored.
+ */
+export const IDEA_STATES = ['open', 'shaped', 'dismissed'] as const;
+
+export type IdeaState = (typeof IDEA_STATES)[number];
+
+/** Which of the three an idea is in. Dismissal wins: it is out of the list. */
+export function ideaState(idea: Pick<IdeaRow, 'dismissedAt' | 'planItem'>): IdeaState {
+  if (idea.dismissedAt) return 'dismissed';
+  return idea.planItem ? 'shaped' : 'open';
+}
+
+/**
  * The four piles the page draws.
  *
  * Your own ideas are the list; a suggestion sits under them so that a session

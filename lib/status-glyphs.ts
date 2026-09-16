@@ -3,10 +3,15 @@
  *
  * Law 4 tells whoever draws the next surface to use "ink and a shape" and
  * never says anywhere what the shapes are. These are them: a glyph for each of
- * the eleven application statuses, each of the three task states, and each of
- * the ten states a plan step can be in. The names are shapes rather than
- * statuses, because components/ui/status-glyph.tsx draws them and knows
- * nothing about pipelines, todo lists or plans.
+ * the eleven application statuses, each of the three task states, each of the
+ * ten states a plan step can be in, and each state of the four other dev
+ * queues. The names are shapes rather than statuses, because
+ * components/ui/status-glyph.tsx draws them and knows nothing about pipelines,
+ * todo lists or plans.
+ *
+ * A state two of these maps share takes one shape in both. The words are shared
+ * the same way, in lib/dev/words.ts, and a state that read alike but drew
+ * differently would undo half of that.
  *
  * The vocabulary is Linear's — an outline at the start of a ladder, the shape
  * filled further as it advances, solid at the top, struck when it ended badly
@@ -15,11 +20,16 @@
  * set of rings would have been the only round shapes in the app.
  *
  * This lives at the root of lib/ beside modules.ts and density.ts because it
- * crosses three workspaces. Neither lib/jobs, lib/todo nor lib/plan owns it.
+ * crosses four workspaces. None of lib/jobs, lib/todo, lib/plan or lib/dev
+ * owns it.
  */
+import type { FeedbackStatus } from '@/lib/feedback/load';
+import type { IdeaState } from '@/lib/ideas/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
+import type { RaisedStatus } from '@/lib/raised/load';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
+import type { UiFindingStatus } from '@/lib/ui-review/load';
 
 /**
  * The whole vocabulary. Five fill levels for a rung on a ladder, and six
@@ -116,4 +126,69 @@ export const PLAN_HEALTH_GLYPHS: Record<PlanHealth, StatusGlyph> = {
   blocked: 'bar',
   waiting: 'dashed',
   unanswered: 'question',
+};
+
+/**
+ * The bugs and requests queue.
+ *
+ * Shapes the plan already uses for the same states, because lib/dev/words.ts
+ * gives them the same words: a note nobody has picked up is half filled the way
+ * a ready step is, a note a run has claimed is three quarters filled, and a note
+ * blocked on you is barred.
+ *
+ * `planned` is the one this queue owns, and it is dashed rather than a rung: the
+ * note has been written into the build plan and waits on a step there, which is
+ * exactly what the dashed hexagon says about a plan step waiting on another.
+ */
+export const FEEDBACK_STATUS_GLYPHS: Record<FeedbackStatus, StatusGlyph> = {
+  open: 'half',
+  planned: 'dashed',
+  in_progress: 'three-quarters',
+  blocked: 'bar',
+  done: 'full',
+  declined: 'slash',
+};
+
+/**
+ * What Claude has raised.
+ *
+ * An open raise is a question waiting on you, so it takes the question mark
+ * rather than the bar -- the same distinction the plan draws between a step
+ * stopped on something and a question nobody has answered. An answered raise
+ * takes the tick a settled plan decision takes, and one you turned down takes
+ * the same struck hexagon a dropped step does.
+ */
+export const RAISED_STATUS_GLYPHS: Record<RaisedStatus, StatusGlyph> = {
+  open: 'question',
+  answered: 'check',
+  dismissed: 'slash',
+};
+
+/**
+ * What a UI pass found.
+ *
+ * A finding is filed as a candidate and you confirm or dismiss it, so an open
+ * one is a question the same way a raise is. Confirmed is the half-filled
+ * hexagon a ready step takes: agreed, and nobody on it yet.
+ */
+export const UI_FINDING_GLYPHS: Record<UiFindingStatus, StatusGlyph> = {
+  open: 'question',
+  confirmed: 'half',
+  dismissed: 'slash',
+};
+
+/**
+ * An idea on /dev/ideas.
+ *
+ * `open` is the empty hexagon a lead and an untouched task are: nothing has
+ * happened to it. `shaped` is dashed, like a note the plan has taken on -- what
+ * happens to it next happens on the plan page. `dismissed` shares the struck
+ * hexagon with everything else nobody is doing; the word beside it keeps the
+ * difference, because putting an idea aside is reversible and dropping a step
+ * is a decision.
+ */
+export const IDEA_STATE_GLYPHS: Record<IdeaState, StatusGlyph> = {
+  open: 'empty',
+  shaped: 'dashed',
+  dismissed: 'slash',
 };

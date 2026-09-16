@@ -11,11 +11,13 @@ import {
 } from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { cn } from '@/lib/cn';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
+import { FEEDBACK_STATUS_GLYPHS } from '@/lib/status-glyphs';
 import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
 
@@ -23,15 +25,16 @@ import { surfaceOf } from '@/lib/feedback/surfaces';
 // on one shape.
 export type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 
-// The tint tokens rather than colour/10: the tints are tuned per theme, and a
-// 10% alpha over a dark surface is not the same thing as a tint.
-const STATUS_STYLE: Record<FeedbackStatus, string> = {
-  open: 'bg-caution-tint text-caution',
-  in_progress: 'bg-accent-tint text-accent',
-  blocked: 'bg-danger-tint text-danger',
-  planned: 'bg-canvas text-ink-muted',
-  done: 'bg-positive-tint text-positive',
-  declined: 'bg-canvas text-ink-muted',
+// A tone rather than a tinted lozenge. The plan has drawn its states as a
+// hexagon and a word for a while; this queue drew a capsule, so the same fact
+// looked like two different kinds of thing on two tabs.
+const STATUS_TONE: Record<FeedbackStatus, DevTone> = {
+  open: 'info',
+  in_progress: 'accent',
+  blocked: 'caution',
+  planned: 'quiet',
+  done: 'positive',
+  declined: 'ghost',
 };
 
 /**
@@ -123,17 +126,15 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         >
           {row.kind}
         </span>
-        <span
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-micro font-medium',
-            STATUS_STYLE[row.status],
-          )}
+        <StateLabel
+          glyph={FEEDBACK_STATUS_GLYPHS[row.status]}
+          word={STATUS_LABEL[row.status]}
+          tone={STATUS_TONE[row.status]}
         >
           {row.status === 'in_progress' && (
             <Bot className="size-3 shrink-0" strokeWidth={2} aria-hidden />
           )}
-          {STATUS_LABEL[row.status]}
-        </span>
+        </StateLabel>
         <span className="text-small text-ink-muted">
           {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
           {/* A note filed from /dev/surfaces is a design note, and it read here

@@ -58,6 +58,7 @@ import {
   Select,
   Textarea,
 } from '@/components/ui/field';
+import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
@@ -1601,7 +1602,13 @@ function Underway({ startedAt, assignee }: { startedAt: string; assignee: string
  */
 type Health = {
   word: string;
-  tone: 'quiet' | 'ghost' | 'accent' | 'info' | 'positive' | 'caution';
+  /**
+   * The six the dev pages share. `info` is the app's blue and deliberately not
+   * `accent`: the accent is whichever hue the workspace you are standing in
+   * owns, so an accent-toned state is a different colour on every page and
+   * slate on this one.
+   */
+  tone: DevTone;
   title?: string;
 };
 
@@ -1742,25 +1749,6 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
     </span>
   );
 }
-
-/**
- * `info` is the app's blue, and it is deliberately not `accent`.
- *
- * The accent is whichever hue the workspace you are standing in owns, so an
- * accent-toned state is a different colour on every page and slate on this
- * one. A state that means the same thing everywhere needs a hue that does
- * too. `status-submitted` is that blue: defined in all five palettes, and
- * already read as a general "info" outside the pipeline it is named for --
- * see the jobs activity feed, which tones its info lines with it.
- */
-const TONE_TEXT: Record<Health['tone'], string> = {
-  quiet: 'text-ink-muted',
-  ghost: 'text-ink-ghost',
-  accent: 'text-accent',
-  info: 'text-status-submitted',
-  positive: 'text-positive',
-  caution: 'text-caution',
-};
 
 const TONE_DOT: Record<Health['tone'], string> = {
   quiet: 'bg-ink-ghost',
@@ -2274,19 +2262,25 @@ function PlanRow({
             TONE_TEXT[health.tone],
           )}
           trigger={
-            <span className="inline-flex items-center gap-1.5" title={health.title}>
-              {/* No glyph on a dropped row. The slash was a third way of
-                  saying what the ghost tone and the struck-through title
-                  already say, on the one state nobody is scanning for -- so it
-                  read as clutter beside the rows that are still live, which is
-                  where the eye is actually going (law 15). Every other state
-                  keeps its shape: those are the ones being scanned, and the
-                  glyph is how they are told apart at a glance. The count
-                  beside the module heading keeps its slash too, because there
-                  a bare number would say nothing at all. */}
-              {health.name !== 'dropped' && <StatusGlyph glyph={health.glyph} />}
-              <span className="truncate">{health.word}</span>
-            </span>
+            <StateLabel
+              // Inherits the trigger's own text size and tone, which is what
+              // makes the health a word you click rather than a badge inside a
+              // button.
+              className="text-inherit"
+              tone={health.tone}
+              title={health.title}
+              word={health.word}
+              // No glyph on a dropped row. The slash was a third way of
+              // saying what the ghost tone and the struck-through title
+              // already say, on the one state nobody is scanning for -- so it
+              // read as clutter beside the rows that are still live, which is
+              // where the eye is actually going (law 15). Every other state
+              // keeps its shape: those are the ones being scanned, and the
+              // glyph is how they are told apart at a glance. The count
+              // beside the module heading keeps its slash too, because there
+              // a bare number would say nothing at all.
+              glyph={health.name === 'dropped' ? null : health.glyph}
+            />
           }
         />
 

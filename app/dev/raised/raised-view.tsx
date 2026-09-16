@@ -11,9 +11,11 @@ import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/rais
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { DEV_STATE_WORD, raisedState } from '@/lib/dev/words';
+import { RAISED_STATUS_GLYPHS } from '@/lib/status-glyphs';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -74,14 +76,25 @@ function lead(detail: string): string {
  * "Answered" is this queue's own -- a raise closes on a reply, which is not the
  * same as the work being finished. A raise you turned down is the same fact as
  * a step dropped or a note declined, so it takes the shared word.
+ *
+ * Nothing on an open one: they are all under a heading that already says
+ * "Waiting on you", and repeating it on every row would be the same fact twice.
  */
+const RAISED_TONE: Record<RaisedRow['status'], DevTone> = {
+  open: 'caution',
+  answered: 'positive',
+  dismissed: 'ghost',
+};
+
 function StatusLabel({ row }: { row: RaisedRow }) {
   const state = raisedState(row.status);
   if (row.status === 'open') return null;
   return (
-    <span className="text-small text-ink-muted">
-      {state ? DEV_STATE_WORD[state] : 'Answered'}
-    </span>
+    <StateLabel
+      glyph={RAISED_STATUS_GLYPHS[row.status]}
+      word={state ? DEV_STATE_WORD[state] : 'Answered'}
+      tone={RAISED_TONE[row.status]}
+    />
   );
 }
 

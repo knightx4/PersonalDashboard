@@ -27,8 +27,13 @@ import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
   APPLICATION_STATUS_GLYPHS,
+  FEEDBACK_STATUS_GLYPHS,
+  IDEA_STATE_GLYPHS,
   PLAN_HEALTH_GLYPHS,
+  RAISED_STATUS_GLYPHS,
   TASK_STATUS_GLYPHS,
+  UI_FINDING_GLYPHS,
+  type StatusGlyph as GlyphName,
 } from '@/lib/status-glyphs';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
@@ -328,6 +333,69 @@ const PLAN_STATES = [
   ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
   ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],
 ] as const satisfies readonly (readonly [PlanHealth, string, string])[];
+
+/**
+ * The four queues beside the plan, all on /dev.
+ *
+ * They are one section rather than four because the interesting thing about
+ * them is where they agree: a note nobody has picked up and a confirmed finding
+ * are both half filled, a question waiting on you is a question mark whether it
+ * was raised by a session or filed by a pass, and everything nobody is doing is
+ * struck through. Each queue keeps a shape of its own only where it knows
+ * something the others do not.
+ */
+const DEV_QUEUE_STATES = [
+  [
+    'Bugs and requests',
+    [
+      [FEEDBACK_STATUS_GLYPHS.open, 'Ready', 'Filed, nobody on it. Half filled, like a ready step.'],
+      [
+        FEEDBACK_STATUS_GLYPHS.planned,
+        'Planned',
+        'Written into the build plan and worked from there. Dashed, like a step waiting on another.',
+      ],
+      [FEEDBACK_STATUS_GLYPHS.in_progress, 'In progress', 'A run has claimed it.'],
+      [FEEDBACK_STATUS_GLYPHS.blocked, 'Waiting on you', 'Stopped on an answer only you have.'],
+      [FEEDBACK_STATUS_GLYPHS.done, 'Done', 'Fixed and committed.'],
+      [FEEDBACK_STATUS_GLYPHS.declined, 'Dropped', 'You decided against it.'],
+    ],
+  ],
+  [
+    'Raised',
+    [
+      [
+        RAISED_STATUS_GLYPHS.open,
+        'Waiting on you',
+        'A session asked you something. The question mark, not the bar: a raise is a question.',
+      ],
+      [RAISED_STATUS_GLYPHS.answered, 'Answered', 'You replied. The tick a settled plan question takes.'],
+      [RAISED_STATUS_GLYPHS.dismissed, 'Dropped', 'You turned it down.'],
+    ],
+  ],
+  [
+    'UI findings',
+    [
+      [UI_FINDING_GLYPHS.open, 'Waiting on you', 'A pass proposed it. Confirm it or dismiss it.'],
+      [UI_FINDING_GLYPHS.confirmed, 'Confirmed', 'You agreed it is real, and nobody is on it yet.'],
+      [UI_FINDING_GLYPHS.dismissed, 'Dropped', 'You looked and left it alone.'],
+    ],
+  ],
+  [
+    'Ideas',
+    [
+      [IDEA_STATE_GLYPHS.open, 'Not shaped', 'A sentence, and nothing has happened to it.'],
+      [IDEA_STATE_GLYPHS.shaped, 'Shaped', 'It became a plan feature. What happens next happens there.'],
+      [
+        IDEA_STATE_GLYPHS.dismissed,
+        'Dismissed',
+        'Put aside, and one press brings it back. The word is what keeps it apart from dropped.',
+      ],
+    ],
+  ],
+] as const satisfies readonly (readonly [
+  string,
+  readonly (readonly [GlyphName, string, string])[],
+])[];
 
 const TYPE_SCALE = [
   ['text-micro', '11px', 'Dense table cells, badges, keycaps. The floor.'],
@@ -971,6 +1039,27 @@ export default function DevUiPage() {
                     <p className="text-ui font-medium text-ink">{name}</p>
                     <p className="text-small text-ink-muted">{note}</p>
                   </div>
+                </div>
+              ))}
+            </div>
+          </CardSection>
+          <CardSection
+            title="The other dev queues"
+            hint="Bugs, raises, findings and ideas drew their own pills until #503. They read off the same shapes now, and the words are shared too: a row decided against is dropped on every one of them."
+          >
+            <div className="space-y-4">
+              {DEV_QUEUE_STATES.map(([queue, states]) => (
+                <div key={queue} className="space-y-3">
+                  <p className="text-small font-semibold text-ink">{queue}</p>
+                  {states.map(([glyph, name, note]) => (
+                    <div key={`${queue}-${name}`} className="flex items-center gap-3">
+                      <StatusGlyph glyph={glyph} size={20} className="text-ink" />
+                      <div className="min-w-0">
+                        <p className="text-ui font-medium text-ink">{name}</p>
+                        <p className="text-small text-ink-muted">{note}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

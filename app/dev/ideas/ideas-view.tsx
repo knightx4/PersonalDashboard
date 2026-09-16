@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import { ideaState, type IdeaList, type IdeaRow, type IdeaState as IdeaStateName } from '@/lib/ideas/load';
 import {
   groupIdeas,
   sortIdeas,
@@ -30,6 +30,9 @@ import {
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { DISMISSED_WORD } from '@/lib/dev/words';
+import { IDEA_STATE_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
 
@@ -164,6 +167,41 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
   );
 }
 
+const IDEA_TONE: Record<IdeaStateName, DevTone> = {
+  open: 'quiet',
+  shaped: 'accent',
+  dismissed: 'ghost',
+};
+
+/**
+ * An idea has no status column: what has happened to it is whether it was
+ * shaped into the plan and whether it was put aside. `ideaState` reads that,
+ * and this draws it.
+ */
+function IdeaState({ idea }: { idea: IdeaRow }) {
+  const state = ideaState(idea);
+  return (
+    <StateLabel
+      glyph={IDEA_STATE_GLYPHS[state]}
+      word={IDEA_WORD[state]}
+      tone={IDEA_TONE[state]}
+      title={state === 'shaped' ? 'It is a feature on the plan page now.' : undefined}
+    />
+  );
+}
+
+/**
+ * `Dismissed` rather than `Dropped`: putting an idea aside is "not right now"
+ * and one press brings it back, which is not the same as deciding against a
+ * step. The other two are this queue's own -- nothing else has an idea nobody
+ * has taken anywhere, or one that became a plan feature.
+ */
+const IDEA_WORD: Record<IdeaStateName, string> = {
+  open: 'Not shaped',
+  shaped: 'Shaped',
+  dismissed: DISMISSED_WORD,
+};
+
 function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(
@@ -195,6 +233,10 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
         )}
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
         <CommentCount count={idea.thread.length} />
+        {/* Where it stands, drawn the way every other dev queue draws it. An
+            idea nobody has done anything with says so rather than leaving the
+            row's state to be worked out from which fold it is in. */}
+        <IdeaState idea={idea} />
       </div>
 
       {/* Which feature the session was working on when it wrote this. On its
