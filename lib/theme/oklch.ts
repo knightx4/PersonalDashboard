@@ -125,6 +125,23 @@ export function oklchToHex(colour: Oklch): string {
 }
 
 /**
+ * How far apart two colours look, as a straight line through OKLab.
+ *
+ * The question this answers is whether a person would take one colour for the
+ * other -- which a hue angle cannot say, because two hues twenty degrees apart
+ * are the same colour at one lightness and plainly different at another. OKLab
+ * is near enough uniform that the distance means the same thing everywhere on
+ * it, so one number serves as a floor across the whole circle. The app's four
+ * written themes keep their accent between 0.16 and 0.31 from the red that
+ * means delete.
+ */
+export function oklabDistance(a: string, b: string): number {
+  const [l1, a1, b1] = linearToOklab(parseHex(a).map(toLinear) as Rgb);
+  const [l2, a2, b2] = linearToOklab(parseHex(b).map(toLinear) as Rgb);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
+/**
  * WCAG relative luminance, 0 for black and 1 for white.
  *
  * The quantity every contrast ratio in the app is actually a function of. It

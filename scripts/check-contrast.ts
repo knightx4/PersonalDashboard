@@ -17,11 +17,15 @@
  *
  * Thresholds are WCAG 2.2 AA: 4.5:1 for text under 18px (which is every piece
  * of text in this app), 3:1 for icons, meaningful borders and focus rings.
+ *
+ * Since #471 it measures one thing that is not a contrast ratio: how far the
+ * app's own accent lands from the three colours that carry a meaning. A link
+ * the same colour as the delete button is perfectly readable, and still wrong.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PAPER_SELECTOR, readTheme, THEME_SELECTORS, type Vars } from '../lib/theme/css';
-import { generatePalette } from '../lib/theme/palette';
+import { generatePalette, MEANING_FLOOR, meaningGaps } from '../lib/theme/palette';
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
@@ -45,8 +49,10 @@ const WRITTEN: Record<string, Vars> = Object.fromEntries(
  */
 const HUE_STEP = 15;
 
+const MODES = ['light', 'dark', 'lightbox'] as const;
+
 const GENERATED: Record<string, Vars> = Object.fromEntries(
-  (['light', 'dark', 'lightbox'] as const).flatMap((mode) =>
+  MODES.flatMap((mode) =>
     Array.from({ length: 360 / HUE_STEP }, (_, step) => {
       const hue = step * HUE_STEP;
       return [`${mode} ${hue}°`, generatePalette(mode, hue) as Vars] as const;
@@ -288,8 +294,39 @@ for (const [name, vars] of Object.entries(THEMES)) {
   }
 }
 
+/**
+ * Every degree of the circle, not every fifteenth.
+ *
+ * The stretches where the accent has to step off a meaning colour are narrow
+ * -- 17 hues of the 360 in light, 25 in dark, 29 on Lightbox -- so the walk
+ * above would step over most of them. This measurement is two colours and a
+ * subtraction, so it can afford to be done properly.
+ */
+const SEPARATION_STEP = 1;
+
+let separations = 0;
+
+for (const mode of MODES) {
+  for (let hue = 0; hue < 360; hue += SEPARATION_STEP) {
+    const palette = generatePalette(mode, hue);
+    for (const { accent, meaning, gap } of meaningGaps(palette)) {
+      separations += 1;
+      if (gap < MEANING_FLOOR) {
+        failures += 1;
+        console.error(
+          `✗ ${mode} ${hue}°: ${accent} is ${gap.toFixed(3)} from ${meaning} in OKLab, ` +
+            `needs ${MEANING_FLOOR} — the app's accent must not wear a meaning colour`,
+        );
+      }
+    }
+  }
+}
+
 if (failures > 0) {
-  console.error(`\n${failures} contrast failure${failures === 1 ? '' : 's'} across ${checked} pairs.`);
+  console.error(
+    `\n${failures} failure${failures === 1 ? '' : 's'} across ${checked} contrast pairs ` +
+      `and ${separations} accent separations.`,
+  );
   process.exit(1);
 }
 
@@ -297,4 +334,8 @@ console.log(
   `✓ ${checked} text and non-text pairs clear WCAG AA across ` +
     `${Object.keys(WRITTEN).length} written themes and ` +
     `${Object.keys(GENERATED).length} generated ones, every ${HUE_STEP}° of the circle.`,
+);
+console.log(
+  `✓ ${separations} accent-to-meaning distances clear the ${MEANING_FLOOR} floor, ` +
+    `every ${SEPARATION_STEP}° of the circle in ${MODES.length} modes.`,
 );
