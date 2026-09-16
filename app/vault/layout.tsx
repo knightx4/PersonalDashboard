@@ -46,6 +46,7 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   return (
     <div data-workspace="vault">
       <AppShell
+        account={user.id}
         module="vault"
         sections={sections}
         settingsHref="/vault/settings"

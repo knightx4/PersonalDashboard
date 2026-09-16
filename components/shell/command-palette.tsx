@@ -43,8 +43,14 @@ import type { NavSection } from '@/components/shell/app-shell';
  * typed this is exactly what it was before any of it existed.
  */
 
-/** Everything findable, and whether the server had to cut the list short. */
-type Held = { hits: SearchHit[]; truncated: boolean };
+/**
+ * Everything findable, whose it is, and whether the server had to cut the list
+ * short.
+ *
+ * `account` is the user id the server returned with the rows. It is what makes
+ * a list from the last open usable now: the same account's, or nobody's.
+ */
+type Held = { account: string; hits: SearchHit[]; truncated: boolean };
 
 /**
  * The list, outside the component.
@@ -55,8 +61,20 @@ type Held = { hits: SearchHit[]; truncated: boolean };
  */
 let held: Held | null = null;
 let inFlight: Promise<void> | null = null;
-/** Whether a fetch has ever finished, which is what tells a failure from a first open. */
-let settled = false;
+/** The account whose fetch last finished, which tells a failure from a first open. */
+let settledFor: string | null = null;
+
+/**
+ * Throw away a list that belongs to somebody else.
+ *
+ * Signing out is a server action that redirects, and the router does that as a
+ * client-side navigation, so nothing here is reloaded -- without this the next
+ * person to press ⌘K in the tab would type at the last person's rows.
+ */
+function forgetOtherAccounts(account: string): void {
+  if (held && held.account !== account) held = null;
+  if (settledFor !== null && settledFor !== account) settledFor = null;
+}
 
 /**
  * Fetch the whole list, one request at a time.
@@ -67,11 +85,21 @@ let settled = false;
  * from a minute ago beats no list at all, and the palette falls back to asking
  * the server per keystroke only when it has nothing.
  */
-function loadEverything(): Promise<void> {
+function loadEverything(account: string): Promise<void> {
+  forgetOtherAccounts(account);
+
   inFlight ??= fetch('/api/search/all')
     .then((response) => (response.ok ? response.json() : null))
-    .then((body: { hits?: SearchHit[]; truncated?: boolean } | null) => {
-      if (body?.hits) held = { hits: body.hits, truncated: body.truncated ?? false };
+    .then((body: { account?: string; hits?: SearchHit[]; truncated?: boolean } | null) => {
+      if (body?.hits) {
+        held = {
+          // Stamped with what the server said the session was, not with what
+          // the page thought it was when the request went out.
+          account: body.account ?? account,
+          hits: body.hits,
+          truncated: body.truncated ?? false,
+        };
+      }
     })
     .catch(() => {
       // The navigation half never depended on this, and the search half has
@@ -79,7 +107,7 @@ function loadEverything(): Promise<void> {
     })
     .finally(() => {
       inFlight = null;
-      settled = true;
+      settledFor = account;
     });
 
   return inFlight;
@@ -94,12 +122,14 @@ function loadEverything(): Promise<void> {
  */
 type Matching =
   | { status: 'loading' }
-  | { status: 'ready'; hits: SearchHit[] }
+  | { status: 'ready'; account: string; hits: SearchHit[] }
   | { status: 'fallback' };
 
-function matchingNow(): Matching {
-  if (held && !held.truncated) return { status: 'ready', hits: held.hits };
-  return settled ? { status: 'fallback' } : { status: 'loading' };
+function matchingNow(account: string): Matching {
+  if (held && held.account === account && !held.truncated) {
+    return { status: 'ready', account, hits: held.hits };
+  }
+  return settledFor === account ? { status: 'fallback' } : { status: 'loading' };
 }
 
 /** A row in the one list: somewhere to go, or something you own. */
@@ -168,11 +198,14 @@ function themeCommands(theme: Theme): Command[] {
 }
 
 export function CommandPalette({
+  account,
   module,
   sections,
   enabledModules,
   theme,
 }: {
+  /** Whose pages these are. The held list is only searched when it is theirs. */
+  account: string;
   module: ModuleId | null;
   sections: readonly NavSection[];
   enabledModules?: readonly ModuleId[];
@@ -191,7 +224,7 @@ export function CommandPalette({
    * fetching causes a render for every keystroke, and the rows would blink.
    */
   const [answer, setAnswer] = useState<{ query: string; hits: SearchHit[] } | null>(null);
-  const [matching, setMatching] = useState<Matching>(matchingNow);
+  const [matching, setMatching] = useState<Matching>(() => matchingNow(account));
   const router = useRouter();
   const { open: openCapture } = useCapture();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -300,14 +333,31 @@ export function CommandPalette({
     if (!open) return;
 
     let alive = true;
-    void loadEverything().then(() => {
-      if (alive) setMatching(matchingNow());
+    void loadEverything(account).then(() => {
+      if (alive) setMatching(matchingNow(account));
     });
 
     return () => {
       alive = false;
     };
-  }, [open]);
+  }, [open, account]);
+
+  /**
+   * Drop everything the moment the account on screen changes.
+   *
+   * Signing out and in again in the same tab does not reload the page, so the
+   * list from before the sign-out is still in memory and the last answer from
+   * the per-keystroke endpoint is still in state. Neither belongs to whoever
+   * is signed in now.
+   */
+  const shownFor = useRef(account);
+  useEffect(() => {
+    if (shownFor.current === account) return;
+    shownFor.current = account;
+    forgetOtherAccounts(account);
+    setAnswer(null);
+    setMatching(matchingNow(account));
+  }, [account]);
 
   /**
    * The rows, ranked here rather than by the server.
@@ -318,13 +368,17 @@ export function CommandPalette({
    */
   const hits = useMemo<SearchHit[]>(() => {
     if (!searching) return [];
-    if (matching.status === 'ready') return paletteHits(matching.hits, needle);
+    // The account is checked here as well as in matchingNow: this is state, and
+    // state from before an account change outlives the render that changed it.
+    if (matching.status === 'ready' && matching.account === account) {
+      return paletteHits(matching.hits, needle);
+    }
     // Stale rows stay on screen while a newer answer is on its way: clearing
     // them first would make the list jump on every keystroke, and a list that
     // moves under the cursor is worse than one that is briefly behind.
     if (matching.status === 'fallback') return answer?.hits ?? [];
     return [];
-  }, [searching, matching, needle, answer]);
+  }, [searching, matching, needle, answer, account]);
 
   const asking = searching && matching.status === 'fallback';
   const looking =

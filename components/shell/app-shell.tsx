@@ -75,6 +75,7 @@ export type NavSection = {
  * props. Neither is worth doing in the same change as this one.
  */
 export function AppShell({
+  account,
   module,
   sections,
   settingsHref,
@@ -91,6 +92,8 @@ export function AppShell({
   notifications = [],
   children,
 }: {
+  /** The signed-in user's id. ⌘K stamps the list it holds with it. */
+  account: string;
   module: ModuleId | null;
   sections: readonly NavSection[];
   settingsHref?: string;
@@ -677,6 +680,7 @@ export function AppShell({
       />
 
       <CommandPalette
+        account={account}
         module={module}
         sections={sections}
         enabledModules={enabledModules}

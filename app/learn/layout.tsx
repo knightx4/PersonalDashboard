@@ -116,6 +116,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   return (
     <div data-workspace="learn">
       <AppShell
+        account={user.id}
         module="learn"
         sections={sections}
         displayName={profile?.display_name ?? null}

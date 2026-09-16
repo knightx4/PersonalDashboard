@@ -47,6 +47,7 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
   return (
     <div data-workspace="todo">
       <AppShell
+        account={user.id}
         module="todo"
         sections={sections}
         settingsHref="/todo/settings"

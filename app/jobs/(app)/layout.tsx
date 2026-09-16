@@ -73,6 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div data-workspace="jobs">
       <AppShell
+        account={user.id}
         module="jobs"
         sections={sections}
         settingsHref="/jobs/settings"
