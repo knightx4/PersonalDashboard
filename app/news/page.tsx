@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { BellOff, Mail } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
@@ -79,9 +80,7 @@ export default async function NewsPage({
 
       {selected && (
         <FilterChips
-          chips={[
-            { label: 'From', value: senderLabel(byId.get(selected)!), clearHref: '/news' },
-          ]}
+          chips={[{ label: 'From', value: senderLabel(byId.get(selected)!), clearHref: '/news' }]}
           clearAllHref="/news"
         />
       )}
@@ -109,9 +108,7 @@ export default async function NewsPage({
                   size="sm"
                   variant="ghost"
                   aria-label={
-                    sender.muted
-                      ? `Unmute ${senderLabel(sender)}`
-                      : `Mute ${senderLabel(sender)}`
+                    sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`
                   }
                 >
                   <BellOff
@@ -143,31 +140,36 @@ export default async function NewsPage({
               {shown.map((issue) => {
                 const sender = byId.get(issue.senderId);
                 return (
-                  <li key={issue.id} className="flex items-baseline gap-3 px-4 py-3">
-                    <span
-                      className={cn(
-                        'mt-1.5 size-2 shrink-0 rounded-full',
-                        issue.readAt ? 'bg-transparent' : 'bg-accent',
-                      )}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1">
+                  <li key={issue.id}>
+                    <Link
+                      href={`/news/i/${issue.id}`}
+                      className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+                    >
                       <span
                         className={cn(
-                          'block truncate text-body text-ink',
-                          issue.readAt ? '' : 'font-medium',
+                          'mt-1.5 size-2 shrink-0 rounded-full',
+                          issue.readAt ? 'bg-transparent' : 'bg-accent',
                         )}
-                      >
-                        {issue.subject ?? 'No subject'}
-                        {!issue.readAt && <span className="sr-only"> (unread)</span>}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            'block truncate text-body text-ink',
+                            issue.readAt ? '' : 'font-medium',
+                          )}
+                        >
+                          {issue.subject ?? 'No subject'}
+                          {!issue.readAt && <span className="sr-only"> (unread)</span>}
+                        </span>
+                        <span className="mt-0.5 block truncate text-ui text-ink-muted">
+                          {sender ? senderLabel(sender) : 'Unknown sender'}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                        {sender ? senderLabel(sender) : 'Unknown sender'}
+                      <span className="shrink-0 text-ui text-ink-muted">
+                        {formatArrival(issue.receivedAt, settings.timezone)}
                       </span>
-                    </span>
-                    <span className="shrink-0 text-ui text-ink-muted">
-                      {formatArrival(issue.receivedAt, settings.timezone)}
-                    </span>
+                    </Link>
                   </li>
                 );
               })}
