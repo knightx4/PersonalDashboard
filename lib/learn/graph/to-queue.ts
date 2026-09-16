@@ -26,32 +26,18 @@ function fail(action: string, error: { message: string }): Error {
 }
 
 /**
- * The question the sources get aimed at.
- *
- * The claim, and the misconception when there is one -- because "find me
- * something that explains why this is wrong" is a different search from "find
- * me something about this", and the second one hands back the introduction
- * somebody has already read.
- */
-export function aimFor(concept: Concept): string {
-  if (concept.misconception) {
-    return `${concept.claim} What is currently believed instead: ${concept.misconception}`;
-  }
-  return concept.claim;
-}
-
-/**
  * Find the track this subject's gaps go in, or make it.
  *
  * One per subject, so a month of gap-reading lands in one place rather than
- * one track per concept. The question is rewritten each time to the claim
- * currently being chased, since that is what the next source gets aimed at.
+ * one track per concept. The question is written once, when the track is made,
+ * and describes the track rather than any one gap in it: a track that holds
+ * twenty claims cannot be about the twentieth. Each reading carries its own
+ * claim, which is read off its concept when something needs it.
  */
 async function trackForSubject(
   supabase: LearnSupabaseClient,
   userId: string,
   subjectName: string,
-  question: string,
 ): Promise<string> {
   const title = `${subjectName}: what you are missing`;
 
@@ -64,22 +50,47 @@ async function trackForSubject(
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Looking for the track', error);
 
-  if (data) {
-    const id = (data as { id: string }).id;
-    const { error: updateError } = await supabase
-      .from('tracks')
-      .update({ question })
-      .eq('id', id);
-    assertSchemaExposed(updateError, LEARN_SCHEMA);
-    if (updateError) throw fail('Pointing the track at that claim', updateError);
-    return id;
-  }
+  if (data) return (data as { id: string }).id;
 
-  return createTrack(supabase, userId, { title, question });
+  return createTrack(supabase, userId, {
+    title,
+    question: `What would settle the claims in ${subjectName} you are shaky on?`,
+  });
+}
+
+/**
+ * The reading already queued for this gap, when there is one you have not
+ * finished with.
+ *
+ * `queued` and `reading` count; `read` and `abandoned` do not. Wanting to read
+ * more about a claim you have read about once is ordinary, and so is coming
+ * back to a claim you gave up on -- both of those are a new reading. What is
+ * not ordinary is pressing the button twice and ending up with the row twice.
+ */
+async function unfinishedReadingFor(
+  supabase: LearnSupabaseClient,
+  conceptId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('readings')
+    .select('id')
+    .eq('concept_id', conceptId)
+    .in('status', ['queued', 'reading'])
+    .order('created_at')
+    .limit(1)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Looking for what you already queued', error);
+  return data ? (data as { id: string }).id : null;
 }
 
 /**
  * Put a concept in the queue, and hand back the reading to open.
+ *
+ * Pressing the button on a gap you already queued hands back the reading you
+ * already have rather than a second copy of it, so the queue holds one row per
+ * gap you are working on.
  *
  * The reading carries the concept's name as its subject and the claim as its
  * reason, so the reading page reads as what it is -- a thing you are trying to
@@ -90,12 +101,10 @@ export async function queueConcept(
   userId: string,
   input: { subjectName: string; concept: Concept },
 ): Promise<string> {
-  const trackId = await trackForSubject(
-    supabase,
-    userId,
-    input.subjectName,
-    aimFor(input.concept),
-  );
+  const existing = await unfinishedReadingFor(supabase, input.concept.id);
+  if (existing) return existing;
+
+  const trackId = await trackForSubject(supabase, userId, input.subjectName);
 
   return addManualReading(supabase, userId, {
     trackId,
