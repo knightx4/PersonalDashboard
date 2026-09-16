@@ -178,6 +178,44 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
   };
 }
 
+/**
+ * One concept, with what is known about it.
+ *
+ * For the places that hold a concept id and want the claim rather than the
+ * whole graph around it -- opening a reading queued from a gap, which needs to
+ * know what that reading is for and nothing else. Null when the concept has
+ * been deleted since, which is a normal thing for a reading queued months ago
+ * to run into.
+ */
+export async function loadConcept(
+  supabase: LearnSupabaseClient,
+  conceptId: string,
+): Promise<Concept | null> {
+  const { data, error } = await supabase
+    .from('concepts')
+    .select('id, name, claim, basis, kind, mastery')
+    .eq('id', conceptId)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading that concept', error);
+  if (!data) return null;
+
+  const { data: stateData, error: stateError } = await supabase
+    .from('concept_state')
+    .select('concept_id, state, established, misconception, tested_at')
+    .eq('concept_id', conceptId)
+    .maybeSingle();
+
+  assertSchemaExposed(stateError, LEARN_SCHEMA);
+  if (stateError) throw fail('Reading what you know', stateError);
+
+  return toConcept(
+    data as unknown as ConceptRow,
+    (stateData ?? undefined) as StateRow | undefined,
+  );
+}
+
 export async function loadGraph(
   supabase: LearnSupabaseClient,
   subjectId: string,

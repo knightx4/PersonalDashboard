@@ -17,13 +17,23 @@
  * starting or assigning a step, dismissing or deleting anything are the
  * person's, made on the page, and an assistant that can make them on its own
  * word has taken them away.
+ *
+ * Writing a row is not one of those, and for a while it was treated as though
+ * it were: an idea could be filed here, but "write this up as a bug" and "add a
+ * step under this" were handed to a session that read the repository to make
+ * one row, minutes later. A note in the queue asked for the four things the dev
+ * pages hold -- ideas, plan steps, features and bug notes -- to be addable and
+ * changeable from a comment, so they are, and each lands in the state the
+ * person still has the say over: a step arrives as a proposal, a note arrives
+ * open, and neither is approved, assigned or prioritised by anything here.
  */
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { isModuleId, MODULES } from '@/lib/modules';
+import { isModuleId, MODULES, type ModuleId } from '@/lib/modules';
 import { handStepToClaude } from '@/lib/plan/handover';
-import type { CommentTarget } from './load';
+import { nextPlanPosition } from '@/lib/plan/position';
+import { TARGET_PATH, type CommentTarget } from './load';
 import type { DashAction } from './reply-payload';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +69,9 @@ export type ActInput = {
 
 /** The ideas column takes 4000 characters. */
 const MAX_IDEA = 4000;
+
+/** What a bug note's body holds, from migration 0026. */
+const MAX_NOTE = 4000;
 
 /**
  * The parts of a plan row that may be rewritten, and what each is called.
@@ -136,6 +149,10 @@ export async function carryOut(input: ActInput): Promise<ActOutcome> {
   switch (input.action.name) {
     case 'file_idea':
       return fileIdea(input);
+    case 'file_note':
+      return fileNote(input);
+    case 'add_step':
+      return addStep(input);
     case 'reword':
       return reword(input);
     case 'send_step':
@@ -178,7 +195,7 @@ async function fileIdea(input: ActInput): Promise<ActOutcome> {
   }
 
   // Named `scope` rather than `module`, which Next reserves.
-  const scope = input.action.module && isModuleId(input.action.module) ? input.action.module : null;
+  const scope = scopeOf(input.action);
   const { error } = await input.supabase.from('ideas').insert({
     user_id: input.userId,
     body,
@@ -189,11 +206,126 @@ async function fileIdea(input: ActInput): Promise<ActOutcome> {
   });
   if (error) return { ok: false, why: `I could not file that idea: ${error.message}` };
 
-  const where = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
   return {
     ok: true,
-    said: `Filed on the ideas page, about ${where}, marked as my suggestion:\n\n${body}`,
+    said: `Filed on the ideas page, about ${labelOf(scope)}, marked as my suggestion:\n\n${body}`,
     redraw: '/dev/ideas',
+  };
+}
+
+/** The workspace an action named, if it named one this app has. */
+function scopeOf(action: DashAction): ModuleId | null {
+  return action.module && isModuleId(action.module) ? action.module : null;
+}
+
+/** What a workspace is called on the page, or what null means. */
+function labelOf(scope: ModuleId | null): string {
+  return scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
+}
+
+/**
+ * Write a bug report or a feature request into the notes queue.
+ *
+ * Filed open at the middle priority, which is where the header button files
+ * one: what a note is worth is read off the queue with the others in front of
+ * it, and a priority set from a sentence is a guess that outranks the ones the
+ * person made. The page path is the dev page the comment was written on, so a
+ * note that came out of a plan step says so rather than looking like it was
+ * filed from nowhere.
+ *
+ * Anything not explicitly a feature request is filed as a bug. Both are in the
+ * same queue and the kind is a dropdown away from right; a note refused over
+ * which heading it belongs under is a note that does not exist.
+ */
+async function fileNote(input: ActInput): Promise<ActOutcome> {
+  const body = input.action.text?.trim();
+  if (!body) {
+    return { ok: false, why: 'I could not tell what to write up, so no note was filed.' };
+  }
+  if (body.length > MAX_NOTE) {
+    return { ok: false, why: `That is longer than a note can be (${MAX_NOTE} characters), so nothing was filed.` };
+  }
+
+  const kind = input.action.kind?.trim().toLowerCase() === 'feature' ? 'feature' : 'bug';
+  const { error } = await input.supabase.from('feedback_items').insert({
+    user_id: input.userId,
+    kind,
+    body,
+    page_path: TARGET_PATH[input.target],
+  });
+  if (error) return { ok: false, why: `I could not file that note: ${error.message}` };
+
+  const what = kind === 'bug' ? 'a bug' : 'a feature request';
+  return {
+    ok: true,
+    said: `Filed on the notes queue as ${what}, open:\n\n${body}`,
+    redraw: '/dev/bugs',
+  };
+}
+
+/**
+ * Add a plan row: a step under the one this comment is on, or a feature.
+ *
+ * A comment on a step means a step beneath that step, and it takes that step's
+ * module -- a sub-step that claimed a different workspace would show up in
+ * neither place anyone looked for it, the same rule the add form on the plan
+ * page follows. A comment anywhere else has no step to hang one under, so what
+ * it writes is a feature at the top of whichever workspace it named.
+ *
+ * It arrives `proposed`, which is the whole of why this is safe to do on an
+ * instruction. A proposal is not work: it is not sent to a session, it does not
+ * count against the plan, and approving it is the person's move on the page.
+ * Nothing here sets a status, an assignee or a priority for the same reason.
+ */
+async function addStep(input: ActInput): Promise<ActOutcome> {
+  const title = input.action.text?.trim();
+  if (!title) {
+    return { ok: false, why: 'I could not tell what to call it, so no step was added.' };
+  }
+  if (title.length > MAX_TITLE) {
+    return {
+      ok: false,
+      why: `That is longer than a step's name can be (${MAX_TITLE} characters), so nothing was added. Put the rest in its detail.`,
+    };
+  }
+  const detail = input.action.detail?.trim() || null;
+  if (detail && detail.length > MAX_DETAIL) {
+    return { ok: false, why: `That detail is longer than a step's can be (${MAX_DETAIL} characters), so nothing was added.` };
+  }
+
+  const parentId = input.target === 'step' ? input.id : null;
+  let scope = scopeOf(input.action);
+  if (parentId) {
+    const { data } = await input.supabase
+      .from('plan_items')
+      .select('module')
+      .eq('id', parentId)
+      .maybeSingle();
+    if (!data) return { ok: false, why: 'That step is not there any more, so nothing was added.' };
+    const parent = (data as { module: string | null }).module;
+    scope = parent && isModuleId(parent) ? parent : null;
+  }
+
+  const position = await nextPlanPosition(input.supabase, input.userId, scope, parentId);
+  const { error } = await input.supabase.from('plan_items').insert({
+    user_id: input.userId,
+    module: scope,
+    parent_id: parentId,
+    title,
+    detail,
+    status: 'proposed',
+    kind: 'build',
+    position,
+  });
+  if (error) return { ok: false, why: `I could not add that step: ${error.message}` };
+
+  const where = parentId ? 'under this one' : `at the top of ${labelOf(scope)}`;
+  return {
+    ok: true,
+    said:
+      `Added ${where}, as a proposal for you to approve:\n\n${title}` +
+      (detail ? `\n\n${detail}` : ''),
+    redraw: '/dev/plan',
   };
 }
 
@@ -261,10 +393,33 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     return { ok: true, said: rewritten(field.word, text, was) };
   }
 
-  const what = input.target === 'note' ? 'a bug note' : 'a raise';
+  if (input.target === 'note') {
+    if (text.length > MAX_NOTE) {
+      return { ok: false, why: `That is longer than a note can be (${MAX_NOTE} characters), so nothing was changed.` };
+    }
+    const { data } = await input.supabase
+      .from('feedback_items')
+      .select('body')
+      .eq('id', input.id)
+      .maybeSingle();
+    const was = (data as { body: string } | null)?.body ?? null;
+    if (was === null) return { ok: false, why: 'That note is not there any more, so nothing was changed.' };
+
+    // The body and nothing else. A note's status, its priority and its
+    // resolution are worked in the queue, and the run that closes one writes
+    // what closed it -- a reword reaching those would rewrite the record of
+    // work rather than the report of the problem.
+    const { error } = await input.supabase
+      .from('feedback_items')
+      .update({ body: text })
+      .eq('id', input.id);
+    if (error) return { ok: false, why: `I could not change it: ${error.message}` };
+    return { ok: true, said: rewritten('the note', text, was) };
+  }
+
   return {
     ok: false,
-    why: `I can only reword an idea or a plan step, and this is ${what}, so nothing was changed.`,
+    why: 'I can only reword an idea, a plan step or a bug note, and this is a raise, so nothing was changed.',
   };
 }
 

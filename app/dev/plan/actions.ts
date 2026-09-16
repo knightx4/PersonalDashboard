@@ -28,6 +28,7 @@ import {
 } from '@/lib/plan/load';
 import { hasLiveClaim } from '@/lib/plan/elapsed';
 import { handStepToClaude } from '@/lib/plan/handover';
+import { nextPlanPosition } from '@/lib/plan/position';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
   buildPlanTree,
@@ -108,38 +109,6 @@ function field(formData: FormData, name: string, fallback = ''): string {
   return value === null ? fallback : String(value);
 }
 
-/**
- * The end of a sibling list.
- *
- * A new step goes after its siblings rather than among them: the plan is
- * read top to bottom, a new step is almost always the next thing rather than
- * a forgotten early one, and anything else can be moved once it exists.
- * Positions are spaced by ten so that one can later be slotted between two
- * others without renumbering the rest.
- *
- * Siblings are the steps under the same parent, or -- at the top of a module
- * -- the module's other top-level steps. `.is(null)` rather than `.eq('')`
- * for the app-wide module: matching null against the empty string would find
- * nothing and restart the numbering at 10 on every add.
- */
-async function nextPosition(
-  supabase: Db,
-  userId: string,
-  module: ModuleId | null,
-  parentId: string | null,
-): Promise<number> {
-  let query = supabase.from('plan_items').select('position').eq('user_id', userId);
-  if (parentId) {
-    query = query.eq('parent_id', parentId);
-  } else {
-    query = query.is('parent_id', null);
-    query = module ? query.eq('module', module) : query.is('module', null);
-  }
-  const { data } = await query.order('position', { ascending: false }).limit(1);
-  const last = (data ?? [])[0]?.position as number | undefined;
-  return (last ?? 0) + 10;
-}
-
 /** The module a step's parent is in -- what a step under it must be in too. */
 async function parentModule(
   supabase: Db,
@@ -206,7 +175,7 @@ export async function addPlanItem(
     scope = parent.module;
   }
 
-  const position = await nextPosition(supabase, user.id, scope, parsed.data.parent);
+  const position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
 
   const { error } = await supabase.from('plan_items').insert({
     user_id: user.id,
@@ -320,7 +289,7 @@ export async function updatePlanItem(
     }
     patch.parent_id = parsed.data.parent;
     patch.module = scope;
-    patch.position = await nextPosition(supabase, user.id, scope, parsed.data.parent);
+    patch.position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
   }
 
   const { error } = await supabase
