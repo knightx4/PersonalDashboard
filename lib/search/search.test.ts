@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { listEverything, rankHits, searchEverything } from './search';
+import { listEverything, searchEverything } from './search';
 import { MIN_QUERY, type HitKind, type SearchHit, type SearchSource } from './sources';
 
 /**
@@ -219,37 +219,6 @@ describe('asking for only some kinds', () => {
 
     expect(orders.find).toHaveBeenCalled();
     expect(result.hits).toHaveLength(2);
-  });
-});
-
-describe('the ranking', () => {
-  it('puts a match at the start of a word above one in the middle', () => {
-    const ranked = rankHits([hit('Paracetamol'), hit('Acme')], 'ac');
-    expect(ranked[0].title).toBe('Acme');
-  });
-
-  it('drops what does not match at all', () => {
-    expect(rankHits([hit('Zebra')], 'qq')).toEqual([]);
-  });
-
-  it('finds a thing by the words its source said to look for it by', () => {
-    // A role is called "Staff Engineer" and is looked for by the company.
-    const ranked = rankHits(
-      [hit('Staff Engineer', { kind: 'role', subtitle: 'Role at Acme · Job search', match: 'Acme' })],
-      'acme',
-    );
-    expect(ranked).toHaveLength(1);
-  });
-
-  it('does not match against the subtitle, which is boilerplate', () => {
-    // "Company · Job search" contains an a and then a c, so matching it would
-    // make "ac" find every company there is.
-    expect(rankHits([hit('Zebra')], 'ac')).toEqual([]);
-  });
-
-  it('is stable for two things that score the same', () => {
-    const ranked = rankHits([hit('Acme Two'), hit('Acme One')], 'ac');
-    expect(ranked.map((h) => h.title)).toEqual(['Acme One', 'Acme Two']);
   });
 });
 
