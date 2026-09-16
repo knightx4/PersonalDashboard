@@ -546,3 +546,50 @@ describe('PlanView', () => {
     expect(render('open', true)).toContain('Import the build order');
   });
 });
+
+/**
+ * The Status column, which is the whole point of there being two.
+ *
+ * Health and status had been one word, so the page could not say "a session is
+ * on this" and "three of its seven steps are done" at the same time. These
+ * assert the page draws both, and that the words come out of the fixture the
+ * way the rules say they should.
+ */
+describe('health and status, as two columns', () => {
+  it('heads both columns', () => {
+    const html = render('all');
+    expect(html).toContain('>Health<');
+    expect(html).toContain('>Status<');
+  });
+
+  // The complaint the note was filed about: a feature whose first step is done
+  // used to go on saying "Not started", with a progress bar beside it saying
+  // otherwise on the same line.
+  it('calls a feature with a finished step in progress, not not-started', () => {
+    const html = render('all');
+    // The row's own two cells: the health menu carries the row's name in its
+    // label, and the health word and the status word follow it in order.
+    const from = html.indexOf('Status of #1 Share links');
+    expect(from).toBeGreaterThan(-1);
+    const row = html.slice(from, from + 900);
+    expect(row).toContain('In progress');
+    expect(row).not.toContain('Not started');
+  });
+
+  it('says a step handed over is for Dash', () => {
+    expect(render('all')).toContain('For Dash');
+  });
+
+  it('says a blocked step and a proposal need you', () => {
+    const html = render('all');
+    expect(html).toContain('Needs you');
+  });
+
+  it('says a step nobody has handed anywhere is yours', () => {
+    expect(render('all')).toContain('Yours');
+  });
+
+  it('says a step held up by another is held up', () => {
+    expect(render('all')).toContain('Held up');
+  });
+});

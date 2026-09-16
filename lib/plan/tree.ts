@@ -507,8 +507,132 @@ export function healthOf(
       return 'dropped';
     case 'not_started':
       if (node.waitingOn.length > 0) return 'waiting';
+      // Work has plainly started once some of it is finished.
+      //
+      // A feature's own status column is set by hand and mostly never is: it
+      // is created `not_started` and left there while the steps beneath it are
+      // picked up and closed one at a time. So a feature with four of seven
+      // steps done went on reading "Not started", which is the one thing it
+      // demonstrably is not, and the progress bar beside it said so on the
+      // same line.
+      //
+      // Read from the subtree rather than from the row, the same way the
+      // closed-over-open case above is, so it is a fact about the plan instead
+      // of a fact about when somebody last edited a parent.
+      if (startedBeneath(node)) return 'in_progress';
       return node.ready ? 'ready' : 'not_started';
   }
+}
+
+/**
+ * Whether any real work beneath this row has been picked up or finished.
+ *
+ * Decisions are excluded: answering a question is not building the thing, and
+ * a feature whose only closed row is its own opening question has not started.
+ * Dismissed rows are excluded for the reason they always are -- putting a row
+ * aside is how it stops counting.
+ */
+function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
+  return descendantsOf(node).some(
+    (child) =>
+      child.kind !== 'decision' &&
+      !isDismissed(child) &&
+      (child.status === 'in_progress' || child.status === 'done'),
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * Whose move it is
+ * ---------------------------------------------------------------------- */
+
+/**
+ * The second column, and the reason there are now two.
+ *
+ * Health says how far along a row is -- not started, underway, done. It does
+ * not say what would move it, and those two questions had been sharing one
+ * word: "Blocked" is a state of progress and also a statement about who has to
+ * act, "Ready" means both "nothing is stopping it" and "a session could take
+ * it", and a step a session is working on right now looked exactly like a step
+ * you started yourself last week. So the page could not answer the question it
+ * is opened to answer, which is "what is Dash on, and what is on me".
+ *
+ * Called a move rather than a status in the code, because `status` is already
+ * the raw column a person sets by hand and a third meaning for that word is
+ * how the first two got confused. The page labels the column Status, which is
+ * what it is to read.
+ *
+ * Every rule here is already written down somewhere else and is reused rather
+ * than restated: `needsThePerson` for what is yours to answer, `waitingOn` for
+ * what another step is holding up, and the `assignee` a hand-over sets. Two
+ * implementations of "is this Dash's" would disagree by next month, and the
+ * disagreement would be between a column and the button beside it.
+ */
+export const PLAN_MOVES = [
+  'on_you',
+  'with_dash',
+  'for_dash',
+  'waiting',
+  'yours',
+  'settled',
+] as const;
+export type PlanMove = (typeof PLAN_MOVES)[number];
+
+/**
+ * Most pressing first, and so the order a parent reports from.
+ *
+ * "On you" outranks everything because it is the only one that stops on your
+ * desk. A session working now outranks one that could start, which outranks a
+ * step held up by another, which outranks work nobody has handed anywhere.
+ */
+const MOVE_RANK: readonly PlanMove[] = [
+  'on_you',
+  'with_dash',
+  'for_dash',
+  'waiting',
+  'yours',
+  'settled',
+];
+
+/** This row alone, ignoring everything beneath it. */
+function ownMove(node: MoveInput): PlanMove {
+  if (isClosed(node.status) || isDismissed({ dismissedAt: node.dismissedAt ?? null })) {
+    return 'settled';
+  }
+  // A question to answer, a proposal to approve, or a step blocked on
+  // something only you can supply. One rule, shared with the "On you" view.
+  if (needsThePerson(node)) return 'on_you';
+  if (node.waitingOn.length > 0) return 'waiting';
+  if (node.assignee === 'claude') {
+    return node.status === 'in_progress' ? 'with_dash' : 'for_dash';
+  }
+  return 'yours';
+}
+
+type MoveInput = Pick<
+  PlanNode,
+  'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
+> & {
+  dismissedAt?: string | null;
+  children?: readonly PlanNode[];
+};
+
+/**
+ * Whose move it is on this row or anything beneath it.
+ *
+ * Over the subtree, because a feature is a container and what is happening to
+ * it is what is happening inside it: a feature whose third step is with a
+ * session right now is with a session, and saying "Yours" because nobody
+ * assigned the feature row itself is how the old column managed to be true and
+ * useless at once. Closed rows report from beneath them too, for the same
+ * reason `healthOf` does -- a question added under a shipped feature is still
+ * a question.
+ */
+export function moveOf(node: MoveInput): PlanMove {
+  const rows: MoveInput[] = [node, ...descendantsOf(node)];
+  const moves = new Set(
+    rows.filter((row) => !isDismissed({ dismissedAt: row.dismissedAt ?? null })).map(ownMove),
+  );
+  return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
 
 /** How many steps are in each state. Every health has an entry, most of them 0. */
