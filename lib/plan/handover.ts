@@ -14,9 +14,10 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { planRoutine } from '@/lib/feedback/routine';
 import { hasLiveClaim } from './elapsed';
 import { planBrief } from './brief';
+import { startRoutineRun } from './runs';
 import { loadPlan } from './load';
 import { buildPlanTree, findNode, flatten, isWaitingOnThePerson, topFeatureOf } from './tree';
 
@@ -129,10 +130,12 @@ export async function handStepToClaude(input: {
     'subject, and close it with a note.\n\n' +
     planBrief(sections, node, { thread: true });
 
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId,
+    job: 'step',
+    routine: planRoutine(),
+    planItemId: node.id,
     text,
   });
   if (!result.ok) return { ok: false, error: result.error };

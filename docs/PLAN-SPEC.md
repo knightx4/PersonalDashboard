@@ -32,7 +32,7 @@ see *Decisions and fog*.
 
 ## The model
 
-Two tables in `public`, both under row level security, and `dev_comments`
+Three tables in `public`, all under row level security, and `dev_comments`
 beside them.
 
 ### `plan_items`
@@ -95,6 +95,25 @@ answerable, a question on an idea leaves it unshaped, and a question on a step
 changes no column on it — the reply is a comment like any other. A reply that
 cannot be produced at all says so in the thread, and the question stays where it
 was written.
+
+### `plan_runs`
+
+Every routine a dev button starts, and what Anthropic answered. One row per
+press: the step it is about where there is one, which button fired it (`job` —
+`step`, `feature`, `queue`, `reshape`, `shape`, `notes`, `review`, `comment`),
+the routine the request went to, and the response body kept whole in
+`response`. `external_id` is whatever in that body looks like a name for the
+run; it is null until it is known what the endpoint returns, which is why the
+body is stored beside it.
+
+A press that never started is a row too — `status = 'failed'` with the reason
+in `error` — because "the token was wrong" and "nobody pressed it" are
+different facts and looked identical before this table existed.
+
+Written by `lib/plan/runs.ts`, which is the only way a routine is fired: the
+fire and the record are one call, so a new button cannot start a run the app
+does not know about. Recording a run never fails the press — by then the
+routine is already going, and saying it is not would be the worse lie.
 
 ### `plan_dependencies`
 

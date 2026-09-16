@@ -242,7 +242,9 @@ describe('PlanView', () => {
     // Not one green length and a blank remainder: a module held up by
     // questions and a module nobody has reached drew the same bar.
     expect(html).toContain('aria-label="Shopping: 1 done, 2 ready, 1 waiting"');
-    expect(html).toContain('aria-label="Job search: 1 blocked"');
+    // A blocked step says who can unblock it, which is the word every dev
+    // queue now uses for a row stopped on the person.
+    expect(html).toContain('aria-label="Job search: 1 waiting on you"');
   });
 
   it('shows a proposal as one, and offers only proposals under that view', () => {

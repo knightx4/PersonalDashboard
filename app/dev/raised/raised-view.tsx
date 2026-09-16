@@ -11,8 +11,12 @@ import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/rais
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
+import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
+import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
+import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -67,12 +71,37 @@ function lead(detail: string): string {
   return first.length > 90 ? `${first.slice(0, 89).trimEnd()}…` : first;
 }
 
+/**
+ * A closed raise, worded the way the other dev queues word it.
+ *
+ * "Answered" is this queue's own -- a raise closes on a reply, which is not the
+ * same as the work being finished. A raise you turned down is the same fact as
+ * a step dropped or a note declined, so it takes the shared word.
+ *
+ * Nothing on an open one: they are all under a heading that already says
+ * "Waiting on you", and repeating it on every row would be the same fact twice.
+ */
+const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
+  waiting: 'caution',
+  unfinished: 'caution',
+  done: 'positive',
+  dropped: 'ghost',
+};
+
 function StatusLabel({ row }: { row: RaisedRow }) {
   if (row.status === 'open') return null;
+  const health = raisedHealth(row);
   return (
-    <span className="text-small text-ink-muted">
-      {row.status === 'answered' ? 'Answered' : 'Dismissed'}
-    </span>
+    <StateLabel
+      glyph={RAISED_HEALTH_GLYPHS[health]}
+      word={RAISED_HEALTH_WORD[health]}
+      tone={HEALTH_TONE[health]}
+      title={
+        health === 'unfinished'
+          ? 'Answered, and nothing was recorded as coming of it. Run what it asked for, or close it with the reason nothing was needed.'
+          : undefined
+      }
+    />
   );
 }
 

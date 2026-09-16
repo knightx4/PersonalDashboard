@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isModuleId, type ModuleId } from '@/lib/modules';
-import { fireFeatureRoutine, planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
+import { planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
 import {
   DISMISSAL_RULE,
   FOG_RULE,
@@ -29,6 +29,7 @@ import {
 import { hasLiveClaim } from '@/lib/plan/elapsed';
 import { handStepToClaude } from '@/lib/plan/handover';
 import { nextPlanPosition } from '@/lib/plan/position';
+import { startRoutineRun } from '@/lib/plan/runs';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
   buildPlanTree,
@@ -761,6 +762,8 @@ export async function answerPlanDecision(
   // A re-shape that will not start loses nothing: the answer is already
   // recorded, and the button is still there.
   const started = await startReshape(
+    supabase,
+    user.id,
     after,
     feature,
     dismissedUnder(feature, await loadDismissedSuggestions(supabase, user.id, feature.id)),
@@ -845,7 +848,7 @@ export async function removePlanDependency(
 /**
  * Hand a step to Claude and start the routine on it now.
  *
- * The same rope the notes queue pulls -- `fireFeatureRoutine` -- with the
+ * The same rope the notes queue pulls -- `startRoutineRun` -- with the
  * step's brief as the extra turn, so the session that wakes up knows which
  * step it is for and everything the plan says about it. The step is marked
  * as Claude's first, whatever happens to the request after: a routine that
@@ -978,10 +981,12 @@ export async function sendPlanFeatureToClaude(
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true });
 
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'feature',
+    routine: planRoutine(),
+    planItemId: node.id,
     text,
   });
   if (!result.ok) return { error: result.error };
@@ -1020,6 +1025,8 @@ export async function sendPlanFeatureToClaude(
  * instruction and a change to it cannot apply to only one of them.
  */
 async function startReshape(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
   sections: readonly PlanSection[],
   node: PlanNode,
   /** What has been put aside under this feature, written out. Empty for none. */
@@ -1068,8 +1075,14 @@ async function startReshape(
     planBrief(sections, node, { thread: true }) +
     (dismissed ? `\n${dismissed}` : '');
 
-  const routine = planRoutine();
-  return fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text });
+  return startRoutineRun({
+    supabase,
+    userId,
+    job: 'reshape',
+    routine: planRoutine(),
+    planItemId: node.id,
+    text,
+  });
 }
 
 // latency: pending
@@ -1104,6 +1117,8 @@ export async function reshapePlanFeature(
   ).length;
 
   const result = await startReshape(
+    supabase,
+    user.id,
     sections,
     node,
     dismissedUnder(node, await loadDismissedSuggestions(supabase, user.id, node.id)),
@@ -1174,10 +1189,13 @@ export async function sendPlanQueueToClaude(
     'plan is the source of truth.\n\n' +
     planQueueBrief(sections, queue, { thread: true });
 
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'queue',
+    routine: planRoutine(),
+    // No step: the queue is the whole of what was handed over, and naming the
+    // first of twelve would say the run was about that one.
     text,
   });
   if (!result.ok) return { error: result.error };

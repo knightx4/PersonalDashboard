@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
+import { findingHealth } from '@/lib/dev/health';
+import { FINDING_HEALTH_WORD } from '@/lib/dev/words';
+import { FINDING_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import { StateLabel } from '@/components/dev/state-label';
 import type { UiFinding, UiReview } from '@/lib/ui-review/load';
 import { UI_SCOPES, type UiScope } from '@/lib/ui-review/scope';
 import { decideUiFinding, startUiReview, type UiReviewActionState } from './actions';
@@ -117,10 +121,15 @@ function FindingRow({ finding }: { finding: UiFinding }) {
             {finding.surface}
           </Link>
         )}
+        {/* "Confirmed" is this queue's own -- a pass proposed it and you agreed
+            it is real. A finding you turned down is the same fact as a step
+            dropped or a note declined, so it takes the shared word. */}
         {finding.status !== 'open' && (
-          <span className="text-small text-ink-muted">
-            {finding.status === 'confirmed' ? 'Confirmed' : 'Dismissed'}
-          </span>
+          <StateLabel
+            glyph={FINDING_HEALTH_GLYPHS[findingHealth(finding)]}
+            word={FINDING_HEALTH_WORD[findingHealth(finding)]}
+            tone={findingHealth(finding) === 'ready' ? 'info' : 'ghost'}
+          />
         )}
       </div>
 

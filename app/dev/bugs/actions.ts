@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { codeMatches } from '@/lib/feedback/code';
-import { fireFeatureRoutine, notesRoutine } from '@/lib/feedback/routine';
+import { notesRoutine } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
+import { startRoutineRun } from '@/lib/plan/runs';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -263,12 +264,14 @@ export async function runFeatureRoutine(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _prev: FeedbackActionState, _formData: FormData,
 ): Promise<FeedbackActionState> {
-  await requireUser();
+  const user = await requireUser();
+  const supabase = await createClient();
 
-  const routine = notesRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'notes',
+    routine: notesRoutine(),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };

@@ -19,10 +19,11 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { serverEnv } from '@/lib/env';
 import { FEEDBACK_COLUMNS, feedbackRowFrom } from '@/lib/feedback/load';
-import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { planRoutine } from '@/lib/feedback/routine';
 import { ideaRowFrom, IDEA_COLUMNS } from '@/lib/ideas/load';
 import { planBrief } from '@/lib/plan/brief';
 import { loadPlan } from '@/lib/plan/load';
+import { startRoutineRun } from '@/lib/plan/runs';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 import { raisedRowFrom, RAISED_COLUMNS } from '@/lib/raised/load';
 import { carryOut } from './act';
@@ -321,10 +322,14 @@ async function handToSession(
   instruction: boolean,
   why: string,
 ): Promise<AskOutcome> {
-  const routine = planRoutine();
-  const started = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const started = await startRoutineRun({
+    supabase: input.supabase,
+    userId: input.userId,
+    job: 'comment',
+    routine: planRoutine(),
+    // The step, when the question was asked on one. An idea, a raise and a bug
+    // note are rows the plan does not number.
+    planItemId: input.target === 'step' ? input.id : null,
     text: sessionTurn(input, subject, history, instruction),
   });
 
