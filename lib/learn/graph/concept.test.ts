@@ -53,13 +53,28 @@ function clientHolding(tables: {
 
 const SUBJECT = { id: 'subject-1', name: 'Macro', note: null, created_at: '2026-01-01' };
 
-function concept(id: string, name: string) {
-  return { id, name, claim: `${name} is the claim`, basis: `${name} is here because`, subject_id: 'subject-1' };
+function concept(id: string, name: string, rewritten?: { original: string; at: string }) {
+  return {
+    id,
+    name,
+    claim: `${name} is the claim`,
+    claim_original: rewritten?.original ?? null,
+    claim_rewritten_at: rewritten?.at ?? null,
+    basis: `${name} is here because`,
+    subject_id: 'subject-1',
+  };
 }
 
 const GRAPH = {
   subjects: [SUBJECT],
-  concepts: [concept('money', 'Money'), concept('prices', 'Prices'), concept('inflation', 'Inflation')],
+  concepts: [
+    concept('money', 'Money'),
+    concept('prices', 'Prices', {
+      original: 'What the app wrote about prices',
+      at: '2026-03-14T10:00:00Z',
+    }),
+    concept('inflation', 'Inflation'),
+  ],
   concept_edges: [
     { prerequisite_id: 'money', dependent_id: 'prices', subject_id: 'subject-1' },
     { prerequisite_id: 'prices', dependent_id: 'inflation', subject_id: 'subject-1' },
@@ -89,6 +104,20 @@ describe('one concept, with what sits either side of it', () => {
     expect(view?.concept.state).toBe('shaky');
     expect(view?.concept.established).toBe('tested');
     expect(view?.subject.name).toBe('Macro');
+  });
+
+  it('carries the kept wording and the date, so the page can say whose words these are', async () => {
+    const view = await loadConceptView(clientHolding(GRAPH), 'prices');
+
+    expect(view?.concept.claimOriginal).toBe('What the app wrote about prices');
+    expect(view?.concept.claimRewrittenAt).toBe('2026-03-14T10:00:00Z');
+  });
+
+  it('reads a claim nobody has rewritten as having neither', async () => {
+    const view = await loadConceptView(clientHolding(GRAPH), 'money');
+
+    expect(view?.concept.claimOriginal).toBeNull();
+    expect(view?.concept.claimRewrittenAt).toBeNull();
   });
 
   it('names what it rests on and what rests on it, in both directions', async () => {

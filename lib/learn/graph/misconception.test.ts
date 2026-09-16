@@ -24,6 +24,7 @@ function probe(partial: Partial<ProbeRow> = {}): ProbeRow {
     chosenIndex: null,
     weight: 0,
     masteryCheck: null,
+    askedAt: '2026-09-13T09:00:00.000Z',
     ...partial,
   };
 }

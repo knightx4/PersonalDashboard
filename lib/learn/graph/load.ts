@@ -129,6 +129,8 @@ type ConceptRow = {
   id: string;
   name: string;
   claim: string;
+  claim_original: string | null;
+  claim_rewritten_at: string | null;
   basis: string;
   kind: ConceptKind | null;
   mastery: unknown;
@@ -168,6 +170,8 @@ function toConcept(row: ConceptRow, state: StateRow | undefined): Concept {
     id: row.id,
     name: row.name,
     claim: row.claim,
+    claimOriginal: row.claim_original ?? null,
+    claimRewrittenAt: row.claim_rewritten_at ?? null,
     basis: row.basis,
     kind: row.kind,
     mastery: masteryOf(row.mastery),
@@ -227,7 +231,7 @@ export async function loadGraph(
   ] = await Promise.all([
     supabase
       .from('concepts')
-      .select('id, name, claim, basis, kind, mastery')
+      .select('id, name, claim, claim_original, claim_rewritten_at, basis, kind, mastery')
       .eq('subject_id', subjectId)
       .order('name'),
     supabase

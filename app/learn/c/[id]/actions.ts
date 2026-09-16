@@ -8,6 +8,7 @@ import { fromClaim, MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { generateChain } from '@/lib/learn/graph/generate';
+import { isSameClaim, MAX_CLAIM, rewriteClaimPatch } from '@/lib/learn/graph/rewrite';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
@@ -152,4 +153,72 @@ export async function approveBranch(
   revalidatePath(`/learn/c/${conceptId.data}`);
   revalidatePath(`/learn/s/${saved.subjectId}`);
   return { message: `Added to ${safe.data.subject}.` };
+}
+
+/**
+ * The claim, in your own sentence.
+ *
+ * Written in place, because everything that reads a concept reads `claim`:
+ * the next question about it is written against whatever is in that column,
+ * which is the whole point of being able to change it. The sentence it
+ * replaced is kept once -- see `rewriteClaimPatch` for why only once -- and
+ * nothing else about the concept moves. In particular the questions already
+ * asked keep their answers, which is what #382 settled.
+ *
+ * The concept is read back first rather than trusted from the page, so the
+ * kept copy is decided from what the column actually holds and RLS has said
+ * the row is yours before anything is written.
+ */
+// latency: pending
+export async function rewriteClaim({
+  conceptId,
+  claim,
+}: {
+  conceptId: string;
+  claim: string;
+}): Promise<{ error?: string }> {
+  await requireUser();
+
+  const parsed = z
+    .object({
+      conceptId: z.string().uuid(),
+      claim: z.string().trim().min(1).max(MAX_CLAIM),
+    })
+    .safeParse({ conceptId, claim });
+  if (!parsed.success) {
+    return {
+      error:
+        claim.trim().length === 0
+          ? 'A claim is a sentence somebody can be wrong about. Write one.'
+          : `Keep it under ${MAX_CLAIM} characters — a claim is a sentence or two.`,
+    };
+  }
+
+  const supabase = await createLearnClient();
+  const { data, error } = await supabase
+    .from('concepts')
+    .select('claim, claim_original')
+    .eq('id', parsed.data.conceptId)
+    .maybeSingle();
+
+  if (error) return { error: `Reading that concept failed: ${error.message}` };
+  if (!data) return { error: 'That concept is not there any more.' };
+
+  const current = data as { claim: string; claim_original: string | null };
+  if (isSameClaim(current.claim, parsed.data.claim)) return {};
+
+  const { error: writeError } = await supabase
+    .from('concepts')
+    .update(
+      rewriteClaimPatch(
+        { claim: current.claim, claimOriginal: current.claim_original },
+        parsed.data.claim,
+      ),
+    )
+    .eq('id', parsed.data.conceptId);
+
+  if (writeError) return { error: `Saving your wording failed: ${writeError.message}` };
+
+  revalidatePath(`/learn/c/${parsed.data.conceptId}`);
+  return {};
 }
