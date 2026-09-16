@@ -127,6 +127,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.dev_comments = raisedComment.id;
 
+  // The read mark over that thread. It is keyed by (user, target, row) and has
+  // no id of its own, so what goes in `ids` is the row the thread hangs off --
+  // see ID_COLUMN below, which is what the cross-user read looks it up by.
+  await admin`
+    insert into dev_comment_reads (user_id, target, row_id)
+    values (${userId}, 'raise', ${raised.id})`;
+  ids.dev_comment_reads = raised.id;
+
   const [uiReview] = await admin<{ id: string }[]>`
     insert into ui_reviews (user_id, module, commit_sha, violations, note)
     values (
@@ -432,14 +440,29 @@ describe('cross-user reads', () => {
     'game_price_quotes',
   ]);
 
+  /**
+   * Tables with no `id` column, and the column that names a row instead.
+   *
+   * Almost everything here has a uuid primary key called `id`, so the loop
+   * below can be written once. `dev_comment_reads` is keyed by (user, target,
+   * row) on purpose -- 0068 explains why -- and without this entry the loop
+   * sent `where id = undefined` to postgres and failed on the column rather
+   * than on a leak.
+   */
+  const ID_COLUMN: Record<string, string> = { dev_comment_reads: 'row_id' };
+
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
 
     for (const table of tables) {
       if (SHARED_REFERENCE_TABLES.has(table)) continue;
       const id = seedA[table];
+      const column = ID_COLUMN[table] ?? 'id';
       const [row] = await asUser(userB, (tx) =>
-        tx.unsafe<{ count: string }[]>(`select count(*)::int as count from ${table} where id = $1`, [id]),
+        tx.unsafe<{ count: string }[]>(
+          `select count(*)::int as count from ${table} where ${column} = $1`,
+          [id],
+        ),
       );
       if (Number(row.count) !== 0) leaks.push(table);
     }
