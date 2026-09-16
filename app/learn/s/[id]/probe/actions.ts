@@ -18,6 +18,7 @@ import {
   setMisconception,
 } from '@/lib/learn/graph/session';
 import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
+import { answerKind, recordOutcome } from '@/lib/learn/next/record';
 import { proposeFloor } from '@/lib/learn/graph/floor';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
@@ -193,6 +194,20 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     });
   } catch (error) {
     return { ...prev, error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  // What Learn next orders from. Written here rather than when the page drew
+  // the row: opening the page and closing it again leaves nothing behind, and
+  // answering is the thing you did. A second answer to the same question is a
+  // person clicking again, so it is not a second thing done about the claim.
+  if (outcome.first) {
+    await recordOutcome(supabase, user.id, {
+      // Where the claim stood before this answer, which is the list it was
+      // offered from: a settled claim only ever appears as a re-check.
+      kind: answerKind(concept?.state === 'known'),
+      conceptId: parsed.data.conceptId,
+      outcome: 'answered',
+    });
   }
 
   const weight = await answeredWeight(
