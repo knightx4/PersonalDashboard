@@ -694,9 +694,12 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  * The module's progress is left over the whole plan, because a filtered view
  * has not changed how far through anything is.
  *
- * "Open" keeps every module, empty or not, because it is the working view and
- * an empty module there is the invitation to plan it. The narrower views leave
- * out modules with nothing to show, so a narrowed page is a short one.
+ * "Everything" is the only view that keeps a module with nothing in it. That
+ * empty section is the invitation to plan the module, and a module that simply
+ * did not appear anywhere would read as one nobody is allowed to plan. Every
+ * other view drops it, "Open" included: four of the seven modules have nothing
+ * open, and four headings you scroll past to reach the work are four too many
+ * when the invitation is one click away.
  *
  * "Everything" goes through the same pruning rather than past it, because
  * dismissed rows are hidden from every view and it is a view.
@@ -704,7 +707,7 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
   return sections
     .map((section) => ({ ...section, nodes: prune(section.nodes, view) }))
-    .filter((section) => view === 'open' || view === 'all' || section.nodes.length > 0);
+    .filter((section) => view === 'all' || section.nodes.length > 0);
 }
 
 /**

@@ -395,8 +395,14 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
   });
 
-  it('keeps every module under "open", because that is where a plan gets written', () => {
-    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(
+  it('drops a module with nothing open from "open" as well', () => {
+    // 'jobs' holds one finished feature and one step waiting on another, so it
+    // stays; the modules with nothing at all in them go.
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['shopping', 'jobs']);
+  });
+
+  it('keeps every module under "all", because that is where a plan gets written', () => {
+    expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
   });

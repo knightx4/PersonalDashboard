@@ -2785,9 +2785,12 @@ export function PlanView({
       </div>
 
       {/* The app-wide list is not offered as a section until something is in
-          it, so this is the only way to put the first thing there. */}
+          it, so this is the only way to put the first thing there. Only on
+          Everything, which is where the empty sections live now: drawing this
+          heading over the open view would put back the one thing dropping
+          them took away. */}
       {!searching &&
-        (view === 'open' || view === 'all') &&
+        view === 'all' &&
         !sections.some((section) => section.module === null) && (
           <section className="space-y-2">
             <h2 className="text-body font-semibold text-ink">The app as a whole</h2>

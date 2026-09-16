@@ -139,6 +139,19 @@ describe('PlanView', () => {
     expect(render('all')).toContain('Schema and RPCs');
   });
 
+  it('leaves a module with nothing open off the open view, and keeps it on all', () => {
+    // Four of the seven modules have nothing open, so on the working view they
+    // are headings between you and the work. The invitation to plan one is on
+    // Everything, along with the offer to start the app-wide list.
+    const open = render('open');
+    expect(open).not.toContain('Vault');
+    expect(open).not.toContain('The app as a whole');
+
+    const all = render('all');
+    expect(all).toContain('Vault');
+    expect(all).toContain('The app as a whole');
+  });
+
   it('puts the facts that decide what is next on the line', () => {
     const html = render('open');
     expect(html).toContain('>Next<');
