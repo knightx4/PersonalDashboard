@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
+import { MessageCircleQuestion } from 'lucide-react';
 import { decideRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,7 +12,7 @@ import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
-import { Disclosure } from '@/components/ui/disclosure';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
@@ -292,24 +292,17 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
       )}
 
       {queue.open.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            Waiting on you <span className="font-normal text-ink-muted">({queue.open.length})</span>
-          </h2>
+        <SectionFold title="Waiting on you" count={queue.open.length}>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.open.map((row) => (
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
-        </section>
+        </SectionFold>
       )}
 
       {queue.unfinished.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            Answered, nothing done{' '}
-            <span className="font-normal text-ink-muted">({queue.unfinished.length})</span>
-          </h2>
+        <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
           <p className="text-small text-ink-muted">
             These closed without anything coming of them. Run what they asked for, or close one
             with the reason nothing was needed.
@@ -319,25 +312,19 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
-        </section>
+        </SectionFold>
       )}
 
+      {/* Shut, where the other two open: this one is history rather than work,
+          and it is the section the hand-rolled fold was written for. */}
       {queue.closed.length > 0 && (
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            Closed <span className="font-normal text-ink-muted">({queue.closed.length})</span>
-          </summary>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+        <SectionFold title="Closed" count={queue.closed.length} defaultOpen={false}>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.closed.map((row) => (
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
-        </details>
+        </SectionFold>
       )}
     </div>
   );
