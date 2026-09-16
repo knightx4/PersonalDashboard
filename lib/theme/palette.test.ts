@@ -8,9 +8,15 @@ import {
   ACCENT_TOKENS,
   HUE_TOKENS,
   LIGHT_CAST,
+  LIGHTBOX_HUE_TOKENS,
   REFERENCE_HUE,
   REFERENCE_PALETTES,
 } from '@/lib/theme/reference';
+
+/** A colour the reference tables are allowed to hold: flat, or flat with alpha. */
+const COLOUR = /^(#[0-9a-f]{6}|rgba?\([\d.\s,/]+\))$/i;
+
+const HEX = /^#[0-9a-f]{6}$/i;
 
 /** The shortest way round the circle between two hues, in degrees. */
 function apart(a: number, b: number): number {
@@ -28,7 +34,7 @@ const FIXED_TOKENS = Object.keys(REFERENCE_PALETTES.paper).filter(
 describe('the reference palettes', () => {
   it('say what app/globals.css says', () => {
     const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
-    for (const name of ['paper', 'ink', 'dusk'] as const) {
+    for (const name of ['paper', 'ink', 'dusk', 'lightbox'] as const) {
       const written = readTheme(css, THEME_SELECTORS[name]);
       const baked = REFERENCE_PALETTES[name];
       for (const token of Object.keys(baked)) {
@@ -37,7 +43,7 @@ describe('the reference palettes', () => {
       // The other direction, so a token added to globals.css is not silently
       // missing from a generated theme.
       const colours = Object.keys(written).filter(
-        (token) => token.startsWith('--c-') && /^#[0-9a-f]{6}$/i.test(written[token]),
+        (token) => token.startsWith('--c-') && COLOUR.test(written[token]),
       );
       expect(colours.sort()).toEqual(Object.keys(baked).sort());
     }
@@ -50,6 +56,18 @@ describe('the reference palettes', () => {
     for (const token of HUE_TOKENS) {
       expect(REFERENCE_PALETTES.paper[token]).toBeDefined();
       expect(REFERENCE_PALETTES.dusk[token]).toBeDefined();
+    }
+  });
+
+  it('turn only the bench on Lightbox, and nothing the sheets are made of', () => {
+    // #467's answer. The sheets are lit paper laid on the bench, so they keep
+    // their own colours; the four of them are written with alpha as well,
+    // which is a second reason the generator must not touch them.
+    for (const token of LIGHTBOX_HUE_TOKENS) {
+      expect(`${token} ${REFERENCE_PALETTES.lightbox[token] !== undefined}`).toBe(`${token} true`);
+    }
+    for (const token of ['--c-canvas', '--c-surface', '--c-raised', '--c-sunken', '--c-ink']) {
+      expect(`${token} ${LIGHTBOX_HUE_TOKENS.includes(token)}`).toBe(`${token} false`);
     }
   });
 });
@@ -180,11 +198,86 @@ describe('generatePalette', () => {
   });
 });
 
+describe('generatePalette on Lightbox', () => {
+  /** The bench tokens that are flat hex, which is all of them but the outline. */
+  const BENCH = LIGHTBOX_HUE_TOKENS.filter((token) =>
+    HEX.test(REFERENCE_PALETTES.lightbox[token]),
+  );
+
+  it('gives back Lightbox with no colour, and at the hue read off its bench', () => {
+    expect(generatePalette('lightbox', null)).toEqual(REFERENCE_PALETTES.lightbox);
+    expect(generatePalette('lightbox', REFERENCE_HUE.lightbox)).toEqual(
+      REFERENCE_PALETTES.lightbox,
+    );
+  });
+
+  it('puts the bench on the colour that was asked for', () => {
+    // Within four degrees rather than within two, which is what eight bits a
+    // channel is worth at the bench's chroma: it carries 0.029 where a light
+    // theme's accent carries 0.15, and the fewer steps a colour has to round
+    // between, the further one of them moves the hue.
+    for (const hue of SWEEP) {
+      const bench = hexToOklch(generatePalette('lightbox', hue)['--c-page']);
+      expect(`${hue} ${apart(bench.h, hue) < 4}`).toBe(`${hue} true`);
+    }
+  });
+
+  it('reflects as much light as Lightbox did, all the way round the circle', () => {
+    for (const hue of SWEEP) {
+      const palette = generatePalette('lightbox', hue);
+      for (const token of BENCH) {
+        const drift = Math.abs(
+          relativeLuminance(palette[token]) -
+            relativeLuminance(REFERENCE_PALETTES.lightbox[token]),
+        );
+        expect(`${hue} ${token} ${drift < 0.008}`).toBe(`${hue} ${token} true`);
+      }
+    }
+  });
+
+  it('leaves the sheets, the workspaces and the meanings exactly as written', () => {
+    for (const hue of SWEEP) {
+      const palette = generatePalette('lightbox', hue);
+      for (const token of Object.keys(REFERENCE_PALETTES.lightbox)) {
+        if (LIGHTBOX_HUE_TOKENS.includes(token)) continue;
+        expect(`${hue} ${token} ${palette[token]}`).toBe(
+          `${hue} ${token} ${REFERENCE_PALETTES.lightbox[token]}`,
+        );
+      }
+    }
+  });
+
+  it('turns the sheet outline with the bench and keeps it translucent', () => {
+    // The outline is the line where a sheet ends and the bench begins, written
+    // as the bench's own colour at 42%. Left behind it would draw a blue edge
+    // round every card in a green room.
+    for (const hue of SWEEP) {
+      const outline = generatePalette('lightbox', hue)['--c-sheet-outline'];
+      const parts = outline.match(/^rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)$/);
+      expect(`${hue} ${outline}`).toBe(`${hue} ${parts ? outline : 'unreadable'}`);
+      expect(`${hue} alpha ${parts![4]}`).toBe(`${hue} alpha 0.42`);
+
+      const hex = `#${[1, 2, 3]
+        .map((at) => Number(parts![at]).toString(16).padStart(2, '0'))
+        .join('')}`;
+      // Fifteen degrees of the bench, which is as close as a colour this dark
+      // gets to anything: the outline sits around 8% lightness, where a single
+      // step of one channel is several degrees of hue. What the test is for is
+      // that it moved at all.
+      const bench = hexToOklch(generatePalette('lightbox', hue)['--c-page']);
+      expect(`${hue} ${apart(hexToOklch(hex).h, bench.h) < 15}`).toBe(`${hue} true`);
+    }
+  });
+});
+
 describe('oklch', () => {
   it('round-trips every written colour without moving it', () => {
     for (const palette of Object.values(REFERENCE_PALETTES)) {
-      for (const [token, hex] of Object.entries(palette)) {
-        expect(`${token} ${oklchToHex(hexToOklch(hex))}`).toBe(`${token} ${hex}`);
+      for (const [token, value] of Object.entries(palette)) {
+        // Lightbox writes its sheets with alpha, and a colour with alpha is not
+        // one the generator reads at all.
+        if (!HEX.test(value)) continue;
+        expect(`${token} ${oklchToHex(hexToOklch(value))}`).toBe(`${token} ${value}`);
       }
     }
   });

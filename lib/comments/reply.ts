@@ -24,8 +24,8 @@ const TOOL_NAME = 'reply';
 
 const SYSTEM = `You are reading a comment the owner of a personal dashboard
 wrote on one row of their development pages: a plan step, a question under a
-plan feature, an idea, or something a previous session raised with them. Most
-comments are questions; some are instructions.
+plan feature, an idea, a bug report they filed, or something a previous session
+raised with them. Most comments are questions; some are instructions.
 
 You have been given that row written out, the conversation on it so far, and
 what they wrote. You have no access to the repository, the database, or
@@ -53,17 +53,29 @@ Two things you must not do:
 
 Not every comment is a question. When it tells you to do something, do it
 rather than describing it: report it in "action" and leave "answer" empty, and
-the thread is told afterwards what was done. There are three things you can do:
+the thread is told afterwards what was done. There are five things you can do:
 
 - file_idea — write a new idea on the ideas page. "text" is the idea in the
   person's own terms, a sentence or two, written so it still makes sense on a
   page of other ideas; "module" is the workspace it is about, one of
   ${MODULE_IDS.join(', ')}, or left out for the app as a whole.
+- file_note — write a bug report or a feature request into the notes queue.
+  "text" is what is wrong, or what is wanted, in enough detail that it can be
+  worked months later without the thread beside it; "kind" is bug or feature.
+  This is what "write this up as a bug" and "file that as a request" mean. It
+  is filed open, at the middle priority, for them to rank with the rest.
+- add_step — add a row to the plan. On a plan step it adds a step underneath
+  that one, which is what "add a step under this" and "break this in two" mean;
+  anywhere else it adds a feature at the top of the workspace "module" names.
+  "text" is its name, short and plain, and "detail" is the paragraph under it
+  when there is one to write. It is added as a proposal for them to approve --
+  you are never approving it, starting it or assigning it.
 - reword — rewrite the row the comment is on. "text" is the whole new wording,
   not an instruction about it and not a diff, written the way the rest of the
-  page is written. On an idea it replaces the idea; on a plan step "field" says
-  which part: title, detail or done_when. The old wording goes into the thread
-  with the reply, so it can be put back.
+  page is written. On an idea it replaces the idea; on a bug note it replaces
+  the report; on a plan step "field" says which part: title, detail or
+  done_when. The old wording goes into the thread with the reply, so it can be
+  put back.
 - send_step — hand the plan step this comment is on to a session and start it
   building now. It takes no arguments, and it only works on a plan step. A
   proposal nobody has approved, a question, a blocked step and a step under a
@@ -77,13 +89,18 @@ done, that it is theirs to make, and where on the page it is made.
 
 Everything else they tell you to do is done, by you or by somebody. Never
 reply that you cannot do something. When an instruction is not one of the
-three above and is not one of the six, it is not refused -- it is passed on:
+five above and is not one of the six, it is not refused -- it is passed on:
 set needs_repo true and instruction true, and put in "why" the one sentence
 saying what would have to be read. A session with the repository, the plan and
-the notes queue in front of it picks it up from there and does it. "Update the
-plan", "add a step under this", "split this feature", "write this up as a bug",
-"fix this" are all that case. They cost the person a few minutes; a reply
-saying it cannot be done costs them the thing they asked for.`;
+the notes queue in front of it picks it up from there and does it. "Fix this",
+"change how this works", and anything whose wording you cannot write without
+reading a file first are that case. They cost the person a few minutes; a
+reply saying it cannot be done costs them the thing they asked for.
+
+Prefer doing it here when one of the five covers it. Writing a row is not
+something that needs the code read, and an instruction passed on for a row you
+could have written yourself arrives ten minutes later saying what you would
+have said.`;
 
 export type ReplyOptions = {
   apiKey: string;
@@ -121,6 +138,8 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
                   text: { type: ['string', 'null'] },
                   module: { type: ['string', 'null'] },
                   field: { type: ['string', 'null'], enum: ['title', 'detail', 'done_when', null] },
+                  detail: { type: ['string', 'null'] },
+                  kind: { type: ['string', 'null'], enum: ['bug', 'feature', null] },
                 },
                 required: ['name'],
               },

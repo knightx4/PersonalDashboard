@@ -13,7 +13,9 @@ import { queueConcept } from '@/lib/learn/graph/to-queue';
  *
  * The one action on this page that writes, and it writes an ordinary reading
  * in an ordinary track -- the queue is the same queue, and everything it
- * already does works on the row because the row is not special.
+ * already does works on the row because the row is not special. Pressed on a
+ * gap that is already in the queue it writes nothing and sends you to the row
+ * that is there.
  */
 // latency: pending
 export async function readAboutConcept(formData: FormData): Promise<void> {
@@ -38,7 +40,8 @@ export async function readAboutConcept(formData: FormData): Promise<void> {
   });
 
   revalidatePath('/learn');
-  // Straight to the reading, where Find sources already knows what to do with
-  // a subject you wrote down and no source yet.
+  // Straight to the reading -- the one just queued, or the one that was
+  // already there -- where Find sources already knows what to do with a
+  // subject you wrote down and no source yet.
   redirect(`/learn/r/${readingId}`);
 }

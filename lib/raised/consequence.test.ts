@@ -12,6 +12,8 @@ describe('what a raise says a yes will do', () => {
       text: 'Refuse a second session on a step',
       module: 'dev',
       field: null,
+      detail: null,
+      kind: null,
     });
     expect(parsed.said).toBe(
       'Files this on the ideas page, about Dev: Refuse a second session on a step',
@@ -59,14 +61,14 @@ describe('what a raise says a yes will do', () => {
   });
 
   it('says the raise module when the action names none', () => {
-    expect(consequenceSaid({ name: 'file_idea', text: 'a thing', module: null, field: null }, 'jobs'))
+    expect(consequenceSaid({ name: 'file_idea', text: 'a thing', module: null, field: null, detail: null, kind: null }, 'jobs'))
       .toBe('Files this on the ideas page, about Job search: a thing');
-    expect(consequenceSaid({ name: 'file_idea', text: 'a thing', module: null, field: null }, null))
+    expect(consequenceSaid({ name: 'file_idea', text: 'a thing', module: null, field: null, detail: null, kind: null }, null))
       .toBe('Files this on the ideas page, about the app as a whole: a thing');
   });
 
   it('still says something for a name the list has never had', () => {
-    expect(consequenceSaid({ name: 'dance', text: 'a jig', module: null, field: null }, null)).toBe(
+    expect(consequenceSaid({ name: 'dance', text: 'a jig', module: null, field: null, detail: null, kind: null }, null)).toBe(
       'dance: a jig',
     );
   });

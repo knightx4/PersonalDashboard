@@ -11,8 +11,9 @@ import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { conceptsFromNote } from '@/lib/learn/graph/from-note';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
-import { loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
+import { loadConcept, loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
 import { isRooted, rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
+import { aimFor, aimSentence, type Aim } from '@/lib/learn/graph/aim';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
@@ -52,21 +53,32 @@ export type FindState = {
   error?: string;
   /** Proposed, not saved. Nothing reaches the row until you pick one. */
   candidates?: ResolvedSource[];
+  /**
+   * The claim the search was aimed at, when it was aimed at one. Said out loud
+   * beside the results so a bad result can be traced to a bad aim rather than
+   * to the search. Absent for a reading you typed, which is about a subject.
+   */
+  aim?: Aim;
   rooting?: RootingNote;
 };
 
 /**
  * What the subject's graph knows, when this reading came from a gap in one.
  *
+ * Two things, off one read: the claim this reading is for, and everything
+ * around it. The aim is read here rather than copied onto the reading when it
+ * was queued, so a claim you have re-probed since searches on where you stand
+ * now.
+ *
  * Everything here can be missing without it being a fault: a reading you typed
  * has no concept, and a concept whose subject was deleted since has no graph.
- * Both end with no rooting rather than an error, because the search still
- * works -- it just works the way it did before.
+ * Both end with no aim and no rooting rather than an error, because the search
+ * still works -- it just works the way it did before.
  */
-async function rootingForReading(
+async function graphBehindReading(
   supabase: Awaited<ReturnType<typeof createLearnClient>>,
   conceptId: string | null,
-): Promise<{ rooting: Rooting; note: RootingNote } | null> {
+): Promise<{ aim: Aim | null; rooting: Rooting; note: RootingNote } | null> {
   if (!conceptId) return null;
 
   const subjectId = await subjectIdOfConcept(supabase, conceptId);
@@ -78,8 +90,14 @@ async function rootingForReading(
   ]);
   if (!subject) return null;
 
+  // The concept can be gone from the graph while its subject is still there --
+  // deleted since the reading was queued. No aim, and the rooting is still
+  // worth having.
+  const concept = graph.concepts.find((c) => c.id === conceptId);
   const rooting = rootingFor(graph, conceptId);
+
   return {
+    aim: concept ? aimFor(concept) : null,
     rooting,
     note: isRooted(rooting)
       ? { rooted: true, settled: rooting.settled.length, subject: subject.name }
@@ -95,10 +113,11 @@ async function rootingForReading(
  * wrong than one given a citation, and a bad source in a queue costs twenty
  * minutes at the moment you were finally going to read something.
  *
- * A reading queued from a gap searches with its subject's graph behind it --
- * what you have settled, and what you are ready for -- so the results skip the
- * introduction you do not need and the paper that starts three steps past you.
- * Which of those two happened is reported back rather than assumed.
+ * A reading queued from a gap searches on the claim it was queued for, with
+ * its subject's graph behind it -- what you have settled, and what you are
+ * ready for -- so the results skip the introduction you do not need and the
+ * paper that starts three steps past you. Which of those two happened is
+ * reported back rather than assumed.
  */
 // latency: pending
 export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
@@ -114,20 +133,28 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
   const reading = await loadReading(supabase, readingId.data);
   if (!reading) return { error: 'That is not there any more.' };
 
-  const rooted = await rootingForReading(supabase, reading.conceptId);
+  const behind = await graphBehindReading(supabase, reading.conceptId);
+
+  // The aim replaces the track's question rather than joining it. A gap
+  // reading's track question is the claim of whichever gap was queued most
+  // recently, which is some other claim as often as not, and sending both aims
+  // the search at two things.
+  const aim = behind?.aim ?? null;
 
   const spend = collectSpend();
   const result = await suggestSources({
     subject: reading.subject,
-    question: reading.trackQuestion,
-    rooting: rooted?.rooting ?? null,
+    question: aim ? null : reading.trackQuestion,
+    aim,
+    rooting: behind?.rooting ?? null,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
   await recordLearnSpend(user.id, 'suggest-sources', spend.reports);
 
-  if (!result.ok) return { error: result.detail, rooting: rooted?.note };
-  return { candidates: result.sources, rooting: rooted?.note };
+  const said = { aim: aim ?? undefined, rooting: behind?.note };
+  if (!result.ok) return { error: result.detail, ...said };
+  return { candidates: result.sources, ...said };
 }
 
 /**
@@ -269,7 +296,8 @@ export async function updateNote(
  *
  * This is the lazy locate pass, and it is a server action rather than a link
  * because the work happens between the click and the tab: fetch the document,
- * find the passage that answers the track's question, verify the phrase is
+ * find the passage that answers what this reading is for -- its own claim when
+ * it came from a gap, its track's question otherwise -- verify the phrase is
  * really in the page, then redirect to a URL that lands on it.
  *
  * Doing it here rather than at import time is what keeps the cost proportional
@@ -305,10 +333,16 @@ export async function openReading(formData: FormData): Promise<void> {
     redirect(url);
   }
 
+  // What this reading is for. A gap track's question covers a whole subject's
+  // worth of claims, which cannot narrow a page down to a paragraph; the claim
+  // this one was queued for can. Read here rather than earlier so the common
+  // path -- already narrowed, nothing to do but go -- costs no query.
+  const concept = reading.conceptId ? await loadConcept(supabase, reading.conceptId) : null;
+
   const spend = collectSpend();
   const outcome = await locatePassage({
     url: reading.source?.canonicalUrl ?? url,
-    question: reading.trackQuestion,
+    question: concept ? aimSentence(aimFor(concept)) : reading.trackQuestion,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
     onSpend: spend.sink,
   });

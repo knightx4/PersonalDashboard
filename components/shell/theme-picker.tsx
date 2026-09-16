@@ -12,6 +12,7 @@ import {
   hueOf,
   modeOf,
   THEME_COLOURS,
+  THEME_MODES,
   type GeneratedTheme,
   type Theme,
   type ThemeMode,
@@ -41,13 +42,15 @@ function getDensityServerSnapshot(): Density {
 }
 
 /**
- * Choosing the room: light or dark, and a colour.
+ * Choosing the room, and a colour for it.
  *
- * Two choices instead of four named themes. The switch says which polarity and
- * the swatches say which colour, and every combination of the two is a theme,
- * generated from the palettes that were written by hand. Lightbox sits beside
- * the switch as its own button, because its page and its cards are opposite
- * polarities and it cannot be said as a mode and a colour at all -- #422.
+ * Two choices instead of four named themes. The switch says which room --
+ * light, dark, or Lightbox -- and the swatches say which colour, and every
+ * combination of the two is a theme, generated from the palettes that were
+ * written by hand. Lightbox is a room rather than a preset because its page
+ * and its cards are opposite polarities, so it is reachable from neither of
+ * the other two; it takes a colour like them, on its bench rather than on its
+ * sheets.
  *
  * Nothing happens until you click. Hovering a swatch used to repaint the whole
  * app, so that you saw a theme before you moved into it; note c0cfc6ae asked
@@ -227,41 +230,28 @@ export function ThemePicker({ value }: { value: Theme }) {
             Theme
           </p>
 
-          <div role="radiogroup" aria-label="Light or dark" className="flex gap-1 px-1 pb-1">
-            {(['light', 'dark'] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={showing.kind === 'generated' && mode === option}
-                onClick={() => save(inMode(option))}
-                className={cn(
-                  'press flex-1 rounded-md px-2 py-1.5 text-small font-medium capitalize transition-colors',
-                  showing.kind === 'generated' && mode === option
-                    ? 'bg-accent-tint text-accent'
-                    : 'text-ink-muted hover:bg-sunken hover:text-ink',
-                )}
-              >
-                {option}
-              </button>
-            ))}
-            {/* Lightbox cannot be said as a mode and a colour -- its page and
-                its cards are opposite polarities -- so it stays a button of
-                its own beside the switch rather than being dropped. */}
-            <button
-              type="button"
-              aria-pressed={showing.kind === 'written' && showing.id === 'lightbox'}
-              onClick={() => save({ kind: 'written', id: 'lightbox' })}
-              title="Lit sheets on a blue-black bench"
-              className={cn(
-                'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
-                showing.kind === 'written' && showing.id === 'lightbox'
-                  ? 'bg-accent-tint text-accent'
-                  : 'text-ink-muted hover:bg-sunken hover:text-ink',
-              )}
-            >
-              Lightbox
-            </button>
+          <div role="radiogroup" aria-label="Room" className="flex gap-1 px-1 pb-1">
+            {THEME_MODES.map((option) => {
+              // Following the system is not one of these, so nothing is
+              // checked until a room has actually been chosen.
+              const on = showing.kind !== 'system' && mode === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => save(inMode(option.id))}
+                  title={option.mood}
+                  className={cn(
+                    'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
+                    on ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
 
           <p className="px-2 pb-1.5 pt-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
@@ -339,7 +329,11 @@ export function ThemePicker({ value }: { value: Theme }) {
  * The accent rather than the ground: the grounds of the five are near-greys a
  * few thousandths of chroma apart, so a row of them would be a row of the same
  * square. The accent is what a person means when they say they want a green
- * app. "No colour" shows the ground instead, because that is what it is.
+ * app. "No colour" shows the page ground instead, because that is what it is.
+ *
+ * The lit accent, specifically. In light and dark it is the same value as the
+ * one on a card; on Lightbox it is the one that lands on the bench, and the
+ * bench is what a colour moves there.
  */
 function Swatch({
   theme,
@@ -354,7 +348,7 @@ function Swatch({
 }) {
   const fill = useMemo(() => {
     const palette = generatePalette(theme.mode, theme.hue);
-    return palette[theme.hue === null ? '--c-canvas' : '--c-accent-base'];
+    return palette[theme.hue === null ? '--c-page' : '--c-accent-base-lit'];
   }, [theme.mode, theme.hue]);
 
   return (
@@ -419,7 +413,7 @@ function HueStrip({
     // thirty degrees and far cheaper than a stop per degree.
     const stops = Array.from({ length: 13 }, (_, step) => {
       const degrees = (step * 30) % 360;
-      return `${generatePalette(mode, degrees)['--c-accent-base']} ${(step / 12) * 100}%`;
+      return `${generatePalette(mode, degrees)['--c-accent-base-lit']} ${(step / 12) * 100}%`;
     });
     return `linear-gradient(to right, ${stops.join(', ')})`;
   }, [mode]);

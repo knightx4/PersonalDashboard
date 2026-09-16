@@ -13,7 +13,7 @@ import { useCapture } from '@/components/shell/capture';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { formatTheme, hueOf, modeOf, THEME_COLOURS, type Theme } from '@/lib/theme';
+import { formatTheme, hueOf, modeOf, THEME_COLOURS, THEME_MODES, type Theme } from '@/lib/theme';
 import { applyTheme } from '@/lib/theme/apply';
 import type { NavSection } from '@/components/shell/app-shell';
 
@@ -65,42 +65,37 @@ function applying(next: Theme): Command['run'] {
 /**
  * The theme commands, built from what is on screen.
  *
- * A colour is applied to the polarity you are already in, which is what makes
- * "Theme: Green" one command rather than two: the switch and the swatches are
+ * A colour is applied to the room you are already in, which is what makes
+ * "Theme: Green" one command rather than three: the switch and the swatches are
  * separate choices in the picker and they stay separate here.
  */
 function themeCommands(theme: Theme): Command[] {
   const mode = modeOf(theme);
   const hue = hueOf(theme);
 
+  const here = THEME_MODES.find((option) => option.id === mode);
+
   return [
-    ...(['light', 'dark'] as const).map((option) => ({
-      id: `theme:${option}`,
-      label: `Theme: ${option === 'light' ? 'Light' : 'Dark'}`,
+    ...THEME_MODES.map((option) => ({
+      id: `theme:${option.id}`,
+      label: `Theme: ${option.label}`,
       hint: 'Keeps the colour you are in',
       icon: 'theme' as const,
-      run: applying({ kind: 'generated', mode: option, hue }),
+      run: applying({ kind: 'generated', mode: option.id, hue }),
     })),
     ...THEME_COLOURS.map((colour) => ({
       id: `theme:${colour.id}`,
       label: `Theme: ${colour.label}`,
-      hint: mode === 'light' ? 'Light' : 'Dark',
+      hint: here?.label,
       icon: 'theme' as const,
       run: applying({ kind: 'generated', mode, hue: colour.hue }),
     })),
     {
       id: 'theme:none',
       label: 'Theme: no colour',
-      hint: mode === 'light' ? 'Paper' : 'Ink',
+      hint: mode === 'light' ? 'Paper' : mode === 'dark' ? 'Ink' : 'Lightbox',
       icon: 'theme' as const,
       run: applying({ kind: 'generated', mode, hue: null }),
-    },
-    {
-      id: 'theme:lightbox',
-      label: 'Theme: Lightbox',
-      hint: 'Lit sheets, blue-black bench',
-      icon: 'theme' as const,
-      run: applying({ kind: 'written', id: 'lightbox' }),
     },
     {
       id: 'theme:system',

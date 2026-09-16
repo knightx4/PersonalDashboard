@@ -66,7 +66,7 @@ export function parseConsequenceArg(
     return { ok: false, why: `"${name}" needs what it works on, written as "${CONSEQUENCE_SHAPE}".` };
   }
 
-  const action: DashAction = { name, text, module, field: null };
+  const action: DashAction = { name, text, module, field: null, detail: null, kind: null };
   return { ok: true, action, said: consequenceSaid(action, module) };
 }
 
@@ -99,6 +99,10 @@ export function consequenceSaid(action: DashAction, module: ModuleId | null): st
   switch (action.name) {
     case 'file_idea':
       return `Files this on the ideas page, about ${where}: ${text}`;
+    case 'file_note':
+      return `Files this on the notes queue as ${action.kind === 'feature' ? 'a feature request' : 'a bug'}: ${text}`;
+    case 'add_step':
+      return `Adds this to the plan as a proposal, about ${where}: ${text}`;
     case 'send_step':
       return `Hands ${text} to a session to be built.`;
     case 'reword':
