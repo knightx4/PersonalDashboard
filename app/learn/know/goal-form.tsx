@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/field';
+import { Field, Input, Select } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
@@ -133,14 +133,24 @@ function Proposal({
 
 export function GoalForm({
   subjectId,
+  subjects,
   goal,
   sweepId,
+  bare = false,
 }: {
   subjectId?: string;
+  /**
+   * Pick the subject here instead of being fixed to one, for the places that
+   * offer a goal away from a subject page. The first one is selected, since
+   * the reason to show this list is to go further in something you have.
+   */
+  subjects?: { id: string; name: string }[];
   /** Filled in when the words were typed earlier, at the start of a sweep. */
   goal?: string;
   /** The opening questions this goal was asked about, when there were any. */
   sweepId?: string;
+  /** No card of its own: it is being drawn inside one. */
+  bare?: boolean;
 }) {
   const [state, propose] = useActionState<ProposeState, FormData>(proposeGoal, {});
 
@@ -148,10 +158,33 @@ export function GoalForm({
     return <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} />;
   }
 
+  const picker = subjects !== undefined && subjects.length > 0;
+
   return (
-    <form action={propose} className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
+    <form
+      action={propose}
+      className={bare ? 'mt-3' : cn(cardVariants({ padding: 'standard' }), 'mt-6')}
+    >
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
       {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
+
+      {picker && (
+        <Field
+          label="Which subject?"
+          id="goal-subject"
+          hint="What it lays out is joined onto what that subject already holds, so it does not propose claims that are in there already."
+          className="mb-4"
+        >
+          <Select id="goal-subject" name="subjectId" defaultValue={subjects[0].id}>
+            {subjects.map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
+            ))}
+            <option value="">A new subject</option>
+          </Select>
+        </Field>
+      )}
 
       <Field
         label="What do you want to understand?"

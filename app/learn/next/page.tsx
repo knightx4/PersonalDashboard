@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { BookOpen, History, Target } from 'lucide-react';
+import { BookOpen, History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import {
   ESTABLISHED_LABEL,
   LastChecked,
@@ -12,9 +11,10 @@ import {
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadNext } from '@/lib/learn/graph/load';
+import { loadNext, loadSubjects } from '@/lib/learn/graph/load';
 import type { NextReading, NextRecheck, NextReady } from '@/lib/learn/next/rank';
 import { ReadAbout } from '../s/[id]/read-about';
+import { NothingLeft } from './nothing-left';
 import { NotNow } from './not-now';
 
 export const dynamic = 'force-dynamic';
@@ -146,11 +146,20 @@ function ReadingRow({ row }: { row: NextReading }) {
  *
  * The list is short on purpose. Eight rows is what a screen holds and what a
  * person can choose between.
+ *
+ * With none of the three, the page offers a goal instead of showing an empty
+ * box -- `nothing-left.tsx`, and the second read this page makes, taken only
+ * when there is nothing to show.
  */
 export default async function LearnNextPage() {
   const user = await requireUser();
   const supabase = await createLearnClient();
   const [rows, settings] = await Promise.all([loadNext(supabase), loadAccountSettings(user.id)]);
+
+  // Only when there is nothing to list: which of the two empty accounts this
+  // is decides what the offer says, and an account with rows on the screen
+  // does not need the question asked.
+  const subjects = rows.length === 0 ? await loadSubjects(supabase) : [];
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -158,19 +167,13 @@ export default async function LearnNextPage() {
         title="Learn next"
         description={
           rows.length === 0
-            ? 'What you could start on, with nothing missing underneath it.'
+            ? 'Nothing is waiting, and what would change that is below.'
             : 'What you could start, what is worth checking again, and what you queued and left.'
         }
       />
 
       {rows.length === 0 ? (
-        <EmptyState
-          icon={Target}
-          title="Nothing waiting"
-          description="Every claim in every subject is settled. Name a goal or paste a briefing, and what is missing will show up here."
-          action={{ label: 'What you know', href: '/learn/know' }}
-          className="mt-6"
-        />
+        <NothingLeft subjects={subjects.map(({ id, name }) => ({ id, name }))} />
       ) : (
         /* One surface with hairlines rather than a card each: the rows are a
            list to choose from, and eight bordered boxes would read as eight
