@@ -427,14 +427,6 @@ async function everywhere(supabase: LearnSupabaseClient): Promise<{
   };
 }
 
-/** What to learn next: the ranked few, for the screen. */
-export async function loadReadyToLearn(
-  supabase: LearnSupabaseClient,
-  limit: number = READY_LIMIT,
-): Promise<ReadyConcept[]> {
-  return rankReady((await everywhere(supabase)).ready, limit);
-}
-
 /**
  * What the five-minute question is picked from.
  *
@@ -467,7 +459,17 @@ export async function loadNext(
   return rankNext(await everywhere(supabase), now, limit);
 }
 
-/** How many are ready in total -- for the tab's badge. */
-export async function countReadyToLearn(supabase: LearnSupabaseClient): Promise<number> {
-  return (await everywhere(supabase)).ready.length;
+/**
+ * How many rows Learn next would show -- for the tab's badge.
+ *
+ * The count is taken from the same ranking the page renders, cut at the same
+ * limit, so the number on the tab and the number of rows on the screen cannot
+ * disagree. A badge reading the ready concepts alone went stale the moment the
+ * page grew re-checks and queued readings.
+ */
+export async function countNext(
+  supabase: LearnSupabaseClient,
+  now: Date = new Date(),
+): Promise<number> {
+  return (await loadNext(supabase, NEXT_LIMIT, now)).length;
 }
