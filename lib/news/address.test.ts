@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localPartOf, newsAddress } from '@/lib/news/address';
+import { localPartOf, LOCAL_PART, newsAddress, randomLocalPart } from '@/lib/news/address';
 
 const DOMAIN = 'in.example.com';
 const MINE = 'k7m2pq4xv9zd3b1n';
@@ -35,5 +35,21 @@ describe('localPartOf', () => {
 describe('newsAddress', () => {
   it('joins the two halves', () => {
     expect(newsAddress(MINE, DOMAIN)).toBe(`${MINE}@${DOMAIN}`);
+  });
+});
+
+describe('randomLocalPart', () => {
+  it('makes a local part the column will accept', () => {
+    expect(randomLocalPart()).toMatch(LOCAL_PART);
+  });
+
+  it('makes a different one every time', () => {
+    const made = new Set(Array.from({ length: 50 }, () => randomLocalPart()));
+    expect(made.size).toBe(50);
+  });
+
+  it('is read back by localPartOf, so a new address answers straight away', () => {
+    const local = randomLocalPart();
+    expect(localPartOf(`${local}@${DOMAIN}`, DOMAIN)).toBe(local);
   });
 });
