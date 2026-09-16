@@ -82,9 +82,85 @@ export function reviewRoutine(): RoutineTarget {
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';
 const ANTHROPIC_VERSION = '2023-06-01';
 
+/**
+ * What a press produced, kept rather than reduced to a sentence.
+ *
+ * The result used to be a message for the toast and nothing else, so the app
+ * threw away the only evidence it ever gets that a run exists. `body` is what
+ * Anthropic answered with -- parsed when it is JSON, the raw text when it is
+ * not, null when there was none -- and `runId` is whatever in it looks like a
+ * name for the run. Both are recorded by `lib/plan/runs.ts`; a failure carries
+ * them too, because the body of a refusal is the half that says why.
+ */
 export type FireRoutineResult =
-  | { ok: true; detail: string }
-  | { ok: false; error: string };
+  | { ok: true; detail: string; status: number; body: unknown; runId: string | null }
+  | { ok: false; error: string; status: number | null; body: unknown };
+
+/** The keys a run's own identifier has turned up under, most specific first. */
+const RUN_ID_KEYS = [
+  'run_id',
+  'routine_run_id',
+  'session_id',
+  'conversation_id',
+  'id',
+] as const;
+
+/** Where an identifier hides when the body wraps it, rather than at the top. */
+const RUN_ID_CONTAINERS = ['run', 'routine_run', 'session', 'data', 'result'] as const;
+
+/**
+ * The identifier of the run that was just started, if the body carries one.
+ *
+ * Nobody has looked at what this endpoint returns, which is the whole reason
+ * step #498 exists, so this reads the keys such a body would plausibly use and
+ * answers null rather than guessing when none of them is there. The body itself
+ * is recorded beside it, so a shape this misses is a question of reading the
+ * stored row, not of firing another run to find out.
+ */
+export function runIdFrom(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const record = body as Record<string, unknown>;
+
+  for (const key of RUN_ID_KEYS) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+
+  for (const container of RUN_ID_CONTAINERS) {
+    const nested = record[container];
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      for (const key of RUN_ID_KEYS) {
+        const value = (nested as Record<string, unknown>)[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The routine a press actually fires: the one set, or the built-in default.
+ *
+ * Exported because the run record names the routine that took the work, and
+ * recording the unset id rather than the one the request went to would make the
+ * record wrong in exactly the case it exists for.
+ */
+export function resolveRoutineId(routineId?: string | null): string {
+  return routineId?.trim() || DEFAULT_FEATURE_ROUTINE_ID;
+}
+
+/** The response body as something storable: JSON when it parses, else the text. */
+function bodyOf(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    // Not JSON. The text is still evidence, and still worth keeping.
+    return trimmed.slice(0, 4000);
+  }
+}
 
 export async function fireFeatureRoutine(options: {
   apiKey: string | null;
@@ -99,10 +175,12 @@ export async function fireFeatureRoutine(options: {
       error:
         'No token for this routine on the deployment, so it cannot be started. ' +
         'Set CLAUDE_PLAN_ROUTINE_TOKEN or CLAUDE_NOTES_ROUTINE_TOKEN (or CLAUDE_API_KEY for both).',
+      status: null,
+      body: null,
     };
   }
 
-  const routineId = options.routineId?.trim() || DEFAULT_FEATURE_ROUTINE_ID;
+  const routineId = resolveRoutineId(options.routineId);
   const fetchFn = options.fetch ?? globalThis.fetch;
   const url = `https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`;
 
@@ -122,15 +200,30 @@ export async function fireFeatureRoutine(options: {
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'The request never reached Anthropic.',
+      status: null,
+      body: null,
     };
   }
 
+  const text = await response.text().catch(() => '');
+  const body = bodyOf(text);
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    return { ok: false, error: `Anthropic answered ${response.status}. ${summarize(body)}`.trim() };
+    return {
+      ok: false,
+      error: `Anthropic answered ${response.status}. ${summarize(text)}`.trim(),
+      status: response.status,
+      body,
+    };
   }
 
-  return { ok: true, detail: 'The routine is running. Its commits will land on their own.' };
+  return {
+    ok: true,
+    detail: 'The routine is running. Its commits will land on their own.',
+    status: response.status,
+    body,
+    runId: runIdFrom(body),
+  };
 }
 
 /** The useful half of an error body, short enough to put in a toast. */

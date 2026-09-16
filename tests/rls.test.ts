@@ -165,6 +165,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_dependencies = planDependency.id;
 
+  const [planRun] = await admin<{ id: string }[]>`
+    insert into plan_runs (user_id, plan_item_id, job, routine_id, external_id, http_status, response)
+    values (
+      ${userId}, ${planItem.id}, 'step', ${`trig_${tag}`}, ${`run_${tag}`}, 200,
+      ${admin.json({ run_id: `run_${tag}` })}::jsonb
+    )
+    returning id`;
+  ids.plan_runs = planRun.id;
+
   const [seedImport] = await admin<{ id: string }[]>`
     insert into plan_seed_imports (user_id, step_key)
     values (${userId}, ${`learn:${tag} already offered this step`})
