@@ -322,24 +322,28 @@ export async function setPlanItemStatus(
   const status = statusField.safeParse(formData.get('status'));
   if (!id.success || !status.success) return { error: 'Missing step or status.' };
 
+  // Two of the statuses need the row as it stands: done reads its fog, and
+  // in progress reads who has it. The rest are one write and no read.
+  const needsCurrent = status.data === 'done' || status.data === 'in_progress';
+  const { data: current } = needsCurrent
+    ? await supabase
+        .from('plan_items')
+        .select('number, fog, fog_dismissed_at, assignee')
+        .eq('user_id', user.id)
+        .eq('id', id.data)
+        .maybeSingle()
+    : { data: null };
+
   // Fog says part of this step was never specified. Closing it as done
   // leaves that admission sitting on finished work, where nothing looks at
   // it again -- which is how three features shipped still carrying theirs.
   // Graduate it into steps, or clear it, then close.
   // Unless you have put that patch aside, which is the other way out: "not
   // right now" said about the gap itself, recorded and findable.
-  if (status.data === 'done') {
-    const { data: current } = await supabase
-      .from('plan_items')
-      .select('number, fog, fog_dismissed_at')
-      .eq('user_id', user.id)
-      .eq('id', id.data)
-      .maybeSingle();
-    if (current?.fog && !current.fog_dismissed_at) {
-      return {
-        error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
-      };
-    }
+  if (status.data === 'done' && current?.fog && !current.fog_dismissed_at) {
+    return {
+      error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
+    };
   }
 
   // Blocking a step takes it back off Claude in the same write.
@@ -350,6 +354,16 @@ export async function setPlanItemStatus(
   // have to remember to unhand it as a second step.
   const patch: Record<string, string | null> = { status: status.data };
   if (status.data === 'blocked') patch.assignee = null;
+
+  // Marking a step underway yourself puts it in your queue, if it was in
+  // nobody's.
+  //
+  // `in_progress` means somebody has this step in hand right now, and the
+  // daily cron puts back a claim with no assignee on exactly that reading --
+  // nothing is working it. Moving the row here is you working it, so the row
+  // says so and the sweep leaves it alone. A step already handed to Claude
+  // keeps its assignee: pressing the status control is not taking it back.
+  if (status.data === 'in_progress' && !current?.assignee) patch.assignee = 'me';
 
   const { error } = await supabase
     .from('plan_items')
