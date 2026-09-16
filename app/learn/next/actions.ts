@@ -24,6 +24,11 @@ const PushedAside = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('reading'), readingId: z.string().uuid() }),
 ]);
 
+// latency: optimistic
+//
+// One insert and two revalidates, with nothing to wait on and nothing to say
+// back -- the row can leave the page the moment the button is pressed. It
+// returns void precisely because there is no outcome worth showing.
 export async function pushAside(formData: FormData): Promise<void> {
   const user = await requireUser();
 
