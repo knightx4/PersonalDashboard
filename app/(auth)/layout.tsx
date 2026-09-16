@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
       <Link href="/" className="mb-8 flex items-center gap-2">
         <ModuleMark module={null} size="md" />
-        <span className="text-lead font-semibold tracking-tight text-ink">
+        <span className="text-body font-semibold tracking-tight text-ink">
           Personal Dashboard
         </span>
       </Link>

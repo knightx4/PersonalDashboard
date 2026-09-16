@@ -86,7 +86,7 @@ export default async function PublicCasePage({
       </header>
 
       {page.body && (
-        <section className="mt-6 whitespace-pre-wrap text-lead leading-relaxed text-ink">
+        <section className="mt-6 whitespace-pre-wrap text-body leading-relaxed text-ink">
           {page.body}
         </section>
       )}

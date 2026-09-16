@@ -238,7 +238,7 @@ export function WorkspaceSwitcher({
         <ModuleMark module={current} size="md" />
         <span
           className={cn(
-            'font-display min-w-0 flex-1 truncate text-left text-lead font-semibold tracking-tight',
+            'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
             onShell ? 'text-shell-ink' : 'text-ink',
             compact && 'sr-only',
           )}

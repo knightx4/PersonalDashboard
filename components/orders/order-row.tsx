@@ -96,7 +96,7 @@ export function OrderRow({ order }: { order: OrderRowData }) {
           <p className="mt-0.5 truncate text-small text-ink-muted">{meta.join(' · ')}</p>
         </div>
 
-        <p className="tabular shrink-0 text-right text-lead font-semibold text-ink">
+        <p className="tabular shrink-0 text-right text-body font-semibold text-ink">
           {formatMoney(order.total_cents, order.currency)}
           {order.native_currency &&
             order.native_total_cents != null &&

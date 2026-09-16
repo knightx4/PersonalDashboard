@@ -14,7 +14,7 @@ export default function HomePage() {
       <header className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
         <div className="flex items-center gap-2">
           <ModuleMark module={null} size="md" />
-          <span className="text-lead font-semibold tracking-tight">
+          <span className="text-body font-semibold tracking-tight">
             Personal Dashboard
           </span>
         </div>
@@ -33,7 +33,7 @@ export default function HomePage() {
           <h1 className="font-display max-w-2xl text-figure font-semibold tracking-[-0.03em] text-ink sm:text-figure-lg">
             You already own two of these.
           </h1>
-          <p className="mt-5 max-w-xl text-lead leading-relaxed text-ink-muted">
+          <p className="mt-5 max-w-xl text-body leading-relaxed text-ink-muted">
             Personal Dashboard reads your order confirmations and turns them into a picture of
             what you own and what you spend. Not a delivery tracker — a way to stop buying the
             same thing twice.

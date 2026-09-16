@@ -57,7 +57,7 @@ export function Figure({
           <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
             {secondary.map((entry, index) => (
               <div key={index} className="min-w-0">
-                <dd className="tabular text-lead font-semibold tracking-tight text-ink">
+                <dd className="tabular text-body font-semibold tracking-tight text-ink">
                   {entry.href ? (
                     <a href={entry.href} className="hover:text-accent">
                       {entry.value}

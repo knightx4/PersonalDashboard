@@ -876,16 +876,6 @@ body,
   --text-ui--line-height: 1.5;
   --text-body: 14px;
   --text-body--line-height: 1.55;
-  /* Was 15px, against a 14px body.
-   *
-   * One pixel is not a distinction anyone perceives; it was a token and a
-   * decision at thirty-odd call sites returning nothing. Collapsed onto the
-   * body size rather than deleted so the sweep that removes the class is a
-   * separate, mechanical change -- but as far as anyone looking at the app is
-   * concerned, this app now has one body size and separates by weight and
-   * colour, which is all the type hierarchy a dashboard needs. */
-  --text-lead: 14px;
-  --text-lead--line-height: 1.55;
   --text-title: 20px;
   --text-title--line-height: 1.25;
   --text-figure: 32px;
@@ -1568,6 +1558,22 @@ form[data-auto-submit] [data-fallback-submit] {
       0 1px 2px rgb(0 0 0 / 0.04),
       0 8px 24px -8px rgb(0 0 0 / 0.10);
   }
+}
+
+/* Lightbox does not float its page, and that is not an oversight.
+ *
+ * Its --c-shell and its --c-page are the same #2b3644 on purpose: "one bench,
+ * one colour -- the sidebar and the page ground are the same surface, so a
+ * card looks laid on the bench rather than floating in a second, slightly
+ * different dark", as the theme's own note further up puts it. Give the pane a
+ * radius and a drop in that theme and you get an invisible rectangle with a
+ * shadow hanging off it, because there is no tone for the corner to cut
+ * against. The cards are the objects here; the bench runs edge to edge.
+ */
+[data-theme='lightbox'] .page-pane {
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* Same alpha over a dark bench is nothing at all. */

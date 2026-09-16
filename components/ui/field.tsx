@@ -142,7 +142,7 @@ export function ComposeTitle({ className, ref, ...props }: React.ComponentProps<
       ref={ref}
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
-        'w-full border-0 bg-transparent p-0 text-base font-medium text-ink outline-none sm:text-lead',
+        'w-full border-0 bg-transparent p-0 text-base font-medium text-ink outline-none sm:text-body',
         'placeholder:font-normal placeholder:text-ink-ghost',
         className,
       )}

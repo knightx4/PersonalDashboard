@@ -61,7 +61,7 @@ export default async function SharePage({
       <header>
         <h1 className="font-display text-title tracking-tight text-ink">{page.title}</h1>
         {page.intro && (
-          <p className="mt-2 text-lead leading-relaxed text-ink-muted">{page.intro}</p>
+          <p className="mt-2 text-body leading-relaxed text-ink-muted">{page.intro}</p>
         )}
         <p className="mt-3 text-ui text-ink-muted">
           {page.totals.units} {page.totals.units === 1 ? 'item' : 'items'}
@@ -88,7 +88,7 @@ export default async function SharePage({
       </header>
 
       {page.groups.length === 0 && (
-        <p className="mt-10 text-lead text-ink-muted">
+        <p className="mt-10 text-body text-ink-muted">
           There is nothing on this list yet.
         </p>
       )}

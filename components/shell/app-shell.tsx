@@ -560,7 +560,7 @@ export function AppShell({
               />
             </span>
 
-            <h2 className="font-display shrink-0 truncate text-lead font-semibold tracking-tight text-shell-ink">
+            <h2 className="font-display shrink-0 truncate text-body font-semibold tracking-tight text-shell-ink">
               {title}
             </h2>
 
