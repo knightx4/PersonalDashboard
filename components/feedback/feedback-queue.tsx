@@ -1,6 +1,7 @@
 import { MessageSquarePlus } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SectionFold } from '@/components/ui/disclosure';
 import { FeedbackList } from '@/components/feedback/feedback-list';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import type { FeedbackQueue } from '@/lib/feedback/load';
@@ -56,22 +57,21 @@ export function FeedbackQueueView({ queue }: { queue: FeedbackQueue }) {
         </Banner>
       )}
 
+      {/* Both sections fold, and Closed starts shut. It is every note ever
+          worked, in full, and it was rendered open under the one list you came
+          here to read -- so the queue got longer every time a note was
+          finished, and the outstanding notes got harder to reach for it. The
+          count on the closed line is the whole reason to open it. Law 10. */}
       <div className="space-y-6">
         {outstanding.length > 0 && (
-          <section className="space-y-2">
-            <h2 className="text-body font-semibold text-ink">
-              Outstanding <span className="font-normal text-ink-muted">({outstanding.length})</span>
-            </h2>
+          <SectionFold title="Outstanding" count={outstanding.length}>
             <FeedbackList rows={outstanding} />
-          </section>
+          </SectionFold>
         )}
         {closed.length > 0 && (
-          <section className="space-y-2">
-            <h2 className="text-body font-semibold text-ink">
-              Closed <span className="font-normal text-ink-muted">({closed.length})</span>
-            </h2>
+          <SectionFold title="Closed" count={closed.length} defaultOpen={false}>
             <FeedbackList rows={closed} />
-          </section>
+          </SectionFold>
         )}
       </div>
     </>
