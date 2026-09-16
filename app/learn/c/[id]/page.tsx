@@ -17,6 +17,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
 import { claimWordingLine } from '@/lib/learn/graph/last-answered';
+import { askedBeforeRewrite } from '@/lib/learn/graph/rewrite';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
 import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
@@ -92,15 +93,27 @@ function MentionLink({ mention }: { mention: Mentioned }) {
  * The reason is shown only for a question that was answered, which is the
  * rule the probe session works to: it was written at the same time as the
  * question, and reading it first is reading the answer.
+ *
+ * A question written before the claim was last rewritten says so. #382
+ * settled that the answers keep their value -- rewriting a claim is usually
+ * tidying a sentence rather than deciding the app had the idea wrong -- but
+ * the page must not go on implying you were tested on wording that is no
+ * longer there. Two timestamps compared, and nothing written.
  */
-function Probe({ probe }: { probe: ProbeRow }) {
+function Probe({ probe, claimRewrittenAt }: { probe: ProbeRow; claimRewrittenAt: string | null }) {
   const chosen = probe.chosenIndex === null ? null : probe.options[probe.chosenIndex];
   const correct = probe.options[probe.correctIndex];
   const right = probe.chosenIndex === probe.correctIndex;
+  const earlier = askedBeforeRewrite(probe.askedAt, claimRewrittenAt);
 
   return (
     <li>
       <p className="text-ui text-ink">{probe.question}</p>
+      {earlier && (
+        <p className="text-small text-ink-muted">
+          Written against the earlier wording of this claim.
+        </p>
+      )}
       <p className={right ? 'text-small text-ink-muted' : 'text-small text-danger'}>
         {chosen === null
           ? 'Asked, not answered.'
@@ -293,7 +306,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
         ) : (
           <ul className="space-y-3">
             {probes.map((probe) => (
-              <Probe key={probe.id} probe={probe} />
+              <Probe key={probe.id} probe={probe} claimRewrittenAt={concept.claimRewrittenAt} />
             ))}
           </ul>
         )}

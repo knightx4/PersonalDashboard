@@ -56,3 +56,22 @@ export function rewriteClaimPatch(
   if (current.claimOriginal === null) patch.claim_original = current.claim;
   return patch;
 }
+
+/**
+ * Was this question written against wording that is no longer there?
+ *
+ * #382's answer: a question asked before the last rewrite keeps its answer and
+ * says on the page which wording it was written against. Comparing two
+ * instants rather than two strings -- both come back from PostgREST and would
+ * usually sort the same way as text, but a claim whose date is stored one way
+ * and a probe whose date is stored another is not a thing to find out about
+ * from a line that quietly stopped appearing.
+ */
+export function askedBeforeRewrite(askedAt: string, claimRewrittenAt: string | null): boolean {
+  if (!claimRewrittenAt) return false;
+
+  const asked = Date.parse(askedAt);
+  const rewritten = Date.parse(claimRewrittenAt);
+  if (Number.isNaN(asked) || Number.isNaN(rewritten)) return false;
+  return asked < rewritten;
+}

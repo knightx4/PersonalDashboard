@@ -32,6 +32,12 @@ export type ProbeRow = {
   weight: number;
   /** The check it was written against, or null for a concept with none. */
   masteryCheck: string | null;
+  /**
+   * When the question was written. Read against the concept's
+   * `claimRewrittenAt` to say whether it was asked about the wording that is
+   * there now -- which is what #382 settled, and it needs no write of its own.
+   */
+  askedAt: string;
 };
 
 function fail(action: string, error: { message: string }): Error {
@@ -131,7 +137,7 @@ export async function probesFor(
   const { data, error } = await supabase
     .from('probes')
     .select(
-      'id, concept_id, question, options, correct_index, reason, chosen_index, weight, mastery_check',
+      'id, concept_id, question, options, correct_index, reason, chosen_index, weight, mastery_check, created_at',
     )
     .eq('concept_id', conceptId)
     .order('created_at', { ascending: false });
@@ -149,6 +155,7 @@ export async function probesFor(
     chosen_index: number | null;
     weight: number | string;
     mastery_check: string | null;
+    created_at: string;
   }[]).map((row) => ({
     id: row.id,
     conceptId: row.concept_id,
@@ -159,6 +166,7 @@ export async function probesFor(
     chosenIndex: row.chosen_index,
     weight: Number(row.weight),
     masteryCheck: row.mastery_check,
+    askedAt: row.created_at,
   }));
 }
 

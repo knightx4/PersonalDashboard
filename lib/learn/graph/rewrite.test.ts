@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSameClaim, rewriteClaimPatch } from './rewrite';
+import { askedBeforeRewrite, isSameClaim, rewriteClaimPatch } from './rewrite';
 
 /**
  * The first rewrite is the one that keeps something. Everything after it is
@@ -56,5 +56,33 @@ describe('isSameClaim', () => {
 
   it('reads a different sentence as a different sentence', () => {
     expect(isSameClaim(APP_WORDING, 'Something else entirely.')).toBe(false);
+  });
+});
+
+describe('askedBeforeRewrite', () => {
+  it('says no about every question when the claim is still the app\u2019s', () => {
+    expect(askedBeforeRewrite('2026-09-13T09:00:00Z', null)).toBe(false);
+  });
+
+  it('marks a question asked before the last rewrite', () => {
+    expect(askedBeforeRewrite('2026-09-13T09:00:00Z', '2026-09-16T10:00:00.000Z')).toBe(true);
+  });
+
+  it('leaves a question asked since the rewrite alone', () => {
+    expect(askedBeforeRewrite('2026-09-16T11:00:00Z', '2026-09-16T10:00:00.000Z')).toBe(false);
+  });
+
+  it('compares the instants, not the way they are written', () => {
+    // The same moment written two ways: asked exactly when it was rewritten
+    // is not asked before it.
+    expect(askedBeforeRewrite('2026-09-16T12:00:00+02:00', '2026-09-16T10:00:00.000Z')).toBe(false);
+    // 09:00Z, half an hour before the rewrite -- and later than it as text,
+    // which is what comparing the strings would have got wrong.
+    expect(askedBeforeRewrite('2026-09-16T11:00:00+02:00', '2026-09-16T09:30:00.000Z')).toBe(true);
+  });
+
+  it('says no when either date will not parse', () => {
+    expect(askedBeforeRewrite('not a date', '2026-09-16T10:00:00.000Z')).toBe(false);
+    expect(askedBeforeRewrite('2026-09-13T09:00:00Z', 'not a date')).toBe(false);
   });
 });
