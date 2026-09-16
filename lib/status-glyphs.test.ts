@@ -3,13 +3,13 @@ import { APPLICATION_STATUSES } from './jobs/pipeline';
 import { PLAN_HEALTHS } from './plan/tree';
 import {
   APPLICATION_STATUS_GLYPHS,
-  FEEDBACK_STATUS_GLYPHS,
-  IDEA_STATE_GLYPHS,
+  FEEDBACK_HEALTH_GLYPHS,
+  FINDING_HEALTH_GLYPHS,
+  IDEA_HEALTH_GLYPHS,
   PLAN_HEALTH_GLYPHS,
-  RAISED_STATUS_GLYPHS,
+  RAISED_HEALTH_GLYPHS,
   STATUS_GLYPHS,
   TASK_STATUS_GLYPHS,
-  UI_FINDING_GLYPHS,
   type StatusGlyph,
 } from './status-glyphs';
 
@@ -134,10 +134,10 @@ describe('status glyphs', () => {
  */
 describe('the dev queue glyphs', () => {
   const MAPS = {
-    feedback: FEEDBACK_STATUS_GLYPHS,
-    raised: RAISED_STATUS_GLYPHS,
-    finding: UI_FINDING_GLYPHS,
-    idea: IDEA_STATE_GLYPHS,
+    feedback: FEEDBACK_HEALTH_GLYPHS,
+    raised: RAISED_HEALTH_GLYPHS,
+    finding: FINDING_HEALTH_GLYPHS,
+    idea: IDEA_HEALTH_GLYPHS,
   } as const;
 
   it('gives every state a glyph from the set', () => {
@@ -155,36 +155,44 @@ describe('the dev queue glyphs', () => {
   });
 
   it('draws a row nobody is doing the same way on every queue', () => {
-    expect(FEEDBACK_STATUS_GLYPHS.declined).toBe(PLAN_HEALTH_GLYPHS.dropped);
-    expect(RAISED_STATUS_GLYPHS.dismissed).toBe(PLAN_HEALTH_GLYPHS.dropped);
-    expect(UI_FINDING_GLYPHS.dismissed).toBe(PLAN_HEALTH_GLYPHS.dropped);
+    expect(FEEDBACK_HEALTH_GLYPHS.dropped).toBe(PLAN_HEALTH_GLYPHS.dropped);
+    expect(RAISED_HEALTH_GLYPHS.dropped).toBe(PLAN_HEALTH_GLYPHS.dropped);
+    expect(FINDING_HEALTH_GLYPHS.dropped).toBe(PLAN_HEALTH_GLYPHS.dropped);
     // The word beside it is "Dismissed" rather than "Dropped", because putting
     // an idea aside is reversible. The shape is the same: nobody is doing it.
-    expect(IDEA_STATE_GLYPHS.dismissed).toBe(PLAN_HEALTH_GLYPHS.dropped);
+    expect(IDEA_HEALTH_GLYPHS.dropped).toBe(PLAN_HEALTH_GLYPHS.dropped);
   });
 
   it('draws a question waiting on you as a question, wherever it was asked', () => {
-    expect(RAISED_STATUS_GLYPHS.open).toBe(PLAN_HEALTH_GLYPHS.unanswered);
-    expect(UI_FINDING_GLYPHS.open).toBe(PLAN_HEALTH_GLYPHS.unanswered);
-    expect(RAISED_STATUS_GLYPHS.answered).toBe(PLAN_HEALTH_GLYPHS.answered);
+    expect(RAISED_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.unanswered);
+    expect(FINDING_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.unanswered);
+    // A proposal nobody has approved is a question on the ideas page too.
+    expect(IDEA_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.unanswered);
+    expect(RAISED_HEALTH_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.answered);
   });
 
   it('draws the notes queue on the plan ladder', () => {
-    expect(FEEDBACK_STATUS_GLYPHS.open).toBe(PLAN_HEALTH_GLYPHS.ready);
-    expect(FEEDBACK_STATUS_GLYPHS.in_progress).toBe(PLAN_HEALTH_GLYPHS.in_progress);
-    expect(FEEDBACK_STATUS_GLYPHS.blocked).toBe(PLAN_HEALTH_GLYPHS.blocked);
-    expect(FEEDBACK_STATUS_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.done);
+    expect(FEEDBACK_HEALTH_GLYPHS.ready).toBe(PLAN_HEALTH_GLYPHS.ready);
+    expect(FEEDBACK_HEALTH_GLYPHS.working).toBe(PLAN_HEALTH_GLYPHS.in_progress);
+    expect(FEEDBACK_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.blocked);
+    expect(FEEDBACK_HEALTH_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.done);
+    expect(IDEA_HEALTH_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.done);
   });
 
   it('draws a row handed to another queue as one waiting on something else', () => {
     // A note written into the plan and an idea shaped into a feature are both
     // waiting on a step, which is what the dashed hexagon says on the plan.
-    expect(FEEDBACK_STATUS_GLYPHS.planned).toBe(PLAN_HEALTH_GLYPHS.waiting);
-    expect(IDEA_STATE_GLYPHS.shaped).toBe(PLAN_HEALTH_GLYPHS.waiting);
+    expect(FEEDBACK_HEALTH_GLYPHS.planned).toBe(PLAN_HEALTH_GLYPHS.waiting);
+    expect(IDEA_HEALTH_GLYPHS.shaped).toBe(PLAN_HEALTH_GLYPHS.waiting);
+  });
+
+  it('draws work a session still owes as ready', () => {
+    expect(RAISED_HEALTH_GLYPHS.unfinished).toBe(PLAN_HEALTH_GLYPHS.ready);
+    expect(FEEDBACK_HEALTH_GLYPHS.answered).toBe(PLAN_HEALTH_GLYPHS.answered);
   });
 
   it('draws an idea nobody has taken anywhere the way it draws a lead', () => {
-    expect(IDEA_STATE_GLYPHS.open).toBe(APPLICATION_STATUS_GLYPHS.lead);
-    expect(UI_FINDING_GLYPHS.confirmed).toBe(PLAN_HEALTH_GLYPHS.ready);
+    expect(IDEA_HEALTH_GLYPHS.open).toBe(APPLICATION_STATUS_GLYPHS.lead);
+    expect(FINDING_HEALTH_GLYPHS.ready).toBe(PLAN_HEALTH_GLYPHS.ready);
   });
 });

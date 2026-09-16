@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { ideaState, type IdeaList, type IdeaRow, type IdeaState as IdeaStateName } from '@/lib/ideas/load';
+import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
 import {
   groupIdeas,
   sortIdeas,
@@ -31,8 +31,9 @@ import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
-import { DISMISSED_WORD } from '@/lib/dev/words';
-import { IDEA_STATE_GLYPHS } from '@/lib/status-glyphs';
+import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
+import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
+import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
 
@@ -145,9 +146,6 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
       >
         <Sparkles className="size-3.5" aria-hidden />
         In the plan as #{idea.planItem.number}
-        {/* The plan's own word for it, so the same step does not read one way
-            here and another on the page it links to. */}
-        {idea.planItem.status === 'proposed' && ' · proposed, waiting on you'}
       </Link>
     );
   }
@@ -167,40 +165,36 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
   );
 }
 
-const IDEA_TONE: Record<IdeaStateName, DevTone> = {
+const HEALTH_TONE: Record<IdeaHealth, DevTone> = {
   open: 'quiet',
+  waiting: 'caution',
   shaped: 'accent',
-  dismissed: 'ghost',
+  done: 'positive',
+  dropped: 'ghost',
+};
+
+const HEALTH_TITLE: Partial<Record<IdeaHealth, string>> = {
+  waiting: 'A session wrote it up as a proposal. Nothing happens to it until you approve it.',
+  shaped: 'It is a feature on the plan page now.',
+  done: 'The feature it became has shipped.',
 };
 
 /**
  * An idea has no status column: what has happened to it is whether it was
- * shaped into the plan and whether it was put aside. `ideaState` reads that,
- * and this draws it.
+ * shaped into the plan, what became of the row it was shaped into, and whether
+ * you put it aside. `ideaHealth` reads all three, and this draws it.
  */
 function IdeaState({ idea }: { idea: IdeaRow }) {
-  const state = ideaState(idea);
+  const health = ideaHealth(idea);
   return (
     <StateLabel
-      glyph={IDEA_STATE_GLYPHS[state]}
-      word={IDEA_WORD[state]}
-      tone={IDEA_TONE[state]}
-      title={state === 'shaped' ? 'It is a feature on the plan page now.' : undefined}
+      glyph={IDEA_HEALTH_GLYPHS[health]}
+      word={IDEA_HEALTH_WORD[health]}
+      tone={HEALTH_TONE[health]}
+      title={HEALTH_TITLE[health]}
     />
   );
 }
-
-/**
- * `Dismissed` rather than `Dropped`: putting an idea aside is "not right now"
- * and one press brings it back, which is not the same as deciding against a
- * step. The other two are this queue's own -- nothing else has an idea nobody
- * has taken anywhere, or one that became a plan feature.
- */
-const IDEA_WORD: Record<IdeaStateName, string> = {
-  open: 'Not shaped',
-  shaped: 'Shaped',
-  dismissed: DISMISSED_WORD,
-};
 
 function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);

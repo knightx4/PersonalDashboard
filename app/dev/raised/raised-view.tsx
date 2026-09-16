@@ -14,8 +14,9 @@ import { CommentThread } from '@/components/dev/comment-thread';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
-import { DEV_STATE_WORD, raisedState } from '@/lib/dev/words';
-import { RAISED_STATUS_GLYPHS } from '@/lib/status-glyphs';
+import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
+import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
+import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -80,20 +81,26 @@ function lead(detail: string): string {
  * Nothing on an open one: they are all under a heading that already says
  * "Waiting on you", and repeating it on every row would be the same fact twice.
  */
-const RAISED_TONE: Record<RaisedRow['status'], DevTone> = {
-  open: 'caution',
-  answered: 'positive',
-  dismissed: 'ghost',
+const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
+  waiting: 'caution',
+  unfinished: 'caution',
+  done: 'positive',
+  dropped: 'ghost',
 };
 
 function StatusLabel({ row }: { row: RaisedRow }) {
-  const state = raisedState(row.status);
   if (row.status === 'open') return null;
+  const health = raisedHealth(row);
   return (
     <StateLabel
-      glyph={RAISED_STATUS_GLYPHS[row.status]}
-      word={state ? DEV_STATE_WORD[state] : 'Answered'}
-      tone={RAISED_TONE[row.status]}
+      glyph={RAISED_HEALTH_GLYPHS[health]}
+      word={RAISED_HEALTH_WORD[health]}
+      tone={HEALTH_TONE[health]}
+      title={
+        health === 'unfinished'
+          ? 'Answered, and nothing was recorded as coming of it. Run what it asked for, or close it with the reason nothing was needed.'
+          : undefined
+      }
     />
   );
 }

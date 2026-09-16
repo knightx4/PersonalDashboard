@@ -23,13 +23,15 @@
  * crosses four workspaces. None of lib/jobs, lib/todo, lib/plan or lib/dev
  * owns it.
  */
-import type { FeedbackStatus } from '@/lib/feedback/load';
-import type { IdeaState } from '@/lib/ideas/load';
+import type {
+  FeedbackHealth,
+  FindingHealth,
+  IdeaHealth,
+  RaisedHealth,
+} from '@/lib/dev/health';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
-import type { RaisedStatus } from '@/lib/raised/load';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
-import type { UiFindingStatus } from '@/lib/ui-review/load';
 
 /**
  * The whole vocabulary. Five fill levels for a rung on a ladder, and six
@@ -129,24 +131,28 @@ export const PLAN_HEALTH_GLYPHS: Record<PlanHealth, StatusGlyph> = {
 };
 
 /**
- * The bugs and requests queue.
+ * The bugs and requests queue, keyed by what a note means rather than by its
+ * column: `blocked` is two states, and lib/dev/health.ts is what tells them
+ * apart.
  *
  * Shapes the plan already uses for the same states, because lib/dev/words.ts
  * gives them the same words: a note nobody has picked up is half filled the way
  * a ready step is, a note a run has claimed is three quarters filled, and a note
- * blocked on you is barred.
+ * stopped on you is barred. `answered` takes the tick a settled plan question
+ * takes -- you replied, and it is a session's again.
  *
  * `planned` is the one this queue owns, and it is dashed rather than a rung: the
  * note has been written into the build plan and waits on a step there, which is
  * exactly what the dashed hexagon says about a plan step waiting on another.
  */
-export const FEEDBACK_STATUS_GLYPHS: Record<FeedbackStatus, StatusGlyph> = {
-  open: 'half',
+export const FEEDBACK_HEALTH_GLYPHS: Record<FeedbackHealth, StatusGlyph> = {
+  waiting: 'bar',
+  answered: 'check',
+  ready: 'half',
   planned: 'dashed',
-  in_progress: 'three-quarters',
-  blocked: 'bar',
+  working: 'three-quarters',
   done: 'full',
-  declined: 'slash',
+  dropped: 'slash',
 };
 
 /**
@@ -154,41 +160,45 @@ export const FEEDBACK_STATUS_GLYPHS: Record<FeedbackStatus, StatusGlyph> = {
  *
  * An open raise is a question waiting on you, so it takes the question mark
  * rather than the bar -- the same distinction the plan draws between a step
- * stopped on something and a question nobody has answered. An answered raise
- * takes the tick a settled plan decision takes, and one you turned down takes
- * the same struck hexagon a dropped step does.
+ * stopped on something and a question nobody has answered. `unfinished` is a
+ * raise you answered with nothing recorded as coming of it, which is work a
+ * session owes, so it takes the half-filled hexagon a ready step takes.
  */
-export const RAISED_STATUS_GLYPHS: Record<RaisedStatus, StatusGlyph> = {
-  open: 'question',
-  answered: 'check',
-  dismissed: 'slash',
+export const RAISED_HEALTH_GLYPHS: Record<RaisedHealth, StatusGlyph> = {
+  waiting: 'question',
+  unfinished: 'half',
+  done: 'check',
+  dropped: 'slash',
 };
 
 /**
  * What a UI pass found.
  *
  * A finding is filed as a candidate and you confirm or dismiss it, so an open
- * one is a question the same way a raise is. Confirmed is the half-filled
+ * one is a question the same way a raise is. A confirmed one is the half-filled
  * hexagon a ready step takes: agreed, and nobody on it yet.
  */
-export const UI_FINDING_GLYPHS: Record<UiFindingStatus, StatusGlyph> = {
-  open: 'question',
-  confirmed: 'half',
-  dismissed: 'slash',
+export const FINDING_HEALTH_GLYPHS: Record<FindingHealth, StatusGlyph> = {
+  waiting: 'question',
+  ready: 'half',
+  dropped: 'slash',
 };
 
 /**
- * An idea on /dev/ideas.
+ * An idea on /dev/ideas, read through the plan row it became.
  *
  * `open` is the empty hexagon a lead and an untouched task are: nothing has
- * happened to it. `shaped` is dashed, like a note the plan has taken on -- what
- * happens to it next happens on the plan page. `dismissed` shares the struck
- * hexagon with everything else nobody is doing; the word beside it keeps the
- * difference, because putting an idea aside is reversible and dropping a step
- * is a decision.
+ * happened to it. A shaped idea splits three ways, because what it became is
+ * what matters -- a proposal nobody has approved is a question waiting on you,
+ * an approved feature is dashed like anything waiting on work elsewhere, and a
+ * finished one is solid. `dropped` shares the struck hexagon with everything
+ * else nobody is doing; the word beside it keeps the difference, because
+ * putting an idea aside is reversible and dropping a step is a decision.
  */
-export const IDEA_STATE_GLYPHS: Record<IdeaState, StatusGlyph> = {
+export const IDEA_HEALTH_GLYPHS: Record<IdeaHealth, StatusGlyph> = {
   open: 'empty',
+  waiting: 'question',
   shaped: 'dashed',
-  dismissed: 'slash',
+  done: 'full',
+  dropped: 'slash',
 };

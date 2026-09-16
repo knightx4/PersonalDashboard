@@ -27,12 +27,12 @@ import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
   APPLICATION_STATUS_GLYPHS,
-  FEEDBACK_STATUS_GLYPHS,
-  IDEA_STATE_GLYPHS,
+  FEEDBACK_HEALTH_GLYPHS,
+  FINDING_HEALTH_GLYPHS,
+  IDEA_HEALTH_GLYPHS,
   PLAN_HEALTH_GLYPHS,
-  RAISED_STATUS_GLYPHS,
+  RAISED_HEALTH_GLYPHS,
   TASK_STATUS_GLYPHS,
-  UI_FINDING_GLYPHS,
   type StatusGlyph as GlyphName,
 } from '@/lib/status-glyphs';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -348,45 +348,65 @@ const DEV_QUEUE_STATES = [
   [
     'Bugs and requests',
     [
-      [FEEDBACK_STATUS_GLYPHS.open, 'Ready', 'Filed, nobody on it. Half filled, like a ready step.'],
+      [FEEDBACK_HEALTH_GLYPHS.ready, 'Ready', 'Filed, nobody on it. Half filled, like a ready step.'],
       [
-        FEEDBACK_STATUS_GLYPHS.planned,
+        FEEDBACK_HEALTH_GLYPHS.planned,
         'Planned',
         'Written into the build plan and worked from there. Dashed, like a step waiting on another.',
       ],
-      [FEEDBACK_STATUS_GLYPHS.in_progress, 'In progress', 'A run has claimed it.'],
-      [FEEDBACK_STATUS_GLYPHS.blocked, 'Waiting on you', 'Stopped on an answer only you have.'],
-      [FEEDBACK_STATUS_GLYPHS.done, 'Done', 'Fixed and committed.'],
-      [FEEDBACK_STATUS_GLYPHS.declined, 'Dropped', 'You decided against it.'],
+      [FEEDBACK_HEALTH_GLYPHS.working, 'In progress', 'A run has claimed it.'],
+      [
+        FEEDBACK_HEALTH_GLYPHS.waiting,
+        'Waiting on you',
+        'Stopped on an answer only you have, and you have not given it.',
+      ],
+      [
+        FEEDBACK_HEALTH_GLYPHS.answered,
+        'Answered',
+        'Blocked, and you replied in the thread. It is a session\u2019s again, and the column still says blocked.',
+      ],
+      [FEEDBACK_HEALTH_GLYPHS.done, 'Done', 'Fixed and committed.'],
+      [FEEDBACK_HEALTH_GLYPHS.dropped, 'Dropped', 'You decided against it.'],
     ],
   ],
   [
     'Raised',
     [
       [
-        RAISED_STATUS_GLYPHS.open,
+        RAISED_HEALTH_GLYPHS.waiting,
         'Waiting on you',
         'A session asked you something. The question mark, not the bar: a raise is a question.',
       ],
-      [RAISED_STATUS_GLYPHS.answered, 'Answered', 'You replied. The tick a settled plan question takes.'],
-      [RAISED_STATUS_GLYPHS.dismissed, 'Dropped', 'You turned it down.'],
+      [
+        RAISED_HEALTH_GLYPHS.unfinished,
+        'Nothing done',
+        'Answered, with no action and no reason for none. Work a session still owes.',
+      ],
+      [RAISED_HEALTH_GLYPHS.done, 'Answered', 'You replied and something came of it.'],
+      [RAISED_HEALTH_GLYPHS.dropped, 'Dropped', 'You turned it down.'],
     ],
   ],
   [
     'UI findings',
     [
-      [UI_FINDING_GLYPHS.open, 'Waiting on you', 'A pass proposed it. Confirm it or dismiss it.'],
-      [UI_FINDING_GLYPHS.confirmed, 'Confirmed', 'You agreed it is real, and nobody is on it yet.'],
-      [UI_FINDING_GLYPHS.dismissed, 'Dropped', 'You looked and left it alone.'],
+      [FINDING_HEALTH_GLYPHS.waiting, 'Waiting on you', 'A pass proposed it. Confirm it or dismiss it.'],
+      [FINDING_HEALTH_GLYPHS.ready, 'Confirmed', 'You agreed it is real, and nobody is on it yet.'],
+      [FINDING_HEALTH_GLYPHS.dropped, 'Dropped', 'You looked and left it alone.'],
     ],
   ],
   [
     'Ideas',
     [
-      [IDEA_STATE_GLYPHS.open, 'Not shaped', 'A sentence, and nothing has happened to it.'],
-      [IDEA_STATE_GLYPHS.shaped, 'Shaped', 'It became a plan feature. What happens next happens there.'],
+      [IDEA_HEALTH_GLYPHS.open, 'Not shaped', 'A sentence, and nothing has happened to it.'],
       [
-        IDEA_STATE_GLYPHS.dismissed,
+        IDEA_HEALTH_GLYPHS.waiting,
+        'Waiting on you',
+        'A session shaped it into a proposal. Nothing happens until you approve it.',
+      ],
+      [IDEA_HEALTH_GLYPHS.shaped, 'Shaped', 'It is a feature being built on the plan page.'],
+      [IDEA_HEALTH_GLYPHS.done, 'Done', 'The feature it became has shipped.'],
+      [
+        IDEA_HEALTH_GLYPHS.dropped,
         'Dismissed',
         'Put aside, and one press brings it back. The word is what keeps it apart from dropped.',
       ],
@@ -1045,7 +1065,7 @@ export default function DevUiPage() {
           </CardSection>
           <CardSection
             title="The other dev queues"
-            hint="Bugs, raises, findings and ideas drew their own pills until #503. They read off the same shapes now, and the words are shared too: a row decided against is dropped on every one of them."
+            hint="Bugs, raises, findings and ideas drew their own pills until #503, and printed their status column until #504. Each reads what its row means now \u2014 a note you have replied to is not still waiting on you \u2014 and the shapes and the words are shared."
           >
             <div className="space-y-4">
               {DEV_QUEUE_STATES.map(([queue, states]) => (

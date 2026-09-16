@@ -3,10 +3,11 @@ import {
   DEV_STATES,
   DEV_STATE_WORD,
   DISMISSED_WORD,
-  feedbackState,
-  findingState,
+  FEEDBACK_HEALTH_WORD,
+  FINDING_HEALTH_WORD,
+  IDEA_HEALTH_WORD,
+  RAISED_HEALTH_WORD,
   planState,
-  raisedState,
 } from '@/lib/dev/words';
 import { PLAN_HEALTHS } from '@/lib/plan/tree';
 
@@ -32,28 +33,36 @@ describe('the shared words', () => {
 describe('a row decided against', () => {
   it('reads the same on every queue', () => {
     const words = [
-      DEV_STATE_WORD[feedbackState('declined') ?? 'waiting'],
-      DEV_STATE_WORD[raisedState('dismissed') ?? 'waiting'],
-      DEV_STATE_WORD[findingState('dismissed') ?? 'waiting'],
+      FEEDBACK_HEALTH_WORD.dropped,
+      RAISED_HEALTH_WORD.dropped,
+      FINDING_HEALTH_WORD.dropped,
       DEV_STATE_WORD[planState('dropped') ?? 'waiting'],
     ];
     expect(new Set(words)).toEqual(new Set(['Dropped']));
   });
-});
 
-describe('a row somebody is working', () => {
-  it('reads the same on the plan and in the notes queue', () => {
-    expect(feedbackState('in_progress')).toBe('working');
-    expect(planState('in_progress')).toBe('working');
+  it('calls an idea put aside dismissed, which is not the same thing', () => {
+    expect(IDEA_HEALTH_WORD.dropped).toBe(DISMISSED_WORD);
   });
 });
 
 describe('a row waiting on the person', () => {
   it('reads the same wherever it is waiting', () => {
-    expect(feedbackState('blocked')).toBe('waiting');
-    expect(raisedState('open')).toBe('waiting');
-    expect(findingState('open')).toBe('waiting');
-    expect(planState('blocked')).toBe('waiting');
+    const words = [
+      FEEDBACK_HEALTH_WORD.waiting,
+      RAISED_HEALTH_WORD.waiting,
+      FINDING_HEALTH_WORD.waiting,
+      IDEA_HEALTH_WORD.waiting,
+      DEV_STATE_WORD[planState('blocked') ?? 'ready'],
+    ];
+    expect(new Set(words)).toEqual(new Set(['Waiting on you']));
+  });
+});
+
+describe('a row somebody is working', () => {
+  it('reads the same on the plan and in the notes queue', () => {
+    expect(FEEDBACK_HEALTH_WORD.working).toBe(DEV_STATE_WORD.working);
+    expect(planState('in_progress')).toBe('working');
   });
 });
 
@@ -63,13 +72,17 @@ describe('a row waiting on the person', () => {
  * would lose what it knows that the others do not.
  */
 describe('what each queue keeps for itself', () => {
-  it('leaves the notes queue its planned notes', () => {
-    expect(feedbackState('planned')).toBeNull();
+  it('leaves the notes queue its planned notes and its answered ones', () => {
+    expect(FEEDBACK_HEALTH_WORD.planned).toBe('Planned');
+    expect(FEEDBACK_HEALTH_WORD.answered).toBe('Answered');
   });
 
-  it('leaves a raise its answer and a finding its confirmation', () => {
-    expect(raisedState('answered')).toBeNull();
-    expect(findingState('confirmed')).toBeNull();
+  it('leaves a raise the one state it exists to show', () => {
+    expect(RAISED_HEALTH_WORD.unfinished).toBe('Nothing done');
+  });
+
+  it('leaves a finding its confirmation', () => {
+    expect(FINDING_HEALTH_WORD.ready).toBe('Confirmed');
   });
 
   it('leaves the plan its questions, proposals and waits', () => {

@@ -16,9 +16,10 @@ import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { cn } from '@/lib/cn';
-import { DEV_STATE_WORD } from '@/lib/dev/words';
-import { FEEDBACK_STATUS_GLYPHS } from '@/lib/status-glyphs';
-import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
+import { feedbackHealth, type FeedbackHealth } from '@/lib/dev/health';
+import { FEEDBACK_HEALTH_WORD } from '@/lib/dev/words';
+import { FEEDBACK_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import { isOutstanding, type FeedbackRow } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
@@ -28,34 +29,14 @@ export type { FeedbackRow, FeedbackStatus } from '@/lib/feedback/load';
 // A tone rather than a tinted lozenge. The plan has drawn its states as a
 // hexagon and a word for a while; this queue drew a capsule, so the same fact
 // looked like two different kinds of thing on two tabs.
-const STATUS_TONE: Record<FeedbackStatus, DevTone> = {
-  open: 'info',
-  in_progress: 'accent',
-  blocked: 'caution',
+const HEALTH_TONE: Record<FeedbackHealth, DevTone> = {
+  waiting: 'caution',
+  answered: 'positive',
+  ready: 'info',
   planned: 'quiet',
+  working: 'accent',
   done: 'positive',
-  declined: 'ghost',
-};
-
-/**
- * What each status is called on the row.
- *
- * Four of the six are states every dev queue has, so the word comes from
- * lib/dev/words.ts and a note reads the way the same thing reads on the plan.
- * `planned` is this queue's own -- the note has been written into the build
- * plan and is worked from there.
- *
- * `in_progress` used to say "Dash is on this", which is who rather than what.
- * Who still shows: the bot beside the word, the same one the plan marks a
- * handed-over step with.
- */
-const STATUS_LABEL: Record<FeedbackStatus, string> = {
-  open: DEV_STATE_WORD.ready,
-  in_progress: DEV_STATE_WORD.working,
-  blocked: DEV_STATE_WORD.waiting,
-  planned: 'Planned',
-  done: DEV_STATE_WORD.done,
-  declined: DEV_STATE_WORD.dropped,
+  dropped: 'ghost',
 };
 
 const PRIORITY_LABEL: Record<number, string> = {
@@ -88,6 +69,10 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
    */
   const [editing, setEditing] = useState(false);
   const canEdit = isOutstanding(row);
+
+  // What the note means, not what its column says. `blocked` is two states and
+  // only the thread tells them apart.
+  const health = feedbackHealth(row);
 
   /**
    * The form stays open on an error so the text is not lost, and closes when a
@@ -127,11 +112,18 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           {row.kind}
         </span>
         <StateLabel
-          glyph={FEEDBACK_STATUS_GLYPHS[row.status]}
-          word={STATUS_LABEL[row.status]}
-          tone={STATUS_TONE[row.status]}
+          glyph={FEEDBACK_HEALTH_GLYPHS[health]}
+          word={FEEDBACK_HEALTH_WORD[health]}
+          tone={HEALTH_TONE[health]}
+          title={
+            health === 'answered'
+              ? 'You replied, so it is a session\'s again. The status column still says blocked.'
+              : undefined
+          }
         >
-          {row.status === 'in_progress' && (
+          {/* Who has it, which the word deliberately does not say. The same bot
+              the plan marks a handed-over step with. */}
+          {health === 'working' && (
             <Bot className="size-3 shrink-0" strokeWidth={2} aria-hidden />
           )}
         </StateLabel>

@@ -23,10 +23,13 @@
  * that works out which state a row is in belongs to each queue.
  */
 
-import type { FeedbackStatus } from '@/lib/feedback/load';
+import type {
+  FeedbackHealth,
+  FindingHealth,
+  IdeaHealth,
+  RaisedHealth,
+} from '@/lib/dev/health';
 import type { PlanHealth } from '@/lib/plan/tree';
-import type { RaisedStatus } from '@/lib/raised/load';
-import type { UiFindingStatus } from '@/lib/ui-review/load';
 
 /** The five states every dev queue has, whatever it calls them in its column. */
 export const DEV_STATES = ['waiting', 'ready', 'working', 'done', 'dropped'] as const;
@@ -69,61 +72,65 @@ export const DEV_STATE_WORD: Record<DevState, string> = {
 export const DISMISSED_WORD = 'Dismissed';
 
 /**
- * Which shared state a note in the bugs queue is in.
+ * What a note in the bugs queue is called.
  *
- * `planned` is the queue's own: it means the note has been written into the
- * build plan and is worked from there, which no other queue can say.
+ * Five of the seven are states every dev queue has, so they take the shared
+ * word. `Answered` and `Planned` are this queue's own: a note you have replied
+ * to is a session's again, and a note written into the build plan is worked
+ * from there.
  */
-export function feedbackState(status: FeedbackStatus): DevState | null {
-  switch (status) {
-    case 'open':
-      return 'ready';
-    case 'in_progress':
-      return 'working';
-    case 'blocked':
-      return 'waiting';
-    case 'done':
-      return 'done';
-    case 'declined':
-      return 'dropped';
-    case 'planned':
-      return null;
-  }
-}
+export const FEEDBACK_HEALTH_WORD: Record<FeedbackHealth, string> = {
+  waiting: DEV_STATE_WORD.waiting,
+  answered: 'Answered',
+  ready: DEV_STATE_WORD.ready,
+  planned: 'Planned',
+  working: DEV_STATE_WORD.working,
+  done: DEV_STATE_WORD.done,
+  dropped: DEV_STATE_WORD.dropped,
+};
 
 /**
- * Which shared state a raise is in.
+ * What a raise is called.
  *
- * `answered` is its own: the person wrote a reply, which is what closes a raise
- * and is not the same as the work being finished.
+ * `Nothing done` is its own, and it is the state this queue exists to show: a
+ * raise answered with no action and no reason for none is not finished, whatever
+ * its status column says.
  */
-export function raisedState(status: RaisedStatus): DevState | null {
-  switch (status) {
-    case 'open':
-      return 'waiting';
-    case 'dismissed':
-      return 'dropped';
-    case 'answered':
-      return null;
-  }
-}
+export const RAISED_HEALTH_WORD: Record<RaisedHealth, string> = {
+  waiting: DEV_STATE_WORD.waiting,
+  unfinished: 'Nothing done',
+  done: 'Answered',
+  dropped: DEV_STATE_WORD.dropped,
+};
 
 /**
- * Which shared state a UI finding is in.
+ * What a UI finding is called.
  *
- * `confirmed` is its own: a pass proposed it and you agreed it is real, which
- * is a step no other queue has between being filed and being worked.
+ * `Confirmed` rather than the shared `Ready`: a pass proposed it and you agreed
+ * it is real, which is a step between being filed and being worked that no
+ * other queue has.
  */
-export function findingState(status: UiFindingStatus): DevState | null {
-  switch (status) {
-    case 'open':
-      return 'waiting';
-    case 'dismissed':
-      return 'dropped';
-    case 'confirmed':
-      return null;
-  }
-}
+export const FINDING_HEALTH_WORD: Record<FindingHealth, string> = {
+  waiting: DEV_STATE_WORD.waiting,
+  ready: 'Confirmed',
+  dropped: DEV_STATE_WORD.dropped,
+};
+
+/**
+ * What an idea is called.
+ *
+ * `Dismissed` rather than `Dropped`: putting an idea aside is "not right now"
+ * and one press brings it back, which is not the same as deciding against a
+ * step. The three before it say what became of it -- nothing yet, a proposal
+ * waiting on your approval, a feature being built, a feature finished.
+ */
+export const IDEA_HEALTH_WORD: Record<IdeaHealth, string> = {
+  open: 'Not shaped',
+  waiting: DEV_STATE_WORD.waiting,
+  shaped: 'Shaped',
+  done: DEV_STATE_WORD.done,
+  dropped: DISMISSED_WORD,
+};
 
 /**
  * Which shared state a plan step's health is.
