@@ -1492,60 +1492,6 @@ form[data-auto-submit] [data-fallback-submit] {
   padding: 0.05em 0.25em;
 }
 
-/* ---------------------------------------------------------------------------
- * The ground the app is laid on.
- *
- * Until now the workspace's colour reached the person as a hue on controls --
- * a button, a chip, the active row. That is a weak signal (you have to be
- * looking at a control to get it) and it is the wrong place for it (colour on
- * content is the thing every law in the guide is trying to keep out).
- *
- * So the colour moves to the chrome and leaves content alone entirely. Two
- * soft radial washes of the workspace's own two hues, at an alpha low enough
- * that nothing on top of them has to work around it, painted on the surround
- * the sidebar and the page pane sit in. Switching workspace now changes the
- * room rather than the buttons.
- *
- * The third layer is grain. A large, soft, two-stop gradient bands visibly on
- * an ordinary display, and banding is the single thing that makes a wash read
- * as CSS rather than as a material. Fractal noise blended in `overlay` fixes
- * it: mid-grey is a no-op under overlay, so only the noise's deviation from
- * mid-grey survives, which is exactly a grain and not a grey veil.
- * ------------------------------------------------------------------------- */
-:root {
-  --wash-a: var(--c-accent-base);
-  --wash-b: var(--c-accent-base);
-  /* Strong enough to see, weak enough that nothing has to accommodate it.
-   * Doubled in the dark schemes: the same alpha over near-black is invisible. */
-  --wash-alpha: 14%;
-  --grain-alpha: 0.45;
-}
-
-[data-workspace='shopping'] { --wash-a: #fb7185; --wash-b: #be123c; }
-[data-workspace='jobs']     { --wash-a: #a78bfa; --wash-b: #7c3aed; }
-[data-workspace='todo']     { --wash-a: #38bdf8; --wash-b: #0369a1; }
-[data-workspace='vault']    { --wash-a: #f0abfc; --wash-b: #a21caf; }
-[data-workspace='learn']    { --wash-a: #34d399; --wash-b: #0f766e; }
-[data-workspace='dev']      { --wash-a: #94a3b8; --wash-b: #475569; }
-
-.shell-ground {
-  background-color: var(--c-shell);
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E"),
-    radial-gradient(
-      120% 90% at 0% 0%,
-      color-mix(in oklab, var(--wash-a) var(--wash-alpha), transparent),
-      transparent 68%
-    ),
-    radial-gradient(
-      110% 80% at 4% 100%,
-      color-mix(in oklab, var(--wash-b) var(--wash-alpha), transparent),
-      transparent 62%
-    );
-  background-blend-mode: overlay, normal, normal;
-  background-attachment: fixed, fixed, fixed;
-}
-
 /* The page pane: the one thing in the shell that genuinely floats. */
 .page-pane {
   background-color: var(--c-page);
@@ -1574,20 +1520,6 @@ form[data-auto-submit] [data-fallback-submit] {
   background-color: transparent;
   border-radius: 0;
   box-shadow: none;
-}
-
-/* Same alpha over a dark bench is nothing at all. */
-[data-theme='midnight'],
-[data-theme='dusk'],
-[data-theme='lightbox'] {
-  --wash-alpha: 26%;
-  --grain-alpha: 0.3;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --wash-alpha: 26%;
-  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -439,9 +439,9 @@ export function AppShell({
     <CaptureProvider>
     <div
       className={cn(
-        // The ground, not a container. It carries the workspace's wash and the
-        // grain over it; see `.shell-ground` in globals.css.
-        'shell-ground min-h-dvh lg:grid',
+        // The ground, not a container: the sidebar and the page pane are both
+        // laid on it.
+        'bg-shell min-h-dvh lg:grid',
         // The inset the page pane floats in. Six pixels of ground showing on
         // every side is what turns two panels butted together into an object
         // laid on a surface.
