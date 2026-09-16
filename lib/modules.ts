@@ -12,7 +12,7 @@
  * module is never invisible while waiting for someone to write the query.
  */
 
-export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn' | 'dev';
+export type ModuleId = 'shopping' | 'jobs' | 'vault' | 'todo' | 'learn' | 'news' | 'dev';
 
 export type AppModule = {
   id: ModuleId;
@@ -54,7 +54,7 @@ export type AppModule = {
  * form, generous radii, and exactly one detail held back for white. The detail
  * is always the thing that *names* the object -- the gap between a cart's
  * basket and its rail, the clasp on a case, the keyhole in a lock -- and never
- * a highlight. One detail each, in every mark, is most of why seven drawings
+ * a highlight. One detail each, in every mark, is most of why eight drawings
  * read as one set.
  *
  * What they are not: outlines. A stroked glyph at 18px is a smudge, and an
@@ -68,7 +68,15 @@ export type AppModule = {
  * any mark contains, because on the home page and in a browser tab it is the
  * mark.
  */
-export type MarkShape = 'dash' | 'cart' | 'briefcase' | 'list' | 'lock' | 'book' | 'terminal';
+export type MarkShape =
+  | 'dash'
+  | 'cart'
+  | 'briefcase'
+  | 'list'
+  | 'lock'
+  | 'book'
+  | 'envelope'
+  | 'terminal';
 
 export interface MarkKey {
   shape: MarkShape;
@@ -143,6 +151,23 @@ export const MODULES: readonly AppModule[] = [
     // end was pushed off teal and into green so that the open book has a green
     // in it and is not a second cyan beside the terminal.
     key: { shape: 'book', from: '#34d399', to: '#0f766e' },
+  },
+  {
+    id: 'news',
+    prefix: '/news',
+    // The list of what has arrived. "What have I been sent" is the question
+    // this module answers, and the address is a setting rather than a page you
+    // come back to.
+    home: '/news',
+    label: 'News',
+    description: 'Newsletters sent to an address of your own',
+    accent: '--color-w-news',
+    // Gold, and the only warm yellow in the app. It is off the sweep the other
+    // four sit on for the same reason dev is: the arc ran out at rose, and the
+    // next stop along it would have been the caution amber. Gold sits further
+    // from the warning colour in all four themes than rose sits from the
+    // delete red, which is the distance this set already accepts.
+    key: { shape: 'envelope', from: '#e8c760', to: '#846905' },
   },
   {
     id: 'dev',
