@@ -53,6 +53,12 @@ export type FindState = {
   error?: string;
   /** Proposed, not saved. Nothing reaches the row until you pick one. */
   candidates?: ResolvedSource[];
+  /**
+   * The claim the search was aimed at, when it was aimed at one. Said out loud
+   * beside the results so a bad result can be traced to a bad aim rather than
+   * to the search. Absent for a reading you typed, which is about a subject.
+   */
+  aim?: Aim;
   rooting?: RootingNote;
 };
 
@@ -146,8 +152,9 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
   });
   await recordLearnSpend(user.id, 'suggest-sources', spend.reports);
 
-  if (!result.ok) return { error: result.detail, rooting: behind?.note };
-  return { candidates: result.sources, rooting: behind?.note };
+  const said = { aim: aim ?? undefined, rooting: behind?.note };
+  if (!result.ok) return { error: result.detail, ...said };
+  return { candidates: result.sources, ...said };
 }
 
 /**
