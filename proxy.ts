@@ -43,6 +43,10 @@ const PUBLIC_PATHS = [
   // ownership with a hash of EBAY_VERIFICATION_TOKEN, and the POST only ever
   // acknowledges. Required for the production keyset to stay enabled.
   '/api/ebay/account-deletion',
+  // Inbound newsletter delivery. Mailgun carries no session; the post is
+  // authenticated by an HMAC over the fields it signs, checked in
+  // lib/news/providers/mailgun.ts before anything is read out of the body.
+  '/api/news/inbound',
   // The shared case page. Authorized by an unguessable, expiring slug and read
   // through one security definer function that checks both; see
   // supabase/migrations-job-search/0017_public_case_page.sql.

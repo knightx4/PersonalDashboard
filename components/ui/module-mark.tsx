@@ -7,8 +7,8 @@ import { HOME_MARK, moduleById, type MarkKey, type MarkShape, type ModuleId } fr
  *
  * Three values and never more: a ground tinted with the module's hue, the
  * object drawn solid in that hue, and one detail held back in white. That is
- * the whole construction, identical in all seven, and it is what makes them a
- * set rather than seven drawings that happen to share a palette.
+ * the whole construction, identical in all eight, and it is what makes them a
+ * set rather than eight drawings that happen to share a palette.
  *
  * -- What this replaced, and why --
  * For a long time every mark was the same four-node square: three constant
@@ -115,6 +115,7 @@ function Solid({ shape }: { shape: MarkShape }) {
     case 'list':
     case 'lock':
     case 'book':
+    case 'envelope':
     case 'terminal':
     case 'dash':
     default:
@@ -122,7 +123,7 @@ function Solid({ shape }: { shape: MarkShape }) {
   }
 }
 
-/** The other five, split out only to keep either switch readable. */
+/** The other six, split out only to keep either switch readable. */
 function SolidRest({ shape }: { shape: MarkShape }) {
   switch (shape) {
     case 'list':
@@ -152,6 +153,17 @@ function SolidRest({ shape }: { shape: MarkShape }) {
           <path d="M11 7.9 4 5.9A1.5 1.5 0 0 0 2.1 7.35v9.9a1.5 1.5 0 0 0 1.1 1.45L11 20.8Z" />
           <path d="M13 7.9v12.9l7.8-2.1a1.5 1.5 0 0 0 1.1-1.45v-9.9A1.5 1.5 0 0 0 20 5.9Z" />
         </>
+      );
+
+    case 'envelope':
+      // An envelope with its flap up, so the silhouette peaks. A closed
+      // envelope is a rounded rectangle, which the terminal beside it already
+      // is and the list is a squarer version of -- three rectangles in one
+      // switcher told apart by their proportions is the mistake this set was
+      // redrawn to fix. The peak is the whole point: it is the only shape here
+      // that is not flat on top.
+      return (
+        <path d="M12 2.5a1.7 1.7 0 0 1 1.02.34l8.14 6.1A2.1 2.1 0 0 1 22 10.62v7.78a3.4 3.4 0 0 1-3.4 3.4H5.4A3.4 3.4 0 0 1 2 18.4v-7.78a2.1 2.1 0 0 1 .84-1.68l8.14-6.1A1.7 1.7 0 0 1 12 2.5Z" />
       );
 
     case 'terminal':
@@ -249,6 +261,12 @@ function Detail({ shape }: { shape: MarkShape }) {
           <rect x="12.4" y="14.6" width="6" height="2.1" rx="1.05" />
         </>
       );
+
+    case 'envelope':
+      // The fold the letter goes behind, drawn as one wide V. It runs the full
+      // width on purpose: a small crease is the first thing to close up at
+      // 18px, and without it the peak above reads as a roof.
+      return <path d="M3.4 10.9 12 16.9 20.6 10.9v3.1L12 20v-3.1L3.4 14Z" />;
 
     case 'dash':
     default:
