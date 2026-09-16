@@ -122,6 +122,16 @@ describe('fireFeatureRoutine', () => {
  * recoverable by looking.
  */
 describe('runIdFrom', () => {
+  it('reads the session id the fire response actually carries', () => {
+    expect(
+      runIdFrom({
+        type: 'routine_fire',
+        claude_code_session_id: 'cse_01XcjPdgtBHS43gGoWWmxNKn',
+        claude_code_session_url: 'https://claude.ai/code/cse_01XcjPdgtBHS43gGoWWmxNKn',
+      }),
+    ).toBe('cse_01XcjPdgtBHS43gGoWWmxNKn');
+  });
+
   it('reads the run\'s own id ahead of a bare id', () => {
     expect(runIdFrom({ id: 'trig_1', run_id: 'run_1' })).toBe('run_1');
   });
