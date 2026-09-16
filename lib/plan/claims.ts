@@ -1,0 +1,63 @@
+/**
+ * When a claim on a step has stopped meaning anything.
+ *
+ * `in_progress` says one thing: a session has claimed this step and is on it.
+ * Nothing releases it when that session dies, so the row goes on saying
+ * underway for the rest of the day -- and the CLI, the brief and the next
+ * session all read the row. `lib/plan/elapsed.ts` already reads the clock
+ * beside the status so the page and the send guard stop calling a dead claim
+ * live; this is the half that says a claim should be written back, so the row
+ * itself stops being wrong.
+ *
+ * Two claims are not being worked. One is older than any session takes, which
+ * is `isStalledClaim`'s rule and the same threshold. The other has nobody on
+ * it at all: every path that claims a step names who holds it -- the send
+ * button and `plan.ts start` name Claude, the page names you -- so a claim
+ * with no assignee is one no session and no person is holding.
+ */
+import { elapsedSince, isStalledClaim } from './elapsed';
+
+export type Claim = {
+  status: string;
+  assignee: string | null;
+  startedAt: string | null;
+};
+
+/** Why a claim is being taken back. */
+export type ExpiredClaim = 'stale' | 'unowned';
+
+/**
+ * Whether this row's claim should be put back, and which of the two it is.
+ *
+ * Null for anything that is not a claim at all, and for a live one. A claim
+ * with no `startedAt` is left alone the way `hasLiveClaim` leaves it: the
+ * column is stamped by a trigger, so a row without one was claimed this
+ * instant.
+ */
+export function expiredClaim(claim: Claim, now: number): ExpiredClaim | null {
+  if (claim.status !== 'in_progress') return null;
+  if (!claim.assignee) return 'unowned';
+  if (!claim.startedAt) return null;
+  return isStalledClaim(claim.startedAt, now) ? 'stale' : null;
+}
+
+/**
+ * The line written into the step's comment when its claim is taken back.
+ *
+ * Dated and appended, the same shape `done`, `block` and `answer` use, so the
+ * history of a step reads in one column however each line got there. It says
+ * how long the claim sat because that is the question somebody reading it a
+ * week later asks: whether the session had time to do anything first.
+ */
+export function claimExpiredNote(
+  why: ExpiredClaim,
+  startedAt: string | null,
+  now: number,
+): string {
+  const stamp = new Date(now).toISOString().slice(0, 10);
+  const reason =
+    why === 'unowned'
+      ? 'it was underway with nobody holding it'
+      : `nothing had touched it for ${elapsedSince(startedAt as string, now)}`;
+  return `Claim expired ${stamp}: ${reason}, so it went back to not started.`;
+}
