@@ -5,7 +5,6 @@ import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
 import { hexToOklch, oklchToHex, relativeLuminance } from '@/lib/theme/oklch';
 import { generatePalette } from '@/lib/theme/palette';
 import {
-  ACCENT_TOKENS,
   HUE_TOKENS,
   LIGHT_CAST,
   LIGHTBOX_HUE_TOKENS,
@@ -184,12 +183,48 @@ describe('generatePalette', () => {
     }
   });
 
-  it('rotates light about LIGHT_CAST, which is Paper everywhere but the accent', () => {
-    for (const token of Object.keys(REFERENCE_PALETTES.paper)) {
-      if (ACCENT_TOKENS.includes(token)) continue;
+  it('rotates light about LIGHT_CAST, which leaves the fixed colours as Paper wrote them', () => {
+    for (const token of FIXED_TOKENS) {
       expect(`${token} ${LIGHT_CAST[token]}`).toBe(`${token} ${REFERENCE_PALETTES.paper[token]}`);
     }
     expect(generatePalette('light', REFERENCE_HUE.paper)).toEqual(LIGHT_CAST);
+  });
+
+  it('gives a light theme enough colour to see, at the luminance Paper wrote', () => {
+    // #456: Paper's neutrals are near-greys between 0.004 and 0.013 chroma, so
+    // a chosen colour reached the links and almost nothing else. They now
+    // carry about what Dusk's neutrals carry, which is what dark has had all
+    // along. Near white there is less room than that -- a card at pure white
+    // reflects everything and cannot be any colour at all -- so what is
+    // checked here is the surfaces with room in them.
+    // Two floors, because the room a token has depends on how light it is.
+    // Borders and text sit far enough down the scale to take the whole lift at
+    // every hue; a well and the sidebar are a few per cent off white, where the
+    // warm hues run out of sRGB around 0.021.
+    const floors: Record<string, number> = {
+      '--c-border': 0.035,
+      '--c-border-strong': 0.035,
+      '--c-border-control': 0.035,
+      '--c-ink-muted': 0.035,
+      '--c-ink-ghost': 0.035,
+      '--c-sunken': 0.021,
+      '--c-shell': 0.018,
+    };
+    for (const hue of SWEEP) {
+      const palette = generatePalette('light', hue);
+      for (const [token, floor] of Object.entries(floors)) {
+        const got = hexToOklch(palette[token]).c;
+        const paper = hexToOklch(REFERENCE_PALETTES.paper[token]).c;
+        expect(`${hue} ${token} ${got >= floor}`).toBe(`${hue} ${token} true`);
+        expect(`${hue} ${token} louder ${got > paper * 2}`).toBe(`${hue} ${token} louder true`);
+      }
+    }
+  });
+
+  it('leaves light with no colour exactly as pale as Paper is', () => {
+    // The lift belongs to the cast palette, not to Paper. Light with no colour
+    // is the theme the app shipped with, down to the byte.
+    expect(generatePalette('light', null)).toEqual(REFERENCE_PALETTES.paper);
   });
 
   it('reads a hue outside 0-360 as the same place on the circle', () => {

@@ -59,10 +59,11 @@ const CAST: Record<ThemeMode, 'paper' | 'dusk' | 'lightbox'> = {
  * from the hue the reference's own page ground carries.
  *
  * The cast reference is Dusk for dark and LIGHT_CAST for light -- Paper with
- * its accent moved onto Paper's own page hue, which is what #454 settled.
- * Paper's page and Paper's accent were chosen independently and sit a hundred
- * and eighty apart, so rotating Paper as one thing would answer a request for
- * green with a faintly green page and magenta links.
+ * its accent moved onto Paper's own page hue, which is what #454 settled, and
+ * its near-grey neutrals given enough chroma to read as a colour, which is
+ * #456. Paper's page and Paper's accent were chosen independently and sit a
+ * hundred and eighty apart, so rotating Paper as one thing would answer a
+ * request for green with a faintly green page and magenta links.
  *
  * `hue` is in degrees and may be anything; it is wrapped, so 400 is 40.
  */
