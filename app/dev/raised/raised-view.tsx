@@ -11,6 +11,7 @@ import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/rais
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { RefText } from '@/components/dev/ref-text';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -38,7 +39,9 @@ function Ask({ ask }: { ask: string }) {
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Needs from you
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink">{ask}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">
+        <RefText text={ask} />
+      </p>
     </div>
   );
 }
@@ -55,7 +58,9 @@ function Consequence({ said }: { said: string }) {
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Answering yes
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink-muted">{said}</p>
+      <p className="whitespace-pre-wrap text-body text-ink-muted">
+        <RefText text={said} />
+      </p>
     </div>
   );
 }
@@ -220,12 +225,18 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           {row.consequence && <Consequence said={row.consequence.said} />}
           {row.detail && (
             <Disclosure title="Why it came up" meta={lead(row.detail)}>
-              <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+              <p className="whitespace-pre-wrap text-body text-ink">
+                <RefText text={row.detail} />
+              </p>
             </Disclosure>
           )}
         </>
       ) : (
-        row.detail && <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+        row.detail && (
+          <p className="whitespace-pre-wrap text-body text-ink">
+            <RefText text={row.detail} />
+          </p>
+        )
       )}
 
       {/* Which run raised it. Without this a raise is a voice from nowhere, and

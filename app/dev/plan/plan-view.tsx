@@ -37,6 +37,7 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { planRowId } from '@/lib/comments/refs';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -2094,10 +2095,13 @@ function PlanRow({
 
   return (
     <>
+      {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
+          the row clear of the pinned header it would otherwise arrive under. */}
       <li
+        id={planRowId(node.number)}
         className={cn(
           ROW_GRID,
-          'group px-3',
+          'group scroll-mt-24 px-3',
           gloss && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
           closed && 'opacity-70',
