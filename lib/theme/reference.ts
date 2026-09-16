@@ -20,7 +20,7 @@
  * #456.
  *
  * These tables are a copy of what globals.css says, flattened -- `--c-page:
- * var(--c-canvas)` is resolved to the hex it lands on -- because the browser
+ * var(--c-page-ground)` is resolved to the hex it lands on -- because the browser
  * cannot read a stylesheet before it has parsed one, and the whole point is to
  * write the palette into the page's first byte. lib/theme/palette.test.ts
  * re-reads globals.css and fails if the two have drifted, which is the only
@@ -49,9 +49,9 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-sunken': '#f2f0ea',
     '--c-border': '#e8e5df',
     '--c-border-strong': '#d5d1c8',
-    '--c-shell': '#f4f2ec',
+    '--c-shell': '#e4dfd2',
     '--c-shell-ink': '#1a1a18',
-    '--c-shell-muted': '#63635e',
+    '--c-shell-muted': '#5d5d58',
     '--c-shell-border': '#e2dfd7',
     '--c-shell-hover': '#eae7df',
     '--c-ink': '#1a1a18',
@@ -96,9 +96,10 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#fafaf9',
     '--c-sheet-outline': '#e8e5df',
     '--c-caution-fill-ink': '#14100a',
-    '--c-page': '#faf9f6',
+    '--c-page-ground': '#f0ece2',
+    '--c-page': '#f0ece2',
     '--c-page-ink': '#1a1a18',
-    '--c-page-ink-muted': '#6b6b66',
+    '--c-page-ink-muted': '#65655f',
     '--c-page-ink-ghost': '#85857e',
     '--c-page-border': '#e8e5df',
     '--c-page-border-strong': '#d5d1c8',
@@ -178,6 +179,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#141516',
     '--c-sheet-outline': '#212225',
     '--c-caution-fill-ink': '#14100a',
+    '--c-page-ground': '#08090a',
     '--c-page': '#08090a',
     '--c-page-ink': '#f7f8f8',
     '--c-page-ink-muted': '#9096a0',
@@ -260,6 +262,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#1c1728',
     '--c-sheet-outline': '#2c2440',
     '--c-caution-fill-ink': '#14100a',
+    '--c-page-ground': '#110d1a',
     '--c-page': '#110d1a',
     '--c-page-ink': '#f2eefa',
     '--c-page-ink-muted': '#a79fc0',
@@ -351,6 +354,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#dfe5eb',
     '--c-sheet-outline': 'rgb(18 24 34 / 0.42)',
     '--c-caution-fill-ink': '#14100a',
+    '--c-page-ground': '#2b3644',
     '--c-page': '#2b3644',
     '--c-page-ink': '#eef2f7',
     '--c-page-ink-muted': '#b6c1ce',
@@ -499,7 +503,7 @@ export const ACCENT_TOKENS: readonly string[] = [
  * rather than a rounding away from it.
  */
 export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox', number> = {
-  paper: hexToOklch(REFERENCE_PALETTES.paper['--c-canvas']).h,
+  paper: hexToOklch(REFERENCE_PALETTES.paper['--c-page']).h,
   dusk: hexToOklch(REFERENCE_PALETTES.dusk['--c-canvas']).h,
   // Lightbox's canvas is a sheet rather than the room, so its own hue is read
   // off the bench -- which is what --c-page is in a two-polarity theme.

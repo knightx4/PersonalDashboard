@@ -318,7 +318,7 @@ export function AppShell({
           the section list rather than in it: settings are not a tenth place to
           work, and a rule keeps them from reading as one. */}
       {settingsHref && (
-        <div className="border-t border-shell-border px-2 py-2">
+        <div className="px-2 py-2">
           {navRow({
             href: settingsHref,
             label: settingsLabel ?? 'Settings',
@@ -439,7 +439,13 @@ export function AppShell({
     <CaptureProvider>
     <div
       className={cn(
-        'min-h-dvh lg:grid',
+        // The ground, not a container. It carries the workspace's wash and the
+        // grain over it; see `.shell-ground` in globals.css.
+        'shell-ground min-h-dvh lg:grid',
+        // The inset the page pane floats in. Six pixels of ground showing on
+        // every side is what turns two panels butted together into an object
+        // laid on a surface.
+        'lg:gap-1.5 lg:p-1.5',
         collapsed ? 'lg:grid-cols-[3.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]',
       )}
     >
@@ -453,7 +459,7 @@ export function AppShell({
           how a company logo and a filter chip ended up in front of an open
           switcher menu. Level with the top bar, below the palette and the
           sheets that are meant to cover the whole shell. */}
-      <aside className="sticky top-0 z-chrome hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
+      <aside className="sticky top-1.5 z-chrome hidden h-[calc(100dvh-0.75rem)] flex-col lg:flex">
         {sidebarInner(collapsed)}
 
         {/* Narrow it when the page needs the width, without losing the way
@@ -520,14 +526,14 @@ export function AppShell({
           it. Making this a full-height flex column and letting `main` take the
           slack puts the line at the bottom of the window when the page is
           short, and `sticky` keeps doing its job when the page is long. */}
-      <div className="flex min-h-dvh min-w-0 flex-col">
+      <div className="page-pane flex min-h-dvh min-w-0 flex-col lg:min-h-[calc(100dvh-0.75rem)] lg:overflow-hidden">
         {/* The top bar is chrome, not page: it takes the shell's ground and
             the shell's ink, the same as the column beside it. In three themes
             the shell is a near-neighbour of the surface it used to use, so
             this reads as the bar picking up its own sidebar's tone. In
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
-        <header className="sticky top-0 z-chrome border-b border-shell-border bg-shell/85 backdrop-blur">
+        <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur">
           <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
             <button
               type="button"
@@ -619,7 +625,7 @@ export function AppShell({
         {/* Below sm the brief has no middle of the bar to live in, so it gets
             its own line under the bar. Read on arrival, same as on a desktop. */}
         {brief && (
-          <p className="border-b border-shell-border bg-shell px-4 py-1.5 text-center text-small sm:hidden">
+          <p className="bg-page px-4 py-1.5 text-center text-small sm:hidden">
             {brief.href ? (
               <Link
                 href={brief.href}

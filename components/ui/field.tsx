@@ -86,7 +86,7 @@ export function InlineInput({ className, ref, ...props }: React.ComponentProps<'
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
         'w-full rounded-control border border-transparent bg-transparent px-1 py-0.5 text-base text-ink sm:text-ui',
-        'hover:border-border hover:bg-sunken',
+        'hover:bg-sunken',
         'focus:border-accent focus:bg-surface focus:outline-none focus:ring-1 focus:ring-accent/40',
         'placeholder:text-ink-ghost aria-invalid:border-danger',
         'disabled:cursor-not-allowed disabled:opacity-50',
@@ -215,7 +215,7 @@ export function ChipSelect({
       className={cn(
         'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
         'border border-transparent px-1.5 py-0.5 text-ui',
-        'hover:border-border hover:bg-sunken',
+        'hover:bg-sunken',
         'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
         className,
       )}
@@ -290,7 +290,7 @@ export function ChipInput({
       className={cn(
         'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
         'border border-transparent px-1.5 py-0.5 text-ui',
-        'hover:border-border hover:bg-sunken',
+        'hover:bg-sunken',
         'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
         className,
       )}

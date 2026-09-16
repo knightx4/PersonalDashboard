@@ -77,10 +77,11 @@ export const ANATOMY_FRAMES: readonly {
 ];
 
 export const RADII: readonly { name: string; px: number; where: string }[] = [
-  { name: 'rounded-card', px: 8, where: 'Cards, panels, banners, popovers, the empty state.' },
+  { name: 'rounded-pane', px: 16, where: 'The page pane, which is the only thing that floats the shell.' },
+  { name: 'rounded-card', px: 12, where: 'Cards, panels, banners, popovers, the empty state.' },
   {
     name: 'rounded-control',
-    px: 6,
+    px: 8,
     where: 'Buttons, inputs, chips, menu rows, the hover ground on a list row.',
   },
   { name: 'rounded', px: 4, where: 'A keycap, and the focus outline.' },

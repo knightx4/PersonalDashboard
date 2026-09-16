@@ -38,9 +38,10 @@
   --c-border: #e8e5df;
   --c-border-strong: #d5d1c8;
 
-  --c-shell: #f4f2ec;
+  --c-page-ground: #f0ece2;
+  --c-shell: #e4dfd2;
   --c-shell-ink: #1a1a18;
-  --c-shell-muted: #63635e;
+  --c-shell-muted: #5d5d58;
   --c-shell-border: #e2dfd7;
   --c-shell-hover: #eae7df;
 
@@ -131,9 +132,24 @@
    *
    * The rule for a new theme: if your page and your cards share a polarity,
    * ignore all of this. */
-  --c-page: var(--c-canvas);
+  /* The page ground, and the one token in this block that is not simply the
+   * sheet half's opposite number.
+   *
+   * It used to be `var(--c-canvas)` outright. That reads as tidy and is
+   * wrong: --c-canvas is the recessed well INSIDE a card -- the Lightbox note
+   * below says so in as many words -- so aliasing them made the page ground
+   * three percent from a white card lying on it, which is why every card in
+   * this app needed a border drawn round it to be seen. It also meant the
+   * page could not be darkened without dragging every well down with it,
+   * which blows the contrast budget in seventy-two generated themes.
+   *
+   * So the page gets a token of its own. The alias survives as the default,
+   * because in the three dark themes canvas already sits below surface and
+   * the page wants exactly that value. Paper is the theme that needed a step
+   * put in, and it is the only one that overrides it. */
+  --c-page: var(--c-page-ground);
   --c-page-ink: var(--c-ink);
-  --c-page-ink-muted: var(--c-ink-muted);
+  --c-page-ink-muted: #65655f;
   --c-page-ink-ghost: var(--c-ink-ghost);
   --c-page-border: var(--c-border);
   --c-page-border-strong: var(--c-border-strong);
@@ -178,6 +194,8 @@
   --c-sheet-scheme: dark;
 
   --c-canvas: #08090a;
+  --c-page-ground: #08090a;
+  --c-page-ink-muted: var(--c-ink-muted);
   --c-surface: #0f1011;
   --c-raised: #191a1c;
   --c-sunken: #050506;
@@ -299,6 +317,7 @@
    * scripts/check-contrast.ts fails on. The sheets still clear the bench by
    * 11:1, so they are as lit as they ever were -- what shrank is the drop
    * from 16.9, and that step was never the point. */
+  --c-page-ground: #2b3644;
   --c-page: #2b3644;
   --c-page-ink: #eef2f7;
   --c-page-ink-muted: #b6c1ce;
@@ -476,6 +495,8 @@
   --c-sheet-scheme: dark;
 
   --c-canvas: #110d1a;
+  --c-page-ground: #110d1a;
+  --c-page-ink-muted: var(--c-ink-muted);
   --c-surface: #191426;
   --c-raised: #241d35;
   --c-sunken: #0b0812;
@@ -545,6 +566,8 @@
     --c-sheet-scheme: dark;
 
     --c-canvas: #08090a;
+    --c-page-ground: #08090a;
+    --c-page-ink-muted: var(--c-ink-muted);
     --c-surface: #0f1011;
     --c-raised: #191a1c;
     --c-sunken: #050506;
@@ -853,8 +876,16 @@ body,
   --text-ui--line-height: 1.5;
   --text-body: 14px;
   --text-body--line-height: 1.55;
-  --text-lead: 15px;
-  --text-lead--line-height: 1.5;
+  /* Was 15px, against a 14px body.
+   *
+   * One pixel is not a distinction anyone perceives; it was a token and a
+   * decision at thirty-odd call sites returning nothing. Collapsed onto the
+   * body size rather than deleted so the sweep that removes the class is a
+   * separate, mechanical change -- but as far as anyone looking at the app is
+   * concerned, this app now has one body size and separates by weight and
+   * colour, which is all the type hierarchy a dashboard needs. */
+  --text-lead: 14px;
+  --text-lead--line-height: 1.55;
   --text-title: 20px;
   --text-title--line-height: 1.25;
   --text-figure: 32px;
@@ -869,11 +900,19 @@ body,
   --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono-stack);
 
-  --radius-card: 0.5rem;
-  /* Tighter than the card that holds them. A control is a small object and a
-   * 12px radius on a 32px box is most of the way to a pill, which reads as a
-   * button even when it is a text field. */
-  --radius-control: 0.375rem;
+  /* Three steps, each one a third larger than the last.
+   *
+   * These were 8 and 6, which is the radius of an admin tool -- small enough
+   * that a corner reads as "not square" rather than as drawn. 12 and 8 is
+   * where a card starts looking like an object, and it is the cheapest
+   * perceived-quality change available anywhere in this file.
+   *
+   * A control stays tighter than the card holding it, for the reason it
+   * always did: 12px on a 32px box is most of the way to a pill, which reads
+   * as a button even when it is a text field. */
+  --radius-pane: 1rem;
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
 
   /* 150ms ease-out everywhere. Alive, never in the way. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1461,4 +1500,114 @@ form[data-auto-submit] [data-fallback-submit] {
   border-radius: 0.25rem;
   font-weight: 500;
   padding: 0.05em 0.25em;
+}
+
+/* ---------------------------------------------------------------------------
+ * The ground the app is laid on.
+ *
+ * Until now the workspace's colour reached the person as a hue on controls --
+ * a button, a chip, the active row. That is a weak signal (you have to be
+ * looking at a control to get it) and it is the wrong place for it (colour on
+ * content is the thing every law in the guide is trying to keep out).
+ *
+ * So the colour moves to the chrome and leaves content alone entirely. Two
+ * soft radial washes of the workspace's own two hues, at an alpha low enough
+ * that nothing on top of them has to work around it, painted on the surround
+ * the sidebar and the page pane sit in. Switching workspace now changes the
+ * room rather than the buttons.
+ *
+ * The third layer is grain. A large, soft, two-stop gradient bands visibly on
+ * an ordinary display, and banding is the single thing that makes a wash read
+ * as CSS rather than as a material. Fractal noise blended in `overlay` fixes
+ * it: mid-grey is a no-op under overlay, so only the noise's deviation from
+ * mid-grey survives, which is exactly a grain and not a grey veil.
+ * ------------------------------------------------------------------------- */
+:root {
+  --wash-a: var(--c-accent-base);
+  --wash-b: var(--c-accent-base);
+  /* Strong enough to see, weak enough that nothing has to accommodate it.
+   * Doubled in the dark schemes: the same alpha over near-black is invisible. */
+  --wash-alpha: 14%;
+  --grain-alpha: 0.45;
+}
+
+[data-workspace='shopping'] { --wash-a: #fb7185; --wash-b: #be123c; }
+[data-workspace='jobs']     { --wash-a: #a78bfa; --wash-b: #7c3aed; }
+[data-workspace='todo']     { --wash-a: #38bdf8; --wash-b: #0369a1; }
+[data-workspace='vault']    { --wash-a: #f0abfc; --wash-b: #a21caf; }
+[data-workspace='learn']    { --wash-a: #34d399; --wash-b: #0f766e; }
+[data-workspace='dev']      { --wash-a: #94a3b8; --wash-b: #475569; }
+
+.shell-ground {
+  background-color: var(--c-shell);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E"),
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in oklab, var(--wash-a) var(--wash-alpha), transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      110% 80% at 4% 100%,
+      color-mix(in oklab, var(--wash-b) var(--wash-alpha), transparent),
+      transparent 62%
+    );
+  background-blend-mode: overlay, normal, normal;
+  background-attachment: fixed, fixed, fixed;
+}
+
+/* The page pane: the one thing in the shell that genuinely floats. */
+.page-pane {
+  background-color: var(--c-page);
+}
+
+@media (min-width: 1024px) {
+  .page-pane {
+    border-radius: var(--radius-pane);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 8px 24px -8px rgb(0 0 0 / 0.10);
+  }
+}
+
+/* Same alpha over a dark bench is nothing at all. */
+[data-theme='midnight'],
+[data-theme='dusk'],
+[data-theme='lightbox'] {
+  --wash-alpha: 26%;
+  --grain-alpha: 0.3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --wash-alpha: 26%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Things arrive by moving.
+ *
+ * Every overlay in this app appeared: one frame absent, the next frame there.
+ * A fade is the cheap default and reads as a repaint; four pixels of travel on
+ * the easing this file already uses reads as the thing coming from somewhere.
+ * ------------------------------------------------------------------------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 140ms var(--ease-out-soft) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
 }

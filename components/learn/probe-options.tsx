@@ -37,7 +37,7 @@ function AnswerButton({
         // as many lines as the answer needs, where Button is centred on one
         // line at the dial's height. Same call as components/todo/task-form.
         'w-full rounded-control border border-border px-4 py-3 text-left text-body text-ink',
-        'hover:border-accent hover:bg-sunken disabled:cursor-not-allowed disabled:opacity-70',
+        'hover:bg-accent-tint disabled:cursor-not-allowed disabled:opacity-70',
       )}
     >
       {label}
