@@ -16,6 +16,7 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadConceptView } from '@/lib/learn/graph/concept';
+import { claimWordingLine } from '@/lib/learn/graph/last-answered';
 import { probesFor, type ProbeRow } from '@/lib/learn/graph/session';
 import { openingQuestionFor } from '@/lib/learn/graph/opening';
 import type { Concept, Mentioned } from '@/lib/learn/graph/model';
@@ -34,10 +35,12 @@ export const dynamic = 'force-dynamic';
  * claim that mentions this one, from a highlight somebody wants to branch off
  * -- and it computes nothing the subject page does not already compute.
  *
- * Two things on it write, and both ask first: taking a gap to the reading
- * queue, which is the same action and the same two ids as the card it came
- * from, and branching a chain off a phrase selected in the claim, which is
- * proposed and approved like any other goal.
+ * Three things on it write. Two ask first: taking a gap to the reading queue,
+ * which is the same action and the same two ids as the card it came from, and
+ * branching a chain off a phrase selected in the claim, which is proposed and
+ * approved like any other goal. The third is rewriting the claim, which needs
+ * no proposal because the words are yours -- what the app wrote is kept, and
+ * the page says which of you wrote the sentence being read.
  */
 
 function ConceptLink({ concept }: { concept: Concept }) {
@@ -150,8 +153,22 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
       <PageHeader title={concept.name} />
 
-      {/* The claim, and the offer to branch off a phrase in it. */}
-      <BranchFromClaim conceptId={concept.id} claim={concept.claim} />
+      {/* The claim, the offer to branch off a phrase in it, and the way to
+          write it yourself. */}
+      <BranchFromClaim
+        conceptId={concept.id}
+        claim={concept.claim}
+        wording={claimWordingLine(concept.claimRewrittenAt, new Date(), settings.timezone)}
+      />
+
+      {/* What the app first wrote, once there is a version of yours sitting
+          where it was. Nothing to show on a claim you have never rewritten,
+          and no heading either. */}
+      {concept.claimOriginal && (
+        <Group title="What the app first wrote" className="mb-5">
+          <p className="max-w-prose text-ui text-ink-muted">{concept.claimOriginal}</p>
+        </Group>
+      )}
 
       <CardSection title="Where it stands" className="mb-5">
         <p className="flex gap-2 text-ui text-ink">

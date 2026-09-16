@@ -18,6 +18,8 @@ function concept(id: string, state: KnowledgeState = 'unknown'): Concept {
     id,
     name: id,
     claim: `${id} is the case, for a reason.`,
+    claimOriginal: null,
+    claimRewrittenAt: null,
     basis: 'Written by hand for this test.',
     kind: null,
     mastery: [],

@@ -29,6 +29,16 @@ export type Concept = {
   name: string;
   /** The claim itself. What a probe question would be written against. */
   claim: string;
+  /**
+   * What the claim said before the first time it was rewritten by hand. Null
+   * on a claim still in the app's wording, which is most of them.
+   */
+  claimOriginal: string | null;
+  /**
+   * When the claim was last written by hand. Null means the wording above is
+   * the app's, and it is what every screen reads to say whose words these are.
+   */
+  claimRewrittenAt: string | null;
   /** How this node came to be believed to belong here. */
   basis: string;
   /**

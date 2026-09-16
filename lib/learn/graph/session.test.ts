@@ -16,6 +16,8 @@ function concept(id: string, state: KnowledgeState, kind: Concept['kind'] = null
     id,
     name: id,
     claim: `${id} is the case.`,
+    claimOriginal: null,
+    claimRewrittenAt: null,
     basis: 'Seeded.',
     kind,
     mastery: [],

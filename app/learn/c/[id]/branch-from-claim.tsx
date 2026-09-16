@@ -207,7 +207,19 @@ function ClaimEditor({
   );
 }
 
-export function BranchFromClaim({ conceptId, claim }: { conceptId: string; claim: string }) {
+export function BranchFromClaim({
+  conceptId,
+  claim,
+  wording,
+}: {
+  conceptId: string;
+  claim: string;
+  /**
+   * Whose words the claim is in, as a finished sentence. Written on the
+   * server, because the date is in the account's timezone.
+   */
+  wording: string;
+}) {
   const claimRef = useRef<HTMLParagraphElement>(null);
   const [selection, setSelection] = useState('');
   const [state, propose, asking] = useActionState<BranchState, FormData>(proposeBranch, {});
@@ -247,9 +259,13 @@ export function BranchFromClaim({ conceptId, claim }: { conceptId: string; claim
     <>
       {/* The claim, which is the concept. Everything else on this page is
           about it. */}
-      <p ref={claimRef} className="mb-3 text-body text-ink">
+      <p ref={claimRef} className="mb-1 text-body text-ink">
         {claim}
       </p>
+
+      {/* Directly under the sentence, because it is about that sentence and
+          nothing else on the page. */}
+      <p className="mb-3 text-small text-ink-muted">{wording}</p>
 
       {chain && state.selection ? (
         <Proposal
