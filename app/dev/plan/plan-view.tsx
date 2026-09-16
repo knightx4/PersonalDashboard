@@ -58,6 +58,7 @@ import {
   Select,
   Textarea,
 } from '@/components/ui/field';
+import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
@@ -1612,6 +1613,12 @@ type Health = {
  * Which shape it draws is in lib/status-glyphs.ts, beside the pipeline's and
  * the todo list's, so a state here looks like the same state there. What is
  * left is the word, the tone and the fixed part of the tooltip.
+ *
+ * Five of the ten are states the other dev queues have too, and those words
+ * come from lib/dev/words.ts so a dropped step and a declined note read alike.
+ * The other five are the plan's own refinements -- a question, a proposal, a
+ * step waiting on another step, a step nobody has reached -- and no other queue
+ * has anything for them to disagree with.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
@@ -1625,8 +1632,17 @@ const HEALTH: Record<PlanHealth, Health> = {
     tone: 'accent',
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
-  in_progress: { word: 'In progress', tone: 'accent' },
-  blocked: { word: 'Blocked', tone: 'caution' },
+  in_progress: { word: DEV_STATE_WORD.working, tone: 'accent' },
+  // "Waiting on you" rather than "Blocked", which said a step was stuck and not
+  // who could unstick it. The notes queue says the same thing about a note
+  // blocked on an answer, and now says it in the same words.
+  blocked: {
+    word: DEV_STATE_WORD.waiting,
+    tone: 'caution',
+    title: 'Stopped on something only you can settle. The note says what.',
+  },
+  // A step waiting on another step, which clears itself. Nothing else to say
+  // "on you" about, and the plan is the only queue that has it.
   waiting: { word: 'Waiting', tone: 'caution' },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
@@ -1638,10 +1654,10 @@ const HEALTH: Record<PlanHealth, Health> = {
   // in this comment and rendered as grey on the only page that shows it.
   // `info` is the app's own blue, themed in all five palettes, and it does
   // not move when the workspace does.
-  ready: { word: 'Ready', tone: 'info' },
+  ready: { word: DEV_STATE_WORD.ready, tone: 'info' },
   not_started: { word: 'Not started', tone: 'quiet' },
-  done: { word: 'Done', tone: 'positive' },
-  dropped: { word: 'Dropped', tone: 'ghost' },
+  done: { word: DEV_STATE_WORD.done, tone: 'positive' },
+  dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
 };
 
 function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {

@@ -142,7 +142,9 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
       >
         <Sparkles className="size-3.5" aria-hidden />
         In the plan as #{idea.planItem.number}
-        {idea.planItem.status === 'proposed' && ' · waiting for your approval'}
+        {/* The plan's own word for it, so the same step does not read one way
+            here and another on the page it links to. */}
+        {idea.planItem.status === 'proposed' && ' · proposed, waiting on you'}
       </Link>
     );
   }

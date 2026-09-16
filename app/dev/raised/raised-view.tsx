@@ -13,6 +13,7 @@ import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
+import { DEV_STATE_WORD, raisedState } from '@/lib/dev/words';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -67,11 +68,19 @@ function lead(detail: string): string {
   return first.length > 90 ? `${first.slice(0, 89).trimEnd()}…` : first;
 }
 
+/**
+ * A closed raise, worded the way the other dev queues word it.
+ *
+ * "Answered" is this queue's own -- a raise closes on a reply, which is not the
+ * same as the work being finished. A raise you turned down is the same fact as
+ * a step dropped or a note declined, so it takes the shared word.
+ */
 function StatusLabel({ row }: { row: RaisedRow }) {
+  const state = raisedState(row.status);
   if (row.status === 'open') return null;
   return (
     <span className="text-small text-ink-muted">
-      {row.status === 'answered' ? 'Answered' : 'Dismissed'}
+      {state ? DEV_STATE_WORD[state] : 'Answered'}
     </span>
   );
 }

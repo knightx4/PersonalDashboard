@@ -15,6 +15,7 @@ import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { cn } from '@/lib/cn';
+import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { isOutstanding, type FeedbackRow, type FeedbackStatus } from '@/lib/feedback/load';
 import { surfaceOf } from '@/lib/feedback/surfaces';
 
@@ -36,19 +37,22 @@ const STATUS_STYLE: Record<FeedbackStatus, string> = {
 /**
  * What each status is called on the row.
  *
- * Every one is its own word except `in_progress`, which is the interesting
- * one: a note is only ever in progress because a run claimed it, so the honest
- * label is who has it rather than the column's name. It carries the same bot
- * the plan page marks a handed-over step with -- the page said nothing about
- * work going to Claude beyond a status word that reads like any other.
+ * Four of the six are states every dev queue has, so the word comes from
+ * lib/dev/words.ts and a note reads the way the same thing reads on the plan.
+ * `planned` is this queue's own -- the note has been written into the build
+ * plan and is worked from there.
+ *
+ * `in_progress` used to say "Dash is on this", which is who rather than what.
+ * Who still shows: the bot beside the word, the same one the plan marks a
+ * handed-over step with.
  */
 const STATUS_LABEL: Record<FeedbackStatus, string> = {
-  open: 'open',
-  in_progress: 'Dash is on this',
-  blocked: 'blocked',
-  planned: 'planned',
-  done: 'done',
-  declined: 'declined',
+  open: DEV_STATE_WORD.ready,
+  in_progress: DEV_STATE_WORD.working,
+  blocked: DEV_STATE_WORD.waiting,
+  planned: 'Planned',
+  done: DEV_STATE_WORD.done,
+  declined: DEV_STATE_WORD.dropped,
 };
 
 const PRIORITY_LABEL: Record<number, string> = {

@@ -320,7 +320,11 @@ const PLAN_STATES = [
     'A question waiting on you. The one letterform in the set, because no fill said it.',
   ],
   ['answered', 'Answered', 'You answered it, and every step beneath is built against it.'],
-  ['blocked', 'Blocked', 'Stopped on something outside the step. Barred, like a closed role.'],
+  [
+    'blocked',
+    'Waiting on you',
+    'Stopped on something only you can settle. Barred, like a closed role.',
+  ],
   ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
   ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],
 ] as const satisfies readonly (readonly [PlanHealth, string, string])[];
