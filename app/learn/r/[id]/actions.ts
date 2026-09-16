@@ -11,9 +11,9 @@ import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { conceptsFromNote } from '@/lib/learn/graph/from-note';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
-import { loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
+import { loadConcept, loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
 import { isRooted, rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
-import { aimFor, type Aim } from '@/lib/learn/graph/aim';
+import { aimFor, aimSentence, type Aim } from '@/lib/learn/graph/aim';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
@@ -289,7 +289,8 @@ export async function updateNote(
  *
  * This is the lazy locate pass, and it is a server action rather than a link
  * because the work happens between the click and the tab: fetch the document,
- * find the passage that answers the track's question, verify the phrase is
+ * find the passage that answers what this reading is for -- its own claim when
+ * it came from a gap, its track's question otherwise -- verify the phrase is
  * really in the page, then redirect to a URL that lands on it.
  *
  * Doing it here rather than at import time is what keeps the cost proportional
@@ -325,10 +326,16 @@ export async function openReading(formData: FormData): Promise<void> {
     redirect(url);
   }
 
+  // What this reading is for. A gap track's question covers a whole subject's
+  // worth of claims, which cannot narrow a page down to a paragraph; the claim
+  // this one was queued for can. Read here rather than earlier so the common
+  // path -- already narrowed, nothing to do but go -- costs no query.
+  const concept = reading.conceptId ? await loadConcept(supabase, reading.conceptId) : null;
+
   const spend = collectSpend();
   const outcome = await locatePassage({
     url: reading.source?.canonicalUrl ?? url,
-    question: reading.trackQuestion,
+    question: concept ? aimSentence(aimFor(concept)) : reading.trackQuestion,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? null,
     onSpend: spend.sink,
   });

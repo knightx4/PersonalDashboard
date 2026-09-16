@@ -3,7 +3,6 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { addManualReading, createTrack } from '@/lib/learn/tracks/save';
-import { aimFor, aimSentence } from '@/lib/learn/graph/aim';
 import type { Concept } from '@/lib/learn/graph/model';
 
 /**
@@ -30,14 +29,15 @@ function fail(action: string, error: { message: string }): Error {
  * Find the track this subject's gaps go in, or make it.
  *
  * One per subject, so a month of gap-reading lands in one place rather than
- * one track per concept. The question is rewritten each time to the claim
- * currently being chased, since that is what the next source gets aimed at.
+ * one track per concept. The question is written once, when the track is made,
+ * and describes the track rather than any one gap in it: a track that holds
+ * twenty claims cannot be about the twentieth. Each reading carries its own
+ * claim, which is read off its concept when something needs it.
  */
 async function trackForSubject(
   supabase: LearnSupabaseClient,
   userId: string,
   subjectName: string,
-  question: string,
 ): Promise<string> {
   const title = `${subjectName}: what you are missing`;
 
@@ -50,18 +50,12 @@ async function trackForSubject(
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Looking for the track', error);
 
-  if (data) {
-    const id = (data as { id: string }).id;
-    const { error: updateError } = await supabase
-      .from('tracks')
-      .update({ question })
-      .eq('id', id);
-    assertSchemaExposed(updateError, LEARN_SCHEMA);
-    if (updateError) throw fail('Pointing the track at that claim', updateError);
-    return id;
-  }
+  if (data) return (data as { id: string }).id;
 
-  return createTrack(supabase, userId, { title, question });
+  return createTrack(supabase, userId, {
+    title,
+    question: `What would settle the claims in ${subjectName} you are shaky on?`,
+  });
 }
 
 /**
@@ -76,12 +70,7 @@ export async function queueConcept(
   userId: string,
   input: { subjectName: string; concept: Concept },
 ): Promise<string> {
-  const trackId = await trackForSubject(
-    supabase,
-    userId,
-    input.subjectName,
-    aimSentence(aimFor(input.concept)),
-  );
+  const trackId = await trackForSubject(supabase, userId, input.subjectName);
 
   return addManualReading(supabase, userId, {
     trackId,
