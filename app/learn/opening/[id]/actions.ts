@@ -87,6 +87,12 @@ export async function answerOpening(
   return {};
 }
 
+// latency: optimistic
+//
+// One row write and a revalidate, with no model call in it -- unlike
+// answerOpening above, which is `pending` because it waits on a grade. Nothing
+// here can come back with a different answer than the one the card already
+// showed, so the question can close the moment it is skipped.
 export async function skipOpening(_prev: AnswerState, formData: FormData): Promise<AnswerState> {
   await requireUser();
 
