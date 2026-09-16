@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/auth/server';
+import { sessionUser } from '@/lib/auth/session-user';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
@@ -42,9 +43,7 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await sessionUser(supabase);
 
   if (!user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
