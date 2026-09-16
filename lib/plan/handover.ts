@@ -122,12 +122,25 @@ export async function handStepToClaude(input: {
     if (error) return { ok: false, error: error.message };
   }
 
-  const text =
-    `Build plan step #${node.number}, "${node.title}", following .claude/skills/plan/SKILL.md. ` +
-    'The brief is below; it is the plan as the app holds it right now, and the plan is the ' +
-    'source of truth -- claim the step, build it, verify, commit with the step number in the ' +
-    'subject, and close it with a note.\n\n' +
-    planBrief(sections, node, { thread: true });
+  // A leaf step is sent straight to the build procedure rather than to the
+  // skill's front door. The front door's job is to route between the jobs and
+  // to orchestrate a batch, and neither applies to one step -- reading it is a
+  // couple of hundred lines the session then carries for the whole run. A step
+  // with anything beneath it is a batch, so it goes to the front door.
+  const alone = flatten([node]).length === 1;
+  const text = alone
+    ? `Build plan step #${node.number}, "${node.title}", following ` +
+      '.claude/skills/plan/reference/building.md. The brief is below; it is the plan as the ' +
+      'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
+      'it, verify, commit with the step number in the subject, and close it with a note. ' +
+      'Push when it is closed.\n\n' +
+      planBrief(sections, node, { thread: true })
+    : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
+      '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
+      'build and so is orchestrated: send each step to its own subagent and keep your own ' +
+      'context for the batch. The brief is below; it is the plan as the app holds it right ' +
+      'now, and the plan is the source of truth.\n\n' +
+      planBrief(sections, node, { thread: true });
 
   const routine = planRoutine();
   const result = await fireFeatureRoutine({

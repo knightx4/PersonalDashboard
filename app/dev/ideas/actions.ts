@@ -226,8 +226,9 @@ export async function shapeIdea(
   const said = threadText(idea.thread);
 
   const text =
-    `Shape idea ${String(idea.id).slice(0, 8)} into the plan, following the "Shaping an idea" ` +
-    'section of .claude/skills/plan/SKILL.md. Write a proposal only: a feature with its steps, ' +
+    `Shape idea ${String(idea.id).slice(0, 8)} into the plan, following ` +
+    '.claude/skills/plan/reference/shaping.md, and .claude/skills/plan/reference/writing.md for ' +
+    'how every row is worded. Write a proposal only: a feature with its steps, ' +
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
     `${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n` +

@@ -235,7 +235,7 @@ none of them stopped their own feature being finished. They sat where nothing
 reads them again: the feature ships, the patch stays, and the thought is lost
 more thoroughly than if it had been dropped. `FOG_RULE` in
 `lib/plan/brief.ts` carries the test into both turns that write fog, the
-shaping one and the re-shaping one, and `.claude/skills/plan/SKILL.md` says it
+shaping one and the re-shaping one, and `.claude/skills/plan/reference/shaping.md` says it
 at length.
 
 **One patch per feature**, because it is one column: a second `fog --note`
@@ -305,7 +305,7 @@ aside under that feature, and the instruction not to write any of them back —
 not as a proposal, not as the same question in different words, not as fog, not
 as an idea. Without that list the next re-shape reads the same code, reaches
 the same thought and writes it again, which is the loop dismissal exists to
-end. `.claude/skills/plan/SKILL.md` says the same thing at length.
+end. `.claude/skills/plan/reference/dismissed.md` says the same thing at length.
 
 ## The routines
 
@@ -538,15 +538,30 @@ it proposes is started; the plan adapts continuously and still changes only
 on an approve. It refuses a proposal, which has nothing agreed to adapt,
 and a leaf step, which has nothing beneath it to re-read.
 
-**The skill.** `.claude/skills/plan/SKILL.md` is the procedure: read the
-brief, check what it waits on, claim it, break it down if it is large, build
-to the done-when, verify, commit with `(plan #n)` in the subject, close with
-a note. It carries the re-shape job too, which
-writes proposals and nothing else. A step assigned to Claude is Claude's to
-pick up; a step named by the user is Claude's whoever holds it; anything
-else, ask. The plan must
-always tell the truth: a step that cannot be finished is blocked with the
-question, never left in progress and never closed to look tidy.
+**The skill.** `.claude/skills/plan/SKILL.md` is the front door: which steps
+are Claude's, how a batch is run, and where each job is written down. The jobs
+themselves are one file each under `reference/` — building a step, shaping an
+idea, re-shaping a feature, answering an `@dash` comment, plus the wording
+rules and the SQL for when the CLI cannot run. A session reads the front door
+and the one file it was sent for, rather than all seven jobs to do one of them.
+
+`reference/building.md` is the per-step procedure: read the brief, check what
+it waits on, claim it, break it down if it is large, build to the done-when,
+verify, commit with `(plan #n)` in the subject, close with a note.
+
+A batch is not built by the session that receives it. More than one step means
+each step goes to its own subagent, which reads `reference/building.md`, builds
+that one step and reports back a paragraph. The orchestrating session never
+opens the step's source files. This is what stops a long feature ending
+halfway: a session that builds nine steps itself carries everything it read for
+the first through every turn of the last, and runs out of room around the
+third. The subagents also skip the full test suite and `next build` — the
+orchestrator runs both once before it pushes, and CI runs them again on main.
+
+A step assigned to Claude is Claude's to pick up; a step named by the user is
+Claude's whoever holds it; anything else, ask. The plan must always tell the
+truth: a step that cannot be finished is blocked with the question, never left
+in progress and never closed to look tidy.
 
 ## What is deliberately not here
 

@@ -954,12 +954,12 @@ export async function sendPlanFeatureToClaude(
   const steps = open.length - 1;
   const text =
     `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
-    '.claude/skills/plan/SKILL.md. Build its steps ONE AT A TIME in the order the plan ' +
-    'gives, each verified, committed and closed before the next is claimed, and keep ' +
-    'going until every step beneath it is closed, something blocks, or the session is ' +
-    'running short. Stop at the first step that needs a decision from me: block it with ' +
-    'the exact question rather than guessing, and do not skip past it to a later step. ' +
-    'Push once at the end of the batch and report every step you closed, by number and ' +
+    '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
+    'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
+    'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
+    'first step that needs a decision from me: block it with the exact question rather ' +
+    'than guessing, and do not skip past it to a later step that depends on it. Run the ' +
+    'gate once at the end, push once, and report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true });
@@ -1025,7 +1025,7 @@ async function startReshape(
 
   const text =
     `Re-shape plan feature #${node.number}, "${node.title}", following ` +
-    '.claude/skills/plan/SKILL.md. This is the re-shape job, not the build job: read the ' +
+    '.claude/skills/plan/reference/reshaping.md. This is the re-shape job, not the build job: read the ' +
     'feature against every answer settled beneath it and against what the code now says, ' +
     'and write what has changed.\n\n' +
     (closed
@@ -1149,14 +1149,13 @@ export async function sendPlanQueueToClaude(
   // got into it -- so the press changes no state at all. It sends.
   const text =
     `Work the ${queue.length} plan ${queue.length === 1 ? 'step' : 'steps'} handed to Claude, ` +
-    'following .claude/skills/plan/SKILL.md. Work them ONE AT A TIME in the order below, each ' +
-    'claimed, built, verified, committed with the step number in the subject and closed with a ' +
-    'note before the next is claimed. A step whose brief says it waits on another is worked ' +
-    'after that one, not skipped. Stop at the first step that needs a decision from me: block ' +
-    'it with the exact question rather than guessing, and carry on with the rest. Keep going ' +
-    'until every step is closed, something blocks the batch as a whole, or the session is ' +
-    'running short. Push once at the end and report every step you closed, by number and ' +
-    'title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
+    'following .claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each ' +
+    'step to its own subagent, in the order below, and do not read the steps\' source files or ' +
+    'make the edits yourself. Keep the carry-forward between them. A step whose brief says it ' +
+    'waits on another is worked after that one, not skipped. Stop at the first step that needs ' +
+    'a decision from me: block it with the exact question rather than guessing, and carry on ' +
+    'with the rest. Run the gate once at the end, push once, and report every step you closed, ' +
+    'by number and title.\n\nThe briefs are below; they are the plan as the app holds it right now, and the ' +
     'plan is the source of truth.\n\n' +
     planQueueBrief(sections, queue, { thread: true });
 
