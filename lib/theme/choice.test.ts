@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatTheme, parseTheme, writtenId, SYSTEM_THEME } from '@/lib/theme';
-import { themeAttribute, themeStyle } from '@/lib/theme/apply';
+import { shouldRepairTheme, themeAttribute, themeStyle } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 
 /**
@@ -112,6 +112,42 @@ describe('putting a theme on the document', () => {
     expect(style).toEqual(generatePalette('dark', 284));
     expect(Object.keys(style!).every((token) => token.startsWith('--c-'))).toBe(true);
     expect(style!['--c-canvas']).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+/**
+ * The repair that put every theme back to Lightbox (note bce3f7e5).
+ *
+ * The picker is handed the account's theme by a render, and saving a theme
+ * starts a render -- so the value it is holding can predate the write it is
+ * answering. While the repair fired on any disagreement, that stale value was
+ * put back on the document and saved over the new one, and the theme could not
+ * be changed at all.
+ */
+describe('shouldRepairTheme', () => {
+  it('puts a stored theme onto a document that carries no choice', () => {
+    // The case it exists for: a device with no cookie, so the server rendered
+    // the system default over an account that has actually chosen something.
+    expect(shouldRepairTheme(null, 'lightbox')).toBe(true);
+    expect(shouldRepairTheme(null, 'dark:284')).toBe(true);
+  });
+
+  it('leaves a document that is already showing the stored theme alone', () => {
+    expect(shouldRepairTheme('lightbox', 'lightbox')).toBe(false);
+  });
+
+  it('never overwrites a choice the document is already carrying', () => {
+    // The bug. The document has the theme just chosen; `stored` is the one it
+    // replaced. Repairing here reverts the choice and then saves the revert.
+    expect(shouldRepairTheme('dark:284', 'lightbox')).toBe(false);
+    expect(shouldRepairTheme('paper', 'ink')).toBe(false);
+  });
+
+  it('does not treat following the system as something to restore', () => {
+    // An account that is not saying is not an account asking for the system
+    // default, and it is also what a failed read looks like.
+    expect(shouldRepairTheme(null, null)).toBe(false);
+    expect(shouldRepairTheme('dusk', null)).toBe(false);
   });
 });
 
