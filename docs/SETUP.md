@@ -101,12 +101,12 @@ Six directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
-| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0037` |
-| `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
+| `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0071` |
+| `supabase/migrations-job-search` | `job_search` | `0001`–`0024` |
 | `supabase/migrations-vault` | `obsidian` | `0001` |
-| `supabase/migrations-learn` | `learn` | `0001`–`0007` |
+| `supabase/migrations-learn` | `learn` | `0001`–`0017` |
 | `supabase/migrations-news` | `news` | `0001` |
-| `supabase/migrations-todo` | `todo` | `0001`–`0004` |
+| `supabase/migrations-todo` | `todo` | `0001`–`0009` |
 
 `migrations-todo` goes **last**, after all five of the others. Its
 `task_links` table carries foreign keys into `job_search` and `obsidian` from
@@ -126,6 +126,16 @@ through `0030`, then all of `job_search`, then the rest of public, then
 `obsidian` — which is what `scripts/db-reset.sh` now does. Running the directories
 straight through fails on `public/0031` with *"relation
 job_search.application_events does not exist"*.
+
+A migration is applied by hand: the code deploys on merge and the SQL does
+not, so a feature can reach production a step ahead of the table it reads. That
+has happened once and it looked like this — every page under `/learn` replying
+*"This page couldn't load"*, because the Learn next badge is drawn in the nav of
+the whole module and its count read `learn.next_outcomes`, which the project did
+not have. The badge now survives a count that fails and the ordering falls back,
+so the same drift costs the feature rather than the module. The fix is still to
+run the migration: paste
+`supabase/migrations-learn/0017_next_outcomes.sql` into the SQL editor.
 
 `job_search` `0001`–`0006` are applied remotely; do not re-run them.
 **`0007`–`0010` are not**, and the code that depends on them is deployed, so

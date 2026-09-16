@@ -22,6 +22,19 @@
 const SCHEMA_NOT_EXPOSED = 'PGRST106';
 
 /**
+ * PostgREST's code for "there is no such table", and Postgres' own.
+ *
+ * Which is a different fault from an unexposed schema and has a different fix:
+ * the schema is being served, the table inside it was never created, because a
+ * migration sitting in `supabase/migrations-*` has not been applied to the
+ * project. The code deploys on merge and the migrations do not, so the two
+ * drift apart in exactly one direction -- deployed code asking for a table
+ * that is not there yet.
+ */
+const TABLE_NOT_FOUND = 'PGRST205';
+const UNDEFINED_TABLE = '42P01';
+
+/**
  * Every schema this app reads through PostgREST.
  *
  * Named here rather than written into the message, because the message used to
@@ -63,4 +76,18 @@ export function assertSchemaExposed(error: PostgrestErrorish, schema: string): v
   if (error?.code === SCHEMA_NOT_EXPOSED) {
     throw new SchemaNotExposedError(schema);
   }
+}
+
+/**
+ * Whether a query failed only because its table does not exist.
+ *
+ * For the caller that can carry on without it. A table that arrived with a
+ * feature's own migration is missing on a deployment that has not run it, and
+ * the part of the page that does not need that table should still draw -- a
+ * nav badge count is not worth the whole module. The caller decides; this only
+ * tells it which failure it is looking at, so that a permission error or a bad
+ * column never gets mistaken for one and swallowed.
+ */
+export function isMissingTable(error: PostgrestErrorish): boolean {
+  return error?.code === TABLE_NOT_FOUND || error?.code === UNDEFINED_TABLE;
 }

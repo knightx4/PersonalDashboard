@@ -1,6 +1,10 @@
 import 'server-only';
 
-import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import {
+  assertSchemaExposed,
+  isMissingTable,
+  SchemaNotExposedError,
+} from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type {
   Concept,
@@ -459,6 +463,18 @@ async function loadNextRecord(
     .order('happened_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
+  // The table arrived with `migrations-learn/0017`, and the code that reads it
+  // deploys on merge while the migration does not. Until it is applied the
+  // record is empty rather than fatal: it is an input to the ordering, not the
+  // content of the page, so Learn next falls back to distance and staleness --
+  // the order it had before -- instead of the module going down with it.
+  if (isMissingTable(error)) {
+    console.error(
+      'learn.next_outcomes is missing, so Learn next is ordered without what you have done. ' +
+        'Apply supabase/migrations-learn/0017_next_outcomes.sql to the project.',
+    );
+    return [];
+  }
   if (error) throw fail('Reading what you have done', error);
 
   const rows = (data ?? []) as unknown as OutcomeRow[];
@@ -570,5 +586,20 @@ export async function countNext(
   supabase: LearnSupabaseClient,
   now: Date = new Date(),
 ): Promise<number> {
-  return (await loadNext(supabase, NEXT_LIMIT, now)).length;
+  try {
+    return (await loadNext(supabase, NEXT_LIMIT, now)).length;
+  } catch (error) {
+    // The badge is drawn in the nav of every page in the module, so a throw
+    // here is not one broken tab -- it is Tracks, Read now, Quizzes and What
+    // you know all answering "this page couldn't load" over a number that was
+    // decoration. No badge is the honest answer to a count that failed, and
+    // the reason goes to the log rather than into the page.
+    //
+    // A schema that is not exposed still throws: that is not a count failing,
+    // it is the whole module unable to read anything, and the message it
+    // carries is the only thing naming the dashboard setting to change.
+    if (error instanceof SchemaNotExposedError) throw error;
+    console.error('Counting Learn next failed, so the tab shows no badge:', error);
+    return 0;
+  }
 }

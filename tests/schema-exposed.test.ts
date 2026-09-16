@@ -11,7 +11,11 @@
  * from ever being silent again.
  */
 import { describe, expect, it } from 'vitest';
-import { assertSchemaExposed, SchemaNotExposedError } from '@/lib/core/db/schema-errors';
+import {
+  assertSchemaExposed,
+  isMissingTable,
+  SchemaNotExposedError,
+} from '@/lib/core/db/schema-errors';
 
 describe('assertSchemaExposed', () => {
   it('throws on PGRST106, naming the schema and the fix', () => {
@@ -44,5 +48,34 @@ describe('assertSchemaExposed', () => {
   it('does nothing when the query succeeded', () => {
     expect(() => assertSchemaExposed(null, 'core')).not.toThrow();
     expect(() => assertSchemaExposed(undefined as never, 'core')).not.toThrow();
+  });
+});
+
+/**
+ * A table that is not there yet is a different fault with a different fix.
+ *
+ * The schema is served, the migration was never applied -- code deploys on
+ * merge and migrations do not. A caller that can carry on without the table
+ * needs to tell that failure apart from a permission error or a bad column,
+ * because swallowing either of those is how a real bug goes quiet.
+ */
+describe('isMissingTable', () => {
+  it('recognises PostgREST and Postgres saying the table does not exist', () => {
+    expect(
+      isMissingTable({
+        code: 'PGRST205',
+        message: "Could not find the table 'learn.next_outcomes' in the schema cache",
+      }),
+    ).toBe(true);
+    expect(
+      isMissingTable({ code: '42P01', message: 'relation "learn.next_outcomes" does not exist' }),
+    ).toBe(true);
+  });
+
+  it('is false for every other failure, and for none', () => {
+    expect(isMissingTable({ code: 'PGRST106', message: 'Invalid schema: learn' })).toBe(false);
+    expect(isMissingTable({ code: '42501', message: 'permission denied' })).toBe(false);
+    expect(isMissingTable({ code: '42703', message: 'column does not exist' })).toBe(false);
+    expect(isMissingTable(null)).toBe(false);
   });
 });

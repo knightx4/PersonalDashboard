@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { assertSchemaExposed, isMissingTable } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { NextKind, NextOutcome } from '@/lib/learn/next/rank';
 
@@ -74,6 +74,13 @@ const ALREADY_THERE = '23505';
  * than counted twice. Every other failure is thrown: this is called from
  * actions that have just written the outcome itself, and a record that
  * silently stops being kept is worse than a visible error.
+ *
+ * The table not existing is the exception, because it is not this write
+ * failing -- it is a deployment a migration ahead of its database, and the
+ * work whose outcome this records has already been committed by the caller.
+ * Failing here would make marking a reading read or answering a question
+ * report an error over something that did happen. So it is logged, naming the
+ * migration to run, and the record simply starts once the table is there.
  */
 export async function recordOutcome(
   supabase: LearnSupabaseClient,
@@ -83,6 +90,13 @@ export async function recordOutcome(
   const { error } = await supabase.from('next_outcomes').insert(outcomeRow(userId, input));
 
   assertSchemaExposed(error, LEARN_SCHEMA);
+  if (isMissingTable(error)) {
+    console.error(
+      'learn.next_outcomes is missing, so what you just did was not recorded for Learn next. ' +
+        'Apply supabase/migrations-learn/0017_next_outcomes.sql to the project.',
+    );
+    return;
+  }
   if (error && error.code !== ALREADY_THERE) {
     throw new Error(`Recording what you did failed: ${error.message}`);
   }

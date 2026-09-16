@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { answerKind, outcomeRow } from './record';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { answerKind, outcomeRow, recordOutcome } from './record';
 
 /**
  * What gets written when you do something with a row on Learn next.
@@ -64,5 +65,60 @@ describe('outcomeRow', () => {
 
     expect([claim.outcome, claim.concept_id]).toEqual(['not_now', 'concept-1']);
     expect([reading.outcome, reading.reading_id]).toEqual(['not_now', 'reading-1']);
+  });
+});
+
+/**
+ * What the write does with a failure.
+ *
+ * Three cases and three different answers, which is the whole of the logic
+ * around the insert: a reading finished twice is one fact, a database a
+ * migration behind is not this write's fault, and anything else is a record
+ * quietly stopping.
+ */
+function clientReturning(error: { code: string; message: string } | null): LearnSupabaseClient {
+  return {
+    from: () => ({ insert: async () => ({ error }) }),
+  } as unknown as LearnSupabaseClient;
+}
+
+const READING_READ = {
+  kind: 'reading',
+  readingId: 'reading-1',
+  outcome: 'read',
+} as const;
+
+describe('recordOutcome', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('writes without complaint', async () => {
+    await expect(recordOutcome(clientReturning(null), USER, READING_READ)).resolves.toBeUndefined();
+  });
+
+  it('drops a second finish of the same reading', async () => {
+    const twice = clientReturning({ code: '23505', message: 'duplicate key' });
+    await expect(recordOutcome(twice, USER, READING_READ)).resolves.toBeUndefined();
+  });
+
+  it('carries on when the table is not there yet, saying which migration to run', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const missing = clientReturning({
+      code: 'PGRST205',
+      message: "Could not find the table 'learn.next_outcomes' in the schema cache",
+    });
+
+    // The reading was already marked read by the caller. Throwing here would
+    // report a failure over work that happened.
+    await expect(recordOutcome(missing, USER, READING_READ)).resolves.toBeUndefined();
+    expect(logged.mock.calls[0]?.[0]).toContain('0017_next_outcomes.sql');
+  });
+
+  it('throws on anything else, because a record that stops being kept is a bug', async () => {
+    const denied = clientReturning({ code: '42501', message: 'permission denied' });
+    await expect(recordOutcome(denied, USER, READING_READ)).rejects.toThrow(
+      /Recording what you did failed/,
+    );
   });
 });
