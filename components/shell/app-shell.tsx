@@ -526,14 +526,14 @@ export function AppShell({
           it. Making this a full-height flex column and letting `main` take the
           slack puts the line at the bottom of the window when the page is
           short, and `sticky` keeps doing its job when the page is long. */}
-      <div className="page-pane flex min-h-dvh min-w-0 flex-col lg:min-h-[calc(100dvh-0.75rem)] lg:overflow-hidden">
+      <div className="page-pane flex min-h-dvh min-w-0 flex-col lg:min-h-[calc(100dvh-0.75rem)]">
         {/* The top bar is chrome, not page: it takes the shell's ground and
             the shell's ink, the same as the column beside it. In three themes
             the shell is a near-neighbour of the surface it used to use, so
             this reads as the bar picking up its own sidebar's tone. In
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
-        <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur">
+        <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur lg:rounded-t-pane">
           <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
             <button
               type="button"
