@@ -63,9 +63,15 @@ Not a topic. Not a tag. Not a note. "Behavioural economics" is a shelf label:
 it cannot be right or wrong, it cannot be probed, and nothing can meaningfully
 require it.
 
-The test, applied to every candidate: *could you write a question that someone
-who holds this answers differently from someone who does not?* If no, it is not
-a node.
+The test, applied to every candidate, has two halves:
+
+1. *Could you write a question that someone who holds this answers differently
+   from someone who does not?*
+2. *Would being wrong about it cost you anything?*
+
+If either fails, it is not a node. The second half was added after the trial:
+"NPV quantifies, IRR is comparable" passes the first test and nobody would ever
+argue it, and a bar that admits facts about tools admits thousands of them.
 
 This is the one place to be uncompromising, and the reason is practical rather
 than aesthetic: strictness here is what keeps the map small. There are
@@ -350,25 +356,41 @@ useless for deciding what to learn next.
 What actually runs, in order. Stages 0 to 3 are the first build; 4 to 7 follow
 immediately but are separable.
 
-### Stage 0 — Route
+### Stage 0 — Classify
 
-Nothing should read your journal.
+Every note is classified, and almost every note is read. One cheap call each,
+over the first ~1,500 characters, returning one of four:
 
-1. **Path rules, no model call.** A screen lists every top-level path in the
-   vault with its note count — there are 109 — and each gets one of three
-   settings: **include**, **exclude**, or **evidence only**. You set them once.
-   Ten clicks beats a model guessing 1,244 times, and it is free.
-2. **A classifier on what survives.** One cheap call per note, reading the first
-   ~1,000 characters: `knowledge`, `personal`, `operational`, or `mixed`. Only
-   `knowledge` and `mixed` go to extraction.
+| class | what happens |
+| --- | --- |
+| `knowledge` | goes to extraction |
+| `mixed` | goes to extraction |
+| `evidence` | no concepts, but it raises confidence in concepts found elsewhere — coursework, transcripts, a CV, an application describing what you can do |
+| `operational` | skipped: logistics, meeting arrangements, task lists, contact details |
 
-**Evidence only** is the third setting because personal notes are not worthless,
-they are *different evidence*. `Yale/` is coursework — the best evidence in the
-vault of what you were actually taught — and it should raise confidence that you
-hold something without necessarily producing concepts of its own. Job
-applications say what you claim to know professionally. The journal is the one
-category to exclude outright, on signal-to-noise and on the plain grounds that
-there is no reason to send it anywhere.
+**There is no folder routing, and that is a decision the trial forced.** The
+original design excluded whole paths — `Me/`, applications, anything that looked
+personal — on the reasoning that a folder is a free, predictable filter. Two
+findings killed it:
+
+- `Me/People/Chewy.md` is a note about a conversation with a friend, full of
+  wedding logistics and a phone call from his dad. It also contains *"cities
+  should be built for people, not cars — even if that costs efficiency,
+  efficiency is not the goal, the same way runs are not the goal in
+  sabermetrics"*, which was one of the three best nodes in the whole sample.
+  The folder rule would have thrown it away.
+- A dated Armodafinil dosage log sat in an *included* folder and produced
+  nothing, because the **node test** rejected all of it.
+
+The node test is a better filter for personal content than a folder is, and it
+is better in both directions — it keeps the good line in the personal note and
+it drops the log in the knowledge folder. Folders in this vault were never
+maintained as a taxonomy, which is the usual case and the reason folder rules
+look cheap and are not.
+
+**The one exclusion that stays is the journal**, and it is excluded on privacy
+rather than on yield: there is no reason to send it anywhere. It is identified
+by an explicit list you control, not inferred.
 
 ### Stage 1 — Chunk
 
@@ -381,9 +403,15 @@ one breath.
 > concepts per note. That is wrong for a dense note. What actually needs
 > guarding against is not volume but **restatement** — the same idea pulled out
 > five times in slightly different words — and reconciliation (Stage 2) catches
-> that far better than a cap ever could. Roughly one concept per 800–1,200
-> characters of substantive prose is a sanity check, not a limit. If a long
-> essay genuinely contains fifteen distinct positions, take fifteen.
+> that far better than a cap ever could. If a long essay genuinely contains
+> fifteen distinct positions, take fifteen.
+>
+> **There is no characters-per-concept guideline either.** An earlier draft
+> offered one concept per 800–1,200 characters as a sanity check. The trial
+> found observed density spanning **290x** — 181 characters per node in a
+> distilled economics course note, 52,937 in a case-prep research dump. Length
+> predicts nothing. Note *type* predicts almost everything, and the classifier
+> in Stage 0 is where that belongs.
 
 ### Stage 2 — Extract
 
@@ -485,12 +513,17 @@ throughout; Sonnet for extraction roughly triples the extraction line.
 
 | stage | rough cost |
 | --- | --- |
-| Classify 1,244 notes (first 1,000 chars each) | ~$0.45 |
-| Extract from what survives routing (~0.7M tokens in) | ~$1.50 |
+| Classify 1,244 notes (first 1,500 chars each) | ~$0.60 |
+| Extract from what classifies as knowledge or mixed | ~$2.00 |
 | Reconcile, batched twenty pairs per call | ~$0.30 |
 | Edges and disagreements | ~$0.50 |
 | Centrality | free |
-| **First full build** | **under $5** |
+| **First full build** | **under $6** |
+
+Unverified. The 30-note trial was run by hand rather than through Haiku,
+because the sandbox it ran in had no API key, so nothing here has been measured
+against a bill. The spend ledger exists so that the first real run replaces this
+table with facts.
 
 Incremental syncs are a fraction of that, because only changed notes are read.
 
@@ -500,9 +533,17 @@ Incremental syncs are a fraction of that, because only changed notes are read.
 
 Agreed before anything runs, so the result can be judged rather than admired.
 
-- **300–600 concepts** from 1,244 notes. Over 2,000 means extraction is too
-  loose and you have a hairball; under 150 means it is only catching the
-  obvious.
+- **1,500–2,500 concepts** from 1,244 notes. Under 800 means the bar is too
+  high and it is only catching the obvious.
+
+  > **Revised after the trial.** This said 300–600, and called anything over
+  > 2,000 a hairball. The sample projects to 1,600–1,800 after reconciliation,
+  > so on the old number the trial failed. The old number was wrong: it
+  > conflated **the map** with **the view**, and centrality already separates
+  > them — a 2,000-node map whose top 150 you actually look at is not a
+  > hairball. Size only hurts in one specific place, which is the frontier
+  > computation getting crowded by trivia, and the fix for that is a
+  > **centrality floor on the frontier query**, not a smaller map.
 - **Under 15% of extracted candidates rejected as orphans.** More than that and
   edge extraction is the weak half, not node extraction.
 - **Every node traceable** to at least one note and one verbatim sentence.
