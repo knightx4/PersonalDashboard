@@ -1521,6 +1521,76 @@ form[data-auto-submit] [data-fallback-submit] {
   white-space: nowrap;
 }
 
+/* ---------------------------------------------------------------------------
+ * The workspace's colour, on the ground rather than on the controls.
+ *
+ * Until now a workspace announced itself as a hue on buttons and chips, which
+ * is both a weak signal -- you have to be looking at a control to get it -- and
+ * the one place the guide keeps trying to get colour out of. This puts it on
+ * the surround the sidebar and the page pane are laid on, and nowhere else.
+ * Switching workspace changes the room, not the buttons.
+ *
+ * Gradients only, and that restriction is the whole lesson from the first
+ * attempt. `body::before` already lays one fixed, full-viewport grain over
+ * every theme in this app, and `--page-wash` already puts fixed radial pools
+ * under Lightbox. The first version of this added a second turbulence layer of
+ * its own on top of both, and under Lightbox the page then could not be
+ * painted at all -- a full-viewport capture never returned. Two feTurbulence
+ * background layers compositing over alpha sheets is not a thing to do.
+ *
+ * So: no noise here, no blend mode here. The grain that is already over the
+ * whole viewport is the grain over this too.
+ *
+ * Fixed, for the reason the body's wash is fixed: a light source the page
+ * moves under rather than a pattern that scrolls away.
+ * ------------------------------------------------------------------------- */
+:root {
+  --shell-wash: none;
+  /* Strong enough to see, weak enough that nothing on top has to accommodate
+   * it. Doubled on a dark bench, where the same alpha is nothing at all. */
+  --shell-wash-alpha: 14%;
+}
+
+[data-theme='ink'],
+[data-theme='dusk'],
+[data-theme='lightbox'] {
+  --shell-wash-alpha: 26%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --shell-wash-alpha: 26%;
+  }
+}
+
+[data-workspace] {
+  --shell-wash:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in oklab, var(--wash-a) var(--shell-wash-alpha), transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      110% 80% at 4% 100%,
+      color-mix(in oklab, var(--wash-b) var(--shell-wash-alpha), transparent),
+      transparent 62%
+    );
+}
+
+/* Each workspace's own two hues, the same pair its mark is drawn from. */
+[data-workspace='shopping'] { --wash-a: #fb7185; --wash-b: #be123c; }
+[data-workspace='jobs']     { --wash-a: #a78bfa; --wash-b: #7c3aed; }
+[data-workspace='todo']     { --wash-a: #38bdf8; --wash-b: #0369a1; }
+[data-workspace='vault']    { --wash-a: #f0abfc; --wash-b: #a21caf; }
+[data-workspace='learn']    { --wash-a: #34d399; --wash-b: #0f766e; }
+[data-workspace='dev']      { --wash-a: #94a3b8; --wash-b: #475569; }
+
+.shell-ground {
+  background-color: var(--c-shell);
+  background-image: var(--shell-wash);
+  background-attachment: fixed;
+}
+
 /* The page pane: the one thing in the shell that genuinely floats. */
 .page-pane {
   background-color: var(--c-page);
