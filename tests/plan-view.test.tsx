@@ -263,6 +263,19 @@ describe('PlanView', () => {
     expect(html).toMatch(/>1<\/span> Claude/);
   });
 
+  it('draws five views as chips and leaves the rest to the menu', () => {
+    const row = /<nav aria-label="View"[^>]*>([\s\S]*?)<\/nav>/.exec(render('open'))?.[1] ?? '';
+    expect(row).not.toBe('');
+    expect([...row.matchAll(/<a /g)]).toHaveLength(5);
+    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', 'Everything']) {
+      expect(row).toContain(label);
+    }
+    // The menu holds the other four. Its panel is a portal opened on a press,
+    // so the row itself carries only the trigger.
+    expect(row).toContain('More views');
+    expect(row).not.toContain('Not specified');
+  });
+
   it('offers the whole queue in one press, and only when there is one', () => {
     // One step is handed over in the fixture, so the button says so rather
     // than making you count.

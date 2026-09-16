@@ -73,8 +73,9 @@ import {
 } from '@/lib/plan/load';
 import {
   PLAN_HEALTHS,
-  PLAN_VIEWS,
+  PLAN_VIEW_CHIPS,
   PLAN_VIEW_LABEL,
+  PLAN_VIEW_MENU,
   countMatches,
   flatten,
   healthOf as planHealthOf,
@@ -275,6 +276,15 @@ function Progress({
   );
 }
 
+/** Where a view lives. "Open" is the page itself, so it keeps the bare link. */
+function viewHref(view: View): string {
+  return view === 'open' ? '/dev/plan' : `/dev/plan?view=${view}`;
+}
+
+const chipClass = 'press rounded-full px-2.5 py-1 text-small font-medium transition-colors';
+const chipOn = 'bg-accent text-surface';
+const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
+
 /**
  * The numbers across the plan, and the views over it.
  *
@@ -411,21 +421,41 @@ function SummaryStrip({
       </p>
       <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
-        {PLAN_VIEWS.map((candidate) => (
+        {PLAN_VIEW_CHIPS.map((candidate) => (
           <Link
             key={candidate}
-            href={candidate === 'open' ? '/dev/plan' : `/dev/plan?view=${candidate}`}
+            href={viewHref(candidate)}
             aria-current={candidate === view ? 'page' : undefined}
-            className={cn(
-              'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-              candidate === view
-                ? 'bg-accent text-surface'
-                : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-            )}
+            className={cn(chipClass, candidate === view ? chipOn : chipOff)}
           >
             {PLAN_VIEW_LABEL[candidate]}
           </Link>
         ))}
+        {/* The other four. Nothing is lost by moving a view off the row -- it
+            is a link in here, and most of them are a link on the counts to the
+            left as well -- and the trigger says which one you are on when it is
+            one of these, so the row still answers "where am I". */}
+        <ActionMenu
+          label="More views"
+          align="end"
+          trigger={
+            <span className="inline-flex items-center gap-1">
+              {PLAN_VIEW_MENU.includes(view) ? PLAN_VIEW_LABEL[view] : 'More'}
+              <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+            </span>
+          }
+          triggerClassName={cn(
+            chipClass,
+            'gap-1',
+            PLAN_VIEW_MENU.includes(view) ? chipOn : chipOff,
+          )}
+          items={PLAN_VIEW_MENU.map((candidate) => ({
+            id: candidate,
+            label: PLAN_VIEW_LABEL[candidate],
+            href: viewHref(candidate),
+            current: candidate === view,
+          }))}
+        />
       </nav>
     </div>
   );

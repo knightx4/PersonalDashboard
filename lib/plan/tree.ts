@@ -102,6 +102,22 @@ export function isPlanView(value: string): value is PlanView {
   return (PLAN_VIEWS as readonly string[]).includes(value);
 }
 
+/**
+ * The views drawn as chips, in the order they sit on the row -- #516's answer.
+ *
+ * Nine chips over a page whose question is usually "what am I on", "what could
+ * I pick up" or "what is waiting on me". These five answer those and give the
+ * way back to the whole plan; the rest are a press further away in the menu
+ * beside them, and the counts along the summary strip link to most of them
+ * anyway.
+ */
+export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all'] as const;
+
+/** Every other view, in the menu at the end of the chip row. */
+export const PLAN_VIEW_MENU: readonly PlanView[] = PLAN_VIEWS.filter(
+  (view) => !(PLAN_VIEW_CHIPS as readonly PlanView[]).includes(view),
+);
+
 export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   all: 'Everything',
   open: 'Open',

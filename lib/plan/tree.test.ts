@@ -7,6 +7,9 @@ import {
   splitFinished,
   searchNodes,
   touchedAt,
+  PLAN_VIEWS,
+  PLAN_VIEW_CHIPS,
+  PLAN_VIEW_MENU,
   findNode,
   flattenSections,
   isReady,
@@ -409,6 +412,15 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
+  });
+});
+
+describe('the chip row', () => {
+  it('draws five views and keeps every other one in the menu', () => {
+    expect([...PLAN_VIEW_CHIPS]).toEqual(['open', 'ready', 'you', 'claude', 'all']);
+    expect([...PLAN_VIEW_CHIPS, ...PLAN_VIEW_MENU].sort()).toEqual([...PLAN_VIEWS].sort());
+    expect(PLAN_VIEW_MENU.some((view) => (PLAN_VIEW_CHIPS as readonly string[]).includes(view)))
+      .toBe(false);
   });
 });
 
