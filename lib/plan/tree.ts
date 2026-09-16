@@ -703,11 +703,50 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  *
  * "Everything" goes through the same pruning rather than past it, because
  * dismissed rows are hidden from every view and it is a view.
+ *
+ * Features are ordered by what was touched last everywhere but "Everything",
+ * which keeps the plan's own order -- see `touchedAt`. Steps under a feature
+ * keep that order in every view, because it is the order they are meant to be
+ * built in.
  */
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
   return sections
-    .map((section) => ({ ...section, nodes: prune(section.nodes, view) }))
+    .map((section) => {
+      const nodes = prune(section.nodes, view);
+      return { ...section, nodes: view === 'all' ? nodes : byRecency(nodes, section.nodes) };
+    })
     .filter((section) => view === 'all' || section.nodes.length > 0);
+}
+
+/**
+ * When a feature was last worked: the newest write to it or to anything
+ * beneath it, which a trigger on `plan_items` keeps. Closing a step writes to
+ * the step, so it lifts the feature above it -- that is what #507 settled.
+ */
+export function touchedAt(node: PlanNode): string {
+  return flatten([node]).reduce(
+    (latest, step) => (step.updatedAt > latest ? step.updatedAt : latest),
+    '',
+  );
+}
+
+/**
+ * The features you were last in the middle of, first.
+ *
+ * Only at the top of a section. Nine features have open work and nothing told
+ * them apart, so the one you opened ten minutes ago sat wherever it was
+ * created and the page opened on somebody else's Tuesday. Nothing to maintain
+ * and nothing to remember: it moves under you as you work.
+ *
+ * Read off the feature as it stands, not as the view left it. The step you
+ * closed an hour ago is the reason its feature is the one you are on, and the
+ * view has just dropped that step for being closed.
+ */
+function byRecency(nodes: readonly PlanNode[], whole: readonly PlanNode[]): PlanNode[] {
+  const when = new Map(whole.map((node) => [node.id, touchedAt(node)]));
+  return [...nodes].sort((a, b) =>
+    (when.get(b.id) ?? touchedAt(b)).localeCompare(when.get(a.id) ?? touchedAt(a)),
+  );
 }
 
 /**

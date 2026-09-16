@@ -6,6 +6,7 @@ import {
   buildPlanTree,
   splitFinished,
   searchNodes,
+  touchedAt,
   findNode,
   flattenSections,
   isReady,
@@ -49,6 +50,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -407,6 +409,53 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
+  });
+});
+
+describe('ordering by what was touched last', () => {
+  const fixture = () =>
+    tree([
+      item({ id: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'first-step', parentId: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'second', position: 20, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'third', position: 30, updatedAt: '2026-01-15T00:00:00Z' }),
+      // The step was closed this morning; its feature is the one being worked.
+      at('done', 'third-step', {
+        parentId: 'third',
+        position: 10,
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'third-next', parentId: 'third', position: 20, updatedAt: '2026-01-15T00:00:00Z' }),
+    ]);
+
+  it('puts the feature worked most recently at the top of a working view', () => {
+    expect(shopping(applyView(fixture(), 'open')).nodes.map((node) => node.id)).toEqual([
+      'third',
+      'second',
+      'first',
+    ]);
+  });
+
+  it('leaves the steps under a feature in the order they are built in', () => {
+    const third = shopping(applyView(fixture(), 'open')).nodes[0];
+    expect(third.children.map((node) => node.id)).toEqual(['third-next']);
+    expect(shopping(applyView(fixture(), 'all')).nodes[2].children.map((n) => n.id)).toEqual([
+      'third-step',
+      'third-next',
+    ]);
+  });
+
+  it('leaves "all" in the plan’s own order', () => {
+    expect(shopping(applyView(fixture(), 'all')).nodes.map((node) => node.id)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('reads a feature’s recency off the newest step beneath it', () => {
+    const third = findNode(applyView(fixture(), 'all'), 'third')!;
+    expect(touchedAt(third)).toBe('2026-03-01T00:00:00Z');
   });
 });
 
