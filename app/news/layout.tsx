@@ -51,6 +51,7 @@ export default async function NewsLayout({ children }: { children: React.ReactNo
   return (
     <div data-workspace="news">
       <AppShell
+        account={user.id}
         module="news"
         sections={sections}
         settingsHref="/news/settings"
