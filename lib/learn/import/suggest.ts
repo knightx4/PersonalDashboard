@@ -9,6 +9,7 @@ import {
 } from '@/lib/learn/import/resolve-payload';
 import { isRooted, type Rooting } from '@/lib/learn/graph/rooting';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
+import type { Aim } from '@/lib/learn/graph/aim';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
@@ -117,23 +118,6 @@ so treat them as evidence rather than as a complete account.`;
 export type SuggestResult =
   | { ok: true; sources: ResolvedSource[] }
   | { ok: false; reason: 'too-vague' | 'nothing-good' | 'error'; detail: string };
-
-/**
- * The one claim a search is for, when it came from a gap in a graph.
- *
- * The claim itself rather than the concept's short name, because "money
- * supply" is a filing label and "an increase in the money supply raises prices
- * only once output is at capacity" is the thing that can be got wrong. The
- * state and the misconception are what turn it from a topic into a search: a
- * source that argues against what somebody believes is a different source from
- * one that merely covers the ground.
- */
-export type Aim = {
-  claim: string;
-  state: KnowledgeState;
-  /** What they believe instead, when the state is `misconception`. */
-  misconception: string | null;
-};
 
 /** How each state reads in a prompt. The word alone does not carry it. */
 const STANDING: Record<KnowledgeState, string> = {

@@ -13,6 +13,7 @@ import { conceptsFromNote } from '@/lib/learn/graph/from-note';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
 import { isRooted, rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
+import { aimFor, type Aim } from '@/lib/learn/graph/aim';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import {
@@ -58,15 +59,20 @@ export type FindState = {
 /**
  * What the subject's graph knows, when this reading came from a gap in one.
  *
+ * Two things, off one read: the claim this reading is for, and everything
+ * around it. The aim is read here rather than copied onto the reading when it
+ * was queued, so a claim you have re-probed since searches on where you stand
+ * now.
+ *
  * Everything here can be missing without it being a fault: a reading you typed
  * has no concept, and a concept whose subject was deleted since has no graph.
- * Both end with no rooting rather than an error, because the search still
- * works -- it just works the way it did before.
+ * Both end with no aim and no rooting rather than an error, because the search
+ * still works -- it just works the way it did before.
  */
-async function rootingForReading(
+async function graphBehindReading(
   supabase: Awaited<ReturnType<typeof createLearnClient>>,
   conceptId: string | null,
-): Promise<{ rooting: Rooting; note: RootingNote } | null> {
+): Promise<{ aim: Aim | null; rooting: Rooting; note: RootingNote } | null> {
   if (!conceptId) return null;
 
   const subjectId = await subjectIdOfConcept(supabase, conceptId);
@@ -78,8 +84,14 @@ async function rootingForReading(
   ]);
   if (!subject) return null;
 
+  // The concept can be gone from the graph while its subject is still there --
+  // deleted since the reading was queued. No aim, and the rooting is still
+  // worth having.
+  const concept = graph.concepts.find((c) => c.id === conceptId);
   const rooting = rootingFor(graph, conceptId);
+
   return {
+    aim: concept ? aimFor(concept) : null,
     rooting,
     note: isRooted(rooting)
       ? { rooted: true, settled: rooting.settled.length, subject: subject.name }
@@ -95,10 +107,11 @@ async function rootingForReading(
  * wrong than one given a citation, and a bad source in a queue costs twenty
  * minutes at the moment you were finally going to read something.
  *
- * A reading queued from a gap searches with its subject's graph behind it --
- * what you have settled, and what you are ready for -- so the results skip the
- * introduction you do not need and the paper that starts three steps past you.
- * Which of those two happened is reported back rather than assumed.
+ * A reading queued from a gap searches on the claim it was queued for, with
+ * its subject's graph behind it -- what you have settled, and what you are
+ * ready for -- so the results skip the introduction you do not need and the
+ * paper that starts three steps past you. Which of those two happened is
+ * reported back rather than assumed.
  */
 // latency: pending
 export async function findSources(_prev: FindState, formData: FormData): Promise<FindState> {
@@ -114,20 +127,27 @@ export async function findSources(_prev: FindState, formData: FormData): Promise
   const reading = await loadReading(supabase, readingId.data);
   if (!reading) return { error: 'That is not there any more.' };
 
-  const rooted = await rootingForReading(supabase, reading.conceptId);
+  const behind = await graphBehindReading(supabase, reading.conceptId);
+
+  // The aim replaces the track's question rather than joining it. A gap
+  // reading's track question is the claim of whichever gap was queued most
+  // recently, which is some other claim as often as not, and sending both aims
+  // the search at two things.
+  const aim = behind?.aim ?? null;
 
   const spend = collectSpend();
   const result = await suggestSources({
     subject: reading.subject,
-    question: reading.trackQuestion,
-    rooting: rooted?.rooting ?? null,
+    question: aim ? null : reading.trackQuestion,
+    aim,
+    rooting: behind?.rooting ?? null,
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
   });
   await recordLearnSpend(user.id, 'suggest-sources', spend.reports);
 
-  if (!result.ok) return { error: result.detail, rooting: rooted?.note };
-  return { candidates: result.sources, rooting: rooted?.note };
+  if (!result.ok) return { error: result.detail, rooting: behind?.note };
+  return { candidates: result.sources, rooting: behind?.note };
 }
 
 /**

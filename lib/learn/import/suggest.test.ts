@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_SUGGESTIONS, suggestSources, type Aim } from './suggest';
+import { MAX_SUGGESTIONS, suggestSources } from './suggest';
+import type { Aim } from '@/lib/learn/graph/aim';
 import type { Rooting } from '@/lib/learn/graph/rooting';
 
 /**

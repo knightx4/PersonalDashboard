@@ -3,6 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { addManualReading, createTrack } from '@/lib/learn/tracks/save';
+import { aimFor, aimSentence } from '@/lib/learn/graph/aim';
 import type { Concept } from '@/lib/learn/graph/model';
 
 /**
@@ -23,21 +24,6 @@ import type { Concept } from '@/lib/learn/graph/model';
 
 function fail(action: string, error: { message: string }): Error {
   return new Error(`${action} failed: ${error.message}`);
-}
-
-/**
- * The question the sources get aimed at.
- *
- * The claim, and the misconception when there is one -- because "find me
- * something that explains why this is wrong" is a different search from "find
- * me something about this", and the second one hands back the introduction
- * somebody has already read.
- */
-export function aimFor(concept: Concept): string {
-  if (concept.misconception) {
-    return `${concept.claim} What is currently believed instead: ${concept.misconception}`;
-  }
-  return concept.claim;
 }
 
 /**
@@ -94,7 +80,7 @@ export async function queueConcept(
     supabase,
     userId,
     input.subjectName,
-    aimFor(input.concept),
+    aimSentence(aimFor(input.concept)),
   );
 
   return addManualReading(supabase, userId, {
