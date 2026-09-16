@@ -14,7 +14,10 @@
  * and eighty apart, because the two were chosen independently, so rotating
  * Paper as one thing would send the accent the wrong way -- ask for green and
  * get a faintly green page with magenta links. #454 settled it: put Paper's
- * accent on Paper's own page hue, and rotate from there.
+ * accent on Paper's own page hue, and rotate from there. LIGHT_CAST also
+ * carries more chroma in its neutrals than Paper does, because Paper's are
+ * near-greys and a near-grey in another hue is still a near-grey; that is
+ * #456.
  *
  * These tables are a copy of what globals.css says, flattened -- `--c-page:
  * var(--c-canvas)` is resolved to the hex it lands on -- because the browser
@@ -504,17 +507,45 @@ export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox', number> = {
 };
 
 /**
- * Paper with its accent moved onto Paper's own page hue.
+ * How much colour the grounds, the borders and the text of a cast light theme
+ * carry.
  *
- * What light with a colour rotates, and the answer #454 gave. Every token
- * keeps the chroma Paper wrote for it and reflects as much light as Paper's
- * did, so every contrast ratio in a light theme is the ratio Paper measured.
- * Only the accent family turns, and it turns as a family, so the tint stays
- * the four degrees off the base that Paper put it.
+ * Paper writes its neutrals between 0.004 and 0.013 chroma, which is about
+ * what Ink writes for dark with no colour -- they are near-greys, and a
+ * near-grey turned to another hue is still a near-grey. Dark never had that
+ * problem because it turns Dusk, a palette written with the colour already in
+ * it at 0.022 to 0.060. Light turned Paper, so a chosen colour reached the
+ * links and almost nothing else, which is what #456 reported.
+ *
+ * 0.045 is the middle of Dusk's range, so light now carries about what dark
+ * carries. Near white there is less room than that -- sRGB holds little chroma
+ * at 95% luminance, and less again in the warm hues -- so the page and the
+ * cards take what fits and the borders, the wells, the sidebar and the text,
+ * which all sit lower, take the whole amount.
+ */
+const CAST_CHROMA = 0.045;
+
+/**
+ * Paper with its accent moved onto Paper's own page hue, and its neutrals
+ * given enough colour to see.
+ *
+ * What light with a colour rotates. The accent move is the answer #454 gave:
+ * Paper's page and Paper's accent sit a hundred and eighty apart, so rotating
+ * Paper as one thing would answer green with a green page and magenta links.
+ * The chroma lift is #456 -- Paper's own neutrals are too close to grey to
+ * show which colour was asked for.
+ *
+ * Both are done at Paper's luminance, so every contrast ratio in a light theme
+ * is still the ratio Paper measured. Chroma is free that way: contrast depends
+ * on how much light a colour reflects and not at all on how colourful it is,
+ * and a token that cannot hold the chroma at its own luminance gives up the
+ * chroma rather than the luminance. `--c-surface` is the limit of that -- pure
+ * white reflects everything, so a white card stays white and the room shows in
+ * its border, the page behind it and the wells inside it.
  *
  * The result is not a theme anybody sees on its own -- light with no colour is
- * Paper, untouched. It is the shape a light theme takes once the page and the
- * accent have to agree about which colour was asked for.
+ * Paper, untouched. It is the shape a light theme takes once a colour has been
+ * chosen.
  */
 export const LIGHT_CAST: Palette = (() => {
   const paper = REFERENCE_PALETTES.paper;
@@ -528,6 +559,16 @@ export const LIGHT_CAST: Palette = (() => {
     // generator makes: a hundred and eighty degrees is the largest move in the
     // whole scheme, and it is the one where holding the wrong quantity shows.
     cast[token] = withLuminance({ ...colour, h: colour.h + turn }, relativeLuminance(value));
+  }
+
+  // The accent already carries 0.107, well past the lift, and it is the one
+  // token nobody said was faded.
+  for (const token of HUE_TOKENS) {
+    if (ACCENT_TOKENS.includes(token)) continue;
+    const value = paper[token]!;
+    const colour = hexToOklch(value);
+    if (colour.c >= CAST_CHROMA) continue;
+    cast[token] = withLuminance({ ...colour, c: CAST_CHROMA }, relativeLuminance(value));
   }
   return cast;
 })();
