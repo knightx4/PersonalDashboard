@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
 import { hexToOklch, oklchToHex, relativeLuminance } from '@/lib/theme/oklch';
-import { generatePalette } from '@/lib/theme/palette';
+import { accentHueFor, generatePalette, MEANING_FLOOR, meaningGaps } from '@/lib/theme/palette';
 import {
   HUE_TOKENS,
   LIGHT_CAST,
@@ -155,9 +155,15 @@ describe('generatePalette', () => {
     // What #454 settled. Paper's page and Paper's accent sit a hundred and
     // eighty apart, so a light theme that rotated Paper as one thing would
     // answer green with a green page and magenta links.
+    //
+    // 165 is the one hue in this sweep the accent does not land on: it is
+    // inside light's green stretch, so #469 has it step off by eight degrees.
+    // The page still goes exactly where it was pointed.
     for (const hue of SWEEP) {
       const accent = hexToOklch(generatePalette('light', hue)['--c-accent-base']);
-      expect(`${hue} ${apart(accent.h, hue) < 2}`).toBe(`${hue} true`);
+      const landed = accentHueFor('light', hue);
+      expect(`${hue} on ${apart(accent.h, landed) < 2}`).toBe(`${hue} on true`);
+      expect(`${hue} asked ${landed - hue}`).toBe(`${hue} asked ${hue === 165 ? 8 : 0}`);
     }
   });
 
@@ -323,5 +329,95 @@ describe('oklch', () => {
     const got = hexToOklch(oklchToHex(asked));
     expect(got.c).toBeLessThan(asked.c);
     expect(Math.abs(got.l - asked.l)).toBeLessThan(0.004);
+  });
+});
+
+/**
+ * The accent stepping off the delete red, the warning amber and the saved
+ * green -- #469, measured the way #493 chose, at the floor #514 set and in the
+ * direction #515 named.
+ */
+describe('the accent and the colours that carry a meaning', () => {
+  const MODES = ['light', 'dark', 'lightbox'] as const;
+
+  /** Every hue of the circle, since the stretches that move are a few degrees wide. */
+  const CIRCLE = Array.from({ length: 360 }, (_, hue) => hue);
+
+  /** Whether the accent had to step off the colour that was asked for. */
+  const moved = (mode: (typeof MODES)[number], hue: number) => accentHueFor(mode, hue) !== hue;
+
+  /** The written palette each mode's fixed colours come from. */
+  const WRITTEN_AS = { light: 'paper', dark: 'dusk', lightbox: 'lightbox' } as const;
+
+  it('never lets the accent wear one of them, at any hue in any mode', () => {
+    for (const mode of MODES) {
+      for (const hue of CIRCLE) {
+        for (const { accent, meaning, gap } of meaningGaps(generatePalette(mode, hue))) {
+          expect(`${mode} ${hue} ${accent}/${meaning} ${gap >= MEANING_FLOOR}`).toBe(
+            `${mode} ${hue} ${accent}/${meaning} true`,
+          );
+        }
+      }
+    }
+  });
+
+  it('moves 17 hues in light, 25 in dark and 29 on Lightbox, by at most 15 degrees', () => {
+    // #514's answer, and what fixes the floor at 0.03: these three counts and
+    // this ceiling are the option that was chosen, so a change to either
+    // number is a change to the decision rather than to the code.
+    const counts = { light: 17, dark: 25, lightbox: 29 };
+    for (const mode of MODES) {
+      const shifts = CIRCLE.map((hue) => accentHueFor(mode, hue) - hue).filter((by) => by !== 0);
+      expect(`${mode} ${shifts.length}`).toBe(`${mode} ${counts[mode]}`);
+      expect(`${mode} ${Math.max(...shifts.map(Math.abs)) <= 15}`).toBe(`${mode} true`);
+    }
+  });
+
+  it('steps to whichever side of the stretch is nearer', () => {
+    // #515. Nothing between where the accent was asked to go and where it
+    // landed is out of the stretch, and neither is the same distance the other
+    // way -- except where the two edges are exactly as far off as each other,
+    // which goes up the circle.
+    for (const mode of MODES) {
+      for (const hue of CIRCLE) {
+        const landed = accentHueFor(mode, hue);
+        if (landed === hue) continue;
+        const way = Math.sign(landed - hue);
+        const by = Math.abs(landed - hue);
+        for (let step = 1; step < by; step += 1) {
+          expect(`${mode} ${hue} +${step} ${moved(mode, hue + way * step)}`).toBe(
+            `${mode} ${hue} +${step} true`,
+          );
+          expect(`${mode} ${hue} -${step} ${moved(mode, hue - way * step)}`).toBe(
+            `${mode} ${hue} -${step} true`,
+          );
+        }
+        if (!moved(mode, hue - way * by)) {
+          expect(`${mode} ${hue} tie ${way}`).toBe(`${mode} ${hue} tie 1`);
+        }
+      }
+    }
+  });
+
+  it('moves the accent and nothing else', () => {
+    // #469 settled that the accent is what gives way, so the page, the panels
+    // and the borders still land on the colour that was asked for and the
+    // three meaning colours stay as they were written.
+    for (const mode of MODES) {
+      for (const hue of CIRCLE) {
+        if (!moved(mode, hue)) continue;
+        const palette = generatePalette(mode, hue);
+        const ground = hexToOklch(palette['--c-page']);
+        expect(`${mode} ${hue} ground ${apart(ground.h, hue) < 4}`).toBe(
+          `${mode} ${hue} ground true`,
+        );
+        const written = REFERENCE_PALETTES[WRITTEN_AS[mode]];
+        for (const token of ['--c-danger', '--c-caution', '--c-positive']) {
+          expect(`${mode} ${hue} ${token} ${palette[token]}`).toBe(
+            `${mode} ${hue} ${token} ${written[token]}`,
+          );
+        }
+      }
+    }
   });
 });
