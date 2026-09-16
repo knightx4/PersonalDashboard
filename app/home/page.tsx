@@ -150,6 +150,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-full">
       <AppShell
+        account={user.id}
         module={null}
         sections={[]}
         displayName={settings.displayName}
