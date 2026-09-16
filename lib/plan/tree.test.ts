@@ -404,8 +404,9 @@ describe('applyView', () => {
 
   it('drops a module with nothing open from "open" as well', () => {
     // 'jobs' holds one finished feature and one step waiting on another, so it
-    // stays; the modules with nothing at all in them go.
-    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['shopping', 'jobs']);
+    // stays; the modules with nothing at all in them go. It is drawn first
+    // because its open step is the newest row in the fixture.
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['jobs', 'shopping']);
   });
 
   it('keeps every module under "all", because that is where a plan gets written', () => {
@@ -468,6 +469,63 @@ describe('ordering by what was touched last', () => {
   it('reads a feature’s recency off the newest step beneath it', () => {
     const third = findNode(applyView(fixture(), 'all'), 'third')!;
     expect(touchedAt(third)).toBe('2026-03-01T00:00:00Z');
+  });
+});
+
+describe('ordering the module sections', () => {
+  // The app-wide section is fixed last, so a feature worked this morning under
+  // it sits below every module's work until the sections sort too -- #517.
+  const fixture = () =>
+    tree([
+      item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
+      item({
+        id: 'shop-step',
+        parentId: 'shop',
+        module: 'shopping',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
+      item({ id: 'job', module: 'jobs', updatedAt: '2026-01-10T00:00:00Z' }),
+      item({ id: 'job-step', parentId: 'job', module: 'jobs', updatedAt: '2026-01-10T00:00:00Z' }),
+      item({ id: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'wide-step', parentId: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
+    ]);
+
+  it('draws the module holding the newest work first', () => {
+    expect(applyView(fixture(), 'open').map((section) => section.module)).toEqual([
+      null,
+      'jobs',
+      'shopping',
+    ]);
+  });
+
+  it('reads a section’s recency off a step the view has dropped', () => {
+    const sections = tree([
+      item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
+      // Closed this morning, so it is gone from "open" and its module is still
+      // the one being worked in.
+      at('done', 'shop-step', {
+        parentId: 'shop',
+        module: 'shopping',
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'job', module: 'jobs', updatedAt: '2026-02-01T00:00:00Z' }),
+    ]);
+    expect(applyView(sections, 'open').map((section) => section.module)).toEqual([
+      'shopping',
+      'jobs',
+    ]);
+  });
+
+  it('leaves the features and steps inside a section as they were', () => {
+    const [section] = applyView(fixture(), 'open');
+    expect(section.nodes.map((node) => node.id)).toEqual(['wide']);
+    expect(section.nodes[0].children.map((node) => node.id)).toEqual(['wide-step']);
+  });
+
+  it('leaves "Everything" in the fixed module order', () => {
+    expect(applyView(fixture(), 'all').map((section) => section.module)).toEqual(
+      fixture().map((section) => section.module),
+    );
   });
 });
 

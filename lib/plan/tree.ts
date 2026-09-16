@@ -724,14 +724,30 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  * which keeps the plan's own order -- see `touchedAt`. Steps under a feature
  * keep that order in every view, because it is the order they are meant to be
  * built in.
+ *
+ * The module sections are ordered the same way, by the newest write among the
+ * features each one is drawing -- #517's answer. Four of the nine features
+ * with open work are app-wide, and that section is fixed last, so the thing
+ * being worked on could sit thirty rows down its own page. "Everything" keeps
+ * the fixed module order, which is what makes it the map of the plan.
  */
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
+  if (view === 'all') {
+    return sections.map((section) => ({ ...section, nodes: prune(section.nodes, view) }));
+  }
+
   return sections
     .map((section) => {
+      const when = recencyOf(section.nodes);
       const nodes = prune(section.nodes, view);
-      return { ...section, nodes: view === 'all' ? nodes : byRecency(nodes, section.nodes) };
+      return {
+        section: { ...section, nodes: byRecency(nodes, when) },
+        touched: newestOf(nodes, when),
+      };
     })
-    .filter((section) => view === 'all' || section.nodes.length > 0);
+    .filter((drawn) => drawn.section.nodes.length > 0)
+    .sort((a, b) => b.touched.localeCompare(a.touched))
+    .map((drawn) => drawn.section);
 }
 
 /**
@@ -747,22 +763,36 @@ export function touchedAt(node: PlanNode): string {
 }
 
 /**
+ * When each feature was last worked, by id.
+ *
+ * Read off the features as they stand, not as a view left them. The step you
+ * closed an hour ago is the reason its feature is the one you are on, and the
+ * view has just dropped that step for being closed.
+ */
+function recencyOf(whole: readonly PlanNode[]): Map<string, string> {
+  return new Map(whole.map((node) => [node.id, touchedAt(node)]));
+}
+
+/**
  * The features you were last in the middle of, first.
  *
  * Only at the top of a section. Nine features have open work and nothing told
  * them apart, so the one you opened ten minutes ago sat wherever it was
  * created and the page opened on somebody else's Tuesday. Nothing to maintain
  * and nothing to remember: it moves under you as you work.
- *
- * Read off the feature as it stands, not as the view left it. The step you
- * closed an hour ago is the reason its feature is the one you are on, and the
- * view has just dropped that step for being closed.
  */
-function byRecency(nodes: readonly PlanNode[], whole: readonly PlanNode[]): PlanNode[] {
-  const when = new Map(whole.map((node) => [node.id, touchedAt(node)]));
+function byRecency(nodes: readonly PlanNode[], when: Map<string, string>): PlanNode[] {
   return [...nodes].sort((a, b) =>
     (when.get(b.id) ?? touchedAt(b)).localeCompare(when.get(a.id) ?? touchedAt(a)),
   );
+}
+
+/** The newest of those, over the features a section is about to draw. */
+function newestOf(nodes: readonly PlanNode[], when: Map<string, string>): string {
+  return nodes.reduce((latest, node) => {
+    const at = when.get(node.id) ?? touchedAt(node);
+    return at > latest ? at : latest;
+  }, '');
 }
 
 /**
