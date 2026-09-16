@@ -711,6 +711,54 @@ export function applyView(sections: readonly PlanSection[], view: PlanView): Pla
 }
 
 /**
+ * A feature nobody is coming back to: closed itself, with nothing open under
+ * it. About 101 of the plan's 110 top-level features are in this state, and
+ * they are consulted rather than read -- "did I already plan that" -- so on
+ * "Everything" they are gathered into one fold instead of running down the
+ * page between the nine features that still have work in them.
+ *
+ * Dropped counts as closed here. A feature decided against is as finished as
+ * one that shipped, and the row says which it was.
+ */
+export function isFinishedFeature(node: PlanNode): boolean {
+  return isClosed(node.status) && !flatten(node.children).some((child) => !isClosed(child.status));
+}
+
+/** When a feature stopped being worked, for ordering the archive. */
+function finishedAt(node: PlanNode): string {
+  return node.completedAt ?? node.createdAt;
+}
+
+/**
+ * "Everything", with the finished features lifted out of the modules.
+ *
+ * They come back as one list across every module, newest first, because that
+ * is the order you look for them in: the thing you finished last week is the
+ * thing you are trying to remember. Each module keeps its progress and its
+ * tally, which are over the whole module either way -- lifting the rows out
+ * changes where they are drawn, not what is true of the module.
+ *
+ * Only worth calling on "Everything". Every other view has already dropped a
+ * finished feature in `prune`, so there is nothing to lift out of it.
+ */
+export function splitFinished(sections: readonly PlanSection[]): {
+  sections: PlanSection[];
+  finished: PlanNode[];
+} {
+  const finished: PlanNode[] = [];
+  const kept = sections.map((section) => {
+    const nodes = section.nodes.filter((node) => {
+      if (!isFinishedFeature(node)) return true;
+      finished.push(node);
+      return false;
+    });
+    return { ...section, nodes };
+  });
+  finished.sort((a, b) => finishedAt(b).localeCompare(finishedAt(a)));
+  return { sections: kept, finished };
+}
+
+/**
  * Whether a step answers a search.
  *
  * The number, the title and the detail, because those are the three ways
@@ -786,6 +834,17 @@ export function searchSections(
   return sections
     .map((section) => ({ ...section, nodes: pruneToQuery(section.nodes, terms) }))
     .filter((section) => section.nodes.length > 0);
+}
+
+/**
+ * A search over steps that are not in a module section: the archive of
+ * finished features on "Everything". The same rules as `searchSections`, so a
+ * feature folded away is still found by number, title or detail.
+ */
+export function searchNodes(nodes: readonly PlanNode[], query: string): PlanNode[] {
+  const terms = searchTerms(query);
+  if (terms.length === 0) return [...nodes];
+  return pruneToQuery(nodes, terms);
 }
 
 /** How many steps a search actually found, as opposed to kept for context. */

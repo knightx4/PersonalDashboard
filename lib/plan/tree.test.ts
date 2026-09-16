@@ -4,6 +4,8 @@ import {
   ancestorsOf,
   applyView,
   buildPlanTree,
+  splitFinished,
+  searchNodes,
   findNode,
   flattenSections,
   isReady,
@@ -405,6 +407,47 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
+  });
+});
+
+describe('splitFinished', () => {
+  const fixture = () =>
+    tree([
+      at('done', 'shipped', { position: 10, completedAt: '2026-02-01T00:00:00Z' }),
+      at('done', 'shipped-step', { parentId: 'shipped' }),
+      at('done', 'older', { position: 20, completedAt: '2026-01-01T00:00:00Z' }),
+      at('dropped', 'abandoned', { position: 30, completedAt: '2026-03-01T00:00:00Z' }),
+      at('done', 'half', { position: 40, completedAt: '2026-02-15T00:00:00Z' }),
+      at('not_started', 'half-step', { parentId: 'half' }),
+      item({ id: 'live', position: 50 }),
+    ]);
+
+  it('lifts the features with nothing left in them, newest first', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    expect(finished.map((node) => node.id)).toEqual(['abandoned', 'shipped', 'older']);
+  });
+
+  it('leaves the modules holding what is still being worked', () => {
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.flatMap((section) => section.nodes).map((node) => node.id)).toEqual([
+      'half',
+      'live',
+    ]);
+  });
+
+  it('leaves a module its progress, which is over the whole module either way', () => {
+    const before = shopping(fixture()).progress;
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.find((section) => section.module === 'shopping')!.progress).toEqual(before);
+  });
+
+  it('finds a folded feature by number, title or detail', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    const shipped = finished.find((node) => node.id === 'shipped')!;
+    expect(searchNodes(finished, `#${shipped.number}`).map((node) => node.id)).toEqual(['shipped']);
+    // Every term has to match the same row, as it does in a module section.
+    expect(searchNodes(finished, 'shipped older').map((node) => node.id)).toEqual([]);
+    expect(searchNodes(finished, '').map((node) => node.id)).toEqual(finished.map((n) => n.id));
   });
 });
 
