@@ -310,10 +310,10 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
    * and the generator leaves them alone.
    */
   lightbox: {
-    '--c-canvas': 'rgb(231 236 242 / 0.92)',
-    '--c-surface': 'rgb(253 252 249 / 0.96)',
-    '--c-raised': 'rgb(255 254 250 / 0.97)',
-    '--c-sunken': 'rgb(228 234 241 / 0.92)',
+    '--c-canvas': 'rgb(231 236 242 / 0.88)',
+    '--c-surface': 'rgb(253 252 249 / 0.80)',
+    '--c-raised': 'rgb(255 254 250 / 0.86)',
+    '--c-sunken': 'rgb(228 234 241 / 0.86)',
     '--c-border': '#d0d9e3',
     '--c-border-strong': '#a6b1bf',
     '--c-shell': '#2b3644',
