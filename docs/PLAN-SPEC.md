@@ -139,9 +139,15 @@ ended, and a reason without an end is a sentence about nothing.
 
 Written only by `lib/plan/overnight.ts`, which also holds `overnightVerdict` —
 the pure reading of the row that says whether another feature may be fired, and
-what to end the night with when it may not. The runner around it (the chooser,
-the tick route, the schedule, the page control and the report) is still being
-built.
+what to end the night with when it may not.
+
+The chooser is `chooseOvernightFeature` in `lib/plan/overnight-choice.ts`: the
+row's verdict and the plan tree composed into one answer, either the feature to
+fire or the sentence to stop on. It picks what a person would — the first row
+of `workOrder(sections, { assignee: 'claude' })`, and the top-level feature
+above it — so a feature it names always has a ready step beneath it, and
+nothing about blocked, waiting or unapproved work is restated here. Still being
+built around it: the tick route, the schedule, the page control and the report.
 
 ### `plan_dependencies`
 
