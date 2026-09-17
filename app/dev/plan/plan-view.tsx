@@ -99,6 +99,7 @@ import {
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
+import { lastRunLine, type LastRun } from '@/lib/plan/run-end';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
@@ -1556,6 +1557,25 @@ function RunningFor({ startedAt }: { startedAt: string }) {
 }
 
 /**
+ * What the last routine run against this step did.
+ *
+ * The claim beside it is what the step says about itself; this is what the run
+ * says. They disagree often enough to be worth both: a step still reading
+ * in_progress whose run stopped four hours ago is the case this line exists
+ * for, and before `plan_runs` was written back nothing on the page could tell
+ * you which of the two had happened.
+ */
+function LastRunLine({ run }: { run: LastRun }) {
+  const now = useClockNow();
+
+  return (
+    <span className={run.status === 'failed' ? 'text-caution' : undefined}>
+      {lastRunLine(run, now)}
+    </span>
+  );
+}
+
+/**
  * The badge on a step that is underway, and the one place the page admits a
  * claim can go stale.
  *
@@ -1937,6 +1957,7 @@ function PlanRow({
   trail,
   catalog,
   canSend,
+  lastRuns,
   view,
   searching,
 }: {
@@ -1945,6 +1966,8 @@ function PlanRow({
   trail: readonly boolean[];
   catalog: readonly PlanCatalogEntry[];
   canSend: boolean;
+  /** The newest run against each step, by step id. Most steps have none. */
+  lastRuns: Readonly<Record<string, LastRun>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -2572,6 +2595,7 @@ function PlanRow({
                 </span>
               )}
               {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
+              {lastRuns[node.id] && <LastRunLine run={lastRuns[node.id]} />}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -2633,6 +2657,7 @@ function PlanRow({
             trail={[...trail, index < substeps.length - 1]}
             catalog={catalog}
             canSend={canSend}
+            lastRuns={lastRuns}
             view={view}
             searching={searching}
           />
@@ -2751,6 +2776,7 @@ export function PlanView({
   summary,
   view,
   catalog,
+  lastRuns,
   empty,
   canSend,
   queued,
@@ -2761,6 +2787,8 @@ export function PlanView({
   summary: PlanSummary;
   view: View;
   catalog: PlanCatalogEntry[];
+  /** The newest run against each step, by step id. */
+  lastRuns: Record<string, LastRun>;
   empty: boolean;
   canSend: boolean;
   queued: number;
@@ -2886,6 +2914,7 @@ export function PlanView({
                       trail={[]}
                       catalog={catalog}
                       canSend={canSend}
+                      lastRuns={lastRuns}
                       view={view}
                       searching={searching}
                     />
@@ -2962,6 +2991,7 @@ export function PlanView({
                 trail={[]}
                 catalog={catalog}
                 canSend={canSend}
+                lastRuns={lastRuns}
                 view={view}
                 searching={searching}
               />

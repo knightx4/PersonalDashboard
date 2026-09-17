@@ -129,6 +129,7 @@ function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocke
       catalog={catalog}
       empty={empty}
       canSend={false}
+      lastRuns={{}}
       queued={handedToClaude(whole).length}
     />,
   );
@@ -180,6 +181,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={0}
       />,
     );
@@ -296,6 +298,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={handedToClaude(nobodys).length}
       />,
     );
@@ -326,6 +329,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={0}
       />,
     );
@@ -353,6 +357,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={0}
       />,
     );
@@ -381,6 +386,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={0}
       />,
     );
@@ -421,6 +427,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={0}
       />,
     );
@@ -459,6 +466,7 @@ describe('PlanView', () => {
         catalog={[]}
         empty={false}
         canSend={false}
+        lastRuns={{}}
         queued={0}
       />,
     );
@@ -495,6 +503,7 @@ describe('PlanView', () => {
           catalog={[]}
           empty={false}
           canSend={false}
+          lastRuns={{}}
           queued={0}
         />,
       );
@@ -529,6 +538,7 @@ describe('PlanView', () => {
           catalog={[]}
           empty={false}
           canSend={false}
+          lastRuns={{}}
           queued={0}
         />,
       );
