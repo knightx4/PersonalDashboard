@@ -6,7 +6,9 @@
  * must not so much as read the plan, and a tick that does fire must fire once
  * and take exactly one off the budget. The fourth is the guard that stops a
  * feature whose remaining work is stuck being sent a session every few minutes
- * for the rest of the night.
+ * for the rest of the night. The fifth is the same restraint applied to the
+ * send's own refusals: a feature it will not take costs the tick a candidate,
+ * not the whole turn.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
@@ -15,6 +17,7 @@ import { OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
 import {
   chooseOvernightFire,
   closedNothingSince,
+  overnightRefusedReason,
   overnightTick,
   OVERNIGHT_NO_PROGRESS,
   type OvernightPorts,
@@ -334,14 +337,124 @@ describe('overnightTick', () => {
 
   it('leaves the budget alone when the send itself failed', async () => {
     const { ports: p, calls } = ports({
-      fire: async () => ({ ok: false, error: 'The routine refused.' }),
+      fire: async () => ({ ok: false, error: 'plan_runs could not be written.' }),
     });
 
     await expect(overnightTick(p)).resolves.toEqual({
       act: 'failed',
-      error: 'The routine refused.',
+      error: 'plan_runs could not be written.',
     });
     expect(calls.recorded).toEqual([]);
     expect(calls.stopped).toEqual([]);
+  });
+
+  it('does not work down the tree when the send broke rather than refused', async () => {
+    const tried: string[] = [];
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree(twoFeatures()),
+      fire: async (feature) => {
+        tried.push(feature.id);
+        return { ok: false, error: 'plan_runs could not be written.' };
+      },
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'failed' });
+    // The second feature would be handed to the same routine over the same
+    // connection, so trying it costs a candidate and buys nothing.
+    expect(tried).toEqual(['first']);
+    expect(calls.stopped).toEqual([]);
+  });
+
+  it('fires the next ready feature when the send refuses the first', async () => {
+    const sections = tree(twoFeatures());
+    const first = findNode(sections, 'first')!;
+    const tried: string[] = [];
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      fire: async (feature) => {
+        tried.push(feature.id);
+        return feature.id === 'first'
+          ? {
+              ok: false,
+              error: `#${first.number} is only a proposal. Approve it first.`,
+              refused: true,
+            }
+          : { ok: true };
+      },
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({
+      act: 'fired',
+      refused: [first.number],
+    });
+    // Both were tried, in the chooser's order, and the budget went down once.
+    expect(tried).toEqual(['first', 'second']);
+    expect(calls.recorded).toEqual([6]);
+    expect(calls.stopped).toEqual([]);
+  });
+
+  it('ends the night naming every feature that refused', async () => {
+    const sections = tree(twoFeatures());
+    const first = findNode(sections, 'first')!;
+    const second = findNode(sections, 'second')!;
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      fire: async (feature) => ({
+        ok: false,
+        refused: true,
+        error:
+          feature.id === 'first'
+            ? `#${first.number} is only a proposal. Approve it first.`
+            : 'Nothing open under that step that is not waiting on you.',
+      }),
+    });
+
+    const ended = await overnightTick(p);
+
+    expect(ended.act).toBe('ended');
+    const reason = ended.act === 'ended' ? ended.reason : '';
+    expect(reason).toContain(`#${first.number} is only a proposal.`);
+    // The refusal that names no feature gets the number put in front of it.
+    expect(reason).toContain(`#${second.number}: Nothing open under that step`);
+    expect(calls.stopped).toEqual([reason]);
+    expect(calls.recorded).toEqual([]);
+  });
+
+  it('says so when the last candidates were passed over rather than refused', async () => {
+    const sections = tree(twoFeatures());
+    const first = findNode(sections, 'first')!;
+    const { ports: p } = ports({
+      loadSections: async () => sections,
+      lastFiredAt: async () => ({ second: YESTERDAY }),
+      fire: async () => ({
+        ok: false,
+        refused: true,
+        error: `#${first.number} is only a proposal. Approve it first.`,
+      }),
+    });
+
+    const ended = await overnightTick(p);
+    const reason = ended.act === 'ended' ? ended.reason : '';
+
+    // "Every feature left refused" would not be true: one was never offered.
+    expect(reason).toContain('what had not already been tried');
+    expect(reason).toContain(`#${first.number} is only a proposal.`);
+  });
+});
+
+describe('overnightRefusedReason', () => {
+  it('names each refusal once, with a full stop', () => {
+    expect(
+      overnightRefusedReason(
+        [
+          { number: 640, error: '#640 is only a proposal. Approve it first.' },
+          { number: 651, error: 'That step no longer exists' },
+        ],
+        OVERNIGHT_NOTHING_READY,
+      ),
+    ).toBe(
+      'Every feature left refused the send, so it stopped rather than retrying them. ' +
+        '#640 is only a proposal. Approve it first. #651: That step no longer exists.',
+    );
   });
 });

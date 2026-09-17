@@ -43,6 +43,13 @@ import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/p
  * there `running` until morning with nothing written on it -- which is exactly
  * the state the morning report has nothing to say about. Firing is what the
  * liveness check guards, and firing is still behind it.
+ *
+ * The third question can be asked more than once in a tick. The send has
+ * refusals of its own -- a proposal, a re-shape underway, a claim still live
+ * beneath the feature -- and a refused feature is treated exactly like one
+ * whose last run closed nothing: pruned out of the tree, and the chooser asked
+ * again. Only when nothing ready is left does the night end, naming what
+ * refused and why.
  */
 
 /** How many accounts one tick will look at. There is one row per account. */
@@ -71,6 +78,46 @@ const FIRE_WINDOW_MS = 10 * 60 * 1000;
 export const OVERNIGHT_NO_PROGRESS =
   'Every feature left had already been tried without a single step closing, so it ' +
   'stopped rather than firing them again.';
+
+/** A feature the send would not take, and the sentence it said no with. */
+export type RefusedFeature = { number: number; error: string };
+
+/** One refusal as the ending reason prints it, made to stand on its own. */
+function sayRefusal(refusal: RefusedFeature): string {
+  const said = refusal.error.trim();
+  const stopped = /[.!?]$/.test(said) ? said : `${said}.`;
+  // Most of the send's refusals open with the feature's own number, and
+  // repeating it would read as a stutter. The two that do not -- the feature
+  // has gone, and nothing open is left under it -- get it put in front.
+  return stopped.startsWith(`#${refusal.number}`) ? stopped : `#${refusal.number}: ${stopped}`;
+}
+
+/**
+ * The night ran out of features the send would take.
+ *
+ * A sentence, like every other `ended_reason`, because the morning report and
+ * the Overnight card print it verbatim -- so the refusals themselves are in
+ * it. "It stopped early" with no names is the version of this the person can
+ * do nothing about at breakfast; "#640 is only a proposal, #651 is being
+ * re-read" is a morning's work listed out.
+ *
+ * `ranOutBecause` is what the chooser said when the pruned tree came back
+ * empty, and the two cases read differently: a night where every candidate
+ * refused is a different fact from one that had also passed features over for
+ * closing nothing last time, and a reason that claimed the first when the
+ * second happened would be the plan describing itself wrongly again.
+ */
+export function overnightRefusedReason(
+  refused: readonly RefusedFeature[],
+  ranOutBecause: string,
+): string {
+  const lead =
+    ranOutBecause === OVERNIGHT_NO_PROGRESS
+      ? 'Nothing left could be started: what had not already been tried without a step ' +
+        'closing refused the send.'
+      : 'Every feature left refused the send, so it stopped rather than retrying them.';
+  return `${lead} ${refused.map(sayRefusal).join(' ')}`;
+}
 
 /**
  * Whether nothing under this feature has closed since the given instant.
@@ -157,8 +204,21 @@ export type OvernightTick =
   /** The last session is still going, so nothing was started or written. */
   | { act: 'waiting'; liveness: RunLiveness }
   | { act: 'ended'; reason: string }
-  | { act: 'fired'; feature: number; step: number; featuresLeft: number }
-  /** The send itself refused or failed. The night is left running. */
+  | {
+      act: 'fired';
+      feature: number;
+      step: number;
+      featuresLeft: number;
+      /** Features the send refused on the way here, in the order they were tried. */
+      refused: number[];
+    }
+  /**
+   * The send broke. The night is left running.
+   *
+   * Not a refusal: a feature the send will not take is passed over and the
+   * next one tried, and only a failure that would repeat on every feature --
+   * a write that errored, a routine that would not start -- lands here.
+   */
   | { act: 'failed'; error: string };
 
 /**
@@ -178,7 +238,16 @@ export type OvernightPorts = {
   lastRunLiveness: (run: OvernightRun) => Promise<RunLiveness | null>;
   /** Put back the claims of sessions that died, before the plan is read. */
   sweepClaims: () => Promise<void>;
-  fire: (feature: PlanNode, step: PlanNode) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Send the feature. `refused` says the feature itself cannot be taken --
+   * a proposal, a re-shape rewriting it, a claim still live beneath it -- as
+   * opposed to the send having broken, which is every feature's problem and
+   * not this one's.
+   */
+  fire: (
+    feature: PlanNode,
+    step: PlanNode,
+  ) => Promise<{ ok: boolean; error?: string; refused?: boolean }>;
   /** Take one off the budget, given what the row said was left. */
   recordFire: (featuresLeft: number) => Promise<void>;
   stop: (reason: string) => Promise<void>;
@@ -243,25 +312,70 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   }
 
   const [sections, lastFiredAt] = await Promise.all([ports.loadSections(), ports.lastFiredAt()]);
-  const choice = chooseOvernightFire(sections, run, ports.now, lastFiredAt);
-  if (choice.act === 'end') {
-    await ports.stop(choice.reason);
-    return { act: 'ended', reason: choice.reason };
+
+  // A refused feature is the same case as one whose last run closed nothing:
+  // take it out of the tree and ask again.
+  //
+  // The send says no for several reasons -- a step beneath it is claimed, a
+  // re-shape is rewriting it, it is only a proposal -- and every one of them
+  // is a fact about that feature that will still be true on the next tick. The
+  // tick used to treat a refusal as the end of its turn, so it spent the night
+  // offering the same feature every four minutes while five others sat ready.
+  //
+  // The retry has to happen here rather than inside `chooseOvernightFire`,
+  // which is pure: whether a feature refuses is only knowable by asking the
+  // send, which writes. So the choosing and the firing take turns, each
+  // refusal costs one candidate, and the loop can go round at most once per
+  // top-level feature.
+  const refused: RefusedFeature[] = [];
+  let remaining: readonly PlanSection[] = sections;
+  const rounds = sections.reduce((total, section) => total + section.nodes.length, 0) + 1;
+
+  for (let round = 0; round < rounds; round += 1) {
+    const choice = chooseOvernightFire(remaining, run, ports.now, lastFiredAt);
+    if (choice.act === 'end') {
+      // The chooser can only say the tree ran out, and once anything has been
+      // refused that is no longer the whole truth: the reason has to name them,
+      // because the row's sentence is all the morning gets.
+      const reason =
+        refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
+      await ports.stop(reason);
+      return { act: 'ended', reason };
+    }
+    if (choice.act !== 'fire') return { act: choice.act };
+
+    const sent = await ports.fire(choice.feature, choice.step);
+    if (sent.ok) {
+      // Only after something was actually started. A budget that went down on a
+      // send that never happened is a night that spends itself on nothing.
+      await ports.recordFire(run.featuresLeft);
+      return {
+        act: 'fired',
+        feature: choice.feature.number,
+        step: choice.step.number,
+        featuresLeft: Math.max(0, run.featuresLeft - 1),
+        refused: refused.map((one) => one.number),
+      };
+    }
+
+    const error = sent.error ?? 'The feature could not be sent.';
+    // A send that broke rather than refused stops the tick where it stands.
+    // The next feature would be handed to the same routine over the same
+    // connection and fail the same way, and a tick that worked down the whole
+    // tree on a dead API would burn every candidate the night had left.
+    if (!sent.refused) return { act: 'failed', error };
+
+    refused.push({ number: choice.feature.number, error });
+    remaining = without(remaining, choice.feature.id);
   }
-  if (choice.act !== 'fire') return { act: choice.act };
 
-  const sent = await ports.fire(choice.feature, choice.step);
-  if (!sent.ok) return { act: 'failed', error: sent.error ?? 'The feature could not be sent.' };
-
-  // Only after something was actually started. A budget that went down on a
-  // send that never happened is a night that spends itself on nothing.
-  await ports.recordFire(run.featuresLeft);
-  return {
-    act: 'fired',
-    feature: choice.feature.number,
-    step: choice.step.number,
-    featuresLeft: Math.max(0, run.featuresLeft - 1),
-  };
+  // Unreachable: every turn of the loop either answers or removes one of the
+  // features it was bounded by. Here so the night ends on a sentence rather
+  // than on a type error if that ever stops being true.
+  /* v8 ignore next 3 */
+  const reason = overnightRefusedReason(refused, OVERNIGHT_NOTHING_READY);
+  await ports.stop(reason);
+  return { act: 'ended', reason };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -415,7 +529,9 @@ function portsFor(input: {
         sections: await loadSections(),
         now,
       });
-      if (!sent.ok) return { ok: false, error: sent.error };
+      // `refused` and not `ok: false` is the distinction the tick turns on:
+      // one costs this feature, the other costs the tick.
+      if (!sent.ok) return { ok: false, error: sent.error, refused: sent.refused === true };
       // The evidence for the choice, so a night can be read back later.
       console.log(
         `overnight: fired #${sent.number} "${sent.title}" for ready step #${step.number}.`,

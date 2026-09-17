@@ -209,7 +209,25 @@ export type FeatureHandOver =
       /** Whether any row changed, so the page needs redrawing. */
       changed: boolean;
     }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      /**
+       * The feature itself cannot be sent, as opposed to the send breaking.
+       *
+       * The five guards above -- gone, proposal, re-shape underway, a live
+       * claim beneath it, nothing open -- are all facts about this one
+       * feature, and every one of them is still true in four minutes' time.
+       * A caller working a queue should take the feature out and ask for
+       * another. That is what the overnight tick does with it.
+       *
+       * Left off when the send itself failed: a write that errored or a
+       * routine that would not start says nothing about which feature was
+       * chosen, and the next feature would hit the same wall. Those stop the
+       * caller rather than costing it a candidate.
+       */
+      refused?: true;
+    };
 
 /**
  * Hand a whole feature over and start the routine on it now.
@@ -243,10 +261,14 @@ export async function handFeatureToClaude(input: {
   const { supabase, userId } = input;
   const sections = input.sections ?? buildPlanTree(await loadPlan(supabase, userId));
   const node = findNode(sections, input.id);
-  if (!node) return { ok: false, error: 'That step no longer exists.' };
+  if (!node) return { ok: false, error: 'That step no longer exists.', refused: true };
 
   if (node.status === 'proposed') {
-    return { ok: false, error: `#${node.number} is only a proposal. Approve it first.` };
+    return {
+      ok: false,
+      error: `#${node.number} is only a proposal. Approve it first.`,
+      refused: true,
+    };
   }
 
   const now = input.now ?? Date.now();
@@ -258,6 +280,7 @@ export async function handFeatureToClaude(input: {
     return {
       ok: false,
       error: `#${node.number} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change these steps.`,
+      refused: true,
     };
   }
 
@@ -271,6 +294,7 @@ export async function handFeatureToClaude(input: {
     return {
       ok: false,
       error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
+      refused: true,
     };
   }
 
@@ -285,7 +309,11 @@ export async function handFeatureToClaude(input: {
     (step) => !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
   );
   if (open.length === 0) {
-    return { ok: false, error: 'Nothing open under that step that is not waiting on you.' };
+    return {
+      ok: false,
+      error: 'Nothing open under that step that is not waiting on you.',
+      refused: true,
+    };
   }
 
   const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
