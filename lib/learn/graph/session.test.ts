@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { nextConcept, nextMasteryCheck, nextRung, type AskedRung } from './session';
+import {
+  nextConcept,
+  nextMasteryCheck,
+  nextRung,
+  settledStateFor,
+  type AskedRung,
+} from './session';
 import type { Concept, KnowledgeState } from './model';
 
 /**
@@ -49,6 +55,19 @@ describe('what to ask about next', () => {
   it('leaves what is settled until last', () => {
     const picked = nextConcept([concept('settled', 'known'), concept('untouched', 'unknown')], noneAsked);
     expect(picked?.id).toBe('untouched');
+  });
+
+  it('comes back to a recognised claim before a settled one', () => {
+    // #401: a claim you picked out of four still has its applied case waiting,
+    // so it is not finished with the way a known one is -- but it has had a
+    // question put about it, so it goes behind the ones that have not.
+    const concepts = [
+      concept('settled', 'known'),
+      concept('recognised', 'recognised'),
+      concept('untouched', 'unknown'),
+    ];
+    expect(nextConcept(concepts, noneAsked)?.id).toBe('untouched');
+    expect(nextConcept([concepts[0], concepts[1]], noneAsked)?.id).toBe('recognised');
   });
 
   it('spreads out rather than circling one node', () => {
@@ -284,5 +303,29 @@ describe('which rung the next question is asked at', () => {
     expect(nextRung([], [])).toEqual({ rung: 'recognise', check: null });
     expect(nextRung([], [picked(null, 'wrong')])).toEqual({ rung: 'recognise', check: null });
     expect(nextRung([], [picked(null, 'right')])).toEqual({ rung: 'apply', check: null });
+  });
+
+  it('does not let an applied answer stand in for the multiple-choice one', () => {
+    // A case answered right about a check nobody picked right says nothing
+    // about whether the questions below it were passed, and the standing is
+    // keyed on the rung so it cannot be read as though it did.
+    const earlier = [picked(CHECKS[0], 'right'), picked(CHECKS[1], 'right'), typed(CHECKS[2], 'right')];
+    expect(nextRung(CHECKS, earlier)).toEqual({ rung: 'recognise', check: CHECKS[2] });
+  });
+});
+
+describe('where an answer leaves the concept', () => {
+  it('reads the rung it came from', () => {
+    // The whole of #401: picking the idea out of four is recognising it, and
+    // known now takes the applied case.
+    expect(settledStateFor('recognise', true)).toBe('recognised');
+    expect(settledStateFor('apply', true)).toBe('known');
+    expect(settledStateFor('defend', true)).toBe('sharp');
+  });
+
+  it('is shaky for a wrong answer at any rung', () => {
+    expect(settledStateFor('recognise', false)).toBe('shaky');
+    expect(settledStateFor('apply', false)).toBe('shaky');
+    expect(settledStateFor('defend', false)).toBe('shaky');
   });
 });
