@@ -26,8 +26,7 @@ import {
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
-import { hasLiveClaim } from '@/lib/plan/elapsed';
-import { handStepToClaude } from '@/lib/plan/handover';
+import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import { nextPlanPosition } from '@/lib/plan/position';
 import { startRoutineRun } from '@/lib/plan/runs';
 import { PLAN_SEED } from '@/lib/plan/seed';
@@ -914,89 +913,15 @@ export async function sendPlanFeatureToClaude(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
 
-  const data = await loadPlan(supabase, user.id);
-  const sections = buildPlanTree(data);
-  const node = findNode(sections, id.data);
-  if (!node) return { error: 'That step no longer exists.' };
+  // Every rule about what may be sent, the cascade and the instruction itself
+  // are in lib/plan/handover.ts, because the overnight tick now fires the same
+  // send with nobody watching and the two must not drift apart.
+  const sent = await handFeatureToClaude({ supabase, userId: user.id, id: id.data });
+  if (!sent.ok) return { error: sent.error };
+  if (sent.changed) revalidatePlan();
 
-  if (node.status === 'proposed') {
-    return { error: `#${node.number} is only a proposal. Approve it first.` };
-  }
-
-  // The same one-at-a-time rule as the single send. A batch started on top of
-  // a running session is the worse version of the same collision, since it
-  // hands the whole feature to a second run.
-  const running = flatten([node]).find((step) => hasLiveClaim(step, Date.now()));
-  if (running) {
-    return {
-      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
-    };
-  }
-
-  // Itself included: a feature is closed when its steps are, and the session
-  // needs it to be its own to close.
-  //
-  // Minus whatever is waiting on the person. A batch that swept up the
-  // feature's unanswered questions and its blocked steps handed a session rows
-  // it could do nothing with, and left them sitting in the Claude's view saying
-  // why they could not be worked.
-  const open = flatten([node]).filter(
-    (step) =>
-      !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
-  );
-  if (open.length === 0) return { error: 'Nothing open under that step that is not waiting on you.' };
-
-  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
-  if (toHandOver.length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update({ assignee: 'claude' })
-      .in('id', toHandOver)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-    revalidatePlan();
-  }
-
-  // Handed over, and that is all. Nothing here is marked underway.
-  //
-  // This used to set every open step in the feature to `in_progress` on the
-  // press, so that the plan showed the batch as work in hand. What it actually
-  // showed was six lies and one truth: the session works the steps one at a
-  // time, and everything it had not reached yet -- everything it never reached,
-  // when a batch ran short or the run died -- sat there reading "in progress"
-  // with nothing on it. That is the bug behind note 60a0ad01, and there is no
-  // clock that fixes it, because the rows were never true in the first place.
-  //
-  // `in_progress` now means one thing: a session has claimed this step and is
-  // on it. The session sets it when it claims, one at a time, and clears it
-  // when it closes the step -- which is what the plan skill already tells it to
-  // do. "Handed to Claude" is a separate fact and has its own state:
-  // `assignee`, set above, which is exactly what this press changes and what
-  // the queue is built from.
-  const steps = open.length - 1;
-  const text =
-    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
-    '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
-    'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
-    'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
-    'first step that needs a decision from me: block it with the exact question rather ' +
-    'than guessing, and do not skip past it to a later step that depends on it. Run the ' +
-    'gate once at the end, push once, and report every step you closed, by number and ' +
-    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
-    'the plan is the source of truth.\n\n' +
-    planBrief(sections, node, { thread: true });
-
-  const result = await startRoutineRun({
-    supabase,
-    userId: user.id,
-    job: 'feature',
-    routine: planRoutine(),
-    planItemId: node.id,
-    text,
-  });
-  if (!result.ok) return { error: result.error };
   return {
-    message: `Sent #${node.number} and its ${steps === 1 ? 'step' : `${steps} steps`}. ${result.detail}`,
+    message: `Sent #${sent.number} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
   };
 }
 
