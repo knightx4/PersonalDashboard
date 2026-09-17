@@ -7,7 +7,7 @@ import { CommentBody } from '@/components/dev/comment-body';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, Textarea } from '@/components/ui/field';
-import { cn } from '@/lib/cn';
+import { awaitingDash } from '@/lib/comments/awaiting';
 import { MENTION, mentionsDash } from '@/lib/comments/mention';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
@@ -94,10 +94,13 @@ function Message({
   titles?: PlanRefTitles;
 }) {
   const now = useClockNow();
-  const sending = comment.id === PENDING;
+  // The one thing still read off the pending id. A comment that has not been
+  // written yet has no id to delete by, so the control waits for the real row;
+  // everything else about it is drawn exactly as a comment that landed.
+  const unsent = comment.id === PENDING;
 
   return (
-    <li className={cn('group flex gap-2', sending && 'opacity-60')}>
+    <li className="group flex gap-2">
       <div className="flex w-4 shrink-0 justify-center pt-1">
         {!grouped && <AuthorMark author={comment.author} />}
       </div>
@@ -106,17 +109,13 @@ function Message({
         {!grouped && (
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="text-small font-semibold text-ink">{AUTHOR_NAME[comment.author]}</span>
-            {sending ? (
-              <span className="text-small text-ink-muted">Sending…</span>
-            ) : (
-              <time
-                dateTime={comment.createdAt}
-                title={exactTime(comment.createdAt)}
-                className="tabular text-small text-ink-muted"
-              >
-                {commentWhen(comment.createdAt, now)}
-              </time>
-            )}
+            <time
+              dateTime={comment.createdAt}
+              title={exactTime(comment.createdAt)}
+              className="tabular text-small text-ink-muted"
+            >
+              {commentWhen(comment.createdAt, now)}
+            </time>
           </div>
         )}
         <div className="text-body text-ink">
@@ -124,7 +123,7 @@ function Message({
         </div>
       </div>
 
-      {!sending && (
+      {!unsent && (
         <div className="shrink-0 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
           <DeleteComment id={comment.id} target={target} />
         </div>
@@ -193,13 +192,15 @@ export function CommentThread({
    */
   awaitingReply?: boolean;
 }) {
-  const [state, action, pending] = useActionState(
-    submit?.action ?? addComment,
-    {} as CommentActionState,
-  );
+  // The write is not waited on: the comment is in the thread the moment it is
+  // written, and a failure puts the words back in the box. Nothing on screen
+  // is keyed to the request being in flight any more.
+  const [state, action] = useActionState(submit?.action ?? addComment, {} as CommentActionState);
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState('');
   const box = useRef<HTMLTextAreaElement>(null);
+  /** So Enter can send without the button being the only way to submit. */
+  const form = useRef<HTMLFormElement>(null);
   /** Kept only so a failed write can hand the words back rather than lose them. */
   const [sent, setSent] = useState('');
 
@@ -231,7 +232,13 @@ export function CommentThread({
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
-  const asking = awaitingReply || (!submit && pending && reaches(sent));
+  //
+  // Read off the thread rather than off the write being in flight. The write
+  // takes a second and the session it starts takes minutes, so tying the line
+  // to `pending` had it up for the wrong one of the two -- and gone entirely
+  // after a reload. `awaitingDash` holds it until Dash answers or until the
+  // wait has gone on longer than an answer ever takes.
+  const asking = awaitingReply || (!submit && awaitingDash(shown, target, now));
   /** Whether what is in the box right now would reach Dash. */
   const tagged = reaches(draft);
 
@@ -246,9 +253,11 @@ export function CommentThread({
               key={comment.id}
               comment={comment}
               target={target}
-              // A message on its way keeps its own header whatever is above it:
-              // "Sending…" is the one thing that header has to say.
-              grouped={comment.id !== PENDING && shown[index - 1]?.author === comment.author}
+              // Grouped on the same rule as any other turn. It used to be
+              // forced apart so it could say "Sending…"; a comment that posts
+              // straight into the thread has nothing to say that the one above
+              // it has not already said.
+              grouped={shown[index - 1]?.author === comment.author}
               titles={titles}
             />
           ))}
@@ -283,6 +292,7 @@ export function CommentThread({
         </button>
       ) : (
         <form
+          ref={form}
           // The box empties and the comment appears before the write is sent,
           // rather than after it comes back.
           action={(formData: FormData) => {
@@ -298,6 +308,12 @@ export function CommentThread({
         >
           <input type="hidden" name="target" value={target} />
           <input type="hidden" name="id" value={id} />
+          {/* Enter sends and shift-Enter breaks the line, which is what every
+              chat window does and what makes this one feel like a message
+              rather than a field with a Save under it. Escape puts the box
+              away, so the pointer's Cancel is not the only way out. Neither
+              replaces the buttons below: they are what says the two are
+              there. */}
           <Textarea
             ref={box}
             name="body"
@@ -307,6 +323,21 @@ export function CommentThread({
             placeholder={placeholder}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                setWriting(false);
+                return;
+              }
+              if (event.key !== 'Enter' || event.shiftKey) return;
+              // A composing keystroke is part of typing a character, not a
+              // send: an IME candidate confirmed with Enter would post the
+              // half-written word otherwise.
+              if (event.nativeEvent.isComposing) return;
+              if (!draft.trim()) return;
+              event.preventDefault();
+              form.current?.requestSubmit();
+            }}
           />
 
           {/* Which of the two things you are writing, while you are writing it.
@@ -342,8 +373,8 @@ export function CommentThread({
           )}
 
           <div className="flex flex-wrap items-center gap-1">
-            <Button type="submit" size="sm">
-              {submit?.label ?? 'Save'}
+            <Button type="submit" size="sm" disabled={!draft.trim()}>
+              {submit?.label ?? 'Send'}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setWriting(false)}>
               Cancel
