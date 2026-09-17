@@ -115,7 +115,14 @@ const catalog = flattenSections(whole).map((node) => ({
   closed: node.status === 'done' || node.status === 'dropped',
 }));
 
-function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked', empty = false) {
+function render(
+  view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked',
+  empty = false,
+  // The page folds every feature, and a folded row renders no children at all.
+  // These tests are about how a nested row is laid out, so they ask for the
+  // rows to be open; the one test that is about the fold itself passes false.
+  unfolded = true,
+) {
   const narrowed = applyView(whole, view);
   // The page splits the finished features out of Everything before it renders;
   // this has to do the same or the fold is never under test.
@@ -133,11 +140,23 @@ function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocke
       lastRuns={{}}
       commitChecks={{}}
       queued={handedToClaude(whole).length}
+      unfolded={unfolded}
     />,
   );
 }
 
 describe('PlanView', () => {
+  it('starts every feature folded, so the first screen is the map and not the detail', () => {
+    const html = render('open', false, false);
+    // The feature is there, and says how much is under it.
+    expect(html).toContain('Share links');
+    // Its steps are not rendered at all until the arrow is pressed.
+    expect(html).not.toContain('The anonymous page');
+    expect(html).not.toContain('The keep or sell form');
+    // A feature with no children has no fold to be on the wrong side of.
+    expect(html).toContain('Account deletion');
+  });
+
   it('shows the steps nested under their feature, with their numbers', () => {
     const html = render('open');
     expect(html).toContain('Share links');
@@ -186,6 +205,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={0}
+        unfolded
       />,
     );
     // The fold says how many it is holding, so shutting it does not hide the
@@ -307,6 +327,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={handedToClaude(nobodys).length}
+        unfolded
       />,
     );
     expect(html).not.toContain('to Claude</button>');
@@ -339,6 +360,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={0}
+        unfolded
       />,
     );
 
@@ -368,6 +390,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={0}
+        unfolded
       />,
     );
     expect(html).toContain('Nothing ready right now');
@@ -398,6 +421,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={0}
+        unfolded
       />,
     );
 
@@ -440,6 +464,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={0}
+        unfolded
       />,
     );
 
@@ -480,6 +505,7 @@ describe('PlanView', () => {
         lastRuns={{}}
         commitChecks={{}}
         queued={0}
+        unfolded
       />,
     );
 
@@ -518,6 +544,7 @@ describe('PlanView', () => {
           lastRuns={{}}
           commitChecks={{}}
           queued={0}
+          unfolded
         />,
       );
 
@@ -554,6 +581,7 @@ describe('PlanView', () => {
           lastRuns={{}}
           commitChecks={{}}
           queued={0}
+          unfolded
         />,
       );
 
@@ -650,6 +678,7 @@ describe('the CI mark on a closed step', () => {
         bbbbbbb: { mergeSha: 'f12facc', conclusion: 'passed', checkedAt: '2026-09-17T03:00:00Z' },
       }}
       queued={0}
+      unfolded
     />,
   );
 

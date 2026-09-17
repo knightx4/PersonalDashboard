@@ -2064,6 +2064,7 @@ function PlanRow({
   commitChecks,
   view,
   searching,
+  unfolded,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -2078,6 +2079,16 @@ function PlanRow({
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
   searching: boolean;
+  /**
+   * Start with the sub-steps showing.
+   *
+   * A seam for the render tests, and said plainly rather than dressed up as a
+   * feature: the page folds every feature by default, a folded row renders no
+   * children at all, and `renderToStaticMarkup` cannot press the arrow. The
+   * tests that pin how a nested row is laid out would otherwise have nothing
+   * to look at. Nothing in the app passes it.
+   */
+  unfolded: boolean;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -2093,11 +2104,19 @@ function PlanRow({
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [answering, setAnswering] = useState(false);
-  // A closed feature keeps its steps folded, because finished work is
-  // consulted rather than read -- except under a search, where the row is only
-  // on the page because something inside it was found, and folding that away
-  // would be answering the search with a closed drawer.
-  const [showChildren, setShowChildren] = useState(() => searching || !isClosed(node.status));
+  // Every feature starts folded.
+  //
+  // It used to be only the closed ones, on the grounds that finished work is
+  // consulted rather than read. But the page opens on a plan of 117 features
+  // and several hundred steps, and unfolding all the open ones by default made
+  // the first screen a wall with no shape in it -- the modules and the features
+  // are the map, and you cannot see a map through its own detail. The arrow on
+  // every row is one press, and it was already there.
+  //
+  // A search is the exception, and the same one as before: the row is only on
+  // the page because something inside it matched, and folding that away would
+  // be answering the search with a closed drawer.
+  const [showChildren, setShowChildren] = useState(() => searching || unfolded);
 
   const [assignState, assignAction, assignPending] = useActionState(
     setPlanItemAssignee,
@@ -2808,6 +2827,7 @@ function PlanRow({
             commitChecks={commitChecks}
             view={view}
             searching={searching}
+            unfolded={unfolded}
           />
         ))}
 
@@ -2929,6 +2949,7 @@ export function PlanView({
   empty,
   canSend,
   queued,
+  unfolded = false,
 }: {
   sections: PlanSection[];
   /** The finished features, for the fold at the foot of Everything. */
@@ -2943,6 +2964,15 @@ export function PlanView({
   empty: boolean;
   canSend: boolean;
   queued: number;
+  /**
+   * Render every feature with its sub-steps already showing.
+   *
+   * A seam for the render tests and nothing else -- the page leaves it off, so
+   * every feature starts folded there. A folded row renders no children at
+   * all, and `renderToStaticMarkup` cannot press the arrow, so the tests that
+   * pin how a nested row is laid out would have nothing to look at.
+   */
+  unfolded?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const searching = searchTerms(query).length > 0;
@@ -3069,6 +3099,7 @@ export function PlanView({
                       commitChecks={commitChecks}
                       view={view}
                       searching={searching}
+                      unfolded={unfolded}
                     />
                   ))}
                 </ul>
@@ -3147,6 +3178,7 @@ export function PlanView({
                 commitChecks={commitChecks}
                 view={view}
                 searching={searching}
+                unfolded={unfolded}
               />
             ))}
           </ul>
