@@ -115,6 +115,18 @@ fire and the record are one call, so a new button cannot start a run the app
 does not know about. Recording a run never fails the press — by then the
 routine is already going, and saying it is not would be the worse lie.
 
+The row also keeps what GitHub last said about the run, so every surface reads
+one answer instead of each asking or falling back to the clock:
+`github_checked_at` when it was last asked, `last_push_at`, `last_push_sha` and
+`last_push_subject` for the newest push it had made by then, and `github_error`
+for a refusal — a missing or rejected key, or a repository GitHub will not
+show. `github_checked_at` is the test of whether there is a reading at all: null
+means nobody has asked, and set with `last_push_at` null means somebody asked
+and the run had pushed nothing. `github_error` is separate from `error`, which
+is Anthropic refusing the fire and is tied to `status = 'failed'`; a rejected
+GitHub key says nothing about whether the run started. `storedReading` in
+`lib/plan/run-end.ts` turns the five columns into the shape the app reads.
+
 ### `plan_overnight_runs`
 
 One row per account, holding what the overnight runner is doing. You press one

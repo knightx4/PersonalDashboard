@@ -5,6 +5,7 @@ import {
   lastRunLine,
   runEnd,
   runQuietNote,
+  storedReading,
   type LastRun,
 } from './run-end';
 
@@ -65,6 +66,7 @@ describe('lastRunLine', () => {
     createdAt: fired,
     error: null,
     job: 'step',
+    reading: null,
     ...over,
   });
 
@@ -99,6 +101,7 @@ describe('isResolvingAnswers', () => {
     createdAt: fired,
     error: null,
     job: 'reshape',
+    reading: null,
     ...over,
   });
 
@@ -128,5 +131,80 @@ describe('isResolvingAnswers', () => {
   it('is false where there is no run at all', () => {
     expect(isResolvingAnswers(null, at(1))).toBe(false);
     expect(isResolvingAnswers(undefined, at(1))).toBe(false);
+  });
+});
+
+describe('storedReading', () => {
+  const checked = '2026-09-17T02:30:00.000Z';
+
+  it('is nothing at all on a run nobody has asked about', () => {
+    expect(
+      storedReading({
+        github_checked_at: null,
+        last_push_at: null,
+        last_push_sha: null,
+        last_push_subject: null,
+        github_error: null,
+      }),
+    ).toBeNull();
+    expect(storedReading({})).toBeNull();
+  });
+
+  it('reads a run that was asked about and had pushed nothing', () => {
+    expect(
+      storedReading({
+        github_checked_at: checked,
+        last_push_at: null,
+        last_push_sha: null,
+        last_push_subject: null,
+        github_error: null,
+      }),
+    ).toEqual({ checkedAt: checked, lastPush: null, refusal: null });
+  });
+
+  it('reads the push it last saw, with the commit and its subject', () => {
+    expect(
+      storedReading({
+        github_checked_at: checked,
+        last_push_at: '2026-09-17T02:20:00.000Z',
+        last_push_sha: 'abc1234',
+        last_push_subject: 'Store what GitHub last said about a run (plan #568)',
+        github_error: null,
+      }),
+    ).toEqual({
+      checkedAt: checked,
+      lastPush: {
+        at: '2026-09-17T02:20:00.000Z',
+        sha: 'abc1234',
+        subject: 'Store what GitHub last said about a run (plan #568)',
+      },
+      refusal: null,
+    });
+  });
+
+  it('keeps a refusal apart from having seen no pushes', () => {
+    const refused = storedReading({
+      github_checked_at: checked,
+      last_push_at: null,
+      last_push_sha: null,
+      last_push_subject: null,
+      github_error: 'GitHub answered 401. Bad credentials',
+    });
+
+    expect(refused).toEqual({
+      checkedAt: checked,
+      lastPush: null,
+      refusal: 'GitHub answered 401. Bad credentials',
+    });
+  });
+
+  it('takes a push whose commit was never named', () => {
+    expect(
+      storedReading({ github_checked_at: checked, last_push_at: '2026-09-17T02:20:00.000Z' }),
+    ).toEqual({
+      checkedAt: checked,
+      lastPush: { at: '2026-09-17T02:20:00.000Z', sha: null, subject: null },
+      refusal: null,
+    });
   });
 });

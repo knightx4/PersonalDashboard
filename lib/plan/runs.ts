@@ -33,8 +33,10 @@ import {
   isResolvingAnswers,
   runEnd,
   runQuietNote,
+  storedReading,
   type LastRun,
   type RunJob,
+  type RunReadingColumns,
   type RunStatus,
 } from './run-end';
 import { listPushes } from './ci';
@@ -373,7 +375,7 @@ export async function reshapeUnderway(
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('status, error, created_at, job')
+    .select('status, created_at, job')
     .eq('user_id', userId)
     .eq('plan_item_id', featureId)
     .eq('job', 'reshape')
@@ -384,12 +386,11 @@ export async function reshapeUnderway(
   // the collision it protects against is rarer than that.
   if (error || !data || data.length === 0) return false;
 
-  const row = data[0] as { status: string; error: string | null; created_at: string; job: string };
+  const row = data[0] as { status: string; created_at: string; job: string };
   return isResolvingAnswers(
     {
       status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
       createdAt: row.created_at,
-      error: row.error,
       job: 'reshape',
     },
     now,
@@ -408,7 +409,9 @@ export async function loadLastRuns(
 ): Promise<Record<string, LastRun>> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('plan_item_id, status, error, created_at, job')
+    .select(
+      'plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error',
+    )
     .eq('user_id', userId)
     .not('plan_item_id', 'is', null)
     .order('created_at', { ascending: false });
@@ -418,19 +421,22 @@ export async function loadLastRuns(
   }
 
   const last: Record<string, LastRun> = {};
-  for (const row of (data ?? []) as Array<{
-    plan_item_id: string;
-    status: string;
-    error: string | null;
-    created_at: string;
-    job: string;
-  }>) {
+  for (const row of (data ?? []) as Array<
+    {
+      plan_item_id: string;
+      status: string;
+      error: string | null;
+      created_at: string;
+      job: string;
+    } & Partial<RunReadingColumns>
+  >) {
     if (last[row.plan_item_id]) continue;
     last[row.plan_item_id] = {
       status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
       createdAt: row.created_at,
       error: row.error,
       job: row.job as RunJob,
+      reading: storedReading(row),
     };
   }
   return last;
