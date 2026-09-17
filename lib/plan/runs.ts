@@ -435,3 +435,49 @@ export async function loadLastRuns(
   }
   return last;
 }
+
+/**
+ * How many of an account's feature runs are read back to find a night's.
+ *
+ * The window is applied here rather than in the query, the way the tick's own
+ * `lastFeatureFires` does it: there are tens of these rows per account and a
+ * night's are all at the top of them. Two hundred is several months of
+ * pressing the button by hand.
+ */
+const FIRE_LIMIT = 200;
+
+/** One press the runner made, as `nightFrom` reads it. */
+export type FeatureFire = { planItemId: string | null; at: string };
+
+/**
+ * Every feature the runner may have fired, newest first.
+ *
+ * `status` and `error` are deliberately not read. `endQuietRuns` is the only
+ * thing that ever writes a run back and it runs from the plan page's render,
+ * so at four in the morning every run of the night still says `started` with
+ * no error on it. Anything counting finished against failed off that column
+ * would say the night finished nothing, every time. What each feature's
+ * session achieved is read from the steps that closed under it instead, which
+ * is how the tick itself judges a run -- see `lib/digest/night.ts`.
+ *
+ * Here rather than in the cron that wrote it first, because since #633 the
+ * plan page reads the same rows to say what the night is doing: the morning
+ * report and the live card must be looking at one set of fires, or they will
+ * disagree about how many features a night got through.
+ */
+export async function loadFeatureFires(supabase: Db, userId: string): Promise<FeatureFire[]> {
+  const { data, error } = await supabase
+    .from('plan_runs')
+    .select('plan_item_id, created_at')
+    .eq('user_id', userId)
+    .eq('job', 'feature')
+    .order('created_at', { ascending: false })
+    .limit(FIRE_LIMIT);
+  if (error) {
+    console.error(`plan_runs could not be read for the night: ${error.message}`);
+    return [];
+  }
+  return ((data ?? []) as Array<{ plan_item_id: string | null; created_at: string }>).map(
+    (row) => ({ planItemId: row.plan_item_id, at: row.created_at }),
+  );
+}

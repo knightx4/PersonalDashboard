@@ -2,9 +2,10 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
-import { endQuietRuns, loadLastRuns } from '@/lib/plan/runs';
-import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
-import { loadOvernightRun } from '@/lib/plan/overnight';
+import { endQuietRuns, loadFeatureFires, loadLastRuns } from '@/lib/plan/runs';
+import { lastPushedCommit, loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
+import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
+import { nightFrom } from '@/lib/digest/night';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
@@ -83,15 +84,42 @@ export default async function DevPlanPage({
   // request only after something new has been closed.
   const checks = await refreshCommitChecks({ supabase, userId: user.id });
 
-  const [data, lastRuns, commitChecks, overnight] = await Promise.all([
+  // The runner's standing intention, which is one row and is read here rather
+  // than inside the tree: it is about the plan as a whole, and the control that
+  // shows it sits above the whole page. Ahead of everything else because what
+  // it says decides whether there is a night to read at all -- one indexed
+  // single-row read to save a GitHub request on every load of a page nobody has
+  // a night running against.
+  const overnight = await loadOvernightRun(supabase, user.id);
+  const standing = overnightStanding(overnight);
+  const startedAt = overnight?.startedAt ?? null;
+  const live = (standing === 'running' || standing === 'paused') && startedAt !== null;
+
+  const [data, lastRuns, commitChecks, fires, push] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     loadCommitChecks(supabase, user.id),
-    // The runner's standing intention, which is one row and is read here
-    // rather than inside the tree: it is about the plan as a whole, and the
-    // control that shows it sits above the whole page.
-    loadOvernightRun(supabase, user.id),
+    // The presses the night made, for the control's totals. The same rows the
+    // morning digest reads, through the same loader, so the two cannot come to
+    // different answers about how many features a night got through. #633.
+    live ? loadFeatureFires(supabase, user.id) : Promise.resolve([]),
+    // And what was last pushed, which is the one thing here that leaves the
+    // building. In the same `Promise.all` as the reads rather than after them,
+    // so the round trip to GitHub overlaps the plan load instead of adding to
+    // it, and asked for at all only while a night is running.
+    live
+      ? lastPushedCommit({ since: new Date(startedAt).getTime() })
+      : Promise.resolve({ commit: null, error: null }),
   ]);
+
+  // The night as `nightFrom` reads it -- the same reading the morning report is
+  // written from. `since` is the night's own start rather than a day's window:
+  // the report is asked whether last night is still news, and this is asked
+  // what is happening right now, which a window could only get wrong.
+  const night = live
+    ? nightFrom({ run: overnight, fires, items: data.items, since: startedAt })
+    : null;
+
   const whole = buildPlanTree(data);
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
@@ -141,7 +169,13 @@ export default async function DevPlanPage({
       {checks.error && (
         <p className="text-small text-caution">Could not read CI. {checks.error}</p>
       )}
-      <OvernightControl run={overnight} canSend={Boolean(planRoutine().token)} />
+      <OvernightControl
+        run={overnight}
+        canSend={Boolean(planRoutine().token)}
+        night={night}
+        push={push.commit}
+        pushError={push.error}
+      />
       <PlanViewComponent
         sections={sections}
         finished={finished}

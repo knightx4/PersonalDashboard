@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { listPushes, refreshCommitChecks, refusalFor } from '@/lib/plan/ci';
+import { lastPushedCommit, listPushes, refreshCommitChecks, refusalFor } from '@/lib/plan/ci';
 
 describe('refusalFor', () => {
   it('names the permission a refused workflow-runs read is short of', () => {
@@ -193,6 +193,88 @@ describe('refreshCommitChecks', () => {
 
     expect(result.error).toBeNull();
     expect(written[0].conclusion).toBe('none');
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('lastPushedCommit', () => {
+  const ACTIVITY = [
+    {
+      activity_type: 'push',
+      ref: 'refs/heads/claude/overnight-card-633',
+      after: 'a4f09127c4d1e6b0f2a3c5d7e9b1c3d5f7a9b1c3',
+      timestamp: '2026-09-17T11:50:00Z',
+    },
+    {
+      activity_type: 'push',
+      ref: 'refs/heads/main',
+      after: 'b1c3d5f7a9b1c3d5f7a9b1c3d5f7a9b1c3d5f7a9',
+      timestamp: '2026-09-17T11:10:00Z',
+    },
+  ];
+
+  function replies(commitMessage: string | null, status = 200) {
+    return vi.fn(async (url: string) => {
+      if (String(url).includes('/activity')) {
+        return new Response(JSON.stringify(ACTIVITY), { status: 200 });
+      }
+      if (commitMessage === null) return new Response('{}', { status });
+      return new Response(JSON.stringify({ commit: { message: commitMessage } }), { status: 200 });
+    });
+  }
+
+  it('names the newest push by the subject of the commit it left', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const fetchFn = replies(
+      'Store what GitHub last said about a run (plan #568)\n\nThe body, which is not the subject.',
+    );
+
+    const { commit, error } = await lastPushedCommit({ since: 0, fetch: fetchFn as never });
+
+    expect(error).toBeNull();
+    expect(commit?.ref).toBe('claude/overnight-card-633');
+    expect(commit?.subject).toBe('Store what GitHub last said about a run (plan #568)');
+    // The sha it asked about is the one the newest push left, not main's.
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked.some((url) => url.endsWith('/commits/a4f09127c4d1e6b0f2a3c5d7e9b1c3d5f7a9b1c3'))).toBe(
+      true,
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it('still names the branch when the commit itself cannot be read', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+
+    const { commit, error } = await lastPushedCommit({
+      since: 0,
+      fetch: replies(null, 403) as never,
+    });
+
+    expect(commit?.ref).toBe('claude/overnight-card-633');
+    expect(commit?.subject).toBeNull();
+    expect(error).toContain('GITHUB_READ_TOKEN');
+    vi.unstubAllEnvs();
+  });
+
+  it('carries the refusal back rather than swallowing it when there is no key', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+
+    await expect(lastPushedCommit({ since: 0 })).resolves.toEqual({
+      commit: null,
+      error: 'No GITHUB_READ_TOKEN is set, so pushes cannot be read.',
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it('is nothing to say rather than an error when nothing has been pushed', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const fetchFn = vi.fn(async () => new Response('[]', { status: 200 }));
+
+    await expect(lastPushedCommit({ since: 0, fetch: fetchFn as never })).resolves.toEqual({
+      commit: null,
+      error: null,
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
     vi.unstubAllEnvs();
   });
 });

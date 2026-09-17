@@ -25,7 +25,13 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { pushesFrom, type ActivityRow, type Push } from './liveness';
+import {
+  commitSubject,
+  pushesFrom,
+  type ActivityRow,
+  type Push,
+  type PushedCommit,
+} from './liveness';
 import {
   carriedBy,
   carrierFor,
@@ -353,5 +359,54 @@ export async function listPushes(input: {
     return { pushes: pushesFrom(rows, input.since), error: null };
   } catch (error) {
     return { pushes: [], error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * The newest push since an instant, with the subject of the commit it left.
+ *
+ * What the overnight control prints as "last push" (#633). The activity
+ * listing is the only endpoint that answers "which branches moved and when" in
+ * one request, and it carries a sha but no message -- so the subject is a
+ * second request, for the one sha, and only when there is a push to name. Two
+ * requests rather than one because a sha is not something anybody reads: the
+ * question the card answers is what the night last got done, and
+ * `a4f0912 claude/overnight-card-633` is not an answer to it.
+ *
+ * Carried back rather than thrown, the same as everything else here. The two
+ * failures are kept apart on purpose: a listing that could not be read is no
+ * push at all, while a subject that could not be read is still a push worth
+ * naming by its branch. Both hand back GitHub's own refusal sentence so
+ * whoever is looking is told the key is missing a permission rather than told
+ * nothing.
+ */
+export async function lastPushedCommit(input: {
+  since: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{ commit: PushedCommit | null; error: string | null }> {
+  const doFetch = input.fetch ?? globalThis.fetch;
+  const { pushes, error } = await listPushes({ since: input.since, fetch: doFetch });
+  if (error) return { commit: null, error };
+
+  // `pushesFrom` sorts newest first, so this is the last thing that moved.
+  const push = pushes[0];
+  if (!push) return { commit: null, error: null };
+  if (!/^[0-9a-f]{7,40}$/.test(push.sha)) return { commit: { ...push, subject: null }, error: null };
+
+  const token = readToken();
+  if (!token) return { commit: { ...push, subject: null }, error: null };
+
+  try {
+    const body = await ask<{ commit?: { message?: string } }>(
+      `/repos/${REPO.owner}/${REPO.repo}/commits/${push.sha}`,
+      token,
+      doFetch,
+    );
+    return { commit: { ...push, subject: commitSubject(body.commit?.message ?? '') }, error: null };
+  } catch (failed) {
+    return {
+      commit: { ...push, subject: null },
+      error: failed instanceof Error ? failed.message : String(failed),
+    };
   }
 }

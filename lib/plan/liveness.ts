@@ -63,6 +63,39 @@ export type Push = {
   at: string;
 };
 
+/**
+ * A push, and what the commit it left on the branch says it was.
+ *
+ * Here rather than beside the request that fills it in, for the reason the
+ * whole of this file is here: `ci.ts` is server-only and the plan page draws
+ * the answer in the browser, so the shape it draws has to live on the
+ * browser-safe side of the pair.
+ */
+export type PushedCommit = Push & {
+  /** The commit's subject line, or null when GitHub would not say. */
+  subject: string | null;
+};
+
+/** Longest a commit subject is printed at before it is cut. */
+export const SUBJECT_LIMIT = 90;
+
+/**
+ * The first line of a commit message, as a row can print it.
+ *
+ * A commit message is a subject, a blank line and a body, and only the subject
+ * says what the commit was -- the body is the reasoning, and on this project it
+ * runs to paragraphs. Cut at a word rather than mid-word, and with an ellipsis,
+ * so a long subject reads as cut rather than as a subject that stops oddly.
+ */
+export function commitSubject(message: string): string | null {
+  const first = message.split('\n', 1)[0]?.replace(/\s+/g, ' ').trim() ?? '';
+  if (first.length === 0) return null;
+  if (first.length <= SUBJECT_LIMIT) return first;
+  const cut = first.slice(0, SUBJECT_LIMIT);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > SUBJECT_LIMIT / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 /** One entry from GitHub's repository activity listing. */
 export type ActivityRow = {
   activity_type?: string;

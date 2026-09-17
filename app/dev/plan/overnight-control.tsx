@@ -13,9 +13,17 @@ import {
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
-import { remainingUntil } from '@/lib/plan/elapsed';
+import {
+  nightBudgetLine,
+  nightClosedLine,
+  nightRows,
+  type DigestNight,
+} from '@/lib/digest/night';
+import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
+import type { PushedCommit } from '@/lib/plan/liveness';
 import {
   OVERNIGHT_DEFAULT_FEATURES,
   OVERNIGHT_DEFAULT_HOURS,
@@ -34,43 +42,134 @@ import { useClockNow } from '@/lib/use-clock-now';
  * about a row in it, which is why it sits above the summary strip instead of
  * inside the tree: what it starts works its way down the whole page.
  *
- * Three things, in the order they are wanted. What it is doing, because that
- * is what you open the page for at seven in the morning. What is left of the
- * budget and the clock, because that is what tells you whether it is worth
- * leaving alone. And the buttons, which change with the state rather than
- * standing there greyed out -- there is no Resume on a night that is running
- * and no Hold on one that is not, so the row never offers a press that would
- * be refused.
+ * What it says, in the order it is wanted. What the night has got through,
+ * because that is the glance: features fired out of the budget, and steps
+ * closed. Then the feature it is on and how long it has been on it. Then what
+ * was last pushed. Then the clock, which is the only thing left that is about
+ * what is to come rather than what has happened. And the buttons, which change
+ * with the state rather than standing there greyed out -- there is no Resume on
+ * a night that is running and no Hold on one that is not, so the row never
+ * offers a press that would be refused.
+ *
+ * It used to lead with what was *left* -- "2 of 6 features left" and a stop
+ * time -- and that is what #633 was: a night working through its list and a
+ * night that fell over on its first feature print exactly the same budget and
+ * the same clock, so the card could not tell you the one thing you open it to
+ * find out. Leading with the totals is what fixes that, and naming the feature
+ * and the last commit is what makes a stuck night visible: the elapsed time
+ * next to the feature is the number that looks wrong.
+ *
+ * The night itself is `nightFrom`'s, the same reading the morning digest is
+ * written from, down to `nightBudgetLine`'s words. A second way of working out
+ * how many features a night fired would be a second answer to it, and the page
+ * and the report would disagree about the night you were asleep for.
  *
  * Every word it prints about a stopped night is the sentence on the row,
  * verbatim. Five different things can end a night and each one writes its own
  * reason -- the budget, the clock, your hand, nothing being ready, nothing
  * getting anywhere -- and the value of writing them as sentences is lost the
  * moment something rewords them on the way out.
+ *
+ * Every clock-derived figure here is left out entirely before the browser's own
+ * clock arrives (`now` of 0) rather than drawn from it, so the lines do not
+ * change shape under the reader on hydration -- a remaining time measured from
+ * the epoch would read "56y" for the first half second after the page landed.
  */
 
+/** What the night has got through: the whole of the glance, in one line. */
+function Totals({ night }: { night: DigestNight }) {
+  return (
+    <p className="text-small text-ink-muted">
+      <span className="tabular font-semibold text-ink">{nightBudgetLine(night)}</span>
+      {' · '}
+      <span className="tabular">{nightClosedLine(night)}</span>
+    </p>
+  );
+}
+
 /**
- * What the night has left, once it has started.
+ * The feature being built, and how long it has been on it.
  *
- * Both brakes on one line, because they are one question -- how much more of
- * this is there -- and either of them can be the one that ends it.
- *
- * The clock half is left out entirely before the browser's own clock arrives
- * (`now` of 0), rather than drawn from it: a remaining time measured from the
- * epoch would read "56y" for the first half second after the page landed.
+ * `lastFire` rather than the last of `features`: a runner that came back to an
+ * earlier feature is working that feature, and the deduplicated list is in the
+ * order the night first reached each one. See the field's note in `night.ts`.
  */
-function BudgetLeft({ run, now }: { run: OvernightRun; now: number }) {
-  const past = run.stopBy !== null && now > 0 && new Date(run.stopBy).getTime() <= now;
+function OnFeature({ fire, now }: { fire: NonNullable<DigestNight['lastFire']>; now: number }) {
+  return (
+    <p className="text-small text-ink-muted">
+      On <span className="tabular text-ink">{fire.ref}</span>{' '}
+      <span className="text-ink">{fire.title}</span>
+      {now > 0 && (
+        <>
+          {' · '}
+          <span className="tabular">{elapsedSince(fire.at, now)}</span>
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * The last thing that moved in the repository since the night started.
+ *
+ * The subject rather than the sha, because a sha is not something anybody
+ * reads: what you want to know at a glance is what the last session actually
+ * got done. A push GitHub would not give a subject for falls back to the
+ * branch, which at least says which session it was.
+ */
+function LastPush({ push }: { push: PushedCommit }) {
+  return (
+    <p className="min-w-0 text-small text-ink-muted">
+      Last push{' '}
+      {push.subject ? (
+        <span className="text-ink">&ldquo;{push.subject}&rdquo;</span>
+      ) : (
+        <span className="font-mono text-ink">{push.ref}</span>
+      )}
+    </p>
+  );
+}
+
+/** How much clock is left, or that there is none. */
+function StopsIn({ run, now }: { run: OvernightRun; now: number }) {
+  if (run.stopBy === null || now === 0) return null;
+  const past = new Date(run.stopBy).getTime() <= now;
 
   return (
     <p className="text-small text-ink-muted">
-      <span className="tabular font-semibold text-ink">{run.featuresLeft}</span> of{' '}
-      <span className="tabular">{run.featuresBudget}</span>{' '}
-      {run.featuresBudget === 1 ? 'feature' : 'features'} left
-      {run.stopBy !== null &&
-        now > 0 &&
-        (past ? ' · its stop time has passed' : ` · stops in ${remainingUntil(run.stopBy, now)}`)}
+      {past ? 'Its stop time has passed.' : `stops in ${remainingUntil(run.stopBy, now)}`}
     </p>
+  );
+}
+
+/**
+ * The step numbers, reachable and out of the line.
+ *
+ * "6 steps closed" is the fact; `#601 #604 #607 #609 #612 #615` is a list you
+ * have to parse to get back to the same fact. So the numbers fold, and the
+ * count above the fold is what tells you whether to open it -- law 10.
+ *
+ * Cut at the same ten rows the morning report cuts at, through the same
+ * helper: a night that closed thirty steps is a list rather than a glance
+ * either way round.
+ */
+function WhichSteps({ night }: { night: DigestNight }) {
+  const closed = nightRows(night.closed);
+
+  return (
+    <Disclosure title="Which steps" meta={nightClosedLine(night)}>
+      <ul className="space-y-1">
+        {closed.shown.map((step) => (
+          <li key={step.ref} className="flex flex-wrap items-baseline gap-2">
+            <span className="tabular shrink-0 text-small text-ink-ghost">{step.ref}</span>
+            <span className="min-w-0 flex-1 text-small text-ink">{step.title}</span>
+          </li>
+        ))}
+        {closed.more > 0 && (
+          <li className="text-small text-ink-muted">{closed.more} more on the changelog.</li>
+        )}
+      </ul>
+    </Disclosure>
   );
 }
 
@@ -78,12 +177,26 @@ export function OvernightControl({
   run,
   /** Whether the deployment has the token the runner fires through at all. */
   canSend,
+  night,
+  push,
+  pushError,
 }: {
   run: OvernightRun | null;
   canSend: boolean;
+  /**
+   * The night so far, as `nightFrom` reads it. Null when there is no night
+   * running -- a stopped night's account is the morning digest's job, and this
+   * card goes back to its resting shape.
+   */
+  night: DigestNight | null;
+  /** The last thing pushed since the night started, or null when nothing was. */
+  push: PushedCommit | null;
+  /** Why GitHub could not be asked, in its own sentence. */
+  pushError: string | null;
 }) {
   const now = useClockNow();
   const standing = overnightStanding(run);
+  const live = standing === 'running' || standing === 'paused';
 
   const [startState, startAction, starting] = useActionState(
     startOvernightRunner,
@@ -123,9 +236,12 @@ export function OvernightControl({
           Overnight
         </span>
         <OvernightState standing={standing} />
-        <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
-        {run && (standing === 'running' || standing === 'paused') && (
-          <BudgetLeft run={run} now={now} />
+        {/* The totals are the headline while a night is on; a night that is
+            over or has never run has none, and says what it is doing instead. */}
+        {night ? (
+          <Totals night={night} />
+        ) : (
+          <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
         )}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -211,6 +327,40 @@ export function OvernightControl({
           )}
         </div>
       </div>
+
+      {/* What the night has actually been doing, under the totals: the feature
+          it is on, the last thing it pushed, and then the clock. A night that
+          has fired nothing says so in the runner's own sentence rather than
+          leaving the block empty and reading like one that is working. */}
+      {live && run && night && (
+        <div className="space-y-0.5">
+          {night.lastFire ? (
+            <OnFeature fire={night.lastFire} now={now} />
+          ) : (
+            <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
+          )}
+
+          {/* The held sentence is worth saying even when a feature is named,
+              because "on #494" and "nothing new is being fired" are both true
+              of a night somebody paused mid-feature. */}
+          {standing === 'paused' && night.lastFire && (
+            <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
+          )}
+
+          {push && <LastPush push={push} />}
+
+          {/* Law 2, and the convention #566 set for this key: a refusal from
+              GitHub is a sentence naming the permission, said where the thing
+              it would have filled in should have been. */}
+          {pushError && (
+            <p className="text-small text-caution">Could not read what was pushed. {pushError}</p>
+          )}
+
+          <StopsIn run={run} now={now} />
+
+          {night.closed.length > 0 && <WhichSteps night={night} />}
+        </div>
+      )}
 
       {/* Law 2: a runner that cannot fire says so where the button is, rather
           than starting a night that writes a row and then sends nothing. */}

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   abandonedClaim,
+  commitSubject,
   lastPushSince,
   pushesFrom,
   runEndedNote,
   runLiveness,
+  SUBJECT_LIMIT,
   type ActivityRow,
   type Push,
   type RunEvidence,
@@ -158,5 +160,25 @@ describe('runEndedNote', () => {
     expect(runEndedNote(evidence({ startedAt: minutesAgo(130) }), NOW)).toBe(
       'Nothing was pushed in the 2h 10m after this run started.',
     );
+  });
+});
+
+describe('commitSubject', () => {
+  it('takes the subject and leaves the body behind', () => {
+    expect(
+      commitSubject('Show what the night has done so far (plan #633)\n\nThe reasoning, at length.'),
+    ).toBe('Show what the night has done so far (plan #633)');
+  });
+
+  it('has nothing to say about a commit with no message', () => {
+    expect(commitSubject('')).toBeNull();
+    expect(commitSubject('\n\nbody only')).toBeNull();
+  });
+
+  it('cuts a long subject at a word, and says it cut it', () => {
+    const said = commitSubject('a'.repeat(20) + ' ' + 'b'.repeat(200));
+    expect(said).toMatch(/…$/);
+    expect(said!.length).toBeLessThanOrEqual(SUBJECT_LIMIT + 1);
+    expect(said).not.toContain('b'.repeat(200));
   });
 });
