@@ -1,4 +1,5 @@
 import { Check, CircleDashed, X } from 'lucide-react';
+import { RUNG_LABEL } from '@/components/learn/concept-state';
 import { cn } from '@/lib/cn';
 import {
   standingOf,
@@ -16,11 +17,11 @@ import {
  * checks sit in the same small muted type the basis already uses and do not
  * compete with the claim above them.
  *
- * On the concept page each check also says how it has gone, which is what
- * makes the bar legible: a second question about a check you have already got
- * right moves it a fraction of what the first one did. An approval screen
- * passes no answers -- nothing has been asked at that point -- and shows the
- * plain list.
+ * On the concept page each check also says how it has gone at each rung, which
+ * is what the ladder is for: getting a check right out of four options and
+ * using it in a case you have not seen are different things shown, and one
+ * mark per check could only say one of them. An approval screen passes no
+ * answers -- nothing has been asked at that point -- and shows the plain list.
  *
  * Spans rather than a `ul`, with the list semantics put back by `role`. Two of
  * the call sites render inside a span already, and a list inside phrasing
@@ -44,10 +45,24 @@ function StandingMark({ standing }: { standing: CheckStanding }) {
   return <CircleDashed className={cn(shared, 'text-ink-muted')} strokeWidth={2} aria-hidden />;
 }
 
+/**
+ * Which rungs get a line under each check.
+ *
+ * The two that can be asked, always, so a check nobody has applied says so
+ * rather than going quiet. The defence rung is in the enum and nothing writes
+ * a question at it yet, so it appears only once something has been asked
+ * there: a rung that cannot be reached reads as a gap you could close, and it
+ * is not one.
+ */
+function rungsToMark(answers: readonly AskedRung[]): Rung[] {
+  const rungs: Rung[] = ['recognise', 'apply'];
+  if (answers.some((probe) => probe.rung === 'defend')) rungs.push('defend');
+  return rungs;
+}
+
 export function MasteryChecks({
   checks,
   answers,
-  rung = 'recognise',
   className,
 }: {
   checks: string[];
@@ -56,12 +71,6 @@ export function MasteryChecks({
    * Left out on a screen where nothing has been asked yet.
    */
   answers?: readonly AskedRung[];
-  /**
-   * Which rung to mark from. A check can have gone differently at each one, so
-   * one list can only show one of them; the concept page shows the
-   * multiple-choice rung until #402 marks every rung on its own line.
-   */
-  rung?: Rung;
   className?: string;
 }) {
   if (checks.length === 0) {
@@ -75,25 +84,50 @@ export function MasteryChecks({
     );
   }
 
-  return (
-    <span role="list" className={cn('block space-y-0.5', className)}>
-      {checks.map((check) => {
-        const standing = answers ? standingOf(check, rung, answers) : null;
-
-        return (
+  if (!answers) {
+    return (
+      <span role="list" className={cn('block space-y-0.5', className)}>
+        {checks.map((check) => (
           <span key={check} role="listitem" className="flex gap-1.5 text-small text-ink-muted">
-            {standing === null ? <span aria-hidden>•</span> : <StandingMark standing={standing} />}
-            <span>
-              {check}
-              {standing !== null && (
-                <span className={cn('ml-2', standing === 'missed' ? 'text-danger' : 'text-ink-muted')}>
-                  {STANDING_LABEL[standing]}
-                </span>
-              )}
-            </span>
+            <span aria-hidden>•</span>
+            <span>{check}</span>
           </span>
-        );
-      })}
+        ))}
+      </span>
+    );
+  }
+
+  const rungs = rungsToMark(answers);
+
+  return (
+    <span role="list" className={cn('block space-y-2', className)}>
+      {checks.map((check) => (
+        <span key={check} role="listitem" className="block text-small text-ink-muted">
+          {check}
+          <span className="mt-0.5 block space-y-0.5 pl-4">
+            {rungs.map((rung) => {
+              const standing = standingOf(check, rung, answers);
+
+              return (
+                <span key={rung} className="flex gap-1.5">
+                  <StandingMark standing={standing} />
+                  <span>
+                    {RUNG_LABEL[rung]}
+                    <span
+                      className={cn(
+                        'ml-2',
+                        standing === 'missed' ? 'text-danger' : 'text-ink-muted',
+                      )}
+                    >
+                      {STANDING_LABEL[standing]}
+                    </span>
+                  </span>
+                </span>
+              );
+            })}
+          </span>
+        </span>
+      ))}
     </span>
   );
 }
