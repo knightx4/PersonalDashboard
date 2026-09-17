@@ -337,6 +337,28 @@
   --page-wash:
     radial-gradient(110% 75% at 15% -5%, rgb(86 118 176 / 0.3), transparent 60%),
     radial-gradient(90% 70% at 88% 6%, rgb(104 96 170 / 0.24), transparent 55%),
+    /* A fourth pool, mid-right, and a ramp under all of them.
+     *
+     * The three pools above sit top-left, top-right and bottom-centre, which
+     * is a sensible arrangement for a bench nobody sees much of -- and exactly
+     * the wrong one now the sheets are transparent, because the middle-right
+     * is where the page pane is and it was the flattest part of the room. A
+     * translucent card over a flat ground is not visibly translucent; it is
+     * just a slightly grey card.
+     *
+     * The ramp is what gives a card at the top of the page and a card at the
+     * bottom different ground to sit on. It only ever ADDS light, and it fades
+     * out rather than darkening the far corner: a sheet is 20% bench now, so
+     * anything that darkens the bench darkens every sheet on it and takes the
+     * ink down with it, in a place scripts/check-contrast.ts cannot see. Light
+     * is the direction that is free. */
+    radial-gradient(70% 60% at 82% 52%, rgb(96 126 190 / 0.2), transparent 62%),
+    linear-gradient(
+      155deg,
+      rgb(140 164 224 / 0.16) 0%,
+      rgb(120 142 205 / 0.07) 34%,
+      transparent 62%
+    ),
     radial-gradient(130% 110% at 55% 115%, rgb(38 74 116 / 0.3), transparent 68%);
   --c-page-positive: #6fe0b0;
   --c-page-caution: #f5b459;
@@ -1046,6 +1068,30 @@ body::before {
   z-index: -1;
 }
 
+/* The sheen on a sheet, and the reason the glass reads as glass.
+ *
+ * A translucent rectangle is not a pane of glass; a translucent rectangle with
+ * light running across it is. This is the one gradient that is ON the sheet
+ * rather than behind it: white catching the top-left corner and gone by the
+ * middle, at the angle the bench's own ramp runs, so the whole room is lit
+ * from the same place.
+ *
+ * It only adds light to a sheet that already carries dark ink, so it cannot
+ * take any pair below where scripts/check-contrast.ts measured it -- which is
+ * just as well, because the checker reads --c-surface and not this.
+ *
+ * On `.sheet` rather than on Card, so every surface that calls itself a sheet
+ * gets it: cards, sections, the empty state, the popovers.
+ */
+[data-theme='lightbox'] .sheet {
+  background-image: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.16) 0%,
+    rgb(255 255 255 / 0.05) 38%,
+    rgb(255 255 255 / 0) 72%
+  );
+}
+
 /* ---------------------------------------------------------------------------
  * Density.
  *
@@ -1649,7 +1695,16 @@ form[data-auto-submit] [data-fallback-submit] {
  * app, on the one theme whose sheets are already alpha-composited.
  */
 [data-theme='lightbox'] .page-pane {
-  background-color: rgb(255 255 255 / 0.04);
+  background-color: rgb(255 255 255 / 0.03);
+  /* The same light, on the biggest piece of glass in the room. Weaker than a
+   * sheet's, because it is behind them and a lit ground competing with lit
+   * cards is how this turns to soup. */
+  background-image: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.05) 0%,
+    rgb(255 255 255 / 0.015) 40%,
+    rgb(255 255 255 / 0) 70%
+  );
 }
 
 @media (min-width: 1024px) {
