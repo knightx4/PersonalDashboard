@@ -127,6 +127,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.dev_comments = raisedComment.id;
 
+  // Keyed by (user_id, target, row_id) rather than an id of its own, so what
+  // goes in `ids` is the row the thread hangs off -- see ROW_KEY below.
+  await admin`
+    insert into dev_comment_reads (user_id, target, row_id)
+    values (${userId}, 'idea', ${idea.id})`;
+  ids.dev_comment_reads = idea.id;
+
   const [uiReview] = await admin<{ id: string }[]>`
     insert into ui_reviews (user_id, module, commit_sha, violations, note)
     values (
@@ -441,14 +448,26 @@ describe('cross-user reads', () => {
     'game_price_quotes',
   ]);
 
+  /**
+   * Where a table's identity is not an `id` column, the column that stands in
+   * for one. `dev_comment_reads` is a primary key of (user_id, target,
+   * row_id) -- one row per conversation per person -- so the question "can B
+   * see A's row" is asked of the row the thread hangs off.
+   */
+  const ROW_KEY: Record<string, string> = { dev_comment_reads: 'row_id' };
+
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
 
     for (const table of tables) {
       if (SHARED_REFERENCE_TABLES.has(table)) continue;
       const id = seedA[table];
+      const key = ROW_KEY[table] ?? 'id';
       const [row] = await asUser(userB, (tx) =>
-        tx.unsafe<{ count: string }[]>(`select count(*)::int as count from ${table} where id = $1`, [id]),
+        tx.unsafe<{ count: string }[]>(
+          `select count(*)::int as count from ${table} where ${key} = $1`,
+          [id],
+        ),
       );
       if (Number(row.count) !== 0) leaks.push(table);
     }
