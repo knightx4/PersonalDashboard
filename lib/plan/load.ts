@@ -137,6 +137,12 @@ export type PlanItem = {
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
   /**
+   * What a blocked step needs, in one sentence. Rewritten every time it is
+   * blocked and cleared when it stops being blocked, so it says what is wanted
+   * now; the dated record of every block it has had stays in `comment`.
+   */
+  blockAsk: string | null;
+  /**
    * What has been said about it, oldest first: your notes and a session's
    * replies. Not a column — it is read alongside the row — and empty on the
    * paths that do not ask for it, the CLI's direct connection among them.
@@ -175,8 +181,8 @@ export type PlanData = {
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
   'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
-  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at, ' +
-  'updated_at, dismissed_at, fog_dismissed_at';
+  'comment, block_ask, priority, size, assignee, commit_sha, position, started_at, completed_at, ' +
+  'created_at, updated_at, dismissed_at, fog_dismissed_at';
 
 /**
  * Every row of the account's plan, in one read. The whole tree is what the
@@ -251,6 +257,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     dismissedAt: stamp(row.dismissed_at),
     fogDismissedAt: stamp(row.fog_dismissed_at),
     comment: (row.comment as string | null) ?? null,
+    blockAsk: (row.block_ask as string | null) ?? null,
     thread: threadFrom(row.thread),
     priority: isPlanPriority(priority) ? priority : 2,
     size: size && isPlanSize(size) ? size : null,

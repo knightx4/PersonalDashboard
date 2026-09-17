@@ -370,6 +370,13 @@ export function planBrief(
     for (const ref of node.blocks) out.push(`- #${ref.number} ${ref.title}`);
   }
 
+  // What it needs, above the record of every time it has been asked for. A
+  // session handed a blocked step should read the sentence rather than work
+  // out which paragraph of the notes still stands.
+  if (node.blockAsk) {
+    out.push('', '## Blocked on', '', node.blockAsk);
+  }
+
   if (node.comment) {
     out.push('', '## Notes', '', node.comment);
   }

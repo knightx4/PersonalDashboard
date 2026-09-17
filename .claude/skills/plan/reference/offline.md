@@ -69,9 +69,12 @@ insert into plan_items (user_id, module, parent_id, title, acceptance, size,
 values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
         'From #63''s answer: <that answer, first line>');
 
--- block: not finished, so no commit
+-- block: not finished, so no commit. `block_ask` is the one sentence saying
+-- what it needs, rewritten on every block and read by Dash and the plan row;
+-- the dated line is the history and is appended. Clear `block_ask` whenever
+-- the step stops being blocked -- start, reopen, done and drop all do.
 update plan_items
-set status = 'blocked',
+set status = 'blocked', block_ask = '<what it needs, in one sentence>',
     comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <the question>'
 where id = '…';
 

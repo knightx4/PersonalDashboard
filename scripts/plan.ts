@@ -29,7 +29,7 @@
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
  *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
- *   npx tsx scripts/plan.ts block <n> --note "what it is waiting on"
+ *   npx tsx scripts/plan.ts block <n> --ask "what it needs" [--note "the rest"]
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
@@ -157,7 +157,7 @@ async function resolveUser(sql: Sql): Promise<string> {
 async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
-           resolution, comment, priority, size, assignee, commit_sha, position,
+           resolution, comment, block_ask, priority, size, assignee, commit_sha, position,
            started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
     from plan_items where user_id = ${userId}
     order by position, created_at`;
@@ -178,7 +178,7 @@ async function byNumber(sql: Sql, userId: string, raw: string | undefined): Prom
   if (!Number.isInteger(number) || number < 1) fail('Give a step number, the "#12" on the page.');
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
-           resolution, comment, priority, size, assignee, commit_sha, position,
+           resolution, comment, block_ask, priority, size, assignee, commit_sha, position,
            started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
     from plan_items where user_id = ${userId} and number = ${number}`;
   if (rows.length === 0) fail(`No step #${number}.`);
@@ -738,16 +738,22 @@ async function main(): Promise<void> {
       // A session claiming a sub-step nobody handed over made exactly that
       // row. `coalesce` rather than a plain set, so a step you had marked as
       // yours stays yours.
+      // A step being worked is not a step waiting on you, so the sentence
+      // saying what it needed goes. The dated line that recorded the block
+      // stays in the comment.
       await sql`
         update plan_items
-        set status = 'in_progress', assignee = coalesce(assignee, 'claude')
+        set status = 'in_progress', assignee = coalesce(assignee, 'claude'),
+            block_ask = null
         where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} in progress.`);
       return;
     }
 
     if (command === 'reopen') {
-      await sql`update plan_items set status = 'not_started' where id = ${item.id} and user_id = ${userId}`;
+      await sql`
+        update plan_items set status = 'not_started', block_ask = null
+        where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} reopened.`);
       return;
     }
@@ -837,7 +843,22 @@ async function main(): Promise<void> {
     // Closing or parking a step always records why. A status with no reason
     // is how a plan becomes something nobody trusts.
     if (command === 'done' || command === 'block' || command === 'drop') {
-      const note = arg('--note');
+      // A block says two things and they have different lifetimes. What the
+      // step needs is one sentence that is true until somebody supplies it, so
+      // it goes in its own column and is rewritten on every block. Everything
+      // else -- what was tried, what was ruled out, what the last block asked
+      // for -- is history, and history is appended. Blocking with only a note
+      // is refused rather than guessed at, because a note is where the ask
+      // used to get lost.
+      const ask = command === 'block' ? arg('--ask')?.trim() : undefined;
+      if (command === 'block' && !ask) {
+        fail(
+          `block ${item.number} --ask "what it needs, in one sentence" [--note "the rest"]. ` +
+            `The ask is what Dash and the plan row show, and blocking again replaces it; ` +
+            `--note is the dated line, which is appended.`,
+        );
+      }
+      const note = arg('--note') ?? ask;
       if (!note) fail(`--note is required for ${command}: say what happened.`);
 
       // Fog on a step being closed as done is work that was never specified
@@ -857,12 +878,17 @@ async function main(): Promise<void> {
       const line = `${STATUS_WORD[status][0].toUpperCase()}${STATUS_WORD[status].slice(1)} ${stamp}: ${note}`;
       const comment = item.comment ? `${item.comment}\n\n${line}` : line;
 
+      // Cleared on done and on drop: a sentence saying what a step needs is a
+      // claim about work that has stopped, and it stops being true the moment
+      // the step moves on.
       await sql`
         update plan_items
         set status = ${status}, comment = ${comment},
-            commit_sha = coalesce(${commit}, commit_sha)
+            commit_sha = coalesce(${commit}, commit_sha),
+            block_ask = ${ask ?? null}
         where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`);
+      if (ask && ask !== note) console.log(`Needs: ${ask}`);
 
       if (command === 'done') {
         const sections = await loadTree(sql, userId);

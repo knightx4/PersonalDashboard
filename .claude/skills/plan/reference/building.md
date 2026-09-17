@@ -19,7 +19,9 @@ it is missing, read `offline.md` in this directory instead of guessing.
 npx tsx scripts/plan.ts show <n>               # the brief: destination, decisions, done-when, waits
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
-npx tsx scripts/plan.ts block <n> --note "…"   # cannot proceed; say what is needed
+npx tsx scripts/plan.ts block <n> --ask "…" [--note "…"]
+                                               # cannot proceed; the ask is the one sentence
+                                               # saying what it needs, rewritten each time
 npx tsx scripts/plan.ts reopen <n>             # put it back to not started
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
@@ -170,8 +172,10 @@ Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
 A step that turns out to need something else from the user — an API key, an
-account, a thing outside the repo — is `block <n> --note "the question"`, with
-the exact question. A step that should not be done is `drop <n> --note "why"`;
+account, a thing outside the repo — is `block <n> --ask "the question"`, with
+the exact question in one sentence. The ask is rewritten on every block, so it
+is what the step needs now; `--note` is for anything else worth recording, and
+that is appended to the history in the comment. A step that should not be done is `drop <n> --note "why"`;
 say "out of scope: …" when that is the reason, since there is no status for it.
 Never delete a step; deleting is the user's.
 

@@ -64,6 +64,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     dismissedAt: null,
     fogDismissedAt: null,
     comment: null,
+    blockAsk: null,
     thread: [],
     priority: 2,
     size: null,
