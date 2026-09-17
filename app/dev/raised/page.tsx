@@ -1,6 +1,9 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
+import { loadPlan } from '@/lib/plan/load';
+import { buildPlanTree } from '@/lib/plan/tree';
+import { waitingOnYou } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
 import { ConversationsView } from './conversations-view';
@@ -30,11 +33,18 @@ export const metadata = { title: 'Dash' };
 export default async function DevRaisedPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, digest, conversations] = await Promise.all([
+  const [queue, digest, conversations, plan] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
     loadConversations(supabase, user.id),
+    loadPlan(supabase, user.id),
   ]);
+
+  // The plan's own half of "waiting on you": a blocked step, an unanswered
+  // decision, a proposal nobody approved. Derived here rather than filed by a
+  // session, so a step blocked on a credential reaches this page without
+  // anybody remembering to raise it as well.
+  const waiting = waitingOnYou(buildPlanTree(plan));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -43,7 +53,7 @@ export default async function DevRaisedPage() {
         description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
       />
       <DigestPanel digest={digest} />
-      <RaisedView queue={queue} />
+      <RaisedView queue={queue} waiting={waiting} />
       <ConversationsView conversations={conversations} />
     </div>
   );

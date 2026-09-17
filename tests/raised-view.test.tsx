@@ -38,7 +38,7 @@ function raise(over: Record<string, unknown> = {}): RaisedRow {
 }
 
 function render(rows: RaisedRow[]): string {
-  return renderToStaticMarkup(<RaisedView queue={raisedQueueFrom(rows)} />);
+  return renderToStaticMarkup(<RaisedView queue={raisedQueueFrom(rows)} waiting={[]} />);
 }
 
 describe('a raise on the page', () => {

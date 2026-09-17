@@ -197,3 +197,18 @@ export function planState(health: PlanHealth): DevState | null {
       return null;
   }
 }
+
+/**
+ * Why a plan step is on your desk, on the Dash tab.
+ *
+ * Three of the ten plan healths, and the only three `needsThePerson` admits.
+ * They take their own words rather than the shared ones because the shared
+ * `Waiting on you` is the section they sit in: repeating it on every row would
+ * say the same thing four times and tell you nothing about which of the three
+ * this is (law 1).
+ */
+export const WAITING_WORD: Record<'blocked' | 'unanswered' | 'proposed', string> = {
+  blocked: 'Stopped',
+  unanswered: 'Question',
+  proposed: 'To approve',
+};
