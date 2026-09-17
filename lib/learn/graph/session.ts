@@ -3,6 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { Probe } from '@/lib/learn/graph/probe-payload';
+import { joinCase, type AppliedCase } from '@/lib/learn/graph/applied-payload';
 import { barPercent, standingOf, weightFor } from '@/lib/learn/graph/probe-payload';
 import { inferredFrom, type Concept, type Graph } from '@/lib/learn/graph/model';
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
@@ -24,11 +25,23 @@ import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
 export type ProbeRow = {
   id: string;
   conceptId: string;
+  /** On an applied row this is the case: the situation, then what to say. */
   question: string;
-  options: string[];
-  correctIndex: number;
-  reason: string;
+  /** Null on a written row, which has nothing to pick from. */
+  options: string[] | null;
+  correctIndex: number | null;
+  reason: string | null;
   chosenIndex: number | null;
+  /** The answer the writer expected. Written rungs only. */
+  expected: string | null;
+  /** What was typed. Null until a written question is answered. */
+  response: string | null;
+  /** Whether what was typed held the idea. Null until it is graded. */
+  responseCorrect: boolean | null;
+  /** The grader's one sentence on why. */
+  gradeReason: string | null;
+  /** Which rung it was asked at. Everything asked before the ladder is recognise. */
+  rung: Rung;
   weight: number;
   /** The check it was written against, or null for a concept with none. */
   masteryCheck: string | null;
@@ -137,7 +150,8 @@ export async function probesFor(
   const { data, error } = await supabase
     .from('probes')
     .select(
-      'id, concept_id, question, options, correct_index, reason, chosen_index, weight, mastery_check, created_at',
+      'id, concept_id, question, options, correct_index, reason, chosen_index, expected, ' +
+        'response, response_correct, grade_reason, rung, weight, mastery_check, created_at',
     )
     .eq('concept_id', conceptId)
     .order('created_at', { ascending: false });
@@ -149,10 +163,15 @@ export async function probesFor(
     id: string;
     concept_id: string;
     question: string;
-    options: string[];
-    correct_index: number;
-    reason: string;
+    options: string[] | null;
+    correct_index: number | null;
+    reason: string | null;
     chosen_index: number | null;
+    expected: string | null;
+    response: string | null;
+    response_correct: boolean | null;
+    grade_reason: string | null;
+    rung: Rung;
     weight: number | string;
     mastery_check: string | null;
     created_at: string;
@@ -164,6 +183,11 @@ export async function probesFor(
     correctIndex: row.correct_index,
     reason: row.reason,
     chosenIndex: row.chosen_index,
+    expected: row.expected,
+    response: row.response,
+    responseCorrect: row.response_correct,
+    gradeReason: row.grade_reason,
+    rung: row.rung,
     weight: Number(row.weight),
     masteryCheck: row.mastery_check,
     askedAt: row.created_at,
@@ -449,6 +473,42 @@ export async function recordProbe(
   return (data as { id: string }).id;
 }
 
+/**
+ * Write an applied case as asked, before it is shown.
+ *
+ * The situation and what to say about it are stored in the question column as
+ * one piece of text, joined the way `joinCase` joins them: a probe row holds
+ * one question, and an applied case is that question in two parts rather than
+ * a different kind of row.
+ *
+ * `expected` goes in here, with the case, and is shown only once the answer
+ * has been typed -- the same rule the multiple-choice reason follows, and what
+ * stops it being an explanation of whatever somebody happened to write.
+ */
+export async function recordAppliedCase(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { conceptId: string; case: AppliedCase; model: string },
+): Promise<string> {
+  const { data, error } = await supabase
+    .from('probes')
+    .insert({
+      user_id: userId,
+      concept_id: input.conceptId,
+      rung: 'apply',
+      question: joinCase(input.case.situation, input.case.question),
+      expected: input.case.expected,
+      mastery_check: input.case.masteryCheck,
+      model: input.model,
+    })
+    .select('id')
+    .single();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error || !data) throw fail('Saving the case', error ?? { message: 'no row' });
+  return (data as { id: string }).id;
+}
+
 export type AnswerOutcome = {
   correct: boolean;
   reason: string;
@@ -574,8 +634,31 @@ export async function recordAnswer(
   assertSchemaExposed(answerError, LEARN_SCHEMA);
   if (answerError) throw fail('Saving the answer', answerError);
 
-  const state = correct ? 'known' : 'shaky';
-  const { error: stateError } = await supabase.from('concept_state').upsert(
+  const { state, inferred } = await settleConcept(supabase, userId, {
+    conceptId: input.conceptId,
+    correct,
+    graph: input.graph,
+  });
+
+  return { correct, reason: probe.reason ?? '', weight, state, inferred, first };
+}
+
+/**
+ * Where an answer leaves the concept, and what it implies underneath.
+ *
+ * The same for a picked answer and a typed one: right settles the node, wrong
+ * makes it shaky, and both say they were established by testing. #401 is where
+ * that changes -- a right multiple-choice answer stops meaning known and the
+ * applied rung starts meaning it -- so the rule lives in one place rather than
+ * once per rung.
+ */
+async function settleConcept(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: { conceptId: string; correct: boolean; graph?: Graph },
+): Promise<{ state: 'known' | 'shaky'; inferred: number }> {
+  const state = input.correct ? 'known' : 'shaky';
+  const { error } = await supabase.from('concept_state').upsert(
     {
       concept_id: input.conceptId,
       user_id: userId,
@@ -590,16 +673,95 @@ export async function recordAnswer(
     { onConflict: 'concept_id' },
   );
 
-  assertSchemaExposed(stateError, LEARN_SCHEMA);
-  if (stateError) throw fail('Recording what that settled', stateError);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Recording what that settled', error);
 
   // Growth trigger 3: answering correctly about a node says the things it
   // rests on are probably in place. Weakly, and never over an answer somebody
   // actually gave -- inferredFrom already refuses those.
   const inferred =
-    correct && input.graph
+    input.correct && input.graph
       ? await markInferred(supabase, userId, inferredFrom(input.graph, input.conceptId))
       : 0;
 
-  return { correct, reason: probe.reason, weight, state, inferred, first };
+  return { state, inferred };
+}
+
+/**
+ * Record a typed answer and the grade it was given.
+ *
+ * The written half of `recordAnswer`: the grading happens outside, because it
+ * costs a model call, and what lands here is the verdict and the sentence
+ * behind it. Both go on the question rather than on the concept, so a page
+ * reading the history a month later has what was typed, what was expected and
+ * why it was marked as it was.
+ *
+ * The weight is the one the multiple-choice rule already gives. An applied
+ * case is only reached once the check it aims at has been got right, so the
+ * check stands as reinforced and the answer earns the fraction; #401 is the
+ * step that makes an applied answer worth the full amount.
+ */
+export async function recordWrittenAnswer(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  input: {
+    probeId: string;
+    conceptId: string;
+    /** What was typed, as typed. */
+    response: string;
+    /** The grader's verdict, and the sentence it wrote first. */
+    correct: boolean;
+    why: string;
+    /** Read only for a concept with no checks, the same as a picked answer. */
+    wasSettled: boolean;
+    graph?: Graph;
+  },
+): Promise<AnswerOutcome> {
+  const { data, error } = await supabase
+    .from('probes')
+    .select('response, mastery_check')
+    .eq('id', input.probeId)
+    .maybeSingle();
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading the case', error);
+  if (!data) throw new Error('That question is not there any more.');
+
+  const probe = data as { response: string | null; mastery_check: string | null };
+
+  const standing =
+    probe.mastery_check === null
+      ? null
+      : standingOf(
+          probe.mastery_check,
+          (await probesFor(supabase, input.conceptId)).filter((row) => row.id !== input.probeId),
+        );
+
+  // Answering the same case twice earns nothing, the same as picking twice.
+  const first = probe.response === null;
+  const weight = first
+    ? weightFor({ conclusive: true, correct: input.correct, standing, wasSettled: input.wasSettled })
+    : 0;
+
+  const { error: answerError } = await supabase
+    .from('probes')
+    .update({
+      response: input.response,
+      response_correct: input.correct,
+      grade_reason: input.why,
+      answered_at: new Date().toISOString(),
+      weight,
+    })
+    .eq('id', input.probeId);
+
+  assertSchemaExposed(answerError, LEARN_SCHEMA);
+  if (answerError) throw fail('Saving the answer', answerError);
+
+  const { state, inferred } = await settleConcept(supabase, userId, {
+    conceptId: input.conceptId,
+    correct: input.correct,
+    graph: input.graph,
+  });
+
+  return { correct: input.correct, reason: input.why, weight, state, inferred, first };
 }
