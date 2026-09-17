@@ -83,6 +83,21 @@ describe('the raised queue', () => {
     expect(queue.closed.map((row) => row.id)).toEqual(['put-aside']);
   });
 
+  // 0073's state. Closing one is you saying you have read what came of it, so
+  // it is filed with the history and not counted anywhere.
+  it('files a closed raise with the history and leaves the count alone', () => {
+    const queue = raisedQueueFrom(
+      [
+        raise({ id: 'open', created_at: '2026-09-03T09:00:00Z' }),
+        raise({ id: 'finished-with', created_at: '2026-09-02T09:00:00Z', status: 'closed' }),
+      ].map(raisedRowFrom),
+    );
+
+    expect(queue.closed.map((row) => row.id)).toEqual(['finished-with']);
+    expect(queue.unfinished).toEqual([]);
+    expect(queue.openCount).toBe(1);
+  });
+
   it('counts the open ones, which is what the sidebar and the bell read', () => {
     const queue = raisedQueueFrom(
       [

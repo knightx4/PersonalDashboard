@@ -79,6 +79,11 @@ describe('what each queue keeps for itself', () => {
 
   it('leaves a raise the one state it exists to show', () => {
     expect(RAISED_HEALTH_WORD.unfinished).toBe('Nothing done');
+    // Answering is this queue's own too: you replied and something came of it,
+    // which is not the end of the row. Being finished with it is, and that
+    // takes the shared word.
+    expect(RAISED_HEALTH_WORD.answered).toBe('Answered');
+    expect(RAISED_HEALTH_WORD.closed).toBe(DEV_STATE_WORD.done);
   });
 
   it('leaves a finding its confirmation', () => {

@@ -2,7 +2,13 @@
 
 import { useActionState, useState } from 'react';
 import { MessageCircleQuestion } from 'lucide-react';
-import { decideRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
+import {
+  closeRaise,
+  decideRaise,
+  dismissRaise,
+  reopenRaise,
+  type RaisedActionState,
+} from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
@@ -77,11 +83,15 @@ function lead(detail: string): string {
 }
 
 /**
- * A closed raise, worded the way the other dev queues word it.
+ * A raise that is no longer open, worded the way the other dev queues word it.
  *
  * "Answered" is this queue's own -- a raise closes on a reply, which is not the
  * same as the work being finished. A raise you turned down is the same fact as
- * a step dropped or a note declined, so it takes the shared word.
+ * a step dropped or a note declined, so it takes the shared word, and so does
+ * one you are finished with.
+ *
+ * `closed` is quiet rather than positive: it is the row you have read and put
+ * away, and the green is for the state that still wants looking at.
  *
  * Nothing on an open one: they are all under a heading that already says
  * "Waiting on you", and repeating it on every row would be the same fact twice.
@@ -89,7 +99,8 @@ function lead(detail: string): string {
 const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
   waiting: 'caution',
   unfinished: 'caution',
-  done: 'positive',
+  answered: 'positive',
+  closed: 'quiet',
   dropped: 'ghost',
 };
 
@@ -202,10 +213,19 @@ function RaiseCard({ row }: { row: RaisedRow }) {
     dismissRaise,
     {} as RaisedActionState,
   );
+  const [closeState, closeAction, closePending] = useActionState(
+    closeRaise,
+    {} as RaisedActionState,
+  );
   const [reopenState, reopenAction, reopenPending] = useActionState(
     reopenRaise,
     {} as RaisedActionState,
   );
+
+  // Answered and something came of it, so the only thing left is you saying
+  // you have read it. An answered raise with nothing recorded is not this: it
+  // is offered the Decide form above instead, because it still owes an outcome.
+  const canClose = row.status === 'answered' && Boolean(row.outcome);
 
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
@@ -271,14 +291,24 @@ function RaiseCard({ row }: { row: RaisedRow }) {
             </Button>
           </form>
         ) : (
-          <form action={reopenAction}>
-            <input type="hidden" name="id" value={row.id} />
-            <Button type="submit" size="sm" variant="ghost" pending={reopenPending}>
-              Reopen
-            </Button>
-          </form>
+          <>
+            {canClose && (
+              <form action={closeAction}>
+                <input type="hidden" name="id" value={row.id} />
+                <Button type="submit" size="sm" variant="secondary" pending={closePending}>
+                  Close it
+                </Button>
+              </form>
+            )}
+            <form action={reopenAction}>
+              <input type="hidden" name="id" value={row.id} />
+              <Button type="submit" size="sm" variant="ghost" pending={reopenPending}>
+                Reopen
+              </Button>
+            </form>
+          </>
         )}
-        <FieldError>{dismissState.error ?? reopenState.error}</FieldError>
+        <FieldError>{dismissState.error ?? closeState.error ?? reopenState.error}</FieldError>
       </div>
     </li>
   );
