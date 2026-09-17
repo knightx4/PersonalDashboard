@@ -212,7 +212,8 @@ export function planState(health: PlanHealth): DevState | null {
 /**
  * Why a plan step is on your desk, on the Dash tab.
  *
- * Three of the ten plan healths, and the only three `needsThePerson` admits.
+ * Three of the thirteen plan healths, and the only three `needsThePerson`
+ * admits.
  * They take their own words rather than the shared ones because the shared
  * `Waiting on you` is the section they sit in: repeating it on every row would
  * say the same thing four times and tell you nothing about which of the three

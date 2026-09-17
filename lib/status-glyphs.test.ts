@@ -69,20 +69,15 @@ describe('status glyphs', () => {
   });
 
   /**
-   * The plan draws its states in one column, so a shape it reuses is a shape
-   * that column cannot tell apart -- and that is allowed in exactly one place.
-   *
-   * `in_progress`, `working` and `quiet` are one rung, not three: all three
-   * mean a session is holding the step, and they differ only in what GitHub
-   * last said about it. #500 split them so the page could say which, and #505
-   * settled that the plan keeps thirteen states rather than collapsing them
-   * back. Giving them three shapes would say the work is at three different
-   * points when it is at one; the tone carries the difference instead.
-   *
-   * Every other state keeps a shape of its own, which is what this pins: the
-   * sharing is the one entry below and not a pattern.
+   * The plan draws all thirteen of its states in one column, so two of them on
+   * one shape is two rows the column cannot tell apart by shape. That is
+   * allowed for exactly one group and is written down here, the way the
+   * pipeline's sharing is: the three readings of a claim are the same rung --
+   * the step is claimed -- and what separates them is whether the session is
+   * still pushing, which the word and the tone carry. Anything else sharing a
+   * shape is a bug.
    */
-  it('shares a plan shape only across the one rung that has three states', () => {
+  it('shares a plan shape only between the three readings of a claim', () => {
     expect(sharedBy(PLAN_HEALTH_GLYPHS)).toEqual({
       'three-quarters': ['in_progress', 'working', 'quiet'],
     });
@@ -123,11 +118,15 @@ describe('status glyphs', () => {
       proposed: ['lead', 'drafting', 'task open'],
       not_started: ['submitted', 'acknowledged'],
       ready: ['in_process'],
+      // The three readings of a claim borrow the same rung, because they are
+      // the same rung: a step somebody has in hand, the way a final round is
+      // an application somebody has in hand.
       in_progress: ['final_round'],
-      // The three that share a rung borrow the same row of the pipeline,
-      // because they are the same fact about the work.
       working: ['final_round'],
       quiet: ['final_round'],
+      // A run that stopped without closing its step borrows the shape of an
+      // application that ended without an offer. Both are work that was
+      // underway and is not any more.
       abandoned: ['rejected'],
       done: ['offer'],
       answered: ['task done'],
