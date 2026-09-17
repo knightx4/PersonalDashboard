@@ -101,10 +101,40 @@ function MentionLink({ mention }: { mention: Mentioned }) {
  * longer there. Two timestamps compared, and nothing written.
  */
 function Probe({ probe, claimRewrittenAt }: { probe: ProbeRow; claimRewrittenAt: string | null }) {
-  const chosen = probe.chosenIndex === null ? null : probe.options[probe.chosenIndex];
-  const correct = probe.options[probe.correctIndex];
-  const right = probe.chosenIndex === probe.correctIndex;
   const earlier = askedBeforeRewrite(probe.askedAt, claimRewrittenAt);
+
+  // An applied case has no options and nothing picked: what was typed and how
+  // it was graded are the answer. Shown plainly here; #402 is where the list
+  // says which rung each question was and marks the checks per rung.
+  if (probe.rung !== 'recognise') {
+    const right = probe.responseCorrect === true;
+
+    return (
+      <li>
+        <p className="whitespace-pre-line text-ui text-ink">{probe.question}</p>
+        {earlier && (
+          <p className="text-small text-ink-muted">
+            Written against the earlier wording of this claim.
+          </p>
+        )}
+        <p className={right ? 'text-small text-ink-muted' : 'text-small text-danger'}>
+          {probe.response === null
+            ? 'Asked, not answered.'
+            : right
+              ? `You wrote “${probe.response}”, which holds the idea.`
+              : `You wrote “${probe.response}”. The answer expected was “${probe.expected}”.`}
+        </p>
+        {probe.gradeReason !== null && (
+          <p className="mt-0.5 text-small text-ink-muted">{probe.gradeReason}</p>
+        )}
+      </li>
+    );
+  }
+
+  const options = probe.options ?? [];
+  const chosen = probe.chosenIndex === null ? null : options[probe.chosenIndex];
+  const correct = probe.correctIndex === null ? null : options[probe.correctIndex];
+  const right = probe.chosenIndex === probe.correctIndex;
 
   return (
     <li>

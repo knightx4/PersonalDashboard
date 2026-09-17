@@ -103,3 +103,32 @@ export function toAppliedCase(
 
   return { ok: true, case: { situation, question, expected, masteryCheck } };
 }
+
+/**
+ * A case as one piece of text, and back out of it.
+ *
+ * `learn.probes` keeps one question per row, and an applied case is two parts:
+ * the situation and what to say about it. They are stored joined by a blank
+ * line and read back by splitting on the last one, so nothing but the question
+ * column is needed to show the case again or to grade an answer to it.
+ *
+ * The question half is flattened to a single line on the way in, which is what
+ * makes the split exact rather than a guess about where the situation ended.
+ */
+export function joinCase(situation: string, question: string): string {
+  const flattened = question.replace(/\s*\n\s*/g, ' ').trim();
+  return `${situation.trim()}\n\n${flattened}`;
+}
+
+/**
+ * The two halves of a stored case.
+ *
+ * Text with no blank line in it is all question: that is what a row written by
+ * anything but `joinCase` looks like, and showing it as the question shows all
+ * of it rather than half.
+ */
+export function splitCase(stored: string): { situation: string; question: string } {
+  const at = stored.lastIndexOf('\n\n');
+  if (at === -1) return { situation: '', question: stored.trim() };
+  return { situation: stored.slice(0, at).trim(), question: stored.slice(at + 2).trim() };
+}

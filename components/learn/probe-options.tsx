@@ -50,8 +50,12 @@ export function ProbeOptions({
   answered,
 }: {
   options: string[];
-  /** Null until the question has been answered. */
-  answered?: { correctIndex: number; chosenIndex: number } | null;
+  /**
+   * Null until the question has been answered. The indexes are absent on an
+   * answer that was typed rather than picked, which this never marks: it is
+   * the multiple-choice rung's own control.
+   */
+  answered?: { correctIndex?: number; chosenIndex?: number } | null;
 }) {
   return (
     <>

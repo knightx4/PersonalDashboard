@@ -60,6 +60,8 @@ describe('the operation names', () => {
       'grade-opening-answer',
       'write-quiz-questions',
       'grade-quiz-answer',
+      'write-applied-case',
+      'grade-applied-answer',
     ]);
   });
 });

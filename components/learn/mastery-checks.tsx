@@ -52,7 +52,8 @@ export function MasteryChecks({
   answers?: readonly {
     masteryCheck: string | null;
     chosenIndex: number | null;
-    correctIndex: number;
+    /** Null on a written row, which has no options and no index that is right. */
+    correctIndex: number | null;
   }[];
   className?: string;
 }) {

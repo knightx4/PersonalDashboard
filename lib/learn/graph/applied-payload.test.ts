@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asksTheClaimBack, toAppliedCase } from './applied-payload';
+import { asksTheClaimBack, joinCase, splitCase, toAppliedCase } from './applied-payload';
 
 /**
  * The rules an applied case has to pass, checked without a network.
@@ -106,5 +106,30 @@ describe('the claim asked back', () => {
     // Nothing to measure rather than a pass: a two-word situation is caught by
     // the schema's own minimum, not by a rule about the claim.
     expect(asksTheClaimBack('It goes up.', CLAIM)).toBe(false);
+  });
+});
+
+describe('a case stored as one question', () => {
+  const SITUATION =
+    'A bakery raises its prices in January. Its staff ask for a rise in June.\nThe owner refuses.';
+  const QUESTION = 'What happens to the real wage in between?';
+
+  it('comes back in the two parts it went in as', () => {
+    expect(splitCase(joinCase(SITUATION, QUESTION))).toEqual({
+      situation: SITUATION,
+      question: QUESTION,
+    });
+  });
+
+  it('flattens a question written over several lines, so the split is exact', () => {
+    // The blank line between the halves is what the split reads, so a blank
+    // line inside the question would move it.
+    const stored = joinCase(SITUATION, 'What happens\n\nto the real wage?');
+    expect(splitCase(stored).question).toBe('What happens to the real wage?');
+    expect(splitCase(stored).situation).toBe(SITUATION);
+  });
+
+  it('reads text with no blank line in it as all question', () => {
+    expect(splitCase('What follows?')).toEqual({ situation: '', question: 'What follows?' });
   });
 });
