@@ -209,10 +209,10 @@ describe('PlanView', () => {
     expect(html).toContain('>Next<');
     expect(html).toContain('>Someday<');
     // Not who has it: the Who column was dropped deliberately -- it was a
-    // column of dashes with the occasional "Claude" in it. Who has a step is
-    // on the open step, in the "Claude's" view, and in the menu that sets it,
-    // and the next two assertions are the ones that cover those.
-    expect(html).not.toContain('>Claude<');
+    // column of dashes with the occasional "Dash" in it. Who has a step is on
+    // the open step, in the "Dash's" view, and in the menu that sets it, and
+    // the next two assertions are the ones that cover those.
+    expect(html).not.toContain('>Dash<');
     expect(render('claude')).toContain('The anonymous page');
     expect(html).toContain('>Ready<');
     expect(html).toContain('Waits on #3');
@@ -262,7 +262,7 @@ describe('PlanView', () => {
     }
     expect(html).toContain('href="/dev/plan"');
     expect(html).toMatch(/>2<\/span> ready/);
-    expect(html).toMatch(/>1<\/span> Claude/);
+    expect(html).toMatch(/>1<\/span> Dash/);
   });
 
   it('draws five views as chips and leaves the rest to the menu', () => {
@@ -281,7 +281,7 @@ describe('PlanView', () => {
   it('offers the whole queue in one press, and only when there is one', () => {
     // One step is handed over in the fixture, so the button says so rather
     // than making you count.
-    expect(render('open')).toContain('Send all 1 to Claude');
+    expect(render('open')).toContain('Send all 1 to Dash');
 
     const nobodys = buildPlanTree({
       items: [item({ id: 'mine', title: 'Mine to do' })],

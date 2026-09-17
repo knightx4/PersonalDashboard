@@ -136,6 +136,9 @@ function Decide({ row }: { row: RaisedRow }) {
       <form action={action} className="w-full space-y-2">
         <input type="hidden" name="id" value={row.id} />
         <input type="hidden" name="answer" value="no" />
+        {/* ui-ok: composer-always-open -- this whole branch renders only after
+          * "No, and here is why" is pressed. The guard is an early return on
+          * `saying`, which the gate reads only in its `if (!open)` shape. */}
         <Textarea
           name="body"
           rows={2}
@@ -160,6 +163,8 @@ function Decide({ row }: { row: RaisedRow }) {
       <input type="hidden" name="id" value={row.id} />
       <input type="hidden" name="answer" value="yes" />
       {saying === 'more' && (
+        // ui-ok: composer-always-open -- opened by "Yes, and…" and closed
+        // otherwise. The gate reads `{flag && (` and not a comparison.
         <Textarea
           name="body"
           rows={2}
