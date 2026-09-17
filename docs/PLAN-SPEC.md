@@ -115,6 +115,34 @@ fire and the record are one call, so a new button cannot start a run the app
 does not know about. Recording a run never fails the press — by then the
 routine is already going, and saying it is not would be the worse lie.
 
+### `plan_overnight_runs`
+
+One row per account, holding what the overnight runner is doing. You press one
+button before bed and a cron tick fires one feature at a time — the existing
+feature send — waiting for each to finish before starting the next. None of
+that can live in the page, because the tick runs with nobody's tab open, so the
+intention is a row: `running`, `paused`, `features_budget` and `features_left`,
+`stop_by`, `started_at`, `last_fired_at`, and `ended_at` with `ended_reason`.
+
+The budget counts down at the fire rather than at the finish — a feature that
+fell over cost the night the same as one that worked. Pausing is not stopping:
+the budget and the stop time survive it, so resuming carries on the same night
+rather than starting a second one.
+
+`ended_reason` is a written sentence, not a code, because the morning report
+reads it back to a person: *It fired every one of the 6 features you allowed.*
+The set of reasons is not closed — the budget and the clock are decided from
+the row, you stopped it is decided by the page, and nothing being ready to
+build is decided by the tick — so no enum could name them all for long. A
+constraint pairs it with `ended_at`: a night that ended carries the reason it
+ended, and a reason without an end is a sentence about nothing.
+
+Written only by `lib/plan/overnight.ts`, which also holds `overnightVerdict` —
+the pure reading of the row that says whether another feature may be fired, and
+what to end the night with when it may not. The runner around it (the chooser,
+the tick route, the schedule, the page control and the report) is still being
+built.
+
 ### `plan_dependencies`
 
 `item_id` cannot start until `depends_on_id` is done. One direction; the

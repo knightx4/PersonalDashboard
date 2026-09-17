@@ -187,6 +187,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_commit_checks = commitCheck.id;
 
+  const [overnight] = await admin<{ id: string }[]>`
+    insert into plan_overnight_runs (
+      user_id, running, paused, features_budget, features_left, stop_by, started_at
+    )
+    values (${userId}, true, false, 6, 6, now() + interval '8 hours', now())
+    returning id`;
+  ids.plan_overnight_runs = overnight.id;
+
   const [seedImport] = await admin<{ id: string }[]>`
     insert into plan_seed_imports (user_id, step_key)
     values (${userId}, ${`learn:${tag} already offered this step`})
