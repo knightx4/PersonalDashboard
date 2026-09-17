@@ -8,6 +8,7 @@ import {
   type PlanItem,
   type PlanStatus,
 } from './load';
+import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
 
 /**
  * The plan, read.
@@ -319,7 +320,7 @@ export function isReady(
  * is shown at the top of its module rather than lost, because a plan that
  * quietly hides a row is worse than one with a row out of place.
  */
-export function buildPlanTree(data: PlanData): PlanSection[] {
+export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSection[] {
   const byId = new Map(data.items.map((item) => [item.id, item]));
   const childrenOf = new Map<string | null, PlanItem[]>();
   for (const item of data.items) {
@@ -381,8 +382,8 @@ export function buildPlanTree(data: PlanData): PlanSection[] {
         label: scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'The app as a whole',
         nodes,
         progress: planProgress(leavesOf(nodes)),
-        tally: tallyHealth(nodes),
-        bands: planBands(nodes),
+        tally: tallyHealth(nodes, liveness),
+        bands: planBands(nodes, liveness),
       };
     })
     .filter((section) => section.module !== null || section.nodes.length > 0);
@@ -414,6 +415,9 @@ export const PLAN_HEALTHS = [
   'answered',
   'proposed',
   'in_progress',
+  'working',
+  'quiet',
+  'abandoned',
   'blocked',
   'waiting',
   'ready',
@@ -422,6 +426,38 @@ export const PLAN_HEALTHS = [
   'dropped',
 ] as const;
 export type PlanHealth = (typeof PLAN_HEALTHS)[number];
+
+/**
+ * What each claimed step's session is doing, by step id.
+ *
+ * The one thing `healthOf` cannot work out from the plan: whether the session
+ * that claimed a step is still pushing. It comes off the run rows, so it is
+ * handed in rather than derived, and it is optional everywhere -- a caller
+ * with no runs to hand asks without it and every claim reads `in_progress`,
+ * which is what the whole plan did before there was anything better to say.
+ */
+export type PlanLiveness = Readonly<Record<string, ClaimLiveness>>;
+
+/**
+ * The claims on these steps, read against the last run on each.
+ *
+ * Built once and handed to `buildPlanTree`, `healthOf` and the guards, because
+ * the alternative is each of them reading the run rows its own way. A step
+ * with no run against it still gets an entry when it is claimed: the clock is
+ * the fallback and `claimLiveness` applies it.
+ */
+export function planLiveness(
+  steps: readonly (ClaimStep & { id: string })[],
+  runs: Readonly<Record<string, ClaimRun>>,
+  now: number,
+): PlanLiveness {
+  const out: Record<string, ClaimLiveness> = {};
+  for (const step of steps) {
+    const reading = claimLiveness(step, runs[step.id], now);
+    if (reading) out[step.id] = reading;
+  }
+  return out;
+}
 
 /**
  * Which open state speaks for a subtree, most pressing first.
@@ -435,8 +471,14 @@ export type PlanHealth = (typeof PLAN_HEALTHS)[number];
 const OPEN_HEALTH_RANK: readonly PlanHealth[] = [
   'unanswered',
   'blocked',
+  // A claim nobody is working is more pressing than a proposal: the step has
+  // been handed over and stopped, so it needs sending again, and a feature
+  // reporting the proposal beneath it instead would hide that.
+  'abandoned',
   'proposed',
   'waiting',
+  'quiet',
+  'working',
   'in_progress',
   'ready',
   'not_started',
@@ -454,7 +496,19 @@ export function healthOf(
      * which only ever sees leaves -- need not build a subtree to ask.
      */
     children?: readonly PlanNode[];
+    /**
+     * Only read to look this row's claim up in `liveness`. Optional for the
+     * callers that classify a row without one in hand, `needsThePerson` among
+     * them, and a row with no id simply has no reading.
+     */
+    id?: string;
   },
+  /**
+   * What the runs say about the claimed steps, from `planLiveness`. Without
+   * it a claim reads `in_progress` and nothing more, which is all the status
+   * column can support on its own.
+   */
+  liveness?: PlanLiveness,
 ): PlanHealth {
   // Closed on top of something open is not closed.
   //
@@ -472,7 +526,7 @@ export function healthOf(
       (child) => !isClosed(child.status) && !isDismissed(child),
     );
     if (open.length > 0) {
-      const healths = new Set(open.map((child) => healthOf(child)));
+      const healths = new Set(open.map((child) => healthOf(child, liveness)));
       const worst = OPEN_HEALTH_RANK.find((health) => healths.has(health));
       if (worst) return worst;
     }
@@ -497,8 +551,25 @@ export function healthOf(
   switch (node.status) {
     case 'proposed':
       return 'proposed';
+    // What the claim actually means, where the run behind it has been read.
+    //
+    // `in_progress` is one word for four situations -- a session pushing right
+    // now, a session that has gone twenty minutes without pushing, a run that
+    // died hours ago and never closed the step, and a claim nothing has ever
+    // looked into. The column cannot tell them apart, so every surface that
+    // read it alone drew a pulsing dot on a step nobody was working. The run
+    // record can, and `claimLiveness` is where that is decided.
     case 'in_progress':
-      return 'in_progress';
+      switch (node.id ? liveness?.[node.id] : undefined) {
+        case 'working':
+          return 'working';
+        case 'quiet':
+          return 'quiet';
+        case 'abandoned':
+          return 'abandoned';
+        default:
+          return 'in_progress';
+      }
     case 'blocked':
       return 'blocked';
     case 'done':
@@ -673,11 +744,11 @@ export type PlanTally = Record<PlanHealth, number>;
  * the count beside a module heading is one of the places it stopped being
  * asked about.
  */
-export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
+export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness): PlanTally {
   const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
   for (const leaf of leavesOf(nodes)) {
     if (isDismissed(leaf)) continue;
-    tally[healthOf(leaf)] += 1;
+    tally[healthOf(leaf, liveness)] += 1;
   }
   return tally;
 }
@@ -698,8 +769,14 @@ export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
 export const PLAN_BAND_ORDER: readonly PlanHealth[] = [
   'done',
   'answered',
+  'working',
+  'quiet',
   'in_progress',
   'ready',
+  // With the stuck states rather than with the underway ones: a claim whose
+  // run ended is not work in hand, it is a step waiting to be handed over
+  // again.
+  'abandoned',
   'blocked',
   'unanswered',
   'waiting',
@@ -724,14 +801,14 @@ export type PlanBand = { health: PlanHealth; count: number };
  * `progress.live` and no two things on this row can disagree. Empty states are
  * dropped: a band of zero is nothing to draw and nothing to say (law 1).
  */
-export function planBands(nodes: readonly PlanNode[]): PlanBand[] {
+export function planBands(nodes: readonly PlanNode[], liveness?: PlanLiveness): PlanBand[] {
   const live = leavesOf(nodes).filter(
     (leaf) => leaf.status !== 'dropped' && leaf.status !== 'proposed',
   );
 
   const counts = new Map<PlanHealth, number>();
   for (const leaf of live) {
-    const health = healthOf(leaf);
+    const health = healthOf(leaf, liveness);
     counts.set(health, (counts.get(health) ?? 0) + 1);
   }
 

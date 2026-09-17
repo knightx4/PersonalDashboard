@@ -20,8 +20,8 @@
  * that died two minutes in read the same. The quiet mark is what separates
  * them, at twenty minutes.
  */
-import { elapsedSince } from './elapsed';
-import { RUN_QUIET_AFTER_MINUTES } from './run-end';
+import { elapsedSince, isStalledClaim } from './elapsed';
+import { RUN_QUIET_AFTER_MINUTES, type StoredRunReading } from './run-end';
 
 /**
  * Nothing pushed for this long and the run is shown as quiet. #524.
@@ -129,11 +129,32 @@ export function lastPushSince(pushes: readonly Push[], startedAt: string): Push 
   return newest;
 }
 
-/** How long a run has been silent, in minutes, counting from when it started. */
-function silentMinutes(evidence: RunEvidence, now: number): number {
-  const fired = new Date(evidence.startedAt).getTime();
-  const pushed = evidence.lastPush ? new Date(evidence.lastPush.at).getTime() : 0;
+/**
+ * How long a run has been silent, in minutes.
+ *
+ * Counted from its last push, or from when it started if it has not pushed --
+ * which is the half of #524 that is easy to get wrong. Counting from the press
+ * instead would call every long batch quiet twenty minutes in, whatever it had
+ * done since.
+ */
+function silentFor(startedAt: string, lastPushAt: string | null, now: number): number {
+  const fired = new Date(startedAt).getTime();
+  const pushed = lastPushAt ? new Date(lastPushAt).getTime() : 0;
   return (now - Math.max(fired, pushed)) / 60_000;
+}
+
+/**
+ * The word for a run that has pushed nothing for this long.
+ *
+ * The two marks #524 set, applied in one place. `runLiveness` reads them off a
+ * fresh listing and `claimLiveness` reads them off the stored reading on the
+ * run row, and a second copy of the comparison is the first thing to drift
+ * when one of the numbers changes.
+ */
+export function silenceReads(minutes: number): 'working' | 'quiet' | 'ended' {
+  if (minutes >= ENDED_AFTER_MINUTES) return 'ended';
+  if (minutes >= QUIET_AFTER_MINUTES) return 'quiet';
+  return 'working';
 }
 
 /**
@@ -156,10 +177,7 @@ export function runLiveness(evidence: RunEvidence, now: number): RunLiveness {
   if (!evidence.read) return 'unknown';
   if (now === 0) return 'working';
 
-  const silent = silentMinutes(evidence, now);
-  if (silent >= ENDED_AFTER_MINUTES) return 'ended';
-  if (silent >= QUIET_AFTER_MINUTES) return 'quiet';
-  return 'working';
+  return silenceReads(silentFor(evidence.startedAt, evidence.lastPush?.at ?? null, now));
 }
 
 /**
@@ -173,6 +191,145 @@ export function runLiveness(evidence: RunEvidence, now: number): RunLiveness {
 export function abandonedClaim(step: { status: string } | null, liveness: RunLiveness): boolean {
   return step?.status === 'in_progress' && liveness === 'ended';
 }
+
+/* -------------------------------------------------------------------------
+ * A claim on a step, read off the run behind it
+ * ---------------------------------------------------------------------- */
+
+/**
+ * What a claim on a step means right now.
+ *
+ * `in_progress` is a claim written when the step was handed over and nothing
+ * clears it when the session holding it dies, so the column alone cannot say
+ * which of these four a row is. Every surface asks this instead, and they
+ * agree because there is one answer:
+ *
+ *  - `claimed` -- the row says a session has it and nothing says what that
+ *    session is doing. No run recorded, or one nobody has asked GitHub about,
+ *    and the clock has not run out either.
+ *  - `working` -- its run has pushed something recently enough.
+ *  - `quiet` -- nothing pushed for `QUIET_AFTER_MINUTES`. It may still be
+ *    reading files or waiting on a build; that is the trade #524 took.
+ *  - `abandoned` -- past `ENDED_AFTER_MINUTES` with the step still open. The
+ *    case the page could not name before: nobody is on it and it was never
+ *    closed.
+ *
+ * `claimed` rather than null for the no-evidence case, because null has to
+ * mean one thing and it means "not a claim at all".
+ */
+export type ClaimLiveness = 'claimed' | 'working' | 'quiet' | 'abandoned';
+
+/** Enough of a step for the rule: the claim, and when it was made. */
+export type ClaimStep = { status: string; startedAt: string | null };
+
+/**
+ * Enough of the last run against it.
+ *
+ * `LastRun` in `run-end.ts` satisfies this, which is what the page, the guard
+ * and the CLI all hand over. Written structurally so nothing here has to
+ * import the loader that produces it.
+ */
+export type ClaimRun = {
+  status: string;
+  createdAt: string;
+  reading: StoredRunReading | null;
+};
+
+/**
+ * How old a stored reading may be and still be believed. #570.
+ *
+ * The mark a run is counted as over on. Nothing is gained by repeating a
+ * reading older than the point at which the run it describes would have ended
+ * anyway, and a surface that cannot refresh it falls back to the clock in
+ * `elapsed.ts` rather than reporting something nobody has checked since
+ * breakfast.
+ */
+export const READING_TRUSTED_FOR_MINUTES = ENDED_AFTER_MINUTES;
+
+/**
+ * Whether the reading stored on a run row may be read as evidence.
+ *
+ * A refusal is not evidence of anything: a rejected or missing key makes every
+ * run look as though it pushed nothing, which is how the wrong credential went
+ * unnoticed for days. So a reading carrying one is set aside here and the
+ * clock answers instead; saying *that* GitHub refused is #566's, on the run
+ * row where the reason is kept.
+ *
+ * `now` of 0 is the clock's pre-mount value, so nothing has aged at that
+ * instant -- the same rule the rest of this file follows.
+ */
+export function readingTrusted(reading: StoredRunReading, now: number): boolean {
+  if (reading.refusal) return false;
+  if (now === 0) return true;
+  return (now - new Date(reading.checkedAt).getTime()) / 60_000 < READING_TRUSTED_FOR_MINUTES;
+}
+
+/**
+ * What the claim on a step reads as, from the last run against it.
+ *
+ * Null when the row is not claimed at all, so a caller can tell "nobody has
+ * this" from "somebody has it and we cannot say more".
+ *
+ * The run is only evidence while it is still `started`. One written off as
+ * `failed` has already been counted as over -- by the sweep, or by the two
+ * hours in `runEnd` -- and a claim standing over it is abandoned by
+ * definition. A `finished` run is not evidence either: it did what it was for,
+ * so whatever is claiming this row now is something the run says nothing
+ * about, and the clock answers.
+ */
+export function claimLiveness(
+  step: ClaimStep,
+  run: ClaimRun | null | undefined,
+  now: number,
+): ClaimLiveness | null {
+  if (step.status !== 'in_progress') return null;
+
+  if (run?.status === 'failed') return 'abandoned';
+
+  const reading = run?.status === 'started' ? run.reading : null;
+  if (run && reading && readingTrusted(reading, now)) {
+    if (now === 0) return 'working';
+    const reads = silenceReads(silentFor(run.createdAt, reading.lastPush?.at ?? null, now));
+    return reads === 'ended' ? 'abandoned' : reads;
+  }
+
+  // Nothing to read, so the clock. The two-hour reading in `elapsed.ts` was
+  // the whole of this signal before GitHub could be asked, and it stays as the
+  // fallback for a claim with no run recorded, a run nobody has asked about
+  // and a reading too old to trust. A claim with no `startedAt` is left alone
+  // the way the guard has always left it: the column is stamped by a trigger,
+  // so a row without one was claimed this instant.
+  const since = step.startedAt ?? run?.createdAt ?? null;
+  if (!since) return 'claimed';
+  return isStalledClaim(since, now) ? 'abandoned' : 'claimed';
+}
+
+/**
+ * Whether a claim is one a session may still be on.
+ *
+ * What the guards ask. `quiet` counts as live: the mark is known to read wrong
+ * on a run that is reading files or waiting on a build, and #574 settled that
+ * a quiet step is re-sent by asking first rather than by the guard letting it
+ * through on its own.
+ */
+export function claimIsLive(liveness: ClaimLiveness | null): boolean {
+  return liveness !== null && liveness !== 'abandoned';
+}
+
+/**
+ * One word for a claim, where there is only room for one.
+ *
+ * The terminal's facts column, which has about ten characters. The page has
+ * room for its own wording beside the other healths and the brief writes a
+ * sentence, but all three describe the same four readings, so this is what
+ * anything terse says rather than a fourth set of words.
+ */
+export const CLAIM_WORD: Record<ClaimLiveness, string> = {
+  claimed: 'claimed',
+  working: 'pushing',
+  quiet: 'quiet',
+  abandoned: 'stopped',
+};
 
 /**
  * Why a run was counted as over, for the reason kept on the run row.

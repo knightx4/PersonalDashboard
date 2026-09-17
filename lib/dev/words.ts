@@ -172,11 +172,12 @@ export const IDEA_HEALTH_WORD: Record<IdeaHealth, string> = {
 /**
  * Which shared state a plan step's health is.
  *
- * The plan reads ten states off six statuses, and half of them are refinements
- * nothing else has: a question nobody has answered, a proposal nobody has
- * approved, a step waiting on another step, a step simply not reached yet. Those
- * keep the plan's own words. The five here are the ones another queue can
- * disagree with.
+ * The plan reads more states off six statuses than any other queue, and most
+ * of them are refinements nothing else has: a question nobody has answered, a
+ * proposal nobody has approved, a step waiting on another step, a step simply
+ * not reached yet, and a claim whose session stopped pushing. Those keep the
+ * plan's own words. The ones mapped here are the states another queue could
+ * word differently.
  */
 export function planState(health: PlanHealth): DevState | null {
   switch (health) {
@@ -184,12 +185,21 @@ export function planState(health: PlanHealth): DevState | null {
       return 'waiting';
     case 'ready':
       return 'ready';
+    // The three readings of a claim are all "working" to another queue. Which
+    // of them it is turns on whether the session is still pushing, and no other
+    // queue has a session pushing anything -- so the difference is the plan's
+    // own and is said in the plan's own words.
     case 'in_progress':
+    case 'working':
+    case 'quiet':
       return 'working';
     case 'done':
       return 'done';
     case 'dropped':
       return 'dropped';
+    // A claim whose run stopped without closing the step. Nothing else has a
+    // run to stop, so this one has no shared word either.
+    case 'abandoned':
     case 'unanswered':
     case 'answered':
     case 'proposed':

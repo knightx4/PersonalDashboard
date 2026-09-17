@@ -17,6 +17,7 @@ import {
   splitFinished,
   flattenSections,
   handedToClaude,
+  planLiveness,
   summarize,
 } from '@/lib/plan/tree';
 
@@ -708,5 +709,50 @@ describe('the CI mark on a closed step', () => {
 
   it('names the merge the checks were read from', () => {
     expect(html).toContain('the merge that put this on main');
+  });
+});
+
+describe('a claim, drawn from what its run did', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+
+  /** The page, for one step claimed `minutes` ago with no run recorded. */
+  function drawClaim(minutes: number) {
+    const items = [
+      item({ id: 'a', title: 'Being worked', status: 'in_progress', startedAt: minutesAgo(minutes) }),
+    ];
+    const liveness = planLiveness(items, {}, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        liveness={liveness}
+        commitChecks={{}}
+        queued={0}
+        unfolded
+      />,
+    );
+  }
+
+  it('draws a fresh claim as work in hand', () => {
+    const html = drawClaim(10);
+    expect(html).toContain('In progress');
+    expect(html).not.toContain('Stopped');
+  });
+
+  it('draws a claim whose run ended as stopped, and counts it that way too', () => {
+    // The whole of #500 on one row: the column, the pill and the count beside
+    // the module heading all read the claim through the same function, so the
+    // page cannot say underway while the count says the run is gone.
+    const html = drawClaim(200);
+    expect(html).toContain('Stopped');
+    expect(html).toContain('stopped without closing');
   });
 });

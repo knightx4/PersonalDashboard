@@ -12,6 +12,7 @@ import {
   flattenSections,
   handedToClaude,
   isPlanView,
+  planLiveness,
   splitFinished,
   summarize,
   type PlanView,
@@ -20,6 +21,20 @@ import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
 
 export const metadata = { title: 'Plan' };
+
+/**
+ * The claims on these steps, read against the last run on each.
+ *
+ * Out here rather than in the page because it reads the clock, and reading the
+ * clock during a render is unstable. The answer is a snapshot either way: the
+ * browser recomputes each row as its own clock ticks.
+ */
+function claimsAsOfNow(
+  items: Parameters<typeof planLiveness>[0],
+  runs: Parameters<typeof planLiveness>[1],
+) {
+  return planLiveness(items, runs, Date.now());
+}
 
 /**
  * What is built, what is being built, and what is still only written down.
@@ -92,7 +107,13 @@ export default async function DevPlanPage({
     // control that shows it sits above the whole page.
     loadOvernightRun(supabase, user.id),
   ]);
-  const whole = buildPlanTree(data);
+  // What the runs say about the steps that are claimed, so the counts beside a
+  // module heading and the bands in its bar read the claims the same way the
+  // health column under them does. The rows are classified again in the browser
+  // as the clock ticks; both go through `healthOf`, so the two cannot disagree
+  // about a claim, only about how many minutes ago it was.
+  const liveness = claimsAsOfNow(data.items, lastRuns);
+  const whole = buildPlanTree(data, liveness);
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
 
@@ -149,6 +170,7 @@ export default async function DevPlanPage({
         view={view}
         catalog={catalog}
         lastRuns={lastRuns}
+        liveness={liveness}
         commitChecks={commitChecks}
         empty={data.items.length === 0}
         canSend={Boolean(planRoutine().token)}

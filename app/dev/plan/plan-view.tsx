@@ -84,12 +84,14 @@ import {
   flatten,
   healthOf as planHealthOf,
   moveOf as planMoveOf,
+  planLiveness,
   searchNodes,
   searchSections,
   searchTerms,
   type MoveContext,
   type PlanBand,
   type PlanHealth,
+  type PlanLiveness,
   type PlanMove,
   type PlanNode,
   type PlanProgress,
@@ -101,7 +103,8 @@ import {
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import type { PlanRefTitles } from '@/lib/comments/refs';
-import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
+import { elapsedSince } from '@/lib/plan/elapsed';
+import type { ClaimLiveness } from '@/lib/plan/liveness';
 import { isResolvingAnswers, lastRunLine, type LastRun } from '@/lib/plan/run-end';
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
@@ -1573,26 +1576,37 @@ function Elapsed({ startedAt }: { startedAt: string }) {
 
 /**
  * The same fact in the opened row's meta line, where there is room for the
- * word. "Running 7h" and "stalled for 7h, nothing on it" are the two things a
- * step underway can mean, and the line said only the first.
+ * word. "Running 7h" and "stopped after 7h, nothing on it" are two of the
+ * things a step underway can mean, and the line said only the first.
+ *
+ * The reading comes from `claimLiveness` through the row rather than from the
+ * clock here, so this line and the health column beside it cannot differ about
+ * the same claim.
  */
-function RunningFor({ startedAt }: { startedAt: string }) {
-  const now = useClockNow();
-
-  if (!isStalledClaim(startedAt, now)) {
+function RunningFor({ startedAt, claim }: { startedAt: string; claim: ClaimLiveness | undefined }) {
+  if (claim === 'abandoned') {
     return (
-      <>
+      <span className="text-caution">
+        {' · stopped after '}
+        <Elapsed startedAt={startedAt} />, nothing on it
+      </span>
+    );
+  }
+
+  if (claim === 'quiet') {
+    return (
+      <span className="text-caution">
         {' · running '}
-        <Elapsed startedAt={startedAt} />
-      </>
+        <Elapsed startedAt={startedAt} />, nothing pushed lately
+      </span>
     );
   }
 
   return (
-    <span className="text-caution">
-      {' · stalled for '}
-      <Elapsed startedAt={startedAt} />, nothing on it
-    </span>
+    <>
+      {' · running '}
+      <Elapsed startedAt={startedAt} />
+    </>
   );
 }
 
@@ -1657,35 +1671,50 @@ function LastRunLine({ run }: { run: LastRun }) {
  *
  * Nothing releases a claim when the session holding it dies, so an abandoned
  * step sat here pulsing at the same accent as one being worked this minute --
- * the state was seven hours old and the badge said "live". Past
- * `STALLED_AFTER_MINUTES` the dot stops pulsing and the pill turns caution:
- * the row is still `in_progress`, because only you can say whether the work
- * happened, but the page stops claiming somebody is on it. Putting it back or
- * closing it is one press in the row's own menu.
+ * the state was seven hours old and the badge said "live". The pill now says
+ * what the run says: the dot pulses while the session is pushing, stops and
+ * turns caution once it has gone quiet, and the pill says the run stopped once
+ * it is past the ended mark. The row is still `in_progress`, because only you
+ * can say whether the work happened, but the page no longer claims somebody is
+ * on it. Putting it back or closing it is one press in the row's own menu.
+ *
+ * `claim` is the reading from `claimLiveness`, handed in by the row so that
+ * this pill, the health column and the meta line all draw one answer.
  */
-function Underway({ startedAt, assignee }: { startedAt: string; assignee: string | null }) {
-  const now = useClockNow();
-  const stalled = isStalledClaim(startedAt, now);
+function Underway({
+  startedAt,
+  assignee,
+  claim,
+}: {
+  startedAt: string;
+  assignee: string | null;
+  claim: ClaimLiveness | undefined;
+}) {
   const since = startedAt.replace('T', ' ').slice(0, 16);
+  const stopped = claim === 'abandoned';
+  const silent = stopped || claim === 'quiet';
 
   return (
     <span
       title={
-        stalled
-          ? `Claimed ${since} and untouched since. A session that stops without closing its step leaves it here — close it or put it back.`
-          : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
+        stopped
+          ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
+          : claim === 'quiet'
+            ? `Claimed ${since}. Its run has pushed nothing for a while; it may still be reading or waiting on a build.`
+            : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
-        stalled ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
+        silent ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
       )}
     >
       <span
-        className={cn('size-1.5 rounded-full', stalled ? 'bg-caution' : 'animate-pulse bg-accent')}
+        className={cn('size-1.5 rounded-full', silent ? 'bg-caution' : 'animate-pulse bg-accent')}
         aria-hidden
       />
       <Elapsed startedAt={startedAt} />
-      {stalled && <span className="sr-only"> with no session on it</span>}
+      {stopped && <span className="sr-only"> with no session on it</span>}
+      {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
     </span>
   );
 }
@@ -1739,6 +1768,26 @@ const HEALTH: Record<PlanHealth, Health> = {
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
   in_progress: { word: DEV_STATE_WORD.working, tone: 'accent' },
+  // The three readings of a claim. `in_progress` above is the fourth and says
+  // the least: the row is claimed and nothing has looked into what the session
+  // is doing.
+  working: {
+    word: DEV_STATE_WORD.working,
+    tone: 'accent',
+    title: 'A session has this and has pushed something recently.',
+  },
+  quiet: {
+    word: 'Quiet',
+    tone: 'caution',
+    title:
+      'A session has this and has pushed nothing for a while. It may still be reading or waiting on a build.',
+  },
+  abandoned: {
+    word: 'Stopped',
+    tone: 'caution',
+    title:
+      'A session claimed this and stopped without closing it. Put it back or send it again -- nothing is working it.',
+  },
   // "Waiting on you" rather than "Blocked", which said a step was stuck and not
   // who could unstick it. The notes queue says the same thing about a note
   // blocked on an answer, and now says it in the same words.
@@ -1766,8 +1815,11 @@ const HEALTH: Record<PlanHealth, Health> = {
   dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
 };
 
-function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {
-  const health = planHealthOf(node);
+function healthOf(
+  node: PlanNode,
+  liveness?: PlanLiveness,
+): Health & { glyph: GlyphName; name: PlanHealth } {
+  const health = planHealthOf(node, liveness);
   const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health], name: health };
 
   // A row closed over open work reports what is open beneath it, so the word
@@ -2063,6 +2115,7 @@ function PlanRow({
   catalog,
   canSend,
   lastRuns,
+  liveness: serverLiveness = {},
   commitChecks,
   view,
   searching,
@@ -2075,6 +2128,16 @@ function PlanRow({
   canSend: boolean;
   /** The newest run against each step, by step id. Most steps have none. */
   lastRuns: Readonly<Record<string, LastRun>>;
+  /**
+   * The same reading worked out on the server, at the clock it rendered with.
+   *
+   * Used until the browser's clock mounts. Without it the first paint would
+   * read every claim as fresh -- `runNow` is 0 before mount -- while the
+   * counts beside the module heading, worked out server-side from a real
+   * clock, already said one of them had stopped. One answer on the first
+   * paint, and the row takes over from the ticking clock after it.
+   */
+  liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Readonly<Record<string, CommitCheck>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
@@ -2163,7 +2226,19 @@ function PlanRow({
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
-  const health = healthOf(node);
+  // What the runs say about the claims on this row and everything under it.
+  //
+  // Recomputed as the clock ticks, so a session that goes quiet while you are
+  // looking at the page says so without a navigation -- the same reason
+  // `useResolving` is built this way. Only this row's subtree, because that is
+  // all this row can report on: the module's counts are worked out server-side
+  // in `buildPlanTree`, from the same function.
+  const liveness = useMemo(
+    () => (runNow === 0 ? serverLiveness : planLiveness(flatten([node]), lastRuns, runNow)),
+    [node, lastRuns, runNow, serverLiveness],
+  );
+  const health = healthOf(node, liveness);
+  const claim = liveness[node.id];
   const resolving = useResolving(lastRuns, runNow);
   // What a "#494" written in a comment on this page is called. The catalog is
   // already every step's number and title, so no page needs to hand it over.
@@ -2462,7 +2537,7 @@ function PlanRow({
                 * looks like from here. The dot pulses because the one fact it
                 * carries is that something is happening right now. */}
               {node.status === 'in_progress' && node.startedAt && (
-                <Underway startedAt={node.startedAt} assignee={node.assignee} />
+                <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
               )}
             </span>
             {/* Where it came from, when it did not come from you. On the row
@@ -2748,7 +2823,7 @@ function PlanRow({
                 <span>
                   Started {when(node.startedAt)}
                   {node.status === 'in_progress' && node.startedAt && (
-                    <RunningFor startedAt={node.startedAt} />
+                    <RunningFor startedAt={node.startedAt} claim={claim} />
                   )}
                 </span>
               )}
@@ -2833,6 +2908,7 @@ function PlanRow({
             catalog={catalog}
             canSend={canSend}
             lastRuns={lastRuns}
+            liveness={serverLiveness}
             commitChecks={commitChecks}
             view={view}
             searching={searching}
@@ -2954,6 +3030,7 @@ export function PlanView({
   view,
   catalog,
   lastRuns,
+  liveness,
   commitChecks,
   empty,
   canSend,
@@ -2968,6 +3045,8 @@ export function PlanView({
   catalog: PlanCatalogEntry[];
   /** The newest run against each step, by step id. */
   lastRuns: Record<string, LastRun>;
+  /** The claims read against their runs, at the clock the page rendered with. */
+  liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Record<string, CommitCheck>;
   empty: boolean;
@@ -3105,6 +3184,7 @@ export function PlanView({
                       catalog={catalog}
                       canSend={canSend}
                       lastRuns={lastRuns}
+                      liveness={liveness}
                       commitChecks={commitChecks}
                       view={view}
                       searching={searching}
@@ -3184,6 +3264,7 @@ export function PlanView({
                 catalog={catalog}
                 canSend={canSend}
                 lastRuns={lastRuns}
+                liveness={liveness}
                 commitChecks={commitChecks}
                 view={view}
                 searching={searching}

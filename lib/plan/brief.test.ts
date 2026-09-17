@@ -404,3 +404,35 @@ describe('the comments a hand-over carries', () => {
     expect(planQueueBrief(sections, queue)).not.toContain('## Comments');
   });
 });
+
+describe('planBrief, on a claimed step', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({ id: 'feature', title: 'Liveness' }),
+      item({ id: 'mine', title: 'The step being read', parentId: 'feature' }),
+      item({ id: 'other', title: 'Somebody else is on this', parentId: 'feature', status: 'in_progress' }),
+    ],
+    dependencies: [],
+  });
+  const feature = findNode(sections, 'feature')!;
+  const mine = findNode(sections, 'mine')!;
+
+  it('says the status column and nothing more without a reading', () => {
+    expect(planBrief(sections, mine)).toContain('Status: not started');
+    expect(planBrief(sections, feature)).toContain('(in progress)');
+  });
+
+  it('says what the run behind a claim is doing, in the status line', () => {
+    const brief = planBrief(sections, findNode(sections, 'other')!, {
+      liveness: { other: 'quiet' },
+    });
+    expect(brief).toContain('Status: in progress, its run quiet');
+  });
+
+  it('says it in the checklist too, so a batch can see which step is stopped', () => {
+    const brief = planBrief(sections, feature, { liveness: { other: 'abandoned' } });
+    expect(brief).toContain(
+      'Somebody else is on this (claimed by a run that ended without closing it)',
+    );
+  });
+});

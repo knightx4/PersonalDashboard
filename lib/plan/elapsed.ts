@@ -25,6 +25,11 @@
  * enough to catch the same afternoon. It is a reading of the row, not a state
  * written to it: only the person can say whether the work happened, so the
  * page says nobody has touched it and leaves the row alone.
+ *
+ * It is the fallback rather than the answer now. `claimLiveness` in
+ * `liveness.ts` reads a claim off what its run pushed and falls back to this
+ * mark when there is no run to read, which is why the two numbers are the
+ * same: #524 set the ended mark here deliberately.
  */
 export const STALLED_AFTER_MINUTES = 120;
 
@@ -39,27 +44,6 @@ export const STALLED_AFTER_MINUTES = 120;
 export function isStalledClaim(startedAt: string, now: number): boolean {
   if (now === 0) return false;
   return (now - new Date(startedAt).getTime()) / 60_000 >= STALLED_AFTER_MINUTES;
-}
-
-/**
- * Whether a step is genuinely being worked right now.
- *
- * `in_progress` on its own does not answer that, because nothing releases the
- * status when the session holding it stops. The page has read the clock
- * alongside the status for a while; the guards that refuse a second session
- * did not, so one dead run left a feature refusing work forever. Both read
- * this now, and they agree about what "underway" means.
- *
- * A claim with no `startedAt` counts as live: the column is stamped by a
- * trigger, so a row without one was claimed this instant.
- */
-export function hasLiveClaim(
-  step: { status: string; startedAt: string | null },
-  now: number,
-): boolean {
-  if (step.status !== 'in_progress') return false;
-  if (!step.startedAt) return true;
-  return !isStalledClaim(step.startedAt, now);
 }
 
 /**

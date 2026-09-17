@@ -57,6 +57,8 @@ import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import { reshapeStamp } from '../lib/plan/origin';
+import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
+import { storedReading } from '../lib/plan/run-end';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
 import {
   isClosed,
@@ -73,8 +75,10 @@ import {
   buildPlanTree,
   findNode,
   flattenSections,
+  planLiveness,
   summarize,
   workOrder,
+  type PlanLiveness,
   type PlanNode,
   type PlanSection,
 } from '../lib/plan/tree';
@@ -169,8 +173,56 @@ async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   };
 }
 
+/**
+ * The last run against each step, as the claim rules read it.
+ *
+ * The same read `loadLastRuns` does over the app's client, done here over the
+ * direct connection: there is no Supabase client in a script, and a terminal
+ * that answered "underway" while the page said the run stopped hours ago is
+ * exactly the disagreement #500 is about. Newest first, one per step.
+ */
+async function loadRuns(sql: Sql, userId: string): Promise<Record<string, ClaimRun>> {
+  const rows = await sql<Record<string, unknown>[]>`
+    select plan_item_id, status, created_at, github_checked_at, last_push_at, last_push_sha,
+           last_push_subject, github_error
+    from plan_runs
+    where user_id = ${userId} and plan_item_id is not null
+    order by created_at desc`;
+  // A direct connection hands back Dates where PostgREST hands back strings.
+  const stamp = (value: unknown): string | null =>
+    value instanceof Date ? value.toISOString() : value == null ? null : String(value);
+
+  const runs: Record<string, ClaimRun> = {};
+  for (const row of rows) {
+    const stepId = String(row.plan_item_id);
+    if (runs[stepId]) continue;
+    runs[stepId] = {
+      status: String(row.status ?? ''),
+      createdAt: stamp(row.created_at) ?? '',
+      reading: storedReading({
+        github_checked_at: stamp(row.github_checked_at),
+        last_push_at: stamp(row.last_push_at),
+        last_push_sha: stamp(row.last_push_sha),
+        last_push_subject: stamp(row.last_push_subject),
+        github_error: stamp(row.github_error),
+      }),
+    };
+  }
+  return runs;
+}
+
+/** The tree, and what the runs say about the steps claimed in it. */
+async function loadState(
+  sql: Sql,
+  userId: string,
+): Promise<{ sections: PlanSection[]; liveness: PlanLiveness }> {
+  const data = await loadData(sql, userId);
+  const liveness = planLiveness(data.items, await loadRuns(sql, userId), Date.now());
+  return { sections: buildPlanTree(data, liveness), liveness };
+}
+
 async function loadTree(sql: Sql, userId: string): Promise<PlanSection[]> {
-  return buildPlanTree(await loadData(sql, userId));
+  return (await loadState(sql, userId)).sections;
 }
 
 async function byNumber(sql: Sql, userId: string, raw: string | undefined): Promise<PlanItem> {
@@ -194,8 +246,12 @@ const GLYPH: Record<PlanStatus, string> = {
   dropped: '[-]',
 };
 
-function facts(node: PlanNode): string {
+function facts(node: PlanNode, liveness?: PlanLiveness): string {
   const out: string[] = [];
+  // What the run behind a claim is doing, where there is one to read. The
+  // status box says "[>]" for all four readings; this says which.
+  const claim = liveness?.[node.id];
+  if (claim && claim !== 'claimed') out.push(CLAIM_WORD[claim]);
   // First, because it changes what every other fact on the line means: a
   // question that is "ready" is ready for the person, not for a session.
   if (node.kind === 'decision') out.push(node.status === 'done' ? 'answered' : 'DECISION');
@@ -212,7 +268,7 @@ function facts(node: PlanNode): string {
   return out.join('  ');
 }
 
-function printNode(node: PlanNode, indent = ''): void {
+function printNode(node: PlanNode, indent = '', liveness?: PlanLiveness): void {
   // Put aside as not right now, so it is not asked here either. It is on
   // /dev/plan under Dismissed, which is the one place it shows.
   if (isDismissed(node)) return;
@@ -223,13 +279,13 @@ function printNode(node: PlanNode, indent = ''): void {
   // not a box waiting to be ticked, it is a question waiting to be answered.
   const glyph = node.kind === 'decision' && !isClosed(node.status) ? '(?)' : GLYPH[node.status];
   const head = `${indent}#${String(node.number).padEnd(4)}${glyph}  ${node.title}`;
-  const tail = facts(node);
+  const tail = facts(node, liveness);
   console.log(tail ? `${head.padEnd(64)}  ${tail}` : head);
   // The admission that part of this is not yet planned, on the line under it.
   if (node.fog && !node.fogDismissedAt) {
     console.log(`${indent}      fog: ${node.fog.replace(/\s+/g, ' ').slice(0, 100)}`);
   }
-  for (const child of node.children) printNode(child, indent + '  ');
+  for (const child of node.children) printNode(child, indent + '  ', liveness);
 }
 
 /**
@@ -314,7 +370,7 @@ async function main(): Promise<void> {
 
   try {
     if (command === 'list') {
-      const sections = await loadTree(sql, userId);
+      const { sections, liveness } = await loadState(sql, userId);
       const all = has('--all');
       const onlyModule = arg('--module');
       const claude = has('--claude');
@@ -329,7 +385,7 @@ async function main(): Promise<void> {
         if (nodes.length === 0) continue;
         const { done, live } = section.progress;
         console.log(`\n== ${section.label}${live ? ` (${done} of ${live} done)` : ''}`);
-        for (const node of nodes) printNode(node);
+        for (const node of nodes) printNode(node, '', liveness);
         shown += flattenSections([{ ...section, nodes }]).length;
       }
 
@@ -584,7 +640,7 @@ async function main(): Promise<void> {
     }
 
     if (command === 'next') {
-      const sections = await loadTree(sql, userId);
+      const { sections, liveness } = await loadState(sql, userId);
       const claude = has('--claude');
       const limit = Number(arg('--limit') ?? 10);
       const order = workOrder(sections, claude ? { assignee: 'claude' } : {});
@@ -600,7 +656,8 @@ async function main(): Promise<void> {
       }
       for (const node of order.slice(0, limit)) {
         const head = `#${String(node.number).padEnd(4)}p${node.priority}  ${node.title}`;
-        console.log(`${head.padEnd(64)}  ${moduleLabel(node.module)}${facts(node) ? `  ${facts(node)}` : ''}`);
+        const tail = facts(node, liveness);
+        console.log(`${head.padEnd(64)}  ${moduleLabel(node.module)}${tail ? `  ${tail}` : ''}`);
       }
       if (order.length > limit) console.log(`… and ${order.length - limit} more.`);
       return;
@@ -608,10 +665,10 @@ async function main(): Promise<void> {
 
     if (command === 'show' || command === 'brief') {
       const item = await byNumber(sql, userId, target);
-      const sections = await loadTree(sql, userId);
+      const { sections, liveness } = await loadState(sql, userId);
       const node = findNode(sections, item.id);
       if (!node) fail(`#${item.number} is not in the tree.`);
-      process.stdout.write(planBrief(sections, node));
+      process.stdout.write(planBrief(sections, node, { liveness }));
       return;
     }
 

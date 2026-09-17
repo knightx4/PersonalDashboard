@@ -420,8 +420,8 @@ session writes it when it claims a step and clears it when it closes one, and
 a session that dies does neither — so the row went on saying underway for the
 rest of the day, which is note 60a0ad01 and the reason #494 exists.
 
-Two halves. `lib/plan/elapsed.ts` reads the clock beside the status, so the
-page stops drawing a two-hour-old claim as live and the send guard stops
+Two halves. `lib/plan/liveness.ts` reads the claim against the run behind it,
+so the page stops drawing a dead claim as live and the send guard stops
 refusing work under a feature nothing is touching. `inngest/dev/claims.ts` is
 the other half: a stage of the daily cron that writes those rows back to
 `not_started` with a dated line in `comment` saying the claim expired. Without
@@ -434,7 +434,33 @@ is why both the page's status control and `plan.ts start` now name who holds a
 step they mark underway — a claim nobody is on is one nothing is working.
 
 Two hours is a threshold and not evidence, and a long batch is called stale
-while it is still going. #499 replaces it with the run itself.
+while it is still going. So the claim is read off the run behind it instead.
+
+**What a claim reads as.** `lib/plan/liveness.ts` has `claimLiveness(step,
+run, now)`, and it answers one of four things about a step marked
+`in_progress`, or `null` when the row is not claimed at all:
+
+| | |
+|---|---|
+| `claimed` | The row says a session has it and nothing says what that session is doing: no run recorded, or one nobody has asked GitHub about, and the clock has not run out either. |
+| `working` | Its run has pushed something within the last twenty minutes. |
+| `quiet` | Nothing pushed for twenty minutes. It may still be reading files or waiting on a build. |
+| `abandoned` | Nothing pushed for two hours, with the step still open. Nobody is on it and it was never closed. |
+
+The two marks are `QUIET_AFTER_MINUTES` and `ENDED_AFTER_MINUTES` (#524),
+counted from the run's last push or from when it was fired if it has not
+pushed. The reading comes off the `plan_runs` row that #568 added columns for,
+written by the route #563 chose; a reading older than the ended mark is not
+trusted (#570) and neither is one carrying a GitHub refusal, and in both cases
+the clock in `elapsed.ts` answers instead. That fallback is also what a claim
+with no run recorded against it gets.
+
+`healthOf` turns those into the healths `working`, `quiet` and `abandoned`, so
+the health column, the module counts and bands, the terminal's facts column,
+the brief's status line and the send guard all read one function. The guard
+counts `quiet` as live: the twenty-minute mark reads wrong on a session that
+is reading rather than writing, and #574 settled that a quiet step is re-sent
+by asking first.
 
 ## The reading
 

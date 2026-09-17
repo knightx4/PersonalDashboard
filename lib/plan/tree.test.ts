@@ -16,6 +16,8 @@ import {
   leavesOf,
   healthOf,
   moveOf,
+  planLiveness,
+  tallyHealth,
   planProgress,
   subtreeIds,
   handedToClaude,
@@ -1408,5 +1410,69 @@ describe('moveOf', () => {
       const step = findNode([sections], 's1')!;
       expect(moveOf(step, whileResolving)).toBe('yours');
     });
+  });
+});
+
+describe('healthOf, on a claim read against its run', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+
+  /** A step marked underway, claimed `minutes` ago. */
+  const claimed = (id: string, minutes = 10) =>
+    at('in_progress', id, { startedAt: minutesAgo(minutes) });
+
+  const run = (minutes: number, pushed: number | null) => ({
+    status: 'started',
+    createdAt: minutesAgo(minutes),
+    reading: {
+      checkedAt: minutesAgo(1),
+      lastPush: pushed === null ? null : { at: minutesAgo(pushed), sha: 'abc', subject: 'A push' },
+      refusal: null,
+    },
+  });
+
+  it('says in progress and no more when no run is recorded against it', () => {
+    const section = shopping(tree([claimed('a')]));
+    expect(healthOf(section.nodes[0], planLiveness([claimed('a')], {}, NOW))).toBe('in_progress');
+  });
+
+  it('says working, quiet or abandoned from what the run pushed', () => {
+    const section = shopping(tree([claimed('a')]));
+    const node = section.nodes[0];
+    const liveness = (pushed: number | null, fired = 30) =>
+      planLiveness([{ id: node.id, status: 'in_progress', startedAt: node.startedAt }],
+        { [node.id]: run(fired, pushed) }, NOW);
+
+    expect(healthOf(node, liveness(2))).toBe('working');
+    expect(healthOf(node, liveness(25))).toBe('quiet');
+    expect(healthOf(node, liveness(150, 200))).toBe('abandoned');
+  });
+
+  it('reads the claim as abandoned on the clock alone once it is two hours old', () => {
+    const step = claimed('a', 130);
+    const section = shopping(tree([step]));
+    expect(healthOf(section.nodes[0], planLiveness([step], {}, NOW))).toBe('abandoned');
+  });
+
+  it('counts the module by the same reading, so the tally cannot disagree', () => {
+    const step = claimed('a', 130);
+    const liveness = planLiveness([step], {}, NOW);
+    const section = shopping(buildPlanTree({ items: [step], dependencies: [] }, liveness));
+    expect(section.tally.abandoned).toBe(1);
+    expect(section.tally.in_progress).toBe(0);
+    expect(section.bands).toEqual([{ health: 'abandoned', count: 1 }]);
+    // And without the reading it counts what the column says, as it always did.
+    expect(tallyHealth(section.nodes).in_progress).toBe(1);
+  });
+
+  it('reports an abandoned step from the feature closed above it', () => {
+    // The closed-over-open rule, with the new reading in it: a feature marked
+    // done over a claim nothing is working reports the claim, and reports it
+    // as stopped rather than as underway.
+    const step = claimed('s', 200);
+    const items = [at('done', 'f'), { ...step, parentId: 'f' }];
+    const liveness = planLiveness(items, {}, NOW);
+    const section = shopping(buildPlanTree({ items, dependencies: [] }, liveness));
+    expect(healthOf(section.nodes[0], liveness)).toBe('abandoned');
   });
 });
