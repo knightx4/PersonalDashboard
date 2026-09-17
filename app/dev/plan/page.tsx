@@ -134,8 +134,12 @@ export default async function DevPlanPage({
       {sync.error && (
         <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
       )}
+      {/* A sentence now rather than a status code, so it is printed as one and
+        in the same tone as the sync failure above it -- a setting nobody can
+        act on until they are told which one is not a quieter problem than a
+        step that did not arrive. */}
       {checks.error && (
-        <p className="text-small text-ink-muted">Could not read CI: {checks.error}</p>
+        <p className="text-small text-caution">Could not read CI. {checks.error}</p>
       )}
       <OvernightControl run={overnight} canSend={Boolean(planRoutine().token)} />
       <PlanViewComponent
