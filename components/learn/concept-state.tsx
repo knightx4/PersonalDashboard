@@ -2,6 +2,7 @@ import { AlertTriangle, BadgeCheck, CircleDashed, CircleDot, Eye, Gem } from 'lu
 import { cn } from '@/lib/cn';
 import { lastCheckedLine } from '@/lib/learn/graph/last-answered';
 import type { Concept } from '@/lib/learn/graph/model';
+import type { Rung } from '@/lib/learn/graph/probe-payload';
 
 /**
  * How a concept's state is said, wherever it is said.
@@ -32,6 +33,20 @@ export const ESTABLISHED_LABEL: Record<Concept['established'], string> = {
   tested: 'answered questions on it',
   inferred: 'inferred from something above it',
   declared: 'you said so',
+};
+
+/**
+ * The three rungs, said as what the question was rather than as a verb.
+ *
+ * The state labels above say what has been shown about a claim; these say what
+ * was asked. Kept together because a page that names one usually names the
+ * other, and they have to agree: picking the idea out of four is the multiple
+ * choice rung and what it can establish is "recognised".
+ */
+export const RUNG_LABEL: Record<Rung, string> = {
+  recognise: 'Multiple choice',
+  apply: 'Applied case',
+  defend: 'Defence',
 };
 
 export function StateMark({ concept, className }: { concept: Concept; className?: string }) {
