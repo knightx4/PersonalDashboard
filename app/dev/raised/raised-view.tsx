@@ -268,14 +268,15 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           the first thing you want to know is what it was doing at the time. */}
       {row.source && <p className="text-small text-ink-muted">Raised by {row.source}</p>}
 
-      {/* One thread, two ways into it. Answering closes the raise; a comment
-          says something about it and leaves it open. */}
+      {/* One thread, two ways into it. The buttons answer the ask it named;
+          what you write here is an answer in your own words, and it starts a
+          session that acts on it and replies under you. */}
       <CommentThread
         target="raise"
         id={row.id}
         thread={row.thread}
-        label="Add a comment"
-        placeholder="Something about this raise that is not the answer to it. Tag @dash to ask; it stays open."
+        label="Answer in your own words"
+        placeholder="What you want done about this. A session reads it, does it, and replies here."
       />
 
       {/* Also on one that reached answered with nothing recorded: that raise is

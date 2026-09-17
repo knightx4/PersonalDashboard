@@ -12,6 +12,7 @@ import {
   type CommentTarget,
 } from '@/lib/comments/load';
 import { mentionsDash, questionFrom } from '@/lib/comments/mention';
+import { pickUpRaise } from '@/lib/raised/pickup';
 
 /**
  * Writing and removing a comment, from any of the three dev pages.
@@ -50,6 +51,10 @@ const bodySchema = z.string().trim().min(1, 'Write something.').max(4000);
  * that follows from it is in lib/comments/ask.ts, so the two paths a reply can
  * take are described in one place rather than half here.
  *
+ * A raise is the exception, and lib/raised/pickup.ts is why: it is a question
+ * put to you, so a comment on one is an answer whether or not it carries the
+ * tag, and an answer starts a session that acts on it.
+ *
  * Ownership of the row being commented on is checked by the insert policy in
  * migration 0062 rather than here: a comment on somebody else's row matches no
  * policy and is refused, which is the check that holds whoever is calling.
@@ -81,8 +86,28 @@ export async function addComment(
     .single();
   if (error) return { error: error.message };
 
-  // Untagged, so it is a note to yourself and this is the end of it.
+  const writtenId = (written as { id: string } | null)?.id ?? '';
+
+  // Untagged, so it is a note to yourself and this is the end of it -- except
+  // on a raise, where there is nobody else it could be addressed to. The raise
+  // asked you something, so what you write on it is the answer, and #541 is
+  // that the answer starts the run rather than waiting for a tag nobody thinks
+  // to add. It is what left two raises carrying an answer for five and six
+  // days.
   if (!mentionsDash(body.data)) {
+    if (target.data === 'raise') {
+      const picked = await pickUpRaise({
+        supabase,
+        userId: user.id,
+        id: id.data,
+        commentId: writtenId,
+        answer: body.data,
+      });
+      redraw(target.data);
+      if (picked.ok) return { message: picked.message };
+      return picked.said ? { error: picked.said } : { message: 'Saved.' };
+    }
+
     redraw(target.data);
     return { message: 'Saved.' };
   }
@@ -92,7 +117,7 @@ export async function addComment(
     userId: user.id,
     target: target.data,
     id: id.data,
-    commentId: (written as { id: string } | null)?.id ?? '',
+    commentId: writtenId,
     question: questionFrom(body.data),
   });
 
