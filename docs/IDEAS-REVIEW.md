@@ -38,11 +38,11 @@ The rest stand, and no two of them say the same thing. They group as:
 | Group | Count | What they are |
 |---|---|---|
 | Dev: the plan, runs and Dash | 18 | The conversation with Dash, what a run records, the guards on sending a step |
-| Learn | 24 | The graph, the gaps tracks, quizzes, what gets asked next |
-| App-wide | 12 | Search and ⌘K, the newsletters, theming, the not-found page |
-| Vault, todo, jobs | 7 | Per-module follow-ons |
+| Learn | 23 | The graph, the gaps tracks, quizzes, what gets asked next |
+| App-wide | 14 | Search and ⌘K, the newsletters, theming, the not-found page |
+| Vault, todo, jobs | 6 | Per-module follow-ons |
 
-About a third of them are the deferred questions migrated off features that
+A quarter of them are the deferred questions migrated off features that
 have since shipped, and most of those say in their own words that they cannot
 be answered until the thing has been used for a few weeks. They were left
 alone deliberately: they are waiting on time rather than on a decision, and
