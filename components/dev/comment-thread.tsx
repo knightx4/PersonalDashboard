@@ -10,6 +10,7 @@ import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { MENTION, mentionsDash } from '@/lib/comments/mention';
 import { commentWhen, exactTime } from '@/lib/comments/when';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
 
@@ -83,11 +84,14 @@ function Message({
   comment,
   target,
   grouped,
+  titles,
 }: {
   comment: DevComment;
   target: CommentTarget;
   /** Whether the message above is from the same author, so the header is up already. */
   grouped: boolean;
+  /** What each step number in the body is called, for the hover text. */
+  titles?: PlanRefTitles;
 }) {
   const now = useClockNow();
   const sending = comment.id === PENDING;
@@ -116,7 +120,7 @@ function Message({
           </div>
         )}
         <div className="text-body text-ink">
-          <CommentBody body={comment.body} />
+          <CommentBody body={comment.body} titles={titles} />
         </div>
       </div>
 
@@ -167,6 +171,7 @@ export function CommentThread({
   submit,
   placeholder = 'A note on this row, or a question for Dash.',
   awaitingReply = false,
+  titles,
 }: {
   target: CommentTarget;
   /** The row being commented on, not the comment. */
@@ -177,6 +182,8 @@ export function CommentThread({
   /** Where the box writes, when it is not a plain comment. */
   submit?: CommentSubmit;
   placeholder?: string;
+  /** What each step number in a comment is called, for the hover text. */
+  titles?: PlanRefTitles;
   /**
    * Draw the waiting line with nothing in flight, for the surface gallery.
    *
@@ -242,6 +249,7 @@ export function CommentThread({
               // A message on its way keeps its own header whatever is above it:
               // "Sending…" is the one thing that header has to say.
               grouped={comment.id !== PENDING && shown[index - 1]?.author === comment.author}
+              titles={titles}
             />
           ))}
 

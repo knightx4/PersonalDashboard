@@ -68,3 +68,30 @@ export function splitOnRefs(text: string): RefPart[] {
   }
   return parts;
 }
+
+/**
+ * What each step number is called, by number.
+ *
+ * Built by whichever page has the plan loaded and handed down to the readers,
+ * rather than looked up where it is drawn: a raise with nine references in it
+ * would otherwise be nine lookups inside a render, and three of the pages that
+ * draw comments never load the plan at all.
+ */
+export type PlanRefTitles = Readonly<Record<number, string>>;
+
+/**
+ * The hover text on a reference.
+ *
+ * "#494" told you a step exists and nothing about which one, so following it
+ * was the only way to find out -- and following it leaves the page you were
+ * reading. The title is what makes the number a sentence you can read without
+ * going anywhere.
+ *
+ * Falls back to the old wording where the page does not know the plan. A
+ * reference to a step that has been deleted lands there too, which is correct:
+ * saying nothing about it is better than saying something made up.
+ */
+export function planRefLabel(number: number, titles?: PlanRefTitles): string {
+  const title = titles?.[number];
+  return title ? `#${number} — ${title}` : `Step #${number} on the plan`;
+}

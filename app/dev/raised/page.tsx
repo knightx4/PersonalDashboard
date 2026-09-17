@@ -1,7 +1,7 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
-import { loadPlan } from '@/lib/plan/load';
+import { loadPlan, planRefTitles } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
@@ -46,6 +46,11 @@ export default async function DevRaisedPage() {
   // anybody remembering to raise it as well.
   const waiting = waitingOnYou(buildPlanTree(plan));
 
+  // What every "#494" on this page is called. Built once here rather than
+  // looked up where each one is drawn: a raise with nine references in it
+  // would otherwise be nine lookups inside a render.
+  const titles = planRefTitles(plan);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
@@ -53,8 +58,8 @@ export default async function DevRaisedPage() {
         description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
       />
       <DigestPanel digest={digest} />
-      <RaisedView queue={queue} waiting={waiting} />
-      <ConversationsView conversations={conversations} />
+      <RaisedView queue={queue} waiting={waiting} titles={titles} />
+      <ConversationsView conversations={conversations} titles={titles} />
     </div>
   );
 }

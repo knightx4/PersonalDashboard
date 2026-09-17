@@ -100,6 +100,7 @@ import {
 } from '@/lib/plan/tree';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
 import { isResolvingAnswers, lastRunLine, type LastRun } from '@/lib/plan/run-end';
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
@@ -1028,7 +1029,7 @@ function AskQuestion({ node, onDone }: { node: PlanNode; onDone: () => void }) {
  * something untrue, because a decision carrying an invented answer would be
  * repeated to every session that reads the feature from then on.
  */
-function QuestionRow({ node }: { node: PlanNode }) {
+function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles }) {
   const [answerState, answerAction, answerPending] = useActionState(
     answerPlanDecision,
     {} as PlanActionState,
@@ -1197,6 +1198,7 @@ function QuestionRow({ node }: { node: PlanNode }) {
               id={node.id}
               thread={node.thread}
               label="Comment"
+              titles={titles}
               placeholder="What is unclear about the question, or what you are weighing. Tag @dash to ask; either way it does not answer it."
             />
           )}
@@ -1225,7 +1227,7 @@ function QuestionRow({ node }: { node: PlanNode }) {
  * this" is the most useful thing a step can tell you; withdrawn ones stay too,
  * quietly, so a question does not simply vanish.
  */
-function Questions({ node }: { node: PlanNode }) {
+function Questions({ node, titles }: { node: PlanNode; titles?: PlanRefTitles }) {
   const [asking, setAsking] = useState(false);
   const questions = node.children.filter((child) => child.kind === 'decision');
   const unanswered = questions.filter(
@@ -1248,7 +1250,7 @@ function Questions({ node }: { node: PlanNode }) {
       {questions.length > 0 && (
         <ul className="space-y-1.5">
           {questions.map((question) => (
-            <QuestionRow key={question.id} node={question} />
+            <QuestionRow key={question.id} node={question} titles={titles} />
           ))}
         </ul>
       )}
@@ -2163,6 +2165,12 @@ function PlanRow({
   const isDecision = node.kind === 'decision';
   const health = healthOf(node);
   const resolving = useResolving(lastRuns, runNow);
+  // What a "#494" written in a comment on this page is called. The catalog is
+  // already every step's number and title, so no page needs to hand it over.
+  const refTitles = useMemo(
+    () => Object.fromEntries(catalog.map((entry) => [entry.number, entry.title])),
+    [catalog],
+  );
   const move = moveFor(node, resolving);
   // Whether this row itself is the one being re-read. The rollup above would
   // also be true of a feature whose child is being re-shaped, and it is the
@@ -2719,7 +2727,7 @@ function PlanRow({
               />
             )}
 
-            <Questions node={node} />
+            <Questions node={node} titles={refTitles} />
 
             <Dependencies node={node} catalog={catalog} />
 
@@ -2727,6 +2735,7 @@ function PlanRow({
               target="step"
               id={node.id}
               thread={node.thread}
+              titles={refTitles}
               placeholder="A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it."
             />
 

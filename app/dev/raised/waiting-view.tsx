@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { RefText } from '@/components/dev/ref-text';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
@@ -35,7 +36,7 @@ const TONE: Record<WaitingRow['health'], DevTone> = {
  * waiting on me" is one question and answering it in two places is how the
  * second place stops being read.
  */
-export function WaitingCard({ row }: { row: WaitingRow }) {
+export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRefTitles }) {
   return (
     <li className="space-y-1 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -54,7 +55,7 @@ export function WaitingCard({ row }: { row: WaitingRow }) {
 
       {row.ask && (
         <p className="text-small text-ink-muted">
-          <RefText text={row.ask} />
+          <RefText text={row.ask} titles={titles} />
         </p>
       )}
 
