@@ -15,7 +15,7 @@ import { raisedQueueFrom, raisedRowFrom, type RaisedRow } from '@/lib/raised/loa
 // render test; the view only needs them to exist to hand to its forms.
 vi.mock('@/app/dev/raised/actions', () => {
   const noop = async () => ({});
-  return { decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
+  return { closeRaise: noop, decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
 });
 
 const { RaisedView } = await import('@/app/dev/raised/raised-view');
@@ -91,6 +91,41 @@ describe('a raise on the page', () => {
 
     expect(html).not.toContain('Yes, do it');
     expect(html).not.toContain('Close with a reason');
+  });
+
+  // #540's state. Answering is a reply and not the end of the row, so the row
+  // offers the press that ends it -- and only once something came of it.
+  it('offers to close an answered raise, and reads a closed one as done', () => {
+    const answered = render([
+      raise({
+        status: 'answered',
+        answered_at: '2026-09-13T05:00:00.000Z',
+        outcome: 'Filed on the ideas page.',
+      }),
+    ]);
+
+    expect(answered).toContain('Close it');
+    expect(answered).toContain('Answered');
+
+    const closed = render([
+      raise({
+        status: 'closed',
+        answered_at: '2026-09-13T05:00:00.000Z',
+        outcome: 'Filed on the ideas page.',
+      }),
+    ]);
+
+    // Nothing left to press but taking it back.
+    expect(closed).not.toContain('Close it');
+    expect(closed).toContain('Reopen');
+  });
+
+  it('will not offer to close one that produced nothing', () => {
+    const html = render([
+      raise({ status: 'answered', answered_at: '2026-09-13T05:00:00.000Z', outcome: null }),
+    ]);
+
+    expect(html).not.toContain('Close it');
   });
 
   // The #342 raise: answered yes, closed, and nothing came of it. It reads as
