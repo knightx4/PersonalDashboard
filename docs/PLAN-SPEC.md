@@ -185,6 +185,14 @@ written without saying which is taken as `outside`: a block that outlives its
 reason is a row somebody looks at, and one that clears itself too early is an
 afternoon a session loses.
 
+`isStaleBlock` in `lib/plan/tree.ts` is the one place that reads it, and every
+surface reads through that: the health on the row, the Ready and Waiting views,
+the counts on the summary strip, a feature's roll-up, "On you", and the Send
+button's refusal. A `steps` block whose named steps have all closed reports the
+step it now is -- ready, or not started -- and is handed over like any other. An
+`outside` block reports `blocked` on all of them however much else closes, and
+Send refuses it until the person moves it.
+
 ## Proposals: from an idea to the plan
 
 An idea on `/dev/ideas` is a sentence. A plan step needs a parent, steps
@@ -507,7 +515,9 @@ steps. Done and dropped dependencies are out of the way; a dropped one is
 shown plainly rather than freezing the dependent forever.
 
 **Ready.** A step could be picked up now when it is not started, waits on
-nothing, has no open sub-steps, and nothing above it is blocked or dropped.
+nothing, has no open sub-steps, and nothing above it is blocked or dropped. A
+step blocked on the steps it names is ready once every one of them has closed;
+a step blocked on something outside the plan never is.
 A feature with open sub-steps is worked through them; the feature is what
 you close when they are all done — and at that point it is itself ready.
 

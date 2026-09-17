@@ -1,9 +1,11 @@
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
+  DEFAULT_BLOCK_KIND,
   hasLiveFog,
   isClosed,
   isDismissed,
   type PlanAssignee,
+  type PlanBlockKind,
   type PlanData,
   type PlanItem,
   type PlanStatus,
@@ -186,6 +188,8 @@ export function planProgress(
     status: PlanStatus;
     dependsOn?: readonly PlanLink[];
     dismissedAt?: string | null;
+    /** Read by `isBlocked` for the blocked count. Absent reads as `outside`. */
+    blockKind?: PlanBlockKind | null;
   }[],
 ): PlanProgress {
   // A dismissed question is out of the denominator with the proposals and the
@@ -230,33 +234,38 @@ function bySibling(a: PlanItem, b: PlanItem): number {
 }
 
 /**
- * A block that has outlived the thing it named.
+ * A block on steps that have all closed.
  *
- * `blocked` means "needs an answer, or something outside the repo", and it is
- * deliberately a status that nothing clears on its own: no amount of other
- * work produces the credential. Waiting on another *step* is meant to be a row
- * in `plan_dependencies` instead, precisely because that does clear itself.
+ * `blocked` covers two different waits and `block_kind` is what tells them
+ * apart. A `steps` block is waiting on the rows in `plan_dependencies` it was
+ * written with, and it is the only kind that can go out of date on its own:
+ * once every step it named is closed, nothing recorded is holding it. #20 sat
+ * blocked on #127 for a day after #127 shipped, and the page went on saying
+ * "Waiting" with nothing left to wait on, which is the bug this answers.
  *
- * A step marked `blocked` that also records dependencies has been given both,
- * and those rows are the only account the plan holds of what it was waiting
- * for. Once every one of them is closed, nothing recorded is holding the step
- * and the status column is simply out of date -- #20 sat blocked on #127 for a
- * day after #127 shipped, and the page went on saying "Waiting" with nothing
- * left to wait on, which is the bug this answers.
+ * An `outside` block is never stale, however much else closes. #499 named
+ * #495, #498 and #522, all three closed, and its block was about a GitHub
+ * token nobody had made: the page called it ready, the Send button took the
+ * press, and three runs came back having found the same wall. #525 settled
+ * that by recording the kind, so this reading is no longer a guess.
  *
- * A step blocked with no dependencies at all is untouched. That is the honest
- * use of the status, and nothing about it can be worked out from the tree.
+ * A block with no kind recorded reads as `DEFAULT_BLOCK_KIND`, which is
+ * `outside`. The database refuses a blocked row without a kind, so nothing can
+ * write one now, but a row whose kind this build does not recognise reads back
+ * as null, and leaving such a step blocked is the safe way to be wrong.
+ *
+ * A step blocked with no dependencies at all is untouched whatever its kind:
+ * there is nothing on record for it to have outlived.
  */
 export function isStaleBlock(node: {
   status: PlanStatus;
   dependsOn?: readonly PlanLink[];
+  blockKind?: PlanBlockKind | null;
 }): boolean {
+  if (node.status !== 'blocked') return false;
+  if ((node.blockKind ?? DEFAULT_BLOCK_KIND) !== 'steps') return false;
   const dependsOn = node.dependsOn ?? [];
-  return (
-    node.status === 'blocked' &&
-    dependsOn.length > 0 &&
-    dependsOn.every((link) => isClosed(link.item.status))
-  );
+  return dependsOn.length > 0 && dependsOn.every((link) => isClosed(link.item.status));
 }
 
 /**
@@ -275,7 +284,11 @@ export function isStaleBlock(node: {
  * the dropdown says Blocked because that is what the row says, and it is the
  * person's to change.
  */
-export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanLink[] }): boolean {
+export function isBlocked(node: {
+  status: PlanStatus;
+  dependsOn?: readonly PlanLink[];
+  blockKind?: PlanBlockKind | null;
+}): boolean {
   return node.status === 'blocked' && !isStaleBlock(node);
 }
 
@@ -283,8 +296,10 @@ export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanL
  * Whether a step could be picked up now.
  *
  *  - It has not been started. A step underway is being worked, not waiting
- *    to be, and a blocked one has said why it cannot be -- unless every
- *    dependency it named has since closed, which is `isStaleBlock`.
+ *    to be, and a blocked one has said why it cannot be -- unless it was
+ *    blocked on steps and every one of them has since closed, which is
+ *    `isStaleBlock`. A block on something outside the plan never becomes
+ *    ready here; it waits for the person to say it is over.
  *  - Nothing it waits on, its own or inherited, is still open.
  *  - None of its own steps are still open. A feature with steps outstanding
  *    is worked through those steps; the feature itself is what you close when
@@ -294,7 +309,7 @@ export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanL
  *    feature waits with it, and one under a proposal has not been agreed to.
  */
 export function isReady(
-  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn'>,
+  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn' | 'blockKind'>,
   ancestors: readonly Pick<PlanItem, 'status'>[],
 ): boolean {
   if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
@@ -490,7 +505,7 @@ function descendantsOf(node: { children?: readonly PlanNode[] }): PlanNode[] {
 }
 
 export function healthOf(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'blockKind'> & {
     /**
      * Optional so the callers that classify one row on its own -- the tally,
      * which only ever sees leaves -- need not build a subtree to ask.
@@ -540,10 +555,12 @@ export function healthOf(
   }
   if (node.kind === 'decision' && node.status === 'done') return 'answered';
 
-  // A block whose every named dependency has closed is reported as the step it
-  // now is, not as the block it used to be. See `isStaleBlock`: leaving it as
+  // A block on steps that have all closed is reported as the step it now is,
+  // not as the block it used to be. See `isStaleBlock`: leaving it as
   // "Waiting" is the page claiming something is holding the step up when the
-  // plan has no record of anything that is.
+  // plan has no record of anything that is. A block on something outside the
+  // plan is not that case -- it goes on reading `blocked` below, because the
+  // thing holding it up was never on the plan to close.
   if (isStaleBlock(node)) {
     return node.ready ? 'ready' : 'not_started';
   }
@@ -703,7 +720,7 @@ function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
 
 type MoveInput = Pick<
   PlanNode,
-  'id' | 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
+  'id' | 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee' | 'blockKind'
 > & {
   dismissedAt?: string | null;
   children?: readonly PlanNode[];
@@ -867,7 +884,7 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
  * opened.
  */
 export function needsThePerson(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'blockKind'> & {
     dismissedAt?: string | null;
   },
 ) {
@@ -1180,7 +1197,10 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
  * something, and it is excluded from a hand-over on its own grounds.
  */
 export function isWaitingOnThePerson(
-  node: Pick<PlanNode, 'kind' | 'status'> & { dependsOn?: readonly PlanLink[] },
+  node: Pick<PlanNode, 'kind' | 'status'> & {
+    dependsOn?: readonly PlanLink[];
+    blockKind?: PlanBlockKind | null;
+  },
 ): boolean {
   if (isBlocked(node)) return true;
   return node.kind === 'decision' && !isClosed(node.status);

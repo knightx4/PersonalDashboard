@@ -258,7 +258,7 @@ describe('dependencies', () => {
 });
 
 describe('isReady', () => {
-  const bare = { waitingOn: [], children: [], dependsOn: [] };
+  const bare = { waitingOn: [], children: [], dependsOn: [], blockKind: null };
 
   it('is a step not yet started, waiting on nothing, with nothing open beneath it', () => {
     expect(isReady({ status: 'not_started', ...bare }, [])).toBe(true);
@@ -270,16 +270,38 @@ describe('isReady', () => {
     }
   });
 
-  it('is a blocked step whose every named dependency has since closed', () => {
+  it('is a step blocked on steps whose every named dependency has since closed', () => {
     // #20 sat blocked on #127 for a day after #127 shipped. A block that
     // records dependencies has told the plan what it was waiting for, and once
     // those are closed there is nothing on record holding it.
-    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'steps' })],
+      [dep('b', 'a')],
+    );
     expect(findNode(sections, 'b')!.ready).toBe(true);
   });
 
+  it('is not a step blocked on something outside the plan, whatever has closed', () => {
+    // #499's three dependencies all closed and its block was about a GitHub
+    // token. Nothing on the plan produces the token, so nothing on the plan
+    // makes the step ready.
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'outside' })],
+      [dep('b', 'a')],
+    );
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
+  it('is not a blocked step with no kind recorded, which reads as outside', () => {
+    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+    expect(findNode(sections, 'b')!.ready).toBe(false);
+  });
+
   it('is not a blocked step with a dependency still open', () => {
-    const sections = tree([item({ id: 'a' }), at('blocked', 'b')], [dep('b', 'a')]);
+    const sections = tree(
+      [item({ id: 'a' }), at('blocked', 'b', { blockKind: 'steps' })],
+      [dep('b', 'a')],
+    );
     expect(findNode(sections, 'b')!.ready).toBe(false);
   });
 
@@ -701,7 +723,7 @@ describe('summarize', () => {
   });
 });
 
-describe('a block whose dependencies have all closed', () => {
+describe('a block on steps whose dependencies have all closed', () => {
   // The note from /dev/plan: "still says blocked. But it looks like everything
   // it waits on is done." The badge already read Ready -- healthOf had been
   // taught this -- while the strip went on counting it under "waiting" and the
@@ -711,7 +733,7 @@ describe('a block whose dependencies have all closed', () => {
     tree(
       [
         item({ id: 'feature' }),
-        at('blocked', 'stale', { parentId: 'feature' }),
+        at('blocked', 'stale', { parentId: 'feature', blockKind: 'steps' }),
         at('done', 'shipped'),
       ],
       [dep('stale', 'shipped')],
@@ -732,7 +754,7 @@ describe('a block whose dependencies have all closed', () => {
 
   it('still counts a block that is waiting on something open', () => {
     const sections = tree(
-      [at('blocked', 'stuck'), item({ id: 'pending' })],
+      [at('blocked', 'stuck', { blockKind: 'steps' }), item({ id: 'pending' })],
       [dep('stuck', 'pending')],
     );
     expect(summarize(sections).waiting).toBe(1);
@@ -745,6 +767,33 @@ describe('a block whose dependencies have all closed', () => {
     const sections = tree([at('blocked', 'stuck')]);
     expect(summarize(sections).waiting).toBe(1);
     expect(flattenSections(applyView(sections, 'blocked')).map((n) => n.id)).toEqual(['stuck']);
+  });
+
+  // The other kind, on the same surfaces. #499 named three steps, all three
+  // closed, and the token it was actually blocked on was never on the plan to
+  // close -- so every one of these readings has to stay where it was.
+  it('reads as blocked everywhere when the block was on something outside the plan', () => {
+    const sections = tree(
+      [
+        item({ id: 'feature' }),
+        at('blocked', 'stuck', { parentId: 'feature', blockKind: 'outside' }),
+        at('done', 'shipped'),
+      ],
+      [dep('stuck', 'shipped')],
+    );
+
+    expect(summarize(sections).waiting).toBe(1);
+    expect(summarize(sections).ready).toBe(0);
+    expect(summarize(sections).onYou).toBe(1);
+    // The feature is in the Waiting view as the container it is shown in; the
+    // step itself is what the view matched.
+    expect(flattenSections(applyView(sections, 'blocked')).filter((n) => n.matches).map((n) => n.id))
+      .toEqual(['stuck']);
+    expect(flattenSections(applyView(sections, 'ready')).map((n) => n.id)).toEqual([]);
+    expect(findNode(sections, 'stuck')!.ready).toBe(false);
+    expect(healthOf(findNode(sections, 'stuck')!)).toBe('blocked');
+    expect(findNode(sections, 'feature')!.rollup).toMatchObject({ blocked: 1, live: 1 });
+    expect(moveOf(findNode(sections, 'stuck')!)).toBe('on_you');
   });
 });
 
@@ -823,19 +872,39 @@ describe('healthOf', () => {
     expect(healthOf(byId.get('a')!)).toBe('not_started');
   });
 
-  it('stops saying blocked once every dependency the block named is closed', () => {
-    const sections = tree([at('done', 'a'), at('blocked', 'b')], [dep('b', 'a')]);
+  it('stops saying blocked once every step a block on steps named is closed', () => {
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'steps' })],
+      [dep('b', 'a')],
+    );
     const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
 
     expect(healthOf(byId.get('b')!)).toBe('ready');
   });
 
   it('goes on saying blocked while a dependency is open, or when none was named', () => {
-    const sections = tree([at('not_started', 'a'), at('blocked', 'b'), at('blocked', 'c')], [
-      dep('b', 'a'),
-    ]);
+    const sections = tree(
+      [
+        at('not_started', 'a'),
+        at('blocked', 'b', { blockKind: 'steps' }),
+        at('blocked', 'c', { blockKind: 'steps' }),
+      ],
+      [dep('b', 'a')],
+    );
     const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
 
+    expect(healthOf(byId.get('b')!)).toBe('blocked');
+    expect(healthOf(byId.get('c')!)).toBe('blocked');
+  });
+
+  it('goes on saying blocked for a block on something outside the plan', () => {
+    const sections = tree(
+      [at('done', 'a'), at('blocked', 'b', { blockKind: 'outside' }), at('blocked', 'c')],
+      [dep('b', 'a'), dep('c', 'a')],
+    );
+    const byId = new Map(flattenSections(sections).map((node) => [node.id, node]));
+
+    // 'c' records no kind, which reads as outside for the same reason.
     expect(healthOf(byId.get('b')!)).toBe('blocked');
     expect(healthOf(byId.get('c')!)).toBe('blocked');
   });
@@ -1028,11 +1097,25 @@ describe('isWaitingOnThePerson', () => {
     expect(isWaitingOnThePerson({ kind: 'build', status: 'blocked' })).toBe(true);
   });
 
-  it('is not a block whose every named dependency has since closed', () => {
+  it('is not a block on steps whose every named step has since closed', () => {
     // It is the plan's own record that says nothing is holding it, so handing
     // it to Claude sends a session at a wall that is no longer there.
-    const sections = tree([at('blocked', 'stale'), at('done', 'dep')], [dep('stale', 'dep')]);
+    const sections = tree(
+      [at('blocked', 'stale', { blockKind: 'steps' }), at('done', 'dep')],
+      [dep('stale', 'dep')],
+    );
     expect(isWaitingOnThePerson(findNode(sections, 'stale')!)).toBe(false);
+  });
+
+  it('is a block on something outside the plan whose named steps have closed', () => {
+    // The other half, and the one the Send button reads: #499's dependencies
+    // were all closed and the token it was blocked on still did not exist.
+    // Three sessions were sent at it and came back having found the same wall.
+    const sections = tree(
+      [at('blocked', 'stuck', { blockKind: 'outside' }), at('done', 'dep')],
+      [dep('stuck', 'dep')],
+    );
+    expect(isWaitingOnThePerson(findNode(sections, 'stuck')!)).toBe(true);
   });
 
   it('is not ordinary work, and not a settled question', () => {
