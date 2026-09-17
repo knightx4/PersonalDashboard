@@ -1,11 +1,14 @@
 import { redirect } from 'next/navigation';
-import { getUser } from '@/lib/auth/server';
+import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { loadPlan } from '@/lib/plan/load';
+import { buildPlanTree } from '@/lib/plan/tree';
+import { waitingOnYou } from '@/lib/plan/waiting';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -23,12 +26,26 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const user = await getUser();
   if (!user) redirect('/login');
 
-  const [settings, counts, activity, raised] = await Promise.all([
+  const supabase = await createClient();
+  const [settings, counts, activity, raised, plan] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
+    loadPlan(supabase, user.id),
   ]);
+
+  /**
+   * The badge is everything waiting on you, which is more than the raises.
+   *
+   * It used to be `raised.length`, so a step blocked on a credential added
+   * nothing to it: #499 sat blocked for a day behind a tab reading zero. The
+   * plan's half is derived the same way the Dash page derives the section it
+   * lands in -- `waitingOnYou` over the same tree -- rather than counted again
+   * here, because a badge that disagrees with the page it links to is worse
+   * than no badge.
+   */
+  const waiting = waitingOnYou(buildPlanTree(plan));
 
   /**
    * Dash is first because it is the page the day starts on: the summary of the
@@ -60,7 +77,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const sections: NavSection[] = [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
-    { href: '/dev/raised', label: 'Dash', icon: 'raised', badge: raised.length },
+    { href: '/dev/raised', label: 'Dash', icon: 'raised', badge: raised.length + waiting.length },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
