@@ -1748,7 +1748,7 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth
 
   // The three tooltips that can only be written with the step in hand.
   if (health === 'answered') return { ...base, title: node.resolution ?? undefined };
-  if (health === 'blocked') return { ...base, title: node.comment ?? undefined };
+  if (health === 'blocked') return { ...base, title: node.blockAsk ?? node.comment ?? undefined };
   if (health === 'waiting') {
     return {
       ...base,
@@ -2597,6 +2597,15 @@ function PlanRow({
               <div>
                 <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Done when</p>
                 <p className="whitespace-pre-wrap text-ui text-ink">{node.acceptance}</p>
+              </div>
+            )}
+            {/* What it needs, in its own line above the history. The comment
+                below is every block this step has had, dated; this is the one
+                sentence that still stands. */}
+            {node.blockAsk && (
+              <div>
+                <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Needs</p>
+                <p className="whitespace-pre-wrap text-ui text-ink">{node.blockAsk}</p>
               </div>
             )}
             {node.comment && (

@@ -13,7 +13,7 @@ Three rules, and they are the same rule as never answering your own decision:
 - **Never dismiss anything.** Not a question, not fog, not a suggestion. A
   session that can put its own questions out of sight has no questions.
 - **Never bring one back.** If a dismissed question turns out to block the work
-  in front of you, say so — `block <n> --note "…"` on your step, naming it.
+  in front of you, say so — `block <n> --ask "…"` on your step, naming it.
 - **Never write it again.** A re-shape is handed what was dismissed under the
   feature, under *Already dismissed*. Do not propose it again, do not ask the
   same question in different words, do not write it back as fog, and do not

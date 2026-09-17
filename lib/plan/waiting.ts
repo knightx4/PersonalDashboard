@@ -32,9 +32,9 @@ export type WaitingRow = {
   /** `unanswered`, `proposed` or `blocked` -- what kind of waiting it is. */
   health: 'unanswered' | 'proposed' | 'blocked';
   /**
-   * The one thing it needs, where the row says. A blocked step's most recent
-   * block note; a decision's own detail, which is the question. Null on a
-   * proposal, where the title is the whole of it.
+   * The one thing it needs, where the row says. A blocked step's ask; a
+   * decision's own detail, which is the question. Null on a proposal, where
+   * the title is the whole of it.
    */
   ask: string | null;
 };
@@ -44,9 +44,11 @@ export type WaitingRow = {
  *
  * `comment` is appended to, never rewritten: `block` adds a dated paragraph
  * each time, so a step blocked four times carries four of them and the request
- * that still stands is the last. #552 gives a block its own field and this
- * stops guessing; until then, the last paragraph opening with a date is the
- * closest thing to the current ask, and it beats showing all four.
+ * that still stands is the last. Since #552 a block writes its ask into
+ * `block_ask` instead, which is one sentence and is rewritten rather than
+ * appended. This is what is read for a row blocked before that column existed,
+ * where the last dated paragraph is the closest thing to the current ask and
+ * beats showing all four.
  */
 export function latestBlockNote(comment: string | null): string | null {
   if (!comment) return null;
@@ -89,7 +91,7 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
       health,
       ask:
         health === 'blocked'
-          ? latestBlockNote(node.comment)
+          ? (node.blockAsk?.trim() || latestBlockNote(node.comment))
           : health === 'unanswered'
             ? (node.detail?.trim() || null)
             : null,

@@ -356,6 +356,11 @@ export async function setPlanItemStatus(
   const patch: Record<string, string | null> = { status: status.data };
   if (status.data === 'blocked') patch.assignee = null;
 
+  // Moving a step off blocked drops the sentence saying what it needed. It is
+  // a claim about work that has stopped, and this control is one of the ways
+  // it starts again; the dated line in the comment is the record either way.
+  if (status.data !== 'blocked') patch.block_ask = null;
+
   // Marking a step underway yourself puts it in your queue, if it was in
   // nobody's.
   //
