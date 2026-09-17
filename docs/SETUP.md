@@ -523,6 +523,51 @@ All of them require `Authorization: Bearer $CRON_SECRET`. Vercel Cron sends it
 automatically once `CRON_SECRET` is set; if it is unset, `TOKEN_ENCRYPTION_KEY`
 is accepted as a local fallback so you can curl the routes in development.
 
+### The overnight tick — two Vault secrets you must add by hand
+
+The overnight runner needs a second, much more frequent clock:
+`/api/cron/overnight` looks at what the runner is doing and, if the last
+feature it fired has finished, fires the next one. Once a day is useless for
+that, and sub-daily cron on Vercel needs Pro — so this one clock lives in the
+database instead. `supabase/migrations/0078_overnight_tick_cron.sql` enables
+`pg_cron` and `pg_net` (both already available on the project, both free) and
+schedules a job named `overnight-tick` that POSTs to the route **every four
+minutes**, in UTC, which is the timezone Supabase runs its databases in.
+
+The job cannot know the origin to post to or the secret to post with — those
+are deployment facts, and the secret must never be in the repository — so it
+reads both out of Supabase Vault every time it fires. **Until you add them, the
+job runs on schedule and posts nowhere.** Applying the migration warns when
+they are missing; nothing else will tell you.
+
+In the Supabase dashboard, **Project Settings → Vault → Add new secret**, twice.
+The names are exact — the job looks them up by name:
+
+| Name | What it holds |
+|---|---|
+| `app_origin` | The deployed origin of this app: scheme and host, no trailing slash, no path — e.g. `https://your-app.vercel.app` |
+| `cron_secret` | The exact value of `CRON_SECRET` in the Vercel environment (or of `TOKEN_ENCRYPTION_KEY` if `CRON_SECRET` is unset, since that is the fallback the routes accept) |
+
+In order: set `CRON_SECRET` in Vercel and deploy, then add the two secrets to
+Vault, then apply the migration (`npx supabase db push`) — or apply it first and
+add the secrets after, which also works; the job re-reads Vault on every tick,
+so rotating the secret or moving the deployment needs no second migration.
+
+To check it afterwards:
+
+```sql
+select jobname, schedule, active from cron.job where jobname = 'overnight-tick';
+select id, status_code, error_msg, created
+  from net._http_response order by created desc limit 5;
+```
+
+(`pg_net` keeps those replies for a few hours and then drops them, so look the
+morning after, not the week after.)
+
+A `200` there is a tick that ran. A `401` means `cron_secret` does not match
+`CRON_SECRET` — which is also the protection this route has instead of a login,
+since anything on the internet can reach it.
+
 ---
 
 ## Running cost
