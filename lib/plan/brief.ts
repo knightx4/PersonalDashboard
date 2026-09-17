@@ -2,7 +2,13 @@ import { commentLine } from '@/lib/comments/context';
 import { MODULES } from '@/lib/modules';
 import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
-import { ancestorsOf, flatten, type PlanNode, type PlanSection } from './tree';
+import {
+  ancestorsOf,
+  flatten,
+  type PlanLiveness,
+  type PlanNode,
+  type PlanSection,
+} from './tree';
 
 /**
  * A step written out for whoever is about to build it.
@@ -103,10 +109,38 @@ function moduleLabel(module: PlanNode['module']): string {
   return module ? (MODULES.find((m) => m.id === module)?.label ?? module) : 'The app as a whole';
 }
 
-function line(node: Pick<PlanNode, 'number' | 'title' | 'status'>): string {
+/**
+ * What a claim on a step is worth saying about it.
+ *
+ * The three readings of `in_progress`, in the words a session needs rather
+ * than the page's: it is about to decide whether to leave that step alone.
+ * Empty for a claim nothing has looked into, which is what the status word on
+ * its own already says.
+ */
+const CLAIM_PHRASE: Record<string, string> = {
+  working: 'in progress, its run still pushing',
+  quiet: 'in progress, its run quiet',
+  abandoned: 'claimed by a run that ended without closing it',
+};
+
+/** How a step's state reads, with the run behind a claim taken into account. */
+function stateWord(
+  node: Pick<PlanNode, 'id' | 'status'>,
+  liveness: PlanLiveness | undefined,
+): string {
+  const claim = liveness?.[node.id];
+  return (claim && CLAIM_PHRASE[claim]) || STATUS_WORD[node.status];
+}
+
+function line(
+  node: Pick<PlanNode, 'id' | 'number' | 'title' | 'status'>,
+  liveness?: PlanLiveness,
+): string {
   const box = node.status === 'done' ? '[x]' : node.status === 'dropped' ? '[-]' : '[ ]';
   return `- ${box} #${node.number} ${node.title}${
-    node.status === 'in_progress' || node.status === 'blocked' ? ` (${STATUS_WORD[node.status]})` : ''
+    node.status === 'in_progress' || node.status === 'blocked'
+      ? ` (${stateWord(node, liveness)})`
+      : ''
   }`;
 }
 
@@ -115,10 +149,17 @@ function line(node: Pick<PlanNode, 'number' | 'title' | 'status'>): string {
  * everything beneath it: the brief is what a session works from, and a
  * question put aside is not part of the job.
  */
-function steps(nodes: readonly PlanNode[], indent = ''): string[] {
+function steps(
+  nodes: readonly PlanNode[],
+  indent = '',
+  liveness?: PlanLiveness,
+): string[] {
   return nodes
     .filter((node) => !isDismissed(node))
-    .flatMap((node) => [indent + line(node), ...steps(node.children, indent + '  ')]);
+    .flatMap((node) => [
+      indent + line(node, liveness),
+      ...steps(node.children, indent + '  ', liveness),
+    ]);
 }
 
 /**
@@ -171,6 +212,16 @@ function decidedSoFar(feature: PlanNode, node: PlanNode): PlanNode[] {
 export type BriefOptions = {
   /** Print the comments on the step and on the steps beneath it. */
   thread?: boolean;
+  /**
+   * What the runs say about the claimed steps, from `planLiveness`.
+   *
+   * A brief is read by a session about to work the step, and "in progress" is
+   * the one fact on it that can be false: the row says a session has this and
+   * says nothing about whether that session is still going. With this the
+   * brief says which, off the same reading the page and the send guard use.
+   * Without it, a claim reads as the status column reads.
+   */
+  liveness?: PlanLiveness;
 };
 
 /**
@@ -298,7 +349,7 @@ export function planBrief(
 
   const facts = [
     `Module: ${moduleLabel(node.module)}`,
-    `Status: ${STATUS_WORD[node.status]}`,
+    `Status: ${stateWord(node, options.liveness)}`,
     `Priority: ${PRIORITY_WORD[node.priority]}`,
   ];
   if (node.size) facts.push(`Size: ${node.size.toUpperCase()}`);
@@ -362,7 +413,7 @@ export function planBrief(
   }
 
   if (node.children.length > 0) {
-    out.push('', '## Steps', '', ...steps(node.children));
+    out.push('', '## Steps', '', ...steps(node.children, '', options.liveness));
   }
 
   if (node.blocks.length > 0) {

@@ -73,8 +73,14 @@ values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
 -- what it needs, rewritten on every block and read by Dash and the plan row;
 -- the dated line is the history and is appended. Clear `block_ask` whenever
 -- the step stops being blocked -- start, reopen, done and drop all do.
+-- `block_kind` says who clears it and the database refuses a blocked row
+-- without one: 'steps' when the block is waiting on the steps it names, which
+-- clears itself when they close, and 'outside' when it is waiting for the
+-- person -- a key, an account, an answer. Use 'steps' only with the
+-- dependency rows to match; 'outside' otherwise. Cleared with the ask.
 update plan_items
 set status = 'blocked', block_ask = '<what it needs, in one sentence>',
+    block_kind = 'outside',
     comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <the question>'
 where id = '…';
 

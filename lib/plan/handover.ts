@@ -19,15 +19,16 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine } from '@/lib/feedback/routine';
-import { hasLiveClaim } from './elapsed';
+import { claimIsLive } from './liveness';
 import { planBrief } from './brief';
-import { reshapeUnderway, startRoutineRun } from './runs';
+import { loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
 import {
   buildPlanTree,
   findNode,
   flatten,
   isWaitingOnThePerson,
+  planLiveness,
   topFeatureOf,
   type PlanSection,
 } from './tree';
@@ -91,14 +92,19 @@ export async function handStepToClaude(input: {
   // September, and both would have been editing the same files. Nothing but
   // timing kept them apart, because nothing here knew the other was running.
   //
-  // Only a live claim refuses. A claim nothing has touched for two hours is a
-  // session that stopped without closing its step, and a guard that took the
-  // status at its word left the feature refusing work forever -- a lock
-  // outliving the run it was protecting is worse than the collision it was
-  // added for. The page has read the clock beside the status since it started
-  // calling these stalled; this reads the same clock.
+  // Only a live claim refuses. A claim whose run has ended is a session that
+  // stopped without closing its step, and a guard that took the status at its
+  // word left the feature refusing work forever -- a lock outliving the run it
+  // was protecting is worse than the collision it was added for.
+  //
+  // Which claims are live is `claimLiveness`, the same function the page's
+  // health column and the brief read, so the button cannot refuse a step the
+  // page is drawing as stopped. A quiet run still counts as live: the
+  // twenty-minute mark reads wrong on a session that is reading files, and
+  // #574 settled that a quiet step is re-sent by asking first.
   const feature = topFeatureOf(sections, node);
   const now = Date.now();
+  const runs = await loadLastRuns(supabase, userId);
 
   // A re-shape is rewriting this feature. Sending a step out of it now hands a
   // session a plan that is about to change underneath it -- the steps it would
@@ -112,7 +118,8 @@ export async function handStepToClaude(input: {
     };
   }
 
-  const underway = flatten([feature]).filter((step) => hasLiveClaim(step, now));
+  const liveness = planLiveness(flatten([feature]), runs, now);
+  const underway = flatten([feature]).filter((step) => claimIsLive(liveness[step.id] ?? null));
   const other = underway.find((step) => step.id !== node.id);
   if (underway.some((step) => step.id === node.id)) {
     return {
@@ -159,13 +166,13 @@ export async function handStepToClaude(input: {
       'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
       'it, verify, commit with the step number in the subject, and close it with a note. ' +
       'Push when it is closed.\n\n' +
-      planBrief(sections, node, { thread: true })
+      planBrief(sections, node, { thread: true, liveness })
     : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
       '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
       'build and so is orchestrated: send each step to its own subagent and keep your own ' +
       'context for the batch. The brief is below; it is the plan as the app holds it right ' +
       'now, and the plan is the source of truth.\n\n' +
-      planBrief(sections, node, { thread: true });
+      planBrief(sections, node, { thread: true, liveness });
 
   const result = await startRoutineRun({
     supabase,
@@ -254,10 +261,12 @@ export async function handFeatureToClaude(input: {
     };
   }
 
-  // The same one-at-a-time rule as the single send. A batch started on top of
+  // The same one-at-a-time rule as the single send, read the same way: off the
+  // run behind each claim rather than off the clock. A batch started on top of
   // a running session is the worse version of the same collision, since it
   // hands the whole feature to a second run.
-  const running = flatten([node]).find((step) => hasLiveClaim(step, now));
+  const liveness = planLiveness(flatten([node]), await loadLastRuns(supabase, userId), now);
+  const running = flatten([node]).find((step) => claimIsLive(liveness[step.id] ?? null));
   if (running) {
     return {
       ok: false,
@@ -317,7 +326,7 @@ export async function handFeatureToClaude(input: {
     'gate once at the end, push once, and report every step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
-    planBrief(sections, node, { thread: true });
+    planBrief(sections, node, { thread: true, liveness });
 
   const result = await startRoutineRun({
     supabase,

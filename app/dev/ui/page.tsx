@@ -311,14 +311,23 @@ const TASK_STATES = [
  * The third ladder: a step on /dev/plan. The five fills first, then the marks.
  *
  * Which state a step is in is worked out in lib/plan/tree.ts and is not its
- * status column -- a question nobody has answered is not "not started", and
- * "ready" is read off what the step waits on.
+ * status column -- a question nobody has answered is not "not started",
+ * "ready" is read off what the step waits on, and the three readings of a
+ * claim are read off the run behind it rather than off the column, which
+ * cannot tell a session that is pushing from one that died an hour ago.
  */
 const PLAN_STATES = [
   ['proposed', 'Proposed', 'Written by a session and waiting on you. The empty hexagon a lead is.'],
   ['not_started', 'Not started', 'You accepted it. Nobody has picked it up.'],
   ['ready', 'Ready', 'Nothing it waits on is still open, so it can be started now.'],
-  ['in_progress', 'In progress', 'Claimed by a session right now.'],
+  ['in_progress', 'In progress', 'Claimed, and nothing has looked into what the session is doing.'],
+  ['working', 'In progress', 'Claimed, and its run has pushed something recently.'],
+  ['quiet', 'Quiet', 'Claimed, and its run has pushed nothing for twenty minutes.'],
+  [
+    'abandoned',
+    'Stopped',
+    'A session claimed it and its run ended without closing it. The cross, because it leaves the ladder.',
+  ],
   ['done', 'Done', 'Built and verified. The row carries the commit that did it.'],
   [
     'unanswered',

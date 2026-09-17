@@ -40,7 +40,7 @@ describe('expiredClaim', () => {
   });
 
   // `started_at` comes from a trigger, so a row without one was claimed this
-  // instant -- the same reading `hasLiveClaim` makes.
+  // instant -- the same reading `claimLiveness` makes.
   it('leaves a claim with no start time alone', () => {
     expect(expiredClaim(claim({ startedAt: null }), at(60 * 40))).toBeNull();
   });

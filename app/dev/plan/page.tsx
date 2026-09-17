@@ -2,9 +2,11 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
-import { endQuietRuns, loadLastRuns } from '@/lib/plan/runs';
+import { endQuietRuns, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
 import { loadOvernightRun } from '@/lib/plan/overnight';
+import { keyRefusal } from '@/lib/plan/work';
+import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
@@ -12,6 +14,7 @@ import {
   flattenSections,
   handedToClaude,
   isPlanView,
+  planLiveness,
   splitFinished,
   summarize,
   type PlanView,
@@ -20,6 +23,32 @@ import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
 
 export const metadata = { title: 'Plan' };
+
+/**
+ * The claims on these steps, read against the last run on each.
+ *
+ * Out here rather than in the page because it reads the clock, and reading the
+ * clock during a render is unstable. The answer is a snapshot either way: the
+ * browser recomputes each row as its own clock ticks.
+ */
+function claimsAsOfNow(
+  items: Parameters<typeof planLiveness>[0],
+  runs: Parameters<typeof planLiveness>[1],
+) {
+  return planLiveness(items, runs, Date.now());
+}
+
+/**
+ * Why GitHub is refusing the key, from the last run on each step.
+ *
+ * Out here beside `claimsAsOfNow` and for the same reason: it reads the clock,
+ * and how old a refusal is decides whether it is still the state of the key.
+ * The browser asks the route again once the page is up and prefers that
+ * answer, so this is only what the first paint is drawn with.
+ */
+function refusedKeyAsOfNow(runs: Record<string, LastRun>): string | null {
+  return keyRefusal(Object.values(runs), Date.now());
+}
 
 /**
  * What is built, what is being built, and what is still only written down.
@@ -83,16 +112,30 @@ export default async function DevPlanPage({
   // request only after something new has been closed.
   const checks = await refreshCommitChecks({ supabase, userId: user.id });
 
-  const [data, lastRuns, commitChecks, overnight] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, overnight] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
+    // What sessions have raised against a step, so an opened step can say what
+    // its run asked for as well as what it pushed and closed.
+    loadRunRaises(supabase, user.id),
     loadCommitChecks(supabase, user.id),
     // The runner's standing intention, which is one row and is read here
     // rather than inside the tree: it is about the plan as a whole, and the
     // control that shows it sits above the whole page.
     loadOvernightRun(supabase, user.id),
   ]);
-  const whole = buildPlanTree(data);
+  // What the runs say about the steps that are claimed, so the counts beside a
+  // module heading and the bands in its bar read the claims the same way the
+  // health column under them does. The rows are classified again in the browser
+  // as the clock ticks; both go through `healthOf`, so the two cannot disagree
+  // about a claim, only about how many minutes ago it was.
+  const liveness = claimsAsOfNow(data.items, lastRuns);
+  // And whether the reason those claims are being read off the clock is that
+  // GitHub is refusing the key. Off the run rows, so it is on screen in the
+  // first paint; the page asks the route again once it is up and takes that
+  // answer instead.
+  const refusedKey = refusedKeyAsOfNow(lastRuns);
+  const whole = buildPlanTree(data, liveness);
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
 
@@ -111,6 +154,8 @@ export default async function DevPlanPage({
     module: node.module,
     parentId: node.parentId,
     depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
     closed: node.status === 'done' || node.status === 'dropped',
   }));
 
@@ -149,6 +194,9 @@ export default async function DevPlanPage({
         view={view}
         catalog={catalog}
         lastRuns={lastRuns}
+        runRaises={runRaises}
+        keyRefusal={refusedKey}
+        liveness={liveness}
         commitChecks={commitChecks}
         empty={data.items.length === 0}
         canSend={Boolean(planRoutine().token)}

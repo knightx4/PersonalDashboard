@@ -19,9 +19,12 @@ it is missing, read `offline.md` in this directory instead of guessing.
 npx tsx scripts/plan.ts show <n>               # the brief: destination, decisions, done-when, waits
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
-npx tsx scripts/plan.ts block <n> --ask "…" [--note "…"]
+npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
                                                # cannot proceed; the ask is the one sentence
-                                               # saying what it needs, rewritten each time
+                                               # saying what it needs, rewritten each time.
+                                               # --on-steps: waiting on the steps it names, so
+                                               # it clears itself when they close. Without it
+                                               # the block waits for the person.
 npx tsx scripts/plan.ts reopen <n>             # put it back to not started
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
@@ -136,8 +139,16 @@ npx tsx scripts/plan.ts add "Which shape for the export?" --parent <the feature>
   --kind decision --detail "<the question, the two or three real options, what
   each costs, and which you would choose and why>"
 npx tsx scripts/plan.ts depends <your step> --on <the decision>
-npx tsx scripts/plan.ts block <your step> --note "Waiting on #<the decision>."
+npx tsx scripts/plan.ts block <your step> --on-steps \
+  --ask "Which of the options on #<the decision>?"
 ```
+
+`--on-steps` is what makes that block clear itself: the step is waiting on the
+question you just wrote, the dependency edge names it, and answering it puts
+the step back in the ready list without anybody unblocking it by hand. Leave
+`--on-steps` off when the step is waiting on something only the person can
+supply — a key, an account, a record in DNS — and it stays blocked until they
+say otherwise.
 
 Then report the block. Do not move on to another step; that is not your call.
 
@@ -173,7 +184,8 @@ Recommend A: the nesting is one column and nobody has asked for it."
 
 A step that turns out to need something else from the user — an API key, an
 account, a thing outside the repo — is `block <n> --ask "the question"`, with
-the exact question in one sentence. The ask is rewritten on every block, so it
+the exact question in one sentence and no `--on-steps`, since nothing on the
+plan will produce it. The ask is rewritten on every block, so it
 is what the step needs now; `--note` is for anything else worth recording, and
 that is appended to the history in the comment. A step that should not be done is `drop <n> --note "why"`;
 say "out of scope: …" when that is the reason, since there is no status for it.

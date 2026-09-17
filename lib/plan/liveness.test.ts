@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   abandonedClaim,
+  claimIsLive,
+  claimLiveness,
+  ENDED_AFTER_MINUTES,
   lastPushSince,
   pushesFrom,
+  QUIET_AFTER_MINUTES,
+  readingTrusted,
+  refusalStanding,
   runEndedNote,
   runLiveness,
+  silenceReads,
   type ActivityRow,
+  type ClaimRun,
   type Push,
   type RunEvidence,
 } from '@/lib/plan/liveness';
+import { STALLED_AFTER_MINUTES } from '@/lib/plan/elapsed';
 
 const NOW = Date.parse('2026-09-17T12:00:00Z');
 
@@ -158,5 +167,206 @@ describe('runEndedNote', () => {
     expect(runEndedNote(evidence({ startedAt: minutesAgo(130) }), NOW)).toBe(
       'Nothing was pushed in the 2h 10m after this run started.',
     );
+  });
+});
+
+/** A claim on a step, as the tree hands it over. */
+function claim(over: Partial<{ status: string; startedAt: string | null }> = {}) {
+  return { status: 'in_progress', startedAt: minutesAgo(30), ...over };
+}
+
+/**
+ * The last run against it, with a reading GitHub gave `checked` minutes ago
+ * and a last push `pushed` minutes ago.
+ */
+function run(over: Partial<ClaimRun> = {}): ClaimRun {
+  return {
+    status: 'started',
+    createdAt: minutesAgo(30),
+    reading: { checkedAt: minutesAgo(1), lastPush: null, refusal: null },
+    ...over,
+  };
+}
+
+function reading(checked: number, pushed: number | null, refusal: string | null = null) {
+  return {
+    checkedAt: minutesAgo(checked),
+    lastPush: pushed === null ? null : { at: minutesAgo(pushed), sha: 'abc1234', subject: 'A push' },
+    refusal,
+  };
+}
+
+describe('silenceReads', () => {
+  it('turns on the two marks #524 set, and nowhere else', () => {
+    expect(silenceReads(QUIET_AFTER_MINUTES - 1)).toBe('working');
+    expect(silenceReads(QUIET_AFTER_MINUTES)).toBe('quiet');
+    expect(silenceReads(ENDED_AFTER_MINUTES - 1)).toBe('quiet');
+    expect(silenceReads(ENDED_AFTER_MINUTES)).toBe('ended');
+  });
+});
+
+describe('readingTrusted', () => {
+  it('believes a reading taken inside the ended mark', () => {
+    expect(readingTrusted(reading(ENDED_AFTER_MINUTES - 1, null), NOW)).toBe(true);
+  });
+
+  it('does not believe one older than that -- #570', () => {
+    expect(readingTrusted(reading(ENDED_AFTER_MINUTES, null), NOW)).toBe(false);
+  });
+
+  it('does not believe one GitHub refused, however fresh', () => {
+    expect(readingTrusted(reading(1, 2, '401 from GitHub'), NOW)).toBe(false);
+  });
+
+  it('believes anything at the clock pre-mount value', () => {
+    expect(readingTrusted(reading(60 * 9, null), 0)).toBe(true);
+  });
+});
+
+/**
+ * The other half of setting a refusal aside: saying it is there.
+ *
+ * `readingTrusted` refuses to read silence the key caused as evidence.
+ * `refusalStanding` is what #566 says instead, and it is the only thing here
+ * that a refusal makes truer rather than less true.
+ */
+describe('refusalStanding', () => {
+  it('is the reason, while the reading is recent', () => {
+    expect(refusalStanding(reading(1, null, '403 from GitHub'), NOW)).toBe('403 from GitHub');
+  });
+
+  it('is nothing on a reading GitHub answered, and nothing with no reading', () => {
+    expect(refusalStanding(reading(1, 2), NOW)).toBeNull();
+    expect(refusalStanding(null, NOW)).toBeNull();
+    expect(refusalStanding(undefined, NOW)).toBeNull();
+  });
+
+  it('is nothing past the trusted mark, since nothing has asked since', () => {
+    expect(refusalStanding(reading(ENDED_AFTER_MINUTES, null, '403'), NOW)).toBeNull();
+    expect(refusalStanding(reading(ENDED_AFTER_MINUTES - 1, null, '403'), NOW)).toBe('403');
+  });
+});
+
+describe('claimLiveness', () => {
+  it('is nothing at all on a step nobody has claimed', () => {
+    for (const status of ['not_started', 'blocked', 'done', 'dropped', 'proposed']) {
+      expect(claimLiveness(claim({ status }), run(), NOW)).toBeNull();
+    }
+  });
+
+  it('is working while its run has pushed inside the quiet mark', () => {
+    expect(claimLiveness(claim(), run({ reading: reading(1, 5) }), NOW)).toBe('working');
+  });
+
+  it('is quiet once nothing has been pushed for the quiet mark', () => {
+    expect(
+      claimLiveness(claim(), run({ reading: reading(1, QUIET_AFTER_MINUTES) }), NOW),
+    ).toBe('quiet');
+  });
+
+  it('counts the silence from the run being fired when it never pushed', () => {
+    expect(
+      claimLiveness(
+        claim({ startedAt: minutesAgo(5) }),
+        run({ createdAt: minutesAgo(QUIET_AFTER_MINUTES), reading: reading(1, null) }),
+        NOW,
+      ),
+    ).toBe('quiet');
+  });
+
+  it('is abandoned past the ended mark, with the step still open', () => {
+    expect(
+      claimLiveness(
+        claim({ startedAt: minutesAgo(10) }),
+        run({ createdAt: minutesAgo(200), reading: reading(1, ENDED_AFTER_MINUTES) }),
+        NOW,
+      ),
+    ).toBe('abandoned');
+  });
+
+  it('is abandoned on a run already written off as failed', () => {
+    expect(
+      claimLiveness(claim({ startedAt: minutesAgo(5) }), run({ status: 'failed', reading: null }), NOW),
+    ).toBe('abandoned');
+  });
+
+  describe('with nothing to read, it falls back to the clock in elapsed.ts', () => {
+    it('is claimed while the claim is inside the two hours', () => {
+      expect(claimLiveness(claim({ startedAt: minutesAgo(10) }), null, NOW)).toBe('claimed');
+      expect(
+        claimLiveness(claim({ startedAt: minutesAgo(10) }), run({ reading: null }), NOW),
+      ).toBe('claimed');
+    });
+
+    it('is abandoned once the claim is past them', () => {
+      expect(
+        claimLiveness(claim({ startedAt: minutesAgo(STALLED_AFTER_MINUTES) }), null, NOW),
+      ).toBe('abandoned');
+    });
+
+    it('ignores a reading older than the ended mark -- #570', () => {
+      // The reading says pushing; it is too old to be worth repeating, so the
+      // claim's own clock answers, and that clock has run out.
+      expect(
+        claimLiveness(
+          claim({ startedAt: minutesAgo(STALLED_AFTER_MINUTES + 10) }),
+          run({ createdAt: minutesAgo(200), reading: reading(ENDED_AFTER_MINUTES + 1, 1) }),
+          NOW,
+        ),
+      ).toBe('abandoned');
+    });
+
+    it('ignores a reading GitHub refused, so a wrong key reads as nothing new', () => {
+      // The third line of #566's done-when, from the other side: the run has
+      // been silent for half an hour, which is past the quiet mark, and the
+      // only reason nothing was heard is that the key was refused. A rejected
+      // key must not be able to make a working session look quiet, so the
+      // clock answers and the claim reads as a claim.
+      const reads = claimLiveness(
+        claim({ startedAt: minutesAgo(10) }),
+        run({ createdAt: minutesAgo(30), reading: reading(1, null, '401 from GitHub') }),
+        NOW,
+      );
+      expect(reads).not.toBe('quiet');
+      expect(reads).toBe('claimed');
+    });
+
+    it('still ends a refused claim on the clock once it is past the two hours', () => {
+      // The fallback is the clock, not silence -- so a refusal does not keep a
+      // claim standing for ever either.
+      expect(
+        claimLiveness(
+          claim({ startedAt: minutesAgo(200) }),
+          run({ createdAt: minutesAgo(200), reading: reading(1, null, '401 from GitHub') }),
+          NOW,
+        ),
+      ).toBe('abandoned');
+    });
+
+    it('leaves a claim with no start time alone: the trigger has not stamped it yet', () => {
+      expect(claimLiveness(claim({ startedAt: null }), null, 0)).toBe('claimed');
+      expect(claimLiveness(claim({ startedAt: null }), null, NOW)).toBe('claimed');
+    });
+  });
+
+  it('ages nothing at the clock pre-mount value', () => {
+    expect(
+      claimLiveness(
+        claim({ startedAt: minutesAgo(60 * 9) }),
+        run({ createdAt: minutesAgo(60 * 9), reading: reading(60 * 9, 60 * 9) }),
+        0,
+      ),
+    ).toBe('working');
+  });
+});
+
+describe('claimIsLive', () => {
+  it('is what the send guard refuses on: everything but a run that ended', () => {
+    expect(claimIsLive('working')).toBe(true);
+    expect(claimIsLive('claimed')).toBe(true);
+    // #574: quiet is re-sent by asking first, not by the guard giving way.
+    expect(claimIsLive('quiet')).toBe(true);
+    expect(claimIsLive('abandoned')).toBe(false);
+    expect(claimIsLive(null)).toBe(false);
   });
 });

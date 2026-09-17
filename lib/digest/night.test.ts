@@ -39,6 +39,7 @@ function step(over: Partial<PlanItem> & { id: string }): PlanItem {
     thread: [],
     comment: null,
     blockAsk: null,
+    blockKind: null,
     priority: 2,
     size: null,
     assignee: null,
