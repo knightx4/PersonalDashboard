@@ -68,16 +68,15 @@ function readToken(): string | null {
  * Which permission each endpoint here is refused for want of.
  *
  * A fine-grained token grants these separately, so a token that reads the
- * repository fine can still be refused its checks -- which is exactly the
- * shape this failed in. Longest match first: a check-runs path carries
- * `/commits` in it too.
+ * repository fine can still be refused the workflow runs -- which is exactly
+ * the shape this failed in.
  *
  * Only the two this file is sure of are named. The activity listing falls
  * through to the unnamed form on purpose: sending someone to tick the wrong
  * box is worse than telling them a box is missing.
  */
 const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
-  ['/check-runs', 'Checks: Read'],
+  ['/actions/runs', 'Actions: Read'],
   ['/commits', 'Contents: Read'],
 ];
 
@@ -163,18 +162,25 @@ async function listMain(
   return { commits, exhausted };
 }
 
-/** What CI said about one commit on main. */
+/**
+ * What CI said about one commit on main.
+ *
+ * The check runs attached to a commit would answer this too, but reading them
+ * needs Checks: Read, and #559 settled on Actions: Read instead. The workflow
+ * runs for a head sha carry the same `status` and `conclusion` fields, so the
+ * reply reads the same way once `workflow_runs` is taken out of it.
+ */
 async function checkCommit(
   sha: string,
   token: string,
   doFetch: typeof globalThis.fetch,
 ): Promise<CheckConclusion> {
-  const body = await ask<{ check_runs?: CheckRun[] }>(
-    `/repos/${REPO.owner}/${REPO.repo}/commits/${sha}/check-runs?per_page=${PAGE_SIZE}`,
+  const body = await ask<{ workflow_runs?: CheckRun[] }>(
+    `/repos/${REPO.owner}/${REPO.repo}/actions/runs?head_sha=${sha}&per_page=${PAGE_SIZE}`,
     token,
     doFetch,
   );
-  return conclusionFrom(body.check_runs ?? []);
+  return conclusionFrom(body.workflow_runs ?? []);
 }
 
 /** A few at a time, so a backlog does not become twenty-five round trips. */
