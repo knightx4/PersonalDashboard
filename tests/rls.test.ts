@@ -181,6 +181,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_runs = planRun.id;
 
+  const [commitCheck] = await admin<{ id: string }[]>`
+    insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
+    values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
+    returning id`;
+  ids.plan_commit_checks = commitCheck.id;
+
   const [seedImport] = await admin<{ id: string }[]>`
     insert into plan_seed_imports (user_id, step_key)
     values (${userId}, ${`learn:${tag} already offered this step`})

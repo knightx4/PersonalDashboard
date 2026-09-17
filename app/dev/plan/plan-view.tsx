@@ -6,6 +6,7 @@ import {
   Bot,
   Check,
   Circle,
+  CircleAlert,
   CircleUser,
   Flag,
   ChevronDown,
@@ -100,6 +101,7 @@ import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-
 import { reshapeOrigin } from '@/lib/plan/origin';
 import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
 import { lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
@@ -1557,6 +1559,42 @@ function RunningFor({ startedAt }: { startedAt: string }) {
 }
 
 /**
+ * What CI said about the commit this step shipped in.
+ *
+ * Read off the merge that carried the step onto main rather than off the sha
+ * the step records, which is nearly always a branch commit nothing ever
+ * checked -- #555. A commit whose checks passed carries no mark: it is the
+ * ordinary case, and the step's own Done is already saying it. Everything else
+ * gets one, a commit nobody has looked up yet included, because a step with no
+ * answer sitting unmarked among steps that passed reads as a step that passed.
+ */
+function CheckMark({ check }: { check: CommitCheck | undefined }) {
+  const word = checkWord(check);
+  if (!word) return null;
+
+  const failed = check?.conclusion === 'failed';
+  const merge = check?.mergeSha ? check.mergeSha.slice(0, 7) : null;
+  const title = failed
+    ? `The checks failed on ${merge}, the merge that put this on main.`
+    : merge
+      ? `${checkLine(check)} on ${merge}, the merge that put this on main.`
+      : `${checkLine(check)}.`;
+
+  return (
+    <span
+      title={title}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 text-small font-semibold',
+        failed ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
+      )}
+    >
+      {failed && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
+      {word}
+    </span>
+  );
+}
+
+/**
  * What the last routine run against this step did.
  *
  * The claim beside it is what the step says about itself; this is what the run
@@ -1958,6 +1996,7 @@ function PlanRow({
   catalog,
   canSend,
   lastRuns,
+  commitChecks,
   view,
   searching,
 }: {
@@ -1968,6 +2007,8 @@ function PlanRow({
   canSend: boolean;
   /** The newest run against each step, by step id. Most steps have none. */
   lastRuns: Readonly<Record<string, LastRun>>;
+  /** What CI said about each commit a step shipped in, by the commit's sha. */
+  commitChecks: Readonly<Record<string, CommitCheck>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -2305,6 +2346,10 @@ function PlanRow({
                   <span className="sr-only">Handed to Dash</span>
                 </span>
               )}
+              {/* And whether the checks passed on what it shipped in. */}
+              {node.status === 'done' && node.commitSha && (
+                <CheckMark check={commitChecks[node.commitSha]} />
+              )}
               {/* And how long it has been going.
                 * "In progress" in the health column is a state; this is the
                 * thing you actually want to know about a step Claude is on --
@@ -2599,6 +2644,17 @@ function PlanRow({
                 </span>
               )}
               {node.commitSha && <span className="font-mono">{node.commitSha}</span>}
+              {node.status === 'done' && node.commitSha && (
+                <span
+                  className={
+                    commitChecks[node.commitSha]?.conclusion === 'failed'
+                      ? 'text-caution'
+                      : undefined
+                  }
+                >
+                  {checkLine(commitChecks[node.commitSha])}
+                </span>
+              )}
               {lastRuns[node.id] && <LastRunLine run={lastRuns[node.id]} />}
             </p>
 
@@ -2662,6 +2718,7 @@ function PlanRow({
             catalog={catalog}
             canSend={canSend}
             lastRuns={lastRuns}
+            commitChecks={commitChecks}
             view={view}
             searching={searching}
           />
@@ -2781,6 +2838,7 @@ export function PlanView({
   view,
   catalog,
   lastRuns,
+  commitChecks,
   empty,
   canSend,
   queued,
@@ -2793,6 +2851,8 @@ export function PlanView({
   catalog: PlanCatalogEntry[];
   /** The newest run against each step, by step id. */
   lastRuns: Record<string, LastRun>;
+  /** What CI said about each commit a step shipped in, by the commit's sha. */
+  commitChecks: Record<string, CommitCheck>;
   empty: boolean;
   canSend: boolean;
   queued: number;
@@ -2919,6 +2979,7 @@ export function PlanView({
                       catalog={catalog}
                       canSend={canSend}
                       lastRuns={lastRuns}
+                      commitChecks={commitChecks}
                       view={view}
                       searching={searching}
                     />
@@ -2996,6 +3057,7 @@ export function PlanView({
                 catalog={catalog}
                 canSend={canSend}
                 lastRuns={lastRuns}
+                commitChecks={commitChecks}
                 view={view}
                 searching={searching}
               />
