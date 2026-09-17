@@ -1,6 +1,13 @@
 import { cn } from '@/lib/cn';
 
 /**
+ * The frame's classes without the segments, for a set whose segments are links
+ * rather than buttons. Same idea as `cardVariants`: one spelling of the box,
+ * wherever the thing inside it has to be something else.
+ */
+export const segmentedFrame = 'inline-flex overflow-hidden rounded-control border border-control';
+
+/**
  * One of a few mutually exclusive modes, as a joined control.
  *
  * This exists because the app had two spellings of the same idea and neither
@@ -45,10 +52,7 @@ export function Segmented<T extends string>({
     <span
       role="group"
       aria-label={label}
-      className={cn(
-        'inline-flex overflow-hidden rounded-control border border-control',
-        className,
-      )}
+      className={cn(segmentedFrame, className)}
     >
       {options.map((option) => {
         const on = option.value === value;
