@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CornerDownLeft, Palette, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { paletteHits } from '@/lib/search/rank';
 import { score } from '@/lib/search/score';
 import { HIT_KINDS, MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { ModuleMark } from '@/components/ui/module-mark';
@@ -36,10 +37,100 @@ import type { NavSection } from '@/components/shell/app-shell';
  * so "which of these is the shopping one" is answered without a label.
  *
  * The navigation half is synchronous and always right. The data half is a
- * fetch, so it arrives later, cannot arrive at all when a workspace is down,
- * and must never hold the first half up: with no query typed this is exactly
- * what it was before any of it existed.
+ * list fetched once when the palette opens and matched in the browser, so
+ * typing costs nothing: it arrives later, cannot arrive at all when a
+ * workspace is down, and must never hold the first half up. With no query
+ * typed this is exactly what it was before any of it existed.
  */
+
+/**
+ * Everything findable, whose it is, and whether the server had to cut the list
+ * short.
+ *
+ * `account` is the user id the server returned with the rows. It is what makes
+ * a list from the last open usable now: the same account's, or nobody's.
+ */
+type Held = { account: string; hits: SearchHit[]; truncated: boolean };
+
+/**
+ * The list, outside the component.
+ *
+ * It has to survive the palette closing and the page changing -- both unmount
+ * this -- or every open would start with nothing to match against and the
+ * first two keystrokes would find nothing.
+ */
+let held: Held | null = null;
+let inFlight: Promise<void> | null = null;
+/** The account whose fetch last finished, which tells a failure from a first open. */
+let settledFor: string | null = null;
+
+/**
+ * Throw away a list that belongs to somebody else.
+ *
+ * Signing out is a server action that redirects, and the router does that as a
+ * client-side navigation, so nothing here is reloaded -- without this the next
+ * person to press ⌘K in the tab would type at the last person's rows.
+ */
+function forgetOtherAccounts(account: string): void {
+  if (held && held.account !== account) held = null;
+  if (settledFor !== null && settledFor !== account) settledFor = null;
+}
+
+/**
+ * Fetch the whole list, one request at a time.
+ *
+ * Every open asks again, which is what #489 settled: the list is then never
+ * more than one open out of date, and nothing has to keep track of what
+ * changed. A failed fetch leaves whatever was already held alone -- a list
+ * from a minute ago beats no list at all, and the palette falls back to asking
+ * the server per keystroke only when it has nothing.
+ */
+function loadEverything(account: string): Promise<void> {
+  forgetOtherAccounts(account);
+
+  inFlight ??= fetch('/api/search/all')
+    .then((response) => (response.ok ? response.json() : null))
+    .then((body: { account?: string; hits?: SearchHit[]; truncated?: boolean } | null) => {
+      if (body?.hits) {
+        held = {
+          // Stamped with what the server said the session was, not with what
+          // the page thought it was when the request went out.
+          account: body.account ?? account,
+          hits: body.hits,
+          truncated: body.truncated ?? false,
+        };
+      }
+    })
+    .catch(() => {
+      // The navigation half never depended on this, and the search half has
+      // the per-keystroke endpoint to fall back to.
+    })
+    .finally(() => {
+      inFlight = null;
+      settledFor = account;
+    });
+
+  return inFlight;
+}
+
+/**
+ * What the palette is matching against.
+ *
+ * `loading` is the first open, before the list has landed. `fallback` is the
+ * two cases the held list cannot answer from: the fetch failed, or the cap cut
+ * it short, so the rows it holds are not all of them.
+ */
+type Matching =
+  | { status: 'loading' }
+  | { status: 'ready'; account: string; hits: SearchHit[] }
+  | { status: 'fallback' };
+
+function matchingNow(account: string): Matching {
+  if (held && held.account === account && !held.truncated) {
+    return { status: 'ready', account, hits: held.hits };
+  }
+  return settledFor === account ? { status: 'fallback' } : { status: 'loading' };
+}
 
 /** A row in the one list: somewhere to go, or something you own. */
 type Row = { kind: 'command'; command: Command } | { kind: 'hit'; hit: SearchHit };
@@ -107,11 +198,14 @@ function themeCommands(theme: Theme): Command[] {
 }
 
 export function CommandPalette({
+  account,
   module,
   sections,
   enabledModules,
   theme,
 }: {
+  /** Whose pages these are. The held list is only searched when it is theirs. */
+  account: string;
   module: ModuleId | null;
   sections: readonly NavSection[];
   enabledModules?: readonly ModuleId[];
@@ -122,13 +216,15 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   /**
-   * The last answer, and which query it answered.
+   * The last answer from the per-keystroke endpoint, and which query it
+   * answered. Only used when the held list cannot answer.
    *
    * Kept together so both "what to show" and "is something still on its way"
    * are derived rather than stored: an effect that clears state on its way to
    * fetching causes a render for every keystroke, and the rows would blink.
    */
   const [answer, setAnswer] = useState<{ query: string; hits: SearchHit[] } | null>(null);
+  const [matching, setMatching] = useState<Matching>(() => matchingNow(account));
   const router = useRouter();
   const { open: openCapture } = useCapture();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -222,33 +318,84 @@ export function CommandPalette({
       .map((entry) => entry.command);
   }, [captures, commands, query]);
 
-  /**
-   * Ask, once the typing settles.
-   *
-   * Debounced, and every request aborts the one before it -- which is why the
-   * endpoint is a route handler rather than a server action. Without the
-   * abort, a slow answer to "ac" lands after the answer to "acme" and replaces
-   * it with staler results, which is the one bug that makes a palette feel
-   * broken rather than slow.
-   *
-   * The rows already on screen stay put while a newer answer is on its way.
-   * Clearing them first would make the list jump on every keystroke, and a
-   * list that moves under the cursor is worse than one that is briefly stale.
-   */
   const needle = query.trim();
   const searching = open && needle.length >= MIN_QUERY;
 
-  // Stale rows stay on screen while a newer answer is on its way: clearing
-  // them first would make the list jump on every keystroke, and a list that
-  // moves under the cursor is worse than one that is briefly behind.
-  const hits = useMemo<SearchHit[]>(
-    () => (searching ? (answer?.hits ?? []) : []),
-    [searching, answer],
-  );
-  const looking = searching && answer?.query !== needle;
-
+  /**
+   * Fetch the list when the palette opens.
+   *
+   * One request per open and none per keystroke, which is the whole of the
+   * change: whatever was held from last time is still what the palette matches
+   * against until the new answer lands, so the first two characters find
+   * something while it is still in flight.
+   */
   useEffect(() => {
-    if (!searching) return;
+    if (!open) return;
+
+    let alive = true;
+    void loadEverything(account).then(() => {
+      if (alive) setMatching(matchingNow(account));
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [open, account]);
+
+  /**
+   * Drop everything the moment the account on screen changes.
+   *
+   * Signing out and in again in the same tab does not reload the page, so the
+   * list from before the sign-out is still in memory and the last answer from
+   * the per-keystroke endpoint is still in state. Neither belongs to whoever
+   * is signed in now.
+   */
+  const shownFor = useRef(account);
+  useEffect(() => {
+    if (shownFor.current === account) return;
+    shownFor.current = account;
+    forgetOtherAccounts(account);
+    setAnswer(null);
+    setMatching(matchingNow(account));
+  }, [account]);
+
+  /**
+   * The rows, ranked here rather than by the server.
+   *
+   * The same file the server ranks with, so a company cannot sort one way in
+   * the held list and another in a fallback answer. Nothing is fetched: this
+   * runs over what the browser already holds, on every keystroke.
+   */
+  const hits = useMemo<SearchHit[]>(() => {
+    if (!searching) return [];
+    // The account is checked here as well as in matchingNow: this is state, and
+    // state from before an account change outlives the render that changed it.
+    if (matching.status === 'ready' && matching.account === account) {
+      return paletteHits(matching.hits, needle);
+    }
+    // Stale rows stay on screen while a newer answer is on its way: clearing
+    // them first would make the list jump on every keystroke, and a list that
+    // moves under the cursor is worse than one that is briefly behind.
+    if (matching.status === 'fallback') return answer?.hits ?? [];
+    return [];
+  }, [searching, matching, needle, answer, account]);
+
+  const asking = searching && matching.status === 'fallback';
+  const looking =
+    searching && (matching.status === 'loading' || (asking && answer?.query !== needle));
+
+  /**
+   * Ask per keystroke, when the held list cannot answer.
+   *
+   * The fetch failed, or the cap cut the list short and the rows in the
+   * browser are not all of them. Debounced, and every request aborts the one
+   * before it -- which is why the endpoint is a route handler rather than a
+   * server action. Without the abort, a slow answer to "ac" lands after the
+   * answer to "acme" and replaces it with staler results, which is the one bug
+   * that makes a palette feel broken rather than slow.
+   */
+  useEffect(() => {
+    if (!asking) return;
 
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -266,7 +413,7 @@ export function CommandPalette({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [needle, searching]);
+  }, [needle, asking]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -288,7 +435,7 @@ export function CommandPalette({
    * One list. Commands first, then the things you own.
    *
    * The commands are already ranked against the query by the same scorer the
-   * server ranks hits with, so the two halves are ordered on the same terms;
+   * hits are ranked with, so the two halves are ordered on the same terms;
    * putting the navigation half first is the tie-break, because it is the half
    * that is always right and always instant.
    */

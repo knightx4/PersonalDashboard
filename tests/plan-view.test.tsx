@@ -14,6 +14,7 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import {
   applyView,
   buildPlanTree,
+  splitFinished,
   flattenSections,
   handedToClaude,
   summarize,
@@ -72,6 +73,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -113,9 +115,15 @@ const catalog = flattenSections(whole).map((node) => ({
 }));
 
 function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked', empty = false) {
+  const narrowed = applyView(whole, view);
+  // The page splits the finished features out of Everything before it renders;
+  // this has to do the same or the fold is never under test.
+  const { sections, finished } =
+    view === 'all' ? splitFinished(narrowed) : { sections: narrowed, finished: [] };
   return renderToStaticMarkup(
     <PlanView
-      sections={applyView(whole, view)}
+      sections={sections}
+      finished={finished}
       summary={summarize(whole)}
       view={view}
       catalog={catalog}
@@ -137,6 +145,63 @@ describe('PlanView', () => {
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
     expect(render('all')).toContain('Schema and RPCs');
+  });
+
+  it('gathers the finished features into the fold at the foot of Everything', () => {
+    const closed = buildPlanTree({
+      items: [
+        item({
+          id: 'shipped',
+          title: 'Share links',
+          status: 'done',
+          completedAt: '2026-02-01T00:00:00Z',
+        }),
+        item({ id: 'shipped-step', title: 'The RPCs', parentId: 'shipped', status: 'done' }),
+        item({
+          id: 'older',
+          title: 'Receipts by photo',
+          status: 'done',
+          completedAt: '2026-01-01T00:00:00Z',
+        }),
+        item({ id: 'live', title: 'Outlook ingestion' }),
+      ],
+      dependencies: [],
+    });
+    const narrowed = applyView(closed, 'all');
+    const { sections, finished } = splitFinished(narrowed);
+    expect(finished.map((node) => node.title)).toEqual(['Share links', 'Receipts by photo']);
+
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={sections}
+        finished={finished}
+        summary={summarize(closed)}
+        view="all"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        queued={0}
+      />,
+    );
+    // The fold says how many it is holding, so shutting it does not hide the
+    // count, and the rows are in it rather than in the module above.
+    expect(html).toContain('Finished');
+    expect(html).toContain('2</span> features');
+    expect(html).toContain('Share links');
+    expect(html).toContain('Outlook ingestion');
+  });
+
+  it('leaves a module with nothing open off the open view, and keeps it on all', () => {
+    // Four of the seven modules have nothing open, so on the working view they
+    // are headings between you and the work. The invitation to plan one is on
+    // Everything, along with the offer to start the app-wide list.
+    const open = render('open');
+    expect(open).not.toContain('Vault');
+    expect(open).not.toContain('The app as a whole');
+
+    const all = render('all');
+    expect(all).toContain('Vault');
+    expect(all).toContain('The app as a whole');
   });
 
   it('puts the facts that decide what is next on the line', () => {
@@ -177,7 +242,9 @@ describe('PlanView', () => {
     // Not one green length and a blank remainder: a module held up by
     // questions and a module nobody has reached drew the same bar.
     expect(html).toContain('aria-label="Shopping: 1 done, 2 ready, 1 waiting"');
-    expect(html).toContain('aria-label="Job search: 1 blocked"');
+    // A blocked step says who can unblock it, which is the word every dev
+    // queue now uses for a row stopped on the person.
+    expect(html).toContain('aria-label="Job search: 1 waiting on you"');
   });
 
   it('shows a proposal as one, and offers only proposals under that view', () => {
@@ -198,6 +265,19 @@ describe('PlanView', () => {
     expect(html).toMatch(/>1<\/span> Claude/);
   });
 
+  it('draws five views as chips and leaves the rest to the menu', () => {
+    const row = /<nav aria-label="View"[^>]*>([\s\S]*?)<\/nav>/.exec(render('open'))?.[1] ?? '';
+    expect(row).not.toBe('');
+    expect([...row.matchAll(/<a /g)]).toHaveLength(5);
+    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', 'Everything']) {
+      expect(row).toContain(label);
+    }
+    // The menu holds the other four. Its panel is a portal opened on a press,
+    // so the row itself carries only the trigger.
+    expect(row).toContain('More views');
+    expect(row).not.toContain('Not specified');
+  });
+
   it('offers the whole queue in one press, and only when there is one', () => {
     // One step is handed over in the fixture, so the button says so rather
     // than making you count.
@@ -210,6 +290,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(nobodys, 'all')}
+        finished={[]}
         summary={summarize(nobodys)}
         view="all"
         catalog={[]}
@@ -239,6 +320,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(reshaped, 'all')}
+        finished={[]}
         summary={summarize(reshaped)}
         view="all"
         catalog={[]}
@@ -265,6 +347,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(nothing, 'ready')}
+        finished={[]}
         summary={summarize(nothing)}
         view="ready"
         catalog={[]}
@@ -292,6 +375,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(withDecision, 'all')}
+        finished={[]}
         summary={summarize(withDecision)}
         view="all"
         catalog={[]}
@@ -331,6 +415,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(withQuestions, 'all')}
+        finished={[]}
         summary={summarize(withQuestions)}
         view="all"
         catalog={[]}
@@ -368,6 +453,7 @@ describe('PlanView', () => {
     const html = renderToStaticMarkup(
       <PlanView
         sections={applyView(foggy, 'all')}
+        finished={[]}
         summary={summarize(foggy)}
         view="all"
         catalog={[]}
@@ -403,6 +489,7 @@ describe('PlanView', () => {
       renderToStaticMarkup(
         <PlanView
           sections={applyView(aside, view)}
+          finished={[]}
           summary={summarize(aside)}
           view={view}
           catalog={[]}
@@ -436,6 +523,7 @@ describe('PlanView', () => {
       renderToStaticMarkup(
         <PlanView
           sections={applyView(aside, view)}
+          finished={[]}
           summary={summarize(aside)}
           view={view}
           catalog={[]}
@@ -456,5 +544,52 @@ describe('PlanView', () => {
 
   it('opens on the import when there is no plan at all', () => {
     expect(render('open', true)).toContain('Import the build order');
+  });
+});
+
+/**
+ * The Status column, which is the whole point of there being two.
+ *
+ * Health and status had been one word, so the page could not say "a session is
+ * on this" and "three of its seven steps are done" at the same time. These
+ * assert the page draws both, and that the words come out of the fixture the
+ * way the rules say they should.
+ */
+describe('health and status, as two columns', () => {
+  it('heads both columns', () => {
+    const html = render('all');
+    expect(html).toContain('>Health<');
+    expect(html).toContain('>Status<');
+  });
+
+  // The complaint the note was filed about: a feature whose first step is done
+  // used to go on saying "Not started", with a progress bar beside it saying
+  // otherwise on the same line.
+  it('calls a feature with a finished step in progress, not not-started', () => {
+    const html = render('all');
+    // The row's own two cells: the health menu carries the row's name in its
+    // label, and the health word and the status word follow it in order.
+    const from = html.indexOf('Status of #1 Share links');
+    expect(from).toBeGreaterThan(-1);
+    const row = html.slice(from, from + 900);
+    expect(row).toContain('In progress');
+    expect(row).not.toContain('Not started');
+  });
+
+  it('says a step handed over is for Dash', () => {
+    expect(render('all')).toContain('For Dash');
+  });
+
+  it('says a blocked step and a proposal need you', () => {
+    const html = render('all');
+    expect(html).toContain('Needs you');
+  });
+
+  it('says a step nobody has handed anywhere is yours', () => {
+    expect(render('all')).toContain('Yours');
+  });
+
+  it('says a step held up by another is held up', () => {
+    expect(render('all')).toContain('Held up');
   });
 });

@@ -30,6 +30,10 @@ import {
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
+import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
+import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cn } from '@/lib/cn';
 
@@ -142,7 +146,6 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
       >
         <Sparkles className="size-3.5" aria-hidden />
         In the plan as #{idea.planItem.number}
-        {idea.planItem.status === 'proposed' && ' · waiting for your approval'}
       </Link>
     );
   }
@@ -159,6 +162,37 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
       {state.message && <span className="text-small text-ink-muted">{state.message}</span>}
       <FieldError>{state.error}</FieldError>
     </form>
+  );
+}
+
+const HEALTH_TONE: Record<IdeaHealth, DevTone> = {
+  open: 'quiet',
+  waiting: 'caution',
+  shaped: 'accent',
+  done: 'positive',
+  dropped: 'ghost',
+};
+
+const HEALTH_TITLE: Partial<Record<IdeaHealth, string>> = {
+  waiting: 'A session wrote it up as a proposal. Nothing happens to it until you approve it.',
+  shaped: 'It is a feature on the plan page now.',
+  done: 'The feature it became has shipped.',
+};
+
+/**
+ * An idea has no status column: what has happened to it is whether it was
+ * shaped into the plan, what became of the row it was shaped into, and whether
+ * you put it aside. `ideaHealth` reads all three, and this draws it.
+ */
+function IdeaState({ idea }: { idea: IdeaRow }) {
+  const health = ideaHealth(idea);
+  return (
+    <StateLabel
+      glyph={IDEA_HEALTH_GLYPHS[health]}
+      word={IDEA_HEALTH_WORD[health]}
+      tone={HEALTH_TONE[health]}
+      title={HEALTH_TITLE[health]}
+    />
   );
 }
 
@@ -193,6 +227,10 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
         )}
         <span className="tabular text-small text-ink-muted">{idea.createdAt.slice(0, 10)}</span>
         <CommentCount count={idea.thread.length} />
+        {/* Where it stands, drawn the way every other dev queue draws it. An
+            idea nobody has done anything with says so rather than leaving the
+            row's state to be worked out from which fold it is in. */}
+        <IdeaState idea={idea} />
       </div>
 
       {/* Which feature the session was working on when it wrote this. On its

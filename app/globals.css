@@ -38,9 +38,10 @@
   --c-border: #e8e5df;
   --c-border-strong: #d5d1c8;
 
-  --c-shell: #f4f2ec;
+  --c-page-ground: #f0ece2;
+  --c-shell: #e4dfd2;
   --c-shell-ink: #1a1a18;
-  --c-shell-muted: #63635e;
+  --c-shell-muted: #5d5d58;
   --c-shell-border: #e2dfd7;
   --c-shell-hover: #eae7df;
 
@@ -65,6 +66,8 @@
   --c-w-vault-tint: #fcecfd;
   --c-w-learn: #0f6b62;
   --c-w-learn-tint: #e4f4f1;
+  --c-w-news: #806500;
+  --c-w-news-tint: #f6f1e2;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -131,9 +134,24 @@
    *
    * The rule for a new theme: if your page and your cards share a polarity,
    * ignore all of this. */
-  --c-page: var(--c-canvas);
+  /* The page ground, and the one token in this block that is not simply the
+   * sheet half's opposite number.
+   *
+   * It used to be `var(--c-canvas)` outright. That reads as tidy and is
+   * wrong: --c-canvas is the recessed well INSIDE a card -- the Lightbox note
+   * below says so in as many words -- so aliasing them made the page ground
+   * three percent from a white card lying on it, which is why every card in
+   * this app needed a border drawn round it to be seen. It also meant the
+   * page could not be darkened without dragging every well down with it,
+   * which blows the contrast budget in seventy-two generated themes.
+   *
+   * So the page gets a token of its own. The alias survives as the default,
+   * because in the three dark themes canvas already sits below surface and
+   * the page wants exactly that value. Paper is the theme that needed a step
+   * put in, and it is the only one that overrides it. */
+  --c-page: var(--c-page-ground);
   --c-page-ink: var(--c-ink);
-  --c-page-ink-muted: var(--c-ink-muted);
+  --c-page-ink-muted: #65655f;
   --c-page-ink-ghost: var(--c-ink-ghost);
   --c-page-border: var(--c-border);
   --c-page-border-strong: var(--c-border-strong);
@@ -151,6 +169,7 @@
   --c-w-todo-lit: var(--c-w-todo);
   --c-w-vault-lit: var(--c-w-vault);
   --c-w-learn-lit: var(--c-w-learn);
+  --c-w-news-lit: var(--c-w-news);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -178,6 +197,8 @@
   --c-sheet-scheme: dark;
 
   --c-canvas: #08090a;
+  --c-page-ground: #08090a;
+  --c-page-ink-muted: var(--c-ink-muted);
   --c-surface: #0f1011;
   --c-raised: #191a1c;
   --c-sunken: #050506;
@@ -209,6 +230,8 @@
   --c-w-vault-tint: #2a1430;
   --c-w-learn: #4fd1c5;
   --c-w-learn-tint: #0a2420;
+  --c-w-news: #d8b23d;
+  --c-w-news-tint: #281e03;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -299,6 +322,7 @@
    * scripts/check-contrast.ts fails on. The sheets still clear the bench by
    * 11:1, so they are as lit as they ever were -- what shrank is the drop
    * from 16.9, and that step was never the point. */
+  --c-page-ground: #2b3644;
   --c-page: #2b3644;
   --c-page-ink: #eef2f7;
   --c-page-ink-muted: #b6c1ce;
@@ -328,6 +352,7 @@
   --c-w-todo-lit: #6ccdf5;
   --c-w-vault-lit: #eda6f6;
   --c-w-learn-lit: #6fdcd2;
+  --c-w-news-lit: #debf69;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -432,6 +457,8 @@
   --c-w-vault-tint: #f2def2;
   --c-w-learn: #0a5d54;
   --c-w-learn-tint: #d8ebe7;
+  --c-w-news: #6e5600;
+  --c-w-news-tint: #ece4cf;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -476,6 +503,8 @@
   --c-sheet-scheme: dark;
 
   --c-canvas: #110d1a;
+  --c-page-ground: #110d1a;
+  --c-page-ink-muted: var(--c-ink-muted);
   --c-surface: #191426;
   --c-raised: #241d35;
   --c-sunken: #0b0812;
@@ -507,6 +536,8 @@
   --c-w-vault-tint: #301a3a;
   --c-w-learn: #74dccf;
   --c-w-learn-tint: #102c29;
+  --c-w-news: #dcb956;
+  --c-w-news-tint: #2c2205;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -545,6 +576,8 @@
     --c-sheet-scheme: dark;
 
     --c-canvas: #08090a;
+    --c-page-ground: #08090a;
+    --c-page-ink-muted: var(--c-ink-muted);
     --c-surface: #0f1011;
     --c-raised: #191a1c;
     --c-sunken: #050506;
@@ -576,6 +609,8 @@
     --c-w-vault-tint: #2a1430;
     --c-w-learn: #4fd1c5;
     --c-w-learn-tint: #0a2420;
+    --c-w-news: #d8b23d;
+    --c-w-news-tint: #281e03;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -644,6 +679,11 @@
   --c-sheet-accent: var(--c-w-learn);
   --c-page-accent: var(--c-w-learn-lit);
   --c-accent-tint: var(--c-w-learn-tint);
+}
+[data-workspace='news'] {
+  --c-sheet-accent: var(--c-w-news);
+  --c-page-accent: var(--c-w-news-lit);
+  --c-accent-tint: var(--c-w-news-tint);
 }
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
@@ -809,6 +849,8 @@ body,
   --color-w-vault-tint: var(--c-w-vault-tint);
   --color-w-learn: var(--c-w-learn);
   --color-w-learn-tint: var(--c-w-learn-tint);
+  --color-w-news: var(--c-w-news);
+  --color-w-news-tint: var(--c-w-news-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
 
@@ -853,8 +895,6 @@ body,
   --text-ui--line-height: 1.5;
   --text-body: 14px;
   --text-body--line-height: 1.55;
-  --text-lead: 15px;
-  --text-lead--line-height: 1.5;
   --text-title: 20px;
   --text-title--line-height: 1.25;
   --text-figure: 32px;
@@ -869,11 +909,19 @@ body,
   --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, sans-serif;
   --font-mono: var(--font-mono-stack);
 
-  --radius-card: 0.5rem;
-  /* Tighter than the card that holds them. A control is a small object and a
-   * 12px radius on a 32px box is most of the way to a pill, which reads as a
-   * button even when it is a text field. */
-  --radius-control: 0.375rem;
+  /* Three steps, each one a third larger than the last.
+   *
+   * These were 8 and 6, which is the radius of an admin tool -- small enough
+   * that a corner reads as "not square" rather than as drawn. 12 and 8 is
+   * where a card starts looking like an object, and it is the cheapest
+   * perceived-quality change available anywhere in this file.
+   *
+   * A control stays tighter than the card holding it, for the reason it
+   * always did: 12px on a 32px box is most of the way to a pill, which reads
+   * as a button even when it is a text field. */
+  --radius-pane: 1rem;
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
 
   /* 150ms ease-out everywhere. Alive, never in the way. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1462,3 +1510,72 @@ form[data-auto-submit] [data-fallback-submit] {
   font-weight: 500;
   padding: 0.05em 0.25em;
 }
+
+/* A step number, drawn as the link it now is. Tabular, because these arrive in
+ * runs -- "#500, #501 and #505" -- and proportional digits make a run of them
+ * ragged. It takes the ordinary link colour rather than a mark of its own: it
+ * goes somewhere, which is exactly what a link already means here. */
+.comment-ref {
+  font-variant-numeric: tabular-nums;
+  text-decoration-thickness: from-font;
+  white-space: nowrap;
+}
+
+/* The page pane: the one thing in the shell that genuinely floats. */
+.page-pane {
+  background-color: var(--c-page);
+}
+
+@media (min-width: 1024px) {
+  .page-pane {
+    border-radius: var(--radius-pane);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.04),
+      0 8px 24px -8px rgb(0 0 0 / 0.10);
+  }
+}
+
+/* Lightbox does not float its page, and that is not an oversight.
+ *
+ * Its --c-shell and its --c-page are the same #2b3644 on purpose: "one bench,
+ * one colour -- the sidebar and the page ground are the same surface, so a
+ * card looks laid on the bench rather than floating in a second, slightly
+ * different dark", as the theme's own note further up puts it. Give the pane a
+ * radius and a drop in that theme and you get an invisible rectangle with a
+ * shadow hanging off it, because there is no tone for the corner to cut
+ * against. The cards are the objects here; the bench runs edge to edge.
+ */
+[data-theme='lightbox'] .page-pane {
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Things arrive by moving.
+ *
+ * Every overlay in this app appeared: one frame absent, the next frame there.
+ * A fade is the cheap default and reads as a repaint; four pixels of travel on
+ * the easing this file already uses reads as the thing coming from somewhere.
+ * ------------------------------------------------------------------------- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 140ms var(--ease-out-soft) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
+}
+

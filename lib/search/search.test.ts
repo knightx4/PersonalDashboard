@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { rankHits, searchEverything } from './search';
+import { listEverything, searchEverything } from './search';
 import { MIN_QUERY, type HitKind, type SearchHit, type SearchSource } from './sources';
 
 /**
@@ -28,7 +28,14 @@ function source(
   module: SearchHit['module'] = 'jobs',
   kinds: readonly HitKind[] = ['company'],
 ): SearchSource {
-  return { id, module, label: id, kinds, find: vi.fn().mockResolvedValue(hits) };
+  return {
+    id,
+    module,
+    label: id,
+    kinds,
+    find: vi.fn().mockResolvedValue(hits),
+    list: vi.fn().mockResolvedValue(hits),
+  };
 }
 
 function failingSource(id: string, module: SearchHit['module'] = 'shopping'): SearchSource {
@@ -38,6 +45,7 @@ function failingSource(id: string, module: SearchHit['module'] = 'shopping'): Se
     label: id,
     kinds: ['company'],
     find: vi.fn().mockRejectedValue(new Error('token expired')),
+    list: vi.fn().mockRejectedValue(new Error('token expired')),
   };
 }
 
@@ -214,33 +222,52 @@ describe('asking for only some kinds', () => {
   });
 });
 
-describe('the ranking', () => {
-  it('puts a match at the start of a word above one in the middle', () => {
-    const ranked = rankHits([hit('Paracetamol'), hit('Acme')], 'ac');
-    expect(ranked[0].title).toBe('Acme');
+describe('the whole list, with no query', () => {
+  // What the palette fetches when it opens. The same three rules as a search
+  // -- a broken workspace costs only itself, a switched-off one contributes
+  // nothing, there is a cap -- and no ranking, because the browser does that.
+  const list = (sources: SearchSource[], enabled: readonly SearchHit['module'][] = ALL, limit?: number) =>
+    listEverything({ userId: 'user-1', sources, enabledModules: enabled, limit });
+
+  it('returns what every source holds, unranked', async () => {
+    const result = await list([
+      source('a', [hit('Zebra'), hit('Acme')]),
+      source('b', [hit('Acorn', { module: 'vault', kind: 'note' })], 'vault', ['note']),
+    ]);
+
+    expect(result.hits.map((h) => h.title)).toEqual(['Zebra', 'Acme', 'Acorn']);
+    expect(result.failed).toEqual([]);
+    expect(result.truncated).toBe(false);
   });
 
-  it('drops what does not match at all', () => {
-    expect(rankHits([hit('Zebra')], 'qq')).toEqual([]);
+  it('asks each source to list rather than to search', async () => {
+    const only = source('jobs', [hit('Acme')]);
+    await list([only], ALL, 40);
+
+    expect(only.find).not.toHaveBeenCalled();
+    expect(only.list).toHaveBeenCalledWith({ userId: 'user-1', limit: 40 });
   });
 
-  it('finds a thing by the words its source said to look for it by', () => {
-    // A role is called "Staff Engineer" and is looked for by the company.
-    const ranked = rankHits(
-      [hit('Staff Engineer', { kind: 'role', subtitle: 'Role at Acme · Job search', match: 'Acme' })],
-      'acme',
-    );
-    expect(ranked).toHaveLength(1);
+  it('lets the others answer when one of them throws', async () => {
+    const result = await list([source('good', [hit('Acme')]), failingSource('broken')]);
+
+    expect(result.hits.map((h) => h.title)).toEqual(['Acme']);
+    expect(result.failed).toEqual(['broken']);
   });
 
-  it('does not match against the subtitle, which is boilerplate', () => {
-    // "Company · Job search" contains an a and then a c, so matching it would
-    // make "ac" find every company there is.
-    expect(rankHits([hit('Zebra')], 'ac')).toEqual([]);
+  it('never runs a source whose workspace is switched off', async () => {
+    const off = source('shopping', [hit('Acme', { module: 'shopping' })], 'shopping');
+    const result = await list([source('jobs', [hit('Acorn')]), off], ['jobs']);
+
+    expect(off.list).not.toHaveBeenCalled();
+    expect(result.hits.map((h) => h.title)).toEqual(['Acorn']);
   });
 
-  it('is stable for two things that score the same', () => {
-    const ranked = rankHits([hit('Acme Two'), hit('Acme One')], 'ac');
-    expect(ranked.map((h) => h.title)).toEqual(['Acme One', 'Acme Two']);
+  it('cuts the list at the cap and says that it did', async () => {
+    const many = Array.from({ length: 9 }, (_, i) => hit(`Acme ${i}`));
+    const result = await list([source('noisy', many)], ALL, 4);
+
+    expect(result.hits).toHaveLength(4);
+    expect(result.truncated).toBe(true);
   });
 });

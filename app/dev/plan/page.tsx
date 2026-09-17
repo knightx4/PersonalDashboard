@@ -9,6 +9,7 @@ import {
   flattenSections,
   handedToClaude,
   isPlanView,
+  splitFinished,
   summarize,
   type PlanView,
 } from '@/lib/plan/tree';
@@ -70,8 +71,14 @@ export default async function DevPlanPage({
 
   const data = await loadPlan(supabase, user.id);
   const whole = buildPlanTree(data);
-  const sections = applyView(whole, view);
+  const narrowed = applyView(whole, view);
   const summary = summarize(whole);
+
+  // Only on Everything, which is the one view a finished feature reaches at
+  // all: it goes into the fold at the foot of the page rather than sitting in
+  // its module among the nine features that still have work in them.
+  const { sections, finished } =
+    view === 'all' ? splitFinished(narrowed) : { sections: narrowed, finished: [] };
 
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
@@ -85,8 +92,14 @@ export default async function DevPlanPage({
     closed: node.status === 'done' || node.status === 'dropped',
   }));
 
+  // Wider than the other dev pages, which are prose and lists at max-w-3xl.
+  // This one is a table with six columns and a tree indenting the first of
+  // them, and the Status column took the last of the room the titles had: at
+  // 3xl a third-level step's title truncated after about two words. The page
+  // earns the extra width by being the only one here that is a grid rather
+  // than a column of text.
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Plan"
         description="Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next."
@@ -101,6 +114,7 @@ export default async function DevPlanPage({
       )}
       <PlanViewComponent
         sections={sections}
+        finished={finished}
         summary={summary}
         view={view}
         catalog={catalog}

@@ -14,10 +14,13 @@
  * and eighty apart, because the two were chosen independently, so rotating
  * Paper as one thing would send the accent the wrong way -- ask for green and
  * get a faintly green page with magenta links. #454 settled it: put Paper's
- * accent on Paper's own page hue, and rotate from there.
+ * accent on Paper's own page hue, and rotate from there. LIGHT_CAST also
+ * carries more chroma in its neutrals than Paper does, because Paper's are
+ * near-greys and a near-grey in another hue is still a near-grey; that is
+ * #456.
  *
  * These tables are a copy of what globals.css says, flattened -- `--c-page:
- * var(--c-canvas)` is resolved to the hex it lands on -- because the browser
+ * var(--c-page-ground)` is resolved to the hex it lands on -- because the browser
  * cannot read a stylesheet before it has parsed one, and the whole point is to
  * write the palette into the page's first byte. lib/theme/palette.test.ts
  * re-reads globals.css and fails if the two have drifted, which is the only
@@ -46,9 +49,9 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-sunken': '#f2f0ea',
     '--c-border': '#e8e5df',
     '--c-border-strong': '#d5d1c8',
-    '--c-shell': '#f4f2ec',
+    '--c-shell': '#e4dfd2',
     '--c-shell-ink': '#1a1a18',
-    '--c-shell-muted': '#63635e',
+    '--c-shell-muted': '#5d5d58',
     '--c-shell-border': '#e2dfd7',
     '--c-shell-hover': '#eae7df',
     '--c-ink': '#1a1a18',
@@ -68,6 +71,8 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-vault-tint': '#fcecfd',
     '--c-w-learn': '#0f6b62',
     '--c-w-learn-tint': '#e4f4f1',
+    '--c-w-news': '#806500',
+    '--c-w-news-tint': '#f6f1e2',
     '--c-w-dev': '#4b5768',
     '--c-w-dev-tint': '#eef1f5',
     '--c-positive': '#286f50',
@@ -93,9 +98,10 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#fafaf9',
     '--c-sheet-outline': '#e8e5df',
     '--c-caution-fill-ink': '#14100a',
-    '--c-page': '#faf9f6',
+    '--c-page-ground': '#f0ece2',
+    '--c-page': '#f0ece2',
     '--c-page-ink': '#1a1a18',
-    '--c-page-ink-muted': '#6b6b66',
+    '--c-page-ink-muted': '#65655f',
     '--c-page-ink-ghost': '#85857e',
     '--c-page-border': '#e8e5df',
     '--c-page-border-strong': '#d5d1c8',
@@ -110,6 +116,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-todo-lit': '#036695',
     '--c-w-vault-lit': '#a21caf',
     '--c-w-learn-lit': '#0f6b62',
+    '--c-w-news-lit': '#806500',
     '--c-w-dev-lit': '#4b5768',
     '--c-sheet-ink': '#1a1a18',
     '--c-sheet-ink-muted': '#6b6b66',
@@ -150,6 +157,8 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-vault-tint': '#2a1430',
     '--c-w-learn': '#4fd1c5',
     '--c-w-learn-tint': '#0a2420',
+    '--c-w-news': '#d8b23d',
+    '--c-w-news-tint': '#281e03',
     '--c-w-dev': '#a9b6c8',
     '--c-w-dev-tint': '#1a1f27',
     '--c-positive': '#54d6a0',
@@ -175,6 +184,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#141516',
     '--c-sheet-outline': '#212225',
     '--c-caution-fill-ink': '#14100a',
+    '--c-page-ground': '#08090a',
     '--c-page': '#08090a',
     '--c-page-ink': '#f7f8f8',
     '--c-page-ink-muted': '#9096a0',
@@ -192,6 +202,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-todo-lit': '#4cc2f1',
     '--c-w-vault-lit': '#e690f2',
     '--c-w-learn-lit': '#4fd1c5',
+    '--c-w-news-lit': '#d8b23d',
     '--c-w-dev-lit': '#a9b6c8',
     '--c-sheet-ink': '#f7f8f8',
     '--c-sheet-ink-muted': '#9096a0',
@@ -232,6 +243,8 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-vault-tint': '#301a3a',
     '--c-w-learn': '#74dccf',
     '--c-w-learn-tint': '#102c29',
+    '--c-w-news': '#dcb956',
+    '--c-w-news-tint': '#2c2205',
     '--c-w-dev': '#b3bfcf',
     '--c-w-dev-tint': '#212832',
     '--c-positive': '#68d9aa',
@@ -257,6 +270,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#1c1728',
     '--c-sheet-outline': '#2c2440',
     '--c-caution-fill-ink': '#14100a',
+    '--c-page-ground': '#110d1a',
     '--c-page': '#110d1a',
     '--c-page-ink': '#f2eefa',
     '--c-page-ink-muted': '#a79fc0',
@@ -274,6 +288,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-todo-lit': '#6fcdf0',
     '--c-w-vault-lit': '#ec9df3',
     '--c-w-learn-lit': '#74dccf',
+    '--c-w-news-lit': '#dcb956',
     '--c-w-dev-lit': '#b3bfcf',
     '--c-sheet-ink': '#f2eefa',
     '--c-sheet-ink-muted': '#a79fc0',
@@ -323,6 +338,8 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-vault-tint': '#f2def2',
     '--c-w-learn': '#0a5d54',
     '--c-w-learn-tint': '#d8ebe7',
+    '--c-w-news': '#6e5600',
+    '--c-w-news-tint': '#ece4cf',
     '--c-w-dev': '#434e5f',
     '--c-w-dev-tint': '#e6eaf0',
     '--c-positive': '#17624a',
@@ -348,6 +365,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#dfe5eb',
     '--c-sheet-outline': 'rgb(18 24 34 / 0.42)',
     '--c-caution-fill-ink': '#14100a',
+    '--c-page-ground': '#2b3644',
     '--c-page': '#2b3644',
     '--c-page-ink': '#eef2f7',
     '--c-page-ink-muted': '#b6c1ce',
@@ -365,6 +383,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-w-todo-lit': '#6ccdf5',
     '--c-w-vault-lit': '#eda6f6',
     '--c-w-learn-lit': '#6fdcd2',
+    '--c-w-news-lit': '#debf69',
     '--c-w-dev-lit': '#bcc7d6',
     '--c-sheet-ink': '#10141a',
     '--c-sheet-ink-muted': '#464f59',
@@ -496,7 +515,7 @@ export const ACCENT_TOKENS: readonly string[] = [
  * rather than a rounding away from it.
  */
 export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox', number> = {
-  paper: hexToOklch(REFERENCE_PALETTES.paper['--c-canvas']).h,
+  paper: hexToOklch(REFERENCE_PALETTES.paper['--c-page']).h,
   dusk: hexToOklch(REFERENCE_PALETTES.dusk['--c-canvas']).h,
   // Lightbox's canvas is a sheet rather than the room, so its own hue is read
   // off the bench -- which is what --c-page is in a two-polarity theme.
@@ -504,17 +523,45 @@ export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox', number> = {
 };
 
 /**
- * Paper with its accent moved onto Paper's own page hue.
+ * How much colour the grounds, the borders and the text of a cast light theme
+ * carry.
  *
- * What light with a colour rotates, and the answer #454 gave. Every token
- * keeps the chroma Paper wrote for it and reflects as much light as Paper's
- * did, so every contrast ratio in a light theme is the ratio Paper measured.
- * Only the accent family turns, and it turns as a family, so the tint stays
- * the four degrees off the base that Paper put it.
+ * Paper writes its neutrals between 0.004 and 0.013 chroma, which is about
+ * what Ink writes for dark with no colour -- they are near-greys, and a
+ * near-grey turned to another hue is still a near-grey. Dark never had that
+ * problem because it turns Dusk, a palette written with the colour already in
+ * it at 0.022 to 0.060. Light turned Paper, so a chosen colour reached the
+ * links and almost nothing else, which is what #456 reported.
+ *
+ * 0.045 is the middle of Dusk's range, so light now carries about what dark
+ * carries. Near white there is less room than that -- sRGB holds little chroma
+ * at 95% luminance, and less again in the warm hues -- so the page and the
+ * cards take what fits and the borders, the wells, the sidebar and the text,
+ * which all sit lower, take the whole amount.
+ */
+const CAST_CHROMA = 0.045;
+
+/**
+ * Paper with its accent moved onto Paper's own page hue, and its neutrals
+ * given enough colour to see.
+ *
+ * What light with a colour rotates. The accent move is the answer #454 gave:
+ * Paper's page and Paper's accent sit a hundred and eighty apart, so rotating
+ * Paper as one thing would answer green with a green page and magenta links.
+ * The chroma lift is #456 -- Paper's own neutrals are too close to grey to
+ * show which colour was asked for.
+ *
+ * Both are done at Paper's luminance, so every contrast ratio in a light theme
+ * is still the ratio Paper measured. Chroma is free that way: contrast depends
+ * on how much light a colour reflects and not at all on how colourful it is,
+ * and a token that cannot hold the chroma at its own luminance gives up the
+ * chroma rather than the luminance. `--c-surface` is the limit of that -- pure
+ * white reflects everything, so a white card stays white and the room shows in
+ * its border, the page behind it and the wells inside it.
  *
  * The result is not a theme anybody sees on its own -- light with no colour is
- * Paper, untouched. It is the shape a light theme takes once the page and the
- * accent have to agree about which colour was asked for.
+ * Paper, untouched. It is the shape a light theme takes once a colour has been
+ * chosen.
  */
 export const LIGHT_CAST: Palette = (() => {
   const paper = REFERENCE_PALETTES.paper;
@@ -528,6 +575,16 @@ export const LIGHT_CAST: Palette = (() => {
     // generator makes: a hundred and eighty degrees is the largest move in the
     // whole scheme, and it is the one where holding the wrong quantity shows.
     cast[token] = withLuminance({ ...colour, h: colour.h + turn }, relativeLuminance(value));
+  }
+
+  // The accent already carries 0.107, well past the lift, and it is the one
+  // token nobody said was faded.
+  for (const token of HUE_TOKENS) {
+    if (ACCENT_TOKENS.includes(token)) continue;
+    const value = paper[token]!;
+    const colour = hexToOklch(value);
+    if (colour.c >= CAST_CHROMA) continue;
+    cast[token] = withLuminance({ ...colour, c: CAST_CHROMA }, relativeLuminance(value));
   }
   return cast;
 })();

@@ -102,6 +102,22 @@ export function isPlanView(value: string): value is PlanView {
   return (PLAN_VIEWS as readonly string[]).includes(value);
 }
 
+/**
+ * The views drawn as chips, in the order they sit on the row -- #516's answer.
+ *
+ * Nine chips over a page whose question is usually "what am I on", "what could
+ * I pick up" or "what is waiting on me". These five answer those and give the
+ * way back to the whole plan; the rest are a press further away in the menu
+ * beside them, and the counts along the summary strip link to most of them
+ * anyway.
+ */
+export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all'] as const;
+
+/** Every other view, in the menu at the end of the chip row. */
+export const PLAN_VIEW_MENU: readonly PlanView[] = PLAN_VIEWS.filter(
+  (view) => !(PLAN_VIEW_CHIPS as readonly PlanView[]).includes(view),
+);
+
 export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   all: 'Everything',
   open: 'Open',
@@ -491,8 +507,132 @@ export function healthOf(
       return 'dropped';
     case 'not_started':
       if (node.waitingOn.length > 0) return 'waiting';
+      // Work has plainly started once some of it is finished.
+      //
+      // A feature's own status column is set by hand and mostly never is: it
+      // is created `not_started` and left there while the steps beneath it are
+      // picked up and closed one at a time. So a feature with four of seven
+      // steps done went on reading "Not started", which is the one thing it
+      // demonstrably is not, and the progress bar beside it said so on the
+      // same line.
+      //
+      // Read from the subtree rather than from the row, the same way the
+      // closed-over-open case above is, so it is a fact about the plan instead
+      // of a fact about when somebody last edited a parent.
+      if (startedBeneath(node)) return 'in_progress';
       return node.ready ? 'ready' : 'not_started';
   }
+}
+
+/**
+ * Whether any real work beneath this row has been picked up or finished.
+ *
+ * Decisions are excluded: answering a question is not building the thing, and
+ * a feature whose only closed row is its own opening question has not started.
+ * Dismissed rows are excluded for the reason they always are -- putting a row
+ * aside is how it stops counting.
+ */
+function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
+  return descendantsOf(node).some(
+    (child) =>
+      child.kind !== 'decision' &&
+      !isDismissed(child) &&
+      (child.status === 'in_progress' || child.status === 'done'),
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * Whose move it is
+ * ---------------------------------------------------------------------- */
+
+/**
+ * The second column, and the reason there are now two.
+ *
+ * Health says how far along a row is -- not started, underway, done. It does
+ * not say what would move it, and those two questions had been sharing one
+ * word: "Blocked" is a state of progress and also a statement about who has to
+ * act, "Ready" means both "nothing is stopping it" and "a session could take
+ * it", and a step a session is working on right now looked exactly like a step
+ * you started yourself last week. So the page could not answer the question it
+ * is opened to answer, which is "what is Dash on, and what is on me".
+ *
+ * Called a move rather than a status in the code, because `status` is already
+ * the raw column a person sets by hand and a third meaning for that word is
+ * how the first two got confused. The page labels the column Status, which is
+ * what it is to read.
+ *
+ * Every rule here is already written down somewhere else and is reused rather
+ * than restated: `needsThePerson` for what is yours to answer, `waitingOn` for
+ * what another step is holding up, and the `assignee` a hand-over sets. Two
+ * implementations of "is this Dash's" would disagree by next month, and the
+ * disagreement would be between a column and the button beside it.
+ */
+export const PLAN_MOVES = [
+  'on_you',
+  'with_dash',
+  'for_dash',
+  'waiting',
+  'yours',
+  'settled',
+] as const;
+export type PlanMove = (typeof PLAN_MOVES)[number];
+
+/**
+ * Most pressing first, and so the order a parent reports from.
+ *
+ * "On you" outranks everything because it is the only one that stops on your
+ * desk. A session working now outranks one that could start, which outranks a
+ * step held up by another, which outranks work nobody has handed anywhere.
+ */
+const MOVE_RANK: readonly PlanMove[] = [
+  'on_you',
+  'with_dash',
+  'for_dash',
+  'waiting',
+  'yours',
+  'settled',
+];
+
+/** This row alone, ignoring everything beneath it. */
+function ownMove(node: MoveInput): PlanMove {
+  if (isClosed(node.status) || isDismissed({ dismissedAt: node.dismissedAt ?? null })) {
+    return 'settled';
+  }
+  // A question to answer, a proposal to approve, or a step blocked on
+  // something only you can supply. One rule, shared with the "On you" view.
+  if (needsThePerson(node)) return 'on_you';
+  if (node.waitingOn.length > 0) return 'waiting';
+  if (node.assignee === 'claude') {
+    return node.status === 'in_progress' ? 'with_dash' : 'for_dash';
+  }
+  return 'yours';
+}
+
+type MoveInput = Pick<
+  PlanNode,
+  'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
+> & {
+  dismissedAt?: string | null;
+  children?: readonly PlanNode[];
+};
+
+/**
+ * Whose move it is on this row or anything beneath it.
+ *
+ * Over the subtree, because a feature is a container and what is happening to
+ * it is what is happening inside it: a feature whose third step is with a
+ * session right now is with a session, and saying "Yours" because nobody
+ * assigned the feature row itself is how the old column managed to be true and
+ * useless at once. Closed rows report from beneath them too, for the same
+ * reason `healthOf` does -- a question added under a shipped feature is still
+ * a question.
+ */
+export function moveOf(node: MoveInput): PlanMove {
+  const rows: MoveInput[] = [node, ...descendantsOf(node)];
+  const moves = new Set(
+    rows.filter((row) => !isDismissed({ dismissedAt: row.dismissedAt ?? null })).map(ownMove),
+  );
+  return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
 
 /** How many steps are in each state. Every health has an entry, most of them 0. */
@@ -694,17 +834,137 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  * The module's progress is left over the whole plan, because a filtered view
  * has not changed how far through anything is.
  *
- * "Open" keeps every module, empty or not, because it is the working view and
- * an empty module there is the invitation to plan it. The narrower views leave
- * out modules with nothing to show, so a narrowed page is a short one.
+ * "Everything" is the only view that keeps a module with nothing in it. That
+ * empty section is the invitation to plan the module, and a module that simply
+ * did not appear anywhere would read as one nobody is allowed to plan. Every
+ * other view drops it, "Open" included: four of the seven modules have nothing
+ * open, and four headings you scroll past to reach the work are four too many
+ * when the invitation is one click away.
  *
  * "Everything" goes through the same pruning rather than past it, because
  * dismissed rows are hidden from every view and it is a view.
+ *
+ * Features are ordered by what was touched last everywhere but "Everything",
+ * which keeps the plan's own order -- see `touchedAt`. Steps under a feature
+ * keep that order in every view, because it is the order they are meant to be
+ * built in.
+ *
+ * The module sections are ordered the same way, by the newest write among the
+ * features each one is drawing -- #517's answer. Four of the nine features
+ * with open work are app-wide, and that section is fixed last, so the thing
+ * being worked on could sit thirty rows down its own page. "Everything" keeps
+ * the fixed module order, which is what makes it the map of the plan.
  */
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
+  if (view === 'all') {
+    return sections.map((section) => ({ ...section, nodes: prune(section.nodes, view) }));
+  }
+
   return sections
-    .map((section) => ({ ...section, nodes: prune(section.nodes, view) }))
-    .filter((section) => view === 'open' || view === 'all' || section.nodes.length > 0);
+    .map((section) => {
+      const when = recencyOf(section.nodes);
+      const nodes = prune(section.nodes, view);
+      return {
+        section: { ...section, nodes: byRecency(nodes, when) },
+        touched: newestOf(nodes, when),
+      };
+    })
+    .filter((drawn) => drawn.section.nodes.length > 0)
+    .sort((a, b) => b.touched.localeCompare(a.touched))
+    .map((drawn) => drawn.section);
+}
+
+/**
+ * When a feature was last worked: the newest write to it or to anything
+ * beneath it, which a trigger on `plan_items` keeps. Closing a step writes to
+ * the step, so it lifts the feature above it -- that is what #507 settled.
+ */
+export function touchedAt(node: PlanNode): string {
+  return flatten([node]).reduce(
+    (latest, step) => (step.updatedAt > latest ? step.updatedAt : latest),
+    '',
+  );
+}
+
+/**
+ * When each feature was last worked, by id.
+ *
+ * Read off the features as they stand, not as a view left them. The step you
+ * closed an hour ago is the reason its feature is the one you are on, and the
+ * view has just dropped that step for being closed.
+ */
+function recencyOf(whole: readonly PlanNode[]): Map<string, string> {
+  return new Map(whole.map((node) => [node.id, touchedAt(node)]));
+}
+
+/**
+ * The features you were last in the middle of, first.
+ *
+ * Only at the top of a section. Nine features have open work and nothing told
+ * them apart, so the one you opened ten minutes ago sat wherever it was
+ * created and the page opened on somebody else's Tuesday. Nothing to maintain
+ * and nothing to remember: it moves under you as you work.
+ */
+function byRecency(nodes: readonly PlanNode[], when: Map<string, string>): PlanNode[] {
+  return [...nodes].sort((a, b) =>
+    (when.get(b.id) ?? touchedAt(b)).localeCompare(when.get(a.id) ?? touchedAt(a)),
+  );
+}
+
+/** The newest of those, over the features a section is about to draw. */
+function newestOf(nodes: readonly PlanNode[], when: Map<string, string>): string {
+  return nodes.reduce((latest, node) => {
+    const at = when.get(node.id) ?? touchedAt(node);
+    return at > latest ? at : latest;
+  }, '');
+}
+
+/**
+ * A feature nobody is coming back to: closed itself, with nothing open under
+ * it. About 101 of the plan's 110 top-level features are in this state, and
+ * they are consulted rather than read -- "did I already plan that" -- so on
+ * "Everything" they are gathered into one fold instead of running down the
+ * page between the nine features that still have work in them.
+ *
+ * Dropped counts as closed here. A feature decided against is as finished as
+ * one that shipped, and the row says which it was.
+ */
+export function isFinishedFeature(node: PlanNode): boolean {
+  return isClosed(node.status) && !flatten(node.children).some((child) => !isClosed(child.status));
+}
+
+/** When a feature stopped being worked, for ordering the archive. */
+function finishedAt(node: PlanNode): string {
+  return node.completedAt ?? node.createdAt;
+}
+
+/**
+ * "Everything", with the finished features lifted out of the modules.
+ *
+ * They come back as one list across every module, newest first, because that
+ * is the order you look for them in: the thing you finished last week is the
+ * thing you are trying to remember. Each module keeps its progress and its
+ * tally, which are over the whole module either way -- lifting the rows out
+ * changes where they are drawn, not what is true of the module.
+ *
+ * Only worth calling on "Everything". Every other view has already dropped a
+ * finished feature in `prune`, so there is nothing to lift out of it.
+ */
+export function splitFinished(sections: readonly PlanSection[]): {
+  sections: PlanSection[];
+  finished: PlanNode[];
+} {
+  const finished: PlanNode[] = [];
+  const kept = sections.map((section) => {
+    const nodes = section.nodes.filter((node) => {
+      if (!isFinishedFeature(node)) return true;
+      finished.push(node);
+      return false;
+    });
+    return { ...section, nodes };
+  });
+  finished.sort((a, b) => finishedAt(b).localeCompare(finishedAt(a)));
+  return { sections: kept, finished };
 }
 
 /**
@@ -783,6 +1043,17 @@ export function searchSections(
   return sections
     .map((section) => ({ ...section, nodes: pruneToQuery(section.nodes, terms) }))
     .filter((section) => section.nodes.length > 0);
+}
+
+/**
+ * A search over steps that are not in a module section: the archive of
+ * finished features on "Everything". The same rules as `searchSections`, so a
+ * feature folded away is still found by number, title or detail.
+ */
+export function searchNodes(nodes: readonly PlanNode[], query: string): PlanNode[] {
+  const terms = searchTerms(query);
+  if (terms.length === 0) return [...nodes];
+  return pruneToQuery(nodes, terms);
 }
 
 /** How many steps a search actually found, as opposed to kept for context. */

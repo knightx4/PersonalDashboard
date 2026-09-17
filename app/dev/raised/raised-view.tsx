@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { ChevronRight, MessageCircleQuestion } from 'lucide-react';
+import { MessageCircleQuestion } from 'lucide-react';
 import { decideRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,8 +11,13 @@ import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/rais
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
-import { Disclosure } from '@/components/ui/disclosure';
+import { RefText } from '@/components/dev/ref-text';
+import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
+import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
+import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
+import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -34,7 +39,9 @@ function Ask({ ask }: { ask: string }) {
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Needs from you
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink">{ask}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">
+        <RefText text={ask} />
+      </p>
     </div>
   );
 }
@@ -51,7 +58,9 @@ function Consequence({ said }: { said: string }) {
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Answering yes
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink-muted">{said}</p>
+      <p className="whitespace-pre-wrap text-body text-ink-muted">
+        <RefText text={said} />
+      </p>
     </div>
   );
 }
@@ -67,12 +76,37 @@ function lead(detail: string): string {
   return first.length > 90 ? `${first.slice(0, 89).trimEnd()}…` : first;
 }
 
+/**
+ * A closed raise, worded the way the other dev queues word it.
+ *
+ * "Answered" is this queue's own -- a raise closes on a reply, which is not the
+ * same as the work being finished. A raise you turned down is the same fact as
+ * a step dropped or a note declined, so it takes the shared word.
+ *
+ * Nothing on an open one: they are all under a heading that already says
+ * "Waiting on you", and repeating it on every row would be the same fact twice.
+ */
+const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
+  waiting: 'caution',
+  unfinished: 'caution',
+  done: 'positive',
+  dropped: 'ghost',
+};
+
 function StatusLabel({ row }: { row: RaisedRow }) {
   if (row.status === 'open') return null;
+  const health = raisedHealth(row);
   return (
-    <span className="text-small text-ink-muted">
-      {row.status === 'answered' ? 'Answered' : 'Dismissed'}
-    </span>
+    <StateLabel
+      glyph={RAISED_HEALTH_GLYPHS[health]}
+      word={RAISED_HEALTH_WORD[health]}
+      tone={HEALTH_TONE[health]}
+      title={
+        health === 'unfinished'
+          ? 'Answered, and nothing was recorded as coming of it. Run what it asked for, or close it with the reason nothing was needed.'
+          : undefined
+      }
+    />
   );
 }
 
@@ -191,12 +225,18 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           {row.consequence && <Consequence said={row.consequence.said} />}
           {row.detail && (
             <Disclosure title="Why it came up" meta={lead(row.detail)}>
-              <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+              <p className="whitespace-pre-wrap text-body text-ink">
+                <RefText text={row.detail} />
+              </p>
             </Disclosure>
           )}
         </>
       ) : (
-        row.detail && <p className="whitespace-pre-wrap text-body text-ink">{row.detail}</p>
+        row.detail && (
+          <p className="whitespace-pre-wrap text-body text-ink">
+            <RefText text={row.detail} />
+          </p>
+        )
       )}
 
       {/* Which run raised it. Without this a raise is a voice from nowhere, and
@@ -263,24 +303,17 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
       )}
 
       {queue.open.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            Waiting on you <span className="font-normal text-ink-muted">({queue.open.length})</span>
-          </h2>
+        <SectionFold title="Waiting on you" count={queue.open.length}>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.open.map((row) => (
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
-        </section>
+        </SectionFold>
       )}
 
       {queue.unfinished.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-body font-semibold text-ink">
-            Answered, nothing done{' '}
-            <span className="font-normal text-ink-muted">({queue.unfinished.length})</span>
-          </h2>
+        <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
           <p className="text-small text-ink-muted">
             These closed without anything coming of them. Run what they asked for, or close one
             with the reason nothing was needed.
@@ -290,25 +323,19 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
-        </section>
+        </SectionFold>
       )}
 
+      {/* Shut, where the other two open: this one is history rather than work,
+          and it is the section the hand-rolled fold was written for. */}
       {queue.closed.length > 0 && (
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            Closed <span className="font-normal text-ink-muted">({queue.closed.length})</span>
-          </summary>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+        <SectionFold title="Closed" count={queue.closed.length} defaultOpen={false}>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.closed.map((row) => (
               <RaiseCard key={row.id} row={row} />
             ))}
           </ul>
-        </details>
+        </SectionFold>
       )}
     </div>
   );

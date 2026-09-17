@@ -1,5 +1,6 @@
-import { score } from '@/lib/search/score';
+import { paletteHits } from '@/lib/search/rank';
 import {
+  LIST_LIMIT,
   MIN_QUERY,
   PER_SOURCE_LIMIT,
   TOTAL_LIMIT,
@@ -12,9 +13,10 @@ import type { ModuleId } from '@/lib/modules';
 /**
  * Running the sources and merging what comes back.
  *
- * Pure of any client: the sources are handed in, so this file -- which holds
- * every rule about what the palette shows -- can be tested with stubs, no
- * database and no network.
+ * Pure of any client: the sources are handed in, so this file can be tested
+ * with stubs, no database and no network. The order and the caps live next
+ * door in rank.ts, because the browser applies the same ones to the list it
+ * holds.
  *
  * Three rules, and each one is a way the box gets ruined:
  *
@@ -27,8 +29,9 @@ import type { ModuleId } from '@/lib/modules';
  *   off has to mean it stops appearing, and a search that quietly still
  *   reaches into it would make that setting a lie.
  *
- *   **Caps per source and overall.** One workspace with four hundred orders
- *   would otherwise fill a list that is meant to be read at a glance.
+ *   **Caps per source and overall**, from rank.ts. One workspace with four
+ *   hundred orders would otherwise fill a list that is meant to be read at a
+ *   glance.
  *
  *   **A caller may ask for only some kinds.** The palette wants everything;
  *   the todo link picker wants only what a task can be about. Narrowing here
@@ -43,27 +46,6 @@ export type SearchOutcome = {
   /** Sources that ran and threw. For a log line, not for the screen. */
   failed: string[];
 };
-
-/** Ranked against the query, best first, then alphabetically for stability. */
-export function rankHits(hits: SearchHit[], query: string): SearchHit[] {
-  return hits
-    .map((hit) => ({
-      hit,
-      // The title, and whatever else the source said this is looked for by --
-      // a role's company, say. Never the subtitle: those are words like
-      // "Company · Job search", and matching them makes nearly every query
-      // match nearly every row.
-      points: Math.max(
-        score(hit.title, query) ?? -1,
-        hit.match ? (score(`${hit.title} ${hit.match}`, query) ?? -1) - 1 : -1,
-      ),
-    }))
-    .filter((scored) => scored.points >= 0)
-    .sort(
-      (a, b) => b.points - a.points || a.hit.title.localeCompare(b.hit.title),
-    )
-    .map((scored) => scored.hit);
-}
 
 export async function searchEverything(input: {
   userId: string;
@@ -110,5 +92,49 @@ export async function searchEverything(input: {
     }
   });
 
-  return { hits: rankHits(hits, query).slice(0, total), failed };
+  return { hits: paletteHits(hits, query, { perModule: perSource, total }), failed };
+}
+
+export type ListOutcome = SearchOutcome & {
+  /**
+   * True when the cap may have cut rows out of the list. Reported the safe way
+   * round: a list that came back exactly at the cap counts as cut short, even
+   * on the off chance it was the whole truth, because the caller's answer to
+   * an incomplete list is to go on asking the server per keystroke.
+   */
+  truncated: boolean;
+};
+
+/**
+ * Everything the palette can find, with no query.
+ *
+ * The same three rules as `searchEverything` -- a failed source contributes
+ * nothing, a switched-off workspace never runs, and there is a cap -- over the
+ * sources' `list` rather than their `find`. Nothing is ranked here: the
+ * browser is what matches this list against what somebody types.
+ */
+export async function listEverything(input: {
+  userId: string;
+  sources: SearchSource[];
+  /** Which workspaces are on. A source outside this never runs. */
+  enabledModules: readonly ModuleId[];
+  limit?: number;
+}): Promise<ListOutcome> {
+  const limit = input.limit ?? LIST_LIMIT;
+
+  const active = input.sources.filter((source) => input.enabledModules.includes(source.module));
+
+  const settled = await Promise.allSettled(
+    active.map((source) => source.list({ userId: input.userId, limit })),
+  );
+
+  const hits: SearchHit[] = [];
+  const failed: string[] = [];
+
+  settled.forEach((result, index) => {
+    if (result.status === 'fulfilled') hits.push(...result.value);
+    else failed.push(active[index].label);
+  });
+
+  return { hits: hits.slice(0, limit), failed, truncated: hits.length >= limit };
 }

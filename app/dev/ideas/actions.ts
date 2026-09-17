@@ -5,10 +5,11 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { threadText } from '@/lib/comments/context';
 import { codeMatches } from '@/lib/feedback/code';
-import { fireFeatureRoutine, planRoutine } from '@/lib/feedback/routine';
+import { planRoutine } from '@/lib/feedback/routine';
 import { IDEA_COLUMNS, ideaRowFrom } from '@/lib/ideas/load';
 import { FOG_RULE, PLAIN_ENGLISH_RULE } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
+import { startRoutineRun } from '@/lib/plan/runs';
 
 export type IdeaActionState = {
   error?: string;
@@ -235,10 +236,13 @@ export async function shapeIdea(
     `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
     (said ? `\n${said}` : '');
 
-  const routine = planRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'shape',
+    routine: planRoutine(),
+    // No step: the proposal the session writes is what will carry the number,
+    // and it does not exist yet.
     text,
   });
   if (!result.ok) return { error: result.error };

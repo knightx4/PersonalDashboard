@@ -64,6 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div data-workspace="shopping">
       <AppShell
+        account={user.id}
         module="shopping"
         sections={sections}
         settingsHref="/shopping/settings"

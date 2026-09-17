@@ -3,9 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
 import { hexToOklch, oklchToHex, relativeLuminance } from '@/lib/theme/oklch';
-import { generatePalette } from '@/lib/theme/palette';
+import { accentHueFor, generatePalette, MEANING_FLOOR, meaningGaps } from '@/lib/theme/palette';
 import {
-  ACCENT_TOKENS,
   HUE_TOKENS,
   LIGHT_CAST,
   LIGHTBOX_HUE_TOKENS,
@@ -156,9 +155,19 @@ describe('generatePalette', () => {
     // What #454 settled. Paper's page and Paper's accent sit a hundred and
     // eighty apart, so a light theme that rotated Paper as one thing would
     // answer green with a green page and magenta links.
+    //
+    // 165 used to be the one hue in this sweep the accent did not land on: it
+    // sat inside light's green stretch and #469 had it step off by eight
+    // degrees. It no longer does. Giving the page a ground of its own moved
+    // REFERENCE_HUE.paper -- which is read off that ground -- a few degrees
+    // warm, and at the new reference the accent generated for 165 clears the
+    // saved-green by more than MEANING_FLOOR on its own. Nothing was relaxed:
+    // the separation check still walks all 360 degrees and passes.
     for (const hue of SWEEP) {
       const accent = hexToOklch(generatePalette('light', hue)['--c-accent-base']);
-      expect(`${hue} ${apart(accent.h, hue) < 2}`).toBe(`${hue} true`);
+      const landed = accentHueFor('light', hue);
+      expect(`${hue} on ${apart(accent.h, landed) < 2}`).toBe(`${hue} on true`);
+      expect(`${hue} asked ${landed - hue}`).toBe(`${hue} asked 0`);
     }
   });
 
@@ -184,12 +193,48 @@ describe('generatePalette', () => {
     }
   });
 
-  it('rotates light about LIGHT_CAST, which is Paper everywhere but the accent', () => {
-    for (const token of Object.keys(REFERENCE_PALETTES.paper)) {
-      if (ACCENT_TOKENS.includes(token)) continue;
+  it('rotates light about LIGHT_CAST, which leaves the fixed colours as Paper wrote them', () => {
+    for (const token of FIXED_TOKENS) {
       expect(`${token} ${LIGHT_CAST[token]}`).toBe(`${token} ${REFERENCE_PALETTES.paper[token]}`);
     }
     expect(generatePalette('light', REFERENCE_HUE.paper)).toEqual(LIGHT_CAST);
+  });
+
+  it('gives a light theme enough colour to see, at the luminance Paper wrote', () => {
+    // #456: Paper's neutrals are near-greys between 0.004 and 0.013 chroma, so
+    // a chosen colour reached the links and almost nothing else. They now
+    // carry about what Dusk's neutrals carry, which is what dark has had all
+    // along. Near white there is less room than that -- a card at pure white
+    // reflects everything and cannot be any colour at all -- so what is
+    // checked here is the surfaces with room in them.
+    // Two floors, because the room a token has depends on how light it is.
+    // Borders and text sit far enough down the scale to take the whole lift at
+    // every hue; a well and the sidebar are a few per cent off white, where the
+    // warm hues run out of sRGB around 0.021.
+    const floors: Record<string, number> = {
+      '--c-border': 0.035,
+      '--c-border-strong': 0.035,
+      '--c-border-control': 0.035,
+      '--c-ink-muted': 0.035,
+      '--c-ink-ghost': 0.035,
+      '--c-sunken': 0.021,
+      '--c-shell': 0.018,
+    };
+    for (const hue of SWEEP) {
+      const palette = generatePalette('light', hue);
+      for (const [token, floor] of Object.entries(floors)) {
+        const got = hexToOklch(palette[token]).c;
+        const paper = hexToOklch(REFERENCE_PALETTES.paper[token]).c;
+        expect(`${hue} ${token} ${got >= floor}`).toBe(`${hue} ${token} true`);
+        expect(`${hue} ${token} louder ${got > paper * 2}`).toBe(`${hue} ${token} louder true`);
+      }
+    }
+  });
+
+  it('leaves light with no colour exactly as pale as Paper is', () => {
+    // The lift belongs to the cast palette, not to Paper. Light with no colour
+    // is the theme the app shipped with, down to the byte.
+    expect(generatePalette('light', null)).toEqual(REFERENCE_PALETTES.paper);
   });
 
   it('reads a hue outside 0-360 as the same place on the circle', () => {
@@ -288,5 +333,95 @@ describe('oklch', () => {
     const got = hexToOklch(oklchToHex(asked));
     expect(got.c).toBeLessThan(asked.c);
     expect(Math.abs(got.l - asked.l)).toBeLessThan(0.004);
+  });
+});
+
+/**
+ * The accent stepping off the delete red, the warning amber and the saved
+ * green -- #469, measured the way #493 chose, at the floor #514 set and in the
+ * direction #515 named.
+ */
+describe('the accent and the colours that carry a meaning', () => {
+  const MODES = ['light', 'dark', 'lightbox'] as const;
+
+  /** Every hue of the circle, since the stretches that move are a few degrees wide. */
+  const CIRCLE = Array.from({ length: 360 }, (_, hue) => hue);
+
+  /** Whether the accent had to step off the colour that was asked for. */
+  const moved = (mode: (typeof MODES)[number], hue: number) => accentHueFor(mode, hue) !== hue;
+
+  /** The written palette each mode's fixed colours come from. */
+  const WRITTEN_AS = { light: 'paper', dark: 'dusk', lightbox: 'lightbox' } as const;
+
+  it('never lets the accent wear one of them, at any hue in any mode', () => {
+    for (const mode of MODES) {
+      for (const hue of CIRCLE) {
+        for (const { accent, meaning, gap } of meaningGaps(generatePalette(mode, hue))) {
+          expect(`${mode} ${hue} ${accent}/${meaning} ${gap >= MEANING_FLOOR}`).toBe(
+            `${mode} ${hue} ${accent}/${meaning} true`,
+          );
+        }
+      }
+    }
+  });
+
+  it('moves 17 hues in light, 25 in dark and 29 on Lightbox, by at most 15 degrees', () => {
+    // #514's answer, and what fixes the floor at 0.03: these three counts and
+    // this ceiling are the option that was chosen, so a change to either
+    // number is a change to the decision rather than to the code.
+    const counts = { light: 17, dark: 25, lightbox: 29 };
+    for (const mode of MODES) {
+      const shifts = CIRCLE.map((hue) => accentHueFor(mode, hue) - hue).filter((by) => by !== 0);
+      expect(`${mode} ${shifts.length}`).toBe(`${mode} ${counts[mode]}`);
+      expect(`${mode} ${Math.max(...shifts.map(Math.abs)) <= 15}`).toBe(`${mode} true`);
+    }
+  });
+
+  it('steps to whichever side of the stretch is nearer', () => {
+    // #515. Nothing between where the accent was asked to go and where it
+    // landed is out of the stretch, and neither is the same distance the other
+    // way -- except where the two edges are exactly as far off as each other,
+    // which goes up the circle.
+    for (const mode of MODES) {
+      for (const hue of CIRCLE) {
+        const landed = accentHueFor(mode, hue);
+        if (landed === hue) continue;
+        const way = Math.sign(landed - hue);
+        const by = Math.abs(landed - hue);
+        for (let step = 1; step < by; step += 1) {
+          expect(`${mode} ${hue} +${step} ${moved(mode, hue + way * step)}`).toBe(
+            `${mode} ${hue} +${step} true`,
+          );
+          expect(`${mode} ${hue} -${step} ${moved(mode, hue - way * step)}`).toBe(
+            `${mode} ${hue} -${step} true`,
+          );
+        }
+        if (!moved(mode, hue - way * by)) {
+          expect(`${mode} ${hue} tie ${way}`).toBe(`${mode} ${hue} tie 1`);
+        }
+      }
+    }
+  });
+
+  it('moves the accent and nothing else', () => {
+    // #469 settled that the accent is what gives way, so the page, the panels
+    // and the borders still land on the colour that was asked for and the
+    // three meaning colours stay as they were written.
+    for (const mode of MODES) {
+      for (const hue of CIRCLE) {
+        if (!moved(mode, hue)) continue;
+        const palette = generatePalette(mode, hue);
+        const ground = hexToOklch(palette['--c-page']);
+        expect(`${mode} ${hue} ground ${apart(ground.h, hue) < 4}`).toBe(
+          `${mode} ${hue} ground true`,
+        );
+        const written = REFERENCE_PALETTES[WRITTEN_AS[mode]];
+        for (const token of ['--c-danger', '--c-caution', '--c-positive']) {
+          expect(`${mode} ${hue} ${token} ${palette[token]}`).toBe(
+            `${mode} ${hue} ${token} ${written[token]}`,
+          );
+        }
+      }
+    }
   });
 });

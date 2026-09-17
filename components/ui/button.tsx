@@ -19,7 +19,7 @@ const button = cva(
         // white on it would be unreadable.
         primary: 'bg-accent text-surface hover:bg-accent-hover',
         secondary:
-          'bg-surface text-ink border border-control hover:border-ink-muted hover:bg-sunken',
+          'bg-surface text-ink border border-control hover:bg-sunken',
         ghost: 'text-ink-muted hover:bg-accent-tint hover:text-accent',
         danger: 'bg-surface text-danger border border-danger hover:bg-danger-tint',
       },

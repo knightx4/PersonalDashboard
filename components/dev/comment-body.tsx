@@ -1,6 +1,7 @@
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { splitOnMention } from '@/lib/comments/mention';
+import { planRefHref, splitOnRefs } from '@/lib/comments/refs';
 
 /**
  * What one comment says, laid out.
@@ -90,11 +91,72 @@ function walk(node: Node): void {
   node.children = out;
 }
 
+/**
+ * Turn `#494` into the step it names.
+ *
+ * The same shape as the mention plugin above and for the same reason -- the
+ * numbers have to be found in the words and left alone inside code, and text
+ * nodes are the only ones carrying words, so walking those does both. A
+ * `inlineCode` or `code` node holds its value directly rather than in a text
+ * child, so it is never descended into and a quoted `#494` stays quoted.
+ *
+ * `link` is skipped as well, which the mention walk does not have to care
+ * about: a span inside an anchor is fine and an anchor inside one is not. A
+ * reference already written as a link is a reference that has been linked.
+ * `mention` is skipped because a marked run is exactly the tag and cannot
+ * contain a number.
+ */
+const OPAQUE = new Set(['link', 'linkReference', 'definition', 'mention']);
+
+function markPlanRefs() {
+  return (tree: Node) => walkRefs(tree);
+}
+
+function walkRefs(node: Node): void {
+  if (!node.children || OPAQUE.has(node.type)) return;
+
+  const out: Node[] = [];
+  for (const child of node.children) {
+    if (child.type !== 'text' || typeof child.value !== 'string') {
+      walkRefs(child);
+      out.push(child);
+      continue;
+    }
+
+    const parts = splitOnRefs(child.value);
+    if (!parts.some((part) => part.ref !== null)) {
+      out.push(child);
+      continue;
+    }
+
+    for (const part of parts) {
+      if (part.text === '') continue;
+      out.push(
+        part.ref !== null
+          ? {
+              type: 'planRef',
+              children: [{ type: 'text', value: part.text }],
+              data: {
+                hName: 'a',
+                hProperties: {
+                  href: planRefHref(part.ref),
+                  className: ['comment-ref'],
+                  title: `Step ${part.text} on the plan`,
+                },
+              },
+            }
+          : { type: 'text', value: part.text },
+      );
+    }
+  }
+  node.children = out;
+}
+
 export function CommentBody({ body }: { body: string }) {
   return (
     <div className="comment-prose">
       <Markdown
-        remarkPlugins={[remarkGfm, markMentions]}
+        remarkPlugins={[remarkGfm, markMentions, markPlanRefs]}
         allowedElements={ALLOWED}
         unwrapDisallowed
         components={{

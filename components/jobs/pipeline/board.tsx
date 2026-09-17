@@ -27,14 +27,31 @@ import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actio
  * put things, and giving it a column would invite people to drag cards into it.
  *
  * A column is a recessed lane, not a frame. It used to be `border border-border
- * bg-canvas` holding bordered cards -- a border inside a border, which law 11
- * calls almost always a mistake, and worse here than usual because in three of
- * the four themes `canvas` *is* the page colour, so the hairline was doing all
- * of the grouping and the fill none of it. On `sunken` the ground does the
- * grouping the law asks it to and the only edges left on the board are the ones
- * around the cards you can pick up. Drag-over is the accent tint alone for the
- * same reason: the lane lighting up is louder than a line around it going
- * purple, and it is legible on a phone where the border never was.
+ * bg-canvas` holding bordered cards, where the fill was the page colour and the
+ * hairline was doing all of the grouping. Moving the fill to `sunken` fixed that
+ * in the light themes, where the lane reads as a proper well and the white cards
+ * sit on it.
+ *
+ * In the dark themes it did not, and the hairline was gone by then, so the lanes
+ * disappeared entirely: Ink's canvas is #08090a and its `sunken` is #050506, one
+ * and a half per cent apart and well under what an eye resolves. Law 11 wants
+ * space, alignment or a shared ground to do the grouping before a border does,
+ * but on a near-black page there is no ground *beneath* a surface card to group
+ * with -- the only step left is upward, and that is where the cards already are.
+ * `sunken` cannot be lightened into the gap either: it is the chip and
+ * meter-track fill in about forty other places, all of them sitting *on* a card
+ * rather than under one, and lifting it to clear the canvas would sink it into
+ * the surface everywhere else.
+ *
+ * So the hairline comes back, as the last resort law 11 describes rather than in
+ * place of a ground: the fill still does the grouping wherever it can be seen,
+ * and the border is what carries the lane's extent where it cannot. It is the
+ * same hairline the Closed fold below is drawn with, which is the shape the rest
+ * of the app uses for a section holding cards.
+ *
+ * Drag-over stays the accent tint alone: the lane lighting up is louder than a
+ * line around it going purple, and it is legible on a phone where the border
+ * never was.
  */
 /**
  * `submitted` and `acknowledged` share a column, labeled by the later one:
@@ -143,7 +160,7 @@ export function PipelineBoard({
             }
             onDrop={() => drop(column.setStatus)}
             className={cn(
-              'rounded-card bg-sunken transition-colors duration-150',
+              'rounded-card border border-border bg-sunken transition-colors duration-150',
               over === column.setStatus && 'bg-accent-tint',
             )}
           >
@@ -180,7 +197,7 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-64 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-150',
+            'w-64 shrink-0 rounded-card border border-border bg-sunken p-2 transition-colors duration-150',
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}

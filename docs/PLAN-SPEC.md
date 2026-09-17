@@ -32,7 +32,7 @@ see *Decisions and fog*.
 
 ## The model
 
-Two tables in `public`, both under row level security, and `dev_comments`
+Three tables in `public`, all under row level security, and `dev_comments`
 beside them.
 
 ### `plan_items`
@@ -95,6 +95,25 @@ answerable, a question on an idea leaves it unshaped, and a question on a step
 changes no column on it — the reply is a comment like any other. A reply that
 cannot be produced at all says so in the thread, and the question stays where it
 was written.
+
+### `plan_runs`
+
+Every routine a dev button starts, and what Anthropic answered. One row per
+press: the step it is about where there is one, which button fired it (`job` —
+`step`, `feature`, `queue`, `reshape`, `shape`, `notes`, `review`, `comment`),
+the routine the request went to, and the response body kept whole in
+`response`. `external_id` is whatever in that body looks like a name for the
+run; it is null until it is known what the endpoint returns, which is why the
+body is stored beside it.
+
+A press that never started is a row too — `status = 'failed'` with the reason
+in `error` — because "the token was wrong" and "nobody pressed it" are
+different facts and looked identical before this table existed.
+
+Written by `lib/plan/runs.ts`, which is the only way a routine is fired: the
+fire and the record are one call, so a new button cannot start a run the app
+does not know about. Recording a run never fails the press — by then the
+routine is already going, and saying it is not would be the worse lie.
 
 ### `plan_dependencies`
 
@@ -347,6 +366,29 @@ The batch button is the one to think twice about. There is no review point
 between its steps, so a step that gets something wrong early has the rest
 built on top of it before anybody looks. Send a migration on its own; batch
 the rest once you have seen what it did.
+
+### Claims, and giving them back
+
+`in_progress` means one thing: somebody has this step in hand right now. A
+session writes it when it claims a step and clears it when it closes one, and
+a session that dies does neither — so the row went on saying underway for the
+rest of the day, which is note 60a0ad01 and the reason #494 exists.
+
+Two halves. `lib/plan/elapsed.ts` reads the clock beside the status, so the
+page stops drawing a two-hour-old claim as live and the send guard stops
+refusing work under a feature nothing is touching. `inngest/dev/claims.ts` is
+the other half: a stage of the daily cron that writes those rows back to
+`not_started` with a dated line in `comment` saying the claim expired. Without
+it the reading is only on the page, and the CLI, the brief and the next session
+all still take the status at its word.
+
+A claim is taken back for one of two reasons, both in `lib/plan/claims.ts`:
+nothing has touched it for two hours, or it has no assignee at all. The second
+is why both the page's status control and `plan.ts start` now name who holds a
+step they mark underway — a claim nobody is on is one nothing is working.
+
+Two hours is a threshold and not evidence, and a long batch is called stale
+while it is still going. #499 replaces it with the run itself.
 
 ## The reading
 

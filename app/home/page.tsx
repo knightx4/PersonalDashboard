@@ -150,6 +150,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-full">
       <AppShell
+        account={user.id}
         module={null}
         sections={[]}
         displayName={settings.displayName}
@@ -208,12 +209,12 @@ export default async function HomePage() {
                   {brief.href ? (
                     <Link
                       href={brief.href}
-                      className="min-w-0 flex-1 truncate text-lead text-ink hover:text-accent"
+                      className="min-w-0 flex-1 truncate text-body text-ink hover:text-accent"
                     >
                       {brief.text}
                     </Link>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate text-lead text-ink">{brief.text}</span>
+                    <span className="min-w-0 flex-1 truncate text-body text-ink">{brief.text}</span>
                   )}
                   {brief.tone === 'caution' && (
                     <span className="size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />

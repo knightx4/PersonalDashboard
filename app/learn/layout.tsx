@@ -9,7 +9,7 @@ import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
-import { countReadyToLearn } from '@/lib/learn/graph/load';
+import { countNext } from '@/lib/learn/graph/load';
 
 /**
  * Shell for the learn workspace.
@@ -48,9 +48,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
    * the column.
    */
   const learnClient = await createLearnClient();
-  const [readNow, readyToLearn] = await Promise.all([
+  const [readNow, learnNext] = await Promise.all([
     countReadNow(learnClient),
-    countReadyToLearn(learnClient),
+    countNext(learnClient),
   ]);
 
   const sections: NavSection[] = [
@@ -79,14 +79,16 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
     },
     // Learn next earns a tab on the same argument Read now does: it is not a
-    // deeper view of a subject, it is every subject's ready concepts on one
-    // screen, and the badge answers "is there anything" from the column.
+    // deeper view of a subject, it is every subject's next thing on one
+    // screen, and the badge answers "is there anything" from the column. The
+    // count is the rows the page would draw, so tapping the tab never finds a
+    // different number of them.
     {
       href: '/learn/next',
       label: 'Learn next',
       icon: 'learnNext',
       exact: true,
-      badge: readyToLearn,
+      badge: learnNext,
     },
     // Quizzes are not a deeper view of anything else here: they are over
     // material you chose out of the vault rather than over a subject the graph
@@ -114,6 +116,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   return (
     <div data-workspace="learn">
       <AppShell
+        account={user.id}
         module="learn"
         sections={sections}
         displayName={profile?.display_name ?? null}

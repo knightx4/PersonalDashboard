@@ -29,6 +29,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }

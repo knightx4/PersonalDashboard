@@ -32,6 +32,7 @@ import { ReadingCard } from '@/components/learn/reading-card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
+import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import {
@@ -1487,6 +1488,20 @@ function SharedDisplayOptions() {
   );
 }
 
+/** The job search's ten sections, as its layout lists them. */
+const shellSections: NavSection[] = [
+  { href: '/jobs/today', label: 'This week', icon: 'week' },
+  { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+  { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
+  { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
+  { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
+  { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+  { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
+  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
+  { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -1792,6 +1807,38 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'wide',
     render: () => <SharedDisplayOptions />,
+  },
+
+  {
+    /* The whole shell, which no other surface shows: the sidebar, the top bar,
+     * and a real page inside them. Every other entry here is a panel on the
+     * page's ground, so the chrome -- where most of the app's character
+     * actually lives -- had never been photographed at all.
+     *
+     * The props are the ones app/jobs/(app)/layout.tsx passes, copied rather
+     * than imported because that layout reads a session and a database and
+     * this route reads neither. */
+    id: 'shell-full',
+    label: 'The shell · Sidebar, top bar and a page',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AppShell
+        account="preview"
+        module="jobs"
+        sections={shellSections}
+        settingsHref="/jobs/settings"
+        settingsLabel="Job search settings"
+        feedbackHref="/dev/bugs"
+        displayName="Chris"
+        email="chris@example.com"
+        counts={{ jobs: '12', shopping: '3', todo: '8' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+      >
+        <TodayLists board={todayBoard} timezone="Europe/London" />
+      </AppShell>
+    ),
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

@@ -152,6 +152,12 @@ export type PlanItem = {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /**
+   * The last write to this row, kept by a trigger. What the working views
+   * order features by: the feature you touched last is the one you are on,
+   * and a step closing counts as touching the feature above it.
+   */
+  updatedAt: string;
 };
 
 /** `itemId` cannot start until `dependsOnId` is done. */
@@ -170,7 +176,7 @@ export type PlanData = {
 export const ITEM_COLUMNS =
   'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
   'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at, ' +
-  'dismissed_at, fog_dismissed_at';
+  'updated_at, dismissed_at, fog_dismissed_at';
 
 /**
  * Every row of the account's plan, in one read. The whole tree is what the
@@ -254,5 +260,6 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     startedAt: stamp(row.started_at),
     completedAt: stamp(row.completed_at),
     createdAt: stamp(row.created_at) ?? '',
+    updatedAt: stamp(row.updated_at) ?? stamp(row.created_at) ?? '',
   };
 }

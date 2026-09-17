@@ -37,6 +37,7 @@ import {
   type PlanActionState,
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { planRowId } from '@/lib/comments/refs';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -58,6 +59,8 @@ import {
   Select,
   Textarea,
 } from '@/components/ui/field';
+import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
+import { DEV_STATE_WORD, PLAN_MOVE_WORD } from '@/lib/dev/words';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
@@ -73,15 +76,19 @@ import {
 } from '@/lib/plan/load';
 import {
   PLAN_HEALTHS,
-  PLAN_VIEWS,
+  PLAN_VIEW_CHIPS,
   PLAN_VIEW_LABEL,
+  PLAN_VIEW_MENU,
   countMatches,
   flatten,
   healthOf as planHealthOf,
+  moveOf as planMoveOf,
+  searchNodes,
   searchSections,
   searchTerms,
   type PlanBand,
   type PlanHealth,
+  type PlanMove,
   type PlanNode,
   type PlanProgress,
   type PlanSection,
@@ -274,6 +281,15 @@ function Progress({
   );
 }
 
+/** Where a view lives. "Open" is the page itself, so it keeps the bare link. */
+function viewHref(view: View): string {
+  return view === 'open' ? '/dev/plan' : `/dev/plan?view=${view}`;
+}
+
+const chipClass = 'press rounded-full px-2.5 py-1 text-small font-medium transition-colors';
+const chipOn = 'bg-accent text-surface';
+const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
+
 /**
  * The numbers across the plan, and the views over it.
  *
@@ -410,21 +426,41 @@ function SummaryStrip({
       </p>
       <SendTheQueue count={queued} />
       <nav aria-label="View" className="ml-auto flex flex-wrap items-center gap-1">
-        {PLAN_VIEWS.map((candidate) => (
+        {PLAN_VIEW_CHIPS.map((candidate) => (
           <Link
             key={candidate}
-            href={candidate === 'open' ? '/dev/plan' : `/dev/plan?view=${candidate}`}
+            href={viewHref(candidate)}
             aria-current={candidate === view ? 'page' : undefined}
-            className={cn(
-              'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-              candidate === view
-                ? 'bg-accent text-surface'
-                : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-            )}
+            className={cn(chipClass, candidate === view ? chipOn : chipOff)}
           >
             {PLAN_VIEW_LABEL[candidate]}
           </Link>
         ))}
+        {/* The other four. Nothing is lost by moving a view off the row -- it
+            is a link in here, and most of them are a link on the counts to the
+            left as well -- and the trigger says which one you are on when it is
+            one of these, so the row still answers "where am I". */}
+        <ActionMenu
+          label="More views"
+          align="end"
+          trigger={
+            <span className="inline-flex items-center gap-1">
+              {PLAN_VIEW_MENU.includes(view) ? PLAN_VIEW_LABEL[view] : 'More'}
+              <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+            </span>
+          }
+          triggerClassName={cn(
+            chipClass,
+            'gap-1',
+            PLAN_VIEW_MENU.includes(view) ? chipOn : chipOff,
+          )}
+          items={PLAN_VIEW_MENU.map((candidate) => ({
+            id: candidate,
+            label: PLAN_VIEW_LABEL[candidate],
+            href: viewHref(candidate),
+            current: candidate === view,
+          }))}
+        />
       </nav>
     </div>
   );
@@ -1569,7 +1605,13 @@ function Underway({ startedAt, assignee }: { startedAt: string; assignee: string
  */
 type Health = {
   word: string;
-  tone: 'quiet' | 'ghost' | 'accent' | 'info' | 'positive' | 'caution';
+  /**
+   * The six the dev pages share. `info` is the app's blue and deliberately not
+   * `accent`: the accent is whichever hue the workspace you are standing in
+   * owns, so an accent-toned state is a different colour on every page and
+   * slate on this one.
+   */
+  tone: DevTone;
   title?: string;
 };
 
@@ -1581,6 +1623,12 @@ type Health = {
  * Which shape it draws is in lib/status-glyphs.ts, beside the pipeline's and
  * the todo list's, so a state here looks like the same state there. What is
  * left is the word, the tone and the fixed part of the tooltip.
+ *
+ * Five of the ten are states the other dev queues have too, and those words
+ * come from lib/dev/words.ts so a dropped step and a declined note read alike.
+ * The other five are the plan's own refinements -- a question, a proposal, a
+ * step waiting on another step, a step nobody has reached -- and no other queue
+ * has anything for them to disagree with.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
@@ -1594,8 +1642,17 @@ const HEALTH: Record<PlanHealth, Health> = {
     tone: 'accent',
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
-  in_progress: { word: 'In progress', tone: 'accent' },
-  blocked: { word: 'Blocked', tone: 'caution' },
+  in_progress: { word: DEV_STATE_WORD.working, tone: 'accent' },
+  // "Waiting on you" rather than "Blocked", which said a step was stuck and not
+  // who could unstick it. The notes queue says the same thing about a note
+  // blocked on an answer, and now says it in the same words.
+  blocked: {
+    word: DEV_STATE_WORD.waiting,
+    tone: 'caution',
+    title: 'Stopped on something only you can settle. The note says what.',
+  },
+  // A step waiting on another step, which clears itself. Nothing else to say
+  // "on you" about, and the plan is the only queue that has it.
   waiting: { word: 'Waiting', tone: 'caution' },
   // Blue, not green. Ready and done were both `positive`, so the one state
   // that is an invitation to start read at a glance as the state that needs
@@ -1607,10 +1664,10 @@ const HEALTH: Record<PlanHealth, Health> = {
   // in this comment and rendered as grey on the only page that shows it.
   // `info` is the app's own blue, themed in all five palettes, and it does
   // not move when the workspace does.
-  ready: { word: 'Ready', tone: 'info' },
+  ready: { word: DEV_STATE_WORD.ready, tone: 'info' },
   not_started: { word: 'Not started', tone: 'quiet' },
-  done: { word: 'Done', tone: 'positive' },
-  dropped: { word: 'Dropped', tone: 'ghost' },
+  done: { word: DEV_STATE_WORD.done, tone: 'positive' },
+  dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
 };
 
 function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {
@@ -1641,6 +1698,57 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth
     };
   }
   return base;
+}
+
+/**
+ * The Status column, worded and toned.
+ *
+ * "Needs you" takes caution, which is the tone every dev queue already spends
+ * on a row stopped on the person. "With Dash" takes the accent because a
+ * session running right now is the one thing on this page that is changing
+ * while you look at it. "For Dash" takes the same blue "Ready" does in the
+ * health column beside it -- the two are saying the same thing from two sides,
+ * and a step that is ready and handed over should not read as two unrelated
+ * facts. The rest are ink: nothing is claimed about work that is simply yours
+ * or simply waiting its turn.
+ *
+ * The tooltip is where the rollup is explained. A feature reporting "With Dash"
+ * because its third step is with a session would otherwise be a word with no
+ * visible cause, which is the complaint the whole column exists to answer.
+ */
+const MOVE_TONE: Record<PlanMove, Health['tone']> = {
+  on_you: 'caution',
+  with_dash: 'accent',
+  for_dash: 'info',
+  waiting: 'quiet',
+  yours: 'quiet',
+  settled: 'ghost',
+};
+
+const MOVE_TITLE: Record<PlanMove, string> = {
+  on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
+  with_dash: 'A session is working on this now.',
+  for_dash: 'Handed to Dash, waiting for a session to pick it up.',
+  waiting: 'Held up by another step that has not closed.',
+  yours: 'Nobody has handed this anywhere. It is yours to pick up or hand over.',
+  settled: 'Nothing left to do on this one.',
+};
+
+function moveFor(node: PlanNode): { word: string; tone: Health['tone']; title?: string } {
+  const move = planMoveOf(node);
+  const own = ownMoveWord(node);
+  return {
+    word: PLAN_MOVE_WORD[move],
+    tone: MOVE_TONE[move],
+    // Said only where it is not obvious from the row itself: a leaf reporting
+    // its own move needs no explanation of where the word came from.
+    title: own === move ? MOVE_TITLE[move] : `${MOVE_TITLE[move]} (from a step beneath this one.)`,
+  };
+}
+
+/** What this row alone would say, to tell a rollup from a row's own state. */
+function ownMoveWord(node: PlanNode): PlanMove {
+  return planMoveOf({ ...node, children: [] });
 }
 
 /**
@@ -1696,25 +1804,6 @@ function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
   );
 }
 
-/**
- * `info` is the app's blue, and it is deliberately not `accent`.
- *
- * The accent is whichever hue the workspace you are standing in owns, so an
- * accent-toned state is a different colour on every page and slate on this
- * one. A state that means the same thing everywhere needs a hue that does
- * too. `status-submitted` is that blue: defined in all five palettes, and
- * already read as a general "info" outside the pipeline it is named for --
- * see the jobs activity feed, which tones its info lines with it.
- */
-const TONE_TEXT: Record<Health['tone'], string> = {
-  quiet: 'text-ink-muted',
-  ghost: 'text-ink-ghost',
-  accent: 'text-accent',
-  info: 'text-status-submitted',
-  positive: 'text-positive',
-  caution: 'text-caution',
-};
-
 const TONE_DOT: Record<Health['tone'], string> = {
   quiet: 'bg-ink-ghost',
   ghost: 'bg-ink-ghost',
@@ -1736,9 +1825,12 @@ const TONE_DOT: Record<Health['tone'], string> = {
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
 // because a column that widens under the pointer moves every row beside it.
+// Status sits directly after Health, because the two are read together -- "how
+// far along, and who has it" is one question asked twice -- and a column
+// between them would make that a comparison across the row.
 const ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_7.25rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_5.5rem_6rem_8rem]';
+  'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
 const LEVEL = 'w-5';
@@ -1754,6 +1846,7 @@ function ColumnHeader() {
     >
       <span>Step</span>
       <span>Health</span>
+      <span className="hidden sm:block">Status</span>
       <span className="hidden sm:block">Priority</span>
       <span className="hidden sm:block">Steps</span>
       <span />
@@ -1917,6 +2010,7 @@ function PlanRow({
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
   const health = healthOf(node);
+  const move = moveFor(node);
 
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
@@ -2059,10 +2153,13 @@ function PlanRow({
 
   return (
     <>
+      {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
+          the row clear of the pinned header it would otherwise arrive under. */}
       <li
+        id={planRowId(node.number)}
         className={cn(
           ROW_GRID,
-          'group px-3',
+          'group scroll-mt-24 px-3',
           gloss && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
           closed && 'opacity-70',
@@ -2227,21 +2324,48 @@ function PlanRow({
             TONE_TEXT[health.tone],
           )}
           trigger={
-            <span className="inline-flex items-center gap-1.5" title={health.title}>
-              {/* No glyph on a dropped row. The slash was a third way of
-                  saying what the ghost tone and the struck-through title
-                  already say, on the one state nobody is scanning for -- so it
-                  read as clutter beside the rows that are still live, which is
-                  where the eye is actually going (law 15). Every other state
-                  keeps its shape: those are the ones being scanned, and the
-                  glyph is how they are told apart at a glance. The count
-                  beside the module heading keeps its slash too, because there
-                  a bare number would say nothing at all. */}
-              {health.name !== 'dropped' && <StatusGlyph glyph={health.glyph} />}
-              <span className="truncate">{health.word}</span>
-            </span>
+            <StateLabel
+              // Inherits the trigger's own text size and tone, which is what
+              // makes the health a word you click rather than a badge inside a
+              // button.
+              className="text-inherit"
+              tone={health.tone}
+              title={health.title}
+              word={health.word}
+              // No glyph on a dropped row. The slash was a third way of
+              // saying what the ghost tone and the struck-through title
+              // already say, on the one state nobody is scanning for -- so it
+              // read as clutter beside the rows that are still live, which is
+              // where the eye is actually going (law 15). Every other state
+              // keeps its shape: those are the ones being scanned, and the
+              // glyph is how they are told apart at a glance. The count
+              // beside the module heading keeps its slash too, because there
+              // a bare number would say nothing at all.
+              glyph={health.name === 'dropped' ? null : health.glyph}
+            />
           }
         />
+
+        {/* Whose move it is, beside how far along it is.
+
+            A word and a tone, and deliberately no glyph: the hexagons belong to
+            health, they are a scale from empty to full, and a second column of
+            shapes beside them would read as a second position on the same scale
+            rather than as an answer to a different question. Law 4 -- if none
+            of the meanings is true, use ink and a shape, and here the shape is
+            the column itself.
+
+            Not a menu, where health is one. Health is set by hand; this is
+            derived from what is already true of the row -- who it is assigned
+            to, what it waits on, whether it is a question -- so there is
+            nothing here to pick. Changing it means handing the step over or
+            answering what it asks, which are the buttons already on the row. */}
+        <span
+          className={cn('hidden truncate text-small sm:block', TONE_TEXT[move.tone])}
+          title={move.title}
+        >
+          {move.word}
+        </span>
 
         <span className="hidden truncate text-small sm:block">
           {node.priority === 1 && <span className="text-accent">Next</span>}
@@ -2623,6 +2747,7 @@ function SearchThePlan({
 
 export function PlanView({
   sections,
+  finished,
   summary,
   view,
   catalog,
@@ -2631,6 +2756,8 @@ export function PlanView({
   queued,
 }: {
   sections: PlanSection[];
+  /** The finished features, for the fold at the foot of Everything. */
+  finished: PlanNode[];
   summary: PlanSummary;
   view: View;
   catalog: PlanCatalogEntry[];
@@ -2650,11 +2777,21 @@ export function PlanView({
     () => (searching ? searchSections(sections, query) : sections),
     [sections, query, searching],
   );
-  const hits = useMemo(() => (searching ? countMatches(shown) : 0), [shown, searching]);
+  // The archive searches with everything else. "Did I already plan that" is
+  // the question a finished feature gets asked, and it is asked by typing.
+  const found = useMemo(
+    () => (searching ? searchNodes(finished, query) : finished),
+    [finished, query, searching],
+  );
+  const hits = useMemo(
+    () => (searching ? countMatches(shown) + flatten(found).filter((n) => n.matches).length : 0),
+    [shown, found, searching],
+  );
 
   if (empty) return <ImportTheBuildOrder />;
 
-  const nothingToShow = shown.every((section) => section.nodes.length === 0);
+  const nothingToShow =
+    shown.every((section) => section.nodes.length === 0) && found.length === 0;
 
   return (
     <div className="space-y-6">
@@ -2721,7 +2858,7 @@ export function PlanView({
                   'group-open/section:border-b group-open/section:border-border',
                 )}
               >
-                <h2 className="flex items-center gap-2 text-lead font-semibold text-ink">
+                <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
                   <ChevronRight
                     aria-hidden
                     strokeWidth={2}
@@ -2784,10 +2921,62 @@ export function PlanView({
         })}
       </div>
 
+      {/* What is finished, out of the way but not gone. Folded shut, newest
+          first, and only on Everything -- every other view dropped these rows
+          before the page saw them. A search opens it, because "did I already
+          plan that" is the question it exists to answer. */}
+      {found.length > 0 && (
+        <details
+          key={searching ? 'finished:found' : 'finished'}
+          open={searching}
+          className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
+        >
+          <summary
+            className={cn(
+              'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
+              'px-3 py-2.5 [&::-webkit-details-marker]:hidden',
+              'transition-colors duration-150 hover:bg-sunken',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2',
+              'group-open/section:border-b group-open/section:border-border',
+            )}
+          >
+            <h2 className="flex items-center gap-2 text-body font-semibold text-ink">
+              <ChevronRight
+                aria-hidden
+                strokeWidth={2}
+                className="size-4 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
+              />
+              Finished
+            </h2>
+            <span className="text-ui text-ink-muted">
+              <span className="tabular font-semibold text-ink">{found.length}</span>{' '}
+              {found.length === 1 ? 'feature' : 'features'}
+            </span>
+          </summary>
+          <ul className="divide-y divide-border">
+            <ColumnHeader />
+            {found.map((node) => (
+              <PlanRow
+                key={node.id}
+                node={node}
+                trail={[]}
+                catalog={catalog}
+                canSend={canSend}
+                view={view}
+                searching={searching}
+              />
+            ))}
+          </ul>
+        </details>
+      )}
+
       {/* The app-wide list is not offered as a section until something is in
-          it, so this is the only way to put the first thing there. */}
+          it, so this is the only way to put the first thing there. Only on
+          Everything, which is where the empty sections live now: drawing this
+          heading over the open view would put back the one thing dropping
+          them took away. */}
       {!searching &&
-        (view === 'open' || view === 'all') &&
+        view === 'all' &&
         !sections.some((section) => section.module === null) && (
           <section className="space-y-2">
             <h2 className="text-body font-semibold text-ink">The app as a whole</h2>

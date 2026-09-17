@@ -4,12 +4,19 @@ import {
   ancestorsOf,
   applyView,
   buildPlanTree,
+  splitFinished,
+  searchNodes,
+  touchedAt,
+  PLAN_VIEWS,
+  PLAN_VIEW_CHIPS,
+  PLAN_VIEW_MENU,
   findNode,
   flattenSections,
   isReady,
   isWaitingOnThePerson,
   leavesOf,
   healthOf,
+  moveOf,
   planProgress,
   subtreeIds,
   handedToClaude,
@@ -47,6 +54,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -395,10 +403,171 @@ describe('applyView', () => {
     expect(applyView(fixture(), 'claude').map((s) => s.module)).toEqual(['shopping']);
   });
 
-  it('keeps every module under "open", because that is where a plan gets written', () => {
-    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(
+  it('drops a module with nothing open from "open" as well', () => {
+    // 'jobs' holds one finished feature and one step waiting on another, so it
+    // stays; the modules with nothing at all in them go. It is drawn first
+    // because its open step is the newest row in the fixture.
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['jobs', 'shopping']);
+  });
+
+  it('keeps every module under "all", because that is where a plan gets written', () => {
+    expect(applyView(fixture(), 'all').map((s) => s.module)).toEqual(
       fixture().map((s) => s.module),
     );
+  });
+});
+
+describe('the chip row', () => {
+  it('draws five views and keeps every other one in the menu', () => {
+    expect([...PLAN_VIEW_CHIPS]).toEqual(['open', 'ready', 'you', 'claude', 'all']);
+    expect([...PLAN_VIEW_CHIPS, ...PLAN_VIEW_MENU].sort()).toEqual([...PLAN_VIEWS].sort());
+    expect(PLAN_VIEW_MENU.some((view) => (PLAN_VIEW_CHIPS as readonly string[]).includes(view)))
+      .toBe(false);
+  });
+});
+
+describe('ordering by what was touched last', () => {
+  const fixture = () =>
+    tree([
+      item({ id: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'first-step', parentId: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
+      item({ id: 'second', position: 20, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'third', position: 30, updatedAt: '2026-01-15T00:00:00Z' }),
+      // The step was closed this morning; its feature is the one being worked.
+      at('done', 'third-step', {
+        parentId: 'third',
+        position: 10,
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'third-next', parentId: 'third', position: 20, updatedAt: '2026-01-15T00:00:00Z' }),
+    ]);
+
+  it('puts the feature worked most recently at the top of a working view', () => {
+    expect(shopping(applyView(fixture(), 'open')).nodes.map((node) => node.id)).toEqual([
+      'third',
+      'second',
+      'first',
+    ]);
+  });
+
+  it('leaves the steps under a feature in the order they are built in', () => {
+    const third = shopping(applyView(fixture(), 'open')).nodes[0];
+    expect(third.children.map((node) => node.id)).toEqual(['third-next']);
+    expect(shopping(applyView(fixture(), 'all')).nodes[2].children.map((n) => n.id)).toEqual([
+      'third-step',
+      'third-next',
+    ]);
+  });
+
+  it('leaves "all" in the plan’s own order', () => {
+    expect(shopping(applyView(fixture(), 'all')).nodes.map((node) => node.id)).toEqual([
+      'first',
+      'second',
+      'third',
+    ]);
+  });
+
+  it('reads a feature’s recency off the newest step beneath it', () => {
+    const third = findNode(applyView(fixture(), 'all'), 'third')!;
+    expect(touchedAt(third)).toBe('2026-03-01T00:00:00Z');
+  });
+});
+
+describe('ordering the module sections', () => {
+  // The app-wide section is fixed last, so a feature worked this morning under
+  // it sits below every module's work until the sections sort too -- #517.
+  const fixture = () =>
+    tree([
+      item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
+      item({
+        id: 'shop-step',
+        parentId: 'shop',
+        module: 'shopping',
+        updatedAt: '2026-01-01T00:00:00Z',
+      }),
+      item({ id: 'job', module: 'jobs', updatedAt: '2026-01-10T00:00:00Z' }),
+      item({ id: 'job-step', parentId: 'job', module: 'jobs', updatedAt: '2026-01-10T00:00:00Z' }),
+      item({ id: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
+      item({ id: 'wide-step', parentId: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
+    ]);
+
+  it('draws the module holding the newest work first', () => {
+    expect(applyView(fixture(), 'open').map((section) => section.module)).toEqual([
+      null,
+      'jobs',
+      'shopping',
+    ]);
+  });
+
+  it('reads a section’s recency off a step the view has dropped', () => {
+    const sections = tree([
+      item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
+      // Closed this morning, so it is gone from "open" and its module is still
+      // the one being worked in.
+      at('done', 'shop-step', {
+        parentId: 'shop',
+        module: 'shopping',
+        updatedAt: '2026-03-01T00:00:00Z',
+      }),
+      item({ id: 'job', module: 'jobs', updatedAt: '2026-02-01T00:00:00Z' }),
+    ]);
+    expect(applyView(sections, 'open').map((section) => section.module)).toEqual([
+      'shopping',
+      'jobs',
+    ]);
+  });
+
+  it('leaves the features and steps inside a section as they were', () => {
+    const [section] = applyView(fixture(), 'open');
+    expect(section.nodes.map((node) => node.id)).toEqual(['wide']);
+    expect(section.nodes[0].children.map((node) => node.id)).toEqual(['wide-step']);
+  });
+
+  it('leaves "Everything" in the fixed module order', () => {
+    expect(applyView(fixture(), 'all').map((section) => section.module)).toEqual(
+      fixture().map((section) => section.module),
+    );
+  });
+});
+
+describe('splitFinished', () => {
+  const fixture = () =>
+    tree([
+      at('done', 'shipped', { position: 10, completedAt: '2026-02-01T00:00:00Z' }),
+      at('done', 'shipped-step', { parentId: 'shipped' }),
+      at('done', 'older', { position: 20, completedAt: '2026-01-01T00:00:00Z' }),
+      at('dropped', 'abandoned', { position: 30, completedAt: '2026-03-01T00:00:00Z' }),
+      at('done', 'half', { position: 40, completedAt: '2026-02-15T00:00:00Z' }),
+      at('not_started', 'half-step', { parentId: 'half' }),
+      item({ id: 'live', position: 50 }),
+    ]);
+
+  it('lifts the features with nothing left in them, newest first', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    expect(finished.map((node) => node.id)).toEqual(['abandoned', 'shipped', 'older']);
+  });
+
+  it('leaves the modules holding what is still being worked', () => {
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.flatMap((section) => section.nodes).map((node) => node.id)).toEqual([
+      'half',
+      'live',
+    ]);
+  });
+
+  it('leaves a module its progress, which is over the whole module either way', () => {
+    const before = shopping(fixture()).progress;
+    const { sections } = splitFinished(applyView(fixture(), 'all'));
+    expect(sections.find((section) => section.module === 'shopping')!.progress).toEqual(before);
+  });
+
+  it('finds a folded feature by number, title or detail', () => {
+    const { finished } = splitFinished(applyView(fixture(), 'all'));
+    const shipped = finished.find((node) => node.id === 'shipped')!;
+    expect(searchNodes(finished, `#${shipped.number}`).map((node) => node.id)).toEqual(['shipped']);
+    // Every term has to match the same row, as it does in a module section.
+    expect(searchNodes(finished, 'shipped older').map((node) => node.id)).toEqual([]);
+    expect(searchNodes(finished, '').map((node) => node.id)).toEqual(finished.map((n) => n.id));
   });
 });
 
@@ -1044,5 +1213,157 @@ describe('searchSections', () => {
 
   it('ignores case', () => {
     expect(countMatches(searchSections(plan(), 'SHELF'))).toBe(1);
+  });
+});
+
+/**
+ * Health says how far along; the move says whose it is. The two were one word
+ * until #fa32dfaa, and these are the cases that separate them.
+ */
+describe('healthOf, over a subtree that has started', () => {
+  const feature = (children: PlanItem[]) =>
+    shopping(tree([at('not_started', 'f'), ...children]));
+
+  it('calls a feature in progress once a step beneath it is done', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+
+  it('calls it in progress while a step beneath it is being worked', () => {
+    const sections = feature([at('in_progress', 's1', { parentId: 'f' })]);
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
+  });
+
+  it('leaves a feature nobody has touched not started', () => {
+    const sections = feature([
+      at('not_started', 's1', { parentId: 'f' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  // Answering the opening question is not building the thing.
+  it('does not count an answered question as work started', () => {
+    const sections = feature([
+      at('done', 'q', { parentId: 'f', kind: 'decision' }),
+      at('not_started', 's1', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  // 'ready' rather than 'not_started' because a feature with no live work
+  // beneath it is startable; what matters here is that it is not in_progress.
+  it('does not count a step that was put aside', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f', dismissedAt: '2026-01-02T00:00:00Z' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('ready');
+  });
+
+  it('leaves a leaf step alone', () => {
+    expect(healthOf(shopping(tree([at('not_started', 'a')])).nodes[0])).toBe('ready');
+  });
+});
+
+describe('moveOf', () => {
+  const only = (items: PlanItem[]) => shopping(tree(items)).nodes[0];
+
+  it('is yours when nobody has handed it anywhere', () => {
+    expect(moveOf(only([at('not_started', 'a')]))).toBe('yours');
+  });
+
+  it('is for Dash once it is assigned', () => {
+    expect(moveOf(only([at('not_started', 'a', { assignee: 'claude' })]))).toBe('for_dash');
+  });
+
+  it('is with Dash while a session is on it', () => {
+    expect(moveOf(only([at('in_progress', 'a', { assignee: 'claude' })]))).toBe('with_dash');
+  });
+
+  it('is still yours when you are the one working on it', () => {
+    expect(moveOf(only([at('in_progress', 'a')]))).toBe('yours');
+  });
+
+  it('needs you for a question nobody has answered', () => {
+    expect(moveOf(only([at('not_started', 'a', { kind: 'decision' })]))).toBe('on_you');
+  });
+
+  it('needs you for a proposal nobody has approved', () => {
+    expect(moveOf(only([at('proposed', 'a')]))).toBe('on_you');
+  });
+
+  // Assigned to Dash and blocked is still yours: a session sent there would
+  // sit in front of the same wall. Same rule `isWaitingOnThePerson` enforces.
+  it('needs you for a blocked step even when it is assigned to Dash', () => {
+    expect(moveOf(only([at('blocked', 'a', { assignee: 'claude' })]))).toBe('on_you');
+  });
+
+  it('is held up when another step is in the way', () => {
+    const sections = shopping(
+      tree([at('not_started', 'a'), at('not_started', 'b')], [dep('a', 'b')]),
+    );
+    expect(moveOf(findNode([sections], 'a')!)).toBe('waiting');
+  });
+
+  it('is settled once it closes', () => {
+    expect(moveOf(only([at('done', 'a')]))).toBe('settled');
+    expect(moveOf(only([at('dropped', 'a')]))).toBe('settled');
+  });
+
+  describe('over a subtree', () => {
+    const feature = (children: PlanItem[]) =>
+      shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
+
+    it('reports a session working beneath it', () => {
+      expect(
+        moveOf(feature([at('in_progress', 's1', { parentId: 'f', assignee: 'claude' })])),
+      ).toBe('with_dash');
+    });
+
+    it('reports the most pressing of several', () => {
+      expect(
+        moveOf(
+          feature([
+            at('in_progress', 's1', { parentId: 'f', assignee: 'claude' }),
+            at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+          ]),
+        ),
+      ).toBe('on_you');
+    });
+
+    // The same rule healthOf keeps: closed on top of something open is not
+    // closed, and a question added under a shipped feature is still a question.
+    it('reports a question added under a finished feature', () => {
+      const sections = shopping(
+        tree([
+          at('done', 'f'),
+          at('done', 's1', { parentId: 'f' }),
+          at('not_started', 'q', { parentId: 'f', kind: 'decision' }),
+        ]),
+      );
+      expect(moveOf(sections.nodes[0])).toBe('on_you');
+    });
+
+    it('is settled when everything beneath it is', () => {
+      const sections = shopping(tree([at('done', 'f'), at('done', 's1', { parentId: 'f' })]));
+      expect(moveOf(sections.nodes[0])).toBe('settled');
+    });
+
+    it('ignores a step that was put aside', () => {
+      expect(
+        moveOf(
+          feature([
+            at('not_started', 'q', {
+              parentId: 'f',
+              kind: 'decision',
+              dismissedAt: '2026-01-02T00:00:00Z',
+            }),
+          ]),
+        ),
+      ).toBe('yours');
+    });
   });
 });

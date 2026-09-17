@@ -19,6 +19,7 @@ import {
   Lightbulb,
   List,
   ListTodo,
+  Mail,
   Map,
   Network,
   PencilLine,
@@ -100,6 +101,10 @@ export const NAV_ICONS = {
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.
   quiz: PencilLine,
+  // News. An envelope, the same object the workspace's own mark draws, because
+  // the tab and the mark name the same thing and picking a second object for
+  // it would say there are two.
+  newsletters: Mail,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

@@ -22,7 +22,10 @@ import {
 } from '@/lib/learn/graph/ready';
 import {
   rankNext,
+  recordWindowStart,
   NEXT_LIMIT,
+  type NextOutcome,
+  type NextRecord,
   type NextRow,
   type QueuedReading,
 } from '@/lib/learn/next/rank';
@@ -427,12 +430,99 @@ async function everywhere(supabase: LearnSupabaseClient): Promise<{
   };
 }
 
-/** What to learn next: the ranked few, for the screen. */
-export async function loadReadyToLearn(
+type OutcomeRow = {
+  concept_id: string | null;
+  reading_id: string | null;
+  outcome: NextOutcome;
+  happened_at: string;
+};
+
+/**
+ * What you have done with what Learn next offered, recently.
+ *
+ * `learn.next_outcomes` holds a claim or a reading, and the order needs the
+ * subject as well -- a subject you are getting through is what lifts its other
+ * rows. So a reading is followed to the claim it was queued against and the
+ * claim to its subject, two reads by id that only run when there is something
+ * to look up. Nothing is written here and nothing is inferred from a page
+ * being opened; the rows this reads are written by the probe action, the
+ * reading status action and Not now.
+ */
+async function loadNextRecord(
   supabase: LearnSupabaseClient,
-  limit: number = READY_LIMIT,
-): Promise<ReadyConcept[]> {
-  return rankReady((await everywhere(supabase)).ready, limit);
+  now: Date,
+): Promise<NextRecord[]> {
+  const { data, error } = await supabase
+    .from('next_outcomes')
+    .select('concept_id, reading_id, outcome, happened_at')
+    .gte('happened_at', recordWindowStart(now).toISOString())
+    .order('happened_at', { ascending: false });
+
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw fail('Reading what you have done', error);
+
+  const rows = (data ?? []) as unknown as OutcomeRow[];
+  if (rows.length === 0) return [];
+
+  const readingIds = [...new Set(rows.map((row) => row.reading_id).filter((id) => id !== null))];
+  const claimOfReading = new Map<string, string>();
+  if (readingIds.length > 0) {
+    const { data: readings, error: readingError } = await supabase
+      .from('readings')
+      .select('id, concept_id')
+      .in('id', readingIds);
+
+    assertSchemaExposed(readingError, LEARN_SCHEMA);
+    if (readingError) throw fail('Reading what you have read', readingError);
+
+    for (const reading of (readings ?? []) as unknown as {
+      id: string;
+      concept_id: string | null;
+    }[]) {
+      if (reading.concept_id !== null) claimOfReading.set(reading.id, reading.concept_id);
+    }
+  }
+
+  const conceptIds = [
+    ...new Set(
+      rows
+        .map((row) => row.concept_id ?? (row.reading_id && claimOfReading.get(row.reading_id)))
+        .filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
+
+  const subjectOfClaim = new Map<string, string>();
+  if (conceptIds.length > 0) {
+    const { data: concepts, error: conceptError } = await supabase
+      .from('concepts')
+      .select('id, subject_id')
+      .in('id', conceptIds);
+
+    assertSchemaExposed(conceptError, LEARN_SCHEMA);
+    if (conceptError) throw fail('Reading which subject those claims are in', conceptError);
+
+    for (const concept of (concepts ?? []) as unknown as {
+      id: string;
+      subject_id: string;
+    }[]) {
+      subjectOfClaim.set(concept.id, concept.subject_id);
+    }
+  }
+
+  return rows.map((row) => {
+    const conceptId =
+      row.concept_id ?? (row.reading_id ? claimOfReading.get(row.reading_id) ?? null : null);
+
+    return {
+      outcome: row.outcome,
+      conceptId,
+      readingId: row.reading_id,
+      // Null when the claim has been deleted since, which credits the outcome
+      // to no subject rather than to a guess.
+      subjectId: conceptId === null ? null : subjectOfClaim.get(conceptId) ?? null,
+      happenedAt: row.happened_at,
+    };
+  });
 }
 
 /**
@@ -453,9 +543,9 @@ export async function loadReadyAndSettled(
 /**
  * What Learn next shows: the three kinds of row, ranked into one list.
  *
- * The same walk as everything else on this page, and the ordering itself is in
- * `lib/learn/next/rank.ts` where it can be tested against rows written by
- * hand. `now` is a parameter for the same reason: what counts as long enough
+ * The same walk as everything else on this page, plus what you have done with
+ * what it offered before, and the ordering itself is in `lib/learn/next/rank.ts`
+ * where it can be tested against rows written by hand. `now` is a parameter for the same reason: what counts as long enough
  * since a claim was answered is a comparison against the clock, and a function
  * that reads the clock itself cannot be tested.
  */
@@ -464,10 +554,21 @@ export async function loadNext(
   limit: number = NEXT_LIMIT,
   now: Date = new Date(),
 ): Promise<NextRow[]> {
-  return rankNext(await everywhere(supabase), now, limit);
+  const [graphs, record] = await Promise.all([everywhere(supabase), loadNextRecord(supabase, now)]);
+  return rankNext({ ...graphs, record }, now, limit);
 }
 
-/** How many are ready in total -- for the tab's badge. */
-export async function countReadyToLearn(supabase: LearnSupabaseClient): Promise<number> {
-  return (await everywhere(supabase)).ready.length;
+/**
+ * How many rows Learn next would show -- for the tab's badge.
+ *
+ * The count is taken from the same ranking the page renders, cut at the same
+ * limit, so the number on the tab and the number of rows on the screen cannot
+ * disagree. A badge reading the ready concepts alone went stale the moment the
+ * page grew re-checks and queued readings.
+ */
+export async function countNext(
+  supabase: LearnSupabaseClient,
+  now: Date = new Date(),
+): Promise<number> {
+  return (await loadNext(supabase, NEXT_LIMIT, now)).length;
 }

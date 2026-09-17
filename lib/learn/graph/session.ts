@@ -272,6 +272,125 @@ export function nextMasteryCheck(
 }
 
 /**
+ * The three rungs, hardest last, as `learn.probe_rung` holds them.
+ *
+ * `defend` is in the enum and nothing returns it yet: the defence rung is not
+ * built, and the picker cannot ask for a question no writer can produce.
+ */
+export type Rung = 'recognise' | 'apply' | 'defend';
+
+/**
+ * One question already asked about a concept, as the picker reads it.
+ *
+ * The columns rather than a verdict, because which of them carries the answer
+ * depends on the rung: a multiple-choice question is answered by picking an
+ * index, and a written one by a grader's judgement on what was typed. Both are
+ * null until the question is answered, which is what makes an abandoned
+ * question different from a wrong one.
+ */
+export type AskedRung = {
+  rung: Rung;
+  masteryCheck: string | null;
+  chosenIndex: number | null;
+  correctIndex: number | null;
+  responseCorrect: boolean | null;
+};
+
+/** Whether a question has been answered at all. */
+function wasAnswered(probe: AskedRung): boolean {
+  return probe.rung === 'recognise' ? probe.chosenIndex !== null : probe.responseCorrect !== null;
+}
+
+/** Whether the answer given was right. False for one nobody has answered. */
+function wasRight(probe: AskedRung): boolean {
+  if (probe.rung === 'recognise') {
+    return probe.chosenIndex !== null && probe.chosenIndex === probe.correctIndex;
+  }
+  return probe.responseCorrect === true;
+}
+
+/**
+ * Which check the applied case is aimed at.
+ *
+ * The one answered wrong most often, and among equals the one written first.
+ * #391 settled that a concept gets one applied case rather than one per check,
+ * aimed at whichever check the multiple-choice answers left weakest, and the
+ * number of times a check was missed on the way to being got right is what
+ * "weakest" can be read off. A concept nothing was ever missed about takes its
+ * first check, since no answer distinguishes them. Misses at every rung count,
+ * so a second case follows the one that was just failed rather than moving on.
+ */
+function weakestCheck(mastery: readonly string[], earlier: readonly AskedRung[]): string | null {
+  if (mastery.length === 0) return null;
+
+  const missed = new Map<string, number>();
+  for (const probe of earlier) {
+    if (probe.masteryCheck === null || !wasAnswered(probe) || wasRight(probe)) continue;
+    missed.set(probe.masteryCheck, (missed.get(probe.masteryCheck) ?? 0) + 1);
+  }
+
+  let chosen = mastery[0];
+  let most = missed.get(chosen) ?? 0;
+  for (const check of mastery.slice(1)) {
+    const count = missed.get(check) ?? 0;
+    if (count > most) {
+      chosen = check;
+      most = count;
+    }
+  }
+
+  return chosen;
+}
+
+/**
+ * Which rung the next question about one concept is asked at, and what it is
+ * aimed at.
+ *
+ * Multiple choice until every check of understanding has been got right at
+ * least once, working through the checks the way it always has, and an applied
+ * case from then on. Getting one check right does not move the concept up:
+ * recognising the idea in one place and not another is the gap the rung is
+ * there to find.
+ *
+ * Read from the answers rather than from the questions, which is the one place
+ * this differs from `nextMasteryCheck`: a question put and abandoned has still
+ * been asked, so it is not put again, but it settled nothing and cannot move a
+ * concept up a rung.
+ *
+ * A concept with no checks has nothing to work through, so one right answer
+ * moves it up, and its applied case is written against the claim itself.
+ *
+ * Once an applied case has been got right the picker stays on `apply`: the
+ * rung above it is the defence, which is not built. A concept that comes round
+ * again after passing gets another case rather than dropping back to the
+ * questions it has already answered.
+ */
+export function nextRung(
+  mastery: readonly string[],
+  /** Every question already asked about this concept, answered or not. */
+  earlier: readonly AskedRung[],
+): { rung: Rung; check: string | null } {
+  const recognise = earlier.filter((probe) => probe.rung === 'recognise');
+
+  const passed =
+    mastery.length === 0
+      ? recognise.some(wasRight)
+      : mastery.every((check) => standingOf(check, recognise) === 'right');
+
+  if (!passed) {
+    return {
+      rung: 'recognise',
+      check: nextMasteryCheck(
+        mastery,
+        recognise.map((probe) => probe.masteryCheck),
+      ),
+    };
+  }
+
+  return { rung: 'apply', check: weakestCheck(mastery, earlier) };
+}
+
+/**
  * Mark a concept as carrying a named misconception.
  *
  * The state and the sentence are one fact -- the database refuses one without
@@ -337,6 +456,12 @@ export type AnswerOutcome = {
   state: 'known' | 'shaky';
   /** How many nodes underneath were marked known by inference. */
   inferred: number;
+  /**
+   * Whether this was the first answer to this question. False when the row had
+   * already been answered, which earns no weight and is not a second thing
+   * done about the claim either.
+   */
+  first: boolean;
 };
 
 /**
@@ -432,10 +557,10 @@ export async function recordAnswer(
 
   // Answering the same row twice earns nothing. The first answer is the one
   // that carried information; a second is a person clicking again.
-  const weight =
-    probe.chosen_index === null
-      ? weightFor({ conclusive: true, correct, standing, wasSettled: input.wasSettled })
-      : 0;
+  const first = probe.chosen_index === null;
+  const weight = first
+    ? weightFor({ conclusive: true, correct, standing, wasSettled: input.wasSettled })
+    : 0;
 
   const { error: answerError } = await supabase
     .from('probes')
@@ -476,5 +601,5 @@ export async function recordAnswer(
       ? await markInferred(supabase, userId, inferredFrom(input.graph, input.conceptId))
       : 0;
 
-  return { correct, reason: probe.reason, weight, state, inferred };
+  return { correct, reason: probe.reason, weight, state, inferred, first };
 }
