@@ -18,6 +18,8 @@
  *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
  *                                # file one follow-on, marked as your suggestion
  *   npx tsx scripts/plan.ts idea --file <path.md>       # file every "## " section of a file
+ *                                # either way, one close to an idea already
+ *                                # filed is refused and names what it matched
  *   npx tsx scripts/plan.ts raise "<title>" --ask "…" --consequence "<action>: <what>"
  *                                [--detail "…"] [--module <id>]
  *                                [--from <n>] [--source "…"]   # ask the person something
@@ -49,6 +51,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
+import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import { reshapeStamp } from '../lib/plan/origin';
@@ -370,6 +373,12 @@ async function main(): Promise<void> {
      * capture panel. So the row is stamped `claude`, the ideas page lists it
      * under their own, and `--from <n>` says which step the session was on
      * when it thought of it.
+     *
+     * It reads the page before writing to it. Sessions wrote 53 of the 55
+     * ideas that were open when this check was added, over four days, several
+     * of them the same thought in different words, because nothing here
+     * looked first. An idea close to one already filed is refused and the
+     * refusal names what it matched (lib/ideas/duplicate.ts).
      */
     if (command === 'idea') {
       const file = arg('--file');
@@ -385,16 +394,46 @@ async function main(): Promise<void> {
       if (ideas.length === 0) {
         fail('Give the idea: idea "…" [--module <id>] [--from <n>], or idea --file <path> with a "## " heading per idea.');
       }
+      /**
+       * What is open on the page, which is what a new idea is checked
+       * against. A shaped idea is in the plan and a dismissed one was put
+       * aside, and neither is a row this would be adding to.
+       */
+      const filed = await sql<{ id: string; body: string }[]>`
+        select id, body from ideas
+        where user_id = ${userId} and plan_item_id is null and dismissed_at is null
+        order by created_at desc`;
+
+      const refusals: string[] = [];
+      let written = 0;
       for (const idea of ideas) {
         if (idea.body.length > 4000) fail(`An idea is at most 4000 characters: "${idea.body.slice(0, 40)}…"`);
+        const match = findDuplicateIdea(idea.body, filed);
+        if (match) {
+          refusals.push(
+            `"${ideaFirstLine(idea.body)}" — ${Math.round(match.score * 100)}% the same words as ` +
+              `${match.idea.id.slice(0, 8)} "${ideaFirstLine(match.idea.body)}"`,
+          );
+          continue;
+        }
         const [row] = await sql<{ id: string }[]>`
           insert into ideas (user_id, body, module, source, from_plan_item_id)
           values (${userId}, ${idea.body}, ${idea.module}, 'claude', ${step?.id ?? null})
           returning id`;
+        // Checked against too, so one --file cannot carry the same idea twice.
+        filed.unshift({ id: row.id, body: idea.body });
+        written += 1;
         console.log(`${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${idea.body.replace(/\s+/g, ' ').slice(0, 90)}`);
       }
+
+      if (refusals.length > 0) {
+        console.error(`\n${refusals.length} not filed; an idea this close is already there:`);
+        for (const line of refusals) console.error(`  ${line}`);
+        console.error('Add what is different to the idea that is already there, or leave it.');
+      }
+      if (written === 0) process.exit(1);
       console.log(
-        `\n${ideas.length} filed as suggestions${step ? ` from #${step.number}` : ''}. ` +
+        `\n${written} filed as suggestions${step ? ` from #${step.number}` : ''}. ` +
           'They are on /dev/ideas, under the user\'s own list.',
       );
       return;
