@@ -25,7 +25,7 @@ import { splitCase } from '@/lib/learn/graph/applied-payload';
 import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
 import { answerKind, recordOutcome } from '@/lib/learn/next/record';
 import { proposeFloor } from '@/lib/learn/graph/floor';
-import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { declareConceptKnown, existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
 import { isSettled, prerequisiteMap, type Concept, type Graph } from '@/lib/learn/graph/model';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
@@ -481,6 +481,61 @@ async function answerApplied(input: {
       couldGoDeeper: !outcome.correct && prerequisites.length === 0,
     },
   };
+}
+
+export type DeclareState = {
+  error?: string;
+  /**
+   * The case that was waved through. Held rather than a bare flag so the
+   * screen can tell this case from the next one and put the answer box back.
+   */
+  probeId?: string;
+};
+
+/**
+ * Wave an applied case through: you already know this one.
+ *
+ * The third thing that can be done with a question, beside picking an option
+ * and typing an answer. Nothing is graded and no model is called, so the
+ * concept is settled on your word: `known`, established `declared`, and no
+ * `tested_at`, which every screen shows as "you said so".
+ *
+ * The case row is left exactly as it was written -- no response, no
+ * `answered_at` -- so it stays in the concept's history as a case that was put
+ * and not answered. Nothing goes to `next_outcomes` either: those record what
+ * came of a row Learn next offered, and nothing here was answered or pushed
+ * aside.
+ *
+ * The rung is read off the stored row rather than taken from the form, the
+ * same rule `answerQuestion` follows. The button only exists on an applied
+ * case, and a multiple-choice question is there to be answered.
+ */
+// latency: pending
+export async function markKnown(_prev: DeclareState, formData: FormData): Promise<DeclareState> {
+  const user = await requireUser();
+
+  const asked = AnsweredQuestion.safeParse({
+    probeId: formData.get('probeId'),
+    conceptId: formData.get('conceptId'),
+    subjectId: formData.get('subjectId'),
+  });
+  if (!asked.success) return { error: 'Could not work out which question that was.' };
+
+  const supabase = await createLearnClient();
+  const askedRow = (await probesFor(supabase, asked.data.conceptId)).find(
+    (probe) => probe.id === asked.data.probeId,
+  );
+  if (!askedRow) return { error: 'That question is not there any more.' };
+  if (askedRow.rung === 'recognise') return { error: 'Pick one of the answers to this one.' };
+
+  try {
+    await declareConceptKnown(supabase, user.id, asked.data.conceptId);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Could not save that.' };
+  }
+
+  revalidatePath(`/learn/s/${asked.data.subjectId}`);
+  return { probeId: asked.data.probeId };
 }
 
 export type FloorState = {

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Textarea } from '@/components/ui/field';
@@ -27,7 +28,14 @@ function GradeButton() {
   );
 }
 
-export function WrittenAnswer({ response }: { response?: string | null }) {
+export function WrittenAnswer({
+  response,
+  beside,
+}: {
+  response?: string | null;
+  /** Anything else that can be done with this case, shown next to Answer. */
+  beside?: ReactNode;
+}) {
   const answered = typeof response === 'string';
 
   return (
@@ -53,8 +61,9 @@ export function WrittenAnswer({ response }: { response?: string | null }) {
       </Field>
 
       {!answered && (
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <GradeButton />
+          {beside}
         </div>
       )}
     </>

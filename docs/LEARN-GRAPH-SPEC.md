@@ -203,6 +203,12 @@ put and abandoned is not put again and settles nothing.
 - **The grader writes its sentence before its verdict**, and both are stored on
   the question beside what was typed. A concept page read a month later has the
   case, the answer expected, the answer given, and why it was marked as it was.
+- **A case about something you are already sure of can be waved through.** A
+  button beside the answer box marks the concept `known`, established
+  `declared`, and no model is called because nothing is typed and nothing is
+  graded. The state reads "you said so" like any other declaration, and the
+  case stays on the concept's history as a question that was put and not
+  answered.
 
 ### The states
 

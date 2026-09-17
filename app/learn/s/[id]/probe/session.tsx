@@ -14,7 +14,9 @@ import {
   approveFloor,
   askQuestion,
   findFloor,
+  markKnown,
   type AskState,
+  type DeclareState,
   type FloorState,
 } from './actions';
 
@@ -59,6 +61,23 @@ function AskButton({ label }: { label: string }) {
   return (
     <Button type="submit" variant="secondary" disabled={pending}>
       {pending ? 'Writing a question…' : label}
+    </Button>
+  );
+}
+
+/**
+ * The way out of a case about something you are already sure of.
+ *
+ * It submits the same form to a different action, which is why it carries
+ * `formAction` and turns the browser's validation off: the answer box is
+ * required for the answer and there is nothing to type here. The concept is
+ * marked known on your word, and the case is left unanswered.
+ */
+function KnownButton({ declare }: { declare: (formData: FormData) => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="ghost" formAction={declare} formNoValidate disabled={pending}>
+      I already know this
     </Button>
   );
 }
@@ -154,12 +173,18 @@ export function ProbeSession({
 }) {
   const [state, ask] = useActionState<AskState, FormData>(askQuestion, { percent: startingPercent });
   const [answerState, answer] = useActionState<AskState, FormData>(answerQuestion, state);
+  const [declared, declare] = useActionState<DeclareState, FormData>(markKnown, {});
 
   // The answer action carries the question forward, so whichever ran last is
   // the live one. An answer that could not be graded counts: the question is
   // still on screen and the reason it was not graded belongs under it.
   const live = answerState.answered || answerState.error ? answerState : state;
   const percent = live.percent ?? startingPercent;
+  // Keyed on the question rather than on a flag, so asking for another one
+  // brings the answer box back instead of leaving the last wave-through on
+  // screen. The bar is not read from here: nothing was answered, so nothing
+  // moved it.
+  const waved = declared.probeId !== undefined && declared.probeId === live.probeId;
 
   return (
     <>
@@ -173,17 +198,36 @@ export function ProbeSession({
           {live.situation && <p className="mt-1 text-body text-ink">{live.situation}</p>}
           <p className="mt-1 text-body text-ink">{live.question}</p>
 
-          <form action={answer} className="mt-4 space-y-2">
-            <input type="hidden" name="probeId" value={live.probeId} />
-            <input type="hidden" name="conceptId" value={live.conceptId} />
-            <input type="hidden" name="subjectId" value={subjectId} />
+          {!waved && (
+            <form action={answer} className="mt-4 space-y-2">
+              <input type="hidden" name="probeId" value={live.probeId} />
+              <input type="hidden" name="conceptId" value={live.conceptId} />
+              <input type="hidden" name="subjectId" value={subjectId} />
 
-            {live.options ? (
-              <ProbeOptions options={live.options} answered={live.answered ?? null} />
-            ) : (
-              <WrittenAnswer response={live.answered?.response ?? null} />
-            )}
-          </form>
+              {live.options ? (
+                <ProbeOptions options={live.options} answered={live.answered ?? null} />
+              ) : (
+                <WrittenAnswer
+                  response={live.answered?.response ?? null}
+                  beside={live.answered ? undefined : <KnownButton declare={declare} />}
+                />
+              )}
+            </form>
+          )}
+
+          {waved && (
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-body text-ink">
+                Marked as known. Nothing was answered here, so it shows as “you said so” wherever
+                the state appears, with no date on it.
+              </p>
+
+              <form action={ask} className="mt-4">
+                <input type="hidden" name="subjectId" value={subjectId} />
+                <AskButton label="Another one" />
+              </form>
+            </div>
+          )}
 
           {live.answered && (
             <div className="mt-4 border-t border-border pt-4">
@@ -234,6 +278,7 @@ export function ProbeSession({
           )}
 
           {live.error && <p className="mt-3 text-ui text-danger">{live.error}</p>}
+          {declared.error && <p className="mt-3 text-ui text-danger">{declared.error}</p>}
         </div>
       ) : (
         <form action={ask} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
