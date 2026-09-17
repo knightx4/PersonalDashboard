@@ -11,6 +11,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
+import type { PlanSection } from '@/lib/plan/tree';
+import type { LastRun } from '@/lib/plan/run-end';
+import type { RunRaise } from '@/lib/plan/work';
 import {
   applyView,
   buildPlanTree,
@@ -47,6 +50,7 @@ vi.mock('@/app/dev/plan/actions', () => {
 });
 
 const { PlanView } = await import('@/app/dev/plan/plan-view');
+type PlanCatalogEntry = Parameters<typeof PlanView>[0]['catalog'][number];
 
 let counter = 0;
 
@@ -106,15 +110,22 @@ const whole = buildPlanTree({
   dependencies: [dep('page', 'schema'), dep('form', 'page')],
 });
 
-const catalog = flattenSections(whole).map((node) => ({
-  id: node.id,
-  number: node.number,
-  title: node.title,
-  module: node.module,
-  parentId: node.parentId,
-  depth: node.depth,
-  closed: node.status === 'done' || node.status === 'dropped',
-}));
+/** The catalog the page builds: every step in the plan, however it is viewed. */
+function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
+  return flattenSections(tree).map((node) => ({
+    id: node.id,
+    number: node.number,
+    title: node.title,
+    module: node.module,
+    parentId: node.parentId,
+    depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
+    closed: node.status === 'done' || node.status === 'dropped',
+  }));
+}
+
+const catalog = catalogOf(whole);
 
 function render(
   view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked',
@@ -754,5 +765,90 @@ describe('a claim, drawn from what its run did', () => {
     const html = drawClaim(200);
     expect(html).toContain('Stopped');
     expect(html).toContain('stopped without closing');
+  });
+});
+
+describe('what an opened step says its run has done', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+  const FIRED = minutesAgo(40);
+
+  /** One claimed feature with a closed step under it, and the run that did it. */
+  function drawRun(
+    reading: LastRun['reading'],
+    raises: (childNumber: number) => RunRaise[] = () => [],
+    childClosedAt: string | null = minutesAgo(8),
+  ) {
+    const parent = item({
+      id: 'p',
+      title: 'Being worked',
+      status: 'in_progress',
+      startedAt: FIRED,
+    });
+    const child = item({
+      id: 'c',
+      title: 'Already closed',
+      parentId: 'p',
+      status: childClosedAt ? 'done' : 'not_started',
+      completedAt: childClosedAt,
+    });
+    const items = [parent, child];
+    const lastRuns: Record<string, LastRun> = {
+      p: { status: 'started', createdAt: FIRED, error: null, job: 'feature', reading },
+    };
+    const liveness = planLiveness(items, lastRuns, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={catalogOf(tree)}
+        empty={false}
+        canSend={false}
+        lastRuns={lastRuns}
+        runRaises={raises(child.number)}
+        liveness={liveness}
+        commitChecks={{}}
+        queued={0}
+        unfolded
+        opened
+      />,
+    );
+  }
+
+  it('names the run and when it started, not only that something is underway', () => {
+    const html = drawRun(null);
+    expect(html).toContain('Its run');
+    expect(html).toContain(`A feature batch started ${FIRED.replace('T', ' ').slice(0, 16)}`);
+  });
+
+  it('lists what it pushed, what it closed and what it raised', () => {
+    const html = drawRun(
+      {
+        checkedAt: minutesAgo(1),
+        lastPush: { at: minutesAgo(6), sha: 'f04d9da1111', subject: 'Read a claim (plan #500)' },
+        refusal: null,
+      },
+      (child) => [
+        {
+          id: 'r',
+          title: 'The GitHub key is refused',
+          source: `plan #${child}`,
+          createdAt: minutesAgo(10),
+        },
+      ],
+    );
+    expect(html).toContain('Read a claim (plan #500)');
+    expect(html).toContain('Closed #');
+    expect(html).toContain('The GitHub key is refused');
+  });
+
+  it('says a run with nothing to show has nothing to show, and which kind of nothing', () => {
+    // No stored reading at all: nobody has asked GitHub, which is not the same
+    // fact as a run that was asked about and had pushed nothing.
+    const html = drawRun(null, () => [], null);
+    expect(html).toContain('nothing has asked GitHub what it has pushed');
   });
 });

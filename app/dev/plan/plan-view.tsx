@@ -106,11 +106,27 @@ import type { PlanRefTitles } from '@/lib/comments/refs';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import type { ClaimLiveness } from '@/lib/plan/liveness';
 import { isResolvingAnswers, lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import {
+  closedLine,
+  nothingToShowLine,
+  pushLine,
+  raisedLine,
+  runStartedLine,
+  runWork,
+  workIsEmpty,
+  type RunRaise,
+} from '@/lib/plan/work';
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
-/** A step as the pickers know it: enough to name it and to place it. */
+/**
+ * A step as the pickers know it: enough to name it and to place it.
+ *
+ * And enough to say when it closed, which the account of a run needs: the
+ * tree a row is drawn from is narrowed by the view, so the step a run closed
+ * is often not in it, while the catalog is every step in the plan.
+ */
 export type PlanCatalogEntry = {
   id: string;
   number: number;
@@ -118,6 +134,8 @@ export type PlanCatalogEntry = {
   module: ModuleId | null;
   parentId: string | null;
   depth: number;
+  status: PlanStatus;
+  completedAt: string | null;
   closed: boolean;
 };
 
@@ -1666,6 +1684,59 @@ function LastRunLine({ run }: { run: LastRun }) {
 }
 
 /**
+ * What the run behind this step has actually done.
+ *
+ * The row above says "In progress" and a number of minutes, which is the same
+ * sentence whether the session has closed two steps or has been sitting on a
+ * failed build since it started. So the step you have opened on purpose gets
+ * the evidence: which press started the run and when, what it last pushed,
+ * which steps closed after it was fired, and what it raised.
+ *
+ * A run with none of that says which kind of none it is, because they are
+ * different things to do about it -- see `nothingToShowLine`. Nothing here asks
+ * GitHub: the push is the reading stored on the run row, so an opened step
+ * costs no request.
+ *
+ * The rules are in `lib/plan/work.ts` so the terminal tool and a session's
+ * brief can say the same thing from the same rows.
+ */
+function RunWork({
+  run,
+  node,
+  catalog,
+  raises,
+}: {
+  run: LastRun;
+  node: PlanNode;
+  catalog: readonly PlanCatalogEntry[];
+  raises: readonly RunRaise[];
+}) {
+  const now = useClockNow();
+  // The row and everything under it: a step run closes its own sub-steps and a
+  // feature batch closes the steps under the feature it was sent at. From the
+  // catalog rather than from `node.children`, because the view has already
+  // taken the closed steps out of the tree the row is drawn from.
+  const work = useMemo(() => {
+    const subtree = subtreeOf(catalog, node.id);
+    return runWork({ run, steps: catalog.filter((entry) => subtree.has(entry.id)), raises });
+  }, [run, node.id, catalog, raises]);
+  const empty = workIsEmpty(work);
+  const closed = closedLine(work);
+  const raised = raisedLine(work);
+
+  return (
+    <div>
+      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
+      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
+      {closed && <p className="text-ui text-ink-muted">{closed}</p>}
+      {raised && <p className="text-ui text-ink-muted">{raised}</p>}
+      {empty && <p className="text-ui text-ink-muted">{nothingToShowLine(work, now)}</p>}
+    </div>
+  );
+}
+
+/**
  * The badge on a step that is underway, and the one place the page admits a
  * claim can go stale.
  *
@@ -2115,11 +2186,13 @@ function PlanRow({
   catalog,
   canSend,
   lastRuns,
+  runRaises = [],
   liveness: serverLiveness = {},
   commitChecks,
   view,
   searching,
   unfolded,
+  opened = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -2128,6 +2201,14 @@ function PlanRow({
   canSend: boolean;
   /** The newest run against each step, by step id. Most steps have none. */
   lastRuns: Readonly<Record<string, LastRun>>;
+  /**
+   * What sessions have raised, for the opened step's account of its run.
+   *
+   * Every raise that names a step, not this step's: which run filed which is
+   * `runWork`, off the source and the time. Defaulted, because a render with
+   * none simply says nothing was raised.
+   */
+  runRaises?: readonly RunRaise[];
   /**
    * The same reading worked out on the server, at the clock it rendered with.
    *
@@ -2154,6 +2235,17 @@ function PlanRow({
    * to look at. Nothing in the app passes it.
    */
   unfolded: boolean;
+  /**
+   * Start with every row's own panel open.
+   *
+   * The second seam for the render tests, and separate from `unfolded` because
+   * they open different things: that one shows a row's sub-steps, this one
+   * shows what is behind the row's own fold. The tests about the panel -- what
+   * a step's run has done among them -- would otherwise be asserting against a
+   * closed drawer, and `renderToStaticMarkup` cannot press the title. Nothing
+   * in the app passes it.
+   */
+  opened?: boolean;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -2163,8 +2255,9 @@ function PlanRow({
   // the Dismissed view would otherwise be a list of steps to open one at a
   // time. The rows that hold something put aside start open there.
   const [open, setOpen] = useState(
-    view === 'dismissed' &&
-      node.children.some((child) => child.kind === 'decision' && isDismissed(child)),
+    opened ||
+      (view === 'dismissed' &&
+        node.children.some((child) => child.kind === 'decision' && isDismissed(child))),
   );
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
@@ -2239,6 +2332,15 @@ function PlanRow({
   );
   const health = healthOf(node, liveness);
   const claim = liveness[node.id];
+  // The run behind this row, where there is one to account for. Typed as
+  // possibly missing because most rows have no run at all -- the index
+  // signature says otherwise and would let a row with none through.
+  const run: LastRun | undefined = lastRuns[node.id];
+  // A step being worked is what the account of a run is for. A run still
+  // reading `started` is included as well, because a feature batch is fired at
+  // a feature the batch itself never claims, and that row is where somebody
+  // looks for what the batch has done.
+  const accountForRun = run !== undefined && (node.status === 'in_progress' || run.status === 'started');
   const resolving = useResolving(lastRuns, runNow);
   // What a "#494" written in a comment on this page is called. The catalog is
   // already every step's number and title, so no page needs to hand it over.
@@ -2793,6 +2895,13 @@ function PlanRow({
               </p>
             )}
 
+            {/* What its run has done, above the questions and the thread: on a
+                step you opened because it says somebody is working it, this is
+                the thing you opened it to find out. */}
+            {accountForRun && run && (
+              <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
+            )}
+
             {isDecision && (
               <AnswerDecision
                 node={node}
@@ -2844,7 +2953,10 @@ function PlanRow({
                   {checkLine(commitChecks[node.commitSha])}
                 </span>
               )}
-              {lastRuns[node.id] && <LastRunLine run={lastRuns[node.id]} />}
+              {/* Only where the block above is not already accounting for
+                  this run: two sentences about the same run on one opened row
+                  is one of them too many. */}
+              {run && !accountForRun && <LastRunLine run={run} />}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -2908,11 +3020,13 @@ function PlanRow({
             catalog={catalog}
             canSend={canSend}
             lastRuns={lastRuns}
+            runRaises={runRaises}
             liveness={serverLiveness}
             commitChecks={commitChecks}
             view={view}
             searching={searching}
             unfolded={unfolded}
+            opened={opened}
           />
         ))}
 
@@ -3030,12 +3144,14 @@ export function PlanView({
   view,
   catalog,
   lastRuns,
+  runRaises = [],
   liveness,
   commitChecks,
   empty,
   canSend,
   queued,
   unfolded = false,
+  opened = false,
 }: {
   sections: PlanSection[];
   /** The finished features, for the fold at the foot of Everything. */
@@ -3045,6 +3161,8 @@ export function PlanView({
   catalog: PlanCatalogEntry[];
   /** The newest run against each step, by step id. */
   lastRuns: Record<string, LastRun>;
+  /** Every raise that names a step, for the opened step's account of its run. */
+  runRaises?: readonly RunRaise[];
   /** The claims read against their runs, at the clock the page rendered with. */
   liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
@@ -3061,6 +3179,14 @@ export function PlanView({
    * pin how a nested row is laid out would have nothing to look at.
    */
   unfolded?: boolean;
+  /**
+   * Render every row with its own panel already open.
+   *
+   * The same kind of seam, for what is behind a row's fold rather than beneath
+   * it: the account of a step's run lives there, and nothing can press a title
+   * in a static render. The page leaves it off.
+   */
+  opened?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const searching = searchTerms(query).length > 0;
@@ -3184,11 +3310,13 @@ export function PlanView({
                       catalog={catalog}
                       canSend={canSend}
                       lastRuns={lastRuns}
+                      runRaises={runRaises}
                       liveness={liveness}
                       commitChecks={commitChecks}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
+                      opened={opened}
                     />
                   ))}
                 </ul>
@@ -3264,11 +3392,13 @@ export function PlanView({
                 catalog={catalog}
                 canSend={canSend}
                 lastRuns={lastRuns}
+                runRaises={runRaises}
                 liveness={liveness}
                 commitChecks={commitChecks}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}
+                opened={opened}
               />
             ))}
           </ul>

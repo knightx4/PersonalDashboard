@@ -46,6 +46,26 @@ export type RunJob =
   | 'raise';
 
 /**
+ * What to call the press, where the page names the run behind a step.
+ *
+ * Written to start a sentence -- "A feature batch started 14:02" -- because
+ * the one place that needs it is the opened step's account of its own run, and
+ * a bare noun there reads as a label rather than as the sentence it is part
+ * of.
+ */
+export const RUN_JOB_LABEL: Record<RunJob, string> = {
+  step: 'A step run',
+  feature: 'A feature batch',
+  queue: 'A queue run',
+  reshape: 'A re-shape',
+  shape: 'A shaping run',
+  notes: 'A notes run',
+  review: 'A UI review',
+  comment: 'A reply to a comment',
+  raise: 'An answer on a raise',
+};
+
+/**
  * How long a run may say nothing before it is counted as gone.
  *
  * The same two hours a claim on a step gets, because it is the same question

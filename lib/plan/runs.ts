@@ -40,6 +40,7 @@ import {
   type RunStatus,
 } from './run-end';
 import { listPushes } from './ci';
+import type { RunRaise } from './work';
 import {
   abandonedClaim,
   lastPushSince,
@@ -75,6 +76,16 @@ export type RunRow = {
   response: unknown;
   error: string | null;
 };
+
+/**
+ * How many raises are read for the plan page.
+ *
+ * Only the ones a run still being drawn could have filed matter, and a run is
+ * over after two hours, so this is a generous ceiling rather than a rule --
+ * enough that no page has to paginate, small enough that the query stays one
+ * cheap read as the queue grows.
+ */
+const RUN_RAISE_LIMIT = 200;
 
 /** How much of a refusal is worth keeping. The column takes 4000. */
 const ERROR_LIMIT = 4000;
@@ -440,4 +451,44 @@ export async function loadLastRuns(
     };
   }
   return last;
+}
+
+/**
+ * The raises sessions have filed against a step, newest first.
+ *
+ * Here rather than with the rest of the raises queue because the question is
+ * about runs: a raise is one of the three things a run leaves behind, and the
+ * plan page shows it beside what that run pushed and closed. `lib/raised/load.ts`
+ * loads the queue itself -- every column and the thread under each row -- which
+ * is far more than naming what a run raised needs.
+ *
+ * Only the rows that name a step at all, since a raise with no source cannot be
+ * attributed to a run. Which step each one names is
+ * `sourceNumbers` in `lib/plan/work.ts`, so the matching rule is pure and the
+ * query stays one read.
+ */
+export async function loadRunRaises(supabase: Db, userId: string): Promise<RunRaise[]> {
+  const { data, error } = await supabase
+    .from('raised_items')
+    .select('id, title, source, created_at')
+    .eq('user_id', userId)
+    .not('source', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(RUN_RAISE_LIMIT);
+  if (error) {
+    console.error(`raised_items could not be read for the plan page: ${error.message}`);
+    return [];
+  }
+
+  return ((data ?? []) as Array<{
+    id: string;
+    title: string;
+    source: string | null;
+    created_at: string;
+  }>).map((row) => ({
+    id: row.id,
+    title: row.title,
+    source: row.source,
+    createdAt: row.created_at,
+  }));
 }

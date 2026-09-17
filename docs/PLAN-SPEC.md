@@ -462,6 +462,25 @@ counts `quiet` as live: the twenty-minute mark reads wrong on a session that
 is reading rather than writing, and #574 settled that a quiet step is re-sent
 by asking first.
 
+**What a run has to show for itself.** One word is the right size for the
+health column and the wrong size for a step you opened because it says somebody
+is working it. So the opened row carries the evidence behind the word: which
+press started the run and when, what it last pushed, which steps closed after
+it was fired and what it raised. `lib/plan/work.ts` has those rules --
+`runWork` gathers them and `runStartedLine`, `pushLine`, `closedLine`,
+`raisedLine` and `nothingToShowLine` are the wording -- pure and browser-safe,
+so the terminal and a brief can say the same thing from the same rows.
+
+Nothing there asks GitHub. The push is the reading stored on the run row, and
+`github_checked_at` keeps the two kinds of silence apart: a run nobody has
+asked about says that rather than reading as a run that pushed nothing, and a
+reading carrying a refusal says GitHub would not answer. The closures are read
+from the page's catalog rather than from the tree the row is drawn in, because
+a view like Open has already filtered out the step a run closed an hour ago.
+The raises are the rows whose `source` names one of the run's steps and that
+were filed after it was fired -- both halves, since the time alone would hand a
+run every raise anybody filed while it was going.
+
 ## The reading
 
 `lib/plan/tree.ts` turns the rows into what the page and the CLI show. It is

@@ -2,7 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
-import { endQuietRuns, loadLastRuns } from '@/lib/plan/runs';
+import { endQuietRuns, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { planRoutine } from '@/lib/feedback/routine';
@@ -98,9 +98,12 @@ export default async function DevPlanPage({
   // request only after something new has been closed.
   const checks = await refreshCommitChecks({ supabase, userId: user.id });
 
-  const [data, lastRuns, commitChecks, overnight] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, overnight] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
+    // What sessions have raised against a step, so an opened step can say what
+    // its run asked for as well as what it pushed and closed.
+    loadRunRaises(supabase, user.id),
     loadCommitChecks(supabase, user.id),
     // The runner's standing intention, which is one row and is read here
     // rather than inside the tree: it is about the plan as a whole, and the
@@ -132,6 +135,8 @@ export default async function DevPlanPage({
     module: node.module,
     parentId: node.parentId,
     depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
     closed: node.status === 'done' || node.status === 'dropped',
   }));
 
@@ -170,6 +175,7 @@ export default async function DevPlanPage({
         view={view}
         catalog={catalog}
         lastRuns={lastRuns}
+        runRaises={runRaises}
         liveness={liveness}
         commitChecks={commitChecks}
         empty={data.items.length === 0}
