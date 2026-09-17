@@ -240,14 +240,14 @@ for (const hue of [
   '--c-w-dev',
 ] as const) {
   CHECKS.push({
-    ink: '--c-surface',
+    ink: '--c-fill-ink',
     grounds: [hue],
     min: TEXT,
     why: `${hue.replace('--c-w-', '')} button label on its solid fill`,
   });
 }
 CHECKS.push({
-  ink: '--c-surface',
+  ink: '--c-fill-ink',
   grounds: ['--c-accent-base'],
   min: TEXT,
   why: 'primary button label on the app accent',

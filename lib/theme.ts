@@ -43,6 +43,16 @@ export const THEMES = [
     ink: '#e7ebf1',
   },
   {
+    id: 'darkroom',
+    label: 'Darkroom',
+    mood: 'Smoked glass, same bench',
+    // Lightbox with the lights off: one polarity rather than two, because the
+    // sheets stopped being the light source.
+    scheme: 'dark',
+    swatch: '#25374f',
+    ink: '#eaf0f8',
+  },
+  {
     id: 'dusk',
     label: 'Dusk',
     mood: 'Plum-cast, soft edges',

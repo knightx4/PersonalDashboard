@@ -115,6 +115,22 @@
    * rather than a hex in a className, so the checker can measure it. */
   --c-caution-fill-ink: #14100a;
 
+  /* The ink a SOLID fill writes its label in -- a primary button, a workspace
+   * button -- as opposed to --c-surface, which is a ground.
+   *
+   * Those were the same token until a theme wanted translucent sheets. The
+   * label was `text-surface`, and --c-surface is a ground that a glass theme
+   * has every reason to make see-through; used as ink on a coloured fill, a
+   * see-through label lets the fill show through the letters. Darkroom failed
+   * eight pairs at 1.6:1 on exactly that, and Lightbox has the same defect
+   * quietly -- at 0.80 its button labels carry a fifth of the accent.
+   *
+   * Always opaque, and always the far end of the theme from its accent: a
+   * near-white on the light themes, whose accents are deep, and a near-black
+   * on the dark ones, whose accents are light. Not hue-rotated, so a generated
+   * theme inherits it unchanged. */
+  --c-fill-ink: #ffffff;
+
   /* A wash laid over the page ground: soft, off-centre pools of colour that
    * give a flat ground somewhere to travel. Only a theme whose bench is large
    * and dark enough to look like a void needs one, so the default is none. */
@@ -193,6 +209,7 @@
  * as one product.
  * ------------------------------------------------------------------------- */
 [data-theme='ink'] {
+  --c-fill-ink: #0f1011;
   color-scheme: dark;
   --c-sheet-scheme: dark;
 
@@ -296,6 +313,7 @@
  * meaning rather than a mood, and it is the same amber in all four themes.
  * ------------------------------------------------------------------------- */
 [data-theme='lightbox'] {
+  --c-fill-ink: #f7f9fc;
   /* The bench is black, so the scrollbar the browser draws down the side of
    * it has to be too. The sheets say `light` for themselves, which is where
    * the checkboxes and date pickers actually live. */
@@ -542,6 +560,7 @@
  * DUSK — plum-cast dark, softer edges, the same accent arc shifted warm.
  * ------------------------------------------------------------------------- */
 [data-theme='dusk'] {
+  --c-fill-ink: #191426;
   color-scheme: dark;
   --c-sheet-scheme: dark;
 
@@ -611,6 +630,171 @@
   --grain-blend: overlay;
 }
 
+/* ---------------------------------------------------------------------------
+ * DARKROOM — Lightbox with the lights off.
+ *
+ * The same room: the same blue-black bench, the same blue-violet-rose pools,
+ * the same workspace pool, the same floating pane, the same grain under the
+ * content. The only thing that changes is what the sheets are made of.
+ *
+ * In Lightbox a sheet is lit paper -- 80% of a warm white, so the bench reads
+ * through it as a tint. Here a sheet is smoked glass: a dark blue panel at
+ * around 42% over the same bench, so it comes out a little LIGHTER than the
+ * room rather than a lot lighter, and the wash behind it reads through as
+ * colour rather than as a stain on white.
+ *
+ * That flips the sheet half to light ink on dark, which means this theme has
+ * one polarity where Lightbox has two. The --c-page-* half is unchanged and
+ * now agrees with the sheet half instead of opposing it; it is kept rather
+ * than collapsed because the SCOPES block at the foot of this file hands
+ * elements one half or the other, and a theme that quietly stopped answering
+ * for one of them would take the whole mechanism down with it.
+ *
+ * The inks and the meaning colours are Dusk's ramp moved off plum onto this
+ * bench's blue -- Dusk had already paid for a dark theme's contrast, and
+ * re-deriving it would have been inventing a second answer to a solved
+ * question. The accents are Lightbox's own lit set, which was tuned to clear
+ * this exact bench.
+ *
+ * The sheet edge loses most of its white. On lit paper a bright inset line is
+ * the light catching the paper's edge; on glass it is a glare, and at 0.85 it
+ * was the brightest thing on the screen with nothing to justify it.
+ * ------------------------------------------------------------------------- */
+[data-theme='darkroom'] {
+  --c-fill-ink: #111a2b;
+  color-scheme: dark;
+  /* One polarity. Lightbox says `light` here because its sheets are paper. */
+  --c-sheet-scheme: dark;
+
+  /* ---- The bench: Lightbox's, unchanged ---- */
+  --c-page-ground: #25374f;
+  --c-page: #25374f;
+  --c-page-ink: #eef2f7;
+  --c-page-ink-muted: #b6c1ce;
+  --c-page-ink-ghost: #8a97a7;
+  --c-page-border: #3d4b5c;
+  --c-page-border-strong: #6d8098;
+  --c-page-border-control: #8a97a7;
+  --c-page-positive: #6fe0b0;
+  --c-page-caution: #f5b459;
+  --c-page-danger: #ff9d9d;
+
+  --page-wash:
+    radial-gradient(105% 72% at 10% -8%, rgb(58 116 214 / 0.34), transparent 60%),
+    radial-gradient(82% 78% at 88% -2%, rgb(255 107 157 / 0.30), transparent 62%),
+    radial-gradient(75% 62% at 78% 48%, rgb(139 92 246 / 0.26), transparent 64%),
+    linear-gradient(
+      155deg,
+      rgb(120 158 248 / 0.20) 0%,
+      rgb(178 126 226 / 0.13) 36%,
+      rgb(240 122 172 / 0.10) 62%,
+      transparent 86%
+    ),
+    radial-gradient(130% 110% at 42% 118%, rgb(26 92 176 / 0.34), transparent 68%);
+
+  --c-accent-base-lit: #a6b4ff;
+  --c-accent-hover-lit: #bcc6ff;
+  --c-w-shopping-lit: #ffa3b8;
+  --c-w-jobs-lit: #c3b0ff;
+  --c-w-todo-lit: #6ccdf5;
+  --c-w-vault-lit: #eda6f6;
+  --c-w-learn-lit: #6fdcd2;
+  --c-w-news-lit: #debf69;
+  --c-w-dev-lit: #bcc7d6;
+
+  /* ---- The sheets: smoked glass ----
+   * Alpha for the same reason Lightbox's are alpha: one token that is a panel
+   * on the bench and a panel on another panel, which no flat hex can be.
+   *
+   * Darker than the bench, not lighter, and that is not only a look. A first
+   * pass made these a lifted blue panel -- a little brighter than the room --
+   * and check-contrast failed eight pairs at about 1.6:1, all of them "button
+   * label on its solid fill". --c-surface is not only a ground: it is also the
+   * ink a solid accent button writes its label in, and on a dark theme the
+   * accents are light, so the surface has to be dark enough to be read ON one.
+   * Dusk gets that for free from an opaque near-black. Here it means the glass
+   * is smoked rather than lifted, which is what a dark glass panel is anyway.
+   *
+   * The bloom, the drop and the lit top edge are what put it above the bench;
+   * being brighter than the room was never the thing doing that. */
+  --c-surface: rgb(13 20 34 / 0.52);
+  --c-raised: rgb(22 32 52 / 0.62);
+  --c-canvas: rgb(8 13 24 / 0.5);
+  --c-sunken: rgb(5 9 17 / 0.55);
+  --c-border: #33445e;
+  --c-border-strong: #53698c;
+
+  /* A light hairline, not a dark one. The sheet sits above the bench here, so
+   * the edge that separates them is the light side of the join. */
+  --c-sheet-outline: rgb(150 178 224 / 0.22);
+  --sheet-edge:
+    inset 0 1px 0 rgb(255 255 255 / 0.13),
+    0 1px 3px rgb(0 0 0 / 0.35),
+    0 14px 32px -14px rgb(0 0 0 / 0.6),
+    0 0 96px -8px rgb(140 158 255 / 0.3),
+    0 18px 68px -12px rgb(74 176 232 / 0.2);
+  --lift-shadow:
+    0 1px 3px rgb(0 0 0 / 0.4),
+    0 16px 36px -14px rgb(0 0 0 / 0.65),
+    0 0 108px -6px rgb(140 158 255 / 0.34);
+
+  --c-shell: #25374f;
+  --c-shell-ink: #eef2f7;
+  --c-shell-muted: #aab7c7;
+  --c-shell-border: #3d4b5c;
+  --c-shell-hover: rgb(255 255 255 / 0.07);
+
+  --c-ink: #eaf0f8;
+  --c-ink-muted: #aebbcd;
+  --c-ink-ghost: #8494aa;
+  --c-border-control: #8494aa;
+
+  --c-accent-base: #a6b4ff;
+  --c-accent-hover: #bcc6ff;
+  --c-accent-tint-base: #1b2440;
+
+  --c-w-shopping: #ffa3b8;
+  --c-w-shopping-tint: #33202c;
+  --c-w-jobs: #c3b0ff;
+  --c-w-jobs-tint: #241f42;
+  --c-w-todo: #6ccdf5;
+  --c-w-todo-tint: #12283a;
+  --c-w-vault: #eda6f6;
+  --c-w-vault-tint: #2e1e3c;
+  --c-w-learn: #6fdcd2;
+  --c-w-learn-tint: #0f2b2e;
+  --c-w-news: #debf69;
+  --c-w-news-tint: #2a2410;
+  --c-w-dev: #bcc7d6;
+  --c-w-dev-tint: #1f2836;
+
+  --c-positive: #6fe0b0;
+  --c-positive-tint: #102b22;
+  --c-caution: #f5b459;
+  --c-caution-fill: #f5b459;
+  --c-caution-tint: #2d2410;
+  --c-danger: #ff9d9d;
+  --c-danger-tint: #32202a;
+
+  --c-status-lead: #a3b0c4;
+  --c-status-lead-tint: #212b3a;
+  --c-status-submitted: #8fb4ff;
+  --c-status-submitted-tint: #1a2340;
+  --c-status-process: #f5b459;
+  --c-status-process-tint: #2d2410;
+  --c-status-final: #c3b0ff;
+  --c-status-final-tint: #241f42;
+  --c-status-offer: #6fe0b0;
+  --c-status-offer-tint: #102b22;
+  --c-status-rejected: #ff9d9d;
+  --c-status-rejected-tint: #32202a;
+  --c-status-ghosted: #93a2b8;
+  --c-status-ghosted-tint: #1e2735;
+
+  --grain-opacity: 0.07;
+  --grain-blend: overlay;
+}
+
 /* An unset choice follows the system, and the system dark is Ink. Kept in sync
  * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
 @media (prefers-color-scheme: dark) {
@@ -618,6 +802,7 @@
     color-scheme: dark;
     --c-sheet-scheme: dark;
 
+    --c-fill-ink: #0f1011;
     --c-canvas: #08090a;
     --c-page-ground: #08090a;
     --c-page-ink-muted: var(--c-ink-muted);
@@ -863,6 +1048,7 @@ body,
   --color-page: var(--c-page);
   --color-canvas: var(--c-canvas);
   --color-surface: var(--c-surface);
+  --color-fill-ink: var(--c-fill-ink);
   --color-raised: var(--c-raised);
   --color-sunken: var(--c-sunken);
   --color-border: var(--c-border);
@@ -1111,7 +1297,8 @@ body::before {
  * grain is on top. Moving it below fixes it outright. If the sheets ever go
  * opaque again, this override should go with them.
  */
-[data-theme='lightbox'] body::before {
+[data-theme='lightbox'] body::before,
+[data-theme='darkroom'] body::before {
   z-index: -1;
 }
 
@@ -1130,7 +1317,8 @@ body::before {
  * On `.sheet` rather than on Card, so every surface that calls itself a sheet
  * gets it: cards, sections, the empty state, the popovers.
  */
-[data-theme='lightbox'] .sheet {
+[data-theme='lightbox'] .sheet,
+[data-theme='darkroom'] .sheet {
   background-image: linear-gradient(
     155deg,
     rgb(255 255 255 / 0.16) 0%,
@@ -1676,15 +1864,15 @@ form[data-auto-submit] [data-fallback-submit] {
   --workspace-pool: none;
 }
 
-[data-theme='lightbox'][data-workspace='shopping'] { --wash-a: 251 113 133; }
-[data-theme='lightbox'][data-workspace='jobs']     { --wash-a: 167 139 250; }
-[data-theme='lightbox'][data-workspace='todo']     { --wash-a: 56 189 248; }
-[data-theme='lightbox'][data-workspace='vault']    { --wash-a: 240 171 252; }
-[data-theme='lightbox'][data-workspace='learn']    { --wash-a: 52 211 153; }
-[data-theme='lightbox'][data-workspace='dev']      { --wash-a: 148 163 184; }
-[data-theme='lightbox'][data-workspace='news']     { --wash-a: 222 191 105; }
+[data-workspace='shopping'] { --wash-a: 251 113 133; }
+[data-workspace='jobs']     { --wash-a: 167 139 250; }
+[data-workspace='todo']     { --wash-a: 56 189 248; }
+[data-workspace='vault']    { --wash-a: 240 171 252; }
+[data-workspace='learn']    { --wash-a: 52 211 153; }
+[data-workspace='dev']      { --wash-a: 148 163 184; }
+[data-workspace='news']     { --wash-a: 222 191 105; }
 
-[data-theme='lightbox'][data-workspace] {
+[data-workspace] {
   /* Bottom left, where the sidebar is, reaching up across the bench. The three
    * blue pools sit top-left, top-right and bottom-centre, so this lands in the
    * one quarter they leave alone. */
@@ -1701,7 +1889,8 @@ form[data-auto-submit] [data-fallback-submit] {
 
 /* One bench, and the body already owns it. The shell paints no ground here so
  * those three pools read through; the workspace pool goes on top of them. */
-[data-theme='lightbox'] .shell-ground {
+[data-theme='lightbox'] .shell-ground,
+[data-theme='darkroom'] .shell-ground {
   background-color: transparent;
   background-image: var(--workspace-pool);
   background-attachment: fixed;
@@ -1774,7 +1963,8 @@ form[data-auto-submit] [data-fallback-submit] {
  * expensive way: a full-height blurred layer under every scrolling list in the
  * app, on the one theme whose sheets are already alpha-composited.
  */
-[data-theme='lightbox'] .page-pane {
+[data-theme='lightbox'] .page-pane,
+[data-theme='darkroom'] .page-pane {
   background-color: rgb(255 255 255 / 0.03);
   /* The same light, on the biggest piece of glass in the room. Weaker than a
    * sheet's, because it is behind them and a lit ground competing with lit
@@ -1788,7 +1978,8 @@ form[data-auto-submit] [data-fallback-submit] {
 }
 
 @media (min-width: 1024px) {
-  [data-theme='lightbox'] .page-pane {
+  [data-theme='lightbox'] .page-pane,
+  [data-theme='darkroom'] .page-pane {
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.10),
       0 18px 48px -20px rgb(0 0 0 / 0.55);
