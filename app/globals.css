@@ -974,19 +974,30 @@ body,
   --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
-/* No rubber band.
+/* No rubber band on the frame -- and only on the frame.
  *
- * Dragging past the top or bottom bounced the whole app a few pixels, which is
- * right for a document and wrong for something that looks like an application
- * window -- and now that the page is an inset pane on a coloured ground, the
- * bounce shows the ground moving underneath it, which reads as the layout
- * coming loose.
+ * From lg up the app is a fixed window: the ground is exactly the viewport and
+ * the pane inside it is what scrolls. A document with nothing to scroll still
+ * rubber-bands on macOS, which dragged the whole frame and its ground a few
+ * pixels and read as the layout coming loose. So the document is told not to.
  *
- * On <html>, not on <body>. overscroll-behavior propagates to the viewport
- * from the root element and does not propagate from body -- the opposite of
- * `overflow`, and the reason writing it on body looks right and does nothing. */
-html {
-  overscroll-behavior: none;
+ * Only from lg up, because below it the document IS the thing that scrolls,
+ * and a thing that scrolls should overscroll: the bounce is the feedback that
+ * you have reached the end, and on a phone `none` here would also kill
+ * pull-to-refresh. The pane keeps `overscroll-behavior: contain` rather than
+ * `none` for exactly the same reason -- `contain` stops the gesture chaining
+ * up to the document but leaves the pane's own bounce intact, because the pane
+ * is meant to scroll.
+ *
+ * On <html>, not on <body>: overscroll-behavior propagates to the viewport
+ * from the root element and does not propagate from body, the opposite of how
+ * `overflow` behaves, which is why writing it on body looks right and does
+ * nothing.
+ */
+@media (min-width: 1024px) {
+  html {
+    overscroll-behavior: none;
+  }
 }
 
 body {
