@@ -318,6 +318,10 @@ function DangerSection({ vaultEnabled }: { vaultEnabled: boolean }) {
                 body: JSON.stringify({ confirm }),
               });
               if (response.ok) {
+                // The account is gone, so the router cache and every rendered
+                // tree holding its rows have to go with it. router.push()
+                // keeps both, which is what this rule would have us use.
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 window.location.href = '/';
                 return;
               }

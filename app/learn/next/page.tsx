@@ -173,6 +173,9 @@ export default async function LearnNextPage() {
       />
 
       {rows.length === 0 ? (
+        // ui-ok: card-per-row -- the map here builds the empty state's props,
+        // and the <Card> the gate sees below it is the single surface the law
+        // asks for, holding the rows on hairlines.
         <NothingLeft subjects={subjects.map(({ id, name }) => ({ id, name }))} />
       ) : (
         /* One surface with hairlines rather than a card each: the rows are a

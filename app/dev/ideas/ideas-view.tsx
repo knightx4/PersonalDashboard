@@ -35,6 +35,7 @@ import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
 import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
 import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
+import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
@@ -348,7 +349,7 @@ function ArrangeRow<T extends string>({
     <span
       role="group"
       aria-label={label}
-      className="inline-flex overflow-hidden rounded-control border border-control"
+      className={segmentedFrame}
     >
       {options.map((option) => {
         const on = option.value === value;
