@@ -100,6 +100,9 @@ const twoFeatures = () => [
 function ports(over: Partial<OvernightPorts> = {}) {
   const calls = {
     sections: 0,
+    swept: 0,
+    /** What the tick asked for, in the order it asked, so sweep-then-tree can be checked. */
+    order: [] as string[],
     fired: [] as Array<{ feature: string; step: string }>,
     recorded: [] as number[],
     stopped: [] as string[],
@@ -111,10 +114,15 @@ function ports(over: Partial<OvernightPorts> = {}) {
     loadRun: async () => night(),
     loadSections: async () => {
       calls.sections += 1;
+      calls.order.push('sections');
       return sections;
     },
     lastFiredAt: async () => ({}),
     lastRunLiveness: async () => null,
+    sweepClaims: async () => {
+      calls.swept += 1;
+      calls.order.push('sweep');
+    },
     fire: async (feature, step) => {
       calls.fired.push({ feature: feature.id, step: step.id });
       return { ok: true };
@@ -217,7 +225,7 @@ describe('overnightTick', () => {
       const { ports: p, calls } = ports({ loadRun: async () => run });
 
       await expect(overnightTick(p)).resolves.toEqual({ act: 'idle' });
-      expect(calls).toMatchObject({ sections: 0, fired: [], recorded: [], stopped: [] });
+      expect(calls).toMatchObject({ sections: 0, swept: 0, fired: [], recorded: [], stopped: [] });
     }
   });
 
@@ -225,7 +233,7 @@ describe('overnightTick', () => {
     const { ports: p, calls } = ports({ loadRun: async () => night({ paused: true }) });
 
     await expect(overnightTick(p)).resolves.toEqual({ act: 'paused' });
-    expect(calls).toMatchObject({ sections: 0, fired: [], recorded: [], stopped: [] });
+    expect(calls).toMatchObject({ sections: 0, swept: 0, fired: [], recorded: [], stopped: [] });
   });
 
   it('changes nothing while the last run is still going', async () => {
@@ -236,8 +244,9 @@ describe('overnightTick', () => {
       });
 
       await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness });
-      // Not even the tree: a tick that cannot fire has nothing to choose from.
-      expect(calls).toMatchObject({ sections: 0, fired: [], recorded: [], stopped: [] });
+      // Not even the tree, and not the claims either: a tick that cannot fire
+      // has nothing to choose from and nothing to clear the way for.
+      expect(calls).toMatchObject({ sections: 0, swept: 0, fired: [], recorded: [], stopped: [] });
     }
   });
 
@@ -294,6 +303,32 @@ describe('overnightTick', () => {
       reason: OVERNIGHT_NOTHING_READY,
     });
     expect(calls.stopped).toEqual([OVERNIGHT_NOTHING_READY]);
+  });
+
+  it('puts back stale claims before it reads the plan', async () => {
+    const { ports: p, calls } = ports();
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    // The order is the whole point: a tree read before the sweep still shows
+    // the dead session's step as underway, and the feature above it is refused.
+    expect(calls.order).toEqual(['sweep', 'sections']);
+    expect(calls.swept).toBe(1);
+  });
+
+  it('still fires when the sweep itself failed', async () => {
+    const { ports: p, calls } = ports({
+      sweepClaims: async () => {
+        throw new Error('plan_items could not be read.');
+      },
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Tidying, not a precondition: a night that gave up here would lose every
+    // feature it could still have fired over a table it could not write.
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toHaveLength(1);
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it('leaves the budget alone when the send itself failed', async () => {

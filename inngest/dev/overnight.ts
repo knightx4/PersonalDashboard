@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { releaseStaleClaims } from '@/inngest/dev/claims';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { listPushes } from '@/lib/plan/ci';
 import { handFeatureToClaude } from '@/lib/plan/handover';
@@ -30,7 +31,9 @@ import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/p
  * -- is `overnightVerdict` and needs no reads at all. The last session -- is
  * it still going -- is `runLiveness` and costs one listing of what has been
  * pushed. The plan -- what should go next -- is `chooseOvernightFeature` and
- * costs the whole tree. Only the last one can fire.
+ * costs the whole tree. Only the last one can fire. The stale-claim sweep sits
+ * between the second and the third, because it is the one write that has to
+ * land before the tree is read rather than after.
  *
  * The one place this departs from "check liveness first" is a night that is
  * already over on its own terms. A budget that is spent or a stop time that
@@ -173,6 +176,8 @@ export type OvernightPorts = {
   lastFiredAt: () => Promise<Record<string, string>>;
   /** What the run this night last fired is doing, or null if it fired none. */
   lastRunLiveness: (run: OvernightRun) => Promise<RunLiveness | null>;
+  /** Put back the claims of sessions that died, before the plan is read. */
+  sweepClaims: () => Promise<void>;
   fire: (feature: PlanNode, step: PlanNode) => Promise<{ ok: boolean; error?: string }>;
   /** Take one off the budget, given what the row said was left. */
   recordFire: (featuresLeft: number) => Promise<void>;
@@ -207,6 +212,35 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
 
   const liveness = await ports.lastRunLiveness(run);
   if (!isOver(liveness)) return { act: 'waiting', liveness: liveness as RunLiveness };
+
+  // Before the tree is read, and only on the tick that will choose from it.
+  //
+  // A session that died mid-feature left its step saying `in_progress`, and
+  // nothing puts that back overnight: the sweep is a stage of the daily cron.
+  // So the step is not ready, the send guard refuses the feature above it, and
+  // one dead run holds up the rest of the night. Sweeping here means the claim
+  // goes back within one tick of ageing out and the tree loaded a line later
+  // shows the step as the not-started work it is.
+  //
+  // Nothing is swept on a tick that is idle, paused, ended or still waiting on
+  // a live session: those ticks write nothing at all, which is the whole shape
+  // of this function, and a claim nobody is working keeps just as well until
+  // the tick that could actually use it.
+  //
+  // A sweep that fails is logged and stepped over rather than thrown. It is a
+  // tidying pass, not a precondition: without it the tick chooses from the tree
+  // as it stands, which is exactly what every night did before this, and a
+  // night that gave up on one unreadable table would cost itself every feature
+  // it could still have fired.
+  try {
+    await ports.sweepClaims();
+  } catch (err) {
+    console.error(
+      `stale claims could not be swept before the overnight tick chose: ${
+        err instanceof Error ? err.message : 'failed'
+      }`,
+    );
+  }
 
   const [sections, lastFiredAt] = await Promise.all([ports.loadSections(), ports.lastFiredAt()]);
   const choice = chooseOvernightFire(sections, run, ports.now, lastFiredAt);
@@ -351,6 +385,23 @@ function portsFor(input: {
     loadSections,
     lastFiredAt: () => lastFeatureFires(supabase, userId),
     lastRunLiveness: (run) => lastFireLiveness({ supabase, userId, run, now, fetch: input.fetch }),
+    sweepClaims: async () => {
+      // The same sweep the daily cron runs, and every account's claims at once
+      // -- a claim nobody is working is wrong in the same way in every account,
+      // which is why `releaseStaleClaims` takes no user. On an ordinary night
+      // there is one account running anyway.
+      //
+      // A failure is left to `overnightTick`, which steps over it: the guard
+      // belongs at the seam, where it is the decision's own property that a
+      // tick which cannot sweep still fires, rather than a kindness this one
+      // implementation happens to do.
+      const swept = await releaseStaleClaims(supabase, new Date(now));
+      if (swept.released > 0) {
+        console.log(
+          `overnight: put back ${swept.released} stale claim(s): ${swept.steps.join(', ')}.`,
+        );
+      }
+    },
     fire: async (feature, step) => {
       // The same send the button makes, with the tree the choice was made from
       // rather than a second read of rows that cannot have moved since.
