@@ -208,6 +208,9 @@ describe('PlanView', () => {
     const html = render('open');
     expect(html).toContain('>Next<');
     expect(html).toContain('>Someday<');
+    // Normal is the priority of nearly every step, so drawing it put the same
+    // word on almost every row. Next and Someday are what the column is for.
+    expect(html).not.toContain('>Normal<');
     // Not who has it: the Who column was dropped deliberately -- it was a
     // column of dashes with the occasional "Dash" in it. Who has a step is on
     // the open step, in the "Dash's" view, and in the menu that sets it, and
