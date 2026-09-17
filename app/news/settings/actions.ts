@@ -22,7 +22,7 @@ export async function replaceAddress(): Promise<{ ok: boolean; error?: string }>
 
   try {
     await loadOrCreateLocalPart(client, user.id);
-    await replaceLocalPart(client);
+    await replaceLocalPart(client, user.id);
   } catch (error) {
     return {
       ok: false,

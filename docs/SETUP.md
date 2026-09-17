@@ -72,23 +72,34 @@ Reading a message *with* a workspace's verdict goes through that schema's
 `inbox_messages` view, which joins the two — PostgREST cannot embed across
 schemas, so the join has to be in the database.
 
-### The one step that is not in this repository
+### Exposed schemas
 
-In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search`, `core`, `obsidian`, `todo`, `learn` and `news`**
-alongside `public`.
+PostgREST only serves the schemas it has been told to serve. The list must
+include **`job_search`, `core`, `obsidian`, `todo`, `learn` and `news`**
+alongside `public` and `graphql_public`. A schema that is missing gets
+`PGRST106 Invalid schema: …` on every request, which reaches the browser as
+*"This page couldn't load — a server error occurred"*.
 
-Without it PostgREST refuses every request against the missing schema with
-*"The schema must be one of the following"*, and because it is a dashboard
-setting rather than a migration it is the step that gets forgotten after a
-project restore or when setting up a second environment. Three things have to
-agree — the migrations, the `db: { schema }` option on every client, and this
-setting — and only the first two are in version control.
+This used to be a dashboard setting only — **Settings → API → Exposed
+schemas** — and being the one thing outside version control is exactly what
+went wrong: `news` shipped with its migration, its clients and its pages, and
+nobody ticked the box, so /news was a server error from the day it landed.
+`supabase/migrations-news/0002_expose_news_to_postgrest.sql` moves the setting
+into the database, where PostgREST also reads its configuration from
+(`pgrst.db_schemas` on the `authenticator` role, which wins over the config
+file). It appends rather than assigns, so it adds `news` without opinion about
+what else is exposed, and running it twice does nothing.
 
-`todo` is the newest and therefore the one most likely to be missing: the
-symptom is a Todo workspace that reports an empty list on an account that has
-one, and — because the account settings live in `core` — a timezone that
-silently reverts to UTC everywhere if that one is missing too.
+A new schema should do the same: one migration that adds its own name, not a
+note asking someone to remember. The dashboard still shows and edits the list,
+and editing it there overwrites what the migration set — so if a schema goes
+missing again after someone has been in Settings → API, re-running that
+migration is the fix.
+
+`todo` is the one whose absence is quietest: the symptom is a Todo workspace
+that reports an empty list on an account that has one, and — because the
+account settings live in `core` — a timezone that silently reverts to UTC
+everywhere if that one is missing too.
 
 **Never add `vault` to that list.** That schema is Supabase's own — Supabase
 Vault, the encrypted secrets store — and `vault.secrets` carries no RLS
@@ -356,6 +367,26 @@ authority on the exact values — the table below is what they look like.
 Verification takes minutes to a few hours. Mailgun's domain page says whether it
 has seen them.
 
+**The MX records are the ones that get missed.** Mailgun's DNS page lists the
+*sending* records (SPF, DKIM, and a `email.` CNAME for tracking) in one block
+and the two *receiving* MX records in another, and a domain with the first
+block and not the second looks verified, passes a spot check, and takes no mail
+whatever. Nothing in this app can see it: the address renders, the settings
+page is happy, and every message sent to it bounces at the sender before
+Mailgun is ever involved. That is exactly what happened here on
+`in.selveyknight.com` — SPF, DKIM and the CNAME all present, no MX at all, two
+newsletter signups and a test message lost to it.
+
+So check the MX explicitly, not the green tick:
+
+```bash
+dig +short MX in.example.com
+# must print two lines: mxa.mailgun.org and mxb.mailgun.org
+```
+
+An empty answer means no mail can ever arrive, no matter what the rest of this
+section says.
+
 **4. Point the mail at the app.** Receiving → Routes → Create Route. Expression
 `catch_all()`, actions `forward("https://<your app>/api/news/inbound")` and
 `stop()`, priority 0. Every message sent to the domain is then posted to that
@@ -377,9 +408,13 @@ NEWS_MAIL_DOMAIN=in.example.com
 MAILGUN_SIGNING_KEY=<the signing key>
 ```
 
-Both are optional. With neither set the app builds and runs: News settings says
-the deployment has no mail domain, and the inbound endpoint refuses everything
-that reaches it.
+Both are optional. With neither set the app builds and runs, and it says so
+rather than pretending: News settings names whichever of the two is missing,
+the News page says "Nothing can arrive yet" instead of inviting you to sign up
+for something, and the inbound endpoint refuses everything that reaches it.
+Setting the domain without the key is the one combination that used to look
+healthy — an address on the page, a promise under it, and a 500 on every
+delivery. `lib/news/inbound/readiness.ts` is what closed that.
 
 **7. Send it something.** Open News settings, copy the address, and mail it from
 anywhere. It appears in News within a minute. If it does not, Mailgun's Logs

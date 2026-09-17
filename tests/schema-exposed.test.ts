@@ -32,6 +32,10 @@ describe('assertSchemaExposed', () => {
     // produces a message that still names it.
     expect(message).toContain('obsidian');
     expect(message).toContain('todo');
+    // `learn` and `news` were both added after this test, and `news` is the one
+    // that proved the point: it shipped with nobody ticking the box.
+    expect(message).toContain('learn');
+    expect(message).toContain('news');
   });
 
   it('ignores every other error, which callers still handle themselves', () => {
