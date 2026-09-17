@@ -69,12 +69,18 @@ describe('status glyphs', () => {
   });
 
   /**
-   * The plan draws all ten of its states in one column, so unlike the pipeline
-   * it can share nothing with itself: two states on one shape would be two
-   * rows the column cannot tell apart.
+   * The plan draws all thirteen of its states in one column, so two of them on
+   * one shape is two rows the column cannot tell apart by shape. That is
+   * allowed for exactly one group and is written down here, the way the
+   * pipeline's sharing is: the three readings of a claim are the same rung --
+   * the step is claimed -- and what separates them is whether the session is
+   * still pushing, which the word and the tone carry. Anything else sharing a
+   * shape is a bug.
    */
-  it('gives the plan ten shapes nobody else on the page has', () => {
-    expect(sharedBy(PLAN_HEALTH_GLYPHS)).toEqual({});
+  it('shares a plan shape only between the three readings of a claim', () => {
+    expect(sharedBy(PLAN_HEALTH_GLYPHS)).toEqual({
+      'three-quarters': ['in_progress', 'working', 'quiet'],
+    });
   });
 
   it('fills the plan ladder in the order the work runs', () => {
@@ -112,7 +118,16 @@ describe('status glyphs', () => {
       proposed: ['lead', 'drafting', 'task open'],
       not_started: ['submitted', 'acknowledged'],
       ready: ['in_process'],
+      // The three readings of a claim borrow the same rung, because they are
+      // the same rung: a step somebody has in hand, the way a final round is
+      // an application somebody has in hand.
       in_progress: ['final_round'],
+      working: ['final_round'],
+      quiet: ['final_round'],
+      // A run that stopped without closing its step borrows the shape of an
+      // application that ended without an offer. Both are work that was
+      // underway and is not any more.
+      abandoned: ['rejected'],
       done: ['offer'],
       answered: ['task done'],
       dropped: ['withdrawn', 'task dropped'],

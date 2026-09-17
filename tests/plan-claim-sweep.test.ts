@@ -7,11 +7,18 @@
  * two properties covered here are that the sweep only touches claims that have
  * stopped meaning anything, and that it says in the step's own comment why the
  * claim was taken back.
+ *
+ * The third is #573's: before it takes a step off a session it asks GitHub
+ * what that session has pushed, and a run still pushing keeps its step however
+ * long it has been going. Both directions of that are covered below, including
+ * every way the ask can come back with nothing, since each of those has to
+ * leave the sweep behaving exactly as it did before.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { releaseStaleClaims } from '@/inngest/dev/claims';
 import { STALLED_AFTER_MINUTES } from '@/lib/plan/elapsed';
+import { QUIET_AFTER_MINUTES } from '@/lib/plan/liveness';
 
 type Row = Record<string, unknown>;
 
@@ -20,11 +27,14 @@ const minutesAgo = (minutes: number) =>
   new Date(NOW.getTime() - minutes * 60_000).toISOString();
 
 /**
- * Enough of the query builder for the one read and the updates it makes.
+ * Enough of the query builder for the reads and the updates it makes.
  * Filters are ignored except the `status` one on the update, which is the
  * guard against writing over a step that closed while the sweep was running.
+ *
+ * The runs are a second table and read-only: the sweep asks which run holds
+ * each condemned step and writes nothing back to `plan_runs`.
  */
-function stubClient(rows: Row[]) {
+function stubClient(rows: Row[], runs: Row[] = []) {
   const updates: Array<{ id: unknown; patch: Row }> = [];
 
   const builder = () => {
@@ -57,7 +67,13 @@ function stubClient(rows: Row[]) {
     return self;
   };
 
-  return { supabase: { from: builder } as unknown as SupabaseClient, updates, rows };
+  const runReads = () => ({
+    select: () => ({ in: () => ({ order: async () => ({ data: runs, error: null }) }) }),
+  });
+
+  const from = (table: string) => (table === 'plan_runs' ? runReads() : builder());
+
+  return { supabase: { from } as unknown as SupabaseClient, updates, rows };
 }
 
 function claim(over: Row = {}): Row {
@@ -72,11 +88,44 @@ function claim(over: Row = {}): Row {
   };
 }
 
+/** A run fired at a step this many minutes ago, still going as far as it knows. */
+function run(over: Row = {}): Row {
+  return {
+    id: 'run-1',
+    plan_item_id: 'a',
+    status: 'started',
+    created_at: minutesAgo(STALLED_AFTER_MINUTES + 40),
+    ...over,
+  };
+}
+
+/** GitHub's activity listing, with one entry per branch that moved. */
+function pushed(...refs: Array<{ ref: string; minutes: number }>) {
+  return vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify(
+          refs.map((push) => ({
+            activity_type: 'push',
+            ref: `refs/heads/${push.ref}`,
+            after: 'abc1234',
+            timestamp: minutesAgo(push.minutes),
+          })),
+        ),
+        { status: 200 },
+      ),
+  );
+}
+
 describe('releaseStaleClaims', () => {
   it('leaves a claim a session could still be working', async () => {
     const { supabase, updates } = stubClient([claim()]);
 
-    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({ released: 0, steps: [] });
+    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
+      released: 0,
+      steps: [],
+      kept: [],
+    });
     expect(updates).toHaveLength(0);
   });
 
@@ -88,6 +137,7 @@ describe('releaseStaleClaims', () => {
     await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
       released: 1,
       steps: [42],
+      kept: [],
     });
     expect(updates[0].patch.status).toBe('not_started');
     expect(updates[0].patch.comment).toBe(
@@ -111,7 +161,11 @@ describe('releaseStaleClaims', () => {
   it('puts back a claim nobody holds, however recent', async () => {
     const { supabase, updates } = stubClient([claim({ assignee: null, started_at: minutesAgo(1) })]);
 
-    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({ released: 1, steps: [42] });
+    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
+      released: 1,
+      steps: [42],
+      kept: [],
+    });
     expect(updates[0].patch.comment).toBe(
       'Claim expired 2026-03-02: it was underway with nobody holding it, so it went back to not started.',
     );
@@ -127,6 +181,116 @@ describe('releaseStaleClaims', () => {
     await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
       released: 2,
       steps: [2, 3],
+      kept: [],
     });
+  });
+});
+
+/**
+ * The look at GitHub, in both directions. #573.
+ *
+ * The sweep is allowed to keep a claim the clock condemned and is not allowed
+ * to take one the clock did not, so every case here starts from a claim past
+ * the two-hour mark and the only question is whether what the run pushed saves
+ * it.
+ */
+describe('releaseStaleClaims against what the run pushed', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** A claim the clock has condemned: two hours and forty minutes old. */
+  const condemned = () => claim({ started_at: minutesAgo(STALLED_AFTER_MINUTES + 40) });
+
+  it('keeps the step of a run that pushed a few minutes ago', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates, rows } = stubClient([condemned()], [run()]);
+
+    await expect(
+      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+    ).resolves.toEqual({ released: 0, steps: [], kept: [42] });
+    expect(updates).toHaveLength(0);
+    expect(rows[0].status).toBe('in_progress');
+  });
+
+  it('keeps the step of a run that has gone quiet but not ended', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+
+    const fetchFn = pushed({ ref: 'claude/one', minutes: QUIET_AFTER_MINUTES + 5 });
+    await expect(releaseStaleClaims(supabase, NOW, { fetch: fetchFn as never })).resolves.toEqual({
+      released: 0,
+      steps: [],
+      kept: [42],
+    });
+    expect(updates).toHaveLength(0);
+  });
+
+  it('takes the step back when nothing was pushed past the ended mark', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+
+    await expect(
+      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 180 }) as never }),
+    ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
+    expect(updates[0].patch.comment).toBe(
+      'Claim expired 2026-03-02: nothing had touched it for 2h 40m, so it went back to not started.',
+    );
+  });
+
+  it('takes the step back when the run pushed nothing at all', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = stubClient([condemned()], [run()]);
+
+    await expect(releaseStaleClaims(supabase, NOW, { fetch: pushed() as never })).resolves.toEqual({
+      released: 1,
+      steps: [42],
+      kept: [],
+    });
+  });
+
+  it('falls back to the clock when GitHub refuses to say', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const { supabase, updates } = stubClient([condemned()], [run()]);
+    const fetchFn = pushed({ ref: 'claude/one', minutes: 6 });
+
+    await expect(releaseStaleClaims(supabase, NOW, { fetch: fetchFn as never })).resolves.toEqual({
+      released: 1,
+      steps: [42],
+      kept: [],
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(updates[0].patch.status).toBe('not_started');
+  });
+
+  it('falls back to the clock for a step with no run recorded', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = stubClient([condemned()], []);
+    const fetchFn = pushed({ ref: 'claude/one', minutes: 6 });
+
+    await expect(releaseStaleClaims(supabase, NOW, { fetch: fetchFn as never })).resolves.toEqual({
+      released: 1,
+      steps: [42],
+      kept: [],
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('takes the step back when its run was already written off', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = stubClient([condemned()], [run({ status: 'failed' })]);
+
+    await expect(
+      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+    ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
+  });
+
+  it('asks nothing when no claim is up for being taken back', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = stubClient([claim()], [run()]);
+    const fetchFn = pushed({ ref: 'claude/one', minutes: 6 });
+
+    await releaseStaleClaims(supabase, NOW, { fetch: fetchFn as never });
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 });

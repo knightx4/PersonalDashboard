@@ -4,7 +4,7 @@
  * Law 4 tells whoever draws the next surface to use "ink and a shape" and
  * never says anywhere what the shapes are. These are them: a glyph for each of
  * the eleven application statuses, each of the three task states, each of the
- * ten states a plan step can be in, and each state of the four other dev
+ * thirteen states a plan step can be in, and each state of the four other dev
  * queues. The names are shapes rather than statuses, because
  * components/ui/status-glyph.tsx draws them and knows nothing about pipelines,
  * todo lists or plans.
@@ -104,24 +104,33 @@ export const TASK_STATUS_GLYPHS: Record<TaskStatus, StatusGlyph> = {
 };
 
 /**
- * The ten states a plan step can be in, as read by lib/plan/tree.ts.
+ * The states a plan step can be in, as read by lib/plan/tree.ts.
  *
  * Five of them are a ladder and take the five fills: a proposal nobody has
  * accepted is the empty hexagon, and each step after it fills further round
- * until a finished step is solid. The other five are not positions on that
- * ladder, so they take marks -- an answered question a tick, a step decided
- * against the same struck hexagon a withdrawal takes, a blocked step the
- * barred one, a step waiting on another the dashed one, and a question nobody
- * has answered the question mark.
+ * until a finished step is solid. The others are not positions on that ladder,
+ * so they take marks -- an answered question a tick, a step decided against
+ * the same struck hexagon a withdrawal takes, a blocked step the barred one, a
+ * step waiting on another the dashed one, and a question nobody has answered
+ * the question mark.
  *
- * A `Record`, like the two above, so an eleventh health added to PLAN_HEALTHS
- * fails the typecheck here rather than drawing itself as a proposal.
+ * `working` and `quiet` share the three-quarter fill with `in_progress`
+ * because they are the same rung: all three are a step somebody has claimed,
+ * and what separates them is whether the session is still pushing, which the
+ * tone and the word say. `abandoned` is the one that leaves the ladder -- a
+ * run that stopped without closing its step -- so it takes the cross.
+ *
+ * A `Record`, like the two above, so a health added to PLAN_HEALTHS fails the
+ * typecheck here rather than drawing itself as a proposal.
  */
 export const PLAN_HEALTH_GLYPHS: Record<PlanHealth, StatusGlyph> = {
   proposed: 'empty',
   not_started: 'quarter',
   ready: 'half',
   in_progress: 'three-quarters',
+  working: 'three-quarters',
+  quiet: 'three-quarters',
+  abandoned: 'cross',
   done: 'full',
   answered: 'check',
   dropped: 'slash',

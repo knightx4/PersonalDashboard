@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   elapsedSince,
-  hasLiveClaim,
   isStalledClaim,
   remainingUntil,
   STALLED_AFTER_MINUTES,
@@ -57,32 +56,6 @@ describe('isStalledClaim', () => {
   // running step to stalled and then back again on mount.
   it('says nothing before the clock has started', () => {
     expect(isStalledClaim(start, 0)).toBe(false);
-  });
-});
-
-describe('hasLiveClaim', () => {
-  it('is false for anything not underway', () => {
-    for (const status of ['not_started', 'blocked', 'proposed', 'done', 'dropped']) {
-      expect(hasLiveClaim({ status, startedAt: start }, at(0))).toBe(false);
-    }
-  });
-
-  it('is true for a step claimed just now', () => {
-    expect(hasLiveClaim({ status: 'in_progress', startedAt: start }, at(1))).toBe(true);
-  });
-
-  // The point of the whole helper: a session that died holds nothing, so the
-  // guard that refuses a second send must let this one through.
-  it('is false once the claim has stalled', () => {
-    expect(hasLiveClaim({ status: 'in_progress', startedAt: start }, at(STALLED_AFTER_MINUTES))).toBe(
-      false,
-    );
-  });
-
-  // `started_at` is stamped by a trigger, so a row without one was claimed this
-  // instant and the clock has nothing to say about it yet.
-  it('treats a claim with no clock as live', () => {
-    expect(hasLiveClaim({ status: 'in_progress', startedAt: null }, at(60 * 9))).toBe(true);
   });
 });
 

@@ -395,11 +395,14 @@ function portsFor(input: {
       // belongs at the seam, where it is the decision's own property that a
       // tick which cannot sweep still fires, rather than a kindness this one
       // implementation happens to do.
-      const swept = await releaseStaleClaims(supabase, new Date(now));
+      const swept = await releaseStaleClaims(supabase, new Date(now), { fetch: input.fetch });
       if (swept.released > 0) {
         console.log(
           `overnight: put back ${swept.released} stale claim(s): ${swept.steps.join(', ')}.`,
         );
+      }
+      if (swept.kept.length > 0) {
+        console.log(`overnight: left ${swept.kept.join(', ')} alone, still pushing.`);
       }
     },
     fire: async (feature, step) => {

@@ -47,6 +47,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Banner } from '@/components/ui/banner';
 import { Bands } from '@/components/ui/meter';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
@@ -84,12 +85,14 @@ import {
   flatten,
   healthOf as planHealthOf,
   moveOf as planMoveOf,
+  planLiveness,
   searchNodes,
   searchSections,
   searchTerms,
   type MoveContext,
   type PlanBand,
   type PlanHealth,
+  type PlanLiveness,
   type PlanMove,
   type PlanNode,
   type PlanProgress,
@@ -101,13 +104,37 @@ import {
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import type { PlanRefTitles } from '@/lib/comments/refs';
-import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
-import { isResolvingAnswers, lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import { elapsedSince } from '@/lib/plan/elapsed';
+import type { ClaimLiveness } from '@/lib/plan/liveness';
+import {
+  isResolvingAnswers,
+  lastRunLine,
+  withReadings,
+  type LastRun,
+  type StoredRunReading,
+} from '@/lib/plan/run-end';
+import {
+  closedLine,
+  nothingToShowLine,
+  pushLine,
+  raisedLine,
+  refusalLine,
+  runStartedLine,
+  runWork,
+  workIsEmpty,
+  type RunRaise,
+} from '@/lib/plan/work';
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
 
-/** A step as the pickers know it: enough to name it and to place it. */
+/**
+ * A step as the pickers know it: enough to name it and to place it.
+ *
+ * And enough to say when it closed, which the account of a run needs: the
+ * tree a row is drawn from is narrowed by the view, so the step a run closed
+ * is often not in it, while the catalog is every step in the plan.
+ */
 export type PlanCatalogEntry = {
   id: string;
   number: number;
@@ -115,6 +142,8 @@ export type PlanCatalogEntry = {
   module: ModuleId | null;
   parentId: string | null;
   depth: number;
+  status: PlanStatus;
+  completedAt: string | null;
   closed: boolean;
 };
 
@@ -1573,26 +1602,37 @@ function Elapsed({ startedAt }: { startedAt: string }) {
 
 /**
  * The same fact in the opened row's meta line, where there is room for the
- * word. "Running 7h" and "stalled for 7h, nothing on it" are the two things a
- * step underway can mean, and the line said only the first.
+ * word. "Running 7h" and "stopped after 7h, nothing on it" are two of the
+ * things a step underway can mean, and the line said only the first.
+ *
+ * The reading comes from `claimLiveness` through the row rather than from the
+ * clock here, so this line and the health column beside it cannot differ about
+ * the same claim.
  */
-function RunningFor({ startedAt }: { startedAt: string }) {
-  const now = useClockNow();
-
-  if (!isStalledClaim(startedAt, now)) {
+function RunningFor({ startedAt, claim }: { startedAt: string; claim: ClaimLiveness | undefined }) {
+  if (claim === 'abandoned') {
     return (
-      <>
+      <span className="text-caution">
+        {' · stopped after '}
+        <Elapsed startedAt={startedAt} />, nothing on it
+      </span>
+    );
+  }
+
+  if (claim === 'quiet') {
+    return (
+      <span className="text-caution">
         {' · running '}
-        <Elapsed startedAt={startedAt} />
-      </>
+        <Elapsed startedAt={startedAt} />, nothing pushed lately
+      </span>
     );
   }
 
   return (
-    <span className="text-caution">
-      {' · stalled for '}
-      <Elapsed startedAt={startedAt} />, nothing on it
-    </span>
+    <>
+      {' · running '}
+      <Elapsed startedAt={startedAt} />
+    </>
   );
 }
 
@@ -1652,40 +1692,114 @@ function LastRunLine({ run }: { run: LastRun }) {
 }
 
 /**
+ * What the run behind this step has actually done.
+ *
+ * The row above says "In progress" and a number of minutes, which is the same
+ * sentence whether the session has closed two steps or has been sitting on a
+ * failed build since it started. So the step you have opened on purpose gets
+ * the evidence: which press started the run and when, what it last pushed,
+ * which steps closed after it was fired, and what it raised.
+ *
+ * A run with none of that says which kind of none it is, because they are
+ * different things to do about it -- see `nothingToShowLine`. Nothing here asks
+ * GitHub: the push is the reading stored on the run row, so an opened step
+ * costs no request.
+ *
+ * The rules are in `lib/plan/work.ts` so the terminal tool and a session's
+ * brief can say the same thing from the same rows.
+ */
+function RunWork({
+  run,
+  node,
+  catalog,
+  raises,
+}: {
+  run: LastRun;
+  node: PlanNode;
+  catalog: readonly PlanCatalogEntry[];
+  raises: readonly RunRaise[];
+}) {
+  const now = useClockNow();
+  // The row and everything under it: a step run closes its own sub-steps and a
+  // feature batch closes the steps under the feature it was sent at. From the
+  // catalog rather than from `node.children`, because the view has already
+  // taken the closed steps out of the tree the row is drawn from.
+  const work = useMemo(() => {
+    const subtree = subtreeOf(catalog, node.id);
+    return runWork({ run, steps: catalog.filter((entry) => subtree.has(entry.id)), raises });
+  }, [run, node.id, catalog, raises]);
+  const empty = workIsEmpty(work);
+  const closed = closedLine(work);
+  const raised = raisedLine(work);
+  const refused = refusalLine(work);
+
+  return (
+    <div>
+      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
+      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
+      {closed && <p className="text-ui text-ink-muted">{closed}</p>}
+      {raised && <p className="text-ui text-ink-muted">{raised}</p>}
+      {empty && <p className="text-ui text-ink-muted">{nothingToShowLine(work, now)}</p>}
+      {/* After the rest, because what the run did is what was asked for and
+          this is why one of the four lines is missing. Caution rather than
+          muted: nothing on this row can be read properly until the key is
+          fixed, and the sentence says how. */}
+      {refused && <p className="text-ui text-caution">{refused}</p>}
+    </div>
+  );
+}
+
+/**
  * The badge on a step that is underway, and the one place the page admits a
  * claim can go stale.
  *
  * Nothing releases a claim when the session holding it dies, so an abandoned
  * step sat here pulsing at the same accent as one being worked this minute --
- * the state was seven hours old and the badge said "live". Past
- * `STALLED_AFTER_MINUTES` the dot stops pulsing and the pill turns caution:
- * the row is still `in_progress`, because only you can say whether the work
- * happened, but the page stops claiming somebody is on it. Putting it back or
- * closing it is one press in the row's own menu.
+ * the state was seven hours old and the badge said "live". The pill now says
+ * what the run says: the dot pulses while the session is pushing, stops and
+ * turns caution once it has gone quiet, and the pill says the run stopped once
+ * it is past the ended mark. The row is still `in_progress`, because only you
+ * can say whether the work happened, but the page no longer claims somebody is
+ * on it. Putting it back or closing it is one press in the row's own menu.
+ *
+ * `claim` is the reading from `claimLiveness`, handed in by the row so that
+ * this pill, the health column and the meta line all draw one answer.
  */
-function Underway({ startedAt, assignee }: { startedAt: string; assignee: string | null }) {
-  const now = useClockNow();
-  const stalled = isStalledClaim(startedAt, now);
+function Underway({
+  startedAt,
+  assignee,
+  claim,
+}: {
+  startedAt: string;
+  assignee: string | null;
+  claim: ClaimLiveness | undefined;
+}) {
   const since = startedAt.replace('T', ' ').slice(0, 16);
+  const stopped = claim === 'abandoned';
+  const silent = stopped || claim === 'quiet';
 
   return (
     <span
       title={
-        stalled
-          ? `Claimed ${since} and untouched since. A session that stops without closing its step leaves it here — close it or put it back.`
-          : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
+        stopped
+          ? `Claimed ${since} and its run stopped without closing the step — close it or put it back.`
+          : claim === 'quiet'
+            ? `Claimed ${since}. Its run has pushed nothing for a while; it may still be reading or waiting on a build.`
+            : `${assignee === 'claude' ? 'Dash has been on this' : 'Underway'} since ${since}`
       }
       className={cn(
         'tabular inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-small font-medium',
-        stalled ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
+        silent ? 'bg-caution-tint text-caution' : 'bg-accent-tint text-accent',
       )}
     >
       <span
-        className={cn('size-1.5 rounded-full', stalled ? 'bg-caution' : 'animate-pulse bg-accent')}
+        className={cn('size-1.5 rounded-full', silent ? 'bg-caution' : 'animate-pulse bg-accent')}
         aria-hidden
       />
       <Elapsed startedAt={startedAt} />
-      {stalled && <span className="sr-only"> with no session on it</span>}
+      {stopped && <span className="sr-only"> with no session on it</span>}
+      {claim === 'quiet' && <span className="sr-only"> with nothing pushed lately</span>}
     </span>
   );
 }
@@ -1720,11 +1834,13 @@ type Health = {
  * the todo list's, so a state here looks like the same state there. What is
  * left is the word, the tone and the fixed part of the tooltip.
  *
- * Five of the ten are states the other dev queues have too, and those words
- * come from lib/dev/words.ts so a dropped step and a declined note read alike.
- * The other five are the plan's own refinements -- a question, a proposal, a
- * step waiting on another step, a step nobody has reached -- and no other queue
- * has anything for them to disagree with.
+ * Seven of the thirteen are states the other dev queues have too, and those
+ * words come from lib/dev/words.ts so a dropped step and a declined note read
+ * alike. The other six are the plan's own refinements -- a question, a
+ * question answered, a proposal, a step waiting on another step, a step nobody
+ * has reached, and a claim whose run stopped -- and no other queue has
+ * anything for them to disagree with. Why there are thirteen rather than fewer
+ * is written where the set is, in lib/plan/tree.ts.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
@@ -1739,6 +1855,26 @@ const HEALTH: Record<PlanHealth, Health> = {
     title: 'Written by a session. Approve it, edit it, or drop it -- nothing happens until you do.',
   },
   in_progress: { word: DEV_STATE_WORD.working, tone: 'accent' },
+  // The three readings of a claim. `in_progress` above is the fourth and says
+  // the least: the row is claimed and nothing has looked into what the session
+  // is doing.
+  working: {
+    word: DEV_STATE_WORD.working,
+    tone: 'accent',
+    title: 'A session has this and has pushed something recently.',
+  },
+  quiet: {
+    word: 'Quiet',
+    tone: 'caution',
+    title:
+      'A session has this and has pushed nothing for a while. It may still be reading or waiting on a build.',
+  },
+  abandoned: {
+    word: 'Stopped',
+    tone: 'caution',
+    title:
+      'A session claimed this and stopped without closing it. Put it back or send it again -- nothing is working it.',
+  },
   // "Waiting on you" rather than "Blocked", which said a step was stuck and not
   // who could unstick it. The notes queue says the same thing about a note
   // blocked on an answer, and now says it in the same words.
@@ -1766,8 +1902,11 @@ const HEALTH: Record<PlanHealth, Health> = {
   dropped: { word: DEV_STATE_WORD.dropped, tone: 'ghost' },
 };
 
-function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth } {
-  const health = planHealthOf(node);
+function healthOf(
+  node: PlanNode,
+  liveness?: PlanLiveness,
+): Health & { glyph: GlyphName; name: PlanHealth } {
+  const health = planHealthOf(node, liveness);
   const base = { ...HEALTH[health], glyph: PLAN_HEALTH_GLYPHS[health], name: health };
 
   // A row closed over open work reports what is open beneath it, so the word
@@ -2063,10 +2202,13 @@ function PlanRow({
   catalog,
   canSend,
   lastRuns,
+  runRaises = [],
+  liveness: serverLiveness = {},
   commitChecks,
   view,
   searching,
   unfolded,
+  opened = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -2075,6 +2217,24 @@ function PlanRow({
   canSend: boolean;
   /** The newest run against each step, by step id. Most steps have none. */
   lastRuns: Readonly<Record<string, LastRun>>;
+  /**
+   * What sessions have raised, for the opened step's account of its run.
+   *
+   * Every raise that names a step, not this step's: which run filed which is
+   * `runWork`, off the source and the time. Defaulted, because a render with
+   * none simply says nothing was raised.
+   */
+  runRaises?: readonly RunRaise[];
+  /**
+   * The same reading worked out on the server, at the clock it rendered with.
+   *
+   * Used until the browser's clock mounts. Without it the first paint would
+   * read every claim as fresh -- `runNow` is 0 before mount -- while the
+   * counts beside the module heading, worked out server-side from a real
+   * clock, already said one of them had stopped. One answer on the first
+   * paint, and the row takes over from the ticking clock after it.
+   */
+  liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Readonly<Record<string, CommitCheck>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
@@ -2091,6 +2251,17 @@ function PlanRow({
    * to look at. Nothing in the app passes it.
    */
   unfolded: boolean;
+  /**
+   * Start with every row's own panel open.
+   *
+   * The second seam for the render tests, and separate from `unfolded` because
+   * they open different things: that one shows a row's sub-steps, this one
+   * shows what is behind the row's own fold. The tests about the panel -- what
+   * a step's run has done among them -- would otherwise be asserting against a
+   * closed drawer, and `renderToStaticMarkup` cannot press the title. Nothing
+   * in the app passes it.
+   */
+  opened?: boolean;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -2100,8 +2271,9 @@ function PlanRow({
   // the Dismissed view would otherwise be a list of steps to open one at a
   // time. The rows that hold something put aside start open there.
   const [open, setOpen] = useState(
-    view === 'dismissed' &&
-      node.children.some((child) => child.kind === 'decision' && isDismissed(child)),
+    opened ||
+      (view === 'dismissed' &&
+        node.children.some((child) => child.kind === 'decision' && isDismissed(child))),
   );
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
@@ -2163,7 +2335,28 @@ function PlanRow({
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
-  const health = healthOf(node);
+  // What the runs say about the claims on this row and everything under it.
+  //
+  // Recomputed as the clock ticks, so a session that goes quiet while you are
+  // looking at the page says so without a navigation -- the same reason
+  // `useResolving` is built this way. Only this row's subtree, because that is
+  // all this row can report on: the module's counts are worked out server-side
+  // in `buildPlanTree`, from the same function.
+  const liveness = useMemo(
+    () => (runNow === 0 ? serverLiveness : planLiveness(flatten([node]), lastRuns, runNow)),
+    [node, lastRuns, runNow, serverLiveness],
+  );
+  const health = healthOf(node, liveness);
+  const claim = liveness[node.id];
+  // The run behind this row, where there is one to account for. Typed as
+  // possibly missing because most rows have no run at all -- the index
+  // signature says otherwise and would let a row with none through.
+  const run: LastRun | undefined = lastRuns[node.id];
+  // A step being worked is what the account of a run is for. A run still
+  // reading `started` is included as well, because a feature batch is fired at
+  // a feature the batch itself never claims, and that row is where somebody
+  // looks for what the batch has done.
+  const accountForRun = run !== undefined && (node.status === 'in_progress' || run.status === 'started');
   const resolving = useResolving(lastRuns, runNow);
   // What a "#494" written in a comment on this page is called. The catalog is
   // already every step's number and title, so no page needs to hand it over.
@@ -2462,7 +2655,7 @@ function PlanRow({
                 * looks like from here. The dot pulses because the one fact it
                 * carries is that something is happening right now. */}
               {node.status === 'in_progress' && node.startedAt && (
-                <Underway startedAt={node.startedAt} assignee={node.assignee} />
+                <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
               )}
             </span>
             {/* Where it came from, when it did not come from you. On the row
@@ -2718,6 +2911,13 @@ function PlanRow({
               </p>
             )}
 
+            {/* What its run has done, above the questions and the thread: on a
+                step you opened because it says somebody is working it, this is
+                the thing you opened it to find out. */}
+            {accountForRun && run && (
+              <RunWork run={run} node={node} catalog={catalog} raises={runRaises} />
+            )}
+
             {isDecision && (
               <AnswerDecision
                 node={node}
@@ -2748,7 +2948,7 @@ function PlanRow({
                 <span>
                   Started {when(node.startedAt)}
                   {node.status === 'in_progress' && node.startedAt && (
-                    <RunningFor startedAt={node.startedAt} />
+                    <RunningFor startedAt={node.startedAt} claim={claim} />
                   )}
                 </span>
               )}
@@ -2769,7 +2969,10 @@ function PlanRow({
                   {checkLine(commitChecks[node.commitSha])}
                 </span>
               )}
-              {lastRuns[node.id] && <LastRunLine run={lastRuns[node.id]} />}
+              {/* Only where the block above is not already accounting for
+                  this run: two sentences about the same run on one opened row
+                  is one of them too many. */}
+              {run && !accountForRun && <LastRunLine run={run} />}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -2833,10 +3036,13 @@ function PlanRow({
             catalog={catalog}
             canSend={canSend}
             lastRuns={lastRuns}
+            runRaises={runRaises}
+            liveness={serverLiveness}
             commitChecks={commitChecks}
             view={view}
             searching={searching}
             unfolded={unfolded}
+            opened={opened}
           />
         ))}
 
@@ -2947,6 +3153,70 @@ function SearchThePlan({
   );
 }
 
+/**
+ * The run readings, asked for once the page has drawn.
+ *
+ * #563: the page appears with whatever was last written down and updates a
+ * moment later, rather than holding the render open on a request to GitHub.
+ * `app/api/plan/runs` does the asking, writes what came back onto the run rows
+ * so the terminal tool and the next session's brief read the same answer, and
+ * hands the readings back for the rows already on screen.
+ *
+ * Nothing is asked when no step is claimed, which is most of the time: there
+ * is no run being worked to ask about, and every reading the page has is about
+ * a run that is over. Asked once rather than on a timer -- the clock ticks the
+ * rows on by itself, and a reading is only worth taking again when something
+ * has been sent since.
+ *
+ * A request that fails changes nothing, so the page goes on showing the
+ * reading it drew with. That is the third line of the done-when, and it is
+ * what falling back to the clock in `claimLiveness` is for.
+ */
+function useRefreshedRuns(
+  lastRuns: Record<string, LastRun>,
+  claims: number,
+  stored: string | null,
+): { runs: Record<string, LastRun>; refusal: string | null } {
+  const [answer, setAnswer] = useState<{
+    readings: Record<string, StoredRunReading>;
+    error: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (claims === 0) return;
+    const leaving = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/plan/runs', { method: 'POST', signal: leaving.signal });
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          readings?: Record<string, StoredRunReading>;
+          error?: string | null;
+        };
+        setAnswer({ readings: body.readings ?? {}, error: body.error ?? null });
+      } catch {
+        // Left as it was drawn.
+      }
+    })();
+
+    return () => leaving.abort();
+  }, [claims]);
+
+  const runs = useMemo(
+    () => (answer ? withReadings(lastRuns, answer.readings) : lastRuns),
+    [lastRuns, answer],
+  );
+
+  // The route's own word wins outright once it has one, `null` included. It
+  // asked GitHub a moment ago, and the refusals the page was handed are from
+  // whenever anything last asked -- a key replaced between the two would
+  // otherwise go on being reported as rejected for as long as one of those
+  // runs was on screen. A 200 with no `error` is GitHub answering, which is
+  // the fix landing.
+  return { runs, refusal: answer ? answer.error : stored };
+}
+
 export function PlanView({
   sections,
   finished,
@@ -2954,11 +3224,15 @@ export function PlanView({
   view,
   catalog,
   lastRuns,
+  runRaises = [],
+  keyRefusal = null,
+  liveness,
   commitChecks,
   empty,
   canSend,
   queued,
   unfolded = false,
+  opened = false,
 }: {
   sections: PlanSection[];
   /** The finished features, for the fold at the foot of Everything. */
@@ -2968,6 +3242,20 @@ export function PlanView({
   catalog: PlanCatalogEntry[];
   /** The newest run against each step, by step id. */
   lastRuns: Record<string, LastRun>;
+  /** Every raise that names a step, for the opened step's account of its run. */
+  runRaises?: readonly RunRaise[];
+  /**
+   * Why GitHub is refusing to say what anything has pushed, as the run rows
+   * had it when the page rendered.
+   *
+   * Drawn with rather than waited for, so a rejected key is on screen in the
+   * first paint instead of a second later: it is the reason every claimed row
+   * below reads off the clock. The route's answer replaces it once that
+   * arrives -- see `useRefreshedRuns`.
+   */
+  keyRefusal?: string | null;
+  /** The claims read against their runs, at the clock the page rendered with. */
+  liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Record<string, CommitCheck>;
   empty: boolean;
@@ -2982,9 +3270,28 @@ export function PlanView({
    * pin how a nested row is laid out would have nothing to look at.
    */
   unfolded?: boolean;
+  /**
+   * Render every row with its own panel already open.
+   *
+   * The same kind of seam, for what is behind a row's fold rather than beneath
+   * it: the account of a step's run lives there, and nothing can press a title
+   * in a static render. The page leaves it off.
+   */
+  opened?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const searching = searchTerms(query).length > 0;
+
+  // What GitHub says about the runs behind the claimed steps, taken once the
+  // page is up and written over the readings it drew with. A claim is the only
+  // reason to ask, so the server's own reading of them is what decides whether
+  // anything is asked at all.
+  const refreshed = useRefreshedRuns(
+    lastRuns,
+    Object.keys(liveness ?? {}).length,
+    keyRefusal,
+  );
+  const runs = refreshed.runs;
 
   // The whole tree is already on the page, so the search runs here rather than
   // as a round trip: a plan is tens of steps, and a filter you feel keeping up
@@ -3013,6 +3320,24 @@ export function PlanView({
 
   return (
     <div className="space-y-6">
+      {/* Above the summary, because it is the reason the summary's claims are
+          read off the clock. A banner rather than a status line: the key is a
+          setting only the person can change, the sentence GitHub's refusal was
+          turned into already says which one and what to do with it, and until
+          it is done no row on this page can say whether its session is still
+          working. */}
+      {refreshed.refusal && (
+        <Banner tone="warn">
+          <p className="font-semibold">
+            Nothing can read what these runs have pushed.
+          </p>
+          <p>{refreshed.refusal}</p>
+          <p className="text-small text-ink-muted">
+            Until then a claimed step reads off the clock: claimed for two hours, then stopped.
+          </p>
+        </Banner>
+      )}
+
       <SummaryStrip summary={summary} view={view} queued={queued} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />
@@ -3104,11 +3429,14 @@ export function PlanView({
                       trail={[]}
                       catalog={catalog}
                       canSend={canSend}
-                      lastRuns={lastRuns}
+                      lastRuns={runs}
+                      runRaises={runRaises}
+                      liveness={liveness}
                       commitChecks={commitChecks}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
+                      opened={opened}
                     />
                   ))}
                 </ul>
@@ -3183,11 +3511,14 @@ export function PlanView({
                 trail={[]}
                 catalog={catalog}
                 canSend={canSend}
-                lastRuns={lastRuns}
+                lastRuns={runs}
+                runRaises={runRaises}
+                liveness={liveness}
                 commitChecks={commitChecks}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}
+                opened={opened}
               />
             ))}
           </ul>

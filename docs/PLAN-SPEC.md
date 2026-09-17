@@ -115,6 +115,31 @@ fire and the record are one call, so a new button cannot start a run the app
 does not know about. Recording a run never fails the press — by then the
 routine is already going, and saying it is not would be the worse lie.
 
+The row also keeps what GitHub last said about the run, so every surface reads
+one answer instead of each asking or falling back to the clock:
+`github_checked_at` when it was last asked, `last_push_at`, `last_push_sha` and
+`last_push_subject` for the newest push it had made by then, and `github_error`
+for a refusal — a missing or rejected key, or a repository GitHub will not
+show. `github_checked_at` is the test of whether there is a reading at all: null
+means nobody has asked, and set with `last_push_at` null means somebody asked
+and the run had pushed nothing. `github_error` is separate from `error`, which
+is Anthropic refusing the fire and is tied to `status = 'failed'`; a rejected
+GitHub key says nothing about whether the run started. `storedReading` in
+`lib/plan/run-end.ts` turns the five columns into the shape the app reads, and
+`readingFor` and `readingColumns` beside it turn a reading back into the
+columns, so the write and the read are worked out in one place.
+
+`app/api/plan/runs` is the only thing that asks GitHub about a run.
+`refreshRunReadings` in `lib/plan/runs.ts` does the work: the reader from
+`readRunLiveness` gets the claimed steps, the runs behind them and one activity
+listing; the listing says which branch moved and to what sha and nothing about
+what the commit said, so `commitSubjects` looks the message up separately and
+is allowed to come back with nothing. Then the runs are written back and the
+same listing goes to `endQuietRuns`, which is what stops a run that pushed four
+minutes ago being written off for being five hours old. A refusal is written to
+`github_error` and carries no push beside it: a reading is what GitHub said
+this time, not a push from the last time somebody got through.
+
 ### `plan_overnight_runs`
 
 One row per account, holding what the overnight runner is doing. You press one
@@ -160,6 +185,26 @@ Waiting on another step is a relation rather than a status because it
 clears itself: the moment the other step is done, this one is ready, and
 nobody has to remember to come back and unblock it. `blocked` is for waiting
 on the outside world — an answer, an API key, a decision.
+
+Rows given both — blocked, and with dependencies naming what they wait for —
+record which they mean in `plan_items.block_kind`, settled by #525 and added
+by migration 0081. `steps` is a block on the rows it names, and it clears
+itself when they all close. `outside` is a block on something only the person
+can supply, and it stays blocked however much else closes. The database
+refuses a row that says `blocked` without one, every path that blocks a step
+writes it (the status control, the edit form, `plan.ts block --on-steps`), and
+it is cleared whenever the step stops being blocked, like `block_ask`. A block
+written without saying which is taken as `outside`: a block that outlives its
+reason is a row somebody looks at, and one that clears itself too early is an
+afternoon a session loses.
+
+`isStaleBlock` in `lib/plan/tree.ts` is the one place that reads it, and every
+surface reads through that: the health on the row, the Ready and Waiting views,
+the counts on the summary strip, a feature's roll-up, "On you", and the Send
+button's refusal. A `steps` block whose named steps have all closed reports the
+step it now is -- ready, or not started -- and is handed over like any other. An
+`outside` block reports `blocked` on all of them however much else closes, and
+Send refuses it until the person moves it.
 
 ## Proposals: from an idea to the plan
 
@@ -408,8 +453,8 @@ session writes it when it claims a step and clears it when it closes one, and
 a session that dies does neither — so the row went on saying underway for the
 rest of the day, which is note 60a0ad01 and the reason #494 exists.
 
-Two halves. `lib/plan/elapsed.ts` reads the clock beside the status, so the
-page stops drawing a two-hour-old claim as live and the send guard stops
+Two halves. `lib/plan/liveness.ts` reads the claim against the run behind it,
+so the page stops drawing a dead claim as live and the send guard stops
 refusing work under a feature nothing is touching. `inngest/dev/claims.ts` is
 the other half: a stage of the daily cron that writes those rows back to
 `not_started` with a dated line in `comment` saying the claim expired. Without
@@ -422,7 +467,55 @@ is why both the page's status control and `plan.ts start` now name who holds a
 step they mark underway — a claim nobody is on is one nothing is working.
 
 Two hours is a threshold and not evidence, and a long batch is called stale
-while it is still going. #499 replaces it with the run itself.
+while it is still going. So the claim is read off the run behind it instead.
+
+**What a claim reads as.** `lib/plan/liveness.ts` has `claimLiveness(step,
+run, now)`, and it answers one of four things about a step marked
+`in_progress`, or `null` when the row is not claimed at all:
+
+| | |
+|---|---|
+| `claimed` | The row says a session has it and nothing says what that session is doing: no run recorded, or one nobody has asked GitHub about, and the clock has not run out either. |
+| `working` | Its run has pushed something within the last twenty minutes. |
+| `quiet` | Nothing pushed for twenty minutes. It may still be reading files or waiting on a build. |
+| `abandoned` | Nothing pushed for two hours, with the step still open. Nobody is on it and it was never closed. |
+
+The two marks are `QUIET_AFTER_MINUTES` and `ENDED_AFTER_MINUTES` (#524),
+counted from the run's last push or from when it was fired if it has not
+pushed. The reading comes off the `plan_runs` row that #568 added columns for,
+written by `app/api/plan/runs`, which the plan page calls once it has drawn
+(#563) -- so the page appears with what was last stored and updates a moment
+later, and the terminal tool, the brief and the send guard read the same answer
+without a request of their own. A reading older than the ended mark is not
+trusted (#570) and neither is one carrying a GitHub refusal, and in both cases
+the clock in `elapsed.ts` answers instead. That fallback is also what a claim
+with no run recorded against it gets.
+
+`healthOf` turns those into the healths `working`, `quiet` and `abandoned`, so
+the health column, the module counts and bands, the terminal's facts column,
+the brief's status line and the send guard all read one function. The guard
+counts `quiet` as live: the twenty-minute mark reads wrong on a session that
+is reading rather than writing, and #574 settled that a quiet step is re-sent
+by asking first.
+
+**What a run has to show for itself.** One word is the right size for the
+health column and the wrong size for a step you opened because it says somebody
+is working it. So the opened row carries the evidence behind the word: which
+press started the run and when, what it last pushed, which steps closed after
+it was fired and what it raised. `lib/plan/work.ts` has those rules --
+`runWork` gathers them and `runStartedLine`, `pushLine`, `closedLine`,
+`raisedLine` and `nothingToShowLine` are the wording -- pure and browser-safe,
+so the terminal and a brief can say the same thing from the same rows.
+
+Nothing there asks GitHub. The push is the reading stored on the run row, and
+`github_checked_at` keeps the two kinds of silence apart: a run nobody has
+asked about says that rather than reading as a run that pushed nothing, and a
+reading carrying a refusal says GitHub would not answer. The closures are read
+from the page's catalog rather than from the tree the row is drawn in, because
+a view like Open has already filtered out the step a run closed an hour ago.
+The raises are the rows whose `source` names one of the run's steps and that
+were filed after it was fired -- both halves, since the time alone would hand a
+run every raise anybody filed while it was going.
 
 ## The reading
 
@@ -438,7 +531,9 @@ steps. Done and dropped dependencies are out of the way; a dropped one is
 shown plainly rather than freezing the dependent forever.
 
 **Ready.** A step could be picked up now when it is not started, waits on
-nothing, has no open sub-steps, and nothing above it is blocked or dropped.
+nothing, has no open sub-steps, and nothing above it is blocked or dropped. A
+step blocked on the steps it names is ready once every one of them has closed;
+a step blocked on something outside the plan never is.
 A feature with open sub-steps is worked through them; the feature is what
 you close when they are all done — and at that point it is itself ready.
 
@@ -468,6 +563,53 @@ default view to be worth landing on.
 questions, proposals nobody has decided on, and blocked steps. Not their ready
 steps — that is work they could do rather than something being asked of them,
 and folding it in makes "waiting on you" a list that cannot be cleared.
+
+### What a row reads as
+
+`healthOf` is the one word the page, the counts, the bands, the CLI and the
+brief all put on a row, and it is not the `status` column. A question and a
+step share that column and do not mean the same things by it, "ready" is worked
+out from what a step waits on, and the reading of a claim comes off the run
+behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
+
+| | |
+|---|---|
+| `unanswered` | An open question. Not "not started" — nothing happens to it until it is answered, and it closes on an answer rather than a commit. One of the three states the *On you* view is made of. |
+| `answered` | A settled question. It carries the resolution and no commit, the resolution is its tooltip, and it is the one state the counts beside a module heading leave out: a decision recorded is neither work outstanding nor work that shipped. |
+| `proposed` | Written by a session, waiting on the person. Out of the progress denominator and out of the bands, which is what keeps it from being `not_started`. |
+| `in_progress` | Claimed, with nothing known about the run behind it: none recorded, or one nobody has asked GitHub about, and the clock has not run out. What every caller that hands in no liveness gets, which is all the status column supports on its own. |
+| `working` | Claimed, and the run pushed something inside the twenty-minute mark. |
+| `quiet` | Claimed, and nothing pushed since. The guard counts it as live and #574 settled that re-sending it asks first. |
+| `abandoned` | Claimed, and the run ended without closing the step. Nobody is on it and it needs handing over again. The one claim reading that leaves the ladder, and it ranks with the stuck states rather than the underway ones. |
+| `blocked` | Stopped on something only the person can settle — `block_kind` of `outside`. It stays blocked however much else closes, and Send refuses it. |
+| `waiting` | Waits on another step, which clears itself when that step closes. The tooltip names which steps. |
+| `ready` | Not started, with nothing in the way. What the Send button takes, `workOrder` lists and the overnight chooser fires. |
+| `not_started` | Not started and not ready either: open sub-steps beneath it, or something above it blocked or dropped. The right-hand end of the progress bar — work not reached. |
+| `done` | Closed against its done-when. The one state that carries a commit. |
+| `dropped` | Decided against, and out of the denominator with the proposals. |
+
+**Why thirteen.** #505 asked whether the set had outgrown what anybody reads:
+`not_started`, `ready` and `waiting` look like three shapes for "not started,
+and here is why". It was measured against one bar — a state stays only if some
+surface does something different with it, rather than merely wording it
+differently — and all thirteen cleared it. Four pairs were close enough to
+argue about. `ready` is what the Send button, the work order and the overnight
+chooser read, so merging it into `not_started` puts the one state that is an
+invitation to start behind a tooltip. `blocked` and `waiting` stopped being one
+fact read twice at #565, which made a `blocked` row reachable with every
+dependency closed: one clears itself, the other waits for the person.
+`in_progress` and `working` are worded the same and drawn the same on purpose —
+they are the same rung, and the live indicator on the row says which — but
+dropping `in_progress` means calling a claim nobody has looked into "working",
+which is the dot the page used to draw on a step nobody was working. And
+`answered` is a closed row with a resolution and no commit, which `done` cannot
+say.
+
+The same bar applies to a fourteenth. Every `Record<PlanHealth, …>` is
+exhaustive — the glyphs in `lib/status-glyphs.ts`, the words and tones on the
+page, the tally, `planState` in `lib/dev/words.ts` — so adding one fails the
+typecheck at each surface rather than drawing itself as a proposal, and
+`/dev/ui` lists all thirteen with their shapes.
 
 ## The page
 

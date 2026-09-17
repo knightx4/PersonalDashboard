@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { listPushes, refreshCommitChecks, refusalFor } from '@/lib/plan/ci';
+import { commitSubjects, listPushes, refreshCommitChecks, refusalFor } from '@/lib/plan/ci';
 
 describe('refusalFor', () => {
   it('names the permission a refused workflow-runs read is short of', () => {
@@ -193,6 +193,57 @@ describe('refreshCommitChecks', () => {
 
     expect(result.error).toBeNull();
     expect(written[0].conclusion).toBe('none');
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('commitSubjects', () => {
+  it('reads the first line of each commit asked about', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const fetchFn = vi.fn(
+      async (url: string) =>
+        new Response(
+          JSON.stringify({
+            commit: {
+              message: `Subject for ${String(url).slice(-7)}\n\nA body nobody stores.`,
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+
+    const subjects = await commitSubjects({
+      shas: ['abc1234', 'def5678', 'abc1234'],
+      fetch: fetchFn as never,
+    });
+
+    expect(subjects).toEqual({
+      abc1234: 'Subject for abc1234',
+      def5678: 'Subject for def5678',
+    });
+    // Asked once per distinct commit.
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    vi.unstubAllEnvs();
+  });
+
+  it('leaves out a commit GitHub would not answer for, rather than failing', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 404 }));
+
+    await expect(
+      commitSubjects({ shas: ['abc1234'], fetch: fetchFn as never }),
+    ).resolves.toEqual({});
+    vi.unstubAllEnvs();
+  });
+
+  it('asks nothing without a token, and nothing about what is not a commit', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 200 }));
+    expect(await commitSubjects({ shas: ['abc1234'], fetch: fetchFn as never })).toEqual({});
+
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    expect(await commitSubjects({ shas: ['', 'nope'], fetch: fetchFn as never })).toEqual({});
+    expect(fetchFn).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
 });

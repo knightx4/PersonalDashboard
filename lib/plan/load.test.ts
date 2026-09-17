@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isPlanStatus, planItemFromRow } from '@/lib/plan/load';
+import {
+  DEFAULT_BLOCK_KIND,
+  blockPatch,
+  isPlanBlockKind,
+  isPlanStatus,
+  planItemFromRow,
+} from '@/lib/plan/load';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import { MODULES } from '@/lib/modules';
 
@@ -49,6 +55,19 @@ describe('planItemFromRow', () => {
     expect(item.kind).toBe('decision');
     expect(item.fog).toBe('How the export is shaped is not yet known.');
     expect(item.resolution).toBe('One file per month.');
+  });
+
+  it('reads which kind of block a blocked step is carrying', () => {
+    expect(planItemFromRow({ ...row, block_kind: 'steps' }).blockKind).toBe('steps');
+    expect(planItemFromRow({ ...row, block_kind: 'outside' }).blockKind).toBe('outside');
+  });
+
+  it('reads no kind on a step that is not blocked, and none on a row written before 0081', () => {
+    expect(planItemFromRow({ ...row, status: 'not_started' }).blockKind).toBeNull();
+    expect(planItemFromRow(row).blockKind).toBeNull();
+    // A word nothing names is read back as none rather than handed on to a
+    // switch that has no arm for it.
+    expect(planItemFromRow({ ...row, block_kind: 'somebody' }).blockKind).toBeNull();
   });
 
   it('reads a value the code no longer names back as the default rather than crashing', () => {
@@ -102,5 +121,43 @@ describe('the seed', () => {
       expect(seen.has(key), `${key} appears twice`).toBe(false);
       seen.add(key);
     }
+  });
+});
+
+describe('blockPatch', () => {
+  it('records the kind it is given when a step becomes blocked', () => {
+    expect(blockPatch('blocked', 'steps')).toEqual({ block_kind: 'steps' });
+    expect(blockPatch('blocked', 'outside')).toEqual({ block_kind: 'outside' });
+  });
+
+  it('takes a block nobody described as waiting on the person', () => {
+    // The safe way to be wrong: a block that outlives its reason is a row
+    // somebody looks at, and one that clears itself early is the afternoon
+    // three sessions lost on #499.
+    expect(DEFAULT_BLOCK_KIND).toBe('outside');
+    expect(blockPatch('blocked')).toEqual({ block_kind: 'outside' });
+    expect(blockPatch('blocked', null)).toEqual({ block_kind: 'outside' });
+  });
+
+  it('leaves the ask alone while a step stays blocked', () => {
+    expect(blockPatch('blocked', 'steps')).not.toHaveProperty('block_ask');
+  });
+
+  it('clears both columns on every status that is not blocked', () => {
+    for (const status of ['not_started', 'in_progress', 'done', 'dropped', 'proposed'] as const) {
+      expect(blockPatch(status)).toEqual({ block_kind: null, block_ask: null });
+      // Even asked for one: a step that is not blocked is not waiting on
+      // anything, whatever the caller passed.
+      expect(blockPatch(status, 'steps')).toEqual({ block_kind: null, block_ask: null });
+    }
+  });
+});
+
+describe('isPlanBlockKind', () => {
+  it('names two kinds and nothing else', () => {
+    expect(isPlanBlockKind('steps')).toBe(true);
+    expect(isPlanBlockKind('outside')).toBe(true);
+    expect(isPlanBlockKind('blocked')).toBe(false);
+    expect(isPlanBlockKind('')).toBe(false);
   });
 });

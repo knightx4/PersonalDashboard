@@ -30,7 +30,7 @@ export type ExpiredClaim = 'stale' | 'unowned';
  * Whether this row's claim should be put back, and which of the two it is.
  *
  * Null for anything that is not a claim at all, and for a live one. A claim
- * with no `startedAt` is left alone the way `hasLiveClaim` leaves it: the
+ * with no `startedAt` is left alone the way `claimLiveness` leaves it: the
  * column is stamped by a trigger, so a row without one was claimed this
  * instant.
  */

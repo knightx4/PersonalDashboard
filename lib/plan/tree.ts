@@ -1,13 +1,16 @@
 import { MODULES, type ModuleId } from '@/lib/modules';
 import {
+  DEFAULT_BLOCK_KIND,
   hasLiveFog,
   isClosed,
   isDismissed,
   type PlanAssignee,
+  type PlanBlockKind,
   type PlanData,
   type PlanItem,
   type PlanStatus,
 } from './load';
+import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
 
 /**
  * The plan, read.
@@ -185,6 +188,8 @@ export function planProgress(
     status: PlanStatus;
     dependsOn?: readonly PlanLink[];
     dismissedAt?: string | null;
+    /** Read by `isBlocked` for the blocked count. Absent reads as `outside`. */
+    blockKind?: PlanBlockKind | null;
   }[],
 ): PlanProgress {
   // A dismissed question is out of the denominator with the proposals and the
@@ -229,33 +234,38 @@ function bySibling(a: PlanItem, b: PlanItem): number {
 }
 
 /**
- * A block that has outlived the thing it named.
+ * A block on steps that have all closed.
  *
- * `blocked` means "needs an answer, or something outside the repo", and it is
- * deliberately a status that nothing clears on its own: no amount of other
- * work produces the credential. Waiting on another *step* is meant to be a row
- * in `plan_dependencies` instead, precisely because that does clear itself.
+ * `blocked` covers two different waits and `block_kind` is what tells them
+ * apart. A `steps` block is waiting on the rows in `plan_dependencies` it was
+ * written with, and it is the only kind that can go out of date on its own:
+ * once every step it named is closed, nothing recorded is holding it. #20 sat
+ * blocked on #127 for a day after #127 shipped, and the page went on saying
+ * "Waiting" with nothing left to wait on, which is the bug this answers.
  *
- * A step marked `blocked` that also records dependencies has been given both,
- * and those rows are the only account the plan holds of what it was waiting
- * for. Once every one of them is closed, nothing recorded is holding the step
- * and the status column is simply out of date -- #20 sat blocked on #127 for a
- * day after #127 shipped, and the page went on saying "Waiting" with nothing
- * left to wait on, which is the bug this answers.
+ * An `outside` block is never stale, however much else closes. #499 named
+ * #495, #498 and #522, all three closed, and its block was about a GitHub
+ * token nobody had made: the page called it ready, the Send button took the
+ * press, and three runs came back having found the same wall. #525 settled
+ * that by recording the kind, so this reading is no longer a guess.
  *
- * A step blocked with no dependencies at all is untouched. That is the honest
- * use of the status, and nothing about it can be worked out from the tree.
+ * A block with no kind recorded reads as `DEFAULT_BLOCK_KIND`, which is
+ * `outside`. The database refuses a blocked row without a kind, so nothing can
+ * write one now, but a row whose kind this build does not recognise reads back
+ * as null, and leaving such a step blocked is the safe way to be wrong.
+ *
+ * A step blocked with no dependencies at all is untouched whatever its kind:
+ * there is nothing on record for it to have outlived.
  */
 export function isStaleBlock(node: {
   status: PlanStatus;
   dependsOn?: readonly PlanLink[];
+  blockKind?: PlanBlockKind | null;
 }): boolean {
+  if (node.status !== 'blocked') return false;
+  if ((node.blockKind ?? DEFAULT_BLOCK_KIND) !== 'steps') return false;
   const dependsOn = node.dependsOn ?? [];
-  return (
-    node.status === 'blocked' &&
-    dependsOn.length > 0 &&
-    dependsOn.every((link) => isClosed(link.item.status))
-  );
+  return dependsOn.length > 0 && dependsOn.every((link) => isClosed(link.item.status));
 }
 
 /**
@@ -274,7 +284,11 @@ export function isStaleBlock(node: {
  * the dropdown says Blocked because that is what the row says, and it is the
  * person's to change.
  */
-export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanLink[] }): boolean {
+export function isBlocked(node: {
+  status: PlanStatus;
+  dependsOn?: readonly PlanLink[];
+  blockKind?: PlanBlockKind | null;
+}): boolean {
   return node.status === 'blocked' && !isStaleBlock(node);
 }
 
@@ -282,8 +296,10 @@ export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanL
  * Whether a step could be picked up now.
  *
  *  - It has not been started. A step underway is being worked, not waiting
- *    to be, and a blocked one has said why it cannot be -- unless every
- *    dependency it named has since closed, which is `isStaleBlock`.
+ *    to be, and a blocked one has said why it cannot be -- unless it was
+ *    blocked on steps and every one of them has since closed, which is
+ *    `isStaleBlock`. A block on something outside the plan never becomes
+ *    ready here; it waits for the person to say it is over.
  *  - Nothing it waits on, its own or inherited, is still open.
  *  - None of its own steps are still open. A feature with steps outstanding
  *    is worked through those steps; the feature itself is what you close when
@@ -293,7 +309,7 @@ export function isBlocked(node: { status: PlanStatus; dependsOn?: readonly PlanL
  *    feature waits with it, and one under a proposal has not been agreed to.
  */
 export function isReady(
-  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn'>,
+  node: Pick<PlanNode, 'status' | 'waitingOn' | 'children' | 'dependsOn' | 'blockKind'>,
   ancestors: readonly Pick<PlanItem, 'status'>[],
 ): boolean {
   if (node.status !== 'not_started' && !isStaleBlock(node)) return false;
@@ -319,7 +335,7 @@ export function isReady(
  * is shown at the top of its module rather than lost, because a plan that
  * quietly hides a row is worse than one with a row out of place.
  */
-export function buildPlanTree(data: PlanData): PlanSection[] {
+export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSection[] {
   const byId = new Map(data.items.map((item) => [item.id, item]));
   const childrenOf = new Map<string | null, PlanItem[]>();
   for (const item of data.items) {
@@ -381,8 +397,8 @@ export function buildPlanTree(data: PlanData): PlanSection[] {
         label: scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'The app as a whole',
         nodes,
         progress: planProgress(leavesOf(nodes)),
-        tally: tallyHealth(nodes),
-        bands: planBands(nodes),
+        tally: tallyHealth(nodes, liveness),
+        bands: planBands(nodes, liveness),
       };
     })
     .filter((section) => section.module !== null || section.nodes.length > 0);
@@ -409,19 +425,99 @@ export function leavesOf(nodes: readonly PlanNode[]): PlanNode[] {
  * same step. The page keeps the wording and the tooltip, lib/status-glyphs.ts
  * keeps the shape; the rule is here.
  */
+/**
+ * The thirteen, and why each one is here.
+ *
+ * #505 asked whether the set had outgrown what anybody reads: `not_started`,
+ * `ready` and `waiting` look like three shapes for "not started, and here is
+ * why". It was measured against one bar -- a health stays only if some surface
+ * does something different with it, rather than merely wording it differently
+ * -- and all thirteen cleared it. Four pairs were close enough to argue about:
+ *
+ * - `ready` against `not_started`. `ready` is what the Send button takes, what
+ *   `workOrder` lists and what the overnight chooser fires. Merging them puts
+ *   the one state that is an invitation to start behind a tooltip.
+ * - `waiting` against `blocked`. Since #565 a `blocked` row can have every
+ *   dependency closed, and a `waiting` row has no block of its own, so they
+ *   are no longer one fact read twice: one clears itself when the steps it
+ *   names close, the other waits for the person.
+ * - `in_progress` against `working`. The column words both "In progress" and
+ *   draws both three-quarters, which is deliberate -- they are the same rung,
+ *   and the live indicator on the row says which off the same reading. What
+ *   separates them is evidence, and dropping `in_progress` means calling a
+ *   claim nobody has looked into "working", which is the dot the page used to
+ *   draw on a step nobody was working.
+ * - `answered` against `done`. A settled question carries a resolution and no
+ *   commit, its tooltip is that resolution, and it is the one state the counts
+ *   beside a module heading leave out.
+ *
+ * Every `Record<PlanHealth, ...>` is exhaustive -- the glyphs, the words, the
+ * tally, `planState` -- so a fourteenth fails the typecheck at each surface
+ * rather than drawing itself as a proposal. The same bar applies to it.
+ */
 export const PLAN_HEALTHS = [
+  // A question, and a question settled. A decision shares the status column
+  // with a step and does not mean the same things by it: an open one is not
+  // "not started", and a closed one carries an answer rather than a commit.
   'unanswered',
   'answered',
+  // Written by a session, waiting on the person. Out of the progress
+  // denominator and out of the bands, which is what separates it from
+  // `not_started`.
   'proposed',
+  // The four readings of a claim. `in_progress` is a claimed row with nothing
+  // known about the run behind it; the other three are what the run says,
+  // through `claimLiveness`. `abandoned` is the one that leaves the ladder --
+  // the step is claimed and nothing is working it.
   'in_progress',
+  'working',
+  'quiet',
+  'abandoned',
+  // Stopped on something outside the plan, and waiting on a step that will
+  // clear itself. `isStaleBlock` is what keeps the two apart.
   'blocked',
   'waiting',
+  // Not started, with and without something in the way.
   'ready',
   'not_started',
+  // Closed. `dropped` leaves the denominator; `done` is the one that carries
+  // a commit.
   'done',
   'dropped',
 ] as const;
 export type PlanHealth = (typeof PLAN_HEALTHS)[number];
+
+/**
+ * What each claimed step's session is doing, by step id.
+ *
+ * The one thing `healthOf` cannot work out from the plan: whether the session
+ * that claimed a step is still pushing. It comes off the run rows, so it is
+ * handed in rather than derived, and it is optional everywhere -- a caller
+ * with no runs to hand asks without it and every claim reads `in_progress`,
+ * which is what the whole plan did before there was anything better to say.
+ */
+export type PlanLiveness = Readonly<Record<string, ClaimLiveness>>;
+
+/**
+ * The claims on these steps, read against the last run on each.
+ *
+ * Built once and handed to `buildPlanTree`, `healthOf` and the guards, because
+ * the alternative is each of them reading the run rows its own way. A step
+ * with no run against it still gets an entry when it is claimed: the clock is
+ * the fallback and `claimLiveness` applies it.
+ */
+export function planLiveness(
+  steps: readonly (ClaimStep & { id: string })[],
+  runs: Readonly<Record<string, ClaimRun>>,
+  now: number,
+): PlanLiveness {
+  const out: Record<string, ClaimLiveness> = {};
+  for (const step of steps) {
+    const reading = claimLiveness(step, runs[step.id], now);
+    if (reading) out[step.id] = reading;
+  }
+  return out;
+}
 
 /**
  * Which open state speaks for a subtree, most pressing first.
@@ -435,8 +531,14 @@ export type PlanHealth = (typeof PLAN_HEALTHS)[number];
 const OPEN_HEALTH_RANK: readonly PlanHealth[] = [
   'unanswered',
   'blocked',
+  // A claim nobody is working is more pressing than a proposal: the step has
+  // been handed over and stopped, so it needs sending again, and a feature
+  // reporting the proposal beneath it instead would hide that.
+  'abandoned',
   'proposed',
   'waiting',
+  'quiet',
+  'working',
   'in_progress',
   'ready',
   'not_started',
@@ -448,13 +550,25 @@ function descendantsOf(node: { children?: readonly PlanNode[] }): PlanNode[] {
 }
 
 export function healthOf(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'blockKind'> & {
     /**
      * Optional so the callers that classify one row on its own -- the tally,
      * which only ever sees leaves -- need not build a subtree to ask.
      */
     children?: readonly PlanNode[];
+    /**
+     * Only read to look this row's claim up in `liveness`. Optional for the
+     * callers that classify a row without one in hand, `needsThePerson` among
+     * them, and a row with no id simply has no reading.
+     */
+    id?: string;
   },
+  /**
+   * What the runs say about the claimed steps, from `planLiveness`. Without
+   * it a claim reads `in_progress` and nothing more, which is all the status
+   * column can support on its own.
+   */
+  liveness?: PlanLiveness,
 ): PlanHealth {
   // Closed on top of something open is not closed.
   //
@@ -472,7 +586,7 @@ export function healthOf(
       (child) => !isClosed(child.status) && !isDismissed(child),
     );
     if (open.length > 0) {
-      const healths = new Set(open.map((child) => healthOf(child)));
+      const healths = new Set(open.map((child) => healthOf(child, liveness)));
       const worst = OPEN_HEALTH_RANK.find((health) => healths.has(health));
       if (worst) return worst;
     }
@@ -486,10 +600,12 @@ export function healthOf(
   }
   if (node.kind === 'decision' && node.status === 'done') return 'answered';
 
-  // A block whose every named dependency has closed is reported as the step it
-  // now is, not as the block it used to be. See `isStaleBlock`: leaving it as
+  // A block on steps that have all closed is reported as the step it now is,
+  // not as the block it used to be. See `isStaleBlock`: leaving it as
   // "Waiting" is the page claiming something is holding the step up when the
-  // plan has no record of anything that is.
+  // plan has no record of anything that is. A block on something outside the
+  // plan is not that case -- it goes on reading `blocked` below, because the
+  // thing holding it up was never on the plan to close.
   if (isStaleBlock(node)) {
     return node.ready ? 'ready' : 'not_started';
   }
@@ -497,8 +613,25 @@ export function healthOf(
   switch (node.status) {
     case 'proposed':
       return 'proposed';
+    // What the claim actually means, where the run behind it has been read.
+    //
+    // `in_progress` is one word for four situations -- a session pushing right
+    // now, a session that has gone twenty minutes without pushing, a run that
+    // died hours ago and never closed the step, and a claim nothing has ever
+    // looked into. The column cannot tell them apart, so every surface that
+    // read it alone drew a pulsing dot on a step nobody was working. The run
+    // record can, and `claimLiveness` is where that is decided.
     case 'in_progress':
-      return 'in_progress';
+      switch (node.id ? liveness?.[node.id] : undefined) {
+        case 'working':
+          return 'working';
+        case 'quiet':
+          return 'quiet';
+        case 'abandoned':
+          return 'abandoned';
+        default:
+          return 'in_progress';
+      }
     case 'blocked':
       return 'blocked';
     case 'done':
@@ -632,7 +765,7 @@ function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
 
 type MoveInput = Pick<
   PlanNode,
-  'id' | 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
+  'id' | 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee' | 'blockKind'
 > & {
   dismissedAt?: string | null;
   children?: readonly PlanNode[];
@@ -673,11 +806,11 @@ export type PlanTally = Record<PlanHealth, number>;
  * the count beside a module heading is one of the places it stopped being
  * asked about.
  */
-export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
+export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness): PlanTally {
   const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
   for (const leaf of leavesOf(nodes)) {
     if (isDismissed(leaf)) continue;
-    tally[healthOf(leaf)] += 1;
+    tally[healthOf(leaf, liveness)] += 1;
   }
   return tally;
 }
@@ -698,8 +831,14 @@ export function tallyHealth(nodes: readonly PlanNode[]): PlanTally {
 export const PLAN_BAND_ORDER: readonly PlanHealth[] = [
   'done',
   'answered',
+  'working',
+  'quiet',
   'in_progress',
   'ready',
+  // With the stuck states rather than with the underway ones: a claim whose
+  // run ended is not work in hand, it is a step waiting to be handed over
+  // again.
+  'abandoned',
   'blocked',
   'unanswered',
   'waiting',
@@ -724,14 +863,14 @@ export type PlanBand = { health: PlanHealth; count: number };
  * `progress.live` and no two things on this row can disagree. Empty states are
  * dropped: a band of zero is nothing to draw and nothing to say (law 1).
  */
-export function planBands(nodes: readonly PlanNode[]): PlanBand[] {
+export function planBands(nodes: readonly PlanNode[], liveness?: PlanLiveness): PlanBand[] {
   const live = leavesOf(nodes).filter(
     (leaf) => leaf.status !== 'dropped' && leaf.status !== 'proposed',
   );
 
   const counts = new Map<PlanHealth, number>();
   for (const leaf of live) {
-    const health = healthOf(leaf);
+    const health = healthOf(leaf, liveness);
     counts.set(health, (counts.get(health) ?? 0) + 1);
   }
 
@@ -790,7 +929,7 @@ export function ancestorsOf(sections: readonly PlanSection[], id: string): PlanN
  * opened.
  */
 export function needsThePerson(
-  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn'> & {
+  node: Pick<PlanNode, 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'blockKind'> & {
     dismissedAt?: string | null;
   },
 ) {
@@ -1103,7 +1242,10 @@ export function handedToClaude(sections: readonly PlanSection[]): PlanNode[] {
  * something, and it is excluded from a hand-over on its own grounds.
  */
 export function isWaitingOnThePerson(
-  node: Pick<PlanNode, 'kind' | 'status'> & { dependsOn?: readonly PlanLink[] },
+  node: Pick<PlanNode, 'kind' | 'status'> & {
+    dependsOn?: readonly PlanLink[];
+    blockKind?: PlanBlockKind | null;
+  },
 ): boolean {
   if (isBlocked(node)) return true;
   return node.kind === 'decision' && !isClosed(node.status);

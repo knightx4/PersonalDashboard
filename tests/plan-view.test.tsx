@@ -11,12 +11,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
+import type { PlanSection } from '@/lib/plan/tree';
+import type { LastRun } from '@/lib/plan/run-end';
+import type { RunRaise } from '@/lib/plan/work';
 import {
   applyView,
   buildPlanTree,
   splitFinished,
   flattenSections,
   handedToClaude,
+  planLiveness,
   summarize,
 } from '@/lib/plan/tree';
 
@@ -46,6 +50,7 @@ vi.mock('@/app/dev/plan/actions', () => {
 });
 
 const { PlanView } = await import('@/app/dev/plan/plan-view');
+type PlanCatalogEntry = Parameters<typeof PlanView>[0]['catalog'][number];
 
 let counter = 0;
 
@@ -65,6 +70,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     fogDismissedAt: null,
     comment: null,
     blockAsk: null,
+    blockKind: null,
     thread: [],
     priority: 2,
     size: null,
@@ -105,15 +111,22 @@ const whole = buildPlanTree({
   dependencies: [dep('page', 'schema'), dep('form', 'page')],
 });
 
-const catalog = flattenSections(whole).map((node) => ({
-  id: node.id,
-  number: node.number,
-  title: node.title,
-  module: node.module,
-  parentId: node.parentId,
-  depth: node.depth,
-  closed: node.status === 'done' || node.status === 'dropped',
-}));
+/** The catalog the page builds: every step in the plan, however it is viewed. */
+function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
+  return flattenSections(tree).map((node) => ({
+    id: node.id,
+    number: node.number,
+    title: node.title,
+    module: node.module,
+    parentId: node.parentId,
+    depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
+    closed: node.status === 'done' || node.status === 'dropped',
+  }));
+}
+
+const catalog = catalogOf(whole);
 
 function render(
   view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked',
@@ -708,5 +721,203 @@ describe('the CI mark on a closed step', () => {
 
   it('names the merge the checks were read from', () => {
     expect(html).toContain('the merge that put this on main');
+  });
+});
+
+describe('a claim, drawn from what its run did', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+
+  /** The page, for one step claimed `minutes` ago with no run recorded. */
+  function drawClaim(minutes: number) {
+    const items = [
+      item({ id: 'a', title: 'Being worked', status: 'in_progress', startedAt: minutesAgo(minutes) }),
+    ];
+    const liveness = planLiveness(items, {}, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        liveness={liveness}
+        commitChecks={{}}
+        queued={0}
+        unfolded
+      />,
+    );
+  }
+
+  it('draws a fresh claim as work in hand', () => {
+    const html = drawClaim(10);
+    expect(html).toContain('In progress');
+    expect(html).not.toContain('Stopped');
+  });
+
+  it('draws a claim whose run ended as stopped, and counts it that way too', () => {
+    // The whole of #500 on one row: the column, the pill and the count beside
+    // the module heading all read the claim through the same function, so the
+    // page cannot say underway while the count says the run is gone.
+    const html = drawClaim(200);
+    expect(html).toContain('Stopped');
+    expect(html).toContain('stopped without closing');
+  });
+});
+
+describe('what an opened step says its run has done', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
+  const FIRED = minutesAgo(40);
+
+  /** One claimed feature with a closed step under it, and the run that did it. */
+  function drawRun(
+    reading: LastRun['reading'],
+    raises: (childNumber: number) => RunRaise[] = () => [],
+    childClosedAt: string | null = minutesAgo(8),
+  ) {
+    const parent = item({
+      id: 'p',
+      title: 'Being worked',
+      status: 'in_progress',
+      startedAt: FIRED,
+    });
+    const child = item({
+      id: 'c',
+      title: 'Already closed',
+      parentId: 'p',
+      status: childClosedAt ? 'done' : 'not_started',
+      completedAt: childClosedAt,
+    });
+    const items = [parent, child];
+    const lastRuns: Record<string, LastRun> = {
+      p: { status: 'started', createdAt: FIRED, error: null, job: 'feature', reading },
+    };
+    const liveness = planLiveness(items, lastRuns, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={catalogOf(tree)}
+        empty={false}
+        canSend={false}
+        lastRuns={lastRuns}
+        runRaises={raises(child.number)}
+        liveness={liveness}
+        commitChecks={{}}
+        queued={0}
+        unfolded
+        opened
+      />,
+    );
+  }
+
+  it('names the run and when it started, not only that something is underway', () => {
+    const html = drawRun(null);
+    expect(html).toContain('Its run');
+    expect(html).toContain(`A feature batch started ${FIRED.replace('T', ' ').slice(0, 16)}`);
+  });
+
+  it('lists what it pushed, what it closed and what it raised', () => {
+    const html = drawRun(
+      {
+        checkedAt: minutesAgo(1),
+        lastPush: { at: minutesAgo(6), sha: 'f04d9da1111', subject: 'Read a claim (plan #500)' },
+        refusal: null,
+      },
+      (child) => [
+        {
+          id: 'r',
+          title: 'The GitHub key is refused',
+          source: `plan #${child}`,
+          createdAt: minutesAgo(10),
+        },
+      ],
+    );
+    expect(html).toContain('Read a claim (plan #500)');
+    expect(html).toContain('Closed #');
+    expect(html).toContain('The GitHub key is refused');
+  });
+
+  it('says a run with nothing to show has nothing to show, and which kind of nothing', () => {
+    // No stored reading at all: nobody has asked GitHub, which is not the same
+    // fact as a run that was asked about and had pushed nothing.
+    const html = drawRun(null, () => [], null);
+    expect(html).toContain('nothing has asked GitHub what it has pushed');
+  });
+
+  it('prints why GitHub refused, on a run that closed a step all the same', () => {
+    // #566. The run has a closure to report, so it is not empty and the
+    // sentence about nothing to show never renders -- the rejected key was
+    // invisible on exactly the runs doing work. It is printed as GitHub's
+    // refusal was worded, since that sentence names the variable and says
+    // what to do about it.
+    const html = drawRun({
+      checkedAt: minutesAgo(1),
+      lastPush: null,
+      refusal:
+        'GITHUB_READ_TOKEN is missing a permission (403). Give it access to ' +
+        "knightx4/PersonalDashboard in the token's settings, then redeploy.",
+    });
+    expect(html).toContain('Closed #');
+    expect(html).toContain('GITHUB_READ_TOKEN is missing a permission (403)');
+    expect(html).toContain('then redeploy.');
+  });
+});
+
+/**
+ * The refused key, above the whole plan.
+ *
+ * Its own state and not a run's: the key is one setting, so every claimed row
+ * below is being read off the clock for the same reason, and the page says
+ * that once rather than on each row.
+ */
+describe('what the page says when GitHub refuses the key', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const REJECTED =
+    'GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped.';
+
+  function draw(keyRefusal: string | null) {
+    const items = [item({ id: 'a', title: 'Being worked', status: 'in_progress' })];
+    const liveness = planLiveness(items, {}, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        keyRefusal={keyRefusal}
+        liveness={liveness}
+        commitChecks={{}}
+        queued={0}
+      />,
+    );
+  }
+
+  it('says so once, in the words the refusal was recorded in', () => {
+    const html = draw(REJECTED);
+    expect(html).toContain('Nothing can read what these runs have pushed.');
+    expect(html).toContain(REJECTED);
+    // And what the rows are doing in the meantime, since they go on showing a
+    // reading and it is no longer coming from GitHub.
+    expect(html).toContain('reads off the clock');
+  });
+
+  it('says nothing at all when the key is working', () => {
+    const html = draw(null);
+    expect(html).not.toContain('Nothing can read what these runs have pushed.');
+    expect(html).not.toContain('GITHUB_READ_TOKEN');
   });
 });

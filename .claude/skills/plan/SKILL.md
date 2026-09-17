@@ -27,9 +27,11 @@ npx tsx scripts/plan.ts show <n>               # the brief: destination, decisio
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
-npx tsx scripts/plan.ts block <n> --ask "…" [--note "…"]
+npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
                                                # cannot proceed; the ask is the one sentence
-                                               # saying what it needs, rewritten each time
+                                               # saying what it needs, rewritten each time.
+                                               # --on-steps: it clears itself when the steps it
+                                               # names close; without it, it waits for you
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--from <n>]  # stamp: whose answer made this
