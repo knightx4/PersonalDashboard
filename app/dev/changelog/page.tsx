@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { ChevronRight, History, SearchX } from 'lucide-react';
+import { ChevronRight, History } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/field';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { loadChangelog } from '@/lib/changelog/load';
 import {
@@ -90,28 +91,23 @@ export default async function DevChangelogPage({
   const groups = groupChangelog(matched, grouping);
 
   /**
-   * All three parameters travel together.
+   * A link for the grouping row and the workspace row, keeping everything else.
    *
    * A grouping link that dropped the search would throw away what you typed the
-   * moment you asked to see it by day, and the form has to carry the grouping
-   * for the same reason in reverse. The workspace is the third: narrowing to
-   * the vault and then regrouping is one thought, not two.
+   * moment you asked to see it by day, and narrowing to the vault and then
+   * regrouping is one thought rather than two. The search box keeps the other
+   * two the same way, through `lib/list-search`.
    */
   function href(
-    over: {
-      group?: ChangelogGrouping;
-      module?: ChangelogModuleFilter | null;
-      q?: string;
-    } = {},
+    over: { group?: ChangelogGrouping; module?: ChangelogModuleFilter | null } = {},
   ): string {
     const nextGrouping = over.group ?? grouping;
     const nextModule = over.module === undefined ? workspace : over.module;
-    const nextQuery = over.q ?? query;
 
     const search = new URLSearchParams();
     if (nextGrouping !== CHANGELOG_DEFAULT_GROUPING) search.set('group', nextGrouping);
     if (nextModule) search.set('module', nextModule);
-    if (nextQuery) search.set('q', nextQuery);
+    if (query) search.set('q', query);
     const rest = search.toString();
     return rest ? `/dev/changelog?${rest}` : '/dev/changelog';
   }
@@ -125,46 +121,23 @@ export default async function DevChangelogPage({
 
       {entries.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <nav aria-label="Grouping" className="flex flex-wrap items-center gap-1">
-              {CHANGELOG_GROUPINGS.map((candidate) => (
-                <Link
-                  key={candidate}
-                  href={href({ group: candidate })}
-                  aria-current={candidate === grouping ? 'page' : undefined}
-                  className={cn(
-                    'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-                    candidate === grouping
-                      ? 'bg-accent text-surface'
-                      : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-                  )}
-                >
-                  {CHANGELOG_GROUPING_LABEL[candidate]}
-                </Link>
-              ))}
-            </nav>
-
-            {/* A plain GET form, like the rest of this page: the search is in the
-                URL, so a search is a link somebody can keep and the page still
-                works with no JavaScript at all (law 5). */}
-            <form action="/dev/changelog" className="ml-auto flex items-center gap-2">
-              {grouping !== CHANGELOG_DEFAULT_GROUPING && (
-                <input type="hidden" name="group" value={grouping} />
-              )}
-              {/* Searching from inside a workspace stays inside it. Without
-                  this the form would post the search alone and silently widen
-                  the page back out to everything. */}
-              {workspace && <input type="hidden" name="module" value={workspace} />}
-              <Input
-                type="search"
-                name="q"
-                defaultValue={query}
-                placeholder="Search what shipped"
-                aria-label="Search what shipped"
-                className="w-48"
-              />
-            </form>
-          </div>
+          <nav aria-label="Grouping" className="flex flex-wrap items-center gap-1">
+            {CHANGELOG_GROUPINGS.map((candidate) => (
+              <Link
+                key={candidate}
+                href={href({ group: candidate })}
+                aria-current={candidate === grouping ? 'page' : undefined}
+                className={cn(
+                  'press rounded-full px-2.5 py-1 text-small font-medium transition-colors',
+                  candidate === grouping
+                    ? 'bg-accent text-surface'
+                    : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+                )}
+              >
+                {CHANGELOG_GROUPING_LABEL[candidate]}
+              </Link>
+            ))}
+          </nav>
 
           {/* Only worth a row when there is more than one thing to choose
               between: one workspace and an "Everything" beside it is two
@@ -187,23 +160,21 @@ export default async function DevChangelogPage({
               ))}
             </nav>
           )}
+
+          {/* Last in the block, so it sits directly above the list it narrows.
+              The grouping and the workspace are already on the URL and the
+              field carries them, so searching from inside a workspace stays
+              inside it. */}
+          <SearchField placeholder="Search what shipped" />
         </div>
       )}
 
       {groups.length === 0 && query ? (
-        <EmptyState
-          icon={SearchX}
-          title={
-            workspace
-              ? `Nothing shipped matching “${query}” in ${narrowedTo(workspace)}`
-              : `Nothing shipped matching “${query}”`
-          }
-          description="Searches the title, what was written about it, the commit, and the feature it shipped under."
-          /* Clearing the search leaves the workspace where it was: the two are
-             separate narrowings and undoing one should not undo the other.
-             Widening back out to everything is the row of chips above. */
-          action={{ label: 'Clear the search', href: href({ q: '' }) }}
-        />
+        /* Clearing the search leaves the workspace and the grouping where they
+           were: they are separate narrowings and undoing one should not undo
+           the others. Widening back out to everything is the row of chips
+           above. */
+        <SearchEmpty query={query} />
       ) : groups.length === 0 ? (
         <EmptyState
           icon={History}
@@ -242,15 +213,6 @@ export default async function DevChangelogPage({
       )}
     </div>
   );
-}
-
-/**
- * What the page is narrowed to, as a name to put in a sentence.
- *
- * Lower case and no "the", because it lands mid-title after "in".
- */
-function narrowedTo(module: ChangelogModuleFilter): string {
-  return module === 'app' ? 'the app as a whole' : (moduleById(module)?.label ?? module);
 }
 
 /**
