@@ -186,6 +186,16 @@ These are enforced by tests and lint rules, not by convention.
 - **Notes render without raw HTML.** `rehype-raw` is not installed and must not
   be: with raw HTML disabled, `react-markdown` will not render the arbitrary
   markup a web-clipper note carries. That absence is the sanitizer.
+- **A newsletter is the one thing rendered as HTML, and it is cleaned first.**
+  #445 settled that an issue should look the way its sender designed it, which
+  the rule above cannot give. `lib/news/issues/sanitize.ts` runs every issue
+  through `sanitize-html` on the way out — script, event handlers,
+  `javascript:` links, forms, frames and stylesheets all go, and every picture
+  is held back until the reader asks for it — and what survives is shown in a
+  sandboxed frame that cannot reach the page around it. Neither half is trusted
+  alone. `lib/news/issues/sanitize.test.ts` asserts the first half. The rule
+  above is unchanged: `rehype-raw` is still not installed, and notes still
+  render without raw HTML.
 - **A foreign key is not an ownership check.** Referential integrity in
   Postgres bypasses RLS, so every cross-schema link in `todo.task_links` is
   checked by a trigger as well, and `tests/rls-todo.test.ts` asserts a link to

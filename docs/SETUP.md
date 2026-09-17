@@ -327,6 +327,66 @@ turns the assessment into paperwork rather than remediation.
 
 ---
 
+## Newsletters — Mailgun and the DNS behind it
+
+Mail sent to your newsletter address is received by Mailgun and posted to this
+app as a form. Nothing is read out of a mailbox, and this is the only way an
+issue is ever written. Twenty minutes of work, plus however long your DNS takes
+to propagate. #457 chose Mailgun because it is the one inbound service that
+receives on a free plan; #461 settled that the address sits on a subdomain of a
+domain you already own.
+
+**1. Pick the subdomain.** `in.example.com`, say. A subdomain rather than the
+domain itself: the MX records below say where mail for that name goes, and on
+the root name they would take your own email with them.
+
+**2. Add it to Mailgun.** Domains → Add New Domain, with the subdomain as the
+name. Mailgun then shows the DNS records for that domain, which are the
+authority on the exact values — the table below is what they look like.
+
+**3. Put the records in your DNS.**
+
+| Type | Name | Value | Why |
+|---|---|---|---|
+| MX | `in.example.com` | `mxa.mailgun.org`, priority 10 | Where mail for the subdomain is delivered. |
+| MX | `in.example.com` | `mxb.mailgun.org`, priority 10 | The second one. Both, or delivery has one place to fail. |
+| TXT | `in.example.com` | `v=spf1 include:mailgun.org ~all` | SPF. Some publishers check the domain before they will send to it. |
+| TXT | `<selector>._domainkey.in.example.com` | the key Mailgun shows | DKIM, for the same reason. The selector is Mailgun's. |
+
+Verification takes minutes to a few hours. Mailgun's domain page says whether it
+has seen them.
+
+**4. Point the mail at the app.** Receiving → Routes → Create Route. Expression
+`catch_all()`, actions `forward("https://<your app>/api/news/inbound")` and
+`stop()`, priority 0. Every message sent to the domain is then posted to that
+endpoint, whatever the local part — which is what lets an address be replaced
+without touching Mailgun. Mail addressed to a local part nobody owns is dropped
+there with a 200 and no bounce, so a stranger cannot learn which addresses
+exist.
+
+**5. Copy the signing key.** Sending → Webhooks, where Mailgun keeps the HTTP
+webhook signing key. Not the API key. Every post to the endpoint is checked
+against it — timestamp and token, HMAC-SHA256 — and a post that does not match
+is answered 401 and stored nowhere.
+
+**6. Set the two variables** in the Vercel project settings, and in `.env.local`
+for a local run:
+
+```
+NEWS_MAIL_DOMAIN=in.example.com
+MAILGUN_SIGNING_KEY=<the signing key>
+```
+
+Both are optional. With neither set the app builds and runs: News settings says
+the deployment has no mail domain, and the inbound endpoint refuses everything
+that reaches it.
+
+**7. Send it something.** Open News settings, copy the address, and mail it from
+anywhere. It appears in News within a minute. If it does not, Mailgun's Logs
+show whether the message reached the route and what the endpoint answered.
+
+---
+
 ## Environment variables
 
 `.env.example` is the full list. You paste three values in total:
@@ -340,6 +400,13 @@ openssl rand -base64 32
 ```
 
 It must not be the anon key or the service role key.
+
+The newsletter workspace adds two of its own, both optional:
+
+| Variable | What it is | Where it comes from |
+|---|---|---|
+| `NEWS_MAIL_DOMAIN` | The domain Mailgun receives newsletters on, e.g. `in.example.com`. Every account's address is a random local part on it. | You choose it, in step 1 above. |
+| `MAILGUN_SIGNING_KEY` | The HTTP webhook signing key every inbound post is checked against. Not the API key. | Mailgun, Sending → Webhooks. |
 
 ---
 
