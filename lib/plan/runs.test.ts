@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FEATURE_ROUTINE_ID } from '@/lib/feedback/routine';
-import { runRowFor, startRoutineRun } from '@/lib/plan/runs';
+import { endQuietRuns, readRunLiveness, runRowFor, startRoutineRun } from '@/lib/plan/runs';
 
 /** A fire that succeeded, with whatever body the endpoint answered with. */
 function started(body: unknown, runId: string | null) {
@@ -140,5 +140,233 @@ describe('startRoutineRun', () => {
     expect(result.ok).toBe(true);
     expect(logged).toHaveBeenCalled();
     logged.mockRestore();
+  });
+});
+
+const NOW = Date.parse('2026-09-17T12:00:00Z');
+
+/** An instant, as minutes before `NOW`, in the shape a row carries. */
+function minutesAgo(minutes: number): string {
+  return new Date(NOW - minutes * 60_000).toISOString();
+}
+
+/** The pushes a caller has already read, in the shape the sweep takes them. */
+function pushes(...refs: Array<{ ref: string; minutes: number }>) {
+  return refs.map((push) => ({ ref: push.ref, sha: 'abc1234', at: minutesAgo(push.minutes) }));
+}
+
+/** GitHub answering the activity listing with these pushes and nothing else. */
+function pushed(...refs: Array<{ ref: string; minutes: number }>) {
+  return vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify(
+          refs.map((push) => ({
+            activity_type: 'push',
+            ref: `refs/heads/${push.ref}`,
+            after: 'abc1234',
+            timestamp: minutesAgo(push.minutes),
+          })),
+        ),
+        { status: 200 },
+      ),
+  );
+}
+
+describe('endQuietRuns', () => {
+  /** The runs, the steps they were sent at, and what got written back. */
+  function db(
+    runs: Array<{ id: string; plan_item_id: string | null; created_at: string }>,
+    steps: Array<{ id: string; completed_at: string | null }> = [],
+  ) {
+    const updates: Array<{ values: Record<string, unknown>; ids: string[] }> = [];
+    const supabase = {
+      from(table: string) {
+        if (table === 'plan_items') {
+          return { select: () => ({ in: async () => ({ data: steps, error: null }) }) };
+        }
+        return {
+          select: () => ({ eq: () => ({ eq: async () => ({ data: runs, error: null }) }) }),
+          update: (values: Record<string, unknown>) => ({
+            in: async (_column: string, ids: string[]) => {
+              updates.push({ values, ids });
+              return { error: null };
+            },
+            eq: async (_column: string, id: string) => {
+              updates.push({ values, ids: [id] });
+              return { error: null };
+            },
+          }),
+        };
+      },
+    };
+    return { supabase, updates };
+  }
+
+  it('leaves a run that is still pushing alone, however long it has been going', async () => {
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) },
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: pushes({ ref: 'claude/one', minutes: 4 }),
+    });
+
+    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(updates).toEqual([]);
+  });
+
+  it('ends a run that has pushed nothing for two hours, saying what it last did', async () => {
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) },
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: pushes({ ref: 'claude/one', minutes: 125 }),
+    });
+
+    expect(result.failed).toBe(1);
+    expect(updates).toEqual([
+      {
+        values: {
+          status: 'failed',
+          error: 'Nothing has been pushed for 2h 5m. The last was claude/one.',
+        },
+        ids: ['run-1'],
+      },
+    ]);
+  });
+
+  it('finishes a run whose step closed after it was fired', async () => {
+    const { supabase, updates } = db(
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
+      [{ id: 'step-1', completed_at: minutesAgo(200) }],
+    );
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: [],
+    });
+
+    expect(result.finished).toBe(1);
+    expect(updates).toEqual([{ values: { status: 'finished' }, ids: ['run-1'] }]);
+  });
+
+  it('falls back to the clock when nobody has read what was pushed', async () => {
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) },
+    ]);
+
+    const result = await endQuietRuns({ supabase: supabase as never, userId: 'user-1', now: NOW });
+
+    expect(result.failed).toBe(1);
+    expect(updates[0].values.error).toBe('Nothing was heard from this run for 5h.');
+  });
+});
+
+describe('readRunLiveness', () => {
+  /** The claimed steps and the runs sent at them. */
+  function db(
+    steps: Array<{ id: string; status: string; completed_at: string | null }>,
+    runs: Array<{ id: string; plan_item_id: string; created_at: string }>,
+  ) {
+    return {
+      from(table: string) {
+        if (table === 'plan_items') {
+          return {
+            select: () => ({ eq: () => ({ eq: async () => ({ data: steps, error: null }) }) }),
+          };
+        }
+        return {
+          select: () => ({
+            eq: () => ({ in: () => ({ order: async () => ({ data: runs, error: null }) }) }),
+          }),
+        };
+      },
+    };
+  }
+
+  it('says a claimed step is being worked when its run is pushing', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const supabase = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(45) }],
+    );
+
+    const { steps, error } = await readRunLiveness({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never,
+    });
+
+    expect(error).toBeNull();
+    expect(steps['step-1']).toMatchObject({
+      runId: 'run-1',
+      liveness: 'working',
+      abandoned: false,
+    });
+    expect(steps['step-1'].lastPush?.ref).toBe('claude/one');
+    vi.unstubAllEnvs();
+  });
+
+  it('names a claim whose run ended without closing the step', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const supabase = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
+    );
+
+    const { steps } = await readRunLiveness({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: pushed({ ref: 'claude/one', minutes: 200 }) as never,
+    });
+
+    expect(steps['step-1']).toMatchObject({ liveness: 'ended', abandoned: true });
+    vi.unstubAllEnvs();
+  });
+
+  it('reads nothing for a step nobody fired a run at', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const supabase = db([{ id: 'step-1', status: 'in_progress', completed_at: null }], []);
+
+    const { steps, error } = await readRunLiveness({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: pushed() as never,
+    });
+
+    expect(steps).toEqual({});
+    expect(error).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it('carries back the reason GitHub could not be read, and claims nothing', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const supabase = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
+    );
+
+    const { steps, error } = await readRunLiveness({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+    });
+
+    expect(error).toBe('No GITHUB_READ_TOKEN is set, so pushes cannot be read.');
+    expect(steps['step-1']).toMatchObject({ liveness: 'unknown', abandoned: false });
+    vi.unstubAllEnvs();
   });
 });

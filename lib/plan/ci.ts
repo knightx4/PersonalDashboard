@@ -1,5 +1,6 @@
 /**
- * Asking GitHub what its checks said about the commits the plan shipped in.
+ * What the plan asks GitHub: how the commits it shipped in fared, and what has
+ * been pushed since.
  *
  * The plan page drew a step's commit sha and stopped there, so a step that
  * landed on a red commit and one that landed on a green one read identically.
@@ -13,10 +14,18 @@
  * and `passed` and `failed` are never asked about again. And a single call
  * resolves at most `MERGE_BUDGET` merges, so the first few loads fill the
  * backlog in instead of one load carrying all of it.
+ *
+ * The pushes are the other question, and the same way in answers it: whether
+ * the session a run started is still working is read off what has moved in
+ * this repository since it was fired. One listing, one token, one set of
+ * headers -- a second route to GitHub would be a second thing to get wrong
+ * when the key is rotated. `liveness.ts` holds the rules for what the listing
+ * means.
  */
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { pushesFrom, type ActivityRow, type Push } from './liveness';
 import {
   carriedBy,
   carrierFor,
@@ -257,5 +266,41 @@ export async function refreshCommitChecks(input: {
     return { checked: rows.length, error: null };
   } catch (error) {
     return { checked: 0, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * What has been pushed to any branch since an instant, newest first.
+ *
+ * One request. The activity listing is the only endpoint that answers "which
+ * branches moved and when" without a request per branch, and this repository
+ * has over a hundred branches, so the per-branch reading #522 describes is
+ * asked for this way. It is newest first and one page of a hundred covers most
+ * of a day here, which is well past the mark at which a run counts as over --
+ * so nothing pages, and a run older than that is already ended whatever the
+ * listing says about it.
+ *
+ * Carried back rather than thrown, the same as the check refresh above: a
+ * reading nobody could take is `unknown`, which is a different answer from
+ * silence, and `liveness.ts` keeps the two apart.
+ */
+export async function listPushes(input: {
+  since: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{ pushes: Push[]; error: string | null }> {
+  const token = readToken();
+  if (!token) {
+    return { pushes: [], error: 'No GITHUB_READ_TOKEN is set, so pushes cannot be read.' };
+  }
+
+  try {
+    const rows = await ask<ActivityRow[]>(
+      `/repos/${REPO.owner}/${REPO.repo}/activity?per_page=${PAGE_SIZE}`,
+      token,
+      input.fetch ?? globalThis.fetch,
+    );
+    return { pushes: pushesFrom(rows, input.since), error: null };
+  } catch (error) {
+    return { pushes: [], error: error instanceof Error ? error.message : String(error) };
   }
 }

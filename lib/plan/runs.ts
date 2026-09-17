@@ -30,6 +30,16 @@ import {
   type RoutineTarget,
 } from '@/lib/feedback/routine';
 import { runEnd, runQuietNote, type LastRun, type RunStatus } from './run-end';
+import { listPushes } from './ci';
+import {
+  abandonedClaim,
+  lastPushSince,
+  runEndedNote,
+  runLiveness,
+  type Push,
+  type RunEvidence,
+  type RunLiveness,
+} from './liveness';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -143,8 +153,17 @@ export async function startRoutineRun(input: {
  *
  * A run ends without telling anybody: the session closes its step and goes
  * away, or it dies and nothing at all happens. So the rows are read against
- * the steps they were sent at and against the clock -- `lib/plan/run-end.ts`
- * holds both rules -- and the ones that are over are written back here.
+ * the steps they were sent at and against what has been pushed since they were
+ * fired -- `lib/plan/liveness.ts` holds those rules -- and the ones that are
+ * over are written back here, with what was last seen of them.
+ *
+ * The pushes are handed in rather than read here, because #563 settled that
+ * nothing on the plan page's own render waits on GitHub: the page sweeps on
+ * the clock as it always did, and the route that reads GitHub passes what it
+ * read. No pushes means no evidence, which is the fallback #570 chose -- a run
+ * past the two-hour mark is ended on the clock exactly as before. With them, a
+ * run that is still pushing is left alone however long it has been going,
+ * which is the thing the clock alone could not do.
  *
  * Run from the plan page, which is where the answer is read. A failed sweep is
  * logged and swallowed for the same reason the insert above is: a page that
@@ -154,6 +173,8 @@ export async function endQuietRuns(input: {
   supabase: Db;
   userId: string;
   now?: number;
+  /** What has been pushed since these runs started, when somebody has read it. */
+  pushes?: readonly Push[] | null;
 }): Promise<{ finished: number; failed: number; error: string | null }> {
   const now = input.now ?? Date.now();
   const nothing = { finished: 0, failed: 0 };
@@ -188,27 +209,153 @@ export async function endQuietRuns(input: {
     }
   }
 
+  const pushes = input.pushes ?? null;
   const finished: string[] = [];
-  const quiet: string[] = [];
+  const ended: Array<{ id: string; note: string }> = [];
   for (const row of started) {
-    const step = row.plan_item_id ? { completedAt: closedAt.get(row.plan_item_id) ?? null } : null;
-    const end = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
-    if (end === 'finished') finished.push(row.id);
-    if (end === 'failed') quiet.push(row.id);
+    const closed = row.plan_item_id ? (closedAt.get(row.plan_item_id) ?? null) : null;
+    if (!pushes) {
+      const end = runEnd(
+        { status: 'started', createdAt: row.created_at },
+        { completedAt: closed },
+        now,
+      );
+      if (end === 'finished') finished.push(row.id);
+      if (end === 'failed') ended.push({ id: row.id, note: runQuietNote(row.created_at, now) });
+      continue;
+    }
+
+    const evidence: RunEvidence = {
+      startedAt: row.created_at,
+      lastPush: lastPushSince(pushes, row.created_at),
+      stepClosedAt: closed,
+      read: true,
+    };
+    const liveness = runLiveness(evidence, now);
+    if (liveness === 'finished') finished.push(row.id);
+    if (liveness === 'ended') ended.push({ id: row.id, note: runEndedNote(evidence, now) });
   }
 
   if (finished.length > 0) {
     await input.supabase.from('plan_runs').update({ status: 'finished' }).in('id', finished);
   }
-  // One at a time, because each reason names how long that run was silent.
-  for (const row of started.filter((candidate) => quiet.includes(candidate.id))) {
+  // One at a time, because each reason names what was last seen of that run.
+  for (const row of ended) {
     await input.supabase
       .from('plan_runs')
-      .update({ status: 'failed', error: runQuietNote(row.created_at, now) })
+      .update({ status: 'failed', error: row.note })
       .eq('id', row.id);
   }
 
-  return { finished: finished.length, failed: quiet.length, error: null };
+  return { finished: finished.length, failed: ended.length, error: null };
+}
+
+/** What the run behind one claimed step is doing. */
+export type StepRunReading = {
+  runId: string;
+  /** When the run was fired. */
+  startedAt: string;
+  /** The newest push on any branch since then, or null when there has been none. */
+  lastPush: Push | null;
+  liveness: RunLiveness;
+  /** The run is over and never closed the step it was sent at. */
+  abandoned: boolean;
+};
+
+/**
+ * What is actually happening on every step that says it is being worked, by
+ * step id.
+ *
+ * This is the question the plan page, the CLI and the send guard have all been
+ * answering from `in_progress` and a clock. One read of the claimed steps, one
+ * read of the runs sent at them, and one listing of what has been pushed since
+ * the oldest of those runs started -- three requests whatever the number of
+ * steps.
+ *
+ * A claimed step with no run recorded gets no reading at all: it was claimed by
+ * a person or by `plan.ts start` rather than by a button, and nothing was ever
+ * fired to ask about. Whoever is reading falls back to the clock for those, the
+ * same as before.
+ *
+ * The listing comes back with the readings so that whoever asked can hand it
+ * to `endQuietRuns` and have the runs written back from the same evidence,
+ * rather than reading GitHub twice to say the same thing.
+ *
+ * Nothing is written here. Storing the answer is #568 and calling this from the
+ * page is #569; this is the part that knows how to find out.
+ */
+export async function readRunLiveness(input: {
+  supabase: Db;
+  userId: string;
+  now?: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{
+  steps: Record<string, StepRunReading>;
+  pushes: Push[];
+  error: string | null;
+}> {
+  const now = input.now ?? Date.now();
+
+  const { data: claimed, error: stepsError } = await input.supabase
+    .from('plan_items')
+    .select('id, status, completed_at')
+    .eq('user_id', input.userId)
+    .eq('status', 'in_progress');
+  if (stepsError) return { steps: {}, pushes: [], error: stepsError.message };
+
+  const steps = (claimed ?? []) as Array<{
+    id: string;
+    status: string;
+    completed_at: string | null;
+  }>;
+  if (steps.length === 0) return { steps: {}, pushes: [], error: null };
+
+  const { data: runRows, error: runsError } = await input.supabase
+    .from('plan_runs')
+    .select('id, plan_item_id, created_at')
+    .eq('user_id', input.userId)
+    .in(
+      'plan_item_id',
+      steps.map((step) => step.id),
+    )
+    .order('created_at', { ascending: false });
+  if (runsError) return { steps: {}, pushes: [], error: runsError.message };
+
+  // Newest first, so the first row seen for a step is the run that holds it.
+  const latest = new Map<string, { id: string; created_at: string }>();
+  for (const row of (runRows ?? []) as Array<{
+    id: string;
+    plan_item_id: string;
+    created_at: string;
+  }>) {
+    if (!latest.has(row.plan_item_id)) latest.set(row.plan_item_id, row);
+  }
+  if (latest.size === 0) return { steps: {}, pushes: [], error: null };
+
+  const oldest = Math.min(...[...latest.values()].map((run) => new Date(run.created_at).getTime()));
+  const { pushes, error: pushError } = await listPushes({ since: oldest, fetch: input.fetch });
+
+  const readings: Record<string, StepRunReading> = {};
+  for (const step of steps) {
+    const run = latest.get(step.id);
+    if (!run) continue;
+    const evidence: RunEvidence = {
+      startedAt: run.created_at,
+      lastPush: pushError ? null : lastPushSince(pushes, run.created_at),
+      stepClosedAt: step.completed_at,
+      read: !pushError,
+    };
+    const liveness = runLiveness(evidence, now);
+    readings[step.id] = {
+      runId: run.id,
+      startedAt: run.created_at,
+      lastPush: evidence.lastPush,
+      liveness,
+      abandoned: abandonedClaim(step, liveness),
+    };
+  }
+
+  return { steps: readings, pushes, error: pushError };
 }
 
 /**
