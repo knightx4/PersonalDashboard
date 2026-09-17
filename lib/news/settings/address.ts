@@ -49,12 +49,26 @@ export async function loadOrCreateLocalPart(
  * table, so there is no window in which both are live and nothing to clean up
  * afterwards. Issues already stored are untouched -- they arrived, and which
  * address they came in on is not something the list asks.
+ *
+ * The `user_id` filter is belt and braces, and it is not optional. The policy
+ * already restricts this update to your own row, and this file's rule is that
+ * application code never decides who owns a row -- but Supabase loads
+ * `safeupdate` into the API role, which refuses any UPDATE that reaches it
+ * without a WHERE clause at all. RLS is applied as a policy rather than as a
+ * clause we wrote, so an update filtered by nothing but the policy looks
+ * exactly like `update every row` on the way in and is rejected with
+ * "UPDATE requires a WHERE clause". Hence the id, passed in rather than read
+ * from a form.
  */
-export async function replaceLocalPart(client: NewsSupabaseClient): Promise<string> {
+export async function replaceLocalPart(
+  client: NewsSupabaseClient,
+  userId: string,
+): Promise<string> {
   const localPart = randomLocalPart();
   const { data, error } = await client
     .from('addresses')
     .update({ local_part: localPart })
+    .eq('user_id', userId)
     .select('local_part')
     .single();
   assertSchemaExposed(error, NEWS_SCHEMA);
