@@ -974,6 +974,21 @@ body,
   --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
+/* No rubber band.
+ *
+ * Dragging past the top or bottom bounced the whole app a few pixels, which is
+ * right for a document and wrong for something that looks like an application
+ * window -- and now that the page is an inset pane on a coloured ground, the
+ * bounce shows the ground moving underneath it, which reads as the layout
+ * coming loose.
+ *
+ * On <html>, not on <body>. overscroll-behavior propagates to the viewport
+ * from the root element and does not propagate from body -- the opposite of
+ * `overflow`, and the reason writing it on body looks right and does nothing. */
+html {
+  overscroll-behavior: none;
+}
+
 body {
   background-color: var(--c-page);
   /* Fixed, so the wash is a light source the page moves under rather than a
@@ -1689,6 +1704,39 @@ form[data-auto-submit] [data-fallback-submit] {
 @media (min-width: 1024px) {
   .page-pane {
     border-radius: var(--radius-pane);
+    /* The pane is the scrollport from here up, and the frame stops moving.
+     *
+     * Two complaints, one cause. Dragging past the end bounced the whole app,
+     * frame and ground and all, because the document was what scrolled. And
+     * the page scrolled straight through the pane's rounded corner and painted
+     * on the ground outside the radius -- worse, once you had scrolled at all
+     * the corner had left the viewport entirely, because the frame went up
+     * with the content.
+     *
+     * A border-radius rounds an element's own background and clips nothing, so
+     * the corner was never a cut-off. Making the pane scroll gives it one for
+     * free: a scroll container clips to its padding box, radius included, and
+     * the frame stays where it is because there is nothing left for the
+     * document to scroll.
+     *
+     * `overflow-y: auto` rather than `overflow: hidden` + a taller inner div:
+     * hidden was tried and it makes the element a scroll container that never
+     * scrolls, which then becomes the sticky containing block for everything
+     * inside it, and the top bar quietly stopped sticking. Here the pane really
+     * does scroll, so the bar sticks to it -- which is what a top bar in an
+     * application window should stick to anyway.
+     *
+     * `overscroll-behavior: contain` so reaching the end of the page does not
+     * hand the gesture up to the document. Inner regions -- the filter rail, a
+     * long menu -- keep their own default and still behave as they always did.
+     *
+     * Below lg none of this applies: there is no radius to cut against, the
+     * document scrolling is what lets a phone browser hide its URL bar, and the
+     * dock is fixed to the viewport regardless.
+     */
+    height: calc(100dvh - 0.75rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     box-shadow:
       0 1px 2px rgb(0 0 0 / 0.04),
       0 8px 24px -8px rgb(0 0 0 / 0.10);
