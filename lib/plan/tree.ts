@@ -868,79 +868,27 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  * "Everything" goes through the same pruning rather than past it, because
  * dismissed rows are hidden from every view and it is a view.
  *
- * Features are ordered by what was touched last everywhere but "Everything",
- * which keeps the plan's own order -- see `touchedAt`. Steps under a feature
- * keep that order in every view, because it is the order they are meant to be
- * built in.
+ * Nothing here reorders anything. Every view draws the modules in the fixed
+ * order lib/modules.ts gives them and the features inside each one in the
+ * plan's own order, which is the order they are numbered in.
  *
- * The module sections are ordered the same way, by the newest write among the
- * features each one is drawing -- #517's answer. Four of the nine features
- * with open work are app-wide, and that section is fixed last, so the thing
- * being worked on could sit thirty rows down its own page. "Everything" keeps
- * the fixed module order, which is what makes it the map of the plan.
+ * It used to sort both by what was touched last -- #507 for the features,
+ * #517 for the sections -- so the thing you were working on rose to the top.
+ * The cost turned out to be the thing the page is for: the plan stopped
+ * having a shape. A module was wherever this morning left it, a feature moved
+ * out from under you as you closed steps beneath it, and the same page read
+ * differently every time it was opened, so nothing could be found twice in the
+ * same place. A fixed order you can learn beats a helpful one you cannot, and
+ * the views themselves are what narrow the page to what is being worked on.
+ *
+ * `prune` is still per view, and a view other than "Everything" still drops a
+ * module with nothing left in it.
  */
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
-  if (view === 'all') {
-    return sections.map((section) => ({ ...section, nodes: prune(section.nodes, view) }));
-  }
-
-  return sections
-    .map((section) => {
-      const when = recencyOf(section.nodes);
-      const nodes = prune(section.nodes, view);
-      return {
-        section: { ...section, nodes: byRecency(nodes, when) },
-        touched: newestOf(nodes, when),
-      };
-    })
-    .filter((drawn) => drawn.section.nodes.length > 0)
-    .sort((a, b) => b.touched.localeCompare(a.touched))
-    .map((drawn) => drawn.section);
-}
-
-/**
- * When a feature was last worked: the newest write to it or to anything
- * beneath it, which a trigger on `plan_items` keeps. Closing a step writes to
- * the step, so it lifts the feature above it -- that is what #507 settled.
- */
-export function touchedAt(node: PlanNode): string {
-  return flatten([node]).reduce(
-    (latest, step) => (step.updatedAt > latest ? step.updatedAt : latest),
-    '',
-  );
-}
-
-/**
- * When each feature was last worked, by id.
- *
- * Read off the features as they stand, not as a view left them. The step you
- * closed an hour ago is the reason its feature is the one you are on, and the
- * view has just dropped that step for being closed.
- */
-function recencyOf(whole: readonly PlanNode[]): Map<string, string> {
-  return new Map(whole.map((node) => [node.id, touchedAt(node)]));
-}
-
-/**
- * The features you were last in the middle of, first.
- *
- * Only at the top of a section. Nine features have open work and nothing told
- * them apart, so the one you opened ten minutes ago sat wherever it was
- * created and the page opened on somebody else's Tuesday. Nothing to maintain
- * and nothing to remember: it moves under you as you work.
- */
-function byRecency(nodes: readonly PlanNode[], when: Map<string, string>): PlanNode[] {
-  return [...nodes].sort((a, b) =>
-    (when.get(b.id) ?? touchedAt(b)).localeCompare(when.get(a.id) ?? touchedAt(a)),
-  );
-}
-
-/** The newest of those, over the features a section is about to draw. */
-function newestOf(nodes: readonly PlanNode[], when: Map<string, string>): string {
-  return nodes.reduce((latest, node) => {
-    const at = when.get(node.id) ?? touchedAt(node);
-    return at > latest ? at : latest;
-  }, '');
+  const drawn = sections.map((section) => ({ ...section, nodes: prune(section.nodes, view) }));
+  // "Everything" is the only view that keeps a module with nothing in it: the
+  // empty section is the invitation to plan that module.
+  return view === 'all' ? drawn : drawn.filter((section) => section.nodes.length > 0);
 }
 
 /**

@@ -6,7 +6,6 @@ import {
   buildPlanTree,
   splitFinished,
   searchNodes,
-  touchedAt,
   PLAN_VIEWS,
   PLAN_VIEW_CHIPS,
   PLAN_VIEW_MENU,
@@ -406,9 +405,9 @@ describe('applyView', () => {
 
   it('drops a module with nothing open from "open" as well', () => {
     // 'jobs' holds one finished feature and one step waiting on another, so it
-    // stays; the modules with nothing at all in them go. It is drawn first
-    // because its open step is the newest row in the fixture.
-    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['jobs', 'shopping']);
+    // stays; the modules with nothing at all in them go. The two that stay
+    // keep the fixed module order they came in.
+    expect(applyView(fixture(), 'open').map((s) => s.module)).toEqual(['shopping', 'jobs']);
   });
 
   it('keeps every module under "all", because that is where a plan gets written', () => {
@@ -427,14 +426,15 @@ describe('the chip row', () => {
   });
 });
 
-describe('ordering by what was touched last', () => {
+describe('ordering the features inside a section', () => {
   const fixture = () =>
     tree([
       item({ id: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
       item({ id: 'first-step', parentId: 'first', position: 10, updatedAt: '2026-01-01T00:00:00Z' }),
       item({ id: 'second', position: 20, updatedAt: '2026-02-01T00:00:00Z' }),
       item({ id: 'third', position: 30, updatedAt: '2026-01-15T00:00:00Z' }),
-      // The step was closed this morning; its feature is the one being worked.
+      // Closed this morning. It used to lift its feature to the top of the
+      // section; nothing moves for it now.
       at('done', 'third-step', {
         parentId: 'third',
         position: 10,
@@ -443,16 +443,16 @@ describe('ordering by what was touched last', () => {
       item({ id: 'third-next', parentId: 'third', position: 20, updatedAt: '2026-01-15T00:00:00Z' }),
     ]);
 
-  it('puts the feature worked most recently at the top of a working view', () => {
+  it('keeps the plan’s own order in a working view, whatever was touched last', () => {
     expect(shopping(applyView(fixture(), 'open')).nodes.map((node) => node.id)).toEqual([
-      'third',
-      'second',
       'first',
+      'second',
+      'third',
     ]);
   });
 
   it('leaves the steps under a feature in the order they are built in', () => {
-    const third = shopping(applyView(fixture(), 'open')).nodes[0];
+    const third = shopping(applyView(fixture(), 'open')).nodes[2];
     expect(third.children.map((node) => node.id)).toEqual(['third-next']);
     expect(shopping(applyView(fixture(), 'all')).nodes[2].children.map((n) => n.id)).toEqual([
       'third-step',
@@ -460,23 +460,18 @@ describe('ordering by what was touched last', () => {
     ]);
   });
 
-  it('leaves "all" in the plan’s own order', () => {
+  it('keeps "all" in that same order', () => {
     expect(shopping(applyView(fixture(), 'all')).nodes.map((node) => node.id)).toEqual([
       'first',
       'second',
       'third',
     ]);
   });
-
-  it('reads a feature’s recency off the newest step beneath it', () => {
-    const third = findNode(applyView(fixture(), 'all'), 'third')!;
-    expect(touchedAt(third)).toBe('2026-03-01T00:00:00Z');
-  });
 });
 
 describe('ordering the module sections', () => {
-  // The app-wide section is fixed last, so a feature worked this morning under
-  // it sits below every module's work until the sections sort too -- #517.
+  // The app-wide section is fixed last and stays last, whatever was worked in
+  // it this morning.
   const fixture = () =>
     tree([
       item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
@@ -492,19 +487,19 @@ describe('ordering the module sections', () => {
       item({ id: 'wide-step', parentId: 'wide', module: null, updatedAt: '2026-02-01T00:00:00Z' }),
     ]);
 
-  it('draws the module holding the newest work first', () => {
+  it('draws the modules in their fixed order, newest work or not', () => {
+    // 'wide' is the newest row in the fixture and the app-wide section is
+    // still last, which is the whole of what #517 used to undo.
     expect(applyView(fixture(), 'open').map((section) => section.module)).toEqual([
-      null,
-      'jobs',
       'shopping',
+      'jobs',
+      null,
     ]);
   });
 
-  it('reads a section’s recency off a step the view has dropped', () => {
+  it('does not move a module for a step the view has dropped either', () => {
     const sections = tree([
       item({ id: 'shop', module: 'shopping', updatedAt: '2026-01-01T00:00:00Z' }),
-      // Closed this morning, so it is gone from "open" and its module is still
-      // the one being worked in.
       at('done', 'shop-step', {
         parentId: 'shop',
         module: 'shopping',
@@ -519,9 +514,9 @@ describe('ordering the module sections', () => {
   });
 
   it('leaves the features and steps inside a section as they were', () => {
-    const [section] = applyView(fixture(), 'open');
-    expect(section.nodes.map((node) => node.id)).toEqual(['wide']);
-    expect(section.nodes[0].children.map((node) => node.id)).toEqual(['wide-step']);
+    const wide = applyView(fixture(), 'open').find((section) => section.module === null)!;
+    expect(wide.nodes.map((node) => node.id)).toEqual(['wide']);
+    expect(wide.nodes[0].children.map((node) => node.id)).toEqual(['wide-step']);
   });
 
   it('leaves "Everything" in the fixed module order', () => {
