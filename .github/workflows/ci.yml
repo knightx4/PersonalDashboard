@@ -69,6 +69,20 @@ jobs:
       - name: Build
         run: npm run build
 
+  # The design checks read source files and need neither a database nor a
+  # build, so they run beside the check job rather than inside it. A design
+  # finding still marks the run red; what it no longer does is stop the tests
+  # and the build from running at all.
+  design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
       # Five themes is five times the surface area for a contrast bug to hide
       # in, and "it looked fine on my screen" is how all of them get shipped.
       - name: Contrast
