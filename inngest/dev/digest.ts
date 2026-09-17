@@ -4,10 +4,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { suggestForDigest, type DigestContext } from '@/inngest/dev/suggest';
 import { oneLine, whatHappened, whatIsReady, withSuggestions, type DigestEvent } from '@/lib/digest/build';
+import { nightFrom, type NightFire } from '@/lib/digest/night';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { loadIdeas } from '@/lib/ideas/load';
 import { moduleById } from '@/lib/modules';
 import { hasLiveFog, isDismissed, loadPlan, type PlanData, type PlanItem } from '@/lib/plan/load';
+import { loadOvernightRun } from '@/lib/plan/overnight';
 import { loadRaised } from '@/lib/raised/load';
 
 /**
@@ -28,6 +30,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** How much of the board the model is shown. Enough to see a pattern in. */
 const CONTEXT_LIMIT = 20;
 
+/**
+ * How many of the account's feature runs are read back to find the night's.
+ *
+ * The window is applied here rather than in the query, the way the tick's own
+ * `lastFeatureFires` does it: there are tens of these rows per account and a
+ * night's are all at the top of them. Two hundred is several months of
+ * pressing the button by hand.
+ */
+const FIRE_LIMIT = 200;
+
 export type DigestSummary = { written: number; skipped: number };
 
 /** The UTC date the run started, which is the day the row covers. */
@@ -46,6 +58,34 @@ async function usersWithAPlan(supabase: SupabaseClient): Promise<string[]> {
   const { data, error } = await supabase.from('plan_items').select('user_id').limit(5000);
   if (error) throw new Error(error.message);
   return [...new Set((data ?? []).map((row) => (row as { user_id: string }).user_id))];
+}
+
+/**
+ * Every feature the runner may have fired, newest first.
+ *
+ * `status` and `error` are deliberately not read. `endQuietRuns` is the only
+ * thing that ever writes a run back and it runs from the plan page's render,
+ * so at four in the morning every run of the night still says `started` with
+ * no error on it. A report that counted finished against failed off that
+ * column would say the night finished nothing, every time. What each feature's
+ * session achieved is read from the steps that closed under it instead, which
+ * is how the tick itself judges a run -- see `lib/digest/night.ts`.
+ */
+async function featureFires(supabase: SupabaseClient, userId: string): Promise<NightFire[]> {
+  const { data, error } = await supabase
+    .from('plan_runs')
+    .select('plan_item_id, created_at')
+    .eq('user_id', userId)
+    .eq('job', 'feature')
+    .order('created_at', { ascending: false })
+    .limit(FIRE_LIMIT);
+  if (error) {
+    console.error(`plan_runs could not be read for the morning summary: ${error.message}`);
+    return [];
+  }
+  return ((data ?? []) as Array<{ plan_item_id: string | null; created_at: string }>).map(
+    (row) => ({ planItemId: row.plan_item_id, at: row.created_at }),
+  );
 }
 
 /** `#12 The title`, the way a person refers to a step out loud. */
@@ -152,13 +192,21 @@ export async function writeDigestFor(
   if (existing) return false;
 
   const since = new Date(now.getTime() - DAY_MS).toISOString();
-  const [plan, notes] = await Promise.all([
+  const [plan, notes, run, fires] = await Promise.all([
     loadPlan(supabase, userId),
     loadFeedbackQueue(supabase, userId),
+    loadOvernightRun(supabase, userId),
+    featureFires(supabase, userId),
   ]);
 
   const happened = whatHappened({ plan, notes: notes.rows, since });
   const ready = whatIsReady(plan);
+
+  // The night, on the days there was one. Not shown to the model: the five
+  // sentences a night can end with are written to be read back verbatim, and
+  // the surest way to have one reworded is to put it in front of something
+  // that writes prose.
+  const night = nightFrom({ run, fires, items: plan.items, since });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const reading = apiKey
@@ -181,6 +229,7 @@ export async function writeDigestFor(
     summary: reading.summary,
     happened,
     attention: withSuggestions(ready, reading.suggestions),
+    night,
   });
 
   // A second cron tick racing the first loses the insert and that is the

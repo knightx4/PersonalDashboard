@@ -118,6 +118,70 @@ describe('writeDigestFor', () => {
     ]);
     vi.unstubAllEnvs();
   });
+
+  /**
+   * The night is read from the runner's row and the feature runs it made, and
+   * stored whole: `plan_overnight_runs` holds one row per account rather than
+   * one per night, so tonight's press overwrites the night this summary is
+   * about.
+   */
+  it('writes what the overnight runner did, with the reason it stopped', async () => {
+    const { supabase, inserted } = stubClient({
+      plan_items: [
+        closedStep({
+          id: 'f1',
+          number: 100,
+          title: 'The runner',
+          status: 'in_progress',
+          completed_at: null,
+        }),
+        closedStep({
+          id: 's1',
+          number: 101,
+          parent_id: 'f1',
+          title: 'The tick',
+          completed_at: '2026-03-02T02:00:00Z',
+        }),
+      ],
+      plan_overnight_runs: [
+        {
+          id: 'run-1',
+          running: false,
+          paused: false,
+          features_budget: 6,
+          features_left: 4,
+          stop_by: '2026-03-02T07:00:00Z',
+          started_at: '2026-03-01T23:00:00Z',
+          last_fired_at: '2026-03-02T01:00:00Z',
+          ended_at: '2026-03-02T03:00:00Z',
+          ended_reason: 'You stopped it.',
+          created_at: '2026-03-01T23:00:00Z',
+          updated_at: '2026-03-02T03:00:00Z',
+        },
+      ],
+      plan_runs: [{ plan_item_id: 'f1', created_at: '2026-03-02T01:00:00Z' }],
+    });
+
+    await writeDigestFor(supabase, 'user-1', NOW);
+
+    expect(inserted[0].row.night).toMatchObject({
+      standing: 'stopped',
+      endedReason: 'You stopped it.',
+      featuresBudget: 6,
+      featuresLeft: 4,
+      features: [{ ref: '#100', title: 'The runner' }],
+      closed: [{ ref: '#101', title: 'The tick' }],
+      blocked: [],
+    });
+  });
+
+  it('writes no night on a day the runner did not run', async () => {
+    const { supabase, inserted } = stubClient({ plan_items: [closedStep()] });
+
+    await writeDigestFor(supabase, 'user-1', NOW);
+
+    expect(inserted[0].row.night).toBeNull();
+  });
 });
 
 describe('dayOf', () => {

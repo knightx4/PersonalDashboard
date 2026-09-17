@@ -1,0 +1,265 @@
+import { featureAbove, type PlanParentRow } from '@/lib/changelog/entries';
+import type { PlanItem } from '@/lib/plan/load';
+import { overnightStanding, type OvernightRun, type OvernightStanding } from '@/lib/plan/overnight';
+import { oneLine } from './build';
+
+/**
+ * The night the runner just had, as the morning summary says it.
+ *
+ * The runner works while nobody is watching -- a cron tick fires one feature,
+ * waits for it, fires the next -- and the whole of what it did is scattered
+ * across three tables by morning. This gathers it into the one thing you want
+ * at breakfast: what it worked, what closed, what it left stopped on you, and
+ * why it stopped.
+ *
+ * Pure, beside `build.ts` and for the same reason: what counts as part of the
+ * night is a rule, and a rule belongs somewhere it can be tested without a
+ * database. `inngest/dev/digest.ts` does the reading and stores the answer on
+ * the day's row; `lib/digest/load.ts` reads it back.
+ *
+ * -- Where the facts come from --
+ *
+ * The fires are `plan_runs` rows with `job = 'feature'` from the night's
+ * window. What closed is `plan_items.completed_at` in the same window. The
+ * tick writes no record of its own beyond the `plan_overnight_runs` row, so
+ * there is nothing else to read.
+ *
+ * Nothing here reads `plan_runs.status`. It would be the obvious way to say
+ * how each feature's session went, and at four in the morning it is a lie:
+ * `endQuietRuns` is the only thing that writes a run back, it runs from the
+ * plan page's render, and nobody has the plan page open at four in the
+ * morning. Every run of the night still reads `started` with no error on it,
+ * so a report counting finished against failed off that column would call the
+ * whole night unfinished. What a feature's session actually achieved is read
+ * the way the tick reads it -- from the steps that closed underneath it -- and
+ * that is what `closed` is.
+ *
+ * -- One vocabulary --
+ *
+ * The same night is also drawn on the plan page by the control in #583, and
+ * the two must not describe it differently. So the state is
+ * `overnightStanding`'s answer rather than a fresh reading of the booleans,
+ * the reason it ended is the sentence on the row printed verbatim, and the
+ * budget is the same two numbers the control prints, read the other way round:
+ * the control says how many are left, a report of a night that is over says
+ * how many were spent.
+ */
+
+/** One press the runner made: a `plan_runs` row with `job = 'feature'`. */
+export type NightFire = {
+  /** The feature it was sent at. Null on a row that names no step. */
+  planItemId: string | null;
+  /** When the run was recorded. */
+  at: string;
+};
+
+/** A feature or a step, as a line of the report names it. */
+export type DigestNightRef = { ref: string; title: string };
+
+export type DigestNightStep = DigestNightRef & {
+  /** The feature it sits under, or null when it is one. */
+  feature: DigestNightRef | null;
+  /**
+   * What a blocked step says it needs, in the sentence the block wrote. Null
+   * on a step that closed, and on a blocked one with nothing recorded.
+   */
+  ask: string | null;
+};
+
+/** What the runner did between the button and the morning. */
+export type DigestNight = {
+  /**
+   * Running, Held or Stopped. `off` is not one of them: a row that is not
+   * running and carries no reason is an account that has never had a night,
+   * and there is nothing to report on.
+   */
+  standing: Exclude<OvernightStanding, 'off'>;
+  /** When the button was pressed. The window everything below is read over. */
+  startedAt: string;
+  /** When it stopped, or null when it was still going at breakfast. */
+  endedAt: string | null;
+  /** Why it stopped, in the row's own sentence. Null on a night still going. */
+  endedReason: string | null;
+  featuresBudget: number;
+  featuresLeft: number;
+  /** Every feature it fired, in the order it fired them. */
+  features: (DigestNightRef & { at: string })[];
+  /** Every step that closed while it ran. */
+  closed: DigestNightStep[];
+  /** Every step that is stopped on you now and was written to while it ran. */
+  blocked: DigestNightStep[];
+};
+
+/**
+ * How many rows of each list the page prints before it counts the rest.
+ *
+ * The stored night keeps every row, the way `happened` keeps every event
+ * beside it: the cap is a reading of the record rather than the record, and a
+ * night that closed thirty steps should not lose twenty of them to a constant
+ * somebody chose for a panel.
+ */
+export const MAX_NIGHT_ROWS = 10;
+
+/** The first `limit` of a list, and how many were left. */
+export function nightRows<T>(
+  rows: readonly T[],
+  limit = MAX_NIGHT_ROWS,
+): { shown: T[]; more: number } {
+  return { shown: rows.slice(0, limit), more: Math.max(0, rows.length - limit) };
+}
+
+/** The plan rows the walk to a step's feature needs, and nothing else. */
+function parentsOf(items: readonly PlanItem[]): PlanParentRow[] {
+  return items.map((item) => ({
+    id: item.id,
+    number: item.number,
+    title: item.title,
+    parentId: item.parentId,
+  }));
+}
+
+function refOf(item: Pick<PlanItem, 'number' | 'title'>): DigestNightRef {
+  return { ref: `#${item.number}`, title: oneLine(item.title) };
+}
+
+function featureOf(
+  item: PlanItem,
+  byId: ReadonlyMap<string, PlanParentRow>,
+): DigestNightRef | null {
+  const above = featureAbove(item.parentId, byId);
+  return above ? { ref: `#${above.number}`, title: oneLine(above.title) } : null;
+}
+
+/** Whether an instant falls inside the night: at or after it started. */
+function inside(at: string | null, startedAt: number): boolean {
+  if (!at) return false;
+  const when = new Date(at).getTime();
+  return Number.isFinite(when) && when >= startedAt;
+}
+
+/**
+ * The night to report, or nothing.
+ *
+ * Three ways there is nothing. The account has never started one, which is
+ * `off`. The row has no start, which the check constraint makes impossible and
+ * which would leave every window below unbounded. And the night ended before
+ * the window this summary covers -- the row is the account's rather than the
+ * night's, so a night that ended on Tuesday is still sitting there on Friday,
+ * and reporting it again every morning would be the same news four times.
+ *
+ * A night still running when the cron fires is a real case rather than an
+ * edge: the daily cron goes off at a fixed hour and a long night can outlast
+ * it. It is reported as what it is -- the night so far -- which is why
+ * `endedAt` and `endedReason` are allowed to be null here.
+ */
+export function nightFrom(input: {
+  run: OvernightRun | null;
+  fires: readonly NightFire[];
+  items: readonly PlanItem[];
+  /** The start of the window the summary covers. */
+  since: string;
+}): DigestNight | null {
+  const { run } = input;
+  const standing = overnightStanding(run);
+  if (!run || standing === 'off' || !run.startedAt) return null;
+  if (run.endedAt !== null && new Date(run.endedAt).getTime() < new Date(input.since).getTime()) {
+    return null;
+  }
+
+  const startedAt = new Date(run.startedAt).getTime();
+  if (!Number.isFinite(startedAt)) return null;
+
+  const items = input.items;
+  const byId = new Map(parentsOf(items).map((row) => [row.id, row]));
+  const itemById = new Map(items.map((item) => [item.id, item]));
+
+  // One line per feature however many times it was fired: a feature the runner
+  // came back to is still one feature it worked, and the count of presses is
+  // the budget line's job. Oldest first, which is the order it chose them in.
+  const seen = new Set<string>();
+  const features = [...input.fires]
+    .filter((fire) => fire.planItemId !== null && inside(fire.at, startedAt))
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .flatMap((fire) => {
+      const item = itemById.get(fire.planItemId as string);
+      if (!item || seen.has(item.id)) return [];
+      seen.add(item.id);
+      return [{ ...refOf(item), at: fire.at }];
+    });
+
+  // Everything that closed while it was running. Nothing on a plan row says
+  // which press closed it, and at three in the morning there is only one thing
+  // pressing anything -- but a step you closed yourself before bed would be in
+  // here too, which is the honest cost of having no record of the tick.
+  const closed = items
+    .filter(
+      (item) =>
+        item.kind !== 'decision' && item.status === 'done' && inside(item.completedAt, startedAt),
+    )
+    .sort((a, b) => (a.completedAt as string).localeCompare(b.completedAt as string))
+    .map((item) => ({ ...refOf(item), feature: featureOf(item, byId), ask: null }));
+
+  // Blocked now, and written to during the night. `updated_at` is the only
+  // stamp a block leaves -- there is no blocked_at column -- so this is "the
+  // row moved while the runner was running and it now reads blocked", which is
+  // the same rule the plan page's own ordering is built on.
+  const blocked = items
+    .filter((item) => item.status === 'blocked' && inside(item.updatedAt, startedAt))
+    .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+    .map((item) => ({
+      ...refOf(item),
+      feature: featureOf(item, byId),
+      ask: item.blockAsk ? oneLine(item.blockAsk, 200) : null,
+    }));
+
+  return {
+    standing,
+    startedAt: run.startedAt,
+    endedAt: run.endedAt,
+    endedReason: run.endedReason,
+    featuresBudget: run.featuresBudget,
+    featuresLeft: run.featuresLeft,
+    features,
+    closed,
+    blocked,
+  };
+}
+
+/**
+ * What the night cost, in the control's words read the other way round.
+ *
+ * The plan page says "2 of 6 features left", because what it is asked is
+ * whether the night is worth leaving alone. A report of a night that is over
+ * is asked the opposite, and the answer is the same pair of numbers: "4 of 6
+ * features spent". One word apart on purpose -- a third phrasing would make
+ * the reader work out whether it was the same quantity.
+ */
+export function nightBudgetLine(
+  night: Pick<DigestNight, 'featuresBudget' | 'featuresLeft'>,
+): string {
+  const spent = Math.max(0, night.featuresBudget - night.featuresLeft);
+  return `${spent} of ${night.featuresBudget} ${
+    night.featuresBudget === 1 ? 'feature' : 'features'
+  } spent`;
+}
+
+/**
+ * The one sentence under the state word.
+ *
+ * A stopped night says the sentence on its row and nothing else: five things
+ * can end a night, each writes its own reason as a whole sentence, and the
+ * value of that is lost the moment something rewords one on the way out.
+ *
+ * The other two are the cron catching a night mid-flight, which the fixed hour
+ * makes ordinary rather than rare. Neither pretends the night is over.
+ */
+export function nightLine(night: DigestNight): string {
+  switch (night.standing) {
+    case 'stopped':
+      return night.endedReason ?? '';
+    case 'paused':
+      return 'It was held when this was written. What was building finished; nothing new was fired.';
+    default:
+      return 'It was still running when this was written, so this is the night so far.';
+  }
+}

@@ -10,7 +10,7 @@ import {
   stopOvernightRunner,
   type PlanActionState,
 } from './actions';
-import { StateLabel, type DevTone } from '@/components/dev/state-label';
+import { OvernightState } from '@/components/dev/overnight-state';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Input, Select } from '@/components/ui/field';
@@ -24,9 +24,7 @@ import {
   overnightLine,
   overnightStanding,
   type OvernightRun,
-  type OvernightStanding,
 } from '@/lib/plan/overnight';
-import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { useClockNow } from '@/lib/use-clock-now';
 
 /**
@@ -50,31 +48,6 @@ import { useClockNow } from '@/lib/use-clock-now';
  * getting anywhere -- and the value of writing them as sentences is lost the
  * moment something rewords them on the way out.
  */
-
-/** The state's word. Local, because no other dev queue has these four. */
-const WORD: Record<OvernightStanding, string> = {
-  off: 'Off',
-  running: 'Running',
-  // "Held" rather than "Paused", because pausing sounds like the session stops
-  // too and it does not: what is building carries on to its commit.
-  paused: 'Held',
-  stopped: 'Stopped',
-};
-
-/** Law 4: the state is a shape as well as a colour. */
-const GLYPH: Record<OvernightStanding, GlyphName> = {
-  off: 'empty',
-  running: 'three-quarters',
-  paused: 'bar',
-  stopped: 'check',
-};
-
-const TONE: Record<OvernightStanding, DevTone> = {
-  off: 'ghost',
-  running: 'accent',
-  paused: 'caution',
-  stopped: 'quiet',
-};
 
 /**
  * What the night has left, once it has started.
@@ -149,7 +122,7 @@ export function OvernightControl({
           <Moon className="size-4 text-ink-muted" aria-hidden />
           Overnight
         </span>
-        <StateLabel glyph={GLYPH[standing]} word={WORD[standing]} tone={TONE[standing]} />
+        <OvernightState standing={standing} />
         <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
         {run && (standing === 'running' || standing === 'paused') && (
           <BudgetLeft run={run} now={now} />
