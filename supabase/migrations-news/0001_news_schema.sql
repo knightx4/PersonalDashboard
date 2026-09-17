@@ -27,6 +27,10 @@
 -- other five schemas already are. lib/core/db/schema-errors.ts turns the
 -- failure into a legible message rather than an empty page, but the setting
 -- still has to be made by hand once.
+--
+-- It was not, and /news was a server error from the day it shipped. 0002 makes
+-- the setting a migration instead of a note; this paragraph stays as the reason
+-- that file exists.
 
 create schema if not exists news;
 

@@ -1,6 +1,7 @@
 import 'server-only';
 
-import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 
 /**
  * When you opened it, set the first time and not moved afterwards.
@@ -18,11 +19,13 @@ export async function markRead(client: NewsSupabaseClient, id: string): Promise<
     .update({ read_at: new Date().toISOString() })
     .eq('id', id)
     .is('read_at', null);
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: marking that newsletter read failed (${error.message})`);
 }
 
 /** Back to unread: the time is cleared, and the home tile counts it again. */
 export async function markUnread(client: NewsSupabaseClient, id: string): Promise<void> {
   const { error } = await client.from('issues').update({ read_at: null }).eq('id', id);
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: marking that newsletter unread failed (${error.message})`);
 }

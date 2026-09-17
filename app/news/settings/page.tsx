@@ -4,6 +4,7 @@ import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireUser } from '@/lib/auth/server';
 import { newsAddress, newsDomainOrNull } from '@/lib/news/address';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { deliveryGap } from '@/lib/news/inbound/readiness';
 import { loadOrCreateLocalPart } from '@/lib/news/settings/address';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { AddressCard } from './address-card';
@@ -24,6 +25,7 @@ export default async function NewsSettingsPage() {
   const localPart = await loadOrCreateLocalPart(client, user.id);
   const domain = newsDomainOrNull();
   const address = domain ? newsAddress(localPart, domain) : null;
+  const gap = deliveryGap();
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -45,6 +47,15 @@ export default async function NewsSettingsPage() {
                 This deployment has no mail domain set, so there is no address to show. Set
                 NEWS_MAIL_DOMAIN to the domain Mailgun receives on. The random half of your
                 address already exists and will not change when you do.
+              </Banner>
+            )}
+            {gap === 'no-signing-key' && (
+              <Banner tone="bad">
+                This address cannot receive anything yet. MAILGUN_SIGNING_KEY is not set, so the
+                app cannot prove a delivery came from Mailgun and answers every one with an
+                error. Copy the HTTP webhook signing key from Mailgun (Sending → Webhooks, not
+                the API key) into the deployment&rsquo;s settings. The address itself is fine and
+                does not change.
               </Banner>
             )}
             <p className="text-body leading-relaxed text-ink-muted">
