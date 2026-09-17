@@ -61,9 +61,9 @@ export const REFERENCE_PALETTES: Record<
   Palette
 > = {
   paper: {
-    '--c-canvas': '#faf9f6',
-    '--c-surface': '#ffffff',
-    '--c-raised': '#ffffff',
+    '--c-canvas': '#f7f4ed',
+    '--c-surface': '#fdfbf5',
+    '--c-raised': '#fffdf7',
     '--c-sunken': '#f2f0ea',
     '--c-border': '#e8e5df',
     '--c-border-strong': '#d5d1c8',
@@ -112,7 +112,7 @@ export const REFERENCE_PALETTES: Record<
     '--c-status-offer-tint': '#ecfdf5',
     '--c-status-rejected': '#b91c1c',
     '--c-status-rejected-tint': '#fef2f2',
-    '--c-status-ghosted': '#78716c',
+    '--c-status-ghosted': '#726b66',
     '--c-status-ghosted-tint': '#fafaf9',
     '--c-sheet-outline': '#e8e5df',
     '--c-caution-fill-ink': '#14100a',
