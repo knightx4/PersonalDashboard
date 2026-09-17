@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   countStates,
   inferredFrom,
+  isSettled,
   learningOrder,
   mentionsFor,
   pruneForGoal,
   readyNow,
   readyToLearn,
+  settledCount,
   type Concept,
   type Graph,
   type KnowledgeState,
@@ -294,15 +296,17 @@ describe('one claim referring to another', () => {
 describe('how much of a subject is settled', () => {
   it('counts each state, and the total', () => {
     const graph = graphOf(
-      { a: 'known', b: 'known', c: 'shaky', d: 'misconception', e: 'unknown' },
+      { a: 'known', b: 'known', c: 'shaky', d: 'misconception', e: 'unknown', f: 'recognised' },
       [],
     );
     expect(countStates(graph)).toEqual({
       known: 2,
       shaky: 1,
+      recognised: 1,
+      sharp: 0,
       misconception: 1,
       unknown: 1,
-      total: 5,
+      total: 6,
     });
   });
 
@@ -310,10 +314,38 @@ describe('how much of a subject is settled', () => {
     expect(countStates({ concepts: [], edges: [], mentions: [] })).toEqual({
       known: 0,
       shaky: 0,
+      recognised: 0,
+      sharp: 0,
       misconception: 0,
       unknown: 0,
       total: 0,
     });
+  });
+
+  it('counts a defended claim as settled and a recognised one as not', () => {
+    const graph = graphOf({ a: 'known', b: 'sharp', c: 'recognised' }, []);
+    expect(settledCount(countStates(graph))).toBe(2);
+  });
+});
+
+describe('what counts as settled', () => {
+  it('is known or sharp, and nothing else', () => {
+    expect(isSettled(concept('a', 'known'))).toBe(true);
+    expect(isSettled(concept('a', 'sharp'))).toBe(true);
+    expect(isSettled(concept('a', 'recognised'))).toBe(false);
+    expect(isSettled(concept('a', 'shaky'))).toBe(false);
+    expect(isSettled(concept('a', 'unknown'))).toBe(false);
+    expect(isSettled(concept('a', 'misconception'))).toBe(false);
+  });
+
+  it('keeps a recognised claim in the view, because its case is still to come', () => {
+    // #392: picking the idea out of four is not using it, so the claim stays
+    // where you can see it rather than being pruned the way known is.
+    const graph = graphOf({ a: 'recognised', goal: 'unknown' }, ['a>goal']);
+    expect(pruneForGoal(graph, 'goal').sort()).toEqual(['a', 'goal']);
+
+    const settled = graphOf({ a: 'known', goal: 'unknown' }, ['a>goal']);
+    expect(pruneForGoal(settled, 'goal')).toEqual(['goal']);
   });
 });
 

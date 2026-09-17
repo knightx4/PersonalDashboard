@@ -10,7 +10,7 @@ import {
   WEIGHT_REINFORCED,
   WEIGHT_SETTLED_NEW,
 } from './probe-payload';
-import type { CheckStanding } from './probe-payload';
+import type { AskedRung, CheckStanding } from './probe-payload';
 
 /**
  * Two things that must not be allowed to lie.
@@ -92,41 +92,61 @@ describe('a question thrown away', () => {
 });
 
 describe('where a check stands', () => {
-  const answered = (check: string | null, chosenIndex: number | null) => ({
+  const CHECK = 'Explains the long run.';
+
+  const answered = (check: string | null, chosenIndex: number | null): AskedRung => ({
+    rung: 'recognise',
     masteryCheck: check,
     chosenIndex,
     correctIndex: 1,
+    responseCorrect: null,
+  });
+
+  const typed = (check: string | null, correct: boolean | null): AskedRung => ({
+    rung: 'apply',
+    masteryCheck: check,
+    chosenIndex: null,
+    correctIndex: null,
+    responseCorrect: correct,
   });
 
   it('is untouched when nothing has been answered about it', () => {
-    expect(standingOf('Explains the long run.', [])).toBe('untouched');
-    expect(standingOf('Explains the long run.', [answered('Explains the long run.', null)])).toBe(
-      'untouched',
-    );
+    expect(standingOf(CHECK, 'recognise', [])).toBe('untouched');
+    expect(standingOf(CHECK, 'recognise', [answered(CHECK, null)])).toBe('untouched');
   });
 
   it('ignores what was answered about a different check', () => {
     expect(
-      standingOf('Explains the long run.', [
-        answered('Says what it rules out.', 0),
-        answered(null, 1),
-      ]),
+      standingOf(CHECK, 'recognise', [answered('Says what it rules out.', 0), answered(null, 1)]),
     ).toBe('untouched');
   });
 
   it('is missed after a wrong answer and nothing right', () => {
-    expect(standingOf('Explains the long run.', [answered('Explains the long run.', 0)])).toBe(
-      'missed',
-    );
+    expect(standingOf(CHECK, 'recognise', [answered(CHECK, 0)])).toBe('missed');
   });
 
   it('is right once one answer got it right, whatever else happened', () => {
+    expect(standingOf(CHECK, 'recognise', [answered(CHECK, 0), answered(CHECK, 1)])).toBe('right');
+  });
+
+  it('does not read a rung one answer as the applied case having been done', () => {
+    // #401: the case about a check you picked right out of four is the first
+    // time anybody has seen you use it, so it is untouched at this rung and
+    // the bar pays for it in full.
+    expect(standingOf(CHECK, 'apply', [answered(CHECK, 1)])).toBe('untouched');
     expect(
-      standingOf('Explains the long run.', [
-        answered('Explains the long run.', 0),
-        answered('Explains the long run.', 1),
-      ]),
-    ).toBe('right');
+      weightFor({ conclusive: true, correct: true, standing: 'untouched', wasSettled: true }),
+    ).toBe(WEIGHT_SETTLED_NEW);
+  });
+
+  it('reads a typed answer by its grade rather than by an index', () => {
+    expect(standingOf(CHECK, 'apply', [typed(CHECK, true)])).toBe('right');
+    expect(standingOf(CHECK, 'apply', [typed(CHECK, false)])).toBe('missed');
+    expect(standingOf(CHECK, 'apply', [typed(CHECK, null)])).toBe('untouched');
+  });
+
+  it('does not read a rung one answer as the applied case having been missed', () => {
+    expect(standingOf(CHECK, 'apply', [answered(CHECK, 0)])).toBe('untouched');
   });
 });
 

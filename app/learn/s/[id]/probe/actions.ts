@@ -27,7 +27,7 @@ import { answerKind, recordOutcome } from '@/lib/learn/next/record';
 import { proposeFloor } from '@/lib/learn/graph/floor';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
-import { prerequisiteMap, type Concept, type Graph } from '@/lib/learn/graph/model';
+import { isSettled, prerequisiteMap, type Concept, type Graph } from '@/lib/learn/graph/model';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 
@@ -292,8 +292,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       // Only for a concept with no checks. One that carries them is weighed by
       // what earlier answers did with the check this question aimed at, and
       // whether the concept as a whole was settled decides nothing.
-      wasSettled:
-        concept !== undefined && concept.mastery.length === 0 && concept.state === 'known',
+      wasSettled: concept !== undefined && concept.mastery.length === 0 && isSettled(concept),
       graph,
     });
   } catch (error) {
@@ -308,7 +307,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     await recordOutcome(supabase, user.id, {
       // Where the claim stood before this answer, which is the list it was
       // offered from: a settled claim only ever appears as a re-check.
-      kind: answerKind(concept?.state === 'known'),
+      kind: answerKind(concept !== undefined && isSettled(concept)),
       conceptId: asked.data.conceptId,
       outcome: 'answered',
     });
@@ -440,7 +439,7 @@ async function answerApplied(input: {
       // Only for a concept with no checks, the same rule a picked answer
       // follows: one that carries them is weighed by what earlier answers did
       // with the check this case aimed at.
-      wasSettled: input.concept.mastery.length === 0 && input.concept.state === 'known',
+      wasSettled: input.concept.mastery.length === 0 && isSettled(input.concept),
       graph: input.graph,
     });
   } catch (error) {
@@ -452,7 +451,7 @@ async function answerApplied(input: {
 
   if (outcome.first) {
     await recordOutcome(input.supabase, input.userId, {
-      kind: answerKind(input.concept.state === 'known'),
+      kind: answerKind(isSettled(input.concept)),
       conceptId: input.concept.id,
       outcome: 'answered',
     });

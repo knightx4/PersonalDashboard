@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubjects } from '@/lib/learn/graph/load';
 import { outstandingCount, unfinishedSweep } from '@/lib/learn/graph/opening';
-import { countStates } from '@/lib/learn/graph/model';
+import { countStates, settledCount } from '@/lib/learn/graph/model';
 import { MAX_BRIEFING_CHARS } from '@/lib/learn/graph/from-brief';
 import { BriefForm } from './brief-form';
 import { GoalForm } from './goal-form';
@@ -32,7 +32,8 @@ export const dynamic = 'force-dynamic';
 function settledLine(counts: ReturnType<typeof countStates>): string {
   if (counts.total === 0) return 'No concepts yet.';
 
-  const parts = [`${counts.known} of ${counts.total} settled`];
+  const parts = [`${settledCount(counts)} of ${counts.total} settled`];
+  if (counts.recognised > 0) parts.push(`${counts.recognised} recognised`);
   if (counts.shaky > 0) parts.push(`${counts.shaky} shaky`);
   // Named first-class, because a thing steering you wrong is not a gap and
   // should not be counted as one.

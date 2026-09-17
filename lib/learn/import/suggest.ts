@@ -123,7 +123,9 @@ export type SuggestResult =
 const STANDING: Record<KnowledgeState, string> = {
   unknown: 'They have not met this claim yet.',
   shaky: 'They have met this claim and it did not land.',
+  recognised: 'They can pick this claim out of a list and have not yet used it.',
   known: 'They have settled this claim and are reading past it.',
+  sharp: 'They have settled this claim and defended it against the objection to it.',
   misconception: 'Something is actively steering them wrong here.',
 };
 
