@@ -40,9 +40,16 @@ import { oneLine } from './build';
  * the two must not describe it differently. So the state is
  * `overnightStanding`'s answer rather than a fresh reading of the booleans,
  * the reason it ended is the sentence on the row printed verbatim, and the
- * budget is the same two numbers the control prints, read the other way round:
- * the control says how many are left, a report of a night that is over says
- * how many were spent.
+ * budget is the same two numbers, in the same words.
+ *
+ * Since #633 the control reads this file rather than only agreeing with it: it
+ * calls `nightFrom` on the live night and prints `nightBudgetLine` and
+ * `nightClosedLine`, so a night the page says fired two features cannot be a
+ * night the morning report says fired three. The control used to count the
+ * budget the other way round -- "2 of 6 left" against the report's "4 of 6
+ * spent" -- and that is gone: leading with what the night has got through is
+ * the whole of #633, and two readings of one pair of numbers on one page is
+ * the arithmetic it was meant to save.
  */
 
 /** One press the runner made: a `plan_runs` row with `job = 'feature'`. */
@@ -84,6 +91,23 @@ export type DigestNight = {
   featuresLeft: number;
   /** Every feature it fired, in the order it fired them. */
   features: (DigestNightRef & { at: string })[];
+  /**
+   * The last press it made, and when -- the feature it is on if it is still
+   * going. Null on a night that has fired nothing.
+   *
+   * Not the last of `features`, and the difference is the whole reason this
+   * is its own field. `features` is one line per feature however many times it
+   * was fired, held in the order the night *first* reached each one; a runner
+   * that came back to an earlier feature is still working that feature, and
+   * the last element of that list would name the wrong one. So this is read
+   * from the fires themselves, undeduplicated, newest wins.
+   *
+   * Added for the plan page's control (#633), which says what the night is
+   * doing right now rather than what it did. The morning report has no use for
+   * it -- by breakfast the night is over -- but a second reading of the same
+   * fires kept somewhere else is exactly the drift `nightFrom` exists to stop.
+   */
+  lastFire: (DigestNightRef & { at: string }) | null;
   /** Every step that closed while it ran. */
   closed: DigestNightStep[];
   /** Every step that is stopped on you now and was written to while it ran. */
@@ -187,6 +211,17 @@ export function nightFrom(input: {
       return [{ ...refOf(item), at: fire.at }];
     });
 
+  // The newest press inside the window, whatever it was for. Read off the
+  // fires rather than off `features` above, which is deduplicated and ordered
+  // by first sight; see the field's own note.
+  const lastFire = [...input.fires]
+    .filter((fire) => fire.planItemId !== null && inside(fire.at, startedAt))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .flatMap((fire) => {
+      const item = itemById.get(fire.planItemId as string);
+      return item ? [{ ...refOf(item), at: fire.at }] : [];
+    })[0] ?? null;
+
   // Everything that closed while it was running. Nothing on a plan row says
   // which press closed it, and at three in the morning there is only one thing
   // pressing anything -- but a step you closed yourself before bed would be in
@@ -220,6 +255,7 @@ export function nightFrom(input: {
     featuresBudget: run.featuresBudget,
     featuresLeft: run.featuresLeft,
     features,
+    lastFire,
     closed,
     blocked,
   };
@@ -241,6 +277,21 @@ export function nightBudgetLine(
   return `${spent} of ${night.featuresBudget} ${
     night.featuresBudget === 1 ? 'feature' : 'features'
   } spent`;
+}
+
+/**
+ * What the night has got through, in steps.
+ *
+ * The other half of the totals, and a sentence rather than a number because a
+ * bare `9` beside `2 of 6 features spent` reads as part of the budget. A night
+ * that has closed nothing says so in words for the same reason the morning
+ * report does: nothing closed is the outcome worth noticing, and a zero is
+ * easy to read past.
+ */
+export function nightClosedLine(night: Pick<DigestNight, 'closed'>): string {
+  const n = night.closed.length;
+  if (n === 0) return 'no steps closed';
+  return `${n} ${n === 1 ? 'step' : 'steps'} closed`;
 }
 
 /**

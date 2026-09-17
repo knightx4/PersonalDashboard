@@ -2,10 +2,12 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
-import { endQuietRuns, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
+import { endQuietRuns, loadFeatureFires, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
-import { loadOvernightRun } from '@/lib/plan/overnight';
+import { loadOvernightRun, overnightStanding } from '@/lib/plan/overnight';
 import { keyRefusal } from '@/lib/plan/work';
+import { lastStoredPush } from '@/lib/plan/liveness';
+import { nightFrom } from '@/lib/digest/night';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
@@ -112,18 +114,44 @@ export default async function DevPlanPage({
   // request only after something new has been closed.
   const checks = await refreshCommitChecks({ supabase, userId: user.id });
 
-  const [data, lastRuns, runRaises, commitChecks, overnight] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, overnight, fires] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     // What sessions have raised against a step, so an opened step can say what
     // its run asked for as well as what it pushed and closed.
     loadRunRaises(supabase, user.id),
     loadCommitChecks(supabase, user.id),
-    // The runner's standing intention, which is one row and is read here
-    // rather than inside the tree: it is about the plan as a whole, and the
-    // control that shows it sits above the whole page.
+    // The runner's standing intention, one row, which is about the plan as a
+    // whole rather than about any part of the tree.
     loadOvernightRun(supabase, user.id),
+    // The presses the night made, for the control's totals. The same rows the
+    // morning digest reads, through the same loader, so the two cannot come to
+    // different answers about how many features a night got through. #633.
+    // Alongside the rest rather than behind a look at the runner's row: it is
+    // one indexed read of a table this page is already reading, and holding it
+    // back would cost every load a round trip to save this one.
+    loadFeatureFires(supabase, user.id),
   ]);
+
+  const standing = overnightStanding(overnight);
+  const startedAt = overnight?.startedAt ?? null;
+  const live = (standing === 'running' || standing === 'paused') && startedAt !== null;
+
+  // The night as `nightFrom` reads it -- the same reading the morning report is
+  // written from. `since` is the night's own start rather than a day's window:
+  // the report is asked whether last night is still news, and this is asked
+  // what is happening right now, which a window could only get wrong.
+  const night = live
+    ? nightFrom({ run: overnight, fires, items: data.items, since: startedAt })
+    : null;
+
+  // And what the night has pushed, off the readings the run rows already carry.
+  // Nothing here asks GitHub: #563 settled that the render never waits on it,
+  // and #569's route refreshes these readings from the browser once the page is
+  // up -- so the card names the same push every other surface is reading rather
+  // than taking a second reading that could disagree with it.
+  const nightPush = live ? lastStoredPush(Object.values(lastRuns), startedAt) : null;
+
   // What the runs say about the steps that are claimed, so the counts beside a
   // module heading and the bands in its bar read the claims the same way the
   // health column under them does. The rows are classified again in the browser
@@ -186,7 +214,12 @@ export default async function DevPlanPage({
       {checks.error && (
         <p className="text-small text-caution">Could not read CI. {checks.error}</p>
       )}
-      <OvernightControl run={overnight} canSend={Boolean(planRoutine().token)} />
+      <OvernightControl
+        run={overnight}
+        canSend={Boolean(planRoutine().token)}
+        night={night}
+        push={nightPush}
+      />
       <PlanViewComponent
         sections={sections}
         finished={finished}

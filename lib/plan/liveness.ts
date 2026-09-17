@@ -63,6 +63,37 @@ export type Push = {
   at: string;
 };
 
+/**
+ * A push as the run row remembers it: when, which commit, and what it said.
+ *
+ * The push half of `StoredRunReading`, named so that a surface drawing one does
+ * not have to spell the nullable field out. Here rather than beside the request
+ * that fills it in, for the reason the whole of this file is here: `ci.ts` is
+ * server-only and the plan page draws the answer in the browser, so the shape
+ * it draws has to live on the browser-safe side of the pair.
+ */
+export type StoredPush = NonNullable<StoredRunReading['lastPush']>;
+
+/** Longest a commit subject is printed at before it is cut. */
+export const SUBJECT_LIMIT = 90;
+
+/**
+ * The first line of a commit message, as a row can print it.
+ *
+ * A commit message is a subject, a blank line and a body, and only the subject
+ * says what the commit was -- the body is the reasoning, and on this project it
+ * runs to paragraphs. Cut at a word rather than mid-word, and with an ellipsis,
+ * so a long subject reads as cut rather than as a subject that stops oddly.
+ */
+export function commitSubject(message: string): string | null {
+  const first = message.split('\n', 1)[0]?.replace(/\s+/g, ' ').trim() ?? '';
+  if (first.length === 0) return null;
+  if (first.length <= SUBJECT_LIMIT) return first;
+  const cut = first.slice(0, SUBJECT_LIMIT);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > SUBJECT_LIMIT / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 /** One entry from GitHub's repository activity listing. */
 export type ActivityRow = {
   activity_type?: string;
@@ -124,6 +155,38 @@ export function lastPushSince(pushes: readonly Push[], startedAt: string): Push 
   for (const push of pushes) {
     const at = new Date(push.at).getTime();
     if (!Number.isFinite(at) || at < fired) continue;
+    if (!newest || at > new Date(newest.at).getTime()) newest = push;
+  }
+  return newest;
+}
+
+/**
+ * The newest push any of these runs is recorded as having made since an
+ * instant.
+ *
+ * What the Overnight card prints, read off the readings #568 stores on the run
+ * rows rather than asked of GitHub while the page renders. #569's route is the
+ * one thing that asks, on the loop the page starts after it has drawn, so this
+ * is the same reading every other surface is looking at and it costs the render
+ * nothing.
+ *
+ * Across the runs rather than one of them, because a night fires a run per
+ * feature and the question is what the *night* last pushed. A refusal carries
+ * no push (`readingFor`), so a run GitHub would not answer for simply has
+ * nothing to offer here and the next one down answers instead; saying that the
+ * key is being refused is `keyRefusal`'s, said once above the plan.
+ */
+export function lastStoredPush(
+  runs: Iterable<{ reading: StoredRunReading | null }>,
+  since: string,
+): StoredPush | null {
+  const from = new Date(since).getTime();
+  let newest: StoredPush | null = null;
+  for (const run of runs) {
+    const push = run.reading?.lastPush;
+    if (!push) continue;
+    const at = new Date(push.at).getTime();
+    if (!Number.isFinite(at) || at < from) continue;
     if (!newest || at > new Date(newest.at).getTime()) newest = push;
   }
   return newest;

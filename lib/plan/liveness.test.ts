@@ -3,8 +3,10 @@ import {
   abandonedClaim,
   claimIsLive,
   claimLiveness,
+  commitSubject,
   ENDED_AFTER_MINUTES,
   lastPushSince,
+  lastStoredPush,
   pushesFrom,
   QUIET_AFTER_MINUTES,
   readingTrusted,
@@ -12,6 +14,7 @@ import {
   runEndedNote,
   runLiveness,
   silenceReads,
+  SUBJECT_LIMIT,
   type ActivityRow,
   type ClaimRun,
   type Push,
@@ -94,6 +97,43 @@ describe('lastPushSince', () => {
 
   it('is null when nothing has been pushed at all', () => {
     expect(lastPushSince([], minutesAgo(60))).toBeNull();
+  });
+});
+
+/**
+ * The night's last push, read off the readings on the run rows rather than
+ * asked of GitHub -- which is what the Overnight card draws (#633 on #568's
+ * columns).
+ */
+describe('lastStoredPush', () => {
+  const stored = (at: number | null, subject = 'A push', refusal: string | null = null) => ({
+    reading: {
+      checkedAt: minutesAgo(1),
+      lastPush: at === null ? null : { at: minutesAgo(at), sha: 'abc1234', subject },
+      refusal,
+    },
+  });
+
+  it('takes the newest push any of the runs recorded', () => {
+    expect(
+      lastStoredPush([stored(40), stored(5, 'The newest'), stored(90)], minutesAgo(120))?.subject,
+    ).toBe('The newest');
+  });
+
+  it('ignores a push from before the night started', () => {
+    expect(lastStoredPush([stored(200)], minutesAgo(120))).toBeNull();
+  });
+
+  it('has nothing to say for a run nobody asked about, or one that pushed nothing', () => {
+    expect(lastStoredPush([{ reading: null }, stored(null)], minutesAgo(120))).toBeNull();
+  });
+
+  it('passes over a refused reading rather than counting it as silence', () => {
+    // A refusal carries no push at all, so the run under it answers instead.
+    const refused = { reading: { checkedAt: minutesAgo(1), lastPush: null, refusal: '403' } };
+    expect(lastStoredPush([refused, stored(5, 'The one that read')], minutesAgo(120))?.subject).toBe(
+      'The one that read',
+    );
   });
 });
 
@@ -368,5 +408,25 @@ describe('claimIsLive', () => {
     expect(claimIsLive('quiet')).toBe(true);
     expect(claimIsLive('abandoned')).toBe(false);
     expect(claimIsLive(null)).toBe(false);
+  });
+});
+
+describe('commitSubject', () => {
+  it('takes the subject and leaves the body behind', () => {
+    expect(
+      commitSubject('Show what the night has done so far (plan #633)\n\nThe reasoning, at length.'),
+    ).toBe('Show what the night has done so far (plan #633)');
+  });
+
+  it('has nothing to say about a commit with no message', () => {
+    expect(commitSubject('')).toBeNull();
+    expect(commitSubject('\n\nbody only')).toBeNull();
+  });
+
+  it('cuts a long subject at a word, and says it cut it', () => {
+    const said = commitSubject('a'.repeat(20) + ' ' + 'b'.repeat(200));
+    expect(said).toMatch(/…$/);
+    expect(said!.length).toBeLessThanOrEqual(SUBJECT_LIMIT + 1);
+    expect(said).not.toContain('b'.repeat(200));
   });
 });

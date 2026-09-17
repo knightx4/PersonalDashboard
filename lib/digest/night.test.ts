@@ -8,7 +8,14 @@
  * is not reported again every morning afterwards.
  */
 import { describe, expect, it } from 'vitest';
-import { MAX_NIGHT_ROWS, nightBudgetLine, nightFrom, nightLine, nightRows } from '@/lib/digest/night';
+import {
+  MAX_NIGHT_ROWS,
+  nightBudgetLine,
+  nightClosedLine,
+  nightFrom,
+  nightLine,
+  nightRows,
+} from '@/lib/digest/night';
 import type { PlanItem } from '@/lib/plan/load';
 import {
   budgetSpentReason,
@@ -114,6 +121,48 @@ describe('nightFrom', () => {
       'One tab for your day',
       'Say what happened overnight',
     ]);
+  });
+
+  it('names the feature it is on now, not the first one it reached', () => {
+    const first = step({ id: 'f1', title: 'One tab for your day' });
+    const second = step({ id: 'f2', title: 'Say what happened overnight' });
+
+    const night = nightFrom({
+      run: run({ running: true, endedAt: null, endedReason: null }),
+      fires: [
+        // It came back to the feature it started on, which is the case the
+        // deduplicated list gets wrong: `features` still leads with #f1.
+        { planItemId: 'f1', at: '2026-03-02T02:30:00Z' },
+        { planItemId: 'f2', at: '2026-03-02T01:00:00Z' },
+        { planItemId: 'f1', at: '2026-03-02T00:10:00Z' },
+      ],
+      items: [first, second],
+      since: SINCE,
+    });
+
+    expect(night?.features.at(-1)?.title).toBe('Say what happened overnight');
+    expect(night?.lastFire).toEqual({
+      ref: `#${first.number}`,
+      title: 'One tab for your day',
+      at: '2026-03-02T02:30:00Z',
+    });
+  });
+
+  it('has no feature to name on a night that has fired nothing', () => {
+    const night = nightFrom({
+      run: run({ running: true, endedAt: null, endedReason: null, lastFiredAt: null }),
+      fires: [
+        // Both outside the night: one before the button, one naming a step
+        // this deploy no longer has.
+        { planItemId: 'f1', at: '2026-03-01T18:00:00Z' },
+        { planItemId: 'gone', at: '2026-03-02T01:00:00Z' },
+      ],
+      items: [step({ id: 'f1', title: 'One tab for your day' })],
+      since: SINCE,
+    });
+
+    expect(night?.features).toEqual([]);
+    expect(night?.lastFire).toBeNull();
   });
 
   it('names what closed inside the night and nothing closed before it', () => {
@@ -235,11 +284,33 @@ describe('nightRows', () => {
 });
 
 describe('nightBudgetLine', () => {
-  // The control says "4 of 6 features left"; this is the same pair the other
-  // way round, and the only difference allowed is the last word.
+  // Since #633 the plan page's control prints this same line rather than
+  // counting the pair the other way round, so these are the words on both.
   it('says what the night spent, in the control’s words', () => {
     expect(nightBudgetLine({ featuresBudget: 6, featuresLeft: 4 })).toBe('2 of 6 features spent');
     expect(nightBudgetLine({ featuresBudget: 1, featuresLeft: 0 })).toBe('1 of 1 feature spent');
     expect(nightBudgetLine({ featuresBudget: 6, featuresLeft: 6 })).toBe('0 of 6 features spent');
+  });
+});
+
+describe('nightClosedLine', () => {
+  // The other half of the totals. A night that closed nothing says so in
+  // words, because a zero beside a budget is the easiest thing on the card to
+  // read past -- and it is the outcome worth getting out of bed for.
+  it('counts the steps, and says when there are none', () => {
+    expect(nightClosedLine({ closed: [] })).toBe('no steps closed');
+    expect(nightClosedLine({ closed: [{ ref: '#1', title: 'One', feature: null, ask: null }] })).toBe(
+      '1 step closed',
+    );
+    expect(
+      nightClosedLine({
+        closed: Array.from({ length: 9 }, (_, index) => ({
+          ref: `#${index}`,
+          title: 'A step',
+          feature: null,
+          ask: null,
+        })),
+      }),
+    ).toBe('9 steps closed');
   });
 });

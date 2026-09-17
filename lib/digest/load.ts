@@ -164,6 +164,15 @@ function nightFrom(value: unknown): DigestNight | null {
       const at = text((entry as Record<string, unknown>)?.at);
       return named ? [{ ...named, at: at ?? '' }] : [];
     }),
+    // Absent on every night stored before #633, which is why it degrades to
+    // null rather than to the last of `features`: the report has no use for it
+    // -- by breakfast there is no feature being built -- and a guess at which
+    // one it was would be a fact nobody wrote down.
+    lastFire: (() => {
+      const named = nightRefFrom(row.lastFire);
+      const at = text((row.lastFire as Record<string, unknown> | null)?.at);
+      return named ? { ...named, at: at ?? '' } : null;
+    })(),
     closed: nightStepsFrom(row.closed),
     blocked: nightStepsFrom(row.blocked),
   };
