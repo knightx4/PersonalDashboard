@@ -125,11 +125,17 @@ export const FEEDBACK_HEALTH_WORD: Record<FeedbackHealth, string> = {
  * `Nothing done` is its own, and it is the state this queue exists to show: a
  * raise answered with no action and no reason for none is not finished, whatever
  * its status column says.
+ *
+ * `Answered` is its own for the same reason: you replied and something came of
+ * it, which no other queue has a word for and which is not the end of the row.
+ * The end of it is, and that takes the shared word -- a raise you are finished
+ * with is the same fact as a step built and a note fixed.
  */
 export const RAISED_HEALTH_WORD: Record<RaisedHealth, string> = {
   waiting: DEV_STATE_WORD.waiting,
   unfinished: 'Nothing done',
-  done: 'Answered',
+  answered: 'Answered',
+  closed: DEV_STATE_WORD.done,
   dropped: DEV_STATE_WORD.dropped,
 };
 

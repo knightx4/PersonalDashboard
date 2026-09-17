@@ -80,8 +80,14 @@ export function feedbackHealth(
   }
 }
 
-/** The four states a raise can be read as. */
-export const RAISED_HEALTHS = ['waiting', 'unfinished', 'done', 'dropped'] as const;
+/** The five states a raise can be read as. */
+export const RAISED_HEALTHS = [
+  'waiting',
+  'unfinished',
+  'answered',
+  'closed',
+  'dropped',
+] as const;
 
 export type RaisedHealth = (typeof RAISED_HEALTHS)[number];
 
@@ -93,13 +99,20 @@ export type RaisedHealth = (typeof RAISED_HEALTHS)[number];
  * the thing it described was still possible -- so it is its own state and the
  * page already lists those rows apart from the closed ones. This is where that
  * rule lives now, rather than only in the grouping.
+ *
+ * `answered` and `closed` are two states rather than one because replying is
+ * not being finished: a yes that files an idea leaves work behind it, and the
+ * person is the one who says they have read what came of it. 0073 added the
+ * column value; this is what the page reads it as.
  */
 export function raisedHealth(row: Pick<RaisedRow, 'status' | 'outcome'>): RaisedHealth {
   switch (row.status) {
     case 'open':
       return 'waiting';
     case 'answered':
-      return row.outcome ? 'done' : 'unfinished';
+      return row.outcome ? 'answered' : 'unfinished';
+    case 'closed':
+      return 'closed';
     case 'dismissed':
       return 'dropped';
   }

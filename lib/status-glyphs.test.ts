@@ -168,7 +168,7 @@ describe('the dev queue glyphs', () => {
     expect(FINDING_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.unanswered);
     // A proposal nobody has approved is a question on the ideas page too.
     expect(IDEA_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.unanswered);
-    expect(RAISED_HEALTH_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.answered);
+    expect(RAISED_HEALTH_GLYPHS.answered).toBe(PLAN_HEALTH_GLYPHS.answered);
   });
 
   it('draws the notes queue on the plan ladder', () => {
@@ -177,6 +177,9 @@ describe('the dev queue glyphs', () => {
     expect(FEEDBACK_HEALTH_GLYPHS.waiting).toBe(PLAN_HEALTH_GLYPHS.blocked);
     expect(FEEDBACK_HEALTH_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.done);
     expect(IDEA_HEALTH_GLYPHS.done).toBe(PLAN_HEALTH_GLYPHS.done);
+    // A raise you are finished with is the top of the same ladder: answering
+    // one is a rung on the way there rather than the end of it.
+    expect(RAISED_HEALTH_GLYPHS.closed).toBe(PLAN_HEALTH_GLYPHS.done);
   });
 
   it('draws a row handed to another queue as one waiting on something else', () => {

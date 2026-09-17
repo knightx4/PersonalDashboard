@@ -14,7 +14,7 @@ import { consequenceFrom, type RaiseConsequence } from './consequence';
  */
 
 /** Mirrors the `raised_items_status_ck` check. */
-export type RaisedStatus = 'open' | 'answered' | 'dismissed';
+export type RaisedStatus = 'open' | 'answered' | 'closed' | 'dismissed';
 
 export type RaisedRow = {
   id: string;
@@ -115,6 +115,12 @@ export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
  * reason the notes queue does it; the ones that produced nothing go under it
  * because they are not finished either, and a page that filed them with the
  * history is the page the #342 raise disappeared into.
+ *
+ * The last group is history, and `closed` joins it beside answered and
+ * dismissed: the three are the ways a raise stops wanting anything. Nothing
+ * moves when a raise is closed, because an answered one was already filed
+ * there — what changes is the word on the row and that the page stops offering
+ * to close it.
  */
 export function raisedQueueFrom(rows: readonly RaisedRow[]): RaisedQueue {
   const byNewest = (a: RaisedRow, b: RaisedRow) => b.createdAt.localeCompare(a.createdAt);

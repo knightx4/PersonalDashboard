@@ -39,7 +39,10 @@ type Db = SupabaseClient<any, 'public'>;
  *
  * The button, not the routine: two of these fire the same plan routine with
  * different briefs, and what somebody reading the record wants to know is what
- * was asked for.
+ * was asked for. `raise` is the one that is not a button -- writing an answer
+ * on a raise is the press -- and it is its own job rather than a `comment` for
+ * the same reason: the brief is the raise and the answer, not a question asked
+ * on a row.
  */
 export type RunJob =
   | 'step'
@@ -49,7 +52,8 @@ export type RunJob =
   | 'shape'
   | 'notes'
   | 'review'
-  | 'comment';
+  | 'comment'
+  | 'raise';
 
 /** A `plan_runs` row, ready to insert. */
 export type RunRow = {

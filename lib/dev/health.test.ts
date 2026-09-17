@@ -56,7 +56,12 @@ describe('lastWordIsYours', () => {
 describe('raisedHealth', () => {
   it('splits an answered raise on whether anything came of it', () => {
     expect(raisedHealth({ status: 'answered', outcome: null })).toBe('unfinished');
-    expect(raisedHealth({ status: 'answered', outcome: 'Filed as an idea.' })).toBe('done');
+    expect(raisedHealth({ status: 'answered', outcome: 'Filed as an idea.' })).toBe('answered');
+  });
+
+  // Replying is not being finished, so the two are different words on the row.
+  it('reads a closed raise apart from an answered one', () => {
+    expect(raisedHealth({ status: 'closed', outcome: 'Filed as an idea.' })).toBe('closed');
   });
 
   it('reads an open raise as waiting and a turned-down one as dropped', () => {

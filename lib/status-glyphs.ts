@@ -163,11 +163,17 @@ export const FEEDBACK_HEALTH_GLYPHS: Record<FeedbackHealth, StatusGlyph> = {
  * stopped on something and a question nobody has answered. `unfinished` is a
  * raise you answered with nothing recorded as coming of it, which is work a
  * session owes, so it takes the half-filled hexagon a ready step takes.
+ *
+ * `answered` takes the tick a settled plan question takes: you replied, and it
+ * is a session's again. `closed` is the solid hexagon every other queue's
+ * finished row draws, because that is what it is -- the raise is done with,
+ * and answering it was a rung on the way there rather than the top.
  */
 export const RAISED_HEALTH_GLYPHS: Record<RaisedHealth, StatusGlyph> = {
   waiting: 'question',
   unfinished: 'half',
-  done: 'check',
+  answered: 'check',
+  closed: 'full',
   dropped: 'slash',
 };
 
