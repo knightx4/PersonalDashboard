@@ -1,4 +1,4 @@
-import { Receipt, Search } from 'lucide-react';
+import { Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -16,12 +16,13 @@ type OrderSourceMessage = {
 import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { Input } from '@/components/ui/field';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
@@ -256,8 +257,10 @@ export default async function OrdersPage({
     rows.reduce((sum, row) => sum + row.displayTotalCents, 0),
   );
 
+  // A search that matched nothing is the shared empty state; this is the other
+  // kind of nothing, where a filter rather than a search emptied the list.
   const filteredEmpty =
-    orders.length === 0 && Boolean(q || status || activeMerchant || activeTag);
+    orders.length === 0 && Boolean(status || activeMerchant || activeTag);
 
   /** What is narrowing this page, said out loud above the results. */
   const chips: FilterChip[] = [];
@@ -443,45 +446,23 @@ export default async function OrdersPage({
 
         <FilterChips chips={chips} clearAllHref="/shopping/orders" />
 
-        <form className="mb-5" action="/shopping/orders" method="get">
-          <input type="hidden" name="range" value={range} />
-          {status && <input type="hidden" name="status" value={status} />}
-          {activeMerchant && (
-            <input type="hidden" name="merchant" value={activeMerchant} />
-          )}
-          {activeTag && <input type="hidden" name="tag" value={activeTag} />}
-          {/* The arrangement rides through a search the same way the filters
-              do, so searching does not put the list back in months. */}
-          {display.sort !== 'newest' && <input type="hidden" name="sort" value={display.sort} />}
-          {display.group !== DEFAULT_ORDERS_GROUP && (
-            <input type="hidden" name="group" value={display.group} />
-          )}
-          {display.hidden.length > 0 && (
-            <input type="hidden" name="hide" value={display.hidden.join(',')} />
-          )}
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <Input
-              name="q"
-              defaultValue={q}
-              placeholder="Search merchant, item, tag, order #, inbox…"
-              aria-label="Search orders"
-              className="pl-9"
-            />
-          </div>
+        {/* Directly above the list it narrows, under the chips that say what
+            is already in force. The range, the status, the merchant, the tag,
+            whose it is and the arrangement are all on the URL, and the field
+            carries them, so searching from a narrowed list stays narrowed. */}
+        <div className="mb-5">
+          <SearchField placeholder="Search merchant, item, tag, order #, inbox…" />
 
           {/* The list was locked into months and had no sort control at all.
               Same control, same place, as the one above the inventory list. */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <DisplayMenu menu={menu} align="start" />
           </div>
-        </form>
+        </div>
 
-        {orders.length === 0 ? (
+        {orders.length === 0 && q ? (
+          <SearchEmpty query={q} />
+        ) : orders.length === 0 ? (
           <EmptyState
             icon={Receipt}
             title={filteredEmpty ? 'No matching orders' : 'No orders yet'}
