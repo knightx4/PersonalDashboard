@@ -47,6 +47,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Banner } from '@/components/ui/banner';
 import { Bands } from '@/components/ui/meter';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import {
@@ -117,6 +118,7 @@ import {
   nothingToShowLine,
   pushLine,
   raisedLine,
+  refusalLine,
   runStartedLine,
   runWork,
   workIsEmpty,
@@ -1729,6 +1731,7 @@ function RunWork({
   const empty = workIsEmpty(work);
   const closed = closedLine(work);
   const raised = raisedLine(work);
+  const refused = refusalLine(work);
 
   return (
     <div>
@@ -1738,6 +1741,11 @@ function RunWork({
       {closed && <p className="text-ui text-ink-muted">{closed}</p>}
       {raised && <p className="text-ui text-ink-muted">{raised}</p>}
       {empty && <p className="text-ui text-ink-muted">{nothingToShowLine(work, now)}</p>}
+      {/* After the rest, because what the run did is what was asked for and
+          this is why one of the four lines is missing. Caution rather than
+          muted: nothing on this row can be read properly until the key is
+          fixed, and the sentence says how. */}
+      {refused && <p className="text-ui text-caution">{refused}</p>}
     </div>
   );
 }
@@ -3165,8 +3173,12 @@ function SearchThePlan({
 function useRefreshedRuns(
   lastRuns: Record<string, LastRun>,
   claims: number,
-): Record<string, LastRun> {
-  const [readings, setReadings] = useState<Record<string, StoredRunReading> | null>(null);
+  stored: string | null,
+): { runs: Record<string, LastRun>; refusal: string | null } {
+  const [answer, setAnswer] = useState<{
+    readings: Record<string, StoredRunReading>;
+    error: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (claims === 0) return;
@@ -3176,8 +3188,11 @@ function useRefreshedRuns(
       try {
         const res = await fetch('/api/plan/runs', { method: 'POST', signal: leaving.signal });
         if (!res.ok) return;
-        const body = (await res.json()) as { readings?: Record<string, StoredRunReading> };
-        if (body.readings) setReadings(body.readings);
+        const body = (await res.json()) as {
+          readings?: Record<string, StoredRunReading>;
+          error?: string | null;
+        };
+        setAnswer({ readings: body.readings ?? {}, error: body.error ?? null });
       } catch {
         // Left as it was drawn.
       }
@@ -3186,10 +3201,18 @@ function useRefreshedRuns(
     return () => leaving.abort();
   }, [claims]);
 
-  return useMemo(
-    () => (readings ? withReadings(lastRuns, readings) : lastRuns),
-    [lastRuns, readings],
+  const runs = useMemo(
+    () => (answer ? withReadings(lastRuns, answer.readings) : lastRuns),
+    [lastRuns, answer],
   );
+
+  // The route's own word wins outright once it has one, `null` included. It
+  // asked GitHub a moment ago, and the refusals the page was handed are from
+  // whenever anything last asked -- a key replaced between the two would
+  // otherwise go on being reported as rejected for as long as one of those
+  // runs was on screen. A 200 with no `error` is GitHub answering, which is
+  // the fix landing.
+  return { runs, refusal: answer ? answer.error : stored };
 }
 
 export function PlanView({
@@ -3200,6 +3223,7 @@ export function PlanView({
   catalog,
   lastRuns,
   runRaises = [],
+  keyRefusal = null,
   liveness,
   commitChecks,
   empty,
@@ -3218,6 +3242,16 @@ export function PlanView({
   lastRuns: Record<string, LastRun>;
   /** Every raise that names a step, for the opened step's account of its run. */
   runRaises?: readonly RunRaise[];
+  /**
+   * Why GitHub is refusing to say what anything has pushed, as the run rows
+   * had it when the page rendered.
+   *
+   * Drawn with rather than waited for, so a rejected key is on screen in the
+   * first paint instead of a second later: it is the reason every claimed row
+   * below reads off the clock. The route's answer replaces it once that
+   * arrives -- see `useRefreshedRuns`.
+   */
+  keyRefusal?: string | null;
   /** The claims read against their runs, at the clock the page rendered with. */
   liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
@@ -3250,7 +3284,12 @@ export function PlanView({
   // page is up and written over the readings it drew with. A claim is the only
   // reason to ask, so the server's own reading of them is what decides whether
   // anything is asked at all.
-  const runs = useRefreshedRuns(lastRuns, Object.keys(liveness ?? {}).length);
+  const refreshed = useRefreshedRuns(
+    lastRuns,
+    Object.keys(liveness ?? {}).length,
+    keyRefusal,
+  );
+  const runs = refreshed.runs;
 
   // The whole tree is already on the page, so the search runs here rather than
   // as a round trip: a plan is tens of steps, and a filter you feel keeping up
@@ -3279,6 +3318,24 @@ export function PlanView({
 
   return (
     <div className="space-y-6">
+      {/* Above the summary, because it is the reason the summary's claims are
+          read off the clock. A banner rather than a status line: the key is a
+          setting only the person can change, the sentence GitHub's refusal was
+          turned into already says which one and what to do with it, and until
+          it is done no row on this page can say whether its session is still
+          working. */}
+      {refreshed.refusal && (
+        <Banner tone="warn">
+          <p className="font-semibold">
+            Nothing can read what these runs have pushed.
+          </p>
+          <p>{refreshed.refusal}</p>
+          <p className="text-small text-ink-muted">
+            Until then a claimed step reads off the clock: claimed for two hours, then stopped.
+          </p>
+        </Banner>
+      )}
+
       <SummaryStrip summary={summary} view={view} queued={queued} />
 
       <SearchThePlan query={query} onQuery={setQuery} hits={hits} searching={searching} />

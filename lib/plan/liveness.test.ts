@@ -8,6 +8,7 @@ import {
   pushesFrom,
   QUIET_AFTER_MINUTES,
   readingTrusted,
+  refusalStanding,
   runEndedNote,
   runLiveness,
   silenceReads,
@@ -222,6 +223,30 @@ describe('readingTrusted', () => {
   });
 });
 
+/**
+ * The other half of setting a refusal aside: saying it is there.
+ *
+ * `readingTrusted` refuses to read silence the key caused as evidence.
+ * `refusalStanding` is what #566 says instead, and it is the only thing here
+ * that a refusal makes truer rather than less true.
+ */
+describe('refusalStanding', () => {
+  it('is the reason, while the reading is recent', () => {
+    expect(refusalStanding(reading(1, null, '403 from GitHub'), NOW)).toBe('403 from GitHub');
+  });
+
+  it('is nothing on a reading GitHub answered, and nothing with no reading', () => {
+    expect(refusalStanding(reading(1, 2), NOW)).toBeNull();
+    expect(refusalStanding(null, NOW)).toBeNull();
+    expect(refusalStanding(undefined, NOW)).toBeNull();
+  });
+
+  it('is nothing past the trusted mark, since nothing has asked since', () => {
+    expect(refusalStanding(reading(ENDED_AFTER_MINUTES, null, '403'), NOW)).toBeNull();
+    expect(refusalStanding(reading(ENDED_AFTER_MINUTES - 1, null, '403'), NOW)).toBe('403');
+  });
+});
+
 describe('claimLiveness', () => {
   it('is nothing at all on a step nobody has claimed', () => {
     for (const status of ['not_started', 'blocked', 'done', 'dropped', 'proposed']) {
@@ -292,13 +317,30 @@ describe('claimLiveness', () => {
     });
 
     it('ignores a reading GitHub refused, so a wrong key reads as nothing new', () => {
+      // The third line of #566's done-when, from the other side: the run has
+      // been silent for half an hour, which is past the quiet mark, and the
+      // only reason nothing was heard is that the key was refused. A rejected
+      // key must not be able to make a working session look quiet, so the
+      // clock answers and the claim reads as a claim.
+      const reads = claimLiveness(
+        claim({ startedAt: minutesAgo(10) }),
+        run({ createdAt: minutesAgo(30), reading: reading(1, null, '401 from GitHub') }),
+        NOW,
+      );
+      expect(reads).not.toBe('quiet');
+      expect(reads).toBe('claimed');
+    });
+
+    it('still ends a refused claim on the clock once it is past the two hours', () => {
+      // The fallback is the clock, not silence -- so a refusal does not keep a
+      // claim standing for ever either.
       expect(
         claimLiveness(
-          claim({ startedAt: minutesAgo(10) }),
-          run({ reading: reading(1, null, '401 from GitHub') }),
+          claim({ startedAt: minutesAgo(200) }),
+          run({ createdAt: minutesAgo(200), reading: reading(1, null, '401 from GitHub') }),
           NOW,
         ),
-      ).toBe('claimed');
+      ).toBe('abandoned');
     });
 
     it('leaves a claim with no start time alone: the trigger has not stamped it yet', () => {

@@ -12,9 +12,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LastRun } from './run-end';
 import {
+  keyRefusal,
   nothingToShowLine,
   pushLine,
   raisesFiledSince,
+  refusalLine,
   runStartedLine,
   runWork,
   sourceNumbers,
@@ -23,6 +25,7 @@ import {
   type RunRaise,
   type StepClosure,
 } from './work';
+import { READING_TRUSTED_FOR_MINUTES } from './liveness';
 
 const NOW = Date.parse('2026-09-17T12:00:00Z');
 const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -198,5 +201,80 @@ describe('the line that names the run', () => {
     const work = runWork({ run: run(), steps: [], raises: [] });
     expect(runStartedLine(work, 0)).not.toContain('going');
     expect(nothingToShowLine(work, 0)).toContain('since it started');
+  });
+});
+
+/**
+ * The refusal, which is what #566 is for.
+ *
+ * Two lines, and they are not the same line. On the run it is why one of the
+ * four things the block reports is missing, and it has to survive a run that
+ * did push or close something -- the case that reached the page through
+ * nothing at all before. Above the plan it is the state of the key, which is
+ * one setting and not a fact about any single run.
+ */
+const REJECTED =
+  'GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped. ' +
+  'Set a new one in Vercel and redeploy.';
+
+function refused(checked: number, refusal = REJECTED): LastRun {
+  return run({ reading: { checkedAt: minutesAgo(checked), lastPush: null, refusal } });
+}
+
+describe('the line that says GitHub refused', () => {
+  it('prints the reason as it was stored, since it is already a sentence', () => {
+    const work = runWork({ run: refused(1), steps: [], raises: [] });
+    expect(refusalLine(work)).toBe(REJECTED);
+  });
+
+  it('says nothing when GitHub answered', () => {
+    const work = runWork({
+      run: run({ reading: { checkedAt: minutesAgo(1), lastPush: null, refusal: null } }),
+      steps: [],
+      raises: [],
+    });
+    expect(refusalLine(work)).toBeNull();
+    expect(refusalLine(runWork({ run: run(), steps: [], raises: [] }))).toBeNull();
+  });
+
+  it('survives a run that closed a step, which is what it could not do before', () => {
+    // The refusal used to reach the page only through `nothingToShowLine`, and
+    // a run with a closure to report is not empty -- so the rejected key was
+    // invisible on exactly the runs that were getting work done.
+    const work = runWork({
+      run: refused(1),
+      steps: [step({ number: 7, completedAt: minutesAgo(5) })],
+      raises: [],
+    });
+    expect(workIsEmpty(work)).toBe(false);
+    expect(refusalLine(work)).toBe(REJECTED);
+  });
+});
+
+describe('the reason the key cannot be read, across the runs on the page', () => {
+  it('is nothing when no run carries a refusal', () => {
+    expect(keyRefusal([run(), run({ reading: null })], NOW)).toBeNull();
+  });
+
+  it('is the reason, once any run has one', () => {
+    expect(keyRefusal([run(), refused(2)], NOW)).toBe(REJECTED);
+  });
+
+  it('is the newest of them, so a fixed key is not reported from an old row', () => {
+    const older = refused(60, 'No GITHUB_READ_TOKEN is set, so pushes cannot be read.');
+    expect(keyRefusal([older, refused(2)], NOW)).toBe(REJECTED);
+    expect(keyRefusal([refused(2), older], NOW)).toBe(REJECTED);
+  });
+
+  it('is nothing from a refusal older than the trusted mark -- #570', () => {
+    // Nothing has asked GitHub since, so the key may already have been
+    // replaced. Telling somebody to set a token that works is worse than
+    // saying nothing; the run row keeps the sentence either way.
+    expect(keyRefusal([refused(READING_TRUSTED_FOR_MINUTES)], NOW)).toBeNull();
+    expect(keyRefusal([refused(READING_TRUSTED_FOR_MINUTES - 1)], NOW)).toBe(REJECTED);
+  });
+
+  it('is nothing when there is nothing to read', () => {
+    expect(keyRefusal([], NOW)).toBeNull();
   });
 });

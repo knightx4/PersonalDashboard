@@ -5,6 +5,8 @@ import { syncPlanFromSeed } from '@/lib/plan/sync';
 import { endQuietRuns, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
 import { loadOvernightRun } from '@/lib/plan/overnight';
+import { keyRefusal } from '@/lib/plan/work';
+import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
@@ -34,6 +36,18 @@ function claimsAsOfNow(
   runs: Parameters<typeof planLiveness>[1],
 ) {
   return planLiveness(items, runs, Date.now());
+}
+
+/**
+ * Why GitHub is refusing the key, from the last run on each step.
+ *
+ * Out here beside `claimsAsOfNow` and for the same reason: it reads the clock,
+ * and how old a refusal is decides whether it is still the state of the key.
+ * The browser asks the route again once the page is up and prefers that
+ * answer, so this is only what the first paint is drawn with.
+ */
+function refusedKeyAsOfNow(runs: Record<string, LastRun>): string | null {
+  return keyRefusal(Object.values(runs), Date.now());
 }
 
 /**
@@ -116,6 +130,11 @@ export default async function DevPlanPage({
   // as the clock ticks; both go through `healthOf`, so the two cannot disagree
   // about a claim, only about how many minutes ago it was.
   const liveness = claimsAsOfNow(data.items, lastRuns);
+  // And whether the reason those claims are being read off the clock is that
+  // GitHub is refusing the key. Off the run rows, so it is on screen in the
+  // first paint; the page asks the route again once it is up and takes that
+  // answer instead.
+  const refusedKey = refusedKeyAsOfNow(lastRuns);
   const whole = buildPlanTree(data, liveness);
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
@@ -176,6 +195,7 @@ export default async function DevPlanPage({
         catalog={catalog}
         lastRuns={lastRuns}
         runRaises={runRaises}
+        keyRefusal={refusedKey}
         liveness={liveness}
         commitChecks={commitChecks}
         empty={data.items.length === 0}

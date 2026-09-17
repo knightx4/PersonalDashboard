@@ -260,8 +260,41 @@ export const READING_TRUSTED_FOR_MINUTES = ENDED_AFTER_MINUTES;
  */
 export function readingTrusted(reading: StoredRunReading, now: number): boolean {
   if (reading.refusal) return false;
+  return readingIsFresh(reading, now);
+}
+
+/**
+ * Whether a reading was taken recently enough to describe the run now.
+ *
+ * The age half of `readingTrusted`, on its own because a refusal fails that
+ * test on its own account and still has to be dated. `now` of 0 is the
+ * clock's pre-mount value, so nothing has aged at that instant.
+ */
+function readingIsFresh(reading: StoredRunReading, now: number): boolean {
   if (now === 0) return true;
   return (now - new Date(reading.checkedAt).getTime()) / 60_000 < READING_TRUSTED_FOR_MINUTES;
+}
+
+/**
+ * The refusal on a reading, while it is still the state of the key.
+ *
+ * `readingTrusted` sets a refusal aside so the silence behind it is never read
+ * as working, quiet or stopped. This is the other half of that -- saying so --
+ * and #566 is where it gets said.
+ *
+ * Age matters here in a way it does not for the silence. A refusal recorded
+ * before the trusted mark is a run nothing has asked about since, and the key
+ * may well have been replaced in the meantime; a page still telling somebody
+ * to set a token that already works is worse than one saying nothing. So the
+ * same freshness mark #570 set applies, and an older refusal stays where it
+ * is on the run row as that run's record.
+ */
+export function refusalStanding(
+  reading: StoredRunReading | null | undefined,
+  now: number,
+): string | null {
+  if (!reading?.refusal) return null;
+  return readingIsFresh(reading, now) ? reading.refusal : null;
 }
 
 /**

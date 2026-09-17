@@ -852,4 +852,72 @@ describe('what an opened step says its run has done', () => {
     const html = drawRun(null, () => [], null);
     expect(html).toContain('nothing has asked GitHub what it has pushed');
   });
+
+  it('prints why GitHub refused, on a run that closed a step all the same', () => {
+    // #566. The run has a closure to report, so it is not empty and the
+    // sentence about nothing to show never renders -- the rejected key was
+    // invisible on exactly the runs doing work. It is printed as GitHub's
+    // refusal was worded, since that sentence names the variable and says
+    // what to do about it.
+    const html = drawRun({
+      checkedAt: minutesAgo(1),
+      lastPush: null,
+      refusal:
+        'GITHUB_READ_TOKEN is missing a permission (403). Give it access to ' +
+        "knightx4/PersonalDashboard in the token's settings, then redeploy.",
+    });
+    expect(html).toContain('Closed #');
+    expect(html).toContain('GITHUB_READ_TOKEN is missing a permission (403)');
+    expect(html).toContain('then redeploy.');
+  });
+});
+
+/**
+ * The refused key, above the whole plan.
+ *
+ * Its own state and not a run's: the key is one setting, so every claimed row
+ * below is being read off the clock for the same reason, and the page says
+ * that once rather than on each row.
+ */
+describe('what the page says when GitHub refuses the key', () => {
+  const NOW = Date.parse('2026-09-17T12:00:00Z');
+  const REJECTED =
+    'GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped.';
+
+  function draw(keyRefusal: string | null) {
+    const items = [item({ id: 'a', title: 'Being worked', status: 'in_progress' })];
+    const liveness = planLiveness(items, {}, NOW);
+    const tree = buildPlanTree({ items, dependencies: [] }, liveness);
+    return renderToStaticMarkup(
+      <PlanView
+        sections={applyView(tree, 'open')}
+        finished={[]}
+        summary={summarize(tree)}
+        view="open"
+        catalog={[]}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        keyRefusal={keyRefusal}
+        liveness={liveness}
+        commitChecks={{}}
+        queued={0}
+      />,
+    );
+  }
+
+  it('says so once, in the words the refusal was recorded in', () => {
+    const html = draw(REJECTED);
+    expect(html).toContain('Nothing can read what these runs have pushed.');
+    expect(html).toContain(REJECTED);
+    // And what the rows are doing in the meantime, since they go on showing a
+    // reading and it is no longer coming from GitHub.
+    expect(html).toContain('reads off the clock');
+  });
+
+  it('says nothing at all when the key is working', () => {
+    const html = draw(null);
+    expect(html).not.toContain('Nothing can read what these runs have pushed.');
+    expect(html).not.toContain('GITHUB_READ_TOKEN');
+  });
 });

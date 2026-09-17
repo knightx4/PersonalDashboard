@@ -19,6 +19,7 @@
  * different facts and this file keeps them apart.
  */
 import { elapsedSince } from './elapsed';
+import { refusalStanding } from './liveness';
 import { RUN_JOB_LABEL, type LastRun, type RunJob, type RunStatus, type StoredRunReading } from './run-end';
 
 /**
@@ -223,6 +224,49 @@ export function closedLine(work: RunWork): string | null {
 export function raisedLine(work: RunWork): string | null {
   if (work.raises.length === 0) return null;
   return `Raised: ${work.raises.map((raise) => raise.title).join('; ')}`;
+}
+
+/**
+ * Why GitHub would not say what this run has pushed, in GitHub's own words.
+ *
+ * Printed as it was stored and not re-worded. `refusalFor` in `lib/plan/ci.ts`
+ * writes a whole sentence aimed at the person -- which variable was rejected,
+ * what is wrong with it, and what to do about it -- so a line that wrapped it
+ * in wording of its own would only push the part worth reading further down.
+ *
+ * Its own line, shown whether or not the run has anything else to report. A
+ * refusal reached the page through `nothingToShowLine` alone before this, so a
+ * run that had closed a step and then had its key rejected said nothing about
+ * the key at all: the block listed the closure and stopped, and the silence
+ * about pushes read as a run that had pushed nothing.
+ */
+export function refusalLine(work: RunWork): string | null {
+  return work.refusal;
+}
+
+/**
+ * The reason GitHub is refusing, from the runs a surface has in hand.
+ *
+ * A refusal is not a fact about one run. The key is a setting, so a missing or
+ * rejected one makes every run unreadable at once and the route writes the
+ * same sentence onto each of them -- which is why it is said once, above the
+ * plan, rather than on each row that happens to be open. Null when nothing is
+ * being refused, which is the ordinary case.
+ *
+ * Newest first among the runs that carry one, and only the ones still standing
+ * -- `refusalStanding` is what decides that a refusal is current rather than
+ * something that was wrong this morning.
+ */
+export function keyRefusal(runs: Iterable<LastRun>, now: number): string | null {
+  let newest: { at: number; refusal: string } | null = null;
+  for (const run of runs) {
+    const refusal = refusalStanding(run.reading, now);
+    if (!refusal || !run.reading) continue;
+    const checked = at(run.reading.checkedAt);
+    const when = Number.isFinite(checked) ? checked : 0;
+    if (!newest || when > newest.at) newest = { at: when, refusal };
+  }
+  return newest?.refusal ?? null;
 }
 
 /**
