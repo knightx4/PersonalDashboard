@@ -39,7 +39,7 @@ export type CommitCheck = {
 /** A commit as the listing gives it: its own sha and its parents', in order. */
 export type CommitNode = { sha: string; parents: readonly string[] };
 
-/** One check run on a commit, as the API reports it. */
+/** One workflow run on a commit, as the API reports it. */
 export type CheckRun = { status: string; conclusion: string | null };
 
 /**
