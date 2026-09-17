@@ -26,8 +26,18 @@ import {
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
-import { hasLiveClaim } from '@/lib/plan/elapsed';
-import { handStepToClaude } from '@/lib/plan/handover';
+import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
+import {
+  OVERNIGHT_FEATURE_CAP,
+  OVERNIGHT_HOUR_CAP,
+  OVERNIGHT_STOPPED_BY_HAND,
+  overnightStopBy,
+  overnightVerdict,
+  pauseOvernightRun,
+  resumeOvernightRun,
+  startOvernightRun,
+  stopOvernightRun,
+} from '@/lib/plan/overnight';
 import { nextPlanPosition } from '@/lib/plan/position';
 import { startRoutineRun } from '@/lib/plan/runs';
 import { PLAN_SEED } from '@/lib/plan/seed';
@@ -914,89 +924,15 @@ export async function sendPlanFeatureToClaude(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing step.' };
 
-  const data = await loadPlan(supabase, user.id);
-  const sections = buildPlanTree(data);
-  const node = findNode(sections, id.data);
-  if (!node) return { error: 'That step no longer exists.' };
+  // Every rule about what may be sent, the cascade and the instruction itself
+  // are in lib/plan/handover.ts, because the overnight tick now fires the same
+  // send with nobody watching and the two must not drift apart.
+  const sent = await handFeatureToClaude({ supabase, userId: user.id, id: id.data });
+  if (!sent.ok) return { error: sent.error };
+  if (sent.changed) revalidatePlan();
 
-  if (node.status === 'proposed') {
-    return { error: `#${node.number} is only a proposal. Approve it first.` };
-  }
-
-  // The same one-at-a-time rule as the single send. A batch started on top of
-  // a running session is the worse version of the same collision, since it
-  // hands the whole feature to a second run.
-  const running = flatten([node]).find((step) => hasLiveClaim(step, Date.now()));
-  if (running) {
-    return {
-      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
-    };
-  }
-
-  // Itself included: a feature is closed when its steps are, and the session
-  // needs it to be its own to close.
-  //
-  // Minus whatever is waiting on the person. A batch that swept up the
-  // feature's unanswered questions and its blocked steps handed a session rows
-  // it could do nothing with, and left them sitting in the Claude's view saying
-  // why they could not be worked.
-  const open = flatten([node]).filter(
-    (step) =>
-      !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
-  );
-  if (open.length === 0) return { error: 'Nothing open under that step that is not waiting on you.' };
-
-  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
-  if (toHandOver.length > 0) {
-    const { error } = await supabase
-      .from('plan_items')
-      .update({ assignee: 'claude' })
-      .in('id', toHandOver)
-      .eq('user_id', user.id);
-    if (error) return { error: error.message };
-    revalidatePlan();
-  }
-
-  // Handed over, and that is all. Nothing here is marked underway.
-  //
-  // This used to set every open step in the feature to `in_progress` on the
-  // press, so that the plan showed the batch as work in hand. What it actually
-  // showed was six lies and one truth: the session works the steps one at a
-  // time, and everything it had not reached yet -- everything it never reached,
-  // when a batch ran short or the run died -- sat there reading "in progress"
-  // with nothing on it. That is the bug behind note 60a0ad01, and there is no
-  // clock that fixes it, because the rows were never true in the first place.
-  //
-  // `in_progress` now means one thing: a session has claimed this step and is
-  // on it. The session sets it when it claims, one at a time, and clears it
-  // when it closes the step -- which is what the plan skill already tells it to
-  // do. "Handed to Claude" is a separate fact and has its own state:
-  // `assignee`, set above, which is exactly what this press changes and what
-  // the queue is built from.
-  const steps = open.length - 1;
-  const text =
-    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
-    '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
-    'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
-    'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
-    'first step that needs a decision from me: block it with the exact question rather ' +
-    'than guessing, and do not skip past it to a later step that depends on it. Run the ' +
-    'gate once at the end, push once, and report every step you closed, by number and ' +
-    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
-    'the plan is the source of truth.\n\n' +
-    planBrief(sections, node, { thread: true });
-
-  const result = await startRoutineRun({
-    supabase,
-    userId: user.id,
-    job: 'feature',
-    routine: planRoutine(),
-    planItemId: node.id,
-    text,
-  });
-  if (!result.ok) return { error: result.error };
   return {
-    message: `Sent #${node.number} and its ${steps === 1 ? 'step' : `${steps} steps`}. ${result.detail}`,
+    message: `Sent #${sent.number} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
   };
 }
 
@@ -1265,6 +1201,174 @@ export async function seedPlan(
 
   revalidatePlan();
   return { message: `Imported ${rows.length} steps from the build order.` };
+}
+
+/**
+ * Set the runner going before bed.
+ *
+ * Two brakes at the press, because the check constraint insists on both and
+ * because a night with only one of them is the night nobody wants to have had:
+ * a budget with no clock runs until it has spent everything, and a clock with
+ * no budget spends whatever it can reach before morning. `startOvernightRun`
+ * clamps both, so nothing a form can send reaches the constraint as a 500 --
+ * the checks here are for the message, not for the safety.
+ *
+ * Pressing it again over a night already running is deliberately allowed. The
+ * row is the account's rather than the night's, so a second press is "start
+ * again with these numbers", which is what somebody changing their mind at
+ * midnight means. Nothing is cancelled by it: whatever session is building
+ * finishes, and the new night's budget governs what is fired after that.
+ */
+// latency: pending
+export async function startOvernightRunner(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const features = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OVERNIGHT_FEATURE_CAP)
+    .safeParse(field(formData, 'features'));
+  if (!features.success) {
+    return { error: `A night runs between 1 and ${OVERNIGHT_FEATURE_CAP} features.` };
+  }
+
+  const hours = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OVERNIGHT_HOUR_CAP)
+    .safeParse(field(formData, 'hours'));
+  if (!hours.success) {
+    return { error: `A night runs between 1 and ${OVERNIGHT_HOUR_CAP} hours.` };
+  }
+
+  const now = new Date();
+  const { run, error } = await startOvernightRun({
+    supabase,
+    userId: user.id,
+    features: features.data,
+    stopBy: overnightStopBy(hours.data, now.getTime()),
+    now,
+  });
+  if (error) return { error };
+  if (!run) return { error: 'The runner could not be started.' };
+
+  revalidatePlan();
+  return {
+    message:
+      `Running. Up to ${run.featuresBudget} ${run.featuresBudget === 1 ? 'feature' : 'features'}, ` +
+      `and it stops in ${hours.data} ${hours.data === 1 ? 'hour' : 'hours'} whatever is left. ` +
+      'The next tick picks the first one.',
+  };
+}
+
+/**
+ * Hold it, without touching what is already building.
+ *
+ * There is no way to call a Claude Code session back -- `/fire` is the only
+ * endpoint there is -- so pause is graceful by construction rather than by
+ * effort: the row says held, the next tick declines to fire, and the session
+ * that is running finishes its feature, commits and closes exactly as it
+ * would have. The button says so, because a pause that looked like a stop
+ * would have somebody watching the branch wondering why it kept committing.
+ *
+ * A null row back is not a failure. It means no night was running to hold --
+ * the clock ran out while the page was open, most likely -- so the page is
+ * revalidated to show what is actually there rather than arguing with it.
+ */
+// latency: pending
+export async function pauseOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { run, error } = await pauseOvernightRun({ supabase, userId: user.id });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'Nothing was running, so there was nothing to hold.' };
+  return {
+    message:
+      'Held. Whatever is building finishes and commits; nothing new is fired until you resume.',
+  };
+}
+
+/**
+ * Carry on from wherever the plan has got to.
+ *
+ * Nothing is picked up where it was left, because nothing was left: the budget
+ * and the stop time are still on the row, and the next tick chooses the most
+ * urgent ready feature as it would have anyway. So a resume at six in the
+ * morning resumes a night with minutes left rather than starting one with
+ * hours, and it says so when those minutes have already gone -- the tick will
+ * end it rather than fire, and being told that now is better than finding it
+ * out at breakfast.
+ */
+// latency: pending
+export async function resumeOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { run, error } = await resumeOvernightRun({ supabase, userId: user.id });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'There is no night to carry on with. Start one and it runs again.' };
+
+  const verdict = overnightVerdict(run, Date.now());
+  if (verdict.act === 'end') return { message: `Resumed, but it is over: ${verdict.reason}` };
+  return { message: 'Running again. The next tick picks up from wherever the plan now is.' };
+}
+
+/**
+ * Stop it for the night, by hand.
+ *
+ * The one of the five reasons a night can carry that nothing else can write:
+ * the tick knows about the budget, the clock and the plan, and only the page
+ * knows you pressed the button. It is the same sentence every time, because
+ * the morning report prints what it finds and "You stopped it." is what
+ * happened.
+ *
+ * Stopping is not cancelling either -- the same limit pause has. The feature
+ * already building finishes; what stopping means is that nothing follows it
+ * and the night is closed with its reason.
+ */
+// latency: pending
+export async function stopOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { run, error } = await stopOvernightRun({
+    supabase,
+    userId: user.id,
+    reason: OVERNIGHT_STOPPED_BY_HAND,
+  });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'Nothing was running, so there was nothing to stop.' };
+  return {
+    message:
+      `Stopped with ${run.featuresLeft} of ${run.featuresBudget} ` +
+      `${run.featuresBudget === 1 ? 'feature' : 'features'} unspent. Anything already building ` +
+      'finishes on its own; nothing follows it.',
+  };
 }
 
 /**

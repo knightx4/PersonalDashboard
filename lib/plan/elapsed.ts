@@ -62,9 +62,15 @@ export function hasLiveClaim(
   return !isStalledClaim(step.startedAt, now);
 }
 
-export function elapsedSince(startedAt: string, now: number): string {
-  const minutes = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 60_000));
-  if (minutes < 1) return 'just now';
+/**
+ * A number of minutes as the coarsest unit that still says it.
+ *
+ * Shared between the two directions on purpose: a step that has been going
+ * `2h 40m` and a night that stops in `2h 40m` are the same quantity read from
+ * either side, and two vocabularies for it on one page would make the reader
+ * do the conversion.
+ */
+function coarse(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
 
   const hours = Math.floor(minutes / 60);
@@ -76,4 +82,23 @@ export function elapsedSince(startedAt: string, now: number): string {
   const days = Math.floor(hours / 24);
   const rest = hours % 24;
   return rest === 0 ? `${days}d` : `${days}d ${rest}h`;
+}
+
+export function elapsedSince(startedAt: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 60_000));
+  return minutes < 1 ? 'just now' : coarse(minutes);
+}
+
+/**
+ * How long there is left until an instant, in the same words.
+ *
+ * Written for the overnight runner's stop time, which is the first thing on
+ * the plan that is read forwards rather than backwards. Never negative: an
+ * instant already past reads as under a minute, and whoever is drawing it has
+ * to say something different about a deadline that has gone by anyway -- a
+ * `-2h` left to run would let them not.
+ */
+export function remainingUntil(at: string, now: number): string {
+  const minutes = Math.max(0, Math.floor((new Date(at).getTime() - now) / 60_000));
+  return minutes < 1 ? 'under a minute' : coarse(minutes);
 }

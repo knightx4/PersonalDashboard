@@ -23,6 +23,11 @@ import { claimExpiredNote, expiredClaim } from '@/lib/plan/claims';
  * What the page shows in the meantime is already right, because it reads the
  * clock. Step #498 records the run behind each claim, and asking that run
  * whether it is alive is what makes this exact rather than a threshold.
+ *
+ * The overnight tick is the second caller, and the reason there is one: a night
+ * runs while the daily cron does not, and a step left claimed by a run that
+ * died holds up every feature above it until morning. It calls
+ * `releaseStaleClaims` itself, before it reads the plan it chooses from.
  */
 
 export type ClaimSweepSummary = {

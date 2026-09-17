@@ -1,5 +1,9 @@
 /**
- * Handing one plan step to a session, with the checks that go with it.
+ * Handing plan work to a session, with the checks that go with it.
+ *
+ * One step below, a whole feature at the bottom. Both end the same way -- an
+ * instruction, the brief, and a `plan_runs` row saying it was fired -- and the
+ * rules about what may be sent are here rather than in any caller.
  *
  * The button on the plan page was the only way to do this, so the rules about
  * what may be sent lived inside that button: a proposal is not work yet, a
@@ -18,8 +22,15 @@ import { planRoutine } from '@/lib/feedback/routine';
 import { hasLiveClaim } from './elapsed';
 import { planBrief } from './brief';
 import { startRoutineRun } from './runs';
-import { loadPlan } from './load';
-import { buildPlanTree, findNode, flatten, isWaitingOnThePerson, topFeatureOf } from './tree';
+import { isClosed, loadPlan } from './load';
+import {
+  buildPlanTree,
+  findNode,
+  flatten,
+  isWaitingOnThePerson,
+  topFeatureOf,
+  type PlanSection,
+} from './tree';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -160,6 +171,144 @@ export async function handStepToClaude(input: {
     // The brief carries the step's whole subtree under "## Steps", so sending
     // a higher-level row hands over rather more than the row that was clicked.
     beneath: flatten([node]).length - 1,
+    detail: result.detail,
+    changed,
+  };
+}
+
+/** What sending a whole feature came back with. */
+export type FeatureHandOver =
+  | {
+      ok: true;
+      number: number;
+      title: string;
+      /** Open steps beneath it that went with it, at any depth. */
+      steps: number;
+      /** What the routine said when it started. */
+      detail: string;
+      /** Whether any row changed, so the page needs redrawing. */
+      changed: boolean;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Hand a whole feature over and start the routine on it now.
+ *
+ * The press on the plan page and the overnight tick both do this, and they
+ * have to do it identically: the same refusals, the same cascade, and above
+ * all the same instruction, because a second copy of that paragraph is a
+ * second thing to keep in step and the first one to drift is the one nobody
+ * is watching at three in the morning. So the whole thing is here and both
+ * callers ask for it; the page turns the answer into a sentence for the
+ * toast, and the tick turns it into a log line and a number off the budget.
+ *
+ * It refuses a proposal, because a proposal is not work yet, and it refuses a
+ * feature with nothing open beneath it, because there would be nothing to do.
+ * Proposed steps beneath an approved feature are left alone rather than swept
+ * in: a step nobody has said yes to is not part of the batch.
+ *
+ * `sections` is the tree when the caller has already built it. The tick has --
+ * it chose the feature out of it -- and re-reading the whole plan to send what
+ * it just chose would be a second read of rows that cannot have moved.
+ */
+export async function handFeatureToClaude(input: {
+  supabase: Db;
+  userId: string;
+  /** The feature's id, not its number. */
+  id: string;
+  /** The plan, when the caller already has it. Read here otherwise. */
+  sections?: readonly PlanSection[];
+  now?: number;
+}): Promise<FeatureHandOver> {
+  const { supabase, userId } = input;
+  const sections = input.sections ?? buildPlanTree(await loadPlan(supabase, userId));
+  const node = findNode(sections, input.id);
+  if (!node) return { ok: false, error: 'That step no longer exists.' };
+
+  if (node.status === 'proposed') {
+    return { ok: false, error: `#${node.number} is only a proposal. Approve it first.` };
+  }
+
+  // The same one-at-a-time rule as the single send. A batch started on top of
+  // a running session is the worse version of the same collision, since it
+  // hands the whole feature to a second run.
+  const running = flatten([node]).find((step) => hasLiveClaim(step, input.now ?? Date.now()));
+  if (running) {
+    return {
+      ok: false,
+      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
+    };
+  }
+
+  // Itself included: a feature is closed when its steps are, and the session
+  // needs it to be its own to close.
+  //
+  // Minus whatever is waiting on the person. A batch that swept up the
+  // feature's unanswered questions and its blocked steps handed a session rows
+  // it could do nothing with, and left them sitting in the Claude's view saying
+  // why they could not be worked.
+  const open = flatten([node]).filter(
+    (step) => !isClosed(step.status) && step.status !== 'proposed' && !isWaitingOnThePerson(step),
+  );
+  if (open.length === 0) {
+    return { ok: false, error: 'Nothing open under that step that is not waiting on you.' };
+  }
+
+  const toHandOver = open.filter((step) => step.assignee !== 'claude').map((step) => step.id);
+  let changed = false;
+  if (toHandOver.length > 0) {
+    const { error } = await supabase
+      .from('plan_items')
+      .update({ assignee: 'claude' })
+      .in('id', toHandOver)
+      .eq('user_id', userId);
+    if (error) return { ok: false, error: error.message };
+    changed = true;
+  }
+
+  // Handed over, and that is all. Nothing here is marked underway.
+  //
+  // This used to set every open step in the feature to `in_progress` on the
+  // press, so that the plan showed the batch as work in hand. What it actually
+  // showed was six lies and one truth: the session works the steps one at a
+  // time, and everything it had not reached yet -- everything it never reached,
+  // when a batch ran short or the run died -- sat there reading "in progress"
+  // with nothing on it. That is the bug behind note 60a0ad01, and there is no
+  // clock that fixes it, because the rows were never true in the first place.
+  //
+  // `in_progress` now means one thing: a session has claimed this step and is
+  // on it. The session sets it when it claims, one at a time, and clears it
+  // when it closes the step -- which is what the plan skill already tells it to
+  // do. "Handed to Claude" is a separate fact and has its own state:
+  // `assignee`, set above, which is exactly what this press changes and what
+  // the queue is built from.
+  const text =
+    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
+    '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
+    'to its own subagent, in the order the plan gives, and do not read the steps\' source ' +
+    'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
+    'first step that needs a decision from me: block it with the exact question rather ' +
+    'than guessing, and do not skip past it to a later step that depends on it. Run the ' +
+    'gate once at the end, push once, and report every step you closed, by number and ' +
+    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
+    'the plan is the source of truth.\n\n' +
+    planBrief(sections, node, { thread: true });
+
+  const result = await startRoutineRun({
+    supabase,
+    userId,
+    job: 'feature',
+    routine: planRoutine(),
+    planItemId: node.id,
+    text,
+  });
+  if (!result.ok) return { ok: false, error: result.error };
+
+  return {
+    ok: true,
+    number: node.number,
+    title: node.title,
+    steps: open.length - 1,
     detail: result.detail,
     changed,
   };

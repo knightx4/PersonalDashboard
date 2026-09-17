@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import { Moon } from 'lucide-react';
+import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { groupHappened, type DigestEvent, type DigestGroup, type DigestPointer } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
+import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
 
 /**
  * The morning summary, at the top of the page.
@@ -15,10 +18,17 @@ import type { Digest } from '@/lib/digest/load';
  * would say "nothing happened" on a day nobody has looked at yet, which is a
  * different and stronger claim than the page has any evidence for.
  *
- * What closed opens with the written account of the day and is then grouped
- * under the feature each row closed under, fifteen rows at most. Flat and
- * uncapped it was fifty-four lines on a busy day, which is a list rather than
- * a summary; the rest are on the changelog and the last line says how many.
+ * What closed opens with the night the runner had, then the written account of
+ * the day, and is then grouped under the feature each row closed under,
+ * fifteen rows at most. Flat and uncapped it was fifty-four lines on a busy
+ * day, which is a list rather than a summary; the rest are on the changelog
+ * and the last line says how many.
+ *
+ * The night is first because it is the thing you went to bed wondering about:
+ * the runner worked while you were asleep and nothing else on the page says
+ * what it did. Every word of it is the runner's own -- the state word and the
+ * shape are the ones the control on the plan page draws, and the sentence
+ * saying why it stopped is the sentence the row carries, printed verbatim.
  */
 
 const EVENT_LABEL: Record<DigestEvent['kind'], string> = {
@@ -103,6 +113,96 @@ function Group({ group }: { group: DigestGroup }) {
   );
 }
 
+/**
+ * The night, above everything else that happened.
+ *
+ * One list rather than three, in the order the night made them: what it
+ * worked, what closed, what it left stopped. The same labelled rows the rest
+ * of the summary uses, because it is the same kind of fact -- a thing that
+ * happened, named by its number.
+ *
+ * The two silences are said out loud. A night that fired nothing and a night
+ * whose sessions closed nothing are the two outcomes worth getting out of bed
+ * for, and a report that just showed a short list would leave you counting.
+ *
+ * A blocked row carries the feature it stops, where one of the closed rows
+ * does not: the feature is already named above as worked, and the blocked step
+ * is the one you are about to do something about.
+ *
+ * Each list is cut at ten and says how many it cut, the same way the day's own
+ * rows are: the stored night holds all of them, and a busy night's thirty
+ * closed steps are a list rather than a report. The changelog has the rest.
+ */
+function Night({ night }: { night: DigestNight }) {
+  const worked = nightRows(night.features);
+  const closed = nightRows(night.closed);
+  const blocked = nightRows(night.blocked);
+
+  return (
+    <section aria-label="The overnight runner" className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
+          <Moon className="size-4 text-ink-muted" aria-hidden />
+          Overnight
+        </span>
+        <OvernightState standing={night.standing} />
+        <span className="tabular text-small text-ink-muted">{nightBudgetLine(night)}</span>
+      </div>
+
+      <p className="text-body text-ink">{nightLine(night)}</p>
+
+      <div className="ml-0.5 border-l border-border pl-3">
+        <ul className="space-y-1.5">
+          {worked.shown.map((feature) => (
+            <li key={`worked-${feature.ref}`} className="flex flex-wrap items-baseline gap-2">
+              <Label>Worked</Label>
+              <Ref value={feature.ref} />
+              <span className="min-w-0 flex-1 text-body text-ink">{feature.title}</span>
+            </li>
+          ))}
+          {closed.shown.map((step) => (
+            <li key={`closed-${step.ref}`} className="flex flex-wrap items-baseline gap-2">
+              <Label>Closed</Label>
+              <Ref value={step.ref} />
+              <span className="min-w-0 flex-1 text-body text-ink">{step.title}</span>
+            </li>
+          ))}
+          {blocked.shown.map((step) => (
+            <li key={`blocked-${step.ref}`} className="space-y-0.5">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Label>Blocked</Label>
+                <Ref value={step.ref} />
+                <span className="min-w-0 flex-1 text-body text-ink">{step.title}</span>
+                {step.feature && <Ref value={step.feature.ref} />}
+              </div>
+              {step.ask && <p className="text-small text-ink-muted">{step.ask}</p>}
+            </li>
+          ))}
+        </ul>
+
+        {night.features.length === 0 && (
+          <p className="text-body text-ink-muted">It fired nothing.</p>
+        )}
+        {night.features.length > 0 && night.closed.length === 0 && (
+          <p className="text-small text-ink-muted">No step closed.</p>
+        )}
+        {(worked.more > 0 || closed.more > 0 || blocked.more > 0) && (
+          <p className="text-small text-ink-muted">
+            {[
+              worked.more > 0 && `${worked.more} more worked`,
+              closed.more > 0 && `${closed.more} more closed`,
+              blocked.more > 0 && `${blocked.more} more blocked`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            .
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Attention({ pointers }: { pointers: DigestPointer[] }) {
   return (
     <ul className="space-y-1.5">
@@ -137,6 +237,8 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
       <Card padding="dense">
         <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
           <div className="space-y-3">
+            {digest.night && <Night night={digest.night} />}
+
             {/* The account of the day, above the rows it is an account of. Absent
                 on a summary written before there was one, and on a day the model
                 call did not happen. */}

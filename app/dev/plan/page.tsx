@@ -4,6 +4,7 @@ import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import { endQuietRuns, loadLastRuns } from '@/lib/plan/runs';
 import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
+import { loadOvernightRun } from '@/lib/plan/overnight';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
@@ -15,6 +16,7 @@ import {
   summarize,
   type PlanView,
 } from '@/lib/plan/tree';
+import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
 
 export const metadata = { title: 'Plan' };
@@ -81,10 +83,14 @@ export default async function DevPlanPage({
   // request only after something new has been closed.
   const checks = await refreshCommitChecks({ supabase, userId: user.id });
 
-  const [data, lastRuns, commitChecks] = await Promise.all([
+  const [data, lastRuns, commitChecks, overnight] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     loadCommitChecks(supabase, user.id),
+    // The runner's standing intention, which is one row and is read here
+    // rather than inside the tree: it is about the plan as a whole, and the
+    // control that shows it sits above the whole page.
+    loadOvernightRun(supabase, user.id),
   ]);
   const whole = buildPlanTree(data);
   const narrowed = applyView(whole, view);
@@ -131,6 +137,7 @@ export default async function DevPlanPage({
       {checks.error && (
         <p className="text-small text-ink-muted">Could not read CI: {checks.error}</p>
       )}
+      <OvernightControl run={overnight} canSend={Boolean(planRoutine().token)} />
       <PlanViewComponent
         sections={sections}
         finished={finished}
