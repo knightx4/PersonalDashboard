@@ -137,10 +137,35 @@ export function createMailgunProvider(options: {
   };
 }
 
-/** The signing key, read at the point of use. See lib/env.ts on why it is lazy. */
-export function mailgunSigningKey(): string {
-  const { MAILGUN_SIGNING_KEY } = z
+/**
+ * The signing key if this deployment has one, null if it does not.
+ *
+ * For the pages that want to *say* whether mail can arrive rather than act on
+ * it. Without the key the inbound endpoint answers 500 to every post, so a
+ * deployment missing it cannot receive at all -- and News settings used to
+ * show the address anyway, next to a sentence promising that newsletters
+ * signed up with it arrive here. Two newsletters and a test message were lost
+ * to that promise.
+ */
+export function mailgunSigningKeyOrNull(): string | null {
+  const parsed = z
     .object({ MAILGUN_SIGNING_KEY: z.string().min(1) })
-    .parse(process.env);
-  return MAILGUN_SIGNING_KEY;
+    .safeParse(process.env);
+  return parsed.success ? parsed.data.MAILGUN_SIGNING_KEY : null;
+}
+
+/**
+ * The same, for delivery, which cannot carry on without it. See lib/env.ts on
+ * why it is read at the point of use rather than at module scope.
+ */
+export function mailgunSigningKey(): string {
+  const key = mailgunSigningKeyOrNull();
+  if (!key) {
+    throw new Error(
+      'MAILGUN_SIGNING_KEY is not set, so no inbound message can be proved to have come from ' +
+        'Mailgun and none will be stored. Copy it from Mailgun (Sending -> Webhooks, the HTTP ' +
+        'webhook signing key, not the API key) into the Vercel project settings or .env.local.',
+    );
+  }
+  return key;
 }

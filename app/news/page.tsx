@@ -9,6 +9,7 @@ import { requireUser } from '@/lib/auth/server';
 import { cn } from '@/lib/cn';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { deliveryGap } from '@/lib/news/inbound/readiness';
 import { loadIssues, loadSenders } from '@/lib/news/issues/load';
 import {
   countLabel,
@@ -55,6 +56,14 @@ export default async function NewsPage({
   const column = sortSenders(senders);
 
   if (issues.length === 0) {
+    /**
+     * Empty has two meanings and they must not read alike. Nothing has been
+     * sent yet is a waiting room. Nothing *can* be received is a broken
+     * deployment, and saying "sign a newsletter up and it lands here" to
+     * somebody whose mail is being refused is how two subscriptions and a
+     * test message get lost before anyone looks at a log.
+     */
+    const gap = deliveryGap();
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader
@@ -63,9 +72,16 @@ export default async function NewsPage({
         />
         <EmptyState
           icon={Mail}
-          title="Nothing has arrived yet"
-          description="Sign a newsletter up with the address in News settings and every issue it sends lands here, including the mail it sends to confirm you meant it."
-          action={{ label: 'Show me my address', href: '/news/settings' }}
+          title={gap ? 'Nothing can arrive yet' : 'Nothing has arrived yet'}
+          description={
+            gap
+              ? 'This deployment is not finished being set up to receive mail, so anything sent to your address is turned away rather than kept. News settings says which part is missing.'
+              : 'Sign a newsletter up with the address in News settings and every issue it sends lands here, including the mail it sends to confirm you meant it.'
+          }
+          action={{
+            label: gap ? 'What is missing' : 'Show me my address',
+            href: '/news/settings',
+          }}
         />
       </div>
     );
