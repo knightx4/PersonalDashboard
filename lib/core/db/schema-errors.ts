@@ -2,10 +2,13 @@
  * Turning a missing Exposed-schemas entry into a sentence.
  *
  * Seven schemas back this app -- `public`, `job_search`, `core`, `obsidian`
- * (the vault workspace), `todo`, `learn` and `news` -- but
- * PostgREST only serves the ones listed under Settings -> API -> Exposed
- * schemas in the Supabase dashboard. That list is not in version control and
- * does not survive a project restore, so it is the step that gets forgotten.
+ * (the vault workspace), `todo`, `learn` and `news` -- but PostgREST only
+ * serves the ones it has been told to serve, under Settings -> API -> Exposed
+ * schemas in the Supabase dashboard. It reads the same list out of the
+ * database, which is where `migrations-news/0002` now writes it, so the fix is
+ * a migration to re-run rather than a checkbox to remember -- but the
+ * dashboard still overwrites it, so the box is still the thing that goes
+ * wrong.
  *
  * When it is wrong, every query against the unlisted schema fails with
  * PGRST106. Nothing crashes: a select returns an error object the caller
@@ -47,8 +50,9 @@ export class SchemaNotExposedError extends Error {
     super(
       `The "${schema}" schema is not exposed by the API, so nothing in it can be read or written. ` +
         `In the Supabase dashboard open Settings → API → Exposed schemas and add "${schema}" to the ` +
-        `list, which should end up holding ${EXPOSED_SCHEMAS.join(', ')}. No migration or deploy ` +
-        'is needed. If it is already listed, PostgREST has not picked it up yet: run ' +
+        `list, which should end up holding ${EXPOSED_SCHEMAS.join(', ')}. No deploy is needed. ` +
+        'Re-running supabase/migrations-news/0002_expose_news_to_postgrest.sql sets the same list ' +
+        'from SQL. If it is already listed, PostgREST has not picked it up yet: run ' +
         "`notify pgrst, 'reload config'` in the SQL editor.",
     );
     this.name = 'SchemaNotExposedError';

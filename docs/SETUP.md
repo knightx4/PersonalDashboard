@@ -72,23 +72,34 @@ Reading a message *with* a workspace's verdict goes through that schema's
 `inbox_messages` view, which joins the two — PostgREST cannot embed across
 schemas, so the join has to be in the database.
 
-### The one step that is not in this repository
+### Exposed schemas
 
-In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search`, `core`, `obsidian`, `todo`, `learn` and `news`**
-alongside `public`.
+PostgREST only serves the schemas it has been told to serve. The list must
+include **`job_search`, `core`, `obsidian`, `todo`, `learn` and `news`**
+alongside `public` and `graphql_public`. A schema that is missing gets
+`PGRST106 Invalid schema: …` on every request, which reaches the browser as
+*"This page couldn't load — a server error occurred"*.
 
-Without it PostgREST refuses every request against the missing schema with
-*"The schema must be one of the following"*, and because it is a dashboard
-setting rather than a migration it is the step that gets forgotten after a
-project restore or when setting up a second environment. Three things have to
-agree — the migrations, the `db: { schema }` option on every client, and this
-setting — and only the first two are in version control.
+This used to be a dashboard setting only — **Settings → API → Exposed
+schemas** — and being the one thing outside version control is exactly what
+went wrong: `news` shipped with its migration, its clients and its pages, and
+nobody ticked the box, so /news was a server error from the day it landed.
+`supabase/migrations-news/0002_expose_news_to_postgrest.sql` moves the setting
+into the database, where PostgREST also reads its configuration from
+(`pgrst.db_schemas` on the `authenticator` role, which wins over the config
+file). It appends rather than assigns, so it adds `news` without opinion about
+what else is exposed, and running it twice does nothing.
 
-`todo` is the newest and therefore the one most likely to be missing: the
-symptom is a Todo workspace that reports an empty list on an account that has
-one, and — because the account settings live in `core` — a timezone that
-silently reverts to UTC everywhere if that one is missing too.
+A new schema should do the same: one migration that adds its own name, not a
+note asking someone to remember. The dashboard still shows and edits the list,
+and editing it there overwrites what the migration set — so if a schema goes
+missing again after someone has been in Settings → API, re-running that
+migration is the fix.
+
+`todo` is the one whose absence is quietest: the symptom is a Todo workspace
+that reports an empty list on an account that has one, and — because the
+account settings live in `core` — a timezone that silently reverts to UTC
+everywhere if that one is missing too.
 
 **Never add `vault` to that list.** That schema is Supabase's own — Supabase
 Vault, the encrypted secrets store — and `vault.secrets` carries no RLS

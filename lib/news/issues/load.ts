@@ -1,6 +1,7 @@
 import 'server-only';
 
-import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import type { NewsIssue, NewsSender } from './list';
 
 /**
@@ -21,6 +22,7 @@ const PAGE = 200;
  */
 export async function loadSenders(client: NewsSupabaseClient): Promise<NewsSender[]> {
   const { data, error } = await client.from('senders').select('id, email, name, muted');
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: reading your senders failed (${error.message})`);
   return (data ?? []) as NewsSender[];
 }
@@ -32,6 +34,7 @@ export async function loadIssues(client: NewsSupabaseClient): Promise<NewsIssue[
     .select('id, sender_id, subject, received_at, read_at')
     .order('received_at', { ascending: false })
     .limit(PAGE);
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: reading your newsletters failed (${error.message})`);
   return (data ?? []).map((row) => ({
     id: row.id as string,
@@ -75,6 +78,7 @@ export async function loadIssue(
     .select('id, sender_id, subject, received_at, read_at, text_body, html_body')
     .eq('id', id)
     .maybeSingle();
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error || !data) return null;
 
   const row = data as {

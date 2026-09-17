@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { createNewsClient } from '@/lib/news/auth/server';
+import { NEWS_SCHEMA } from '@/lib/news/db/schema-name';
 
 const MuteInput = z.object({ senderId: z.string().uuid(), muted: z.enum(['true', 'false']) });
 
@@ -28,6 +30,7 @@ export async function setSenderMuted(formData: FormData): Promise<void> {
     .from('senders')
     .update({ muted: parsed.data.muted === 'true' })
     .eq('id', parsed.data.senderId);
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: muting that sender failed (${error.message})`);
 
   revalidatePath('/news');

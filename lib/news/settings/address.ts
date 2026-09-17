@@ -1,7 +1,8 @@
 import 'server-only';
 
 import { randomLocalPart } from '@/lib/news/address';
-import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
+import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
+import { NEWS_SCHEMA, type NewsSupabaseClient } from '@/lib/news/db/schema-name';
 
 /** Postgres' unique violation: somebody else's request wrote the row first. */
 const UNIQUE_VIOLATION = '23505';
@@ -21,6 +22,7 @@ export async function loadOrCreateLocalPart(
   userId: string,
 ): Promise<string> {
   const existing = await client.from('addresses').select('local_part').maybeSingle();
+  assertSchemaExposed(existing.error, NEWS_SCHEMA);
   if (existing.error) throw new Error(`news: reading your address failed (${existing.error.message})`);
   if (existing.data) return existing.data.local_part as string;
 
@@ -55,6 +57,7 @@ export async function replaceLocalPart(client: NewsSupabaseClient): Promise<stri
     .update({ local_part: localPart })
     .select('local_part')
     .single();
+  assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: replacing your address failed (${error.message})`);
   return data.local_part as string;
 }
