@@ -1834,11 +1834,13 @@ type Health = {
  * the todo list's, so a state here looks like the same state there. What is
  * left is the word, the tone and the fixed part of the tooltip.
  *
- * Five of the ten are states the other dev queues have too, and those words
- * come from lib/dev/words.ts so a dropped step and a declined note read alike.
- * The other five are the plan's own refinements -- a question, a proposal, a
- * step waiting on another step, a step nobody has reached -- and no other queue
- * has anything for them to disagree with.
+ * Seven of the thirteen are states the other dev queues have too, and those
+ * words come from lib/dev/words.ts so a dropped step and a declined note read
+ * alike. The other six are the plan's own refinements -- a question, a
+ * question answered, a proposal, a step waiting on another step, a step nobody
+ * has reached, and a claim whose run stopped -- and no other queue has
+ * anything for them to disagree with. Why there are thirteen rather than fewer
+ * is written where the set is, in lib/plan/tree.ts.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {

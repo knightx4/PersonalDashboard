@@ -425,18 +425,63 @@ export function leavesOf(nodes: readonly PlanNode[]): PlanNode[] {
  * same step. The page keeps the wording and the tooltip, lib/status-glyphs.ts
  * keeps the shape; the rule is here.
  */
+/**
+ * The thirteen, and why each one is here.
+ *
+ * #505 asked whether the set had outgrown what anybody reads: `not_started`,
+ * `ready` and `waiting` look like three shapes for "not started, and here is
+ * why". It was measured against one bar -- a health stays only if some surface
+ * does something different with it, rather than merely wording it differently
+ * -- and all thirteen cleared it. Four pairs were close enough to argue about:
+ *
+ * - `ready` against `not_started`. `ready` is what the Send button takes, what
+ *   `workOrder` lists and what the overnight chooser fires. Merging them puts
+ *   the one state that is an invitation to start behind a tooltip.
+ * - `waiting` against `blocked`. Since #565 a `blocked` row can have every
+ *   dependency closed, and a `waiting` row has no block of its own, so they
+ *   are no longer one fact read twice: one clears itself when the steps it
+ *   names close, the other waits for the person.
+ * - `in_progress` against `working`. The column words both "In progress" and
+ *   draws both three-quarters, which is deliberate -- they are the same rung,
+ *   and the live indicator on the row says which off the same reading. What
+ *   separates them is evidence, and dropping `in_progress` means calling a
+ *   claim nobody has looked into "working", which is the dot the page used to
+ *   draw on a step nobody was working.
+ * - `answered` against `done`. A settled question carries a resolution and no
+ *   commit, its tooltip is that resolution, and it is the one state the counts
+ *   beside a module heading leave out.
+ *
+ * Every `Record<PlanHealth, ...>` is exhaustive -- the glyphs, the words, the
+ * tally, `planState` -- so a fourteenth fails the typecheck at each surface
+ * rather than drawing itself as a proposal. The same bar applies to it.
+ */
 export const PLAN_HEALTHS = [
+  // A question, and a question settled. A decision shares the status column
+  // with a step and does not mean the same things by it: an open one is not
+  // "not started", and a closed one carries an answer rather than a commit.
   'unanswered',
   'answered',
+  // Written by a session, waiting on the person. Out of the progress
+  // denominator and out of the bands, which is what separates it from
+  // `not_started`.
   'proposed',
+  // The four readings of a claim. `in_progress` is a claimed row with nothing
+  // known about the run behind it; the other three are what the run says,
+  // through `claimLiveness`. `abandoned` is the one that leaves the ladder --
+  // the step is claimed and nothing is working it.
   'in_progress',
   'working',
   'quiet',
   'abandoned',
+  // Stopped on something outside the plan, and waiting on a step that will
+  // clear itself. `isStaleBlock` is what keeps the two apart.
   'blocked',
   'waiting',
+  // Not started, with and without something in the way.
   'ready',
   'not_started',
+  // Closed. `dropped` leaves the denominator; `done` is the one that carries
+  // a commit.
   'done',
   'dropped',
 ] as const;

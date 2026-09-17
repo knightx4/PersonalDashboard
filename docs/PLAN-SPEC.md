@@ -564,6 +564,53 @@ questions, proposals nobody has decided on, and blocked steps. Not their ready
 steps — that is work they could do rather than something being asked of them,
 and folding it in makes "waiting on you" a list that cannot be cleared.
 
+### What a row reads as
+
+`healthOf` is the one word the page, the counts, the bands, the CLI and the
+brief all put on a row, and it is not the `status` column. A question and a
+step share that column and do not mean the same things by it, "ready" is worked
+out from what a step waits on, and the reading of a claim comes off the run
+behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
+
+| | |
+|---|---|
+| `unanswered` | An open question. Not "not started" — nothing happens to it until it is answered, and it closes on an answer rather than a commit. One of the three states the *On you* view is made of. |
+| `answered` | A settled question. It carries the resolution and no commit, the resolution is its tooltip, and it is the one state the counts beside a module heading leave out: a decision recorded is neither work outstanding nor work that shipped. |
+| `proposed` | Written by a session, waiting on the person. Out of the progress denominator and out of the bands, which is what keeps it from being `not_started`. |
+| `in_progress` | Claimed, with nothing known about the run behind it: none recorded, or one nobody has asked GitHub about, and the clock has not run out. What every caller that hands in no liveness gets, which is all the status column supports on its own. |
+| `working` | Claimed, and the run pushed something inside the twenty-minute mark. |
+| `quiet` | Claimed, and nothing pushed since. The guard counts it as live and #574 settled that re-sending it asks first. |
+| `abandoned` | Claimed, and the run ended without closing the step. Nobody is on it and it needs handing over again. The one claim reading that leaves the ladder, and it ranks with the stuck states rather than the underway ones. |
+| `blocked` | Stopped on something only the person can settle — `block_kind` of `outside`. It stays blocked however much else closes, and Send refuses it. |
+| `waiting` | Waits on another step, which clears itself when that step closes. The tooltip names which steps. |
+| `ready` | Not started, with nothing in the way. What the Send button takes, `workOrder` lists and the overnight chooser fires. |
+| `not_started` | Not started and not ready either: open sub-steps beneath it, or something above it blocked or dropped. The right-hand end of the progress bar — work not reached. |
+| `done` | Closed against its done-when. The one state that carries a commit. |
+| `dropped` | Decided against, and out of the denominator with the proposals. |
+
+**Why thirteen.** #505 asked whether the set had outgrown what anybody reads:
+`not_started`, `ready` and `waiting` look like three shapes for "not started,
+and here is why". It was measured against one bar — a state stays only if some
+surface does something different with it, rather than merely wording it
+differently — and all thirteen cleared it. Four pairs were close enough to
+argue about. `ready` is what the Send button, the work order and the overnight
+chooser read, so merging it into `not_started` puts the one state that is an
+invitation to start behind a tooltip. `blocked` and `waiting` stopped being one
+fact read twice at #565, which made a `blocked` row reachable with every
+dependency closed: one clears itself, the other waits for the person.
+`in_progress` and `working` are worded the same and drawn the same on purpose —
+they are the same rung, and the live indicator on the row says which — but
+dropping `in_progress` means calling a claim nobody has looked into "working",
+which is the dot the page used to draw on a step nobody was working. And
+`answered` is a closed row with a resolution and no commit, which `done` cannot
+say.
+
+The same bar applies to a fourteenth. Every `Record<PlanHealth, …>` is
+exhaustive — the glyphs in `lib/status-glyphs.ts`, the words and tones on the
+page, the tally, `planState` in `lib/dev/words.ts` — so adding one fails the
+typecheck at each surface rather than drawing itself as a proposal, and
+`/dev/ui` lists all thirteen with their shapes.
+
 ## The page
 
 Each module is a section with its progress bar. Each step is a line: the

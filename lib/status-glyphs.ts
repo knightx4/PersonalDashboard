@@ -4,7 +4,7 @@
  * Law 4 tells whoever draws the next surface to use "ink and a shape" and
  * never says anywhere what the shapes are. These are them: a glyph for each of
  * the eleven application statuses, each of the three task states, each of the
- * ten states a plan step can be in, and each state of the four other dev
+ * thirteen states a plan step can be in, and each state of the four other dev
  * queues. The names are shapes rather than statuses, because
  * components/ui/status-glyph.tsx draws them and knows nothing about pipelines,
  * todo lists or plans.
