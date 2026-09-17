@@ -22,13 +22,14 @@ export function themeAttribute(theme: Theme): ThemeId | undefined {
   if (theme.kind === 'system') return undefined;
   if (theme.kind === 'written') return theme.id;
   // A generated theme borrows the written block of its own mode: light is
-  // Paper's, dark is Ink's and lightbox is Lightbox's. With no colour that is
+  // Paper's, dark is Ink's, and the two glass rooms are their own. With no colour that is
   // the whole story and nothing else is written; with a colour the tokens
   // below paint over it. Lightbox needs its block for more than the polarity
   // -- the glow round a sheet, the wash across the bench and the two
   // colour-schemes are all in there, and none of them are `--c-*` tokens.
   if (theme.mode === 'light') return 'paper';
-  return theme.mode === 'dark' ? 'ink' : 'lightbox';
+  if (theme.mode === 'dark') return 'ink';
+  return theme.mode === 'lightbox' ? 'lightbox' : 'darkroom';
 }
 
 /**

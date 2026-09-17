@@ -22,6 +22,7 @@ export const THEME_SELECTORS: Record<string, string> = {
   paper: PAPER_SELECTOR,
   ink: "[data-theme='ink']",
   lightbox: "[data-theme='lightbox']",
+  darkroom: "[data-theme='darkroom']",
   dusk: "[data-theme='dusk']",
 };
 

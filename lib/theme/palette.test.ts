@@ -33,7 +33,7 @@ const FIXED_TOKENS = Object.keys(REFERENCE_PALETTES.paper).filter(
 describe('the reference palettes', () => {
   it('say what app/globals.css says', () => {
     const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
-    for (const name of ['paper', 'ink', 'dusk', 'lightbox'] as const) {
+    for (const name of ['paper', 'ink', 'dusk', 'lightbox', 'darkroom'] as const) {
       const written = readTheme(css, THEME_SELECTORS[name]);
       const baked = REFERENCE_PALETTES[name];
       for (const token of Object.keys(baked)) {
@@ -342,7 +342,7 @@ describe('oklch', () => {
  * direction #515 named.
  */
 describe('the accent and the colours that carry a meaning', () => {
-  const MODES = ['light', 'dark', 'lightbox'] as const;
+  const MODES = ['light', 'dark', 'lightbox', 'darkroom'] as const;
 
   /** Every hue of the circle, since the stretches that move are a few degrees wide. */
   const CIRCLE = Array.from({ length: 360 }, (_, hue) => hue);
@@ -351,7 +351,12 @@ describe('the accent and the colours that carry a meaning', () => {
   const moved = (mode: (typeof MODES)[number], hue: number) => accentHueFor(mode, hue) !== hue;
 
   /** The written palette each mode's fixed colours come from. */
-  const WRITTEN_AS = { light: 'paper', dark: 'dusk', lightbox: 'lightbox' } as const;
+  const WRITTEN_AS = {
+    light: 'paper',
+    dark: 'dusk',
+    lightbox: 'lightbox',
+    darkroom: 'darkroom',
+  } as const;
 
   it('never lets the accent wear one of them, at any hue in any mode', () => {
     for (const mode of MODES) {
@@ -365,11 +370,16 @@ describe('the accent and the colours that carry a meaning', () => {
     }
   });
 
-  it('moves 17 hues in light, 25 in dark and 29 on Lightbox, by at most 15 degrees', () => {
-    // #514's answer, and what fixes the floor at 0.03: these three counts and
-    // this ceiling are the option that was chosen, so a change to either
-    // number is a change to the decision rather than to the code.
-    const counts = { light: 17, dark: 25, lightbox: 29 };
+  it('moves 17 hues in light, 25 in dark and 29 in either glass room, by at most 15 degrees', () => {
+    // #514's answer, and what fixes the floor at 0.03: these counts and this
+    // ceiling are the option that was chosen, so a change to any number is a
+    // change to the decision rather than to the code.
+    //
+    // Darkroom matches Lightbox exactly, which is the expected answer rather
+    // than a coincidence: the two share a bench, so they share the hue their
+    // accents rotate from, and the meaning colours they have to stay clear of
+    // are the same three.
+    const counts = { light: 17, dark: 25, lightbox: 29, darkroom: 29 };
     for (const mode of MODES) {
       const shifts = CIRCLE.map((hue) => accentHueFor(mode, hue) - hue).filter((by) => by !== 0);
       expect(`${mode} ${shifts.length}`).toBe(`${mode} ${counts[mode]}`);

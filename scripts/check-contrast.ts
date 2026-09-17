@@ -49,7 +49,7 @@ const WRITTEN: Record<string, Vars> = Object.fromEntries(
  */
 const HUE_STEP = 15;
 
-const MODES = ['light', 'dark', 'lightbox'] as const;
+const MODES = ['light', 'dark', 'lightbox', 'darkroom'] as const;
 
 const GENERATED: Record<string, Vars> = Object.fromEntries(
   MODES.flatMap((mode) =>
@@ -240,14 +240,14 @@ for (const hue of [
   '--c-w-dev',
 ] as const) {
   CHECKS.push({
-    ink: '--c-surface',
+    ink: '--c-fill-ink',
     grounds: [hue],
     min: TEXT,
     why: `${hue.replace('--c-w-', '')} button label on its solid fill`,
   });
 }
 CHECKS.push({
-  ink: '--c-surface',
+  ink: '--c-fill-ink',
   grounds: ['--c-accent-base'],
   min: TEXT,
   why: 'primary button label on the app accent',

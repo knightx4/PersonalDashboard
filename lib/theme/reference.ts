@@ -36,12 +36,30 @@ import { hexToOklch, relativeLuminance, withLuminance } from './oklch';
  * polarities: lit sheets on a dark bench cannot be said as light or as dark,
  * but it rotates around a hue the same way the other two do.
  */
-export type ThemeMode = 'light' | 'dark' | 'lightbox';
+/**
+ * A room, which is two choices rather than one.
+ *
+ * The picker asks them separately -- light or dark, solid or lightbox -- and
+ * the four answers compose into these. Solid is the app as a flat page, which
+ * is what light and dark have always been; lightbox is the glass treatment,
+ * where the bench is dark in both and the polarity decides only what a SHEET
+ * is made of: lit paper, or smoked glass.
+ *
+ * One flat union rather than a pair, because everything downstream -- the
+ * reference palettes, the cast, the generated tokens, the stored string --
+ * keys off a single mode, and splitting it there would be four call sites of
+ * churn for no gain. `modeFor` and `partsOf` in lib/theme.ts are the two ends
+ * of the translation.
+ */
+export type ThemeMode = 'light' | 'dark' | 'lightbox' | 'darkroom';
 
 /** Every `--c-*` colour token, by name, as `#rrggbb`. */
 export type Palette = Record<string, string>;
 
-export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', Palette> = {
+export const REFERENCE_PALETTES: Record<
+  'paper' | 'ink' | 'dusk' | 'lightbox' | 'darkroom',
+  Palette
+> = {
   paper: {
     '--c-canvas': '#faf9f6',
     '--c-surface': '#ffffff',
@@ -98,6 +116,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#fafaf9',
     '--c-sheet-outline': '#e8e5df',
     '--c-caution-fill-ink': '#14100a',
+    '--c-fill-ink': '#ffffff',
     '--c-page-ground': '#f0ece2',
     '--c-page': '#f0ece2',
     '--c-page-ink': '#1a1a18',
@@ -184,6 +203,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#141516',
     '--c-sheet-outline': '#212225',
     '--c-caution-fill-ink': '#14100a',
+    '--c-fill-ink': '#0f1011',
     '--c-page-ground': '#08090a',
     '--c-page': '#08090a',
     '--c-page-ink': '#f7f8f8',
@@ -270,6 +290,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#1c1728',
     '--c-sheet-outline': '#2c2440',
     '--c-caution-fill-ink': '#14100a',
+    '--c-fill-ink': '#191426',
     '--c-page-ground': '#110d1a',
     '--c-page': '#110d1a',
     '--c-page-ink': '#f2eefa',
@@ -365,6 +386,7 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-status-ghosted-tint': '#dfe5eb',
     '--c-sheet-outline': 'rgb(18 24 34 / 0.42)',
     '--c-caution-fill-ink': '#14100a',
+    '--c-fill-ink': '#f7f9fc',
     '--c-page-ground': '#25374f',
     '--c-page': '#25374f',
     '--c-page-ink': '#eef2f7',
@@ -394,6 +416,93 @@ export const REFERENCE_PALETTES: Record<'paper' | 'ink' | 'dusk' | 'lightbox', P
     '--c-sheet-positive': '#17624a',
     '--c-sheet-caution': '#8a480a',
     '--c-sheet-danger': '#9e1a1a',
+  },
+  darkroom: {
+    '--c-canvas': 'rgb(8 13 24 / 0.5)',
+    '--c-surface': 'rgb(13 20 34 / 0.52)',
+    '--c-raised': 'rgb(22 32 52 / 0.62)',
+    '--c-sunken': 'rgb(5 9 17 / 0.55)',
+    '--c-border': '#33445e',
+    '--c-border-strong': '#53698c',
+    '--c-shell': '#25374f',
+    '--c-shell-ink': '#eef2f7',
+    '--c-shell-muted': '#aab7c7',
+    '--c-shell-border': '#3d4b5c',
+    '--c-shell-hover': '#31445e',
+    '--c-ink': '#eaf0f8',
+    '--c-ink-muted': '#aebbcd',
+    '--c-ink-ghost': '#8494aa',
+    '--c-border-control': '#8494aa',
+    '--c-accent-base': '#a6b4ff',
+    '--c-accent-hover': '#bcc6ff',
+    '--c-accent-tint-base': '#1b2440',
+    '--c-w-shopping': '#ffa3b8',
+    '--c-w-shopping-tint': '#33202c',
+    '--c-w-jobs': '#c3b0ff',
+    '--c-w-jobs-tint': '#241f42',
+    '--c-w-todo': '#6ccdf5',
+    '--c-w-todo-tint': '#12283a',
+    '--c-w-vault': '#eda6f6',
+    '--c-w-vault-tint': '#2e1e3c',
+    '--c-w-learn': '#6fdcd2',
+    '--c-w-learn-tint': '#0f2b2e',
+    '--c-w-news': '#debf69',
+    '--c-w-news-tint': '#2a2410',
+    '--c-w-dev': '#bcc7d6',
+    '--c-w-dev-tint': '#1f2836',
+    '--c-positive': '#6fe0b0',
+    '--c-positive-tint': '#102b22',
+    '--c-caution': '#f5b459',
+    '--c-caution-fill': '#f5b459',
+    '--c-caution-tint': '#2d2410',
+    '--c-danger': '#ff9d9d',
+    '--c-danger-tint': '#32202a',
+    '--c-status-lead': '#a3b0c4',
+    '--c-status-lead-tint': '#212b3a',
+    '--c-status-submitted': '#8fb4ff',
+    '--c-status-submitted-tint': '#1a2340',
+    '--c-status-process': '#f5b459',
+    '--c-status-process-tint': '#2d2410',
+    '--c-status-final': '#c3b0ff',
+    '--c-status-final-tint': '#241f42',
+    '--c-status-offer': '#6fe0b0',
+    '--c-status-offer-tint': '#102b22',
+    '--c-status-rejected': '#ff9d9d',
+    '--c-status-rejected-tint': '#32202a',
+    '--c-status-ghosted': '#93a2b8',
+    '--c-status-ghosted-tint': '#1e2735',
+    '--c-sheet-outline': 'rgb(150 178 224 / 0.22)',
+    '--c-caution-fill-ink': '#14100a',
+    '--c-fill-ink': '#111a2b',
+    '--c-page-ground': '#25374f',
+    '--c-page': '#25374f',
+    '--c-page-ink': '#eef2f7',
+    '--c-page-ink-muted': '#b6c1ce',
+    '--c-page-ink-ghost': '#8a97a7',
+    '--c-page-border': '#3d4b5c',
+    '--c-page-border-strong': '#6d8098',
+    '--c-page-border-control': '#8a97a7',
+    '--c-page-positive': '#6fe0b0',
+    '--c-page-caution': '#f5b459',
+    '--c-page-danger': '#ff9d9d',
+    '--c-accent-base-lit': '#a6b4ff',
+    '--c-accent-hover-lit': '#bcc6ff',
+    '--c-w-shopping-lit': '#ffa3b8',
+    '--c-w-jobs-lit': '#c3b0ff',
+    '--c-w-todo-lit': '#6ccdf5',
+    '--c-w-vault-lit': '#eda6f6',
+    '--c-w-learn-lit': '#6fdcd2',
+    '--c-w-news-lit': '#debf69',
+    '--c-w-dev-lit': '#bcc7d6',
+    '--c-sheet-ink': '#eaf0f8',
+    '--c-sheet-ink-muted': '#aebbcd',
+    '--c-sheet-ink-ghost': '#8494aa',
+    '--c-sheet-border': '#33445e',
+    '--c-sheet-border-strong': '#53698c',
+    '--c-sheet-border-control': '#8494aa',
+    '--c-sheet-positive': '#6fe0b0',
+    '--c-sheet-caution': '#f5b459',
+    '--c-sheet-danger': '#ff9d9d',
   },
 };
 
@@ -491,7 +600,9 @@ export const LIGHTBOX_HUE_TOKENS: readonly string[] = [
 
 /** Which tokens take the colour in one mode. */
 export function hueTokensFor(mode: ThemeMode): readonly string[] {
-  return mode === 'lightbox' ? LIGHTBOX_HUE_TOKENS : HUE_TOKENS;
+  // Both glass rooms turn the same list: they share a bench, and the `-lit`
+  // tokens only exist in those two.
+  return mode === 'lightbox' || mode === 'darkroom' ? LIGHTBOX_HUE_TOKENS : HUE_TOKENS;
 }
 
 /**
@@ -514,12 +625,15 @@ export const ACCENT_TOKENS: readonly string[] = [
  * the identity: Dusk asked for its own hue comes back as Dusk, hex for hex,
  * rather than a rounding away from it.
  */
-export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox', number> = {
+export const REFERENCE_HUE: Record<'paper' | 'dusk' | 'lightbox' | 'darkroom', number> = {
   paper: hexToOklch(REFERENCE_PALETTES.paper['--c-page']).h,
   dusk: hexToOklch(REFERENCE_PALETTES.dusk['--c-canvas']).h,
   // Lightbox's canvas is a sheet rather than the room, so its own hue is read
   // off the bench -- which is what --c-page is in a two-polarity theme.
   lightbox: hexToOklch(REFERENCE_PALETTES.lightbox['--c-page']).h,
+  // The same bench as Lightbox, so the same hue -- read rather than shared, so
+  // that if one bench ever moves the other does not silently follow it.
+  darkroom: hexToOklch(REFERENCE_PALETTES.darkroom['--c-page']).h,
 };
 
 /**
