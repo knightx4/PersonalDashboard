@@ -98,6 +98,7 @@ export type FireRoutineResult =
 
 /** The keys a run's own identifier has turned up under, most specific first. */
 const RUN_ID_KEYS = [
+  'claude_code_session_id',
   'run_id',
   'routine_run_id',
   'session_id',
@@ -111,11 +112,15 @@ const RUN_ID_CONTAINERS = ['run', 'routine_run', 'session', 'data', 'result'] as
 /**
  * The identifier of the run that was just started, if the body carries one.
  *
- * Nobody has looked at what this endpoint returns, which is the whole reason
- * step #498 exists, so this reads the keys such a body would plausibly use and
- * answers null rather than guessing when none of them is there. The body itself
- * is recorded beside it, so a shape this misses is a question of reading the
- * stored row, not of firing another run to find out.
+ * The real body is now known, from the rows #498 started keeping:
+ * `{"type": "routine_fire", "claude_code_session_id": "cse_...",
+ * "claude_code_session_url": "https://claude.ai/code/cse_..."}`. So
+ * `claude_code_session_id` is read first, and the keys below it stay because
+ * they cost nothing and the endpoint is a beta whose shape may move.
+ *
+ * Null rather than a guess when none of them is there. The body is recorded
+ * beside the id, so a shape this misses is a question of reading the stored
+ * row, not of firing another run to find out.
  */
 export function runIdFrom(body: unknown): string | null {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
