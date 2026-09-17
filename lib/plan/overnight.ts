@@ -22,6 +22,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { elapsedSince } from './elapsed';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
@@ -143,6 +145,103 @@ export function budgetSpentReason(run: Pick<OvernightRun, 'featuresBudget'>): st
   return n === 1
     ? 'It fired the one feature you allowed.'
     : `It fired every one of the ${n} features you allowed.`;
+}
+
+/**
+ * Which of four things the control on the plan page is looking at.
+ *
+ * The row carries two booleans and an ended reason, and every question the
+ * page asks -- which buttons to offer, which word to print, whether there is a
+ * budget worth showing -- is one of these four answers rather than a fresh
+ * reading of the booleans in the markup. `off` covers both a fresh account
+ * with no row at all and a row nothing has ever run on.
+ *
+ * A stopped night is `stopped` rather than `off` for as long as its reason is
+ * on the row, because "it stopped, and here is why" is a different thing to
+ * say than "it is not running" -- and the reason is the whole of what you came
+ * to the page for at breakfast.
+ */
+export type OvernightStanding = 'off' | 'running' | 'paused' | 'stopped';
+
+export function overnightStanding(run: OvernightRun | null): OvernightStanding {
+  if (!run) return 'off';
+  if (run.running) return run.paused ? 'paused' : 'running';
+  return run.endedReason ? 'stopped' : 'off';
+}
+
+/**
+ * What the runner is doing, in one sentence, for the control to print.
+ *
+ * The honest limit, and it is worth stating because it is not obvious: a tick
+ * that finds the last session still working writes nothing at all, so a
+ * running row looks exactly the same whether the cron is ticking away and
+ * waiting or has not run since you closed the laptop. Nothing here claims to
+ * know which. What it gives instead is the fact that separates them in
+ * practice -- how long it is since a feature was fired -- and leaves the
+ * reader to notice that four hours of it on a six-feature night means
+ * something is wrong. #581. Do not turn this into a claim about the cron
+ * without a column that actually records a tick.
+ *
+ * A stopped night says its reason verbatim, because the five reasons are
+ * written as whole sentences precisely so that everything reading them back --
+ * this control and the morning report both -- says the same words.
+ *
+ * `now` of 0 is the clock's pre-mount value, so the sentence that would
+ * otherwise carry an elapsed time says the same thing without one rather than
+ * changing shape under the reader on hydration.
+ */
+export function overnightLine(run: OvernightRun | null, now: number): string {
+  switch (overnightStanding(run)) {
+    case 'off':
+      return 'Nothing is fired until you start it.';
+    case 'stopped':
+      return run?.endedReason ?? '';
+    case 'paused':
+      return 'Held. Whatever was already building finishes and commits; nothing new is fired until you resume.';
+    default:
+      break;
+  }
+  if (!run?.lastFiredAt)
+    return 'Nothing has been fired yet. The next tick picks the first feature.';
+  return now === 0
+    ? 'A feature is already under way. The next one goes once that session has ended.'
+    : `It last fired a feature ${elapsedSince(run.lastFiredAt, now)} ago. The next one goes once that session has ended.`;
+}
+
+/** What the start form offers before you touch it: a night, and a sleep. */
+export const OVERNIGHT_DEFAULT_FEATURES = 6;
+export const OVERNIGHT_DEFAULT_HOURS = 8;
+
+/**
+ * The lengths of night the control offers, in hours.
+ *
+ * Hours from now rather than a clock time to stop at, which is the shape the
+ * question is asked in ("stop by seven") but not one the app can answer
+ * honestly: the server has no idea what "seven" means to a browser it never
+ * sees, the profile's timezone is free text people write as "ET", and a
+ * bedtime button that is an hour out on the night the clocks change is worse
+ * than one that never offered the hour at all. A duration is the same
+ * intention with nothing to get wrong, and the row still stores the absolute
+ * instant either way.
+ *
+ * The short ones are for watching it work rather than for a night's sleep.
+ */
+export const OVERNIGHT_HOUR_CHOICES = [1, 2, 4, 6, 8, 10, 12] as const;
+
+/** The longest a night may be given. Past this it is not an overnight run. */
+export const OVERNIGHT_HOUR_CAP = 24;
+
+/**
+ * The instant a night of this many hours should stop by.
+ *
+ * Clamped rather than refused, the same way `startOvernightRun` clamps the
+ * budget: a stop time is one of the two brakes the check constraint insists
+ * on, and a form that managed to send nonsense should still come out of here
+ * with a brake on.
+ */
+export function overnightStopBy(hours: number, now: number): string {
+  const held = Math.min(OVERNIGHT_HOUR_CAP, Math.max(1, Math.trunc(hours) || 1));
+  return new Date(now + held * 60 * 60 * 1000).toISOString();
 }
 
 /** What a write answers with: the row as it now stands, or why it did not. */

@@ -27,6 +27,17 @@ import {
   type PlanStatus,
 } from '@/lib/plan/load';
 import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
+import {
+  OVERNIGHT_FEATURE_CAP,
+  OVERNIGHT_HOUR_CAP,
+  OVERNIGHT_STOPPED_BY_HAND,
+  overnightStopBy,
+  overnightVerdict,
+  pauseOvernightRun,
+  resumeOvernightRun,
+  startOvernightRun,
+  stopOvernightRun,
+} from '@/lib/plan/overnight';
 import { nextPlanPosition } from '@/lib/plan/position';
 import { startRoutineRun } from '@/lib/plan/runs';
 import { PLAN_SEED } from '@/lib/plan/seed';
@@ -1190,6 +1201,174 @@ export async function seedPlan(
 
   revalidatePlan();
   return { message: `Imported ${rows.length} steps from the build order.` };
+}
+
+/**
+ * Set the runner going before bed.
+ *
+ * Two brakes at the press, because the check constraint insists on both and
+ * because a night with only one of them is the night nobody wants to have had:
+ * a budget with no clock runs until it has spent everything, and a clock with
+ * no budget spends whatever it can reach before morning. `startOvernightRun`
+ * clamps both, so nothing a form can send reaches the constraint as a 500 --
+ * the checks here are for the message, not for the safety.
+ *
+ * Pressing it again over a night already running is deliberately allowed. The
+ * row is the account's rather than the night's, so a second press is "start
+ * again with these numbers", which is what somebody changing their mind at
+ * midnight means. Nothing is cancelled by it: whatever session is building
+ * finishes, and the new night's budget governs what is fired after that.
+ */
+// latency: pending
+export async function startOvernightRunner(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const features = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OVERNIGHT_FEATURE_CAP)
+    .safeParse(field(formData, 'features'));
+  if (!features.success) {
+    return { error: `A night runs between 1 and ${OVERNIGHT_FEATURE_CAP} features.` };
+  }
+
+  const hours = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OVERNIGHT_HOUR_CAP)
+    .safeParse(field(formData, 'hours'));
+  if (!hours.success) {
+    return { error: `A night runs between 1 and ${OVERNIGHT_HOUR_CAP} hours.` };
+  }
+
+  const now = new Date();
+  const { run, error } = await startOvernightRun({
+    supabase,
+    userId: user.id,
+    features: features.data,
+    stopBy: overnightStopBy(hours.data, now.getTime()),
+    now,
+  });
+  if (error) return { error };
+  if (!run) return { error: 'The runner could not be started.' };
+
+  revalidatePlan();
+  return {
+    message:
+      `Running. Up to ${run.featuresBudget} ${run.featuresBudget === 1 ? 'feature' : 'features'}, ` +
+      `and it stops in ${hours.data} ${hours.data === 1 ? 'hour' : 'hours'} whatever is left. ` +
+      'The next tick picks the first one.',
+  };
+}
+
+/**
+ * Hold it, without touching what is already building.
+ *
+ * There is no way to call a Claude Code session back -- `/fire` is the only
+ * endpoint there is -- so pause is graceful by construction rather than by
+ * effort: the row says held, the next tick declines to fire, and the session
+ * that is running finishes its feature, commits and closes exactly as it
+ * would have. The button says so, because a pause that looked like a stop
+ * would have somebody watching the branch wondering why it kept committing.
+ *
+ * A null row back is not a failure. It means no night was running to hold --
+ * the clock ran out while the page was open, most likely -- so the page is
+ * revalidated to show what is actually there rather than arguing with it.
+ */
+// latency: pending
+export async function pauseOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { run, error } = await pauseOvernightRun({ supabase, userId: user.id });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'Nothing was running, so there was nothing to hold.' };
+  return {
+    message:
+      'Held. Whatever is building finishes and commits; nothing new is fired until you resume.',
+  };
+}
+
+/**
+ * Carry on from wherever the plan has got to.
+ *
+ * Nothing is picked up where it was left, because nothing was left: the budget
+ * and the stop time are still on the row, and the next tick chooses the most
+ * urgent ready feature as it would have anyway. So a resume at six in the
+ * morning resumes a night with minutes left rather than starting one with
+ * hours, and it says so when those minutes have already gone -- the tick will
+ * end it rather than fire, and being told that now is better than finding it
+ * out at breakfast.
+ */
+// latency: pending
+export async function resumeOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { run, error } = await resumeOvernightRun({ supabase, userId: user.id });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'There is no night to carry on with. Start one and it runs again.' };
+
+  const verdict = overnightVerdict(run, Date.now());
+  if (verdict.act === 'end') return { message: `Resumed, but it is over: ${verdict.reason}` };
+  return { message: 'Running again. The next tick picks up from wherever the plan now is.' };
+}
+
+/**
+ * Stop it for the night, by hand.
+ *
+ * The one of the five reasons a night can carry that nothing else can write:
+ * the tick knows about the budget, the clock and the plan, and only the page
+ * knows you pressed the button. It is the same sentence every time, because
+ * the morning report prints what it finds and "You stopped it." is what
+ * happened.
+ *
+ * Stopping is not cancelling either -- the same limit pause has. The feature
+ * already building finishes; what stopping means is that nothing follows it
+ * and the night is closed with its reason.
+ */
+// latency: pending
+export async function stopOvernightRunner(
+  // Signature is fixed by useActionState; the button sends nothing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _prev: PlanActionState, _formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { run, error } = await stopOvernightRun({
+    supabase,
+    userId: user.id,
+    reason: OVERNIGHT_STOPPED_BY_HAND,
+  });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!run) return { message: 'Nothing was running, so there was nothing to stop.' };
+  return {
+    message:
+      `Stopped with ${run.featuresLeft} of ${run.featuresBudget} ` +
+      `${run.featuresBudget === 1 ? 'feature' : 'features'} unspent. Anything already building ` +
+      'finishes on its own; nothing follows it.',
+  };
 }
 
 /**

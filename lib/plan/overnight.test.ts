@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   budgetSpentReason,
   loadOvernightRun,
+  overnightLine,
   overnightRunFromRow,
+  overnightStanding,
+  overnightStopBy,
   overnightVerdict,
+  OVERNIGHT_HOUR_CAP,
   OVERNIGHT_STOPPED_BY_HAND,
   OVERNIGHT_TIME_UP,
   pauseOvernightRun,
@@ -127,6 +131,78 @@ describe('budgetSpentReason', () => {
     expect(budgetSpentReason({ featuresBudget: 4 })).toBe(
       'It fired every one of the 4 features you allowed.',
     );
+  });
+});
+
+describe('what the control reads off the row', () => {
+  it('has a standing for each of the four things the row can be', () => {
+    expect(overnightStanding(null)).toBe('off');
+    expect(overnightStanding(night())).toBe('running');
+    expect(overnightStanding(night({ paused: true }))).toBe('paused');
+    expect(
+      overnightStanding(night({ running: false, paused: false, endedReason: OVERNIGHT_TIME_UP })),
+    ).toBe('stopped');
+  });
+
+  // A row that has never run carries no reason, and "Stopped" with nothing
+  // after it would be the page claiming something happened that did not.
+  it('calls a row that has never run off rather than stopped', () => {
+    expect(overnightStanding(night({ running: false, endedReason: null }))).toBe('off');
+  });
+
+  // The five reasons are written as whole sentences so that everything reading
+  // them back says the same words. This is that promise, pinned.
+  it('prints a stopped night reason verbatim', () => {
+    const run = night({ running: false, endedReason: OVERNIGHT_STOPPED_BY_HAND });
+    expect(overnightLine(run, MIDNIGHT)).toBe(OVERNIGHT_STOPPED_BY_HAND);
+    expect(overnightLine(night({ running: false, endedReason: OVERNIGHT_TIME_UP }), MIDNIGHT)).toBe(
+      OVERNIGHT_TIME_UP,
+    );
+  });
+
+  it('says a held night finishes what it started and fires nothing after it', () => {
+    expect(overnightLine(night({ paused: true }), MIDNIGHT)).toContain('finishes and commits');
+  });
+
+  // #581: the row cannot tell a tick waiting on a live session from a cron
+  // that has stopped running, so the line gives the elapsed time and claims
+  // neither.
+  it('dates the last fire rather than claiming the runner is waiting', () => {
+    const run = night({ lastFiredAt: '2026-09-17T22:20:00.000Z' });
+    expect(overnightLine(run, MIDNIGHT)).toBe(
+      'It last fired a feature 40m ago. The next one goes once that session has ended.',
+    );
+  });
+
+  it('says nothing has been fired on a night that has not fired anything', () => {
+    expect(overnightLine(night(), MIDNIGHT)).toBe(
+      'Nothing has been fired yet. The next tick picks the first feature.',
+    );
+  });
+
+  // The clock's pre-mount value. Same sentence, no figure, so the line does not
+  // change shape under the reader on hydration.
+  it('drops the elapsed time before the browser clock arrives', () => {
+    expect(overnightLine(night({ lastFiredAt: '2026-09-17T22:20:00.000Z' }), 0)).toBe(
+      'A feature is already under way. The next one goes once that session has ended.',
+    );
+  });
+});
+
+describe('overnightStopBy', () => {
+  it('turns a number of hours into the instant the night stops', () => {
+    expect(overnightStopBy(8, MIDNIGHT)).toBe('2026-09-18T07:00:00.000Z');
+  });
+
+  // Both brakes or no press: whatever the form sent, what comes out of here is
+  // a stop time the check constraint will take.
+  it('clamps a length no form should have been able to send', () => {
+    expect(overnightStopBy(0, MIDNIGHT)).toBe('2026-09-18T00:00:00.000Z');
+    expect(overnightStopBy(-4, MIDNIGHT)).toBe('2026-09-18T00:00:00.000Z');
+    expect(overnightStopBy(1000, MIDNIGHT)).toBe(
+      new Date(MIDNIGHT + OVERNIGHT_HOUR_CAP * 60 * 60 * 1000).toISOString(),
+    );
+    expect(overnightStopBy(Number.NaN, MIDNIGHT)).toBe('2026-09-18T00:00:00.000Z');
   });
 });
 
