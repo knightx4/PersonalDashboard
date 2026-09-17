@@ -41,7 +41,8 @@ import { cn } from '@/lib/cn';
  * a panel hanging off a trigger, so it takes the shape and keeps its own
  * mechanics.
  */
-export const popoverSurface = 'rise-in rounded-card border border-border bg-raised shadow-lg';
+export const popoverSurface =
+  'popover-panel rise-in rounded-card border border-border bg-raised shadow-lg';
 
 /**
  * The scrim: the ground an overlay is read against, and the button that

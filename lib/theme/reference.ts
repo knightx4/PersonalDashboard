@@ -333,7 +333,7 @@ export const REFERENCE_PALETTES: Record<
   lightbox: {
     '--c-canvas': 'rgb(231 236 242 / 0.88)',
     '--c-surface': 'rgb(253 252 249 / 0.80)',
-    '--c-raised': 'rgb(255 254 250 / 0.86)',
+    '--c-raised': 'rgb(255 254 250 / 0.9)',
     '--c-sunken': 'rgb(228 234 241 / 0.86)',
     '--c-border': '#d0d9e3',
     '--c-border-strong': '#a6b1bf',
@@ -420,7 +420,7 @@ export const REFERENCE_PALETTES: Record<
   darkroom: {
     '--c-canvas': 'rgb(8 13 24 / 0.5)',
     '--c-surface': 'rgb(13 20 34 / 0.52)',
-    '--c-raised': 'rgb(22 32 52 / 0.62)',
+    '--c-raised': 'rgb(22 32 52 / 0.82)',
     '--c-sunken': 'rgb(5 9 17 / 0.55)',
     '--c-border': '#33445e',
     '--c-border-strong': '#53698c',

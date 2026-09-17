@@ -439,7 +439,7 @@
    * purpose: a well in a sheet is in shadow, and shadow takes the colour of
    * the room, which here is the bench. */
   --c-surface: rgb(253 252 249 / 0.80);
-  --c-raised: rgb(255 254 250 / 0.86);
+  --c-raised: rgb(255 254 250 / 0.9);
   --c-sunken: rgb(228 234 241 / 0.86);
   --c-border: #d0d9e3;
   --c-border-strong: #a6b1bf;
@@ -718,7 +718,7 @@
    * The bloom, the drop and the lit top edge are what put it above the bench;
    * being brighter than the room was never the thing doing that. */
   --c-surface: rgb(13 20 34 / 0.52);
-  --c-raised: rgb(22 32 52 / 0.62);
+  --c-raised: rgb(22 32 52 / 0.82);
   --c-canvas: rgb(8 13 24 / 0.5);
   --c-sunken: rgb(5 9 17 / 0.55);
   --c-border: #33445e;
@@ -1317,6 +1317,31 @@ body::before {
  * On `.sheet` rather than on Card, so every surface that calls itself a sheet
  * gets it: cards, sections, the empty state, the popovers.
  */
+/* A floating panel in a glass room is frosted, and that is not decoration.
+ *
+ * `--c-raised` was already 0.86 in Lightbox -- nearly opaque -- and the menus
+ * were still hard to read. Alpha was not the problem on its own: with no blur
+ * you get a SHARP ghost of whatever is behind, and the sidebar behind these is
+ * light text on a dark bench, which is the highest-contrast thing in the room.
+ * A crisp 7% ghost of legible words is far worse to read across than a 20%
+ * smear of colour.
+ *
+ * So the blur is what makes it readable and the alpha is what lets the room
+ * through. Both moved: 0.86 -> 0.90 here, 0.62 -> 0.82 in Darkroom, which was
+ * the worse of the two.
+ *
+ * backdrop-filter is cheap here in a way it is not on the page pane, which is
+ * why the pane says outright that it does not use one: a popover is small and
+ * transient, and nothing scrolls underneath it while it is open.
+ *
+ * The saturate is doing real work -- a blur alone greys the colour it is
+ * blurring, and the point is to keep some of the bench's gradient.
+ */
+[data-theme='lightbox'] .popover-panel,
+[data-theme='darkroom'] .popover-panel {
+  backdrop-filter: blur(22px) saturate(1.5);
+}
+
 [data-theme='lightbox'] .sheet,
 [data-theme='darkroom'] .sheet {
   background-image: linear-gradient(

@@ -401,7 +401,7 @@ export function WorkspaceSheet({
         role="menu"
         aria-label="Workspaces"
         /* ui-ok: a sheet against the foot of the screen, not a card -- it is rounded and bordered only on the one edge that meets the page */
-        className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
+        className="popover-panel absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
       >
         {rows.map((row) => {
           const isCurrent = row.id === current;

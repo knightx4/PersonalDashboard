@@ -252,7 +252,7 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
-            className="fixed z-overlay overflow-hidden rounded-lg border border-border bg-raised py-1 shadow-lg"
+            className="popover-panel fixed z-overlay overflow-hidden rounded-lg border border-border bg-raised py-1 shadow-lg"
           >
             {items.map((item) => {
               if (armed === item.id) {
