@@ -105,7 +105,13 @@ import { reshapeOrigin } from '@/lib/plan/origin';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import type { ClaimLiveness } from '@/lib/plan/liveness';
-import { isResolvingAnswers, lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import {
+  isResolvingAnswers,
+  lastRunLine,
+  withReadings,
+  type LastRun,
+  type StoredRunReading,
+} from '@/lib/plan/run-end';
 import {
   closedLine,
   nothingToShowLine,
@@ -3137,6 +3143,55 @@ function SearchThePlan({
   );
 }
 
+/**
+ * The run readings, asked for once the page has drawn.
+ *
+ * #563: the page appears with whatever was last written down and updates a
+ * moment later, rather than holding the render open on a request to GitHub.
+ * `app/api/plan/runs` does the asking, writes what came back onto the run rows
+ * so the terminal tool and the next session's brief read the same answer, and
+ * hands the readings back for the rows already on screen.
+ *
+ * Nothing is asked when no step is claimed, which is most of the time: there
+ * is no run being worked to ask about, and every reading the page has is about
+ * a run that is over. Asked once rather than on a timer -- the clock ticks the
+ * rows on by itself, and a reading is only worth taking again when something
+ * has been sent since.
+ *
+ * A request that fails changes nothing, so the page goes on showing the
+ * reading it drew with. That is the third line of the done-when, and it is
+ * what falling back to the clock in `claimLiveness` is for.
+ */
+function useRefreshedRuns(
+  lastRuns: Record<string, LastRun>,
+  claims: number,
+): Record<string, LastRun> {
+  const [readings, setReadings] = useState<Record<string, StoredRunReading> | null>(null);
+
+  useEffect(() => {
+    if (claims === 0) return;
+    const leaving = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/plan/runs', { method: 'POST', signal: leaving.signal });
+        if (!res.ok) return;
+        const body = (await res.json()) as { readings?: Record<string, StoredRunReading> };
+        if (body.readings) setReadings(body.readings);
+      } catch {
+        // Left as it was drawn.
+      }
+    })();
+
+    return () => leaving.abort();
+  }, [claims]);
+
+  return useMemo(
+    () => (readings ? withReadings(lastRuns, readings) : lastRuns),
+    [lastRuns, readings],
+  );
+}
+
 export function PlanView({
   sections,
   finished,
@@ -3190,6 +3245,12 @@ export function PlanView({
 }) {
   const [query, setQuery] = useState('');
   const searching = searchTerms(query).length > 0;
+
+  // What GitHub says about the runs behind the claimed steps, taken once the
+  // page is up and written over the readings it drew with. A claim is the only
+  // reason to ask, so the server's own reading of them is what decides whether
+  // anything is asked at all.
+  const runs = useRefreshedRuns(lastRuns, Object.keys(liveness ?? {}).length);
 
   // The whole tree is already on the page, so the search runs here rather than
   // as a round trip: a plan is tens of steps, and a filter you feel keeping up
@@ -3309,7 +3370,7 @@ export function PlanView({
                       trail={[]}
                       catalog={catalog}
                       canSend={canSend}
-                      lastRuns={lastRuns}
+                      lastRuns={runs}
                       runRaises={runRaises}
                       liveness={liveness}
                       commitChecks={commitChecks}
@@ -3391,7 +3452,7 @@ export function PlanView({
                 trail={[]}
                 catalog={catalog}
                 canSend={canSend}
-                lastRuns={lastRuns}
+                lastRuns={runs}
                 runRaises={runRaises}
                 liveness={liveness}
                 commitChecks={commitChecks}

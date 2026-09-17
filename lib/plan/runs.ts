@@ -31,6 +31,8 @@ import {
 } from '@/lib/feedback/routine';
 import {
   isResolvingAnswers,
+  readingColumns,
+  readingFor,
   runEnd,
   runQuietNote,
   storedReading,
@@ -38,8 +40,9 @@ import {
   type RunJob,
   type RunReadingColumns,
   type RunStatus,
+  type StoredRunReading,
 } from './run-end';
-import { listPushes } from './ci';
+import { commitSubjects, listPushes } from './ci';
 import type { RunRaise } from './work';
 import {
   abandonedClaim,
@@ -365,6 +368,123 @@ export async function readRunLiveness(input: {
   }
 
   return { steps: readings, pushes, error: pushError };
+}
+
+/**
+ * Ask GitHub about the runs behind the claimed steps, write down the answer,
+ * and hand it back.
+ *
+ * The one place that asks. #563 settled that the plan page draws with whatever
+ * was last written down and calls this a moment later, rather than holding the
+ * render open on a request to GitHub -- so the page is quick, and the terminal
+ * tool, a session's brief and the send guard all read the reading this wrote
+ * instead of each asking or falling back to the clock.
+ *
+ * Three requests and a write. `readRunLiveness` reads the claimed steps, the
+ * runs sent at them and one listing of what has been pushed since the oldest
+ * of those runs started; the listing says which branch moved and to what sha
+ * and nothing about what the commit said, so the subjects are looked up
+ * separately and are allowed to come back missing. Then the runs the listing
+ * was about are written back, and the same listing is handed to `endQuietRuns`
+ * -- which is the whole point of it coming back from the reader: a run that
+ * pushed four minutes ago keeps its step however long it has been going, and
+ * asking GitHub twice to say that would be two readings that could disagree.
+ *
+ * A refusal is written down too, in `github_error`. It is the only way the
+ * wrong key becomes visible: without it every run reads as though it pushed
+ * nothing, which is how a token missing a permission went unnoticed for days.
+ * A refused reading carries no push (`readingFor`), nothing is swept on the
+ * clock instead of on evidence, and `readingTrusted` sets the reading aside so
+ * the two-hour clock in `elapsed.ts` answers until somebody fixes the key.
+ *
+ * Failures are carried back rather than thrown, the same as the rest of this
+ * file: a page that could not refresh its readings is still a page worth
+ * reading, and it goes on showing what it already had.
+ */
+export async function refreshRunReadings(input: {
+  supabase: Db;
+  userId: string;
+  now?: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{
+  /** The reading now stored against each claimed step's run, by step id. */
+  readings: Record<string, StoredRunReading>;
+  /** How many run rows were written. */
+  written: number;
+  /** Why GitHub refused, which is also what went into `github_error`. */
+  error: string | null;
+}> {
+  const now = input.now ?? Date.now();
+  const checkedAt = new Date(now).toISOString();
+
+  const live = await readRunLiveness({
+    supabase: input.supabase,
+    userId: input.userId,
+    now,
+    fetch: input.fetch,
+  });
+  // No evidence, so the sweep falls back to the clock exactly as the page's own
+  // call does. #570: nothing repeats a reading nobody could take.
+  const pushes = live.error ? null : live.pushes;
+
+  const claimed = Object.entries(live.steps);
+  if (claimed.length === 0) {
+    // Nothing claimed has a run to ask about. The sweep still runs: a run whose
+    // step closed is finished whatever is claimed now.
+    await endQuietRuns({ supabase: input.supabase, userId: input.userId, now, pushes });
+    return { readings: {}, written: 0, error: live.error };
+  }
+
+  const subjects = live.error
+    ? {}
+    : await commitSubjects({
+        shas: claimed.map(([, reading]) => reading.lastPush?.sha ?? '').filter(Boolean),
+        fetch: input.fetch,
+      });
+
+  const readings: Record<string, StoredRunReading> = {};
+  // One update per distinct set of columns rather than one per run, which is
+  // one update in the case that matters: a refusal reads the same for every
+  // run, and so does silence.
+  const groups = new Map<string, { columns: RunReadingColumns; ids: string[] }>();
+  for (const [stepId, reading] of claimed) {
+    const stored = readingFor({
+      checkedAt,
+      lastPush: reading.lastPush
+        ? {
+            at: reading.lastPush.at,
+            sha: reading.lastPush.sha,
+            subject: subjects[reading.lastPush.sha] ?? null,
+          }
+        : null,
+      refusal: live.error,
+    });
+    readings[stepId] = stored;
+
+    const columns = readingColumns(stored);
+    const key = JSON.stringify(columns);
+    const group = groups.get(key);
+    if (group) group.ids.push(reading.runId);
+    else groups.set(key, { columns, ids: [reading.runId] });
+  }
+
+  let written = 0;
+  for (const group of groups.values()) {
+    const { error } = await input.supabase
+      .from('plan_runs')
+      .update(group.columns)
+      .in('id', group.ids)
+      .eq('user_id', input.userId);
+    if (error) {
+      console.error(`what GitHub said about a run could not be written: ${error.message}`);
+      continue;
+    }
+    written += group.ids.length;
+  }
+
+  await endQuietRuns({ supabase: input.supabase, userId: input.userId, now, pushes });
+
+  return { readings, written, error: live.error };
 }
 
 /**

@@ -321,6 +321,59 @@ export async function refreshCommitChecks(input: {
 }
 
 /**
+ * How many commit messages one refresh will look up.
+ *
+ * One request each, and the shas asked about are the last push of every step
+ * being worked -- a handful at most, since only one step under a feature may
+ * be underway. The cap is there so that a table full of claims cannot turn one
+ * refresh into a hundred requests.
+ */
+const SUBJECT_BUDGET = 10;
+
+/**
+ * The first line of each commit's message, by sha.
+ *
+ * The activity listing says which branch moved and to what sha, and nothing
+ * about what the commit said, so saying what a push *was* costs one request
+ * per commit. That is why the subject is a separate lookup rather than part of
+ * `listPushes`, and why it is allowed to come back missing: a push with no
+ * subject stored is legal, and the page falls back to the short sha and then
+ * to the time alone.
+ *
+ * A refusal on one commit is dropped rather than carried, because it must not
+ * turn a reading GitHub answered into a reading GitHub refused. The refusal
+ * that matters is the one on the listing, and `listPushes` carries that.
+ */
+export async function commitSubjects(input: {
+  shas: readonly string[];
+  fetch?: typeof globalThis.fetch;
+}): Promise<Record<string, string>> {
+  const token = readToken();
+  const wanted = [...new Set(input.shas.filter((sha) => /^[0-9a-f]{7,40}$/.test(sha)))].slice(
+    0,
+    SUBJECT_BUDGET,
+  );
+  if (!token || wanted.length === 0) return {};
+
+  const doFetch = input.fetch ?? globalThis.fetch;
+  const subjects: Record<string, string> = {};
+  await inLanes(wanted, async (sha) => {
+    try {
+      const body = await ask<{ commit?: { message?: string } }>(
+        `/repos/${REPO.owner}/${REPO.repo}/commits/${sha}`,
+        token,
+        doFetch,
+      );
+      const subject = (body.commit?.message ?? '').split('\n')[0].trim();
+      if (subject) subjects[sha] = subject;
+    } catch {
+      // Left out. The reading is worth storing without it.
+    }
+  });
+  return subjects;
+}
+
+/**
  * What has been pushed to any branch since an instant, newest first.
  *
  * One request. The activity listing is the only endpoint that answers "which

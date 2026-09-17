@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FEATURE_ROUTINE_ID } from '@/lib/feedback/routine';
-import { endQuietRuns, readRunLiveness, runRowFor, startRoutineRun } from '@/lib/plan/runs';
+import {
+  endQuietRuns,
+  readRunLiveness,
+  refreshRunReadings,
+  runRowFor,
+  startRoutineRun,
+} from '@/lib/plan/runs';
 
 /** A fire that succeeded, with whatever body the endpoint answered with. */
 function started(body: unknown, runId: string | null) {
@@ -367,6 +373,218 @@ describe('readRunLiveness', () => {
 
     expect(error).toBe('No GITHUB_READ_TOKEN is set, so pushes cannot be read.');
     expect(steps['step-1']).toMatchObject({ liveness: 'unknown', abandoned: false });
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('refreshRunReadings', () => {
+  /**
+   * The claimed steps, the runs sent at them, and what got written back.
+   *
+   * One fake for both halves of the call: the reader asks for the claimed steps
+   * and the runs against them, and the sweep that follows asks for the runs
+   * still reading `started` and for which of those steps have closed.
+   */
+  function db(
+    steps: Array<{ id: string; status: string; completed_at: string | null }>,
+    runs: Array<{ id: string; plan_item_id: string; created_at: string }>,
+  ) {
+    const writes: Array<{ values: Record<string, unknown>; ids: string[] }> = [];
+    const answered = <T,>(data: T) => Promise.resolve({ data, error: null });
+
+    const supabase = {
+      from(table: string) {
+        if (table === 'plan_items') {
+          return {
+            select: () => ({
+              eq: () => ({ eq: () => answered(steps) }),
+              in: () => answered(steps),
+            }),
+          };
+        }
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => answered(runs),
+              in: () => ({ order: () => answered(runs) }),
+            }),
+          }),
+          update: (values: Record<string, unknown>) => ({
+            in: (_column: string, ids: string[]) => {
+              writes.push({ values, ids });
+              return Object.assign(Promise.resolve({ error: null }), {
+                eq: async () => ({ error: null }),
+              });
+            },
+            eq: async (_column: string, id: string) => {
+              writes.push({ values, ids: [id] });
+              return { error: null };
+            },
+          }),
+        };
+      },
+    };
+    return { supabase, writes };
+  }
+
+  /** GitHub answering the activity listing, and the message behind a commit. */
+  function github(
+    activity: Array<{ ref: string; minutes: number }>,
+    subject?: string,
+  ) {
+    return vi.fn(async (url: string) => {
+      if (String(url).includes('/activity')) {
+        return new Response(
+          JSON.stringify(
+            activity.map((push) => ({
+              activity_type: 'push',
+              ref: `refs/heads/${push.ref}`,
+              after: 'abc1234',
+              timestamp: minutesAgo(push.minutes),
+            })),
+          ),
+          { status: 200 },
+        );
+      }
+      if (subject) {
+        return new Response(JSON.stringify({ commit: { message: `${subject}\n\nA body.` } }), {
+          status: 200,
+        });
+      }
+      return new Response('{}', { status: 404 });
+    });
+  }
+
+  it('writes what GitHub said onto the run, with the first line of the commit', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, writes } = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(45) }],
+    );
+
+    const result = await refreshRunReadings({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: github([{ ref: 'claude/one', minutes: 6 }], 'Read a step wanting an answer (plan #1)') as never,
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.written).toBe(1);
+    expect(writes).toEqual([
+      {
+        values: {
+          github_checked_at: new Date(NOW).toISOString(),
+          last_push_at: minutesAgo(6),
+          last_push_sha: 'abc1234',
+          last_push_subject: 'Read a step wanting an answer (plan #1)',
+          github_error: null,
+        },
+        ids: ['run-1'],
+      },
+    ]);
+    expect(result.readings['step-1'].lastPush?.subject).toBe(
+      'Read a step wanting an answer (plan #1)',
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it('writes the check with no push when the run had pushed nothing', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, writes } = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(25) }],
+    );
+
+    const result = await refreshRunReadings({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: github([]) as never,
+    });
+
+    expect(result.error).toBeNull();
+    expect(writes[0].values).toEqual({
+      github_checked_at: new Date(NOW).toISOString(),
+      last_push_at: null,
+      last_push_sha: null,
+      last_push_subject: null,
+      github_error: null,
+    });
+    expect(result.readings['step-1']).toEqual({
+      checkedAt: new Date(NOW).toISOString(),
+      lastPush: null,
+      refusal: null,
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it('writes why GitHub refused, and no push beside it', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const { supabase, writes } = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(45) }],
+    );
+
+    const result = await refreshRunReadings({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+    });
+
+    expect(result.error).toBe('No GITHUB_READ_TOKEN is set, so pushes cannot be read.');
+    expect(writes[0]).toEqual({
+      values: {
+        github_checked_at: new Date(NOW).toISOString(),
+        last_push_at: null,
+        last_push_sha: null,
+        last_push_subject: null,
+        github_error: 'No GITHUB_READ_TOKEN is set, so pushes cannot be read.',
+      },
+      ids: ['run-1'],
+    });
+    expect(result.readings['step-1'].refusal).toBe(
+      'No GITHUB_READ_TOKEN is set, so pushes cannot be read.',
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it('leaves a long run alone while it is still pushing, on the same listing', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, writes } = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) }],
+    );
+
+    await refreshRunReadings({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: github([{ ref: 'claude/one', minutes: 4 }], 'Still going (plan #2)') as never,
+    });
+
+    // The reading, and nothing writing the run off.
+    expect(writes).toHaveLength(1);
+    expect(writes[0].values.github_checked_at).toBe(new Date(NOW).toISOString());
+    vi.unstubAllEnvs();
+  });
+
+  it('writes nothing about a claimed step nobody fired a run at', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, writes } = db(
+      [{ id: 'step-1', status: 'in_progress', completed_at: null }],
+      [],
+    );
+
+    const result = await refreshRunReadings({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      fetch: github([]) as never,
+    });
+
+    expect(result).toEqual({ readings: {}, written: 0, error: null });
+    expect(writes).toEqual([]);
     vi.unstubAllEnvs();
   });
 });

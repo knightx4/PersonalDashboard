@@ -125,7 +125,20 @@ means nobody has asked, and set with `last_push_at` null means somebody asked
 and the run had pushed nothing. `github_error` is separate from `error`, which
 is Anthropic refusing the fire and is tied to `status = 'failed'`; a rejected
 GitHub key says nothing about whether the run started. `storedReading` in
-`lib/plan/run-end.ts` turns the five columns into the shape the app reads.
+`lib/plan/run-end.ts` turns the five columns into the shape the app reads, and
+`readingFor` and `readingColumns` beside it turn a reading back into the
+columns, so the write and the read are worked out in one place.
+
+`app/api/plan/runs` is the only thing that asks GitHub about a run.
+`refreshRunReadings` in `lib/plan/runs.ts` does the work: the reader from
+`readRunLiveness` gets the claimed steps, the runs behind them and one activity
+listing; the listing says which branch moved and to what sha and nothing about
+what the commit said, so `commitSubjects` looks the message up separately and
+is allowed to come back with nothing. Then the runs are written back and the
+same listing goes to `endQuietRuns`, which is what stops a run that pushed four
+minutes ago being written off for being five hours old. A refusal is written to
+`github_error` and carries no push beside it: a reading is what GitHub said
+this time, not a push from the last time somebody got through.
 
 ### `plan_overnight_runs`
 
@@ -470,7 +483,10 @@ run, now)`, and it answers one of four things about a step marked
 The two marks are `QUIET_AFTER_MINUTES` and `ENDED_AFTER_MINUTES` (#524),
 counted from the run's last push or from when it was fired if it has not
 pushed. The reading comes off the `plan_runs` row that #568 added columns for,
-written by the route #563 chose; a reading older than the ended mark is not
+written by `app/api/plan/runs`, which the plan page calls once it has drawn
+(#563) -- so the page appears with what was last stored and updates a moment
+later, and the terminal tool, the brief and the send guard read the same answer
+without a request of their own. A reading older than the ended mark is not
 trusted (#570) and neither is one carrying a GitHub refusal, and in both cases
 the clock in `elapsed.ts` answers instead. That fallback is also what a claim
 with no run recorded against it gets.

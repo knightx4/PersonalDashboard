@@ -152,6 +152,80 @@ export function storedReading(row: Partial<RunReadingColumns>): StoredRunReading
   };
 }
 
+/** What the columns hold, so nothing longer than a column takes is sent. */
+const SHA_LIMIT = 64;
+const SUBJECT_LIMIT = 500;
+const REFUSAL_LIMIT = 500;
+
+/** A value worth storing, or null. An empty string is not a value. */
+function text(value: string | null | undefined, limit: number): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.slice(0, limit) : null;
+}
+
+/**
+ * A reading to write down, with the one rule about what a refusal means.
+ *
+ * A refusal carries no push. GitHub either answered or it did not, so a row
+ * holding both would be two readings at once -- a push from the last time
+ * somebody got through, a refusal from this time -- and `readingTrusted` sets
+ * the whole reading aside on the refusal anyway, so the push beside it could
+ * only mislead whoever read it. What a refusal leaves behind is the answer to
+ * "when was this asked" and "what did GitHub say", which is what #566 shows.
+ */
+export function readingFor(input: {
+  checkedAt: string;
+  lastPush?: StoredRunReading['lastPush'];
+  refusal?: string | null;
+}): StoredRunReading {
+  const refusal = text(input.refusal, REFUSAL_LIMIT);
+  return {
+    checkedAt: input.checkedAt,
+    lastPush: refusal ? null : (input.lastPush ?? null),
+    refusal,
+  };
+}
+
+/**
+ * The five columns a reading is written to.
+ *
+ * The write-side twin of `storedReading`, here beside it so that what the
+ * route writes and what the page reads back are worked out in one place. Every
+ * reading sets `github_checked_at`, which is what the three check constraints
+ * on `plan_runs` require and what makes "nobody has asked" a different fact
+ * from "asked, and it had pushed nothing".
+ */
+export function readingColumns(reading: StoredRunReading): RunReadingColumns {
+  return {
+    github_checked_at: reading.checkedAt,
+    last_push_at: reading.lastPush?.at ?? null,
+    last_push_sha: text(reading.lastPush?.sha, SHA_LIMIT),
+    last_push_subject: text(reading.lastPush?.subject, SUBJECT_LIMIT),
+    github_error: text(reading.refusal, REFUSAL_LIMIT),
+  };
+}
+
+/**
+ * The runs the page loaded, with fresher readings written over them.
+ *
+ * What the browser does with the route's answer: the rows were drawn from what
+ * was stored when the page rendered, and a reading taken a moment later
+ * replaces the one on the run it is about. Only the steps the page already has
+ * a run for -- a reading about a run it never loaded has nothing to attach to,
+ * and inventing a `LastRun` from it would be inventing the press behind it.
+ */
+export function withReadings(
+  runs: Readonly<Record<string, LastRun>>,
+  readings: Readonly<Record<string, StoredRunReading>>,
+): Record<string, LastRun> {
+  const merged: Record<string, LastRun> = { ...runs };
+  for (const [stepId, reading] of Object.entries(readings)) {
+    const run = merged[stepId];
+    if (run) merged[stepId] = { ...run, reading };
+  }
+  return merged;
+}
+
 /**
  * Whether a feature is being re-read against the answers just given.
  *
