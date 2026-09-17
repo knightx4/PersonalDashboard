@@ -2367,13 +2367,17 @@ function PlanRow({
           {move.word}
         </span>
 
+        {/* Priority, and only when it says something. Nearly every step is at
+            Normal, so the word was on almost every row and told you nothing;
+            what you are scanning for is the handful marked Next or Someday.
+            The separator before the size goes with it, so a normal step at S
+            reads as "S" rather than as "· S". */}
         <span className="hidden truncate text-small sm:block">
           {node.priority === 1 && <span className="text-accent">Next</span>}
-          {node.priority === 2 && <span className="text-ink-muted">Normal</span>}
           {node.priority === 3 && <span className="text-ink-ghost">Someday</span>}
           {node.size && (
             <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-              {' · '}
+              {node.priority !== 2 && ' · '}
               {node.size.toUpperCase()}
             </span>
           )}
@@ -2555,7 +2559,7 @@ function PlanRow({
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
               <span>{scopeLabel(node.module)}</span>
-              <span>{PRIORITY_LABEL[node.priority]}</span>
+              {node.priority !== 2 && <span>{PRIORITY_LABEL[node.priority]}</span>}
               {node.size && <span>{SIZE_LABEL[node.size]}</span>}
               {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
               {when(node.startedAt) && (
