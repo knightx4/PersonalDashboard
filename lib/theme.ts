@@ -19,8 +19,10 @@ export const THEMES = [
     label: 'Paper',
     mood: 'Warm, printed, quiet',
     scheme: 'light',
-    /** For the picker's swatch, before the theme is applied. */
-    swatch: '#faf9f6',
+    /** For the picker's swatch, before the theme is applied. Paper's canvas
+     * rather than its sheet, because the sheet is a near-white that reads as
+     * no swatch at all against the picker's own ground. */
+    swatch: '#f7f4ed',
     ink: '#1a1a18',
   },
   {

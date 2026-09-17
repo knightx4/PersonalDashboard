@@ -64,6 +64,51 @@ function readToken(): string | null {
   return process.env.GITHUB_READ_TOKEN?.trim() || null;
 }
 
+/**
+ * Which permission each endpoint here is refused for want of.
+ *
+ * A fine-grained token grants these separately, so a token that reads the
+ * repository fine can still be refused its checks -- which is exactly the
+ * shape this failed in. Longest match first: a check-runs path carries
+ * `/commits` in it too.
+ *
+ * Only the two this file is sure of are named. The activity listing falls
+ * through to the unnamed form on purpose: sending someone to tick the wrong
+ * box is worse than telling them a box is missing.
+ */
+const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
+  ['/check-runs', 'Checks: Read'],
+  ['/commits', 'Contents: Read'],
+];
+
+/**
+ * What a refusal from GitHub means, said to the person who can fix it.
+ *
+ * This came back as a bug report reading "Could not read CI: GitHub answered
+ * 403 for /repos/…/check-runs?per_page=100", with "I dont even know what this
+ * means" under it -- which is fair, because the page was repeating HTTP at
+ * somebody who never asked GitHub anything. Law 2 wants a source that failed
+ * to say so in place; it does not want it said in status codes.
+ *
+ * A 403 or a 404 on these paths is neither a bug nor an outage. It is
+ * GITHUB_READ_TOKEN missing one permission, or having expired, and both of
+ * those are a sentence rather than a number. The status stays in the text
+ * because it is the thing to search for if the sentence turns out wrong.
+ */
+export function refusalFor(status: number, path: string): string {
+  if (status === 401) {
+    return `GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped. Set a new one in Vercel and redeploy.`;
+  }
+  if (status === 403 || status === 404) {
+    const permission = PERMISSION_FOR.find(([fragment]) => path.includes(fragment))?.[1];
+    const grant = permission
+      ? `Give it "${permission}" on ${REPO.owner}/${REPO.repo}`
+      : `Give it access to ${REPO.owner}/${REPO.repo}`;
+    return `GITHUB_READ_TOKEN is missing a permission (${status}). ${grant} in the token's settings, then redeploy.`;
+  }
+  return `GitHub answered ${status} for ${path}`;
+}
+
 async function ask<T>(path: string, token: string, doFetch: typeof globalThis.fetch): Promise<T> {
   const res = await doFetch(`${API}${path}`, {
     headers: {
@@ -75,7 +120,7 @@ async function ask<T>(path: string, token: string, doFetch: typeof globalThis.fe
     cache: 'no-store',
   });
   if (!res.ok) {
-    throw new Error(`GitHub answered ${res.status} for ${path}`);
+    throw new Error(refusalFor(res.status, path));
   }
   return (await res.json()) as T;
 }

@@ -270,3 +270,17 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     updatedAt: stamp(row.updated_at) ?? stamp(row.created_at) ?? '',
   };
 }
+
+/**
+ * What each step is called, by number, for the hover text on a reference.
+ *
+ * Off the raw items rather than the tree: a reference can name a step that is
+ * closed, dropped or dismissed, and the reader wants to know what it was
+ * either way. `lib/comments/refs.ts` says what the label is made of; this is
+ * just the lookup it reads.
+ */
+export function planRefTitles(data: PlanData): Record<number, string> {
+  const titles: Record<number, string> = {};
+  for (const item of data.items) titles[item.number] = item.title;
+  return titles;
+}

@@ -9,6 +9,7 @@ import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { CommentTarget } from '@/lib/comments/load';
 import type { Conversation } from '@/lib/comments/recent';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { commentWhen, exactTime } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
 
@@ -51,7 +52,7 @@ const ELSEWHERE: Partial<Record<CommentTarget, string>> = {
   note: 'Open it on the bugs page',
 };
 
-function Line({ conversation }: { conversation: Conversation }) {
+function Line({ conversation, titles }: { conversation: Conversation; titles?: PlanRefTitles }) {
   const now = useClockNow();
   const [opened, setOpened] = useState(false);
   const who = conversation.lastAuthor === 'claude' ? 'Dash' : 'You';
@@ -112,6 +113,7 @@ function Line({ conversation }: { conversation: Conversation }) {
             thread={conversation.thread}
             label="Reply"
             placeholder="A reply on this row. Tag @dash to ask for an answer."
+            titles={titles}
           />
           {elsewhere && (
             <Link
@@ -127,7 +129,14 @@ function Line({ conversation }: { conversation: Conversation }) {
   );
 }
 
-export function ConversationsView({ conversations }: { conversations: Conversation[] }) {
+export function ConversationsView({
+  conversations,
+  titles,
+}: {
+  conversations: Conversation[];
+  /** What each step number in a comment is called, for the hover text. */
+  titles?: PlanRefTitles;
+}) {
   const shown = conversations.slice(0, CONVERSATIONS_SHOWN);
 
   return (
@@ -144,7 +153,11 @@ export function ConversationsView({ conversations }: { conversations: Conversati
         <>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {shown.map((conversation) => (
-              <Line key={`${conversation.target}:${conversation.rowId}`} conversation={conversation} />
+              <Line
+                key={`${conversation.target}:${conversation.rowId}`}
+                conversation={conversation}
+                titles={titles}
+              />
             ))}
           </ul>
           {conversations.length > shown.length && (

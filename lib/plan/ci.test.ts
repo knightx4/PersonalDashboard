@@ -1,5 +1,41 @@
 import { describe, expect, it, vi } from 'vitest';
-import { listPushes } from '@/lib/plan/ci';
+import { listPushes, refusalFor } from '@/lib/plan/ci';
+
+describe('refusalFor', () => {
+  it('names the permission a refused check-runs read is short of', () => {
+    const said = refusalFor(
+      403,
+      '/repos/knightx4/PersonalDashboard/commits/a405587/check-runs?per_page=100',
+    );
+    expect(said).toContain('Checks: Read');
+    expect(said).toContain('GITHUB_READ_TOKEN');
+    expect(said).toContain('403');
+    // The path carries /commits as well, and the longer match is the right one.
+    expect(said).not.toContain('Contents: Read');
+  });
+
+  it('names Contents for the commit listing', () => {
+    expect(
+      refusalFor(404, '/repos/knightx4/PersonalDashboard/commits?sha=main&per_page=100'),
+    ).toContain('Contents: Read');
+  });
+
+  it('asks for no particular permission where it does not know which', () => {
+    const said = refusalFor(403, '/repos/knightx4/PersonalDashboard/activity?per_page=100');
+    expect(said).toContain('knightx4/PersonalDashboard');
+    expect(said).not.toContain(': Read"');
+  });
+
+  it('says an expired token is expired rather than unpermitted', () => {
+    const said = refusalFor(401, '/repos/knightx4/PersonalDashboard/activity');
+    expect(said).toContain('401');
+    expect(said).toMatch(/expired/);
+  });
+
+  it('leaves a status it has nothing to say about as it found it', () => {
+    expect(refusalFor(500, '/repos/x/y/commits')).toBe('GitHub answered 500 for /repos/x/y/commits');
+  });
+});
 
 describe('listPushes', () => {
   it('asks for the repository activity and reads the pushes out of it', async () => {

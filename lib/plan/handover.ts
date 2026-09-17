@@ -21,7 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine } from '@/lib/feedback/routine';
 import { hasLiveClaim } from './elapsed';
 import { planBrief } from './brief';
-import { startRoutineRun } from './runs';
+import { reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
 import {
   buildPlanTree,
@@ -99,6 +99,19 @@ export async function handStepToClaude(input: {
   // calling these stalled; this reads the same clock.
   const feature = topFeatureOf(sections, node);
   const now = Date.now();
+
+  // A re-shape is rewriting this feature. Sending a step out of it now hands a
+  // session a plan that is about to change underneath it -- the steps it would
+  // build may be dropped, reworded or superseded before it finishes reading
+  // the brief. The page greys the button for this; a press can still arrive
+  // from a tab that was open before the run started, so it is asked again here.
+  if (await reshapeUnderway(supabase, userId, feature.id, now)) {
+    return {
+      ok: false,
+      error: `#${feature.number} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change this step.`,
+    };
+  }
+
   const underway = flatten([feature]).filter((step) => hasLiveClaim(step, now));
   const other = underway.find((step) => step.id !== node.id);
   if (underway.some((step) => step.id === node.id)) {
@@ -229,10 +242,22 @@ export async function handFeatureToClaude(input: {
     return { ok: false, error: `#${node.number} is only a proposal. Approve it first.` };
   }
 
+  const now = input.now ?? Date.now();
+
+  // The same refusal as the single send, and more clearly right here: the
+  // batch hands over every open step under a feature a re-shape is in the
+  // middle of rewriting.
+  if (await reshapeUnderway(supabase, userId, node.id, now)) {
+    return {
+      ok: false,
+      error: `#${node.number} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change these steps.`,
+    };
+  }
+
   // The same one-at-a-time rule as the single send. A batch started on top of
   // a running session is the worse version of the same collision, since it
   // hands the whole feature to a second run.
-  const running = flatten([node]).find((step) => hasLiveClaim(step, input.now ?? Date.now()));
+  const running = flatten([node]).find((step) => hasLiveClaim(step, now));
   if (running) {
     return {
       ok: false,
