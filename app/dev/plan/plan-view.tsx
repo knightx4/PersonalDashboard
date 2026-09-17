@@ -87,6 +87,7 @@ import {
   searchNodes,
   searchSections,
   searchTerms,
+  type MoveContext,
   type PlanBand,
   type PlanHealth,
   type PlanMove,
@@ -100,7 +101,7 @@ import {
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { reshapeOrigin } from '@/lib/plan/origin';
 import { elapsedSince, isStalledClaim } from '@/lib/plan/elapsed';
-import { lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import { isResolvingAnswers, lastRunLine, type LastRun } from '@/lib/plan/run-end';
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
 import { cn } from '@/lib/cn';
@@ -1415,6 +1416,7 @@ function SendToClaude({
   reshapeAction,
   reshapePending,
   quiet,
+  resolving,
 }: {
   node: PlanNode;
   canSend: boolean;
@@ -1429,6 +1431,16 @@ function SendToClaude({
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
+  /**
+   * A re-shape is re-reading this feature right now.
+   *
+   * Everything that hands work over is shut while it is: the run is rewriting
+   * the steps a press would send, so a session sent now would build against a
+   * plan that is about to change under it, and a second re-shape would be the
+   * duplicate-question collision all over again. The button is disabled rather
+   * than removed -- a control that vanishes teaches nobody why.
+   */
+  resolving: boolean;
 }) {
   // Every open step beneath, the feature itself aside: what the batch would
   // take on, and the only reason to offer it.
@@ -1436,11 +1448,22 @@ function SendToClaude({
     (step) => step.id !== node.id && !isClosed(step.status) && step.status !== 'proposed',
   ).length;
 
+  const held = resolving
+    ? 'Dash is re-reading this feature against the answers you just gave. This comes back when it is done.'
+    : undefined;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <form action={action}>
         <input type="hidden" name="id" value={node.id} />
-        <Button type="submit" size="sm" variant="secondary" pending={pending}>
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          pending={pending}
+          disabled={resolving}
+          title={held}
+        >
           <Play className="size-3.5" aria-hidden />
           {pending ? 'Sending…' : sendLabel(node)}
         </Button>
@@ -1453,7 +1476,8 @@ function SendToClaude({
             size="sm"
             variant="ghost"
             pending={batchPending}
-            title="Hand every open step beneath this one to Dash, worked in order"
+            disabled={resolving}
+            title={held ?? 'Hand every open step beneath this one to Dash, worked in order'}
           >
             {batchPending ? 'Sending…' : `Send all ${beneath} beneath`}
           </Button>
@@ -1472,13 +1496,25 @@ function SendToClaude({
             size="sm"
             variant="ghost"
             pending={reshapePending}
-            title="Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started."
+            disabled={resolving}
+            title={
+              held ??
+              'Re-read this feature against the questions answered beneath it. Whatever comes back is proposed, not started.'
+            }
           >
             {reshapePending ? 'Re-shaping…' : 'Re-shape'}
           </Button>
         </form>
       )}
-      {!canSend && quiet && (
+      {/* Said in the row as well as on the tooltip: three buttons that have
+          gone quiet at once is the kind of thing a person reads as broken
+          unless something tells them otherwise. Law 2. */}
+      {resolving && (
+        <span className="text-small text-ink-muted">
+          Re-reading this against your answers. The buttons come back when it is done.
+        </span>
+      )}
+      {!canSend && quiet && !resolving && (
         <span className="text-small text-ink-muted">
           Needs the plan routine&apos;s token on the deployment.
         </span>
@@ -1775,6 +1811,9 @@ function healthOf(node: PlanNode): Health & { glyph: GlyphName; name: PlanHealth
  * visible cause, which is the complaint the whole column exists to answer.
  */
 const MOVE_TONE: Record<PlanMove, Health['tone']> = {
+  // The accent, the same as "With Dash": both are a session working on this
+  // right now, and the difference between them is which job, not whose turn.
+  resolving: 'accent',
   on_you: 'caution',
   with_dash: 'accent',
   for_dash: 'info',
@@ -1784,6 +1823,8 @@ const MOVE_TONE: Record<PlanMove, Health['tone']> = {
 };
 
 const MOVE_TITLE: Record<PlanMove, string> = {
+  resolving:
+    'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you: 'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
   with_dash: 'A session is working on this now.',
   for_dash: 'Handed to Dash, waiting for a session to pick it up.',
@@ -1792,9 +1833,12 @@ const MOVE_TITLE: Record<PlanMove, string> = {
   settled: 'Nothing left to do on this one.',
 };
 
-function moveFor(node: PlanNode): { word: string; tone: Health['tone']; title?: string } {
-  const move = planMoveOf(node);
-  const own = ownMoveWord(node);
+function moveFor(
+  node: PlanNode,
+  context?: MoveContext,
+): { word: string; tone: Health['tone']; title?: string } {
+  const move = planMoveOf(node, context);
+  const own = ownMoveWord(node, context);
   return {
     word: PLAN_MOVE_WORD[move],
     tone: MOVE_TONE[move],
@@ -1805,8 +1849,29 @@ function moveFor(node: PlanNode): { word: string; tone: Health['tone']; title?: 
 }
 
 /** What this row alone would say, to tell a rollup from a row's own state. */
-function ownMoveWord(node: PlanNode): PlanMove {
-  return planMoveOf({ ...node, children: [] });
+function ownMoveWord(node: PlanNode, context?: MoveContext): PlanMove {
+  return planMoveOf({ ...node, children: [] }, context);
+}
+
+/**
+ * Which rows a re-shape is running against right now.
+ *
+ * Built from the runs the page already loaded rather than from a second read:
+ * `loadLastRuns` carries the job, and a re-shape still going is the whole of
+ * the question. Recomputed as the clock ticks, so the state clears on its own
+ * when the run ages out rather than on the next navigation.
+ */
+function useResolving(lastRuns: Readonly<Record<string, LastRun>>, now: number): MoveContext {
+  return useMemo(
+    () => ({
+      resolving: new Set(
+        Object.entries(lastRuns)
+          .filter(([, run]) => isResolvingAnswers(run, now))
+          .map(([id]) => id),
+      ),
+    }),
+    [lastRuns, now],
+  );
 }
 
 /**
@@ -2014,6 +2079,10 @@ function PlanRow({
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
   searching: boolean;
 }) {
+  // Ticks, so a re-shape that ages out stops holding this row's buttons shut
+  // without the page being navigated. 0 before mount, which is what keeps the
+  // server render and the first client one agreeing.
+  const runNow = useClockNow();
   // A question lives in its step's panel rather than as a row of its own, so
   // the Dismissed view would otherwise be a list of steps to open one at a
   // time. The rows that hold something put aside start open there.
@@ -2074,7 +2143,12 @@ function PlanRow({
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
   const health = healthOf(node);
-  const move = moveFor(node);
+  const resolving = useResolving(lastRuns, runNow);
+  const move = moveFor(node, resolving);
+  // Whether this row itself is the one being re-read. The rollup above would
+  // also be true of a feature whose child is being re-shaped, and it is the
+  // child's buttons that should be shut, not this one's.
+  const beingResolved = resolving.resolving?.has(node.id) ?? false;
 
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
@@ -2160,6 +2234,9 @@ function PlanRow({
           {
             id: 'send',
             label: sendLabel(node),
+            // Shut for the same reason the button beside it is: the menu is
+            // the phone's copy of that button, not a way round it.
+            disabled: beingResolved,
             formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
             formFields: { id: node.id },
           },
@@ -2703,6 +2780,7 @@ function PlanRow({
                   batchPending={batchPending}
                   reshapeAction={reshapeAction}
                   reshapePending={reshapePending}
+                  resolving={beingResolved}
                   quiet={
                     !sendState.error &&
                     !sendState.message &&

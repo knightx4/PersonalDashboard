@@ -22,6 +22,30 @@ export type RunEnd = 'finished' | 'failed';
 export type RunStatus = 'started' | RunEnd;
 
 /**
+ * Which press started the run.
+ *
+ * The button, not the routine: two of these fire the same plan routine with
+ * different briefs, and what somebody reading the record wants to know is what
+ * was asked for. `raise` is the one that is not a button -- writing an answer
+ * on a raise is the press -- and it is its own job rather than a `comment` for
+ * the same reason: the brief is the raise and the answer, not a question asked
+ * on a row.
+ *
+ * Here rather than in `runs.ts`, which is server-only: the plan page tells a
+ * re-shape run from a build run in the browser.
+ */
+export type RunJob =
+  | 'step'
+  | 'feature'
+  | 'queue'
+  | 'reshape'
+  | 'shape'
+  | 'notes'
+  | 'review'
+  | 'comment'
+  | 'raise';
+
+/**
  * How long a run may say nothing before it is counted as gone.
  *
  * The same two hours a claim on a step gets, because it is the same question
@@ -37,7 +61,33 @@ export type LastRun = {
   createdAt: string;
   /** Why it did not finish. Null on every run that is going or that did. */
   error: string | null;
+  /** Which press started it. What tells a re-shape from a build. */
+  job: RunJob;
 };
+
+/**
+ * Whether a feature is being re-read against the answers just given.
+ *
+ * Answering the last open question under a feature fires a re-shape at it, and
+ * that run takes a few minutes to assess what was settled, propose what it
+ * changes and clear what it made pointless. The plan said nothing about that
+ * window: the questions went green, the feature went back to reading like
+ * ordinary work, and Send was live on steps a run was about to rewrite.
+ *
+ * So it is a state of its own, read off the run that is doing it -- the same
+ * `plan_runs` row the answer wrote, still `started` and not yet past the
+ * cutoff. `runEnd` decides "still going" for every other reading of a run and
+ * decides it here too, because two answers to that would disagree by next
+ * month.
+ *
+ * `now` of 0 is the clock's pre-mount value, the same rule as everywhere else:
+ * nothing has aged out at that instant, so the server and the first client
+ * render agree.
+ */
+export function isResolvingAnswers(run: LastRun | null | undefined, now: number): boolean {
+  if (!run || run.job !== 'reshape') return false;
+  return runEnd(run, null, now) === null && run.status === 'started';
+}
 
 /**
  * What a run that still reads `started` should be written back as, or null

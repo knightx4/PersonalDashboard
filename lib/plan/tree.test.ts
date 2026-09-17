@@ -1367,4 +1367,51 @@ describe('moveOf', () => {
       ).toBe('yours');
     });
   });
+
+  describe('resolving', () => {
+    const feature = (children: PlanItem[] = []) =>
+      shopping(tree([at('not_started', 'f'), ...children])).nodes[0];
+    const whileResolving = { resolving: new Set(['f']) };
+
+    it('says so while a re-shape is re-reading the feature', () => {
+      expect(moveOf(feature(), whileResolving)).toBe('resolving');
+    });
+
+    // The run writes proposed rows as it goes, and each one is something to
+    // approve. Ranked under "on you", the feature would flip to "Needs you"
+    // halfway through a run that is still rewriting it.
+    it('outranks a proposal the run itself has just written', () => {
+      expect(moveOf(feature([at('proposed', 's1', { parentId: 'f' })]), whileResolving)).toBe(
+        'resolving',
+      );
+    });
+
+    it('outranks a question left open beneath it', () => {
+      expect(
+        moveOf(
+          feature([at('not_started', 'q', { parentId: 'f', kind: 'decision' })]),
+          whileResolving,
+        ),
+      ).toBe('resolving');
+    });
+
+    // A re-shape can be asked for on a feature that already shipped.
+    it('outranks settled', () => {
+      const sections = shopping(tree([at('done', 'f'), at('done', 's1', { parentId: 'f' })]));
+      expect(moveOf(sections.nodes[0], whileResolving)).toBe('resolving');
+    });
+
+    it('is not claimed of a feature no re-shape is running against', () => {
+      expect(moveOf(feature(), { resolving: new Set(['somebody-else']) })).toBe('yours');
+      expect(moveOf(feature())).toBe('yours');
+    });
+
+    // The set holds the feature the run was fired at. A step beneath it is not
+    // itself being re-read, and it is the feature's buttons that shut.
+    it('does not spread down to the steps beneath it', () => {
+      const sections = shopping(tree([at('not_started', 'f'), at('not_started', 's1', { parentId: 'f' })]));
+      const step = findNode([sections], 's1')!;
+      expect(moveOf(step, whileResolving)).toBe('yours');
+    });
+  });
 });

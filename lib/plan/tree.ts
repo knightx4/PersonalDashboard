@@ -568,6 +568,7 @@ function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
  * disagreement would be between a column and the button beside it.
  */
 export const PLAN_MOVES = [
+  'resolving',
   'on_you',
   'with_dash',
   'for_dash',
@@ -578,6 +579,18 @@ export const PLAN_MOVES = [
 export type PlanMove = (typeof PLAN_MOVES)[number];
 
 /**
+ * What the move cannot be worked out from the tree alone.
+ *
+ * `resolving` is the only one: a re-shape is a run against a feature, and a
+ * run is a row in another table. Passed in as the ids rather than read here,
+ * because this file is pure and the page is what holds the runs.
+ */
+export type MoveContext = {
+  /** Feature ids a re-shape is running against right now. */
+  resolving?: ReadonlySet<string>;
+};
+
+/**
  * Most pressing first, and so the order a parent reports from.
  *
  * "On you" outranks everything because it is the only one that stops on your
@@ -585,6 +598,7 @@ export type PlanMove = (typeof PLAN_MOVES)[number];
  * step held up by another, which outranks work nobody has handed anywhere.
  */
 const MOVE_RANK: readonly PlanMove[] = [
+  'resolving',
   'on_you',
   'with_dash',
   'for_dash',
@@ -594,7 +608,15 @@ const MOVE_RANK: readonly PlanMove[] = [
 ];
 
 /** This row alone, ignoring everything beneath it. */
-function ownMove(node: MoveInput): PlanMove {
+function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
+  // First, and above even "on you", because it is the one state that is true
+  // of the whole feature right now and the only one with something to say
+  // about what a press would do. A re-shape writes proposed rows as it goes,
+  // and each of those is a thing to approve -- so ranked any lower, a feature
+  // would flip to "On you" halfway through a run that is still rewriting it,
+  // and the questions it is about to raise would be answered against a plan
+  // that is mid-edit. It clears when the run does.
+  if (context?.resolving?.has(node.id)) return 'resolving';
   if (isClosed(node.status) || isDismissed({ dismissedAt: node.dismissedAt ?? null })) {
     return 'settled';
   }
@@ -610,7 +632,7 @@ function ownMove(node: MoveInput): PlanMove {
 
 type MoveInput = Pick<
   PlanNode,
-  'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
+  'id' | 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
 > & {
   dismissedAt?: string | null;
   children?: readonly PlanNode[];
@@ -627,10 +649,12 @@ type MoveInput = Pick<
  * reason `healthOf` does -- a question added under a shipped feature is still
  * a question.
  */
-export function moveOf(node: MoveInput): PlanMove {
+export function moveOf(node: MoveInput, context?: MoveContext): PlanMove {
   const rows: MoveInput[] = [node, ...descendantsOf(node)];
   const moves = new Set(
-    rows.filter((row) => !isDismissed({ dismissedAt: row.dismissedAt ?? null })).map(ownMove),
+    rows
+      .filter((row) => !isDismissed({ dismissedAt: row.dismissedAt ?? null }))
+      .map((row) => ownMove(row, context)),
   );
   return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
