@@ -31,9 +31,25 @@
   color-scheme: light;
   --c-sheet-scheme: light;
 
-  --c-canvas: #faf9f6;
-  --c-surface: #ffffff;
-  --c-raised: #ffffff;
+  /* The sheet is paper, not #ffffff.
+   *
+   * It used to be pure white, which cost two things. On Paper itself the card
+   * was the one surface in the theme carrying no warmth at all -- a cold slab
+   * on a warm page, with a warm well inside it. And in every generated light
+   * theme it stayed that way: the cast lifts a neutral to CAST_CHROMA while
+   * holding its luminance, and #ffffff is luminance 1.0, where sRGB has room
+   * for no chroma whatsoever. Ask for a blue light theme and the bench, the
+   * wells and the borders turned blue while the cards -- the largest lit area
+   * on the screen -- stayed white. The note calling them "pure white parts
+   * that dont respond to color" was measuring exactly this.
+   *
+   * So the sheet sits just under white, which is where printed paper is
+   * anyway, and the lift has somewhere to move it. Raised is a step above it
+   * rather than the same value twice, so a menu over a card reads as lifted
+   * off it without a border being asked to say so. Law 11. */
+  --c-canvas: #f7f4ed;
+  --c-surface: #fdfbf5;
+  --c-raised: #fffdf7;
   --c-sunken: #f2f0ea;
   --c-border: #e8e5df;
   --c-border-strong: #d5d1c8;
@@ -91,7 +107,12 @@
   --c-status-offer-tint: #ecfdf5;
   --c-status-rejected: #b91c1c;
   --c-status-rejected-tint: #fef2f2;
-  --c-status-ghosted: #78716c;
+  /* Two shades down from #78716c, which is what the well moving down cost.
+   * Ghosted is the one pipeline ink drawn on --c-canvas, and it was sitting at
+   * 4.56:1 there -- six hundredths over the floor, so the well could not be
+   * darkened by a single step without it failing. Darkening the ink instead
+   * buys the room and raises every other ground it sits on with it. */
+  --c-status-ghosted: #726b66;
   --c-status-ghosted-tint: #fafaf9;
 
   /* Turned up from 0.035: at that level the grain did not survive a 1x

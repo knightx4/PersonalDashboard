@@ -568,6 +568,7 @@ function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
  * disagreement would be between a column and the button beside it.
  */
 export const PLAN_MOVES = [
+  'resolving',
   'on_you',
   'with_dash',
   'for_dash',
@@ -578,6 +579,18 @@ export const PLAN_MOVES = [
 export type PlanMove = (typeof PLAN_MOVES)[number];
 
 /**
+ * What the move cannot be worked out from the tree alone.
+ *
+ * `resolving` is the only one: a re-shape is a run against a feature, and a
+ * run is a row in another table. Passed in as the ids rather than read here,
+ * because this file is pure and the page is what holds the runs.
+ */
+export type MoveContext = {
+  /** Feature ids a re-shape is running against right now. */
+  resolving?: ReadonlySet<string>;
+};
+
+/**
  * Most pressing first, and so the order a parent reports from.
  *
  * "On you" outranks everything because it is the only one that stops on your
@@ -585,6 +598,7 @@ export type PlanMove = (typeof PLAN_MOVES)[number];
  * step held up by another, which outranks work nobody has handed anywhere.
  */
 const MOVE_RANK: readonly PlanMove[] = [
+  'resolving',
   'on_you',
   'with_dash',
   'for_dash',
@@ -594,7 +608,15 @@ const MOVE_RANK: readonly PlanMove[] = [
 ];
 
 /** This row alone, ignoring everything beneath it. */
-function ownMove(node: MoveInput): PlanMove {
+function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
+  // First, and above even "on you", because it is the one state that is true
+  // of the whole feature right now and the only one with something to say
+  // about what a press would do. A re-shape writes proposed rows as it goes,
+  // and each of those is a thing to approve -- so ranked any lower, a feature
+  // would flip to "On you" halfway through a run that is still rewriting it,
+  // and the questions it is about to raise would be answered against a plan
+  // that is mid-edit. It clears when the run does.
+  if (context?.resolving?.has(node.id)) return 'resolving';
   if (isClosed(node.status) || isDismissed({ dismissedAt: node.dismissedAt ?? null })) {
     return 'settled';
   }
@@ -610,7 +632,7 @@ function ownMove(node: MoveInput): PlanMove {
 
 type MoveInput = Pick<
   PlanNode,
-  'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
+  'id' | 'kind' | 'status' | 'waitingOn' | 'ready' | 'dependsOn' | 'assignee'
 > & {
   dismissedAt?: string | null;
   children?: readonly PlanNode[];
@@ -627,10 +649,12 @@ type MoveInput = Pick<
  * reason `healthOf` does -- a question added under a shipped feature is still
  * a question.
  */
-export function moveOf(node: MoveInput): PlanMove {
+export function moveOf(node: MoveInput, context?: MoveContext): PlanMove {
   const rows: MoveInput[] = [node, ...descendantsOf(node)];
   const moves = new Set(
-    rows.filter((row) => !isDismissed({ dismissedAt: row.dismissedAt ?? null })).map(ownMove),
+    rows
+      .filter((row) => !isDismissed({ dismissedAt: row.dismissedAt ?? null }))
+      .map((row) => ownMove(row, context)),
   );
   return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
@@ -844,79 +868,27 @@ function prune(nodes: readonly PlanNode[], view: PlanView): PlanNode[] {
  * "Everything" goes through the same pruning rather than past it, because
  * dismissed rows are hidden from every view and it is a view.
  *
- * Features are ordered by what was touched last everywhere but "Everything",
- * which keeps the plan's own order -- see `touchedAt`. Steps under a feature
- * keep that order in every view, because it is the order they are meant to be
- * built in.
+ * Nothing here reorders anything. Every view draws the modules in the fixed
+ * order lib/modules.ts gives them and the features inside each one in the
+ * plan's own order, which is the order they are numbered in.
  *
- * The module sections are ordered the same way, by the newest write among the
- * features each one is drawing -- #517's answer. Four of the nine features
- * with open work are app-wide, and that section is fixed last, so the thing
- * being worked on could sit thirty rows down its own page. "Everything" keeps
- * the fixed module order, which is what makes it the map of the plan.
+ * It used to sort both by what was touched last -- #507 for the features,
+ * #517 for the sections -- so the thing you were working on rose to the top.
+ * The cost turned out to be the thing the page is for: the plan stopped
+ * having a shape. A module was wherever this morning left it, a feature moved
+ * out from under you as you closed steps beneath it, and the same page read
+ * differently every time it was opened, so nothing could be found twice in the
+ * same place. A fixed order you can learn beats a helpful one you cannot, and
+ * the views themselves are what narrow the page to what is being worked on.
+ *
+ * `prune` is still per view, and a view other than "Everything" still drops a
+ * module with nothing left in it.
  */
 export function applyView(sections: readonly PlanSection[], view: PlanView): PlanSection[] {
-  if (view === 'all') {
-    return sections.map((section) => ({ ...section, nodes: prune(section.nodes, view) }));
-  }
-
-  return sections
-    .map((section) => {
-      const when = recencyOf(section.nodes);
-      const nodes = prune(section.nodes, view);
-      return {
-        section: { ...section, nodes: byRecency(nodes, when) },
-        touched: newestOf(nodes, when),
-      };
-    })
-    .filter((drawn) => drawn.section.nodes.length > 0)
-    .sort((a, b) => b.touched.localeCompare(a.touched))
-    .map((drawn) => drawn.section);
-}
-
-/**
- * When a feature was last worked: the newest write to it or to anything
- * beneath it, which a trigger on `plan_items` keeps. Closing a step writes to
- * the step, so it lifts the feature above it -- that is what #507 settled.
- */
-export function touchedAt(node: PlanNode): string {
-  return flatten([node]).reduce(
-    (latest, step) => (step.updatedAt > latest ? step.updatedAt : latest),
-    '',
-  );
-}
-
-/**
- * When each feature was last worked, by id.
- *
- * Read off the features as they stand, not as a view left them. The step you
- * closed an hour ago is the reason its feature is the one you are on, and the
- * view has just dropped that step for being closed.
- */
-function recencyOf(whole: readonly PlanNode[]): Map<string, string> {
-  return new Map(whole.map((node) => [node.id, touchedAt(node)]));
-}
-
-/**
- * The features you were last in the middle of, first.
- *
- * Only at the top of a section. Nine features have open work and nothing told
- * them apart, so the one you opened ten minutes ago sat wherever it was
- * created and the page opened on somebody else's Tuesday. Nothing to maintain
- * and nothing to remember: it moves under you as you work.
- */
-function byRecency(nodes: readonly PlanNode[], when: Map<string, string>): PlanNode[] {
-  return [...nodes].sort((a, b) =>
-    (when.get(b.id) ?? touchedAt(b)).localeCompare(when.get(a.id) ?? touchedAt(a)),
-  );
-}
-
-/** The newest of those, over the features a section is about to draw. */
-function newestOf(nodes: readonly PlanNode[], when: Map<string, string>): string {
-  return nodes.reduce((latest, node) => {
-    const at = when.get(node.id) ?? touchedAt(node);
-    return at > latest ? at : latest;
-  }, '');
+  const drawn = sections.map((section) => ({ ...section, nodes: prune(section.nodes, view) }));
+  // "Everything" is the only view that keeps a module with nothing in it: the
+  // empty section is the invitation to plan that module.
+  return view === 'all' ? drawn : drawn.filter((section) => section.nodes.length > 0);
 }
 
 /**

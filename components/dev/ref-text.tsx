@@ -1,4 +1,4 @@
-import { planRefHref, splitOnRefs } from '@/lib/comments/refs';
+import { planRefHref, planRefLabel, splitOnRefs, type PlanRefTitles } from '@/lib/comments/refs';
 
 /**
  * Plain text, with its step numbers turned into links.
@@ -16,7 +16,7 @@ import { planRefHref, splitOnRefs } from '@/lib/comments/refs';
  * The caller keeps its own `whitespace-pre-wrap`, and the fragments preserve
  * every newline and run of spaces the raise was written with.
  */
-export function RefText({ text }: { text: string }) {
+export function RefText({ text, titles }: { text: string; titles?: PlanRefTitles }) {
   const parts = splitOnRefs(text);
   if (!parts.some((part) => part.ref !== null)) return <>{text}</>;
 
@@ -30,7 +30,7 @@ export function RefText({ text }: { text: string }) {
             key={index}
             href={planRefHref(part.ref)}
             className="comment-ref underline underline-offset-2 hover:text-accent"
-            title={`Step ${part.text} on the plan`}
+            title={planRefLabel(part.ref, titles)}
           >
             {part.text}
           </a>

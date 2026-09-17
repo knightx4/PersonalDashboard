@@ -39,7 +39,7 @@ import {
   stopOvernightRun,
 } from '@/lib/plan/overnight';
 import { nextPlanPosition } from '@/lib/plan/position';
-import { startRoutineRun } from '@/lib/plan/runs';
+import { reshapeUnderway, startRoutineRun } from '@/lib/plan/runs';
 import { PLAN_SEED } from '@/lib/plan/seed';
 import {
   buildPlanTree,
@@ -1050,6 +1050,17 @@ export async function reshapePlanFeature(
   if (node.children.length === 0) {
     return {
       error: `#${node.number} is a step, not a feature. A re-shape re-reads a feature against what has been settled beneath it, and nothing is beneath this one.`,
+    };
+  }
+
+  // Two re-shapes at one feature within three minutes is what raise b1d138ce
+  // recorded: the second read the tree before the first had written anything,
+  // and both wrote the same question. A re-shape claims nothing, so the live-
+  // claim guard above never saw it; this is the guard it needed, off the run
+  // row the first one wrote.
+  if (await reshapeUnderway(supabase, user.id, node.id, Date.now())) {
+    return {
+      error: `#${node.number} is already being re-read. Wait for that to finish rather than starting a second one over the top of it.`,
     };
   }
 

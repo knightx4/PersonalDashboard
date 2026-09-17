@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   RUN_QUIET_AFTER_MINUTES,
+  isResolvingAnswers,
   lastRunLine,
   runEnd,
   runQuietNote,
@@ -63,6 +64,7 @@ describe('lastRunLine', () => {
     status: 'started',
     createdAt: fired,
     error: null,
+    job: 'step',
     ...over,
   });
 
@@ -88,5 +90,43 @@ describe('lastRunLine', () => {
     expect(lastRunLine(run({ status: 'failed' }), at(60))).toBe(
       'Last run stopped: no reason recorded',
     );
+  });
+});
+
+describe('isResolvingAnswers', () => {
+  const reshape = (over: Partial<LastRun> = {}): LastRun => ({
+    status: 'started',
+    createdAt: fired,
+    error: null,
+    job: 'reshape',
+    ...over,
+  });
+
+  it('is true while the re-shape the answer fired is still going', () => {
+    expect(isResolvingAnswers(reshape(), at(1))).toBe(true);
+    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES - 1))).toBe(true);
+  });
+
+  it('clears once the run is past the cutoff', () => {
+    expect(isResolvingAnswers(reshape(), at(RUN_QUIET_AFTER_MINUTES))).toBe(false);
+  });
+
+  it('clears the moment the run is written back as over', () => {
+    expect(isResolvingAnswers(reshape({ status: 'finished' }), at(1))).toBe(false);
+    expect(isResolvingAnswers(reshape({ status: 'failed' }), at(1))).toBe(false);
+  });
+
+  it('is not every run: a build session on the feature is not resolving anything', () => {
+    expect(isResolvingAnswers(reshape({ job: 'step' }), at(1))).toBe(false);
+    expect(isResolvingAnswers(reshape({ job: 'feature' }), at(1))).toBe(false);
+  });
+
+  it('holds before the clock has mounted, so the two renders agree', () => {
+    expect(isResolvingAnswers(reshape(), 0)).toBe(true);
+  });
+
+  it('is false where there is no run at all', () => {
+    expect(isResolvingAnswers(null, at(1))).toBe(false);
+    expect(isResolvingAnswers(undefined, at(1))).toBe(false);
   });
 });

@@ -29,7 +29,14 @@ import {
   type FireRoutineResult,
   type RoutineTarget,
 } from '@/lib/feedback/routine';
-import { runEnd, runQuietNote, type LastRun, type RunStatus } from './run-end';
+import {
+  isResolvingAnswers,
+  runEnd,
+  runQuietNote,
+  type LastRun,
+  type RunJob,
+  type RunStatus,
+} from './run-end';
 import { listPushes } from './ci';
 import {
   abandonedClaim,
@@ -47,23 +54,12 @@ type Db = SupabaseClient<any, 'public'>;
 /**
  * Which press started the run.
  *
- * The button, not the routine: two of these fire the same plan routine with
- * different briefs, and what somebody reading the record wants to know is what
- * was asked for. `raise` is the one that is not a button -- writing an answer
- * on a raise is the press -- and it is its own job rather than a `comment` for
- * the same reason: the brief is the raise and the answer, not a question asked
- * on a row.
+ * Defined in `run-end.ts` and re-exported here, where it has always been read
+ * from. This file is server-only and the plan page names a run's job in the
+ * browser, so the vocabulary has to live on the browser-safe side of the pair
+ * -- the same reason the rest of the pure run rules are over there.
  */
-export type RunJob =
-  | 'step'
-  | 'feature'
-  | 'queue'
-  | 'reshape'
-  | 'shape'
-  | 'notes'
-  | 'review'
-  | 'comment'
-  | 'raise';
+export type { RunJob } from './run-end';
 
 /** A `plan_runs` row, ready to insert. */
 export type RunRow = {
@@ -359,6 +355,48 @@ export async function readRunLiveness(input: {
 }
 
 /**
+ * Whether a re-shape is re-reading this feature right now.
+ *
+ * The guard behind the greyed-out buttons on the page. The page decides from
+ * the runs it already loaded; a press arrives from whatever the browser had on
+ * screen, which may be minutes old, so the same question is asked again here
+ * against the row rather than trusted from the client.
+ *
+ * `isResolvingAnswers` is the one rule for it, shared with the page, so the
+ * button and the action cannot come to different answers about the same run.
+ */
+export async function reshapeUnderway(
+  supabase: Db,
+  userId: string,
+  featureId: string,
+  now: number,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('plan_runs')
+    .select('status, error, created_at, job')
+    .eq('user_id', userId)
+    .eq('plan_item_id', featureId)
+    .eq('job', 'reshape')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  // A guard that cannot read the table lets the press through. Refusing on a
+  // failed read would make a database hiccup look like a permanent lock, and
+  // the collision it protects against is rarer than that.
+  if (error || !data || data.length === 0) return false;
+
+  const row = data[0] as { status: string; error: string | null; created_at: string; job: string };
+  return isResolvingAnswers(
+    {
+      status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
+      createdAt: row.created_at,
+      error: row.error,
+      job: 'reshape',
+    },
+    now,
+  );
+}
+
+/**
  * The last run against each step, by step id.
  *
  * One read of the account's runs rather than one per row: there are tens of
@@ -370,7 +408,7 @@ export async function loadLastRuns(
 ): Promise<Record<string, LastRun>> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('plan_item_id, status, error, created_at')
+    .select('plan_item_id, status, error, created_at, job')
     .eq('user_id', userId)
     .not('plan_item_id', 'is', null)
     .order('created_at', { ascending: false });
@@ -385,12 +423,14 @@ export async function loadLastRuns(
     status: string;
     error: string | null;
     created_at: string;
+    job: string;
   }>) {
     if (last[row.plan_item_id]) continue;
     last[row.plan_item_id] = {
       status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
       createdAt: row.created_at,
       error: row.error,
+      job: row.job as RunJob,
     };
   }
   return last;

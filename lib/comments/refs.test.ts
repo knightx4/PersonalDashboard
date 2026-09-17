@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRefHref, planRowId, splitOnRefs } from './refs';
+import { planRefHref, planRefLabel, planRowId, splitOnRefs } from './refs';
 
 /** The refs found in a body, in order. */
 function refs(text: string): number[] {
@@ -78,5 +78,24 @@ describe('planRefHref', () => {
 
   it('agrees with the id the row carries', () => {
     expect(planRefHref(494).endsWith(`#${planRowId(494)}`)).toBe(true);
+  });
+});
+
+describe('planRefLabel', () => {
+  const titles = { 494: 'A step says when a session is working on it', 63: 'Which permission' };
+
+  it('names the step, so the number can be read without following it', () => {
+    expect(planRefLabel(494, titles)).toBe(
+      '#494 — A step says when a session is working on it',
+    );
+  });
+
+  it('falls back where the page does not know the plan', () => {
+    expect(planRefLabel(494)).toBe('Step #494 on the plan');
+    expect(planRefLabel(494, {})).toBe('Step #494 on the plan');
+  });
+
+  it('says nothing made up about a number the plan no longer holds', () => {
+    expect(planRefLabel(9999, titles)).toBe('Step #9999 on the plan');
   });
 });

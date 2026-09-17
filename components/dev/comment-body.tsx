@@ -1,7 +1,7 @@
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { splitOnMention } from '@/lib/comments/mention';
-import { planRefHref, splitOnRefs } from '@/lib/comments/refs';
+import { planRefHref, planRefLabel, splitOnRefs, type PlanRefTitles } from '@/lib/comments/refs';
 
 /**
  * What one comment says, laid out.
@@ -108,17 +108,17 @@ function walk(node: Node): void {
  */
 const OPAQUE = new Set(['link', 'linkReference', 'definition', 'mention']);
 
-function markPlanRefs() {
-  return (tree: Node) => walkRefs(tree);
+function markPlanRefs(titles?: PlanRefTitles) {
+  return () => (tree: Node) => walkRefs(tree, titles);
 }
 
-function walkRefs(node: Node): void {
+function walkRefs(node: Node, titles?: PlanRefTitles): void {
   if (!node.children || OPAQUE.has(node.type)) return;
 
   const out: Node[] = [];
   for (const child of node.children) {
     if (child.type !== 'text' || typeof child.value !== 'string') {
-      walkRefs(child);
+      walkRefs(child, titles);
       out.push(child);
       continue;
     }
@@ -141,7 +141,7 @@ function walkRefs(node: Node): void {
                 hProperties: {
                   href: planRefHref(part.ref),
                   className: ['comment-ref'],
-                  title: `Step ${part.text} on the plan`,
+                  title: planRefLabel(part.ref, titles),
                 },
               },
             }
@@ -152,11 +152,11 @@ function walkRefs(node: Node): void {
   node.children = out;
 }
 
-export function CommentBody({ body }: { body: string }) {
+export function CommentBody({ body, titles }: { body: string; titles?: PlanRefTitles }) {
   return (
     <div className="comment-prose">
       <Markdown
-        remarkPlugins={[remarkGfm, markMentions, markPlanRefs]}
+        remarkPlugins={[remarkGfm, markMentions, markPlanRefs(titles)]}
         allowedElements={ALLOWED}
         unwrapDisallowed
         components={{

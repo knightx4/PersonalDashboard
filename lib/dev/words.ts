@@ -93,6 +93,7 @@ export const DISMISSED_WORD = 'Dismissed';
  * (law 1).
  */
 export const PLAN_MOVE_WORD: Record<PlanMove, string> = {
+  resolving: 'Resolving answers',
   on_you: 'Needs you',
   with_dash: 'With Dash',
   for_dash: 'For Dash',

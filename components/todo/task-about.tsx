@@ -19,11 +19,36 @@ import { pointTaskAt, unpointTask } from '@/app/todo/actions';
  * appears when there is one, because a control that does nothing is a control
  * that lies.
  *
+ * On a narrow row there is no room for either. Passing `open` puts the finder
+ * under the row's overflow menu instead: the component draws no buttons of its
+ * own and is only the panel, because the two it would otherwise add are the
+ * third and fourth icon in a row that is allowed three. Unlinking moves into
+ * that menu with them, so nothing is lost by taking the buttons away.
+ *
  * The chip itself is drawn by the row, from the anchor the page resolved. This
  * writes and lets the page come back with the answer.
  */
-export function TaskAbout({ taskId, linked }: { taskId: string; linked: boolean }) {
-  const [open, setOpen] = useState(false);
+export function TaskAbout({
+  taskId,
+  linked,
+  open: openProp,
+  onOpenChange,
+}: {
+  taskId: string;
+  linked: boolean;
+  /** Set to drive the finder from somewhere else; the buttons go away with it. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const controlled = openProp !== undefined;
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = controlled ? openProp : ownOpen;
+
+  function setOpen(next: boolean) {
+    if (controlled) onOpenChange?.(next);
+    else setOwnOpen(next);
+  }
+
   const [pending, start] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -33,20 +58,24 @@ export function TaskAbout({ taskId, linked }: { taskId: string; linked: boolean 
 
   return (
     <span className="relative inline-flex items-center gap-0.5">
-      <button
-        ref={triggerRef}
-        type="button"
-        title={linked ? 'Point it at something else' : 'What is this about?'}
-        aria-expanded={open}
-        disabled={pending}
-        onClick={() => setOpen((on) => !on)}
-        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
-      >
-        <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">{linked ? 'Point it at something else' : 'What is this about?'}</span>
-      </button>
+      {!controlled && (
+        <button
+          ref={triggerRef}
+          type="button"
+          title={linked ? 'Point it at something else' : 'What is this about?'}
+          aria-expanded={open}
+          disabled={pending}
+          onClick={() => setOpen(!open)}
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
+        >
+          <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+          <span className="sr-only">
+            {linked ? 'Point it at something else' : 'What is this about?'}
+          </span>
+        </button>
+      )}
 
-      {linked && (
+      {!controlled && linked && (
         <button
           type="button"
           title="Not about anything"

@@ -20,6 +20,7 @@ import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { RefText } from '@/components/dev/ref-text';
+import type { PlanRefTitles } from '@/lib/comments/refs';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -41,14 +42,14 @@ function scopeLabel(module: ModuleId | null): string {
  * it. The label is there so a row reads as a request rather than as a report:
  * a page of paragraphs is a page nobody can clear.
  */
-function Ask({ ask }: { ask: string }) {
+function Ask({ ask, titles }: { ask: string; titles?: PlanRefTitles }) {
   return (
     <div className="space-y-0.5">
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Needs from you
       </p>
       <p className="whitespace-pre-wrap text-body text-ink">
-        <RefText text={ask} />
+        <RefText text={ask} titles={titles} />
       </p>
     </div>
   );
@@ -60,14 +61,14 @@ function Ask({ ask }: { ask: string }) {
  * answer worth something. A raise filed before there was a column for it shows
  * nothing here.
  */
-function Consequence({ said }: { said: string }) {
+function Consequence({ said, titles }: { said: string; titles?: PlanRefTitles }) {
   return (
     <div className="space-y-0.5">
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
         Answering yes
       </p>
       <p className="whitespace-pre-wrap text-body text-ink-muted">
-        <RefText text={said} />
+        <RefText text={said} titles={titles} />
       </p>
     </div>
   );
@@ -210,7 +211,7 @@ function Decide({ row }: { row: RaisedRow }) {
   );
 }
 
-function RaiseCard({ row }: { row: RaisedRow }) {
+function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) {
   const [dismissState, dismissAction, dismissPending] = useActionState(
     dismissRaise,
     {} as RaisedActionState,
@@ -248,12 +249,12 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           so it keeps it open rather than hiding itself behind a fold. */}
       {row.ask ? (
         <>
-          <Ask ask={row.ask} />
-          {row.consequence && <Consequence said={row.consequence.said} />}
+          <Ask ask={row.ask} titles={titles} />
+          {row.consequence && <Consequence said={row.consequence.said} titles={titles} />}
           {row.detail && (
             <Disclosure title="Why it came up" meta={lead(row.detail)}>
               <p className="whitespace-pre-wrap text-body text-ink">
-                <RefText text={row.detail} />
+                <RefText text={row.detail} titles={titles} />
               </p>
             </Disclosure>
           )}
@@ -261,7 +262,7 @@ function RaiseCard({ row }: { row: RaisedRow }) {
       ) : (
         row.detail && (
           <p className="whitespace-pre-wrap text-body text-ink">
-            <RefText text={row.detail} />
+            <RefText text={row.detail} titles={titles} />
           </p>
         )
       )}
@@ -279,6 +280,7 @@ function RaiseCard({ row }: { row: RaisedRow }) {
         thread={row.thread}
         label="Answer in your own words"
         placeholder="What you want done about this. A session reads it, does it, and replies here."
+        titles={titles}
       />
 
       {/* Also on one that reached answered with nothing recorded: that raise is
@@ -329,7 +331,16 @@ function RaiseCard({ row }: { row: RaisedRow }) {
  * kept so that a session can read the answer back rather than so you can read
  * it again.
  */
-export function RaisedView({ queue, waiting }: { queue: RaisedQueue; waiting: WaitingRow[] }) {
+export function RaisedView({
+  queue,
+  waiting,
+  titles,
+}: {
+  queue: RaisedQueue;
+  waiting: WaitingRow[];
+  /** What each step number in a raise is called, for the hover text. */
+  titles?: PlanRefTitles;
+}) {
   const onYou = waiting.length + queue.open.length;
 
   return (
@@ -348,10 +359,10 @@ export function RaisedView({ queue, waiting }: { queue: RaisedQueue; waiting: Wa
             {/* Plan steps first: a step that has stopped is work already begun
                 and not moving, where a raise is a question that can wait. */}
             {waiting.map((row) => (
-              <WaitingCard key={row.id} row={row} />
+              <WaitingCard key={row.id} row={row} titles={titles} />
             ))}
             {queue.open.map((row) => (
-              <RaiseCard key={row.id} row={row} />
+              <RaiseCard key={row.id} row={row} titles={titles} />
             ))}
           </ul>
         </SectionFold>
@@ -365,7 +376,7 @@ export function RaisedView({ queue, waiting }: { queue: RaisedQueue; waiting: Wa
           </p>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.unfinished.map((row) => (
-              <RaiseCard key={row.id} row={row} />
+              <RaiseCard key={row.id} row={row} titles={titles} />
             ))}
           </ul>
         </SectionFold>
@@ -377,7 +388,7 @@ export function RaisedView({ queue, waiting }: { queue: RaisedQueue; waiting: Wa
         <SectionFold title="Closed" count={queue.closed.length} defaultOpen={false}>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {queue.closed.map((row) => (
-              <RaiseCard key={row.id} row={row} />
+              <RaiseCard key={row.id} row={row} titles={titles} />
             ))}
           </ul>
         </SectionFold>
