@@ -40,7 +40,9 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # file a follow-on on /dev/ideas; it lands
                                                # marked as your suggestion, under the
                                                # user's own ideas. --from names the step
-                                               # you were on when you thought of it.
+                                               # you were on when you thought of it. One
+                                               # close to an idea already filed is refused
+                                               # and names what it matched.
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
                                 [--detail "…"] [--module <id>] [--from <n>]
