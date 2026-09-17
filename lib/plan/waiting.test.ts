@@ -22,6 +22,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     fogDismissedAt: null,
     comment: null,
     blockAsk: null,
+    blockKind: null,
     thread: [],
     priority: 2,
     size: null,

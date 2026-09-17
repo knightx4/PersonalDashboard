@@ -21,8 +21,10 @@ import {
   PLAN_PRIORITIES,
   PLAN_SIZES,
   PLAN_STATUSES,
+  blockPatch,
   isClosed,
   isDismissed,
+  isPlanBlockKind,
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
@@ -197,6 +199,9 @@ export async function addPlanItem(
     acceptance: parsed.data.acceptance || null,
     status: parsed.data.status,
     kind: parsed.data.kind,
+    // A step written straight into blocked still has to say which kind of
+    // block it is; the form does not ask, so it takes the default.
+    ...blockPatch(parsed.data.status),
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
@@ -257,11 +262,18 @@ export async function updatePlanItem(
 
   const { data: current } = await supabase
     .from('plan_items')
-    .select('parent_id, module, fog')
+    .select('parent_id, module, fog, block_kind')
     .eq('user_id', user.id)
     .eq('id', parsed.data.id)
     .maybeSingle();
   if (!current) return { error: 'That step no longer exists.' };
+
+  // A step already blocked keeps the kind it was blocked with. This form saves
+  // the whole row at once, and rewriting the kind because somebody fixed a
+  // typo in the detail would turn a block that clears itself into one that
+  // does not.
+  const storedKind = current.block_kind as string | null;
+  const blockKind = storedKind && isPlanBlockKind(storedKind) ? storedKind : null;
 
   const patch: Record<string, unknown> = {
     title: parsed.data.title,
@@ -274,6 +286,9 @@ export async function updatePlanItem(
     comment: parsed.data.comment || null,
     commit_sha: parsed.data.commit || null,
     status: parsed.data.status,
+    // The same rule the status control follows: a blocked row carries a kind,
+    // and a step saved out of blocked loses the ask and the kind together.
+    ...blockPatch(parsed.data.status, blockKind),
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
@@ -363,13 +378,20 @@ export async function setPlanItemStatus(
   // session does will move it -- and a row left assigned sits in the Claude's
   // view carrying the reason it cannot be worked. Whoever blocks it should not
   // have to remember to unhand it as a second step.
-  const patch: Record<string, string | null> = { status: status.data };
+  // Blocking from here records the kind of block as well, because the
+  // database will not take a blocked row without one. It is `outside` — the
+  // default in lib/plan/load.ts — and that is what this control has always
+  // meant: the comment above says the step needs something outside the repo.
+  // A block that really is waiting on other steps is a row in
+  // plan_dependencies, or `plan.ts block --on-steps` from a session parking
+  // its own step behind a question.
+  //
+  // Moving a step off blocked drops both: the sentence saying what it needed
+  // and the word saying who could supply it. Both are claims about work that
+  // has stopped, and this control is one of the ways it starts again; the
+  // dated line in the comment is the record either way.
+  const patch: Record<string, string | null> = { status: status.data, ...blockPatch(status.data) };
   if (status.data === 'blocked') patch.assignee = null;
-
-  // Moving a step off blocked drops the sentence saying what it needed. It is
-  // a claim about work that has stopped, and this control is one of the ways
-  // it starts again; the dated line in the comment is the record either way.
-  if (status.data !== 'blocked') patch.block_ask = null;
 
   // Marking a step underway yourself puts it in your queue, if it was in
   // nobody's.

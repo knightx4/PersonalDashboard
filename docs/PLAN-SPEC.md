@@ -173,6 +173,18 @@ clears itself: the moment the other step is done, this one is ready, and
 nobody has to remember to come back and unblock it. `blocked` is for waiting
 on the outside world — an answer, an API key, a decision.
 
+Rows given both — blocked, and with dependencies naming what they wait for —
+record which they mean in `plan_items.block_kind`, settled by #525 and added
+by migration 0081. `steps` is a block on the rows it names, and it clears
+itself when they all close. `outside` is a block on something only the person
+can supply, and it stays blocked however much else closes. The database
+refuses a row that says `blocked` without one, every path that blocks a step
+writes it (the status control, the edit form, `plan.ts block --on-steps`), and
+it is cleared whenever the step stops being blocked, like `block_ask`. A block
+written without saying which is taken as `outside`: a block that outlives its
+reason is a row somebody looks at, and one that clears itself too early is an
+afternoon a session loses.
+
 ## Proposals: from an idea to the plan
 
 An idea on `/dev/ideas` is a sentence. A plan step needs a parent, steps
