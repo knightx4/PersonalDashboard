@@ -1,4 +1,4 @@
-import { Package, Search, SearchX } from 'lucide-react';
+import { Package, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
@@ -7,12 +7,12 @@ import { SelectionProvider } from '@/components/ui/selection';
 import { LeftRail, RailGroup, RailItem, RailPicker } from '@/components/shell/left-rail';
 import { AttributeFilterPicker } from './attribute-filter-picker';
 import { PageHeader } from '@/components/shell/page-header';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
-import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { backfillUserInventoryDisplay } from '@/lib/inventory/backfill-display';
 import { filterAndRankBySearch } from '@/lib/inventory/search';
@@ -436,8 +436,10 @@ export default async function InventoryPage({
     rows.reduce((sum, item) => sum + item.cost_cents, 0),
   );
 
+  // A search that matched nothing is the shared empty state; this is the other
+  // kind of nothing, where a filter rather than a search emptied the shelf.
   const filtered = Boolean(
-    q || categoryId || activeMerchant || activeList || range !== 'all' || attrFilters.length,
+    categoryId || activeMerchant || activeList || range !== 'all' || attrFilters.length,
   );
 
   // The shares that exist, so a filtered shelf can be sent to one in a click.
@@ -691,35 +693,13 @@ export default async function InventoryPage({
 
           <FilterChips chips={chips} clearAllHref="/shopping/inventory" />
 
-          <form className="mb-4 space-y-3" action="/shopping/inventory" method="get">
-            {range !== 'all' && <input type="hidden" name="range" value={range} />}
-            {categoryId && <input type="hidden" name="category" value={categoryId} />}
-            {activeMerchant && <input type="hidden" name="merchant" value={activeMerchant} />}
-            {activeList && <input type="hidden" name="list" value={activeList} />}
-            {personId && <input type="hidden" name="person" value={personId} />}
-            {attrFilters.map((filter) => (
-              <input
-                key={`${filter.key}:${filter.value}`}
-                type="hidden"
-                name="attr"
-                value={serializeAttributeFilter(filter)}
-              />
-            ))}
-
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <Input
-                name="q"
-                defaultValue={q}
-                placeholder="Search what you own — try makeup, lipstick, kitchen…"
-                aria-label="Search inventory"
-                className="pl-9"
-              />
-            </div>
+          {/* Directly above the list it narrows, under the chips that say what
+              is already in force. The range, the category, the merchant, the
+              list, whose it is, the item-detail filters and the arrangement are
+              all on the URL, and the field carries them, so searching from a
+              narrowed shelf stays narrowed. */}
+          <div className="mb-4 space-y-3">
+            <SearchField placeholder="Search what you own — try makeup, lipstick, kitchen…" />
 
             {/* One Display control where two selects were: the sorts, the
               groupings and a switch per column, all of them links. #329 --
@@ -728,27 +708,21 @@ export default async function InventoryPage({
               two selects sat, and both are about the list below them. */}
             <div className="flex flex-wrap items-center gap-2">
               <DisplayMenu menu={menu} align="start" />
-              <SubmitOnChange />
-              {/* Still the only way through with JavaScript off, and still
-                what submits the search box. */}
-              <Button type="submit" variant="secondary" size="sm" data-fallback-submit>
-                Apply
-              </Button>
               {q && (
                 <p className="text-small text-ink-muted">Sorted by relevance while searching</p>
               )}
             </div>
-          </form>
+          </div>
 
-          {finalItems.length === 0 ? (
+          {finalItems.length === 0 && q ? (
+            <SearchEmpty query={q} />
+          ) : finalItems.length === 0 ? (
             <EmptyState
               icon={filtered ? SearchX : Package}
               title={filtered ? 'No matching items' : 'Nothing in your inventory yet'}
               description={
                 filtered
-                  ? q
-                    ? 'Nothing matched that search across names, tags, and categories. You probably don’t own it.'
-                    : 'Try a different search, list, merchant, category, or date range.'
+                  ? 'Try a different list, merchant, category, or date range.'
                   : 'Every item from an order lands here as its own entry, so you can search what you own, mark things returned, or record that you got rid of them.'
               }
               action={
