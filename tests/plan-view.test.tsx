@@ -130,6 +130,7 @@ function render(view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocke
       empty={empty}
       canSend={false}
       lastRuns={{}}
+      commitChecks={{}}
       queued={handedToClaude(whole).length}
     />,
   );
@@ -182,6 +183,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={0}
       />,
     );
@@ -302,6 +304,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={handedToClaude(nobodys).length}
       />,
     );
@@ -333,6 +336,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={0}
       />,
     );
@@ -361,6 +365,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={0}
       />,
     );
@@ -390,6 +395,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={0}
       />,
     );
@@ -431,6 +437,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={0}
       />,
     );
@@ -470,6 +477,7 @@ describe('PlanView', () => {
         empty={false}
         canSend={false}
         lastRuns={{}}
+        commitChecks={{}}
         queued={0}
       />,
     );
@@ -507,6 +515,7 @@ describe('PlanView', () => {
           empty={false}
           canSend={false}
           lastRuns={{}}
+          commitChecks={{}}
           queued={0}
         />,
       );
@@ -542,6 +551,7 @@ describe('PlanView', () => {
           empty={false}
           canSend={false}
           lastRuns={{}}
+          commitChecks={{}}
           queued={0}
         />,
       );
@@ -604,5 +614,69 @@ describe('health and status, as two columns', () => {
 
   it('says a step held up by another is held up', () => {
     expect(render('all')).toContain('Held up');
+  });
+});
+
+/**
+ * What CI said about a shipped step, on the row.
+ *
+ * The answer is kept against the commit the step closed at, so the page draws
+ * it from a map rather than from the row -- which is exactly the kind of wiring
+ * that typechecks and then shows nothing.
+ */
+describe('the CI mark on a closed step', () => {
+  const shipped = buildPlanTree({
+    items: [
+      item({ id: 'red', title: 'Landed on a red commit', status: 'done', commitSha: 'aaaaaaa' }),
+      item({ id: 'green', title: 'Landed on a green commit', status: 'done', commitSha: 'bbbbbbb' }),
+      item({ id: 'new', title: 'Nobody has looked yet', status: 'done', commitSha: 'ccccccc' }),
+    ],
+    dependencies: [],
+  });
+
+  const html = renderToStaticMarkup(
+    <PlanView
+      sections={applyView(shipped, 'all')}
+      finished={[]}
+      summary={summarize(shipped)}
+      view="all"
+      catalog={[]}
+      empty={false}
+      canSend={false}
+      lastRuns={{}}
+      commitChecks={{
+        aaaaaaa: { mergeSha: 'f12facc', conclusion: 'failed', checkedAt: '2026-09-17T03:00:00Z' },
+        bbbbbbb: { mergeSha: 'f12facc', conclusion: 'passed', checkedAt: '2026-09-17T03:00:00Z' },
+      }}
+      queued={0}
+    />,
+  );
+
+  // From the row's own title up to its status menu, which is the end of the
+  // step cell and the start of the next column. Anything else would let the
+  // row above lend its mark to the row below.
+  const row = (title: string) => {
+    const from = html.indexOf(title);
+    expect(from).toBeGreaterThan(-1);
+    const to = html.indexOf('Status of #', from);
+    expect(to).toBeGreaterThan(from);
+    return html.slice(from, to);
+  };
+
+  it('marks the step that landed on a failing commit', () => {
+    expect(row('Landed on a red commit')).toContain('CI failed');
+  });
+
+  it('leaves a step whose checks passed unmarked', () => {
+    expect(row('Landed on a green commit')).not.toContain('CI failed');
+    expect(row('Landed on a green commit')).not.toContain('Not checked');
+  });
+
+  it('says so on a step with no answer yet, rather than letting it look green', () => {
+    expect(row('Nobody has looked yet')).toContain('Not checked');
+  });
+
+  it('names the merge the checks were read from', () => {
+    expect(html).toContain('the merge that put this on main');
   });
 });
