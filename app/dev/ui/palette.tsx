@@ -8,7 +8,7 @@ import {
   parseTheme,
   THEME_CHOICE_ATTRIBUTE,
   THEME_COLOURS,
-  THEME_MODES,
+  THEME_ROOMS,
   type Theme,
 } from '@/lib/theme';
 import { generatePalette } from '@/lib/theme/palette';
@@ -32,7 +32,7 @@ import { FIXED_STRIP, HUE_SWEEP, PALETTE_STRIP } from './palette-tokens';
 function describe(theme: Theme): string {
   if (theme.kind === 'system') return 'Following the system';
   if (theme.kind === 'written') return `${theme.id[0]!.toUpperCase()}${theme.id.slice(1)}`;
-  const mode = THEME_MODES.find((option) => option.id === theme.mode)?.label ?? theme.mode;
+  const mode = THEME_ROOMS.find((option) => option.id === theme.mode)?.label ?? theme.mode;
   if (theme.hue === null) return `${mode}, no colour`;
   const preset = THEME_COLOURS.find((colour) => colour.hue === theme.hue);
   return preset ? `${mode}, ${preset.label.toLowerCase()}` : `${mode}, ${theme.hue}°`;

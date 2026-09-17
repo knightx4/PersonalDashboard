@@ -129,7 +129,8 @@ export function parseTheme(value: string | null | undefined): Theme {
   if (isThemeId(text)) return { kind: 'written', id: text };
 
   const [mode, hue] = text.split(':');
-  if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox') return SYSTEM_THEME;
+  if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox' && mode !== 'darkroom')
+    return SYSTEM_THEME;
   if (hue === undefined) return { kind: 'generated', mode, hue: null };
 
   const degrees = Number(hue);
@@ -162,6 +163,7 @@ export function modeOf(theme: Theme): ThemeMode {
   if (theme.kind === 'generated') return theme.mode;
   if (theme.kind === 'system') return 'light';
   if (theme.id === 'lightbox') return 'lightbox';
+  if (theme.id === 'darkroom') return 'darkroom';
   return THEMES.find((written) => written.id === theme.id)?.scheme ?? 'light';
 }
 
@@ -171,18 +173,59 @@ export function hueOf(theme: Theme): number | null {
 }
 
 /**
- * The three rooms the switch offers.
+ * A room, as the picker asks for it: two questions, not one.
  *
- * Light and dark are the two polarities. Lightbox is the third because it is
- * both at once -- lit sheets on a dark bench -- and so cannot be reached by
- * switching one of them. All three take a colour: what the colour moves
- * differs, and lib/theme/reference.ts says how.
+ * Light or dark is the polarity. Solid or lightbox is the surface -- whether
+ * the app is a flat page or a set of sheets floating on a lit bench. They are
+ * independent, so all four combinations exist and each one takes a colour.
+ *
+ * It used to be one list of three: light, dark, and lightbox as a third thing
+ * that was "both at once". That was true of the theme and false of the
+ * question -- it made lightbox a polarity you could not be light or dark
+ * inside of, and there was no way to ask for the dark one at all.
+ *
+ * In solid the polarity decides everything. In lightbox the bench is dark
+ * either way and the polarity decides only what a SHEET is made of: lit paper,
+ * or smoked glass.
  */
-export const THEME_MODES: readonly { id: ThemeMode; label: string; mood: string }[] = [
+export const THEME_POLARITIES: readonly { id: Polarity; label: string; mood: string }[] = [
+  { id: 'light', label: 'Light', mood: 'Warm, printed, quiet' },
+  { id: 'dark', label: 'Dark', mood: 'Near-black, low chroma' },
+];
+
+export const THEME_SURFACES: readonly { id: Surface; label: string; mood: string }[] = [
+  { id: 'solid', label: 'Solid', mood: 'One flat ground, edge to edge' },
+  { id: 'lightbox', label: 'Lightbox', mood: 'Sheets floating on a lit bench' },
+];
+
+export type Polarity = 'light' | 'dark';
+export type Surface = 'solid' | 'lightbox';
+
+/** The two answers, as the one mode everything downstream keys off. */
+export function modeFor(polarity: Polarity, surface: Surface): ThemeMode {
+  if (surface === 'solid') return polarity;
+  return polarity === 'light' ? 'lightbox' : 'darkroom';
+}
+
+/**
+ * The four rooms as one list, for the places that need to name or offer a room
+ * rather than ask the two questions -- the command palette, and the swatch
+ * table on /dev/ui. The picker itself uses the two axes above, because two
+ * questions are what it asks.
+ */
+export const THEME_ROOMS: readonly { id: ThemeMode; label: string; mood: string }[] = [
   { id: 'light', label: 'Light', mood: 'Warm, printed, quiet' },
   { id: 'dark', label: 'Dark', mood: 'Near-black, low chroma' },
   { id: 'lightbox', label: 'Lightbox', mood: 'Lit sheets on a dark bench' },
+  { id: 'darkroom', label: 'Darkroom', mood: 'Smoked glass on the same bench' },
 ];
+
+/** And back again, for putting the switch where the current theme is. */
+export function partsOf(mode: ThemeMode): { polarity: Polarity; surface: Surface } {
+  if (mode === 'lightbox') return { polarity: 'light', surface: 'lightbox' };
+  if (mode === 'darkroom') return { polarity: 'dark', surface: 'lightbox' };
+  return { polarity: mode, surface: 'solid' };
+}
 
 /**
  * The five colours the picker offers.

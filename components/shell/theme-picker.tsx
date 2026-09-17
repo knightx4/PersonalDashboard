@@ -13,7 +13,12 @@ import {
   modeOf,
   THEME_CHOICE_ATTRIBUTE,
   THEME_COLOURS,
-  THEME_MODES,
+  THEME_POLARITIES,
+  THEME_SURFACES,
+  modeFor,
+  partsOf,
+  type Polarity,
+  type Surface,
   type GeneratedTheme,
   type Theme,
   type ThemeMode,
@@ -198,8 +203,24 @@ export function ThemePicker({ value }: { value: Theme }) {
     });
   }
 
-  /** Changing the polarity keeps the colour, and the other way round. */
-  const inMode = (next: ThemeMode): GeneratedTheme => ({ kind: 'generated', mode: next, hue });
+  /**
+   * Each of the three controls moves its own axis and leaves the other two.
+   *
+   * A room is two answers -- light or dark, solid or lightbox -- so changing
+   * one of them has to keep the other, which is what `partsOf` is for: read
+   * the current room apart, replace one half, put it back together.
+   */
+  const here = partsOf(mode);
+  const inPolarity = (next: Polarity): GeneratedTheme => ({
+    kind: 'generated',
+    mode: modeFor(next, here.surface),
+    hue,
+  });
+  const inSurface = (next: Surface): GeneratedTheme => ({
+    kind: 'generated',
+    mode: modeFor(here.polarity, next),
+    hue,
+  });
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
 
   return (
@@ -236,18 +257,44 @@ export function ThemePicker({ value }: { value: Theme }) {
             Theme
           </p>
 
-          <div role="radiogroup" aria-label="Room" className="flex gap-1 px-1 pb-1">
-            {THEME_MODES.map((option) => {
+          <div role="radiogroup" aria-label="Light or dark" className="flex gap-1 px-1 pb-1">
+            {THEME_POLARITIES.map((option) => {
               // Following the system is not one of these, so nothing is
               // checked until a room has actually been chosen.
-              const on = showing.kind !== 'system' && mode === option.id;
+              const on = showing.kind !== 'system' && here.polarity === option.id;
               return (
                 <button
                   key={option.id}
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  onClick={() => save(inMode(option.id))}
+                  onClick={() => save(inPolarity(option.id))}
+                  title={option.mood}
+                  className={cn(
+                    'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',
+                    on ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="px-2 pb-1.5 pt-2 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+            Surface
+          </p>
+
+          <div role="radiogroup" aria-label="Surface" className="flex gap-1 px-1 pb-1">
+            {THEME_SURFACES.map((option) => {
+              const on = showing.kind !== 'system' && here.surface === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => save(inSurface(option.id))}
                   title={option.mood}
                   className={cn(
                     'press flex-1 rounded-md px-2 py-1.5 text-small font-medium transition-colors',

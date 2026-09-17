@@ -14,7 +14,7 @@ import { useCapture } from '@/components/shell/capture';
 import { matchCaptureActions } from '@/lib/capture/actions';
 import { setTheme } from '@/app/theme-actions';
 import { MODULES, type ModuleId } from '@/lib/modules';
-import { formatTheme, hueOf, modeOf, THEME_COLOURS, THEME_MODES, type Theme } from '@/lib/theme';
+import { formatTheme, hueOf, modeOf, THEME_COLOURS, THEME_ROOMS, type Theme } from '@/lib/theme';
 import { applyTheme } from '@/lib/theme/apply';
 import type { NavSection } from '@/components/shell/app-shell';
 
@@ -164,10 +164,10 @@ function themeCommands(theme: Theme): Command[] {
   const mode = modeOf(theme);
   const hue = hueOf(theme);
 
-  const here = THEME_MODES.find((option) => option.id === mode);
+  const here = THEME_ROOMS.find((option) => option.id === mode);
 
   return [
-    ...THEME_MODES.map((option) => ({
+    ...THEME_ROOMS.map((option) => ({
       id: `theme:${option.id}`,
       label: `Theme: ${option.label}`,
       hint: 'Keeps the colour you are in',

@@ -41,17 +41,22 @@ import {
 export type { Palette, ThemeMode } from './reference';
 
 /** The written palette a mode with no colour already is. */
-const PLAIN: Record<ThemeMode, 'paper' | 'ink' | 'lightbox'> = {
+const PLAIN: Record<ThemeMode, 'paper' | 'ink' | 'lightbox' | 'darkroom'> = {
   light: 'paper',
   dark: 'ink',
   lightbox: 'lightbox',
+  darkroom: 'darkroom',
 };
 
 /** The palette a mode with a colour turns, and whose hue it turns from. */
-const CAST: Record<ThemeMode, 'paper' | 'dusk' | 'lightbox'> = {
+const CAST: Record<ThemeMode, 'paper' | 'dusk' | 'lightbox' | 'darkroom'> = {
   light: 'paper',
   dark: 'dusk',
   lightbox: 'lightbox',
+  // Its own, not Dusk's: a glass room turns a different token list and turns
+  // it from its own bench, so borrowing the solid dark reference would rotate
+  // the wrong things from the wrong place.
+  darkroom: 'darkroom',
 };
 
 /**

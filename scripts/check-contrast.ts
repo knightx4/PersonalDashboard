@@ -49,7 +49,7 @@ const WRITTEN: Record<string, Vars> = Object.fromEntries(
  */
 const HUE_STEP = 15;
 
-const MODES = ['light', 'dark', 'lightbox'] as const;
+const MODES = ['light', 'dark', 'lightbox', 'darkroom'] as const;
 
 const GENERATED: Record<string, Vars> = Object.fromEntries(
   MODES.flatMap((mode) =>
