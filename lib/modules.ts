@@ -172,9 +172,10 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'dev',
     prefix: '/dev',
-    // Bugs and requests, not the ideas list: the queue is the thing with work
-    // in it, and the ideas are what you read when there is none.
-    home: '/dev/bugs',
+    // Dash, not the bug list: every bug report is closed, and Dash is the one
+    // page that carries what is still waiting -- the raises, the blocked steps
+    // and the questions nobody has answered.
+    home: '/dev/raised',
     label: 'Dev',
     description: 'Bugs, the build plan and long-term ideas for this app',
     accent: '--color-w-dev',
