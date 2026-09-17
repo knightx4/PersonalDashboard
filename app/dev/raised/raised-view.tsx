@@ -8,6 +8,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
+import type { WaitingRow } from '@/lib/plan/waiting';
+import { WaitingCard } from './waiting-view';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
@@ -291,10 +293,12 @@ function RaiseCard({ row }: { row: RaisedRow }) {
  * kept so that a session can read the answer back rather than so you can read
  * it again.
  */
-export function RaisedView({ queue }: { queue: RaisedQueue }) {
+export function RaisedView({ queue, waiting }: { queue: RaisedQueue; waiting: WaitingRow[] }) {
+  const onYou = waiting.length + queue.open.length;
+
   return (
     <div className="space-y-6">
-      {queue.open.length === 0 && (
+      {onYou === 0 && (
         <EmptyState
           icon={MessageCircleQuestion}
           title="Nothing waiting on you"
@@ -302,9 +306,14 @@ export function RaisedView({ queue }: { queue: RaisedQueue }) {
         />
       )}
 
-      {queue.open.length > 0 && (
-        <SectionFold title="Waiting on you" count={queue.open.length}>
+      {onYou > 0 && (
+        <SectionFold title="Waiting on you" count={onYou}>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+            {/* Plan steps first: a step that has stopped is work already begun
+                and not moving, where a raise is a question that can wait. */}
+            {waiting.map((row) => (
+              <WaitingCard key={row.id} row={row} />
+            ))}
             {queue.open.map((row) => (
               <RaiseCard key={row.id} row={row} />
             ))}
