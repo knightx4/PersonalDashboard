@@ -2,7 +2,13 @@
 
 import { useActionState, useState } from 'react';
 import { MessageCircleQuestion } from 'lucide-react';
-import { decideRaise, dismissRaise, reopenRaise, type RaisedActionState } from './actions';
+import {
+  closeRaise,
+  decideRaise,
+  dismissRaise,
+  reopenRaise,
+  type RaisedActionState,
+} from './actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FieldError, Textarea } from '@/components/ui/field';
@@ -79,11 +85,15 @@ function lead(detail: string): string {
 }
 
 /**
- * A closed raise, worded the way the other dev queues word it.
+ * A raise that is no longer open, worded the way the other dev queues word it.
  *
  * "Answered" is this queue's own -- a raise closes on a reply, which is not the
  * same as the work being finished. A raise you turned down is the same fact as
- * a step dropped or a note declined, so it takes the shared word.
+ * a step dropped or a note declined, so it takes the shared word, and so does
+ * one you are finished with.
+ *
+ * `closed` is quiet rather than positive: it is the row you have read and put
+ * away, and the green is for the state that still wants looking at.
  *
  * Nothing on an open one: they are all under a heading that already says
  * "Waiting on you", and repeating it on every row would be the same fact twice.
@@ -91,7 +101,8 @@ function lead(detail: string): string {
 const HEALTH_TONE: Record<RaisedHealth, DevTone> = {
   waiting: 'caution',
   unfinished: 'caution',
-  done: 'positive',
+  answered: 'positive',
+  closed: 'quiet',
   dropped: 'ghost',
 };
 
@@ -138,6 +149,9 @@ function Decide({ row }: { row: RaisedRow }) {
       <form action={action} className="w-full space-y-2">
         <input type="hidden" name="id" value={row.id} />
         <input type="hidden" name="answer" value="no" />
+        {/* ui-ok: composer-always-open -- this whole branch renders only after
+          * "No, and here is why" is pressed. The guard is an early return on
+          * `saying`, which the gate reads only in its `if (!open)` shape. */}
         <Textarea
           name="body"
           rows={2}
@@ -162,6 +176,8 @@ function Decide({ row }: { row: RaisedRow }) {
       <input type="hidden" name="id" value={row.id} />
       <input type="hidden" name="answer" value="yes" />
       {saying === 'more' && (
+        // ui-ok: composer-always-open -- opened by "Yes, and…" and closed
+        // otherwise. The gate reads `{flag && (` and not a comparison.
         <Textarea
           name="body"
           rows={2}
@@ -199,10 +215,19 @@ function RaiseCard({ row }: { row: RaisedRow }) {
     dismissRaise,
     {} as RaisedActionState,
   );
+  const [closeState, closeAction, closePending] = useActionState(
+    closeRaise,
+    {} as RaisedActionState,
+  );
   const [reopenState, reopenAction, reopenPending] = useActionState(
     reopenRaise,
     {} as RaisedActionState,
   );
+
+  // Answered and something came of it, so the only thing left is you saying
+  // you have read it. An answered raise with nothing recorded is not this: it
+  // is offered the Decide form above instead, because it still owes an outcome.
+  const canClose = row.status === 'answered' && Boolean(row.outcome);
 
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
@@ -245,14 +270,15 @@ function RaiseCard({ row }: { row: RaisedRow }) {
           the first thing you want to know is what it was doing at the time. */}
       {row.source && <p className="text-small text-ink-muted">Raised by {row.source}</p>}
 
-      {/* One thread, two ways into it. Answering closes the raise; a comment
-          says something about it and leaves it open. */}
+      {/* One thread, two ways into it. The buttons answer the ask it named;
+          what you write here is an answer in your own words, and it starts a
+          session that acts on it and replies under you. */}
       <CommentThread
         target="raise"
         id={row.id}
         thread={row.thread}
-        label="Add a comment"
-        placeholder="Something about this raise that is not the answer to it. Tag @dash to ask; it stays open."
+        label="Answer in your own words"
+        placeholder="What you want done about this. A session reads it, does it, and replies here."
       />
 
       {/* Also on one that reached answered with nothing recorded: that raise is
@@ -268,14 +294,24 @@ function RaiseCard({ row }: { row: RaisedRow }) {
             </Button>
           </form>
         ) : (
-          <form action={reopenAction}>
-            <input type="hidden" name="id" value={row.id} />
-            <Button type="submit" size="sm" variant="ghost" pending={reopenPending}>
-              Reopen
-            </Button>
-          </form>
+          <>
+            {canClose && (
+              <form action={closeAction}>
+                <input type="hidden" name="id" value={row.id} />
+                <Button type="submit" size="sm" variant="secondary" pending={closePending}>
+                  Close it
+                </Button>
+              </form>
+            )}
+            <form action={reopenAction}>
+              <input type="hidden" name="id" value={row.id} />
+              <Button type="submit" size="sm" variant="ghost" pending={reopenPending}>
+                Reopen
+              </Button>
+            </form>
+          </>
         )}
-        <FieldError>{dismissState.error ?? reopenState.error}</FieldError>
+        <FieldError>{dismissState.error ?? closeState.error ?? reopenState.error}</FieldError>
       </div>
     </li>
   );

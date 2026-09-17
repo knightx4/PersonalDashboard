@@ -160,6 +160,56 @@ export async function decideRaise(
 }
 
 /**
+ * Filing one you are finished with.
+ *
+ * Answering a raise is you replying, which is not the same as being done with
+ * it: a yes that files an idea leaves the work behind it, and the reply a
+ * session owes on an answer is often written days later. So an answered raise
+ * stayed answered and read that way for as long as it existed, with nothing
+ * past it but a dismissal, which says something else entirely.
+ *
+ * Only offered on a raise that is already answered and carries an outcome. The
+ * rule #367 holds -- a raise closes on what it produced -- and closing is not a
+ * second way of answering one, so an open raise is refused here rather than
+ * given a quiet way out of being answered.
+ */
+// latency: pending
+export async function closeRaise(
+  _prev: RaisedActionState,
+  formData: FormData,
+): Promise<RaisedActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing raise.' };
+
+  const { data: raise } = await supabase
+    .from('raised_items')
+    .select('status, outcome')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!raise) return { error: 'That raise no longer exists.' };
+  if (raise.status !== 'answered') {
+    return { error: 'Only an answered raise can be closed. Answer it or dismiss it.' };
+  }
+  if (!raise.outcome) {
+    return { error: 'Nothing is recorded as coming of this one. Close it with a reason instead.' };
+  }
+
+  const { error } = await supabase
+    .from('raised_items')
+    .update({ status: 'closed' })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/dev/raised');
+  return { message: 'Closed.' };
+}
+
+/**
  * Closing a raise without saying anything.
  *
  * The answer to some of these is that they did not need asking, and a page
@@ -188,7 +238,7 @@ export async function dismissRaise(
   return { message: 'Dismissed.' };
 }
 
-/** Putting one back in the open list, for a dismissal you want back. */
+/** Putting one back in the open list, for a row you closed or dismissed too soon. */
 // latency: pending
 export async function reopenRaise(
   _prev: RaisedActionState,

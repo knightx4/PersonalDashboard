@@ -40,12 +40,16 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # file a follow-on on /dev/ideas; it lands
                                                # marked as your suggestion, under the
                                                # user's own ideas. --from names the step
-                                               # you were on when you thought of it.
+                                               # you were on when you thought of it. One
+                                               # close to an idea already filed is refused
+                                               # and names what it matched. Two an hour
+                                               # is the most a session can file.
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
                                 [--detail "…"] [--module <id>] [--from <n>]
                                                # ask the person something. Never answered by you.
 npx tsx scripts/plan.ts raises                 # open raises, and answers no session has replied to
+                                               # a closed one is finished with and is not listed
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.

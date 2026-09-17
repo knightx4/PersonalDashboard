@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn';
 import { KindBadge } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { ProbeOptions } from '@/components/learn/probe-options';
+import { WrittenAnswer } from '@/components/learn/written-answer';
 import {
   answerQuestion,
   approveFloor,
@@ -155,17 +156,21 @@ export function ProbeSession({
   const [answerState, answer] = useActionState<AskState, FormData>(answerQuestion, state);
 
   // The answer action carries the question forward, so whichever ran last is
-  // the live one.
-  const live = answerState.answered ? answerState : state;
+  // the live one. An answer that could not be graded counts: the question is
+  // still on screen and the reason it was not graded belongs under it.
+  const live = answerState.answered || answerState.error ? answerState : state;
   const percent = live.percent ?? startingPercent;
 
   return (
     <>
       <Bar percent={percent} />
 
-      {live.question && live.options ? (
+      {live.question ? (
         <div className={cardVariants({ padding: 'standard' })}>
           <p className="text-small text-ink-muted">{live.conceptName}</p>
+          {/* The case, on the applied rung. Read first, then the thing to say
+              about it, which is why they are two paragraphs rather than one. */}
+          {live.situation && <p className="mt-1 text-body text-ink">{live.situation}</p>}
           <p className="mt-1 text-body text-ink">{live.question}</p>
 
           <form action={answer} className="mt-4 space-y-2">
@@ -173,7 +178,11 @@ export function ProbeSession({
             <input type="hidden" name="conceptId" value={live.conceptId} />
             <input type="hidden" name="subjectId" value={subjectId} />
 
-            <ProbeOptions options={live.options} answered={live.answered ?? null} />
+            {live.options ? (
+              <ProbeOptions options={live.options} answered={live.answered ?? null} />
+            ) : (
+              <WrittenAnswer response={live.answered?.response ?? null} />
+            )}
           </form>
 
           {live.answered && (
@@ -182,8 +191,17 @@ export function ProbeSession({
                 {live.answered.correct ? 'Right.' : 'Not this time.'}
               </p>
               {/* Written when the question was, not in response to what was
-                  picked. That is what makes it worth reading. */}
+                  picked. That is what makes it worth reading. On the applied
+                  rung it is the grader's sentence about what was typed, and
+                  the answer the case was written with is below it. */}
               <p className="mt-1 text-body text-ink">{live.answered.reason}</p>
+
+              {live.answered.expected && (
+                <>
+                  <p className="mt-3 text-small text-ink-muted">The answer expected</p>
+                  <p className="mt-0.5 text-body text-ink">{live.answered.expected}</p>
+                </>
+              )}
 
               {!live.answered.correct && live.answered.weight === 0 && (
                 // A part of the idea you had already missed. Said out loud,

@@ -2,6 +2,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
+import { endQuietRuns, loadLastRuns } from '@/lib/plan/runs';
+import { loadCommitChecks, refreshCommitChecks } from '@/lib/plan/ci';
 import { planRoutine } from '@/lib/feedback/routine';
 import {
   applyView,
@@ -69,7 +71,21 @@ export default async function DevPlanPage({
   // so rather than the page falling over.
   const sync = await syncPlanFromSeed(supabase, user.id);
 
-  const data = await loadPlan(supabase, user.id);
+  // Before the runs are read, so a run that ended hours ago is drawn as ended
+  // on this render rather than still saying it is going. Nothing reports the
+  // end of a run, so this is where it gets noticed.
+  await endQuietRuns({ supabase, userId: user.id });
+
+  // And what CI said about the commits the closed steps shipped in. Nothing is
+  // asked of GitHub unless some commit has no answer yet, so this costs a
+  // request only after something new has been closed.
+  const checks = await refreshCommitChecks({ supabase, userId: user.id });
+
+  const [data, lastRuns, commitChecks] = await Promise.all([
+    loadPlan(supabase, user.id),
+    loadLastRuns(supabase, user.id),
+    loadCommitChecks(supabase, user.id),
+  ]);
   const whole = buildPlanTree(data);
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
@@ -112,12 +128,17 @@ export default async function DevPlanPage({
       {sync.error && (
         <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
       )}
+      {checks.error && (
+        <p className="text-small text-ink-muted">Could not read CI: {checks.error}</p>
+      )}
       <PlanViewComponent
         sections={sections}
         finished={finished}
         summary={summary}
         view={view}
         catalog={catalog}
+        lastRuns={lastRuns}
+        commitChecks={commitChecks}
         empty={data.items.length === 0}
         canSend={Boolean(planRoutine().token)}
         queued={handedToClaude(whole).length}

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListChecks, Search } from 'lucide-react';
+import { ListChecks } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks, loadParentTitles } from '@/lib/todo/tasks/load';
@@ -7,9 +7,10 @@ import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/field';
 import { TaskRow } from '@/components/todo/task-row';
 import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
@@ -76,8 +77,8 @@ export default async function AllTasksPage({
 
       {focus && <FocusTask id={focus} />}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <nav className="flex items-center gap-1" aria-label="Filter by status">
+      <div className="flex flex-col gap-3">
+        <nav className="flex flex-wrap items-center gap-1" aria-label="Filter by status">
           {FILTERS.map((filter) => {
             const href = { pathname: '/todo/all', query: { status: filter.id, ...(search ? { q: search } : {}) } };
             return (
@@ -98,25 +99,17 @@ export default async function AllTasksPage({
           })}
         </nav>
 
-        {/* A plain GET form: a search box that needs JavaScript to search is a
-            search box that does not work on a slow connection. */}
-        <form action="/todo/all" className="ml-auto flex items-center gap-2">
-          <input type="hidden" name="status" value={status} />
-          <Input
-            type="search"
-            name="q"
-            defaultValue={search}
-            placeholder="Search titles"
-            aria-label="Search titles"
-            className="w-48"
-          />
-        </form>
+        {/* Directly above the list it narrows, like every other list in the
+            app. The status filter rides along in the URL, so searching stays
+            inside the tab you are on. */}
+        <SearchField placeholder="Search titles" />
       </div>
 
-      {tasks.length === 0 ? (
+      {tasks.length === 0 && search ? (
+        <SearchEmpty query={search} className="mt-6" />
+      ) : tasks.length === 0 ? (
         <AllTasksEmpty
           status={status}
-          search={search}
           seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:todo-all`}
         />
       ) : (
@@ -154,31 +147,12 @@ export default async function AllTasksPage({
 }
 
 /**
- * Three kinds of nothing. A search that found nothing offers to clear itself;
- * an empty Open list is the list finished, so it gets the quiet-day mark; an
- * empty archive is waiting for the agenda to feed it.
+ * Two kinds of nothing, neither of them a search: an empty Open list is the
+ * list finished, so it gets the quiet-day mark, and an empty archive is
+ * waiting for the agenda to feed it. A search that matched nothing is the
+ * shared empty state, rendered by the page above.
  */
-function AllTasksEmpty({
-  status,
-  search,
-  seed,
-}: {
-  status: Filter;
-  search: string;
-  seed: string;
-}) {
-  if (search) {
-    return (
-      <EmptyState
-        icon={Search}
-        title="Nothing matched"
-        description={`No ${status === 'all' ? '' : `${status} `}task has “${search}” in its title.`}
-        action={{ label: 'Clear the search', href: `/todo/all?status=${status}` }}
-        className="mt-6"
-      />
-    );
-  }
-
+function AllTasksEmpty({ status, seed }: { status: Filter; seed: string }) {
   if (status === 'open') {
     return (
       <EmptyState

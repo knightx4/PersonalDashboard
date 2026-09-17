@@ -322,8 +322,8 @@
    * scripts/check-contrast.ts fails on. The sheets still clear the bench by
    * 11:1, so they are as lit as they ever were -- what shrank is the drop
    * from 16.9, and that step was never the point. */
-  --c-page-ground: #2b3644;
-  --c-page: #2b3644;
+  --c-page-ground: #25374f;
+  --c-page: #25374f;
   --c-page-ink: #eef2f7;
   --c-page-ink-muted: #b6c1ce;
   --c-page-ink-ghost: #8a97a7;
@@ -331,13 +331,56 @@
   --c-page-border-strong: #6d8098;
   --c-page-border-control: #8a97a7;
 
-  /* Three pools, held under 0.3 alpha so the bench never lightens enough to
-   * put the inks above out of range. Fixed to the viewport at <body>, so it
-   * reads as depth the page slides over rather than a pattern that scrolls. */
+  /* The room, and it is two colours rather than one.
+   *
+   * It used to be three blues and a violet, which on a slate bench came out as
+   * one blue haze -- and once the sheets went transparent, one blue haze read
+   * through them as grey. A ground with a single hue in it has nowhere to
+   * travel, so nothing on top of it has anything to reveal.
+   *
+   * So it runs the app's own ramp: blue at the top left, the brand violet
+   * through the middle, rose at the top right, and a deep blue holding the
+   * floor. Those are the three hexes the home mark has worn since before this
+   * app had modules -- the one gradient this product already owns -- and a
+   * card crossing the room now crosses from blue to violet to rose rather than
+   * sitting in a flat wash.
+   *
+   * Every layer only ADDS light, and that is load-bearing rather than tidy: a
+   * sheet is 20% bench, so a layer that darkens the bench darkens every sheet
+   * on it and takes the ink with it, somewhere scripts/check-contrast.ts
+   * cannot see -- it composites sheets over the flat --c-page. Checked by
+   * compositing all of them at full strength: the flat bench stays the darkest
+   * case, so the gate is a conservative bound rather than a blind spot.
+   *
+   * Fixed to the viewport at <body>, so it reads as depth the page slides over
+   * rather than a pattern that scrolls. */
   --page-wash:
-    radial-gradient(110% 75% at 15% -5%, rgb(86 118 176 / 0.3), transparent 60%),
-    radial-gradient(90% 70% at 88% 6%, rgb(104 96 170 / 0.24), transparent 55%),
-    radial-gradient(130% 110% at 55% 115%, rgb(38 74 116 / 0.3), transparent 68%);
+    radial-gradient(105% 72% at 10% -8%, rgb(58 116 214 / 0.34), transparent 60%),
+    radial-gradient(82% 78% at 88% -2%, rgb(255 107 157 / 0.30), transparent 62%),
+    /* A fourth pool, mid-right, and a ramp under all of them.
+     *
+     * The three pools above sit top-left, top-right and bottom-centre, which
+     * is a sensible arrangement for a bench nobody sees much of -- and exactly
+     * the wrong one now the sheets are transparent, because the middle-right
+     * is where the page pane is and it was the flattest part of the room. A
+     * translucent card over a flat ground is not visibly translucent; it is
+     * just a slightly grey card.
+     *
+     * The ramp is what gives a card at the top of the page and a card at the
+     * bottom different ground to sit on. It only ever ADDS light, and it fades
+     * out rather than darkening the far corner: a sheet is 20% bench now, so
+     * anything that darkens the bench darkens every sheet on it and takes the
+     * ink down with it, in a place scripts/check-contrast.ts cannot see. Light
+     * is the direction that is free. */
+    radial-gradient(75% 62% at 78% 48%, rgb(139 92 246 / 0.26), transparent 64%),
+    linear-gradient(
+      155deg,
+      rgb(120 158 248 / 0.20) 0%,
+      rgb(178 126 226 / 0.13) 36%,
+      rgb(240 122 172 / 0.10) 62%,
+      transparent 86%
+    ),
+    radial-gradient(130% 110% at 42% 118%, rgb(26 92 176 / 0.34), transparent 68%);
   --c-page-positive: #6fe0b0;
   --c-page-caution: #f5b459;
   --c-page-danger: #ff9d9d;
@@ -366,7 +409,7 @@
    * that, so an alpha that would darken a sheet out of range fails there.
    * --c-sunken is written a shade lighter than the flat value it replaces to
    * pay for the alpha: it is the darkest sheet and the one with least room. */
-  --c-canvas: rgb(231 236 242 / 0.92);
+  --c-canvas: rgb(231 236 242 / 0.88);
   /* Up from 0.9. At 0.9 over the bench the surface landed near #e3e5e7,
    * which is a grey card, not a lit one; at 0.96 it lands near #f1f3f5 and
    * is brighter than anything else on screen, which is what lit means.
@@ -377,9 +420,9 @@
    * and a warm one does not. The two sunken tokens keep their blue cast on
    * purpose: a well in a sheet is in shadow, and shadow takes the colour of
    * the room, which here is the bench. */
-  --c-surface: rgb(253 252 249 / 0.96);
-  --c-raised: rgb(255 254 250 / 0.97);
-  --c-sunken: rgb(228 234 241 / 0.92);
+  --c-surface: rgb(253 252 249 / 0.80);
+  --c-raised: rgb(255 254 250 / 0.86);
+  --c-sunken: rgb(228 234 241 / 0.86);
   --c-border: #d0d9e3;
   --c-border-strong: #a6b1bf;
 
@@ -432,7 +475,7 @@
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
-  --c-shell: #2b3644;
+  --c-shell: #25374f;
   --c-shell-ink: #eef2f7;
   --c-shell-muted: #b6c1ce;
   --c-shell-border: #3d4b5c;
@@ -931,6 +974,32 @@ body,
   --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
+/* No rubber band on the frame -- and only on the frame.
+ *
+ * From lg up the app is a fixed window: the ground is exactly the viewport and
+ * the pane inside it is what scrolls. A document with nothing to scroll still
+ * rubber-bands on macOS, which dragged the whole frame and its ground a few
+ * pixels and read as the layout coming loose. So the document is told not to.
+ *
+ * Only from lg up, because below it the document IS the thing that scrolls,
+ * and a thing that scrolls should overscroll: the bounce is the feedback that
+ * you have reached the end, and on a phone `none` here would also kill
+ * pull-to-refresh. The pane keeps `overscroll-behavior: contain` rather than
+ * `none` for exactly the same reason -- `contain` stops the gesture chaining
+ * up to the document but leaves the pane's own bounce intact, because the pane
+ * is meant to scroll.
+ *
+ * On <html>, not on <body>: overscroll-behavior propagates to the viewport
+ * from the root element and does not propagate from body, the opposite of how
+ * `overflow` behaves, which is why writing it on body looks right and does
+ * nothing.
+ */
+@media (min-width: 1024px) {
+  html {
+    overscroll-behavior: none;
+  }
+}
+
 body {
   background-color: var(--c-page);
   /* Fixed, so the wash is a light source the page moves under rather than a
@@ -1022,6 +1091,52 @@ body::before {
   mix-blend-mode: var(--grain-blend);
   content: "";
   pointer-events: none;
+}
+
+/* In Lightbox the grain goes under the content instead of over it.
+ *
+ * Everywhere else the grain is a film across the whole viewport, sheets
+ * included, and that is right: those sheets are opaque, so the only way to get
+ * texture onto them is to lay it on top.
+ *
+ * Here the sheets are alpha. The bench reads through them, and so does the
+ * bench's texture -- which is what grain on glass actually looks like, and a
+ * better answer than a film over the paper.
+ *
+ * It is also the only answer that paints. A full-viewport fixed layer sitting
+ * ABOVE a stack of alpha-composited sheets is pathological: with --c-surface
+ * at 0.96 the page renders, and at 0.80 it does not render at all -- a capture
+ * never returns, at 25 seconds or at 90. Not the blend mode (normal hangs
+ * too), not the wash, not the pane; only the sheet alpha, and only while the
+ * grain is on top. Moving it below fixes it outright. If the sheets ever go
+ * opaque again, this override should go with them.
+ */
+[data-theme='lightbox'] body::before {
+  z-index: -1;
+}
+
+/* The sheen on a sheet, and the reason the glass reads as glass.
+ *
+ * A translucent rectangle is not a pane of glass; a translucent rectangle with
+ * light running across it is. This is the one gradient that is ON the sheet
+ * rather than behind it: white catching the top-left corner and gone by the
+ * middle, at the angle the bench's own ramp runs, so the whole room is lit
+ * from the same place.
+ *
+ * It only adds light to a sheet that already carries dark ink, so it cannot
+ * take any pair below where scripts/check-contrast.ts measured it -- which is
+ * just as well, because the checker reads --c-surface and not this.
+ *
+ * On `.sheet` rather than on Card, so every surface that calls itself a sheet
+ * gets it: cards, sections, the empty state, the popovers.
+ */
+[data-theme='lightbox'] .sheet {
+  background-image: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.16) 0%,
+    rgb(255 255 255 / 0.05) 38%,
+    rgb(255 255 255 / 0) 72%
+  );
 }
 
 /* ---------------------------------------------------------------------------
@@ -1521,6 +1636,77 @@ form[data-auto-submit] [data-fallback-submit] {
   white-space: nowrap;
 }
 
+/* ---------------------------------------------------------------------------
+ * The workspace's colour, on the ground -- in Lightbox and nowhere else.
+ *
+ * A workspace used to announce itself as a hue on buttons and chips, which is
+ * both a weak signal (you have to be looking at a control to get it) and the
+ * one place the guide keeps trying to get colour out of. This puts it on the
+ * bench instead. Switching workspace changes the room, not the buttons.
+ *
+ * -- Why only here --
+ * Lightbox is the theme to play with colour in; its own note says so, and it
+ * is already built for this. It has a mid-toned bench rather than a page, it
+ * already lays three fixed radial pools over that bench, its sheets are alpha
+ * rather than flat white so the bench reads through them, and it already has
+ * a coloured bloom around every sheet. A workspace pool is a fourth pool in a
+ * theme that has three; in Paper it would be a wash on a sheet of paper.
+ *
+ * -- How it composes --
+ * As one more fixed gradient over the bench, on the element that carries
+ * `data-workspace` -- which is a div inside <body>, not <html>, so it cannot
+ * feed the body's own `--page-wash` however tidy that would have been. The
+ * shell draws no ground of its own in this theme, so the body's three pools
+ * show straight through and this lands on top of them.
+ *
+ * One gradient and no more. The first attempt gave the shell a whole ground of
+ * its own with a turbulence layer besides, and the result could not be painted
+ * at all here -- a full-viewport capture never returned, because two
+ * feTurbulence-backed background layers compositing over alpha sheets is not a
+ * thing to do. `body::before` already lays the one grain over everything,
+ * including this.
+ *
+ * The pool is held at 0.22 -- below the 0.3 the three blue pools are held at,
+ * because it is a fourth pool laid over them rather than one of them, and
+ * because scripts/check-contrast.ts composites sheets over the flat --c-page
+ * and cannot see it. Anything strong enough to move a sheet's contrast would
+ * be moving it somewhere the checker is not looking.
+ * ------------------------------------------------------------------------- */
+:root {
+  --workspace-pool: none;
+}
+
+[data-theme='lightbox'][data-workspace='shopping'] { --wash-a: 251 113 133; }
+[data-theme='lightbox'][data-workspace='jobs']     { --wash-a: 167 139 250; }
+[data-theme='lightbox'][data-workspace='todo']     { --wash-a: 56 189 248; }
+[data-theme='lightbox'][data-workspace='vault']    { --wash-a: 240 171 252; }
+[data-theme='lightbox'][data-workspace='learn']    { --wash-a: 52 211 153; }
+[data-theme='lightbox'][data-workspace='dev']      { --wash-a: 148 163 184; }
+[data-theme='lightbox'][data-workspace='news']     { --wash-a: 222 191 105; }
+
+[data-theme='lightbox'][data-workspace] {
+  /* Bottom left, where the sidebar is, reaching up across the bench. The three
+   * blue pools sit top-left, top-right and bottom-centre, so this lands in the
+   * one quarter they leave alone. */
+  --workspace-pool: radial-gradient(
+    95% 75% at 0% 100%,
+    rgb(var(--wash-a) / 0.30),
+    transparent 62%
+  );
+}
+
+.shell-ground {
+  background-color: var(--c-shell);
+}
+
+/* One bench, and the body already owns it. The shell paints no ground here so
+ * those three pools read through; the workspace pool goes on top of them. */
+[data-theme='lightbox'] .shell-ground {
+  background-color: transparent;
+  background-image: var(--workspace-pool);
+  background-attachment: fixed;
+}
+
 /* The page pane: the one thing in the shell that genuinely floats. */
 .page-pane {
   background-color: var(--c-page);
@@ -1529,26 +1715,84 @@ form[data-auto-submit] [data-fallback-submit] {
 @media (min-width: 1024px) {
   .page-pane {
     border-radius: var(--radius-pane);
+    /* The pane is the scrollport from here up, and the frame stops moving.
+     *
+     * Two complaints, one cause. Dragging past the end bounced the whole app,
+     * frame and ground and all, because the document was what scrolled. And
+     * the page scrolled straight through the pane's rounded corner and painted
+     * on the ground outside the radius -- worse, once you had scrolled at all
+     * the corner had left the viewport entirely, because the frame went up
+     * with the content.
+     *
+     * A border-radius rounds an element's own background and clips nothing, so
+     * the corner was never a cut-off. Making the pane scroll gives it one for
+     * free: a scroll container clips to its padding box, radius included, and
+     * the frame stays where it is because there is nothing left for the
+     * document to scroll.
+     *
+     * `overflow-y: auto` rather than `overflow: hidden` + a taller inner div:
+     * hidden was tried and it makes the element a scroll container that never
+     * scrolls, which then becomes the sticky containing block for everything
+     * inside it, and the top bar quietly stopped sticking. Here the pane really
+     * does scroll, so the bar sticks to it -- which is what a top bar in an
+     * application window should stick to anyway.
+     *
+     * `overscroll-behavior: contain` so reaching the end of the page does not
+     * hand the gesture up to the document. Inner regions -- the filter rail, a
+     * long menu -- keep their own default and still behave as they always did.
+     *
+     * Below lg none of this applies: there is no radius to cut against, the
+     * document scrolling is what lets a phone browser hide its URL bar, and the
+     * dock is fixed to the viewport regardless.
+     */
+    height: calc(100dvh - 0.75rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     box-shadow:
       0 1px 2px rgb(0 0 0 / 0.04),
       0 8px 24px -8px rgb(0 0 0 / 0.10);
   }
 }
 
-/* Lightbox does not float its page, and that is not an oversight.
+/* Lightbox floats its page too, but not by being a different colour.
  *
- * Its --c-shell and its --c-page are the same #2b3644 on purpose: "one bench,
- * one colour -- the sidebar and the page ground are the same surface, so a
- * card looks laid on the bench rather than floating in a second, slightly
- * different dark", as the theme's own note further up puts it. Give the pane a
- * radius and a drop in that theme and you get an invisible rectangle with a
- * shadow hanging off it, because there is no tone for the corner to cut
- * against. The cards are the objects here; the bench runs edge to edge.
+ * The first attempt here gave up: its --c-shell and its --c-page are the same
+ * #2b3644, so a pane drawn in --c-page was an invisible rectangle with a
+ * shadow hanging off it, and the note said the bench should simply run edge to
+ * edge. That was the right call for an opaque pane and the wrong one for this
+ * theme, which separates everything by light rather than by tone -- it is the
+ * only theme in the app where a sheet is already alpha and already carries a
+ * bloom.
+ *
+ * So the pane is the faintest sheet in the stack: four percent of white over
+ * the bench, no tone change at all, and a hairline of caught light along its
+ * top edge. That is enough for the corner to cut against and for the drop to
+ * have something to fall from, and it adds a third depth between the bench and
+ * the cards rather than a second colour.
+ *
+ * No backdrop-filter. It would be the obvious way to do this and it is the
+ * expensive way: a full-height blurred layer under every scrolling list in the
+ * app, on the one theme whose sheets are already alpha-composited.
  */
 [data-theme='lightbox'] .page-pane {
-  background-color: transparent;
-  border-radius: 0;
-  box-shadow: none;
+  background-color: rgb(255 255 255 / 0.03);
+  /* The same light, on the biggest piece of glass in the room. Weaker than a
+   * sheet's, because it is behind them and a lit ground competing with lit
+   * cards is how this turns to soup. */
+  background-image: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.05) 0%,
+    rgb(255 255 255 / 0.015) 40%,
+    rgb(255 255 255 / 0) 70%
+  );
+}
+
+@media (min-width: 1024px) {
+  [data-theme='lightbox'] .page-pane {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.10),
+      0 18px 48px -20px rgb(0 0 0 / 0.55);
+  }
 }
 
 /* ---------------------------------------------------------------------------

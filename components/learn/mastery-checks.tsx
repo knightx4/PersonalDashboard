@@ -1,6 +1,11 @@
 import { Check, CircleDashed, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { standingOf, type CheckStanding } from '@/lib/learn/graph/probe-payload';
+import {
+  standingOf,
+  type AskedRung,
+  type CheckStanding,
+  type Rung,
+} from '@/lib/learn/graph/probe-payload';
 
 /**
  * The checks that say what understanding a claim looks like.
@@ -42,6 +47,7 @@ function StandingMark({ standing }: { standing: CheckStanding }) {
 export function MasteryChecks({
   checks,
   answers,
+  rung = 'recognise',
   className,
 }: {
   checks: string[];
@@ -49,11 +55,13 @@ export function MasteryChecks({
    * The questions asked about this concept, when there are any to mark from.
    * Left out on a screen where nothing has been asked yet.
    */
-  answers?: readonly {
-    masteryCheck: string | null;
-    chosenIndex: number | null;
-    correctIndex: number;
-  }[];
+  answers?: readonly AskedRung[];
+  /**
+   * Which rung to mark from. A check can have gone differently at each one, so
+   * one list can only show one of them; the concept page shows the
+   * multiple-choice rung until #402 marks every rung on its own line.
+   */
+  rung?: Rung;
   className?: string;
 }) {
   if (checks.length === 0) {
@@ -70,7 +78,7 @@ export function MasteryChecks({
   return (
     <span role="list" className={cn('block space-y-0.5', className)}>
       {checks.map((check) => {
-        const standing = answers ? standingOf(check, answers) : null;
+        const standing = answers ? standingOf(check, rung, answers) : null;
 
         return (
           <span key={check} role="listitem" className="flex gap-1.5 text-small text-ink-muted">

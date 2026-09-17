@@ -60,8 +60,15 @@ moves, name `file_idea` with what to do; it lands on the ideas page and is
 shaped from there.
 
 **A session never answers or dismisses a raise**, the same rule as never
-answering its own decision. Replying to an answer the person wrote is the
-exception, and it is a `claude` comment on the thread, not a close.
+answering its own decision. Two things it does do. Replying to an answer the
+person wrote is a `claude` comment on the thread. And a raise whose answer you
+have carried out is closed — `status = 'closed'`, the state past `answered` —
+which is neither answering it nor putting it aside, and which is what takes it
+off the page and out of `raises`. Leave it as it is if what the answer asked
+for is still outstanding.
+
+An answer written on a raise starts a run by itself now, with the raise, its
+thread and the answer. If that is the run you are, the turn says so.
 
 A raise is not a way past a step that needs a decision. A step blocked on a
 question about the feature it belongs to gets that decision written under the

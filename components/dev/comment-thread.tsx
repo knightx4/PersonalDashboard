@@ -217,12 +217,16 @@ export function CommentThread({
 
   const now = useClockNow();
   const trigger = submit?.label ?? label ?? (thread.length === 0 ? 'Add a comment' : 'Add another');
+  // A raise is a question put to you, so anything you write on one reaches
+  // Dash whether or not it carries the tag -- #541. Everywhere else the tag is
+  // what does it.
+  const reaches = (body: string) => target === 'raise' || mentionsDash(body);
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
-  const asking = awaitingReply || (!submit && pending && mentionsDash(sent));
+  const asking = awaitingReply || (!submit && pending && reaches(sent));
   /** Whether what is in the box right now would reach Dash. */
-  const tagged = mentionsDash(draft);
+  const tagged = reaches(draft);
 
   const last = shown[shown.length - 1];
 
@@ -306,9 +310,11 @@ export function CommentThread({
           {!submit && (
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-small text-ink-muted">
-                {tagged
-                  ? 'Dash will read this and reply in the thread.'
-                  : 'A note on the row. Nothing reads it.'}
+                {target === 'raise'
+                  ? 'This is your answer. A session acts on it and replies in the thread.'
+                  : tagged
+                    ? 'Dash will read this and reply in the thread.'
+                    : 'A note on the row. Nothing reads it.'}
               </p>
               {!tagged && (
                 <button

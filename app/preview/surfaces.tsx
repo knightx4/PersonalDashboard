@@ -465,6 +465,8 @@ const reviewRows: ReviewRow[] = [
     id: 'r1',
     subject: 'Your application to Monzo — Backend Engineer, Payments',
     fromAddress: 'no-reply@greenhouse.io',
+    threadId: 'thread-monzo-payments',
+    replyToAddress: 'careers@monzo.example',
     receivedAt: '2026-09-09T07:41:00.000Z',
     classification: 'confirmation',
     reason: 'Sent by an ATS, and no pursuit on file matches the job id.',
@@ -490,6 +492,9 @@ const reviewRows: ReviewRow[] = [
     id: 'r2',
     subject: 'Following up',
     fromAddress: 'kate@thehiringpartners.example',
+    // The unplaceable one has neither, which is why the matcher has nothing.
+    threadId: null,
+    replyToAddress: null,
     receivedAt: '2026-09-08T16:03:00.000Z',
     classification: 'other',
     reason: 'A person wrote it, and nothing in it names a role.',

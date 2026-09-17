@@ -11,18 +11,23 @@ import {
   answeredCount,
   answeredWeight,
   nextConcept,
-  nextMasteryCheck,
+  nextRung,
   probesFor,
   recordAnswer,
+  recordAppliedCase,
   recordProbe,
+  recordWrittenAnswer,
   setMisconception,
+  type ProbeRow,
 } from '@/lib/learn/graph/session';
+import { APPLIED_MODEL, gradeAppliedAnswer, writeAppliedCase } from '@/lib/learn/graph/applied';
+import { splitCase } from '@/lib/learn/graph/applied-payload';
 import { nameMisconception, repeatedWrongAnswer } from '@/lib/learn/graph/misconception';
 import { answerKind, recordOutcome } from '@/lib/learn/next/record';
 import { proposeFloor } from '@/lib/learn/graph/floor';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
 import { loadSubject } from '@/lib/learn/graph/load';
-import { prerequisiteMap, type Concept } from '@/lib/learn/graph/model';
+import { isSettled, prerequisiteMap, type Concept, type Graph } from '@/lib/learn/graph/model';
 import { approvedChainSchema, type ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { barPercent } from '@/lib/learn/graph/probe-payload';
 
@@ -41,15 +46,24 @@ export type AskState = {
   conceptId?: string;
   conceptName?: string;
   question?: string;
+  /**
+   * The case to read, on an applied question. It is the presence of this and
+   * the absence of options that tells the screen which rung it is showing.
+   */
+  situation?: string;
   options?: string[];
   /** Where the bar stood before this question. */
   percent?: number;
   /** Filled in once answered, by the answer action. */
   answered?: {
     correct: boolean;
+    /** The reason on a picked answer, the grader's sentence on a typed one. */
     reason: string;
-    correctIndex: number;
-    chosenIndex: number;
+    correctIndex?: number;
+    chosenIndex?: number;
+    /** What was typed, and the answer the case was written with. Applied only. */
+    response?: string;
+    expected?: string;
     /** How far this answer moved the bar. Zero when it repeated a miss. */
     weight: number;
     /** Named only when the same wrong answer has now been picked twice. */
@@ -111,12 +125,23 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
   if (!concept) return { error: 'Nothing in this subject to ask about yet.' };
 
   const previous = await probesFor(supabase, concept.id);
-  // Which check of understanding this one is for. Null when the concept
+  // Which rung this question is asked at, and which check of understanding it
+  // is for. Multiple choice until every check has been got right at least
+  // once, and an applied case from then on. The check is null when the concept
   // carries none, and then the question is written against the claim itself.
-  const check = nextMasteryCheck(
-    concept.mastery,
-    previous.map((probe) => probe.masteryCheck),
-  );
+  const { rung, check } = nextRung(concept.mastery, previous);
+
+  if (rung !== 'recognise') {
+    return askApplied({
+      userId: user.id,
+      supabase,
+      concept,
+      check,
+      previous,
+      conceptIds: graph.concepts.map((c) => c.id),
+      apiKey,
+    });
+  }
 
   const spend = collectSpend();
   const result = await writeProbe({
@@ -124,7 +149,11 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
     claim: concept.claim,
     check,
     otherChecks: concept.mastery.filter((other) => other !== check),
-    asked: previous.map((probe) => probe.question),
+    // The multiple-choice questions only: an applied case is a different rung
+    // and repeating a situation is what `askApplied` guards against.
+    asked: previous
+      .filter((probe) => probe.rung === 'recognise')
+      .map((probe) => probe.question),
     missedBefore: previous.some(
       (probe) => probe.chosenIndex !== null && probe.chosenIndex !== probe.correctIndex,
     ),
@@ -156,40 +185,114 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
   };
 }
 
-const AnswerInput = z.object({
+/**
+ * The applied rung: a case to read and a box to type into.
+ *
+ * Written and stored before it is shown, exactly as a multiple-choice question
+ * is, so the answer only has to name the row it is answering and a closed tab
+ * loses nothing. The situations already used for this claim go into the call,
+ * which is what stops the second case being the first one again.
+ */
+async function askApplied(input: {
+  userId: string;
+  supabase: Awaited<ReturnType<typeof createLearnClient>>;
+  concept: Concept;
+  check: string | null;
+  previous: ProbeRow[];
+  conceptIds: string[];
+  apiKey: string;
+}): Promise<AskState> {
+  const spend = collectSpend();
+  const result = await writeAppliedCase({
+    concept: input.concept.name,
+    claim: input.concept.claim,
+    check: input.check,
+    asked: input.previous
+      .filter((probe) => probe.rung !== 'recognise')
+      .map((probe) => splitCase(probe.question).situation),
+    anthropicApiKey: input.apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(input.userId, 'write-applied-case', spend.reports);
+
+  if (!result.ok) return { error: result.detail };
+
+  const probeId = await recordAppliedCase(input.supabase, input.userId, {
+    conceptId: input.concept.id,
+    case: result.case,
+    model: APPLIED_MODEL,
+  });
+
+  const weight = await answeredWeight(input.supabase, input.conceptIds);
+
+  return {
+    probeId,
+    conceptId: input.concept.id,
+    conceptName: input.concept.name,
+    situation: result.case.situation,
+    question: result.case.question,
+    percent: barPercent(weight),
+  };
+}
+
+const AnsweredQuestion = z.object({
   probeId: z.string().uuid(),
   conceptId: z.string().uuid(),
   subjectId: z.string().uuid(),
-  chosenIndex: z.coerce.number().int().min(0).max(5),
 });
+
+const PickedAnswer = z.object({ chosenIndex: z.coerce.number().int().min(0).max(5) });
+const TypedAnswer = z.object({ response: z.string().trim().min(1).max(2000) });
 
 // latency: pending
 export async function answerQuestion(prev: AskState, formData: FormData): Promise<AskState> {
   const user = await requireUser();
 
-  const parsed = AnswerInput.safeParse({
+  const asked = AnsweredQuestion.safeParse({
     probeId: formData.get('probeId'),
     conceptId: formData.get('conceptId'),
     subjectId: formData.get('subjectId'),
-    chosenIndex: formData.get('chosenIndex'),
   });
-  if (!parsed.success) return { ...prev, error: 'Could not work out what you picked.' };
+  if (!asked.success) return { ...prev, error: 'Could not work out what you answered.' };
 
   const supabase = await createLearnClient();
-  const graph = await loadGraph(supabase, parsed.data.subjectId);
-  const concept = graph.concepts.find((c) => c.id === parsed.data.conceptId);
+  const graph = await loadGraph(supabase, asked.data.subjectId);
+  const concept = graph.concepts.find((c) => c.id === asked.data.conceptId);
+
+  // Which rung this is comes from the row rather than from the form. The row
+  // is what decides whether an index or a paragraph is the answer to it, and
+  // it is the half of this the browser did not write.
+  const askedRow = (await probesFor(supabase, asked.data.conceptId)).find(
+    (probe) => probe.id === asked.data.probeId,
+  );
+  if (!askedRow) return { ...prev, error: 'That question is not there any more.' };
+
+  if (askedRow.rung !== 'recognise') {
+    return answerApplied({
+      prev,
+      userId: user.id,
+      supabase,
+      graph,
+      concept,
+      probe: askedRow,
+      subjectId: asked.data.subjectId,
+      typed: formData.get('response'),
+    });
+  }
+
+  const parsed = PickedAnswer.safeParse({ chosenIndex: formData.get('chosenIndex') });
+  if (!parsed.success) return { ...prev, error: 'Could not work out what you picked.' };
 
   let outcome;
   try {
     outcome = await recordAnswer(supabase, user.id, {
-      probeId: parsed.data.probeId,
-      conceptId: parsed.data.conceptId,
+      probeId: asked.data.probeId,
+      conceptId: asked.data.conceptId,
       chosenIndex: parsed.data.chosenIndex,
       // Only for a concept with no checks. One that carries them is weighed by
       // what earlier answers did with the check this question aimed at, and
       // whether the concept as a whole was settled decides nothing.
-      wasSettled:
-        concept !== undefined && concept.mastery.length === 0 && concept.state === 'known',
+      wasSettled: concept !== undefined && concept.mastery.length === 0 && isSettled(concept),
       graph,
     });
   } catch (error) {
@@ -204,8 +307,8 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     await recordOutcome(supabase, user.id, {
       // Where the claim stood before this answer, which is the list it was
       // offered from: a settled claim only ever appears as a re-check.
-      kind: answerKind(concept?.state === 'known'),
-      conceptId: parsed.data.conceptId,
+      kind: answerKind(concept !== undefined && isSettled(concept)),
+      conceptId: asked.data.conceptId,
       outcome: 'answered',
     });
   }
@@ -215,10 +318,10 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
     graph.concepts.map((c) => c.id),
   );
 
-  revalidatePath(`/learn/s/${parsed.data.subjectId}`);
+  revalidatePath(`/learn/s/${asked.data.subjectId}`);
 
-  const probes = await probesFor(supabase, parsed.data.conceptId);
-  const answeredRow = probes.find((probe) => probe.id === parsed.data.probeId);
+  const probes = await probesFor(supabase, asked.data.conceptId);
+  const answeredRow = probes.find((probe) => probe.id === asked.data.probeId);
 
   // The same wrong answer twice is a position rather than a slip, and worth
   // one call to name. Nothing here can fail loudly: a misconception that could
@@ -238,7 +341,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
         .filter(
           (probe) =>
             probe.chosenIndex !== null &&
-            probe.options[probe.chosenIndex]?.trim().toLowerCase() ===
+            probe.options?.[probe.chosenIndex]?.trim().toLowerCase() ===
               repeated.option.trim().toLowerCase(),
         )
         .map((probe) => probe.question),
@@ -249,7 +352,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
 
     if (named.ok) {
       try {
-        await setMisconception(supabase, user.id, parsed.data.conceptId, named.misconception);
+        await setMisconception(supabase, user.id, asked.data.conceptId, named.misconception);
         misconception = named.misconception;
       } catch {
         // The answer is already recorded and the concept is already shaky.
@@ -263,7 +366,7 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
   // to and nothing to be told to learn instead, which means the chain was
   // drawn starting too high. Offered rather than done, since it is generated
   // at the moment somebody is least inclined to argue with it.
-  const prerequisites = prerequisiteMap(graph).get(parsed.data.conceptId) ?? [];
+  const prerequisites = prerequisiteMap(graph).get(asked.data.conceptId) ?? [];
   const couldGoDeeper = !outcome.correct && prerequisites.length === 0;
 
   return {
@@ -278,6 +381,104 @@ export async function answerQuestion(prev: AskState, formData: FormData): Promis
       chosenIndex: parsed.data.chosenIndex,
       misconception,
       couldGoDeeper,
+    },
+  };
+}
+
+/**
+ * Grade what was typed about a case, and record it.
+ *
+ * The grading is a model call and the recording is not, so a grade that never
+ * came back leaves the row exactly as it was: the case is still there to
+ * answer, and pressing again asks for the grade again rather than storing a
+ * verdict nobody made. The answer that was expected is read off the row it was
+ * written on and shown afterwards, so it is the answer the case was built
+ * around rather than a reply to whatever was typed.
+ */
+async function answerApplied(input: {
+  prev: AskState;
+  userId: string;
+  supabase: Awaited<ReturnType<typeof createLearnClient>>;
+  graph: Graph;
+  concept: Concept | undefined;
+  probe: ProbeRow;
+  subjectId: string;
+  typed: FormDataEntryValue | null;
+}): Promise<AskState> {
+  const parsed = TypedAnswer.safeParse({ response: input.typed });
+  if (!parsed.success) return { ...input.prev, error: 'Write an answer first.' };
+  if (!input.concept) return { ...input.prev, error: 'That claim is not in this subject.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ...input.prev, error: 'Grading needs ANTHROPIC_API_KEY to be set.' };
+
+  const { situation, question } = splitCase(input.probe.question);
+  const spend = collectSpend();
+  const grade = await gradeAppliedAnswer({
+    concept: input.concept.name,
+    claim: input.concept.claim,
+    situation,
+    question,
+    expected: input.probe.expected ?? '',
+    response: parsed.data.response,
+    anthropicApiKey: apiKey,
+    onSpend: spend.sink,
+  });
+  await recordLearnSpend(input.userId, 'grade-applied-answer', spend.reports);
+
+  if (!grade.ok) return { ...input.prev, error: grade.detail };
+
+  let outcome;
+  try {
+    outcome = await recordWrittenAnswer(input.supabase, input.userId, {
+      probeId: input.probe.id,
+      conceptId: input.concept.id,
+      response: parsed.data.response,
+      correct: grade.correct,
+      why: grade.why,
+      // Only for a concept with no checks, the same rule a picked answer
+      // follows: one that carries them is weighed by what earlier answers did
+      // with the check this case aimed at.
+      wasSettled: input.concept.mastery.length === 0 && isSettled(input.concept),
+      graph: input.graph,
+    });
+  } catch (error) {
+    return {
+      ...input.prev,
+      error: error instanceof Error ? error.message : 'Could not save that.',
+    };
+  }
+
+  if (outcome.first) {
+    await recordOutcome(input.supabase, input.userId, {
+      kind: answerKind(isSettled(input.concept)),
+      conceptId: input.concept.id,
+      outcome: 'answered',
+    });
+  }
+
+  const weight = await answeredWeight(
+    input.supabase,
+    input.graph.concepts.map((c) => c.id),
+  );
+
+  revalidatePath(`/learn/s/${input.subjectId}`);
+
+  // The same offer a missed multiple-choice question makes: getting something
+  // wrong with nothing underneath it says the chain was drawn too high.
+  const prerequisites = prerequisiteMap(input.graph).get(input.concept.id) ?? [];
+
+  return {
+    ...input.prev,
+    error: undefined,
+    percent: barPercent(weight),
+    answered: {
+      correct: outcome.correct,
+      reason: outcome.reason,
+      weight: outcome.weight,
+      response: parsed.data.response,
+      expected: input.probe.expected ?? undefined,
+      couldGoDeeper: !outcome.correct && prerequisites.length === 0,
     },
   };
 }

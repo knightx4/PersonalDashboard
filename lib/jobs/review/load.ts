@@ -43,6 +43,17 @@ export interface ReviewMessageRow {
   id: string;
   subject: string | null;
   fromAddress: string | null;
+  /**
+   * The two signals the page scores with beyond the sender and the subject.
+   *
+   * The thread id was already read here for the Gmail link and then dropped,
+   * and reply-to was not read at all, so the queue ranked its candidates on
+   * less than the mailbox had on file. Thread continuity is the scorer's
+   * strongest signal and reply-to is what carries the employer domain on ATS
+   * mail, which is most of what lands in this queue.
+   */
+  threadId: string | null;
+  replyToAddress: string | null;
   receivedAt: string | null;
   classification: string;
   reason: string;
@@ -140,7 +151,7 @@ export async function loadReviewQueue(
       ? supabase
           .from('inbox_messages')
           .select(
-            'id, email_account_id, thread_id, provider_message_id, subject, from_address, received_at, classification, error, link_confidence',
+            'id, email_account_id, thread_id, provider_message_id, subject, from_address, reply_to_address, received_at, classification, error, link_confidence',
           )
           .in('email_account_id', accountIds)
           .eq('parse_status', 'needs_review')
@@ -173,6 +184,8 @@ export async function loadReviewQueue(
       id: raw.id as string,
       subject: (raw.subject as string) ?? null,
       fromAddress: (raw.from_address as string) ?? null,
+      threadId: (raw.thread_id as string) ?? null,
+      replyToAddress: (raw.reply_to_address as string) ?? null,
       receivedAt: (raw.received_at as string) ?? null,
       classification: (raw.classification as string) ?? 'unknown',
       reason:

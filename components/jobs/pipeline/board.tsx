@@ -160,7 +160,7 @@ export function PipelineBoard({
             }
             onDrop={() => drop(column.setStatus)}
             className={cn(
-              'rounded-card border border-border bg-sunken transition-colors duration-150',
+              'rounded-card bg-sunken transition-colors duration-150',
               over === column.setStatus && 'bg-accent-tint',
             )}
           >
@@ -197,7 +197,7 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-64 shrink-0 rounded-card border border-border bg-sunken p-2 transition-colors duration-150',
+            'w-64 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-150',
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
