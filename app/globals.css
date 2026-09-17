@@ -322,8 +322,8 @@
    * scripts/check-contrast.ts fails on. The sheets still clear the bench by
    * 11:1, so they are as lit as they ever were -- what shrank is the drop
    * from 16.9, and that step was never the point. */
-  --c-page-ground: #2b3644;
-  --c-page: #2b3644;
+  --c-page-ground: #25374f;
+  --c-page: #25374f;
   --c-page-ink: #eef2f7;
   --c-page-ink-muted: #b6c1ce;
   --c-page-ink-ghost: #8a97a7;
@@ -331,12 +331,32 @@
   --c-page-border-strong: #6d8098;
   --c-page-border-control: #8a97a7;
 
-  /* Three pools, held under 0.3 alpha so the bench never lightens enough to
-   * put the inks above out of range. Fixed to the viewport at <body>, so it
-   * reads as depth the page slides over rather than a pattern that scrolls. */
+  /* The room, and it is two colours rather than one.
+   *
+   * It used to be three blues and a violet, which on a slate bench came out as
+   * one blue haze -- and once the sheets went transparent, one blue haze read
+   * through them as grey. A ground with a single hue in it has nowhere to
+   * travel, so nothing on top of it has anything to reveal.
+   *
+   * So it runs the app's own ramp: blue at the top left, the brand violet
+   * through the middle, rose at the top right, and a deep blue holding the
+   * floor. Those are the three hexes the home mark has worn since before this
+   * app had modules -- the one gradient this product already owns -- and a
+   * card crossing the room now crosses from blue to violet to rose rather than
+   * sitting in a flat wash.
+   *
+   * Every layer only ADDS light, and that is load-bearing rather than tidy: a
+   * sheet is 20% bench, so a layer that darkens the bench darkens every sheet
+   * on it and takes the ink with it, somewhere scripts/check-contrast.ts
+   * cannot see -- it composites sheets over the flat --c-page. Checked by
+   * compositing all of them at full strength: the flat bench stays the darkest
+   * case, so the gate is a conservative bound rather than a blind spot.
+   *
+   * Fixed to the viewport at <body>, so it reads as depth the page slides over
+   * rather than a pattern that scrolls. */
   --page-wash:
-    radial-gradient(110% 75% at 15% -5%, rgb(86 118 176 / 0.3), transparent 60%),
-    radial-gradient(90% 70% at 88% 6%, rgb(104 96 170 / 0.24), transparent 55%),
+    radial-gradient(105% 72% at 10% -8%, rgb(58 116 214 / 0.34), transparent 60%),
+    radial-gradient(82% 78% at 88% -2%, rgb(255 107 157 / 0.30), transparent 62%),
     /* A fourth pool, mid-right, and a ramp under all of them.
      *
      * The three pools above sit top-left, top-right and bottom-centre, which
@@ -352,14 +372,15 @@
      * anything that darkens the bench darkens every sheet on it and takes the
      * ink down with it, in a place scripts/check-contrast.ts cannot see. Light
      * is the direction that is free. */
-    radial-gradient(70% 60% at 82% 52%, rgb(96 126 190 / 0.2), transparent 62%),
+    radial-gradient(75% 62% at 78% 48%, rgb(139 92 246 / 0.26), transparent 64%),
     linear-gradient(
       155deg,
-      rgb(140 164 224 / 0.16) 0%,
-      rgb(120 142 205 / 0.07) 34%,
-      transparent 62%
+      rgb(120 158 248 / 0.20) 0%,
+      rgb(178 126 226 / 0.13) 36%,
+      rgb(240 122 172 / 0.10) 62%,
+      transparent 86%
     ),
-    radial-gradient(130% 110% at 55% 115%, rgb(38 74 116 / 0.3), transparent 68%);
+    radial-gradient(130% 110% at 42% 118%, rgb(26 92 176 / 0.34), transparent 68%);
   --c-page-positive: #6fe0b0;
   --c-page-caution: #f5b459;
   --c-page-danger: #ff9d9d;
@@ -454,7 +475,7 @@
 
   /* The sidebar is the same surface as the page ground, to the byte: one
    * bench, not two nearly-identical darks meeting at an edge. */
-  --c-shell: #2b3644;
+  --c-shell: #25374f;
   --c-shell-ink: #eef2f7;
   --c-shell-muted: #b6c1ce;
   --c-shell-border: #3d4b5c;
@@ -1643,7 +1664,7 @@ form[data-auto-submit] [data-fallback-submit] {
    * one quarter they leave alone. */
   --workspace-pool: radial-gradient(
     95% 75% at 0% 100%,
-    rgb(var(--wash-a) / 0.22),
+    rgb(var(--wash-a) / 0.30),
     transparent 62%
   );
 }
