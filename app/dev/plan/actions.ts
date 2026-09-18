@@ -726,6 +726,7 @@ export async function setPlanItemAssignee(
  * thing is decided per row, and a feature marked Next does not make every step
  * under it Next.
  */
+// latency: pending
 export async function setPlanItemPriority(
   _prev: PlanActionState,
   formData: FormData,

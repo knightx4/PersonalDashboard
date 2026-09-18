@@ -197,3 +197,73 @@ describe('when things happened', () => {
     expect((await stamps(step.id)).completed_at).not.toBeNull();
   });
 });
+
+/**
+ * The reading the overnight runner takes to tell a session that is working
+ * from one that has stopped. It used to ask whether the feature it fired at
+ * had closed, and a feature does not close while any step under it is open --
+ * so a session that closed three steps of four looked identical to a session
+ * that had died, and the runner sat out a two-hour silence timeout before
+ * firing again. Two nights lost about four hours each to it.
+ */
+describe('the newest close under a step', () => {
+  async function closedAt(id: string): Promise<Date | null> {
+    const [row] = await asUser(alice, (tx) =>
+      tx<{ at: Date | null }[]>`select public.plan_subtree_closed_at(${id}) as at`,
+    );
+    return row.at;
+  }
+
+  it('is null while nothing under it has closed', async () => {
+    const feature = await addStep(alice, 'Nothing done yet');
+    await addStep(alice, 'Open step', { parentId: feature.id });
+    expect(await closedAt(feature.id)).toBeNull();
+  });
+
+  it('answers for a feature that can never close itself', async () => {
+    // The shape that cost the runner its nights: some steps done, one left
+    // `proposed` -- which is the person's to approve and no session may close,
+    // so the feature stays open for good.
+    const feature = await addStep(alice, 'Half built');
+    await addStep(alice, 'Built', { parentId: feature.id, status: 'done' });
+    await addStep(alice, 'Waiting on you', { parentId: feature.id, status: 'proposed' });
+
+    const [row] = await asUser(alice, (tx) =>
+      tx<{ completed_at: Date | null }[]>`
+        select completed_at from plan_items where id = ${feature.id}`,
+    );
+    // The old reading: the feature itself has not closed and never will.
+    expect(row.completed_at).toBeNull();
+    // The new one: a step under it closed, so the session was working.
+    expect(await closedAt(feature.id)).not.toBeNull();
+  });
+
+  it('reaches a step of a step, not just the children', async () => {
+    const feature = await addStep(alice, 'Deep');
+    const middle = await addStep(alice, 'Middle', { parentId: feature.id });
+    await addStep(alice, 'Leaf', { parentId: middle.id, status: 'done' });
+    expect(await closedAt(feature.id)).not.toBeNull();
+  });
+
+  it('takes the newest close when several have closed', async () => {
+    const feature = await addStep(alice, 'Several');
+    const first = await addStep(alice, 'First', { parentId: feature.id, status: 'done' });
+    const second = await addStep(alice, 'Second', { parentId: feature.id });
+    await asUser(alice, (tx) => tx`update plan_items set status = 'done' where id = ${second.id}`);
+
+    const [earlier] = await asUser(alice, (tx) =>
+      tx<{ at: Date }[]>`select completed_at as at from plan_items where id = ${first.id}`,
+    );
+    const newest = await closedAt(feature.id);
+    expect(newest).not.toBeNull();
+    expect((newest as Date).getTime()).toBeGreaterThanOrEqual(earlier.at.getTime());
+  });
+
+  it("shows one account nothing of another account's plan", async () => {
+    // `security invoker`, so the policy on plan_items still applies and a step
+    // belonging to someone else reads as an empty subtree rather than a date.
+    const hers = await addStep(bob, 'Bob feature');
+    await addStep(bob, 'Bob step', { parentId: hers.id, status: 'done' });
+    expect(await closedAt(hers.id)).toBeNull();
+  });
+});
