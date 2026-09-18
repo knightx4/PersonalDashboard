@@ -125,6 +125,73 @@ export function oklchToHex(colour: Oklch): string {
 }
 
 /**
+ * The most chroma sRGB holds at one lightness and hue.
+ *
+ * The same bisection `oklchToHex` runs when a colour does not fit, pulled out
+ * so a caller can ask the question before choosing a colour rather than after.
+ * What it is for is the wash: the pools are decorative, so where a token that
+ * carries text holds its chroma and gives up whatever the gamut refuses, a
+ * pool wants to sit *on* that edge, and it can only do that if it can find it.
+ */
+export function gamutChroma(l: number, h: number): number {
+  let low = 0;
+  let high = 0.5;
+  // Twelve halvings land within a ten-thousandth of a chroma step, and the
+  // smallest difference an 8-bit channel can show is about twenty times that.
+  for (let step = 0; step < 12; step += 1) {
+    const middle = (low + high) / 2;
+    if (inGamut({ l, c: middle, h })) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
+/**
+ * The lightness at which a hue is most colourful in sRGB, and how colourful
+ * that is.
+ *
+ * Every hue has one, and they are nowhere near each other: blue peaks around
+ * L 0.45 and yellow around L 0.93. That single fact is why rotating a hue at a
+ * fixed lightness turns a good blue into a bad yellow -- a yellow held at
+ * blue's lightness is brown, because brown is what a dark yellow is. Anything
+ * that wants a rotated hue to look as good as the one it replaced has to know
+ * where the new hue actually lives.
+ *
+ * A ternary search, because chroma against lightness at a fixed hue rises to
+ * one peak and falls away; forty rounds take the interval below a thousandth
+ * of a lightness step.
+ */
+export function cuspOf(h: number): { l: number; c: number } {
+  const key = Math.round(((h % 360) + 360) % 360);
+  const known = CUSPS.get(key);
+  if (known) return known;
+
+  let low = 0;
+  let high = 1;
+  for (let step = 0; step < 24; step += 1) {
+    const third = (high - low) / 3;
+    if (gamutChroma(low + third, key) < gamutChroma(high - third, key)) low += third;
+    else high -= third;
+  }
+  const l = (low + high) / 2;
+  const cusp = { l, c: gamutChroma(l, key) };
+  CUSPS.set(key, cusp);
+  return cusp;
+}
+
+/**
+ * Cusps already worked out, by whole degree.
+ *
+ * Two hundred-odd square roots each, and the palette is generated on every
+ * render and again under the cursor as the colour wheel is dragged, so they
+ * are worth keeping. A whole degree is finer than the answer needs: the cusp
+ * lightness moves by under a hundredth across a degree anywhere on the circle,
+ * which no pixel of a wash five layers deep could show. Bounded at 360 by
+ * construction.
+ */
+const CUSPS = new Map<number, { l: number; c: number }>();
+
+/**
  * How far apart two colours look, as a straight line through OKLab.
  *
  * The question this answers is whether a person would take one colour for the

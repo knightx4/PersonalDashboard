@@ -596,14 +596,29 @@ export const HUE_TOKENS: readonly string[] = [
  * too: both are written as gradients and shadow stacks rather than as flat
  * tokens, so the generator cannot read them at all.
  */
-export const LIGHTBOX_HUE_TOKENS: readonly string[] = [
-  // The bench's pools. Named for where they sit, not what colour they are:
-  // they turn with everything else, and the point of turning all four by the
-  // same amount is that the sweep between them survives the move.
+/**
+ * The four pools the bench's wash is painted from.
+ *
+ * Named for where they sit, not what colour they are: they turn with
+ * everything else, and the point of turning all four by the same amount is
+ * that the sweep between them survives the move.
+ *
+ * Their own list as well as being in `LIGHTBOX_HUE_TOKENS`, because they are
+ * the one group that does not turn the way the rest of the palette turns. A
+ * token that carries text is rotated to the light it was reflecting, so the
+ * contrast it had is the contrast it keeps. A pool carries nothing: it is a
+ * decoration behind everything, and holding it to a blue's luminance is what
+ * made a warm room brown -- see `turnWash` in ./palette.ts.
+ */
+export const WASH_TOKENS: readonly string[] = [
   '--c-wash-near',
   '--c-wash-mid',
   '--c-wash-far',
   '--c-wash-floor',
+];
+
+export const LIGHTBOX_HUE_TOKENS: readonly string[] = [
+  ...WASH_TOKENS,
   // The bench, which is the page ground and the sidebar at the same value.
   '--c-page',
   '--c-shell',

@@ -27,10 +27,19 @@
  * No `server-only`: the layout writes the palette into the first byte and the
  * picker previews it under the cursor, so both sides need this.
  */
-import { hexToOklch, oklabDistance, relativeLuminance, withLuminance } from './oklch';
+import {
+  cuspOf,
+  gamutChroma,
+  hexToOklch,
+  oklabDistance,
+  oklchToHex,
+  relativeLuminance,
+  withLuminance,
+} from './oklch';
 import {
   ACCENT_TOKENS,
   hueTokensFor,
+  WASH_TOKENS,
   LIGHT_CAST,
   REFERENCE_HUE,
   REFERENCE_PALETTES,
@@ -213,14 +222,109 @@ function rotate(
 ): Palette {
   const turning = new Set(tokens);
   const accents = new Set(ACCENT_TOKENS);
+  const wash = new Set(WASH_TOKENS);
   const palette: Palette = {};
   for (const token of Object.keys(reference)) {
     const value = reference[token];
-    palette[token] = turning.has(token)
-      ? turnColour(value, accents.has(token) ? accentTurn : turn)
-      : value;
+    if (!turning.has(token)) {
+      palette[token] = value;
+      continue;
+    }
+    palette[token] = wash.has(token)
+      ? turnWash(value, turn)
+      : turnColour(value, accents.has(token) ? accentTurn : turn);
   }
   return palette;
+}
+
+/**
+ * One of the bench's pools, moved `turn` degrees to a colour as good as the
+ * one it replaced.
+ *
+ * Not `turnColour`, and the difference is the whole of #529. Every other token
+ * is rotated at the light it was reflecting, because the contrast the app has
+ * is a function of luminance and holding it is what makes a generated theme as
+ * readable as the written one. A pool reflects light at nothing: it is a
+ * decoration five layers behind the nearest word. Holding it to the luminance
+ * of a blue is a constraint it was never owed, and it is what made every warm
+ * room brown -- a blue sits at a tenth of the light a screen can throw, and a
+ * yellow forced down to a tenth is not a yellow, it is olive. The screenshots
+ * that started this showed an orange room and a green-gold one, both mud.
+ *
+ * So a pool turns on the two things that actually decide whether a colour
+ * looks like itself:
+ *
+ * Its lightness follows its hue. Every hue is most colourful at its own
+ * lightness -- blue near L 0.45, yellow near L 0.93 -- and `cuspOf` says
+ * where. The pool moves seven tenths of the way from where its old hue peaked
+ * to where its new one does, which is enough to lift a yellow out of the brown
+ * and not so much that a sweep loses the shape it was drawn with. All the way
+ * flattens it: the pools converge on one lightness and the wash goes grey.
+ *
+ * Its chroma is whatever the screen can still show there. A pool is seen
+ * through a 26-to-34 percent mix over a near-black bench, so a third of its
+ * colour is all that survives to the glass; sitting on the gamut edge is what
+ * keeps a red room red rather than dust. The old code held the chroma number
+ * instead, which reads as vivid at blue -- where sRGB is generous -- and as
+ * grey at gold, where it is not.
+ *
+ * Identity at `turn` 0, so the wheel is smooth: no move, no new cusp, no
+ * change. The written palettes are left as they are and are a little softer
+ * than what this generates beside them, which is deliberate -- they were
+ * chosen by eye rather than derived, and that is the one palette nobody
+ * complained about.
+ */
+function turnWash(value: string, turn: number): string {
+  const from = hexToOklch(value);
+  const h = from.h + turn;
+  const lifted = Math.min(
+    0.92,
+    Math.max(0.08, from.l + CUSP_FOLLOW * (cuspOf(h).l - cuspOf(from.h).l)),
+  );
+  const l = capped(lifted, h, relativeLuminance(value) * WASH_LIGHT_BUDGET);
+  return oklchToHex({ l, c: gamutChroma(l, h), h });
+}
+
+/** How much of the way a pool's lightness moves to where its new hue peaks. */
+const CUSP_FOLLOW = 0.7;
+
+/**
+ * How much more light a turned pool may throw than the one it came from.
+ *
+ * Lifting a pool onto its hue's cusp is what takes the brown out of a warm
+ * room, and it is also the one thing in the wash that can cost readability:
+ * the bench carries the sidebar's text, a sheet is a fifth bench, and every
+ * layer of the wash only adds light, so a brighter pool closes the gap between
+ * the bench and the pale ink on it. Left unbounded the lift nearly triples the
+ * light at the brightest point of the field -- measured, 0.15 to 0.41 -- and
+ * takes eighteen more pairs under 4.5:1 with it.
+ *
+ * A quarter more than the written pool buys most of the colour back and costs
+ * a fifth of that: the field peaks at 0.19 against today's 0.15. Which is a
+ * real cost and not nothing, so it is written here as one number with its
+ * reasoning rather than buried in a bisection.
+ */
+const WASH_LIGHT_BUDGET = 1.3;
+
+/**
+ * The highest lightness at or below `l` whose colour reflects no more than
+ * `budget`, at this hue and on the gamut edge.
+ *
+ * Luminance rises with lightness along the edge, so a bisection finds it.
+ * Returns `l` untouched when it already fits, which is most of the circle --
+ * only the yellows and greens lift far enough to hit the ceiling.
+ */
+function capped(l: number, h: number, budget: number): number {
+  const lightAt = (at: number) => relativeLuminance(oklchToHex({ l: at, c: gamutChroma(at, h), h }));
+  if (lightAt(l) <= budget) return l;
+  let low = 0;
+  let high = l;
+  for (let step = 0; step < 20; step += 1) {
+    const middle = (low + high) / 2;
+    if (lightAt(middle) < budget) low = middle;
+    else high = middle;
+  }
+  return low;
 }
 
 /** `rgb(r g b / a)`, which is how Lightbox writes the colours that are not flat. */
