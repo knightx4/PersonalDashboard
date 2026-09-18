@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import {
   answerPlanDecision,
+  approvePlanItem,
+  approveProposals,
   setPlanItemStatus,
   type PlanActionState,
 } from '@/app/dev/plan/actions';
@@ -16,7 +18,7 @@ import { planRefHref, type PlanRefTitles } from '@/lib/comments/refs';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
-import type { WaitingRow } from '@/lib/plan/waiting';
+import type { WaitingEntry, WaitingRow } from '@/lib/plan/waiting';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -54,6 +56,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   const setup = row.health === 'setup';
   const question = row.health === 'unanswered';
   const blocked = row.health === 'blocked';
+  const proposed = row.health === 'proposed';
 
   return (
     <li className="space-y-1 p-3">
@@ -99,6 +102,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         </p>
         {setup && <SetupDone row={row} />}
         {blocked && <BlockedDone row={row} />}
+        {proposed && <ApprovePlanRow row={row} />}
       </div>
     </li>
   );
@@ -175,6 +179,82 @@ function BlockedDone({ row }: { row: WaitingRow }) {
       <FieldError>{state.error}</FieldError>
       <Button type="submit" size="sm" pending={pending}>
         I have done this
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * The press that says yes to one proposal, on the page where you read it.
+ *
+ * A proposal is the one kind here that is finished by agreeing to it: nothing
+ * has to be typed and nothing has to be gone and done. Until now Dash could
+ * only tell you a proposal was waiting, and saying yes meant opening the plan,
+ * finding the number and going through the row's status menu.
+ *
+ * `approvePlanItem` is the plan page's own action and it approves the row
+ * together with every proposal beneath it, which is why the label says how
+ * many are coming with it. `proposedBeneath` is that count, worked out where
+ * the row was flattened out of the tree.
+ *
+ * The one press every other proposal on the list gets too, and it stays on the
+ * row even with Approve all above the group: #630 settled that approving the
+ * lot is for proposals as a set, and a proposal you want and three you have
+ * not read yet is still a row-at-a-time job.
+ */
+function ApprovePlanRow({ row }: { row: WaitingRow }) {
+  const [state, action, pending] = useActionState(
+    approvePlanItem,
+    {} as PlanActionState,
+  );
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={row.id} />
+      <FieldError>{state.error}</FieldError>
+      <Button type="submit" size="sm" pending={pending}>
+        {row.proposedBeneath > 0 ? `Approve, with ${row.proposedBeneath} beneath` : 'Approve'}
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * One press for every proposal in the group.
+ *
+ * The group is mostly one shaped feature at a time -- the feature and its five
+ * steps arrive together and are read together -- so the common answer to the
+ * whole group is one yes, and asking for six presses is asking you to do the
+ * same thing six times.
+ *
+ * It says how many it will approve rather than just "Approve all", because
+ * this sits above a list you may have scrolled past: #630's answer is that the
+ * count is the guard, in place of a confirm step nothing else on these pages
+ * asks for.
+ *
+ * Plan rows only. A request from a session can be drawn in this group as well
+ * -- #622 puts one that named an action here -- and a yes on one of those runs
+ * what it named, there and then, including handing a step to a routine that
+ * starts building. That is not a thing to do to rows you have not read one at
+ * a time, so those keep their own buttons and are not counted here.
+ */
+export function ApproveAll({ entries }: { entries: readonly WaitingEntry[] }) {
+  const [state, action, pending] = useActionState(
+    approveProposals,
+    {} as PlanActionState,
+  );
+
+  const proposals = entries.filter((entry) => entry.kind === 'plan');
+  if (proposals.length === 0) return null;
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      {proposals.map((entry) => (
+        <input key={entry.id} type="hidden" name="id" value={entry.id} />
+      ))}
+      <FieldError>{state.error}</FieldError>
+      <Button type="submit" size="sm" variant="secondary" pending={pending}>
+        Approve all {proposals.length}
       </Button>
     </form>
   );

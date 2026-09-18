@@ -19,12 +19,14 @@ vi.mock('@/app/dev/raised/actions', () => {
   return { closeRaise: noop, decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
 });
 
-// The plan's own actions, for the same reason: the setup row's Done button and
-// the question's answering box drive them, and the render only needs them to be
-// functions.
+// The plan's own actions, for the same reason: the setup row's Done button, the
+// question's answering box and both approve buttons drive them, and the render
+// only needs them to be functions.
 vi.mock('@/app/dev/plan/actions', () => ({
   setPlanItemStatus: async () => ({}),
   answerPlanDecision: async () => ({}),
+  approvePlanItem: async () => ({}),
+  approveProposals: async () => ({}),
 }));
 
 const { RaisedView } = await import('@/app/dev/raised/raised-view');
@@ -330,6 +332,101 @@ describe('a stopped step on the page', () => {
       const html = render([], [waitingRow({ health })]);
       expect(html).not.toContain('I have done this');
     }
+  });
+});
+
+/**
+ * #628: a proposal is approved here, one at a time or the whole group at once.
+ */
+describe('a proposal on the page', () => {
+  const proposal = (over: Partial<WaitingRow> = {}) =>
+    waitingRow({
+      id: 'x1',
+      number: 645,
+      title: 'File what the night notices as ideas',
+      health: 'proposed',
+      ask: null,
+      detail: null,
+      ...over,
+    });
+
+  it('offers the press that approves it, carrying the row it approves', () => {
+    const html = render([], [proposal()]);
+
+    expect(html).toContain('#645 File what the night notices as ideas');
+    expect(html).toContain('>Approve</button>');
+    expect(html).toContain('type="hidden" name="id" value="x1"');
+  });
+
+  // Approving a proposal approves everything proposed under it, so the button
+  // says what is coming with it rather than letting five steps go quietly.
+  it('says how many steps come with it', () => {
+    const html = render([], [proposal({ proposedBeneath: 3 })]);
+
+    expect(html).toContain('Approve, with 3 beneath');
+    expect(html).not.toContain('>Approve</button>');
+  });
+
+  it('offers no approve on the three that are not proposals', () => {
+    for (const health of ['setup', 'unanswered', 'blocked'] as const) {
+      const html = render([], [waitingRow({ health })]);
+      expect(html).not.toContain('>Approve</button>');
+      expect(html).not.toContain('Approve all');
+    }
+  });
+});
+
+/**
+ * #630, answer A: Approve all is for plan proposals, it says how many it will
+ * approve, and a request from a session keeps the yes button on its own row.
+ */
+describe('approving the whole group', () => {
+  const proposal = (over: Partial<WaitingRow> = {}) =>
+    waitingRow({ health: 'proposed', ask: null, detail: null, ...over });
+
+  const request = (over: Record<string, unknown> = {}) =>
+    raise({
+      id: 'r9',
+      consequence: { name: 'file_idea', text: 'Refuse a second session', module: null, field: null },
+      ...over,
+    });
+
+  it('counts what it will approve and sends every one of those rows', () => {
+    const html = render(
+      [],
+      [proposal({ id: 'x1', number: 645 }), proposal({ id: 'x2', number: 647 })],
+    );
+
+    expect(html).toContain('Approve all 2');
+    expect(html).toContain('type="hidden" name="id" value="x1"');
+    expect(html).toContain('type="hidden" name="id" value="x2"');
+  });
+
+  // A yes on a request runs what it named there and then, which is not the
+  // move Approve all is making.
+  it('leaves a request out of the count and leaves it its own yes', () => {
+    const html = render([request()], [proposal({ id: 'x1', number: 645 })]);
+
+    expect(html).toContain('Approve all 1');
+    expect(html).toContain('Yes, do it');
+  });
+
+  it('draws no Approve all over a group that holds only requests', () => {
+    const html = render([request()], []);
+
+    expect(html).toContain('To approve');
+    expect(html).not.toContain('Approve all');
+  });
+
+  it('draws no Approve all over the two groups that are finished in words', () => {
+    const html = render(
+      [],
+      [waitingRow({ id: 'p1' }), waitingRow({ id: 'p2', number: 611, health: 'unanswered' })],
+    );
+
+    expect(html).toContain('Your actions');
+    expect(html).toContain('Questions for you');
+    expect(html).not.toContain('Approve all');
   });
 });
 

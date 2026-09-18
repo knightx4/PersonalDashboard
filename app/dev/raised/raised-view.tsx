@@ -15,7 +15,7 @@ import { FieldError, Textarea } from '@/components/ui/field';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
 import type { WaitingGroup } from '@/lib/plan/waiting';
-import { WaitingCard } from './waiting-view';
+import { ApproveAll, WaitingCard } from './waiting-view';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
@@ -379,6 +379,12 @@ export function RaisedView({
                     </span>
                   </>
                 }
+                /* Opposite the heading rather than on a row of its own: it
+                   acts on the whole group, and a button sitting inside the
+                   list would read as belonging to whichever row it landed
+                   next to. Only this group has one -- the other two are
+                   finished a row at a time, in words. */
+                action={group.key === 'approve' ? <ApproveAll entries={group.entries} /> : undefined}
               >
                 <ul className={cn(cardVariants(), 'divide-y divide-border')}>
                   {/* A plan row and a raise sit in the same group when the same
