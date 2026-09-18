@@ -9,12 +9,12 @@
  * may not be.
  *
  * So this reads rather than requires. When the detail happens to be written as
- * a lettered set — the two forms the plan has actually used, `A — …` and
- * `(a) …` — the page can offer those options as one-click answers. When it is
- * not, nothing is found and the answer box is the whole form, exactly as
- * before. Nothing is ever inferred from an unlabelled paragraph: "A fired
- * session, like the ideas page's button" opens a real option in the plan today
- * and is not a marker, which is why a separator after the letter is required.
+ * a lettered set, in any of the forms `MARKER` below lists, the page can offer
+ * those options as one-click answers. When it is not, nothing is found and the
+ * answer box is the whole form, exactly as before. Nothing is ever inferred
+ * from an unlabelled paragraph: "A fired session, like the ideas page's
+ * button" opens a real option in the plan today and is not a marker, which is
+ * why a separator after the letter is required.
  */
 
 export type PlanOption = {
@@ -25,11 +25,16 @@ export type PlanOption = {
 };
 
 /**
- * `(a) …`, `[a] …`, `A) …`, `A. …`, `A: …`, `A — …`, `A - …`.
+ * `(a) …`, `[a] …`, `A) …`, `A. …`, `A: …`, `A — …`, `A - …`, `A -- …`.
  *
  * The bracketed forms need no separator after them, because the bracket is
  * one. The bare letter does, which is the whole reason a paragraph opening
  * "A fired session…" is prose and not option A.
+ *
+ * The dash run is one or two characters, because `--` is what a keyboard
+ * types when an em dash is meant, and decisions on the plan are written that
+ * way. Not three: `---` on its own line is a rule, and a rule after a letter
+ * is likelier a typo than a choice.
  */
 const MARKER =
   /^(?:\(([A-Za-z])\)|\[([A-Za-z])\]|([A-Za-z])[).:]|([A-Za-z])\s*(?:[—–]|-{1,2}))\s+(\S.*)$/;
