@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/auth/server';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { MODULES, type ModuleId } from '@/lib/modules';
+import { modulesFor, type ModuleId } from '@/lib/modules';
 import { AppShell } from '@/components/shell/app-shell';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Card, cardVariants } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
 import { countReviewItems as countShoppingReview } from '@/lib/review/load';
@@ -83,7 +84,7 @@ export default async function HomePage() {
     day: '2-digit',
   }).format(now);
 
-  const [counts, raised, agenda, shopping, core, jobs, mainCheck] = await Promise.all([
+  const [counts, raised, agenda, shopping, core, jobs, mainCheck, owner] = await Promise.all([
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
     // The agenda reads three schemas; a failure in any of them must cost this
@@ -93,9 +94,13 @@ export default async function HomePage() {
     createCoreClient(),
     createJobsClient(),
     loadMainCheck(),
+    isOwner({ user }),
   ]);
 
-  const enabled = MODULES.filter((module) => moduleEnabled(settings, module.id));
+  // The tiles are the third list of workspaces, after the switcher and the
+  // account page, and they go through the same rule: a workspace this account
+  // may not see is not a door with a locked room behind it, it is not a door.
+  const enabled = modulesFor(owner).filter((module) => moduleEnabled(settings, module.id));
   const on = (id: ModuleId) => enabled.some((module) => module.id === id);
 
   // Each brief already swallows its own failures; the review counts feed two
@@ -158,6 +163,7 @@ export default async function HomePage() {
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}

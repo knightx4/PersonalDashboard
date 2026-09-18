@@ -28,6 +28,8 @@ function db(
     row?: Record<string, unknown> | null;
     /** What a list read hands back -- the sibling a new step is positioned after. */
     rows?: Record<string, unknown>[];
+    /** What an insert asked for its row back hands back: `build_step` needs the number. */
+    inserted?: Record<string, unknown> | null;
     error?: { message: string };
   } = {},
 ) {
@@ -38,7 +40,18 @@ function db(
       return {
         insert(row: Record<string, unknown>) {
           writes.push({ table, op: 'insert', row });
-          return Promise.resolve({ error });
+          // A thenable that also chains, the shape the real builder has: an
+          // insert is awaited on its own, or has `.select().maybeSingle()`
+          // hung off it when the caller needs the row it just wrote.
+          return Object.assign(Promise.resolve({ error }), {
+            select: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: error ? null : (options.inserted ?? { id: 'new-step', number: 712 }),
+                  error,
+                }),
+            }),
+          });
         },
         select() {
           // `eq` chains, because a lookup by number filters on the account as
@@ -238,13 +251,48 @@ describe('rewording the row a comment is on', () => {
     expect(Object.keys(writes[0].row)).toEqual(['body']);
   });
 
-  it('will not reword a raise', async () => {
-    const { writes, supabase } = db({ row: { title: 'A row' } });
+  // A raise has no wording of its own, and "put this in the plan" is what
+  // arrives as a reword on one. Refusing it was a dead end over a name (#604).
+  it('puts a reword aimed at a raise on the plan instead of refusing it', async () => {
+    const { writes, supabase } = db({ rows: [{ position: 20 }] });
     const outcome = await carryOut(
-      input({ supabase, target: 'raise', action: action({ name: 'reword', text: 'Something else' }) }),
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({ name: 'reword', text: 'Say which actions apply on which row', module: 'dev' }),
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(writes).toEqual([
+      {
+        table: 'plan_items',
+        op: 'insert',
+        row: {
+          user_id: 'user-1',
+          module: 'dev',
+          parent_id: null,
+          title: 'Say which actions apply on which row',
+          detail: null,
+          status: 'proposed',
+          kind: 'build',
+          position: 30,
+        },
+      },
+    ]);
+    expect(outcome.ok && outcome.said).toContain('no wording of its own');
+    expect(outcome.ok && outcome.said).toContain('Say which actions apply on which row');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
+  });
+
+  it('writes nothing from a reword on a raise it cannot name', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', id: 'raise-1', action: action({ name: 'reword' }) }),
     );
     expect(writes).toHaveLength(0);
-    expect(outcome.ok === false && outcome.why).toContain('a raise');
+    expect(outcome.ok).toBe(false);
   });
 });
 
@@ -369,6 +417,38 @@ describe('adding a step from a comment', () => {
     expect(outcome.ok && outcome.said).toContain('Vault');
   });
 
+  // The done-when this file is checked against: a comment on a raise asking for
+  // the plan to be updated leaves a proposal on the plan page, and the line
+  // written back names it.
+  it('adds a proposal at the top of a workspace from a comment on a raise', async () => {
+    const { writes, supabase } = db({ rows: [{ position: 60 }] });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({
+          name: 'add_step',
+          text: 'Name the actions a raise takes',
+          detail: 'The prompt says which of the five apply on which kind of row.',
+          module: 'dev',
+        }),
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(writes[0].row).toMatchObject({
+      parent_id: null,
+      module: 'dev',
+      status: 'proposed',
+      title: 'Name the actions a raise takes',
+      position: 70,
+    });
+    expect(outcome.ok && outcome.said).toContain('Name the actions a raise takes');
+    expect(outcome.ok && outcome.said).toContain('Dev');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
+  });
+
   it('adds nothing when it cannot tell what to call it', async () => {
     const { writes, supabase } = db({ row: { module: null } });
     const outcome = await carryOut(input({ supabase, action: action({ name: 'add_step' }) }));
@@ -427,6 +507,102 @@ describe('sending a step to be built', () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.ok === false && outcome.why).toContain('nothing was started');
+  });
+});
+
+describe('writing a step from a raise and sending it', () => {
+  // The done-when: a comment on a raise telling Dash to do the work leaves a
+  // step on the plan, ready to be worked rather than proposed (#605), and a
+  // session on it. The line written back names it by number.
+  it('writes the step ready to be worked and hands it straight over', async () => {
+    const { writes, supabase } = db({ rows: [{ position: 40 }] });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({
+          name: 'build_step',
+          text: 'Say which run is holding a step',
+          detail: 'The refusal names how long the other session has been silent.',
+          module: 'dev',
+        }),
+      }),
+    );
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0].table).toBe('plan_items');
+    expect(writes[0].row).toMatchObject({
+      user_id: 'user-1',
+      parent_id: null,
+      module: 'dev',
+      title: 'Say which run is holding a step',
+      status: 'not_started',
+      kind: 'build',
+      position: 50,
+    });
+    // Who is on it is the hand-over's to write, and only when a session is.
+    expect(writes[0].row).not.toHaveProperty('assignee');
+
+    expect(vi.mocked(handStepToClaude)).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', id: 'new-step' }),
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.ok && outcome.said).toContain('#712');
+    expect(outcome.ok && outcome.said).toContain('sent it to be built');
+    expect(outcome.ok && outcome.said).toContain('Say which run is holding a step');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
+  });
+
+  // The other half of it. The hand-over refuses over timing -- a feature
+  // already being worked, a re-shape rewriting it -- so the step stays on the
+  // plan and the thread says it was not started and why.
+  it('keeps the step and says it did not start it when the hand-over refused', async () => {
+    vi.mocked(handStepToClaude).mockResolvedValueOnce({
+      ok: false,
+      error: '#603 is being re-read against the answers under it.',
+    });
+    const { writes, supabase } = db({ rows: [{ position: 40 }] });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({ name: 'build_step', text: 'Say which run is holding a step', module: 'dev' }),
+      }),
+    );
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0].row).toMatchObject({ status: 'not_started' });
+    expect(outcome.ok).toBe(true);
+    expect(outcome.ok && outcome.said).toContain('#712');
+    expect(outcome.ok && outcome.said).toContain('did not start it');
+    expect(outcome.ok && outcome.said).toContain('being re-read');
+    expect(outcome.ok && outcome.redraw).toBe('/dev/plan');
+  });
+
+  // `carryOut` is handed the raise's id and nothing else, so the workspace the
+  // raise is filed under is read rather than guessed at.
+  it('puts it in the raise\'s own workspace when the instruction named none', async () => {
+    const { writes, supabase } = db({ row: { module: 'learn' }, rows: [] });
+    await carryOut(
+      input({
+        supabase,
+        target: 'raise',
+        id: 'raise-1',
+        action: action({ name: 'build_step', text: 'Say which run is holding a step' }),
+      }),
+    );
+    expect(writes[0].row).toMatchObject({ module: 'learn', position: 10 });
+  });
+
+  it('starts nothing when it cannot tell what to call it', async () => {
+    const { writes, supabase } = db();
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', id: 'raise-1', action: action({ name: 'build_step' }) }),
+    );
+    expect(writes).toHaveLength(0);
+    expect(outcome.ok === false && outcome.why).toContain('no step was added');
   });
 });
 

@@ -22,7 +22,7 @@ import {
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
+import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
 import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
@@ -82,6 +82,7 @@ export function AppShell({
   displayName,
   email,
   enabledModules,
+  isOwner = false,
   counts,
   theme,
   banner,
@@ -101,6 +102,16 @@ export function AppShell({
   displayName: string | null;
   email: string;
   enabledModules?: readonly ModuleId[];
+  /**
+   * Whether the signed-in account owns this app. Read once on the server, in
+   * the layout, and passed down: the check costs a round trip and is
+   * server-only, so nothing in here may ask for itself.
+   *
+   * Omitted means "not the owner", which hides one workspace too many rather
+   * than showing one that is not theirs. Every real call site passes the
+   * answer.
+   */
+  isOwner?: boolean;
   counts?: SwitcherCounts;
   theme: Theme;
   /** Rendered above the page, inside the content column. */
@@ -126,6 +137,21 @@ export function AppShell({
   const [switcher, setSwitcher] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const initial = (displayName || email).charAt(0).toUpperCase();
+
+  /**
+   * The workspaces this person may switch to: the ones they switched on,
+   * minus any this account is not allowed to see at all.
+   *
+   * Three lists below read it -- the column's switcher, the phone's sheet and
+   * ⌘K -- and the filtering happens once here rather than in each of them,
+   * because three lists disagreeing about which workspaces exist is the bug
+   * this shell was written to end.
+   *
+   * The rule itself is in lib/modules, where it can be read by a test without
+   * a DOM -- these three lists are a menu, a sheet and a palette, and none of
+   * them puts a workspace in its markup until it is opened.
+   */
+  const workspaces = switchableModules(enabledModules, isOwner);
 
   /**
    * How wide you want the column, remembered.
@@ -324,7 +350,7 @@ export function AppShell({
       <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
           current={module}
-          enabled={enabledModules}
+          enabled={workspaces}
           counts={counts}
           onShell
           compact={narrow}
@@ -578,7 +604,7 @@ export function AppShell({
                 <span className="lg:hidden">
                   <WorkspaceSwitcher
                     current={module}
-                    enabled={enabledModules}
+                    enabled={workspaces}
                     counts={counts}
                     onShell
                     compact
@@ -633,7 +659,7 @@ export function AppShell({
                   <CaptureButton />
                   <ThemePicker value={theme} />
                   <NotificationsButton notifications={notifications} />
-                  <FeedbackButton allHref={feedbackHref} />
+                  <FeedbackButton allHref={feedbackHref} isOwner={isOwner} />
 
                   <Link
                     href="/account"
@@ -701,7 +727,7 @@ export function AppShell({
 
           <WorkspaceSheet
             current={module}
-            enabled={enabledModules}
+            enabled={workspaces}
             counts={counts}
             open={switcher}
             onClose={() => setSwitcher(false)}
@@ -711,7 +737,7 @@ export function AppShell({
             account={account}
             module={module}
             sections={sections}
-            enabledModules={enabledModules}
+            enabledModules={workspaces}
             theme={theme}
           />
         </div>

@@ -29,8 +29,22 @@ export const MAX_REPLY = 4000;
  * through to a session that read the whole repository to make one row. Writing
  * a row is not a thing that needs the code read, and a capability that takes
  * ten minutes to reach is one the person stops asking for.
+ *
+ * `build_step` is the one that writes a row and does not stop there: it is
+ * "just do it", said on a raise that already describes the work. #605 settled
+ * that the step it writes is not a proposal -- the raise named the work and
+ * the comment said to do it, so the comment is the approval -- and that it is
+ * handed to a session in the same press. Taking it back is setting the row to
+ * not started, which is a move on the page like any other.
  */
-export const ACTIONS = ['file_idea', 'file_note', 'add_step', 'reword', 'send_step'] as const;
+export const ACTIONS = [
+  'file_idea',
+  'file_note',
+  'add_step',
+  'reword',
+  'send_step',
+  'build_step',
+] as const;
 export type ActionName = (typeof ACTIONS)[number];
 
 /**

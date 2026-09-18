@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { TARGET_COLUMN, TARGET_PATH, isCommentTarget, threadFrom } from '@/lib/comments/load';
+import {
+  COMMENT_TARGETS,
+  TARGET_COLUMN,
+  TARGET_PATH,
+  isCommentTarget,
+  threadFrom,
+} from '@/lib/comments/load';
 
 describe('threadFrom', () => {
   it('reads a row into the app shape', () => {
@@ -50,7 +56,8 @@ describe('targets', () => {
   it('writes each target to its own column', () => {
     expect(TARGET_COLUMN.step).toBe('plan_item_id');
     expect(TARGET_COLUMN.note).toBe('feedback_item_id');
-    expect(new Set(Object.values(TARGET_COLUMN)).size).toBe(4);
+    expect(TARGET_COLUMN.spec).toBe('spec_section_id');
+    expect(new Set(Object.values(TARGET_COLUMN)).size).toBe(COMMENT_TARGETS.length);
   });
 
   it('redraws the page each target is read on', () => {

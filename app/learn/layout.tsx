@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
@@ -27,14 +28,16 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity, raised, mainCheck] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadActivity(),
-    loadRaisedNotifications(user.id),
-    loadMainCheck(),
-  ]);
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner] =
+    await Promise.all([
+      supabase.from('profiles').select('display_name').eq('id', user.id).single(),
+      loadAccountSettings(user.id),
+      loadModuleCounts(user.id),
+      loadActivity(),
+      loadRaisedNotifications(user.id),
+      loadMainCheck(),
+      isOwner({ user }),
+    ]);
 
   const brief = await loadLearnBrief();
 
@@ -124,6 +127,7 @@ export default async function LearnLayout({ children }: { children: React.ReactN
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}

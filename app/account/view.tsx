@@ -10,13 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Input, Label, Select } from '@/components/ui/field';
 import { TimezoneField } from '@/components/ui/timezone-field';
 import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
-import { MODULES, type ModuleId } from '@/lib/modules';
+import { modulesFor, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
 import { cardVariants } from '@/components/ui/card';
 
 export function AccountView({
   email,
   settings,
+  isOwner,
 }: {
   email: string;
   settings: {
@@ -25,11 +26,13 @@ export function AccountView({
     displayCurrency: string;
     enabledModules: ModuleId[];
   };
+  /** Whether this account owns the app. Read on the server; see lib/dev/owner. */
+  isOwner: boolean;
 }) {
   return (
     <div className="space-y-6">
       <YouSection email={email} settings={settings} />
-      <ModulesSection enabled={settings.enabledModules} />
+      <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
       <ModuleSettingsSection enabled={settings.enabledModules} />
       <SpendSection />
       <SessionSection />
@@ -99,8 +102,16 @@ function YouSection({
   );
 }
 
-function ModulesSection({ enabled }: { enabled: ModuleId[] }) {
+function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: boolean }) {
   const [state, action] = useActionState<AccountState, FormData>(updateEnabledModules, {});
+
+  /**
+   * The workspaces this account may have, not every workspace there is. A
+   * checkbox for one it may not open would be a switch that does nothing --
+   * `updateEnabledModules` filters the form through the same rule, so ticking
+   * it by hand leaves it off anyway.
+   */
+  const modules = modulesFor(isOwner);
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -117,7 +128,7 @@ function ModulesSection({ enabled }: { enabled: ModuleId[] }) {
             than as workspaces. The rules between them say "one list" on their
             own -- law 11. */}
         <div className="divide-y divide-border border-y border-border">
-          {MODULES.map((module) => (
+          {modules.map((module) => (
             <label key={module.id} className="row-pad flex items-start gap-3">
               <input
                 type="checkbox"

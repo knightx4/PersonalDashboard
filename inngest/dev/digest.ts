@@ -185,6 +185,13 @@ export async function writeDigestFor(
       })
     : { summary: null, suggestions: [] };
 
+  // How many ideas the night filed, recorded beside the summary so the morning
+  // can say they arrived. Nothing writes them yet: #623 settled that what the
+  // night notices becomes ideas on the ideas page, and #645 is the step that
+  // makes this run write them and hand back how many it wrote. Until that
+  // lands the honest count is none, and a summary carrying none draws no line.
+  const ideasFiled = 0;
+
   const { error } = await supabase.from('dev_digests').insert({
     user_id: userId,
     day,
@@ -192,6 +199,7 @@ export async function writeDigestFor(
     summary: reading.summary,
     happened,
     attention: withSuggestions(ready, reading.suggestions),
+    ideas_filed: ideasFiled,
     night,
   });
 

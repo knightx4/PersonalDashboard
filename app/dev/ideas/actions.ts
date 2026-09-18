@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { threadText } from '@/lib/comments/context';
 import { codeMatches } from '@/lib/feedback/code';
 import { planRoutine } from '@/lib/feedback/routine';
@@ -36,8 +37,8 @@ export async function addIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const body = bodySchema.safeParse(formData.get('body') ?? '');
   const scope = moduleSchema.safeParse(String(formData.get('module') ?? ''));
@@ -70,12 +71,22 @@ export async function addIdea(
  * The page path comes over so the panel can propose the workspace the person
  * was in; the module that is actually filed is whatever the select says, which
  * may be neither.
+ *
+ * The owner check is here as well as in `addIdea`, and it is first -- before
+ * the submit code. This is the one action in this file the header panel calls,
+ * so it is reachable from every page in the app rather than only from /dev, and
+ * the check has to be the first thing it does or the answer it gives away is
+ * whether the code was right. Filing a *note* is what stays open to every
+ * account (#417); an idea is not a note, it is a row on the dev workspace's
+ * own list.
  */
 // latency: pending
 export async function submitIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
+  await requireOwner();
+
   if (!codeMatches(String(formData.get('code') ?? ''))) {
     return { error: 'That code is not right.' };
   }
@@ -91,8 +102,8 @@ export async function updateIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   const body = bodySchema.safeParse(formData.get('body') ?? '');
@@ -126,8 +137,8 @@ export async function dismissIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing idea.' };
@@ -149,8 +160,8 @@ export async function restoreIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing idea.' };
@@ -171,8 +182,8 @@ export async function deleteIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing idea.' };
@@ -202,8 +213,8 @@ export async function shapeIdea(
   _prev: IdeaActionState,
   formData: FormData,
 ): Promise<IdeaActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing idea.' };
