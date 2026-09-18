@@ -122,6 +122,36 @@ describe('waitingOnYou', () => {
 
     expect(found.map((row) => row.health)).toEqual(['blocked', 'setup', 'unanswered', 'proposed']);
   });
+
+  it('leaves out a feature that is only waiting because a step beneath it is', () => {
+    // #635 was a not-started feature whose one open step was blocked, and both
+    // of them were on this list. `healthOf` reports a feature as blocked when
+    // nothing beneath it can move, which is right on the plan page, where the
+    // step is on the next line. Here it put up a row with no ask on it and
+    // nothing to press, beside the step that had both.
+    const found = rows([
+      item({ id: 'o', title: 'The feature' }),
+      item({
+        id: 'p',
+        parentId: 'o',
+        title: 'The step',
+        status: 'blocked',
+        blockAsk: 'Say whether the mark is enough.',
+      }),
+    ]);
+
+    expect(found.map((row) => row.title)).toEqual(['The step']);
+    expect(found[0].ask).toBe('Say whether the mark is enough.');
+  });
+
+  it('still lists a question beneath a feature that is finished', () => {
+    const found = rows([
+      item({ id: 'q', title: 'Shipped', status: 'done' }),
+      item({ id: 'r', parentId: 'q', title: 'One thing left', kind: 'decision' }),
+    ]);
+
+    expect(found.map((row) => row.title)).toEqual(['One thing left']);
+  });
 });
 
 describe('latestBlockNote', () => {
