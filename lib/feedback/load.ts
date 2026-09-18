@@ -125,3 +125,70 @@ export async function loadFeedbackQueue(
     blocked: outstanding.filter((row) => row.status === 'blocked'),
   };
 }
+
+/**
+ * A note somebody else filed, as the Other users section reads it.
+ *
+ * Deliberately not a `FeedbackRow`. The row in the table is byte-for-byte the
+ * same shape whoever filed it, but #414 settled that another account's note is
+ * read-only here -- no status, no priority, no thread, no buttons -- and a
+ * type carrying those fields is an invitation to render them.
+ */
+export type OtherFeedbackRow = {
+  id: string;
+  /** Who filed it. Null only when the address could not be read. */
+  email: string | null;
+  kind: 'bug' | 'feature';
+  body: string;
+  pagePath: string | null;
+  createdAt: string;
+};
+
+/** What the Other users section reads, which is the note and nothing about working it. */
+export const OTHER_FEEDBACK_COLUMNS = 'id, user_id, kind, body, page_path, created_at';
+
+/**
+ * The notes the other accounts have filed, newest first.
+ *
+ * `neq` rather than `eq`, and that is the whole difference from the queue
+ * above: every other read in the Dev workspace filters to the signed-in id,
+ * which is what kept these rows invisible even before RLS was widened. This
+ * one opts out of that filter on purpose, and it is the only read that does.
+ *
+ * Two round trips, made together. The row carries no email -- `auth.users` is
+ * closed to a signed-in session -- so the address comes from
+ * `feedback_filer_emails()` (migration 0086), which answers the owner and
+ * hands everybody else an empty object. Signed in as anyone but the owner both
+ * halves come back empty, because the select policy from 0026 still stands:
+ * this returns nothing rather than refusing, and the section simply does not
+ * render.
+ */
+export async function loadOtherUsersFeedback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, 'public'>,
+  userId: string,
+): Promise<OtherFeedbackRow[]> {
+  const [rows, emails] = await Promise.all([
+    supabase
+      .from('feedback_items')
+      .select(OTHER_FEEDBACK_COLUMNS)
+      .neq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    supabase.rpc('feedback_filer_emails'),
+  ]);
+
+  const byUserId = (emails.error ? {} : ((emails.data ?? {}) as Record<string, unknown>)) ?? {};
+
+  return ((rows.data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
+    const address = byUserId[row.user_id as string];
+    return {
+      id: row.id as string,
+      email: typeof address === 'string' ? address : null,
+      kind: row.kind as OtherFeedbackRow['kind'],
+      body: row.body as string,
+      pagePath: (row.page_path as string | null) ?? null,
+      createdAt: row.created_at as string,
+    };
+  });
+}

@@ -35,6 +35,9 @@ import { usePopover } from '@/lib/use-popover';
  * day. They share a panel because they share the moment: the thought arrives
  * while you are looking at the thing, and which of the three it is, is not
  * something anybody should have to decide by picking a page to navigate to.
+ *
+ * Three tabs for the owner. Two for everybody else, and no code box and
+ * nothing under the form: see `isOwner` below for what goes and why.
  */
 type Kind = 'bug' | 'feature' | 'idea';
 
@@ -78,12 +81,32 @@ const KIND = Object.fromEntries(KINDS.map((entry) => [entry.id, entry])) as Reco
 
 export function FeedbackButton({
   allHref = '/dev/bugs',
+  isOwner = false,
 }: {
   allHref?: string;
+  /**
+   * Whether the signed-in account owns this app. Passed down from the shell,
+   * which read it once on the server: the check is server-only and costs a
+   * round trip, so a client component may not ask for itself.
+   *
+   * It decides how much of this panel there is. Everyone gets the capture --
+   * a bug is a bug whoever hit it -- and the rest of what is in here is the
+   * dev workspace poking through the header: the Idea tab writes to a list
+   * only the owner can see, the submit code guards a queue only they work,
+   * and the routine section below the form is that queue's own controls.
+   *
+   * Omitted means "not the owner": the smaller panel, which files a note and
+   * says so, rather than one offering buttons whose actions would refuse.
+   */
+  isOwner?: boolean;
 } = {}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>('feature');
+  // Two tabs for everybody else. Not a third tab that refuses: `submitIdea`
+  // turns a non-owner away before it looks at anything (#417), so offering it
+  // would be offering a button whose only answer is no.
+  const tabs = isOwner ? KINDS : KINDS.filter((entry) => entry.id !== 'idea');
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [noteState, noteAction, notePending] = useActionState(
@@ -115,7 +138,11 @@ export function FeedbackButton({
   // filing one is not a reason to re-count it.
   const submitted = noteState.message;
   useEffect(() => {
-    if (!open) return;
+    // The count is the owner's queue, and `openFeedbackCount` is locked to
+    // them (#417). Not fetched at all for anyone else, rather than fetched and
+    // swallowed: the number has nowhere to go once the section below the form
+    // is gone.
+    if (!open || !isOwner) return;
     let cancelled = false;
     void openFeedbackCount()
       .then((count) => {
@@ -125,7 +152,7 @@ export function FeedbackButton({
     return () => {
       cancelled = true;
     };
-  }, [open, submitted]);
+  }, [open, submitted, isOwner]);
 
   return (
     <div className="relative shrink-0">
@@ -167,7 +194,7 @@ export function FeedbackButton({
             <input type="hidden" name="kind" value={kind} />
 
             <div className="flex gap-1">
-              {KINDS.map(({ id, tab }) => (
+              {tabs.map(({ id, tab }) => (
                 <button
                   key={id}
                   type="button"
@@ -227,17 +254,23 @@ export function FeedbackButton({
               </div>
             )}
 
-            <div>
-              <Label htmlFor="feedback_code">Code</Label>
-              <Input
-                id="feedback_code"
-                name="code"
-                type="password"
-                autoComplete="off"
-                required
-                placeholder="Submit code"
-              />
-            </div>
+            {/* The owner's, and only theirs. It is the code that guards the
+                dev workspace's own writing, and `submitFeedback` asks for it
+                from the owner alone -- a second account has nothing to type
+                here and no way of knowing it. */}
+            {isOwner && (
+              <div>
+                <Label htmlFor="feedback_code">Code</Label>
+                <Input
+                  id="feedback_code"
+                  name="code"
+                  type="password"
+                  autoComplete="off"
+                  required
+                  placeholder="Submit code"
+                />
+              </div>
+            )}
 
             <Button type="submit" size="sm" disabled={pending} className="self-start">
               {pending ? 'Saving…' : 'Send'}
@@ -259,25 +292,32 @@ export function FeedbackButton({
               through and not the button. Offering to run the notes routine
               under a form that files somewhere else would say the two are one
               queue, which is the whole distinction between them. */}
-          <div className="mt-4">
-            {idea ? (
-              <div className="flex border-t border-border pt-4">
-                <Link
-                  href="/dev/ideas"
-                  onClick={() => setOpen(false)}
-                  className="ml-auto text-ui text-accent hover:underline"
-                >
-                  See all ideas
-                </Link>
-              </div>
-            ) : (
-              <RunRoutineButton
-                openCount={openCount}
-                allHref={allHref}
-                onNavigate={() => setOpen(false)}
-              />
-            )}
-          </div>
+          {/* All of it the owner's. The routine, the count and both ways
+              through land in /dev, which another account cannot open at all
+              (#416) -- so for them the panel is the form and nothing else: you
+              write the note, it says it saved it, and that is the whole of
+              what filing one is. */}
+          {isOwner && (
+            <div className="mt-4">
+              {idea ? (
+                <div className="flex border-t border-border pt-4">
+                  <Link
+                    href="/dev/ideas"
+                    onClick={() => setOpen(false)}
+                    className="ml-auto text-ui text-accent hover:underline"
+                  >
+                    See all ideas
+                  </Link>
+                </div>
+              ) : (
+                <RunRoutineButton
+                  openCount={openCount}
+                  allHref={allHref}
+                  onNavigate={() => setOpen(false)}
+                />
+              )}
+            </div>
+          )}
         </Popover>
       )}
     </div>

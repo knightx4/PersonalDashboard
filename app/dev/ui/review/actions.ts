@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { reviewRoutine } from '@/lib/feedback/routine';
 import { startRoutineRun } from '@/lib/plan/runs';
 import { isUiScope, type UiScope } from '@/lib/ui-review/scope';
@@ -49,8 +50,8 @@ export async function startUiReview(
   _prev: UiReviewActionState,
   formData: FormData,
 ): Promise<UiReviewActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const scope = scopeSchema.safeParse(formData.get('module'));
   if (!scope.success) return { error: 'Missing module.' };
@@ -89,8 +90,8 @@ export async function decideUiFinding(
   _prev: UiReviewActionState,
   formData: FormData,
 ): Promise<UiReviewActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = idSchema.safeParse(formData.get('id'));
   const decision = decisionSchema.safeParse(formData.get('decision'));

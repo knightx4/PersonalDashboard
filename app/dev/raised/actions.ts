@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { createClient } from '@/lib/auth/server';
+import { requireOwner } from '@/lib/dev/owner';
 import { carryOut } from '@/lib/comments/act';
 import { askDash } from '@/lib/comments/ask';
 import { isCommentTarget, type CommentTarget } from '@/lib/comments/load';
@@ -66,8 +67,8 @@ export async function decideRaise(
   _prev: RaisedActionState,
   formData: FormData,
 ): Promise<RaisedActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = idSchema.safeParse(formData.get('id'));
   const answer = answerSchema.safeParse(formData.get('answer'));
@@ -178,8 +179,8 @@ export async function closeRaise(
   _prev: RaisedActionState,
   formData: FormData,
 ): Promise<RaisedActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = idSchema.safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing raise.' };
@@ -221,8 +222,8 @@ export async function dismissRaise(
   _prev: RaisedActionState,
   formData: FormData,
 ): Promise<RaisedActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = idSchema.safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing raise.' };
@@ -244,8 +245,8 @@ export async function reopenRaise(
   _prev: RaisedActionState,
   formData: FormData,
 ): Promise<RaisedActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   const id = idSchema.safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing raise.' };
@@ -276,8 +277,8 @@ export async function markConversationRead(
   target: CommentTarget,
   id: string,
 ): Promise<RaisedActionState> {
-  const user = await requireUser();
   const supabase = await createClient();
+  const user = await requireOwner({ supabase });
 
   if (!isCommentTarget(target)) return { error: 'Missing what was read.' };
   const row = idSchema.safeParse(id);
