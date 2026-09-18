@@ -411,6 +411,31 @@ async function lastFeatureFires(supabase: Db, userId: string): Promise<Record<st
 }
 
 /**
+ * The newest close on a step or anything beneath it, or null if nothing has.
+ *
+ * `plan_subtree_closed_at` (migration 0089) walks the subtree in one indexed
+ * statement rather than the tick pulling the tree over the wire every four
+ * minutes to answer a question about one branch of it.
+ *
+ * A function that cannot be reached falls back to the feature row alone. That
+ * is the reading this code took before 0089 -- too strict, never wrong -- and
+ * a runner that answered `unknown` here would stop firing for the rest of the
+ * night over a failed lookup, which is a worse trade than being slow.
+ */
+async function subtreeClosedAt(supabase: Db, root: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('plan_subtree_closed_at', { root });
+  if (!error) return (data as string | null) ?? null;
+
+  console.error(`plan_subtree_closed_at could not be read; falling back: ${error.message}`);
+  const { data: item } = await supabase
+    .from('plan_items')
+    .select('completed_at')
+    .eq('id', root)
+    .maybeSingle();
+  return (item as { completed_at: string | null } | null)?.completed_at ?? null;
+}
+
+/**
  * What the feature this night last fired is doing.
  *
  * Null when the night has fired nothing yet, which is the first tick of every
@@ -457,14 +482,15 @@ async function lastFireLiveness(input: {
 
   // Still marked started, which is the ordinary case at three in the morning:
   // nothing sweeps these rows while nobody has the plan page open.
+  //
+  // The whole subtree, not the feature row. A run is fired at a feature and a
+  // feature closes only once every step beneath it closes, so a feature with
+  // one blocked or `proposed` step never closes and this test never fired --
+  // which sent every run to the two-hour silence fallback below, however well
+  // it had gone. See 0089 for the nights that measured it.
   let closedAt: string | null = null;
   if (last.plan_item_id) {
-    const { data: item } = await supabase
-      .from('plan_items')
-      .select('completed_at')
-      .eq('id', last.plan_item_id)
-      .maybeSingle();
-    closedAt = (item as { completed_at: string | null } | null)?.completed_at ?? null;
+    closedAt = await subtreeClosedAt(supabase, last.plan_item_id);
   }
 
   const since = new Date(last.created_at).getTime();
@@ -634,6 +660,14 @@ export async function runOvernightTick(
       const tick = await overnightTick(portsFor({ supabase, userId, now, fetch: input.fetch }));
       results[userId] = tick;
       if (tick.act === 'fired') fired += 1;
+      // A tick that fires says so; a tick that waits used to say nothing at
+      // all, and the run that waited two hours for a session which had already
+      // merged looked exactly like a quiet night. The reason is the whole
+      // diagnosis, so it goes in the log beside the fires.
+      if (tick.act === 'waiting') {
+        console.log(`overnight: waiting -- the last run reads ${tick.liveness}.`);
+      }
+      if (tick.act === 'ended') console.log(`overnight: ended -- ${tick.reason}`);
     } catch (err) {
       results[userId] = { act: 'failed', error: err instanceof Error ? err.message : 'failed' };
     }
