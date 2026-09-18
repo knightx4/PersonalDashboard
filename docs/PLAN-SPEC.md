@@ -538,6 +538,24 @@ counts `quiet` as live: the twenty-minute mark reads wrong on a session that
 is reading rather than writing, and #574 settled that a quiet step is re-sent
 by asking first.
 
+**What the asking is.** `sendOverClaim` in `lib/plan/liveness.ts` is the whole
+rule: a claim nothing is reading and one whose run has stopped go straight
+through, a run still pushing is refused as it always was, and a quiet run is
+asked about. The question is `quietSendAsk`, and it carries the evidence rather
+than the verdict — how long the silence has run and what the last push was —
+because "its run is quiet" alone cannot tell a dead session from one waiting on
+a build. The guard in `handover.ts` and the three Send doors on the plan page
+(the quick icon, the button on the opened row, the row menu) all read that one
+function, so the page cannot arm a confirmation the guard would refuse outright
+or send something the guard would have asked about. Confirming carries
+`confirm=quiet` on the press; the guard takes that as the answer and nothing
+else, so a form that never saw the question cannot set it. The run being
+replaced is written off first — `endRunsOnStep`, status `failed` with
+`runReplacedNote` — because a row still reading `started` under a fresh
+session's claim is the older run answering for the newer one. Only the step's
+own claim is asked about; another step under the same feature with a quiet run
+still refuses, which is #587's answer and #590's step.
+
 **What a run has to show for itself.** One word is the right size for the
 health column and the wrong size for a step you opened because it says somebody
 is working it. So the opened row carries the evidence behind the word: which

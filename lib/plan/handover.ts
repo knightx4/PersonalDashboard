@@ -19,11 +19,12 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine } from '@/lib/feedback/routine';
-import { claimIsLive } from './liveness';
+import { claimIsLive, runReplacedNote, sendOverClaim, underwayRefusal } from './liveness';
 import { planBrief } from './brief';
-import { loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
+import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
 import {
+  blockRefusal,
   buildPlanTree,
   findNode,
   flatten,
@@ -48,7 +49,20 @@ export type HandOverResult =
       /** Whether the row itself changed, so the page needs redrawing. */
       changed: boolean;
     }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      /**
+       * The same press, sent again with `confirmQuiet`, would go through.
+       *
+       * Only on the one refusal that is really a question -- a step whose run
+       * has gone quiet, which #574 settled is asked about rather than refused.
+       * The caller needs to tell that from the refusals that stay refusals
+       * however many times they are pressed, so that it offers a confirmation
+       * on the first and not on the others.
+       */
+      confirm?: true;
+    };
 
 /**
  * Send a step to be built, now.
@@ -65,6 +79,15 @@ export async function handStepToClaude(input: {
   userId: string;
   /** The step's id, not its number. */
   id: string;
+  /**
+   * Send it even though its run has gone quiet, and write that run off.
+   *
+   * The answer to the question the refusal asked, so it only means anything on
+   * a step whose claim reads `quiet`. It does not loosen any other refusal: a
+   * run still pushing is still refused, and so is a question, a proposal and a
+   * feature with another session in it.
+   */
+  confirmQuiet?: boolean;
 }): Promise<HandOverResult> {
   const { supabase, userId } = input;
 
@@ -76,12 +99,17 @@ export async function handStepToClaude(input: {
     return { ok: false, error: `#${node.number} is only a proposal. Approve it first.` };
   }
 
+  // A blocked step says which kind of block refused the press: the sentence
+  // is `blockRefusal`, so that a block naming steps names them rather than
+  // claiming the step waits on something outside the repo. Whether a block on
+  // steps should be refused at all is its own question; this is only what the
+  // refusal says.
   if (isWaitingOnThePerson(node)) {
     return {
       ok: false,
       error:
         node.status === 'blocked'
-          ? `#${node.number} is blocked on something outside the repo. Clear what it is waiting on first -- its note says what.`
+          ? blockRefusal(node)
           : `#${node.number} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
     };
   }
@@ -121,17 +149,62 @@ export async function handStepToClaude(input: {
   const liveness = planLiveness(flatten([feature]), runs, now);
   const underway = flatten([feature]).filter((step) => claimIsLive(liveness[step.id] ?? null));
   const other = underway.find((step) => step.id !== node.id);
-  if (underway.some((step) => step.id === node.id)) {
-    return {
-      ok: false,
-      error: `#${node.number} is already underway. Put it back to not started first if the session that had it is gone.`,
-    };
+
+  // The claim on this step itself, which #574 made answerable rather than a
+  // flat refusal. A run still pushing is refused as it always was, a run that
+  // has stopped goes through as it always has, and a quiet one is asked about:
+  // the twenty-minute mark reads wrong on a session that is reading files, so
+  // the press is taken with the evidence in front of you rather than on the
+  // mark alone. The rule is in `sendOverClaim` so this and the button on the
+  // page cannot disagree about which press gets asked about.
+  const own = sendOverClaim({
+    number: node.number,
+    liveness: liveness[node.id] ?? null,
+    run: runs[node.id],
+    now,
+    confirmed: input.confirmQuiet === true,
+  });
+  if (!own.send) {
+    return { ok: false, error: own.ask, ...(own.confirmable ? { confirm: true as const } : {}) };
   }
+
+  // A different step under this feature is held, and #587 settled that a quiet
+  // run holds it exactly as a working one does: the press is refused rather
+  // than asked about, because the twenty-minute mark reads wrong on a session
+  // that is reading files and spending that reading here puts two sessions in
+  // the same files on different work. The step the quiet run was sent at is
+  // the one exception and it is `own` above, which asks. The refusal names how
+  // long the sibling has been silent, so the decision to put it back is made
+  // on the evidence rather than by opening the row.
   if (other) {
     return {
       ok: false,
-      error: `#${other.number} ${other.title} is underway under the same feature. Wait for it, or put it back to not started if its session is gone.`,
+      error: underwayRefusal({
+        press: 'step',
+        number: other.number,
+        title: other.title,
+        liveness: liveness[other.id] ?? null,
+        run: runs[other.id],
+        now,
+      }),
     };
+  }
+
+  // The run this press is replacing stops here.
+  //
+  // Only when a quiet claim was confirmed through: every other send either had
+  // no run to replace or had one already written off. Before the new run is
+  // started rather than after, so that there is never an instant with two rows
+  // reading `started` against one step -- `loadLastRuns` takes the newest of
+  // them and the page would be reading a run nobody is on.
+  const replacing = input.confirmQuiet === true ? runs[node.id] : undefined;
+  if (replacing && replacing.status === 'started') {
+    await endRunsOnStep({
+      supabase,
+      userId,
+      stepId: node.id,
+      note: runReplacedNote(replacing, now),
+    });
   }
 
   // Handed over and underway, in the one write. A step sent to Claude is being
@@ -288,12 +361,20 @@ export async function handFeatureToClaude(input: {
   // run behind each claim rather than off the clock. A batch started on top of
   // a running session is the worse version of the same collision, since it
   // hands the whole feature to a second run.
-  const liveness = planLiveness(flatten([node]), await loadLastRuns(supabase, userId), now);
+  const runs = await loadLastRuns(supabase, userId);
+  const liveness = planLiveness(flatten([node]), runs, now);
   const running = flatten([node]).find((step) => claimIsLive(liveness[step.id] ?? null));
   if (running) {
     return {
       ok: false,
-      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
+      error: underwayRefusal({
+        press: 'feature',
+        number: running.number,
+        title: running.title,
+        liveness: liveness[running.id] ?? null,
+        run: runs[running.id],
+        now,
+      }),
       refused: true,
     };
   }

@@ -1385,6 +1385,63 @@ export function isWaitingOnThePerson(
 }
 
 /**
+ * Why the Send button will not take a blocked step. #634.
+ *
+ * There are two kinds of block and, until #564 recorded which one a row
+ * carries, there was one sentence for both: every refusal said the step was
+ * waiting on something outside the repo. That is the wrong thing to tell
+ * somebody about a step whose block names three other steps, none of which
+ * have closed. The kind is on the row now, so a block on steps names the ones
+ * still open instead, because that list is what the press was really about.
+ *
+ * What this does not change is whether the press is refused. #525 settled that
+ * the two kinds are recorded, not what the Send button does with each, so a
+ * block on steps is refused here exactly as it was.
+ *
+ * A block with no kind recorded, or one this build does not recognise, reads
+ * as `outside` and keeps the sentence it had -- the same reading `isStaleBlock`
+ * and `isReady` take of it.
+ */
+export function blockRefusal(
+  node: Pick<PlanNode, 'number'> & {
+    dependsOn?: readonly PlanLink[];
+    blockKind?: PlanBlockKind | null;
+  },
+): string {
+  if (!waitsOnItsSteps(node)) {
+    return (
+      `#${node.number} is blocked on something outside the repo. ` +
+      'Clear what it is waiting on first -- its note says what.'
+    );
+  }
+
+  // Blocked on steps and naming none. `isStaleBlock` leaves such a row blocked
+  // on purpose, since there is nothing on record for the block to have
+  // outlived, so the press is refused with nothing to point at. Saying that is
+  // more use than an empty list.
+  const open = (node.dependsOn ?? []).filter((link) => !isClosed(link.item.status));
+  if (open.length === 0) {
+    return (
+      `#${node.number} is blocked on other steps, and none are recorded against it. ` +
+      'Say what it is waiting for, or put it back to not started.'
+    );
+  }
+
+  const named = andList(open.map((link) => `#${link.item.number}`));
+  return open.length === 1
+    ? `#${node.number} is blocked on ${named}, which is still open. ` +
+        'It clears itself when that step closes.'
+    : `#${node.number} is blocked on ${named}, which are still open. ` +
+        'It clears itself when they close.';
+}
+
+/** "#1", then "#1 and #2", then "#1, #2 and #3". */
+function andList(parts: readonly string[]): string {
+  if (parts.length < 2) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+/**
  * The feature a step belongs to: the highest step above it, or itself.
  *
  * The whole tree it sits in, rather than the nearest ancestor that says what

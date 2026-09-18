@@ -9,12 +9,17 @@ import {
   lastStoredPush,
   pushesFrom,
   QUIET_AFTER_MINUTES,
+  quietRunNote,
+  quietSendAsk,
   readingTrusted,
   refusalStanding,
   runEndedNote,
   runLiveness,
+  runReplacedNote,
+  sendOverClaim,
   silenceReads,
   SUBJECT_LIMIT,
+  underwayRefusal,
   type ActivityRow,
   type ClaimRun,
   type Push,
@@ -52,7 +57,12 @@ describe('pushesFrom', () => {
       after: 'bbb',
       timestamp: minutesAgo(12),
     },
-    { activity_type: 'branch_deletion', ref: 'refs/heads/old', after: 'ccc', timestamp: minutesAgo(8) },
+    {
+      activity_type: 'branch_deletion',
+      ref: 'refs/heads/old',
+      after: 'ccc',
+      timestamp: minutesAgo(8),
+    },
     { activity_type: 'push', ref: 'refs/heads/main', after: 'ddd', timestamp: minutesAgo(90) },
   ];
 
@@ -131,9 +141,9 @@ describe('lastStoredPush', () => {
   it('passes over a refused reading rather than counting it as silence', () => {
     // A refusal carries no push at all, so the run under it answers instead.
     const refused = { reading: { checkedAt: minutesAgo(1), lastPush: null, refusal: '403' } };
-    expect(lastStoredPush([refused, stored(5, 'The one that read')], minutesAgo(120))?.subject).toBe(
-      'The one that read',
-    );
+    expect(
+      lastStoredPush([refused, stored(5, 'The one that read')], minutesAgo(120))?.subject,
+    ).toBe('The one that read');
   });
 });
 
@@ -231,7 +241,8 @@ function run(over: Partial<ClaimRun> = {}): ClaimRun {
 function reading(checked: number, pushed: number | null, refusal: string | null = null) {
   return {
     checkedAt: minutesAgo(checked),
-    lastPush: pushed === null ? null : { at: minutesAgo(pushed), sha: 'abc1234', subject: 'A push' },
+    lastPush:
+      pushed === null ? null : { at: minutesAgo(pushed), sha: 'abc1234', subject: 'A push' },
     refusal,
   };
 }
@@ -299,9 +310,9 @@ describe('claimLiveness', () => {
   });
 
   it('is quiet once nothing has been pushed for the quiet mark', () => {
-    expect(
-      claimLiveness(claim(), run({ reading: reading(1, QUIET_AFTER_MINUTES) }), NOW),
-    ).toBe('quiet');
+    expect(claimLiveness(claim(), run({ reading: reading(1, QUIET_AFTER_MINUTES) }), NOW)).toBe(
+      'quiet',
+    );
   });
 
   it('counts the silence from the run being fired when it never pushed', () => {
@@ -326,16 +337,20 @@ describe('claimLiveness', () => {
 
   it('is abandoned on a run already written off as failed', () => {
     expect(
-      claimLiveness(claim({ startedAt: minutesAgo(5) }), run({ status: 'failed', reading: null }), NOW),
+      claimLiveness(
+        claim({ startedAt: minutesAgo(5) }),
+        run({ status: 'failed', reading: null }),
+        NOW,
+      ),
     ).toBe('abandoned');
   });
 
   describe('with nothing to read, it falls back to the clock in elapsed.ts', () => {
     it('is claimed while the claim is inside the two hours', () => {
       expect(claimLiveness(claim({ startedAt: minutesAgo(10) }), null, NOW)).toBe('claimed');
-      expect(
-        claimLiveness(claim({ startedAt: minutesAgo(10) }), run({ reading: null }), NOW),
-      ).toBe('claimed');
+      expect(claimLiveness(claim({ startedAt: minutesAgo(10) }), run({ reading: null }), NOW)).toBe(
+        'claimed',
+      );
     });
 
     it('is abandoned once the claim is past them', () => {
@@ -405,6 +420,7 @@ describe('claimIsLive', () => {
     expect(claimIsLive('working')).toBe(true);
     expect(claimIsLive('claimed')).toBe(true);
     // #574: quiet is re-sent by asking first, not by the guard giving way.
+    // #587: and it goes on refusing every other step under the same feature.
     expect(claimIsLive('quiet')).toBe(true);
     expect(claimIsLive('abandoned')).toBe(false);
     expect(claimIsLive(null)).toBe(false);
@@ -428,5 +444,209 @@ describe('commitSubject', () => {
     expect(said).toMatch(/…$/);
     expect(said!.length).toBeLessThanOrEqual(SUBJECT_LIMIT + 1);
     expect(said).not.toContain('b'.repeat(200));
+  });
+});
+
+describe('quietRunNote', () => {
+  it('says how long the silence has run and what the last push was', () => {
+    expect(quietRunNote(run({ createdAt: minutesAgo(90), reading: reading(1, 35) }), NOW)).toBe(
+      'Nothing has been pushed for 35m. The last was "A push".',
+    );
+  });
+
+  it('names the commit when the push was recorded without its subject', () => {
+    expect(
+      quietRunNote(
+        run({
+          reading: {
+            checkedAt: minutesAgo(1),
+            lastPush: { at: minutesAgo(25), sha: 'abc1234def', subject: null },
+            refusal: null,
+          },
+        }),
+        NOW,
+      ),
+    ).toBe('Nothing has been pushed for 25m. The last was abc1234.');
+  });
+
+  it('counts from the press when the run never pushed at all', () => {
+    expect(quietRunNote(run({ createdAt: minutesAgo(40), reading: reading(1, null) }), NOW)).toBe(
+      'Nothing has been pushed in the 40m since it started.',
+    );
+  });
+});
+
+describe('quietSendAsk', () => {
+  it('is a question, and it carries the evidence rather than the verdict', () => {
+    const ask = quietSendAsk(586, run({ createdAt: minutesAgo(90), reading: reading(1, 35) }), NOW);
+    expect(ask).toContain('#586');
+    expect(ask).toContain('35m');
+    expect(ask).toContain('A push');
+    expect(ask.endsWith('?')).toBe(true);
+  });
+});
+
+describe('runReplacedNote', () => {
+  it('says the run was replaced and what it had managed first', () => {
+    const note = runReplacedNote(run({ reading: reading(1, 35) }), NOW);
+    expect(note).toContain('handed to a fresh session');
+    expect(note).toContain('35m');
+  });
+});
+
+describe('sendOverClaim', () => {
+  const quietRun = run({ createdAt: minutesAgo(90), reading: reading(1, 35) });
+
+  it('sends a step nothing is claiming', () => {
+    expect(
+      sendOverClaim({ number: 1, liveness: null, run: null, now: NOW, confirmed: false }),
+    ).toEqual({
+      send: true,
+    });
+  });
+
+  it('sends a step whose run has stopped, without asking', () => {
+    expect(
+      sendOverClaim({
+        number: 1,
+        liveness: 'abandoned',
+        run: quietRun,
+        now: NOW,
+        confirmed: false,
+      }),
+    ).toEqual({ send: true });
+  });
+
+  it('asks before sending a step whose run has gone quiet', () => {
+    const verdict = sendOverClaim({
+      number: 586,
+      liveness: 'quiet',
+      run: quietRun,
+      now: NOW,
+      confirmed: false,
+    });
+    expect(verdict.send).toBe(false);
+    if (verdict.send) throw new Error('unreachable');
+    expect(verdict.confirmable).toBe(true);
+    expect(verdict.ask).toBe(quietSendAsk(586, quietRun, NOW));
+  });
+
+  it('sends that same step once the question has been answered', () => {
+    expect(
+      sendOverClaim({ number: 586, liveness: 'quiet', run: quietRun, now: NOW, confirmed: true }),
+    ).toEqual({ send: true });
+  });
+
+  it('refuses a run that is still pushing, and confirming does not get past it', () => {
+    for (const confirmed of [false, true]) {
+      const verdict = sendOverClaim({
+        number: 586,
+        liveness: 'working',
+        run: run({ reading: reading(1, 2) }),
+        now: NOW,
+        confirmed,
+      });
+      expect(verdict.send).toBe(false);
+      if (verdict.send) throw new Error('unreachable');
+      expect(verdict.confirmable).toBe(false);
+      expect(verdict.ask).toContain('already underway');
+    }
+  });
+
+  it('refuses a claim nothing has been read about, the way it always has', () => {
+    const verdict = sendOverClaim({
+      number: 586,
+      liveness: 'claimed',
+      run: null,
+      now: NOW,
+      confirmed: true,
+    });
+    expect(verdict.send).toBe(false);
+    if (verdict.send) throw new Error('unreachable');
+    expect(verdict.confirmable).toBe(false);
+  });
+});
+
+describe('underwayRefusal', () => {
+  const quietRun = run({ createdAt: minutesAgo(90), reading: reading(1, 35) });
+
+  it('names the sibling holding the feature and how long it has been silent', () => {
+    expect(
+      underwayRefusal({
+        press: 'step',
+        number: 591,
+        title: 'Draw the run on the row',
+        liveness: 'quiet',
+        run: quietRun,
+        now: NOW,
+      }),
+    ).toBe(
+      '#591 Draw the run on the row is underway under the same feature. ' +
+        'Nothing has been pushed for 35m. The last was "A push". ' +
+        'Wait for it, or put it back to not started if its session is gone.',
+    );
+  });
+
+  it('says where the claim is differently when the whole feature was pressed', () => {
+    const said = underwayRefusal({
+      press: 'feature',
+      number: 591,
+      title: 'Draw the run on the row',
+      liveness: 'quiet',
+      run: quietRun,
+      now: NOW,
+    });
+    expect(said).toContain('#591 Draw the run on the row is already underway.');
+    expect(said).toContain('35m');
+    expect(said).not.toContain('under the same feature');
+  });
+
+  it('leaves a claim nothing has been read about reading exactly as it did', () => {
+    for (const press of ['step', 'feature'] as const) {
+      expect(
+        underwayRefusal({
+          press,
+          number: 591,
+          title: 'Draw it',
+          liveness: 'claimed',
+          run: null,
+          now: NOW,
+        }),
+      ).toBe(
+        press === 'step'
+          ? '#591 Draw it is underway under the same feature. ' +
+              'Wait for it, or put it back to not started if its session is gone.'
+          : '#591 Draw it is already underway. ' +
+              'Wait for it, or put it back to not started if its session is gone.',
+      );
+    }
+  });
+
+  it('says nothing about silence for a run that is still pushing', () => {
+    expect(
+      underwayRefusal({
+        press: 'step',
+        number: 591,
+        title: 'Draw it',
+        liveness: 'working',
+        run: run({ reading: reading(1, 2) }),
+        now: NOW,
+      }),
+    ).not.toContain('Nothing has been pushed');
+  });
+
+  it('is never a question, however quiet the run is', () => {
+    // #587's answer (b): quiet frees the step its run was sent at and nothing
+    // else, so this refusal has no confirmation behind it the way `sendOverClaim`
+    // does.
+    const said = underwayRefusal({
+      press: 'step',
+      number: 591,
+      title: 'Draw it',
+      liveness: 'quiet',
+      run: quietRun,
+      now: NOW,
+    });
+    expect(said).not.toContain('?');
   });
 });
