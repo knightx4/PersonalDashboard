@@ -582,6 +582,64 @@ export async function approvePlanItem(
 }
 
 /**
+ * Say yes to a whole list of proposals, in one press.
+ *
+ * What Dash's "To approve" group is drawn from, where the alternative is a
+ * press per row on a list that is mostly one feature's steps. Each id is
+ * approved the way `approvePlanItem` approves one -- the row and everything
+ * proposed beneath it -- and the ids are collected into a set before the
+ * write, because that list holds a proposed feature and its proposed steps as
+ * separate rows and the feature already takes the steps with it. Without the
+ * set the same row is updated twice and counted twice.
+ *
+ * A row that has gone since the page was drawn is passed over rather than
+ * failing the press: approving one on the plan page in another tab is an
+ * ordinary thing to have done, and it should not stop the rest.
+ *
+ * #630 settled what this covers: plan proposals only. A request from a session
+ * is a different move -- a yes on one runs what it named, there and then -- so
+ * it keeps the buttons on its own row even when it is drawn in the same group.
+ */
+// latency: pending
+export async function approveProposals(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const asked = z
+    .array(z.string().uuid())
+    .min(1)
+    .safeParse(formData.getAll('id').map((value) => String(value)));
+  if (!asked.success) return { error: 'Nothing to approve.' };
+
+  const sections = buildPlanTree(await loadPlan(supabase, user.id));
+
+  const ids = new Set<string>();
+  for (const id of asked.data) {
+    const node = findNode(sections, id);
+    if (!node) continue;
+    for (const step of flatten([node])) {
+      if (step.status === 'proposed') ids.add(step.id);
+    }
+  }
+  if (ids.size === 0) return { message: 'Nothing left to approve.' };
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started' })
+    .in('id', [...ids])
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return {
+    message: ids.size === 1 ? 'Approved 1 proposal.' : `Approved ${ids.size} proposals.`,
+  };
+}
+
+/**
  * Hand a step to Claude, or take it back, in one click.
  *
  * The step and every open step beneath it, for the same reason approving works

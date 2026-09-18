@@ -17,12 +17,14 @@
  * here on.
  */
 import {
+  flatten,
   flattenSections,
   healthOf,
   needsThePerson,
   type PlanNode,
   type PlanSection,
 } from './tree';
+import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
 
 /** One row of the section, flattened out of the tree it came from. */
 export type WaitingRow = {
@@ -45,6 +47,28 @@ export type WaitingRow = {
    * whole of it.
    */
   ask: string | null;
+  /**
+   * The row's own detail, which on a question is the question and its lettered
+   * options. Dash answers a question where it stands rather than sending you
+   * to the plan page, and `planOptions` reads the options out of this.
+   *
+   * The same string as `ask` on a question and on a setup job; they are two
+   * readings of the column rather than two columns, and the card shows one
+   * while the answer box parses the other.
+   */
+  detail: string | null;
+  /**
+   * What you have already answered, on a question you answered and left open.
+   * Null on everything else. The answer box shows it above the box and offers
+   * to change it, the way the plan page does.
+   */
+  resolution: string | null;
+  /**
+   * How many proposed steps sit beneath this one, at any depth, not counting
+   * the row itself. Approving a proposal approves everything proposed under
+   * it, so this is what the button has to say it is about to approve.
+   */
+  proposedBeneath: number;
 };
 
 /**
@@ -121,6 +145,14 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
       title: node.title,
       module: node.module,
       health,
+      detail: node.detail?.trim() || null,
+      resolution: node.resolution?.trim() || null,
+      // From the real node rather than from `row` above, which had its
+      // children taken off it so that `healthOf` would answer for this row
+      // alone.
+      proposedBeneath: flatten([node]).filter(
+        (step) => step.id !== node.id && step.status === 'proposed',
+      ).length,
       ask:
         health === 'blocked'
           ? (node.blockAsk?.trim() || latestBlockNote(node.comment))
@@ -131,4 +163,99 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
   }
 
   return rows.sort((a, b) => ORDER[a.health] - ORDER[b.health] || a.number - b.number);
+}
+
+/**
+ * The three groups the Dash section is drawn in.
+ *
+ * `actions` is what you have to go and do: a step stopped on something only
+ * you can supply, and a setup job that was yours from the day it was written.
+ * `questions` is what you have to answer in words. `approve` is what you only
+ * have to say yes to.
+ *
+ * The split is by what finishes the row, not by where it came from, which is
+ * why a raise and a plan row can sit in the same group. One list sorted by
+ * urgency asked you to work out for each row which of those three it was.
+ */
+export type WaitingGroupKey = 'actions' | 'questions' | 'approve';
+
+/**
+ * One row of a group, as the page draws it: a plan row takes the plan card and
+ * a raise takes the raise card, and each carries what finishes it.
+ */
+export type WaitingEntry =
+  | { kind: 'plan'; id: string; row: WaitingRow }
+  | { kind: 'raise'; id: string; raise: RaisedRow };
+
+export type WaitingGroup = {
+  key: WaitingGroupKey;
+  /** The heading, and the only place it is written. */
+  title: string;
+  entries: WaitingEntry[];
+};
+
+const GROUP_TITLE: Record<WaitingGroupKey, string> = {
+  actions: 'Your actions',
+  questions: 'Questions for you',
+  approve: 'To approve',
+};
+
+/** Which group a plan row finishes in. */
+const PLAN_GROUP: Record<WaitingRow['health'], WaitingGroupKey> = {
+  blocked: 'actions',
+  setup: 'actions',
+  unanswered: 'questions',
+  proposed: 'approve',
+};
+
+/**
+ * Which group a raise finishes in: #622 settled that one naming an action Dash
+ * will run on a yes goes under To approve, and the rest are questions.
+ *
+ * A guess, and known to be one. The column was written to say what a yes does,
+ * not to sort the row, so a raise that named an action and also wants a
+ * paragraph back lands under To approve. It costs nothing to be wrong: the row
+ * carries its own buttons whichever heading it is drawn under, and #630 keeps
+ * Approve all off them.
+ */
+function groupOf(raise: RaisedRow): WaitingGroupKey {
+  return raise.consequence ? 'approve' : 'questions';
+}
+
+/**
+ * Everything waiting on you, in the three groups, most pressing group first.
+ *
+ * Both halves of the list in one pass: the plan rows `waitingOnYou` derives
+ * and the raises sessions filed. Empty groups are returned as well as full
+ * ones, so the page decides what an empty one looks like rather than having to
+ * work out which of the three is missing.
+ *
+ * Plan rows lead each group. A step that has stopped is work already begun and
+ * not moving, where a raise is a question that can wait, and the same ordering
+ * held when the two were one list.
+ */
+export function waitingGroups(
+  sections: readonly PlanSection[],
+  queue: Pick<RaisedQueue, 'open'>,
+): WaitingGroup[] {
+  const entries: Record<WaitingGroupKey, WaitingEntry[]> = {
+    actions: [],
+    questions: [],
+    approve: [],
+  };
+
+  for (const row of waitingOnYou(sections)) {
+    entries[PLAN_GROUP[row.health]].push({ kind: 'plan', id: row.id, row });
+  }
+  // In the order the queue reads them, newest first, which is the order they
+  // were in when every raise sat in one fold.
+  for (const raise of queue.open) {
+    entries[groupOf(raise)].push({ kind: 'raise', id: raise.id, raise });
+  }
+
+  return (['actions', 'questions', 'approve'] as const).map((key) => ({
+    key,
+    title: GROUP_TITLE[key],
+    entries: entries[key],
+  }));
 }
