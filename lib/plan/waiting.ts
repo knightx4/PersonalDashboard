@@ -90,8 +90,22 @@ export function waitingOnYou(sections: readonly PlanSection[]): WaitingRow[] {
   const rows: WaitingRow[] = [];
 
   for (const node of flattenSections(sections)) {
-    if (!needsThePerson(node)) continue;
-    const health = healthOf(node);
+    // The row on its own terms, with nothing beneath it.
+    //
+    // `healthOf` reports a feature as blocked when every open step under it is,
+    // and as the worst thing still open beneath it when it is closed. That is
+    // right on the plan page, where the step it is speaking for is on the next
+    // line. It is wrong here: this is a list of things to do, and #635 put a
+    // feature on it with no ask, nothing to press and no way to see that the
+    // one step it borrowed its "waiting" from was the very next row.
+    //
+    // So each row answers for itself. Nothing is lost by it -- a question, a
+    // proposal, a block and a setup job are all rows in their own right, and
+    // each one is still here under its own number, with the ask that says what
+    // it wants.
+    const row = { ...node, children: [] };
+    if (!needsThePerson(row)) continue;
+    const health = healthOf(row);
     if (
       health !== 'blocked' &&
       health !== 'unanswered' &&

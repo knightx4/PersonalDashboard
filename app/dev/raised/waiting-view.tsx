@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FieldError } from '@/components/ui/field';
 import { RefText } from '@/components/dev/ref-text';
-import type { PlanRefTitles } from '@/lib/comments/refs';
+import { planRefHref, type PlanRefTitles } from '@/lib/comments/refs';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { WAITING_WORD } from '@/lib/dev/words';
@@ -51,8 +51,14 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
   return (
     <li className="space-y-1 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
+        {/* The row itself, not the top of the plan. Every one of these is a
+            discrete thing to go and settle, and landing on the plan page and
+            hunting for the number is what made the list feel like it was
+            saying something was waiting without saying what. `planRefHref`
+            is the same link a `#494` in a comment makes -- it asks for the
+            All view, so a row a filter would have hidden is still reached. */}
         <Link
-          href="/dev/plan"
+          href={planRefHref(row.number)}
           className="text-body font-semibold text-ink hover:underline"
         >
           #{row.number} {row.title}

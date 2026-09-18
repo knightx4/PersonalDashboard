@@ -44,6 +44,7 @@ vi.mock('@/app/dev/plan/actions', () => {
     sendPlanItemToClaude: noop,
     sendPlanQueueToClaude: noop,
     setPlanItemAssignee: noop,
+    setPlanItemPriority: noop,
     setPlanItemStatus: noop,
     updatePlanItem: noop,
   };
@@ -175,11 +176,30 @@ describe('PlanView', () => {
     expect(html).toContain('Share links');
     expect(html).toContain('#1');
     expect(html).toContain('The anonymous page');
-    expect(html).toContain('#3');
+    // Note 4ff04135: a step is numbered by its place under its feature. The
+    // done first step is filtered out of this view and the ones left keep the
+    // numbers they had -- a filter does not renumber the plan.
+    expect(html).toContain('#1.2');
+    expect(html).toContain('#1.3');
+    // Its own number is still the handle, on the button that opens it.
+    expect(html).toContain('Open #3');
     // The done schema step is not on the open view; the feature that holds
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
     expect(render('all')).toContain('Schema and RPCs');
+  });
+
+  it('makes priority a word on the row you click, not a form you open', () => {
+    // Note 3bfb2749: it was a label, and changing it meant opening the step
+    // and going through the edit form for one of three values.
+    const html = render('open');
+    // Every row, whatever it is set to, and named so the menu says which step
+    // it belongs to.
+    expect(html).toContain('Priority of #1 Share links');
+    expect(html).toContain('Priority of #5 Account deletion');
+    // The word itself is what carries the press.
+    expect(html).toContain('>Next</span>');
+    expect(html).toContain('>Someday</span>');
   });
 
   it('gathers the finished features into the fold at the foot of Everything', () => {
@@ -248,7 +268,12 @@ describe('PlanView', () => {
     expect(html).toContain('>Someday<');
     // Normal is the priority of nearly every step, so drawing it put the same
     // word on almost every row. Next and Someday are what the column is for.
-    expect(html).not.toContain('>Normal<');
+    //
+    // Since note 3bfb2749 the word is the control that changes it, so on a
+    // Normal step it is in the markup as the thing you click -- and drawn
+    // only while the row is under the pointer, which is what keeps the
+    // resting column to Next and Someday. The rule is the class now.
+    expect(html).toContain('opacity-0 group-hover:opacity-100');
     // Not who has it: the Who column was dropped deliberately -- it was a
     // column of dashes with the occasional "Dash" in it. Who has a step is on
     // the open step, in the "Dash's" view, and in the menu that sets it, and

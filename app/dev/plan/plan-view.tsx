@@ -34,6 +34,7 @@ import {
   sendPlanItemToClaude,
   sendPlanQueueToClaude,
   setPlanItemAssignee,
+  setPlanItemPriority,
   setPlanItemStatus,
   updatePlanItem,
   type PlanActionState,
@@ -68,6 +69,7 @@ import { MODULES, type ModuleId } from '@/lib/modules';
 import {
   PLAN_ASSIGNEES,
   PLAN_PRIORITIES,
+  PLAN_PRIORITY_LABEL,
   PLAN_SIZES,
   PLAN_STATUSES,
   isClosed,
@@ -157,7 +159,6 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
   dropped: 'Dropped',
 };
 
-const PRIORITY_LABEL: Record<PlanPriority, string> = { 1: 'Next', 2: 'Normal', 3: 'Someday' };
 const SIZE_LABEL: Record<PlanSize, string> = { s: 'Small', m: 'Medium', l: 'Large' };
 const ASSIGNEE_LABEL: Record<PlanAssignee, string> = { me: 'Me', claude: 'Dash' };
 
@@ -201,7 +202,7 @@ function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriority; id?:
     >
       {PLAN_PRIORITIES.map((priority) => (
         <option key={priority} value={priority}>
-          {PRIORITY_LABEL[priority]}
+          {PLAN_PRIORITY_LABEL[priority]}
         </option>
       ))}
     </ChipSelect>
@@ -851,7 +852,7 @@ function TheQuestion({ node }: { node: PlanNode }) {
     <div className="space-y-0.5">
       <QuestionPartLabel>The question</QuestionPartLabel>
       <p className="text-ui font-medium text-ink">
-        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.number}</span>
+        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.outline}</span>
         {node.title}
       </p>
     </div>
@@ -1184,7 +1185,7 @@ function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles 
               and none of the apparatus for answering it applies. */}
           {node.status === 'dropped' ? (
             <p className="text-ui text-ink-muted line-through">
-              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.number}</span>
+              <span className="tabular mr-1.5 text-small text-ink-ghost">#{node.outline}</span>
               {node.title}
             </p>
           ) : (
@@ -2502,6 +2503,14 @@ function PlanRow({
     })),
   ];
 
+  const priorityMenu: ActionMenuItem[] = PLAN_PRIORITIES.map((priority) => ({
+    id: `priority-${priority}`,
+    label: PLAN_PRIORITY_LABEL[priority],
+    disabled: priority === node.priority,
+    formAction: (formData: FormData) => setPlanItemPriority({}, formData),
+    formFields: { id: node.id, priority: String(priority) },
+  }));
+
   // The open steps beneath this one, which a hand-over covers as well. Said in
   // the label rather than found out afterwards.
   const openBeneath = flatten([node]).filter(
@@ -2679,7 +2688,15 @@ function PlanRow({
                 trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
               )}
             >
-              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.number}</span>
+              {/* Where the row sits, not just what it is called: a feature
+                  reads #595 and its second step reads #595.2, so a step says
+                  which feature it belongs to and how far through it is
+                  without the tree guides having to be traced up by eye.
+                  `number` is still the handle -- it is what the commits, the
+                  comments and the CLI say, it is the anchor a `#597` link
+                  lands on, and the button around this says "Open #597" -- and
+                  the search box takes either. */}
+              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
               {/* Truncated closed, whole open. A row is a line and a long title
                 * has to give way to keep it one; but opening the step is the
                 * gesture that means "show me this one", and a name still cut
@@ -2827,10 +2844,34 @@ function PlanRow({
             Normal, so the word was on almost every row and told you nothing;
             what you are scanning for is the handful marked Next or Someday.
             The separator before the size goes with it, so a normal step at S
-            reads as "S" rather than as "· S". */}
+            reads as "S" rather than as "· S".
+
+            A word you click, like the health beside it -- note 3bfb2749. At
+            Normal there is no word to click, so the trigger is the word
+            itself, drawn only while the row is under the pointer or the menu
+            is being reached by keyboard: the resting row still says nothing,
+            which is the whole reason Normal is silent. */}
         <span className="hidden truncate text-small sm:block">
-          {node.priority === 1 && <span className="text-accent">Next</span>}
-          {node.priority === 3 && <span className="text-ink-ghost">Someday</span>}
+          <ActionMenu
+            label={`Priority of #${node.number} ${node.title}`}
+            items={priorityMenu}
+            align="start"
+            triggerClassName={cn(
+              'h-auto w-auto rounded px-0.5 py-0 font-normal',
+              node.priority === 2 &&
+                'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
+            )}
+            trigger={
+              <span
+                className={cn(
+                  node.priority === 1 && 'text-accent',
+                  node.priority === 3 && 'text-ink-ghost',
+                )}
+              >
+                {PLAN_PRIORITY_LABEL[node.priority]}
+              </span>
+            }
+          />
           {node.size && (
             <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
               {node.priority !== 2 && ' · '}
@@ -3043,7 +3084,7 @@ function PlanRow({
 
             <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
               <span>{scopeLabel(node.module)}</span>
-              {node.priority !== 2 && <span>{PRIORITY_LABEL[node.priority]}</span>}
+              {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
               {node.size && <span>{SIZE_LABEL[node.size]}</span>}
               {node.assignee && <span>{ASSIGNEE_LABEL[node.assignee]}</span>}
               {when(node.startedAt) && (

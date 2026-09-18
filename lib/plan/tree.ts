@@ -50,6 +50,22 @@ export type PlanLink = {
 export type PlanNode = PlanItem & {
   /** 0 at the top of a module's plan. */
   depth: number;
+  /**
+   * Where the row sits in its feature, to read: "595" on a feature and
+   * "595.2" on the second step under it.
+   *
+   * Not the identity -- `number` is, and stays. Every commit subject on main
+   * says "plan #601", 330 rows and 25 comments carry a `#nnn` in their text,
+   * and a commit message cannot be rewritten, so a step's number can never be
+   * given away to a different row. What the outline is for is reading: #597
+   * says nothing about which feature it belongs to or how far through it is,
+   * and 595.2 says both.
+   *
+   * Worked out here, before any view or search narrows the tree, so hiding a
+   * sibling cannot renumber the ones left. Reordering the steps does renumber
+   * them, which is the point of an outline and the reason it is not a handle.
+   */
+  outline: string;
   children: PlanNode[];
   /** The steps this one is declared to wait on, done or not. */
   dependsOn: PlanLink[];
@@ -382,7 +398,12 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
     blocks.set(target.id, [...(blocks.get(target.id) ?? []), toRef(item)]);
   }
 
-  function build(item: PlanItem, ancestors: PlanItem[], inherited: PlanRef[]): PlanNode {
+  function build(
+    item: PlanItem,
+    ancestors: PlanItem[],
+    inherited: PlanRef[],
+    outline: string,
+  ): PlanNode {
     const own = (dependsOn.get(item.id) ?? [])
       .map((link) => link.item)
       .filter((ref) => !isClosed(ref.status));
@@ -390,13 +411,14 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
     const waitingOn = [...inherited, ...own.filter((ref) => !seen.has(ref.id))];
 
     const chain = [...ancestors, item];
-    const children = (childrenOf.get(item.id) ?? []).map((child) =>
-      build(child, chain, waitingOn),
+    const children = (childrenOf.get(item.id) ?? []).map((child, index) =>
+      build(child, chain, waitingOn, `${outline}.${index + 1}`),
     );
 
     const node: PlanNode = {
       ...item,
       depth: ancestors.length,
+      outline,
       children,
       dependsOn: (dependsOn.get(item.id) ?? []).sort((a, b) => a.item.number - b.item.number),
       blocks: (blocks.get(item.id) ?? []).sort((a, b) => a.number - b.number),
@@ -409,7 +431,9 @@ export function buildPlanTree(data: PlanData, liveness?: PlanLiveness): PlanSect
     return node;
   }
 
-  const roots = (childrenOf.get(null) ?? []).map((item) => build(item, [], []));
+  const roots = (childrenOf.get(null) ?? []).map((item) =>
+    build(item, [], [], String(item.number)),
+  );
 
   const scopes: Array<ModuleId | null> = [...MODULES.map((module) => module.id), null];
   return scopes
@@ -1188,7 +1212,9 @@ export function splitFinished(sections: readonly PlanSection[]): {
  * finds the step only if it is both. Case and surrounding space are ignored.
  */
 function matchesQuery(node: PlanNode, terms: readonly string[]): boolean {
-  const haystack = [`#${node.number}`, node.title, node.detail ?? '']
+  // The outline as well as the number: a step reads "595.2" on the page, so
+  // that is what gets typed into the box after reading it.
+  const haystack = [`#${node.number}`, node.outline, node.title, node.detail ?? '']
     .join(' ')
     .toLowerCase();
   return terms.every((term) => haystack.includes(term));
