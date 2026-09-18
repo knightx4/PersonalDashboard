@@ -1,9 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState } from 'react';
-import { setPlanItemStatus, type PlanActionState } from '@/app/dev/plan/actions';
+import { useActionState, useState } from 'react';
+import {
+  answerPlanDecision,
+  setPlanItemStatus,
+  type PlanActionState,
+} from '@/app/dev/plan/actions';
 import { Button } from '@/components/ui/button';
+import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FieldError } from '@/components/ui/field';
 import { RefText } from '@/components/dev/ref-text';
@@ -47,6 +52,7 @@ const TONE: Record<WaitingRow['health'], DevTone> = {
  */
 export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRefTitles }) {
   const setup = row.health === 'setup';
+  const question = row.health === 'unanswered';
 
   return (
     <li className="space-y-1 p-3">
@@ -73,12 +79,18 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
       {/* The title above is the one-line summary and this is what you have to
           actually go and do -- #599 asked for both, and on a setup row the two
           are the whole of the errand, so the instructions keep their line
-          breaks rather than being run together into a gloss. */}
-      {row.ask && (
+          breaks rather than being run together into a gloss.
+
+          A question is the exception: its ask is the same string the answering
+          box reads its options out of, so drawing both would be the same
+          paragraph twice. */}
+      {row.ask && !question && (
         <p className={setup ? 'whitespace-pre-wrap text-small text-ink' : 'text-small text-ink-muted'}>
           <RefText text={row.ask} titles={titles} />
         </p>
       )}
+
+      {question && <AnswerQuestion row={row} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-micro text-ink-ghost">
@@ -98,13 +110,12 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
  * the whole cost of one of these is that it is small and you are somewhere
  * else. So the same action the plan page's box drives is driven from here.
  *
- * The other three kinds get no button, and that is the difference between them.
- * A question and a proposal are closed by words -- an answer, an approval --
- * and a one-press Done on either would be closing a decision with nothing
- * recorded against it. A blocked step is cleared by whatever it was blocked on
- * arriving, not by saying it is fine. A setup job is the one that is finished
- * by you having gone and done it, and "I have" is the whole of what there is
- * to record.
+ * A one-press Done is the right control for this one kind and the wrong one for
+ * the rest. A question is closed by words and gets the answering box below
+ * instead; a proposal is closed by an approval. A blocked step is cleared by
+ * whatever it was blocked on arriving, not by saying it is fine. A setup job is
+ * the one that is finished by you having gone and done it, and "I have" is the
+ * whole of what there is to record.
  *
  * `setPlanItemStatus` writes `done` and no commit, which is right: nothing was
  * built, and `commit_sha` stays null the same way it does on an answered
@@ -125,5 +136,61 @@ function SetupDone({ row }: { row: WaitingRow }) {
         I have set this up
       </Button>
     </form>
+  );
+}
+
+/**
+ * A question answered where you read it, rather than on the plan page.
+ *
+ * The list on Dash said a question was waiting and gave you its number; the
+ * answering was somewhere else, so settling one meant opening the plan, finding
+ * the row and scrolling to the same box. The box is `components/dev/question`
+ * now and this is the plan page's questions list in miniature: the options as
+ * buttons that fill the answer in, any answer already recorded above them, and
+ * the box itself opened by a press rather than standing open on every card.
+ *
+ * The question is not restated. The card's own heading is the question, and
+ * `TheQuestion` under it would be the same sentence twice.
+ *
+ * `answerPlanDecision` is the same write the plan page makes, and it
+ * revalidates this page as well as that one, so answering takes the row off
+ * the list rather than leaving it sitting there answered.
+ */
+function AnswerQuestion({ row }: { row: WaitingRow }) {
+  const [state, action, pending] = useActionState(
+    answerPlanDecision,
+    {} as PlanActionState,
+  );
+  const [answering, setAnswering] = useState(false);
+  const { answer, setAnswer, choose } = useAnswerDraft(() => setAnswering(true));
+
+  return (
+    <div className="space-y-2">
+      <TheOptions detail={row.detail} onChoose={choose} />
+
+      {row.resolution && <TheAnswered resolution={row.resolution} />}
+
+      {answering ? (
+        <AnswerBox
+          id={row.id}
+          detail={row.detail}
+          resolution={row.resolution}
+          action={action}
+          pending={pending}
+          answer={answer}
+          onAnswer={setAnswer}
+          autoFocus
+          error={state.error}
+          onCancel={() => {
+            setAnswer('');
+            setAnswering(false);
+          }}
+        />
+      ) : (
+        <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>
+          {row.resolution ? 'Change the answer' : 'Answer'}
+        </Button>
+      )}
+    </div>
   );
 }

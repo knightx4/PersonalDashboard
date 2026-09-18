@@ -47,7 +47,6 @@ import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { cardVariants } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Banner } from '@/components/ui/banner';
 import { Bands } from '@/components/ui/meter';
@@ -128,7 +127,14 @@ import {
   type RunRaise,
 } from '@/lib/plan/work';
 import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
-import { optionAnswer, planOptions, type PlanOption } from '@/lib/plan/options';
+import {
+  AnswerBox,
+  QuestionPartLabel,
+  TheAnswered,
+  TheOptions,
+  TheQuestion,
+  useAnswerDraft,
+} from '@/components/dev/question';
 import { cn } from '@/lib/cn';
 
 /**
@@ -824,120 +830,6 @@ function EditStep({
  * box is still the whole form when a question has no options, which is most of
  * them.
  */
-/**
- * The heading over a part of a question: the question, the options, the answer.
- *
- * Three words in the same small caps in every place a question is shown, so
- * that "which of these am I reading" is answered by the shape of the thing and
- * not by working it out from the prose.
- */
-function QuestionPartLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">{children}</p>
-  );
-}
-
-/**
- * The question itself, said once and set apart.
- *
- * A question used to be a line of body text among the step's other lines, at
- * the same size and weight as the description of the work -- so the one thing
- * on the surface that is actually waiting on a person looked like reading
- * matter. It is now labelled and set a step up the scale, which is the whole
- * ask: when something needs an answer, the question I am answering should be
- * the clearest thing on the surface.
- */
-function TheQuestion({ node }: { node: PlanNode }) {
-  return (
-    <div className="space-y-0.5">
-      <QuestionPartLabel>The question</QuestionPartLabel>
-      <p className="text-ui font-medium text-ink">
-        <span className="tabular mr-1.5 font-normal text-small text-ink-ghost">#{node.outline}</span>
-        {node.title}
-      </p>
-    </div>
-  );
-}
-
-/**
- * The options, as options.
- *
- * They are written as prose in `detail` -- a lettered paragraph each, with
- * what it costs and a recommendation -- and were shown as that same paragraph:
- * a muted block of text in which the choices had to be found by reading. Where
- * the letters are legible (see lib/plan/options.ts) each one now gets its own
- * line and its letter in a badge, so the shape of the choice is visible before
- * a word of it is read.
- *
- * `onChoose` makes each line the button that answers with it. Without it they
- * are just the options, which is what they are while nobody is answering.
- *
- * The prose does not disappear: the letters carry only each option's opening
- * sentence, and the cost and the recommendation are the rest of the paragraph.
- * That goes under the fold, where it can be read by anybody who wants more than
- * the choice -- law 10, and the collapsed line says what is behind it.
- */
-function TheOptions({
-  detail,
-  onChoose,
-}: {
-  detail: string | null;
-  onChoose?: (option: PlanOption) => void;
-}) {
-  if (!detail) return null;
-  const options = planOptions(detail);
-
-  if (options.length === 0) {
-    return (
-      <div className="space-y-0.5">
-        <QuestionPartLabel>The options</QuestionPartLabel>
-        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1">
-      <QuestionPartLabel>The options</QuestionPartLabel>
-      <ul className="space-y-1">
-        {options.map((option) => {
-          const body = (
-            <>
-              <span
-                aria-hidden
-                className="flex size-5 shrink-0 items-center justify-center rounded-control bg-surface text-micro font-semibold uppercase text-ink"
-              >
-                {option.letter}
-              </span>
-              <span className="min-w-0 flex-1 text-left text-small text-ink">{option.label}</span>
-            </>
-          );
-
-          return (
-            <li key={option.letter}>
-              {onChoose ? (
-                <button
-                  type="button"
-                  onClick={() => onChoose(option)}
-                  title={`Answer ${option.letter}: ${option.label}`}
-                  className="press flex w-full items-start gap-2 rounded-control px-1.5 py-1 transition-colors duration-150 hover:bg-accent-tint"
-                >
-                  {body}
-                </button>
-              ) : (
-                <span className="flex items-start gap-2 px-1.5 py-1">{body}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <Disclosure title="What each one costs" className="px-1.5">
-        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
-      </Disclosure>
-    </div>
-  );
-}
-
 function AnswerDecision({
   node,
   action,
@@ -949,20 +841,7 @@ function AnswerDecision({
   pending: boolean;
   autoFocus: boolean;
 }) {
-  const field = `answer-${node.id}`;
-  const options = planOptions(node.detail);
-  const [answer, setAnswer] = useState('');
-
-  // Replaces rather than appends: the options are a choice between them, and
-  // pressing two means you changed your mind, not that you want both written
-  // down. What you type after it is yours and is left alone.
-  //
-  // Controlled rather than written through a ref. A ref put the text into the
-  // DOM node behind React's back, which worked here only because this box
-  // happens to always be mounted -- the same call in the questions list had
-  // nothing to write to, so the options there did nothing at all. One
-  // mechanism, in both places.
-  const choose = (option: PlanOption) => setAnswer(optionAnswer(option));
+  const { answer, setAnswer, choose } = useAnswerDraft();
 
   return (
     /* A well, not a frame: this sits inside the open step, which is already a
@@ -973,37 +852,21 @@ function AnswerDecision({
       {/* The question and its options, before the box that closes them. The
           box used to come first with the options as a row of chips above it,
           which put the form in front of the thing the form is about. */}
-      <TheQuestion node={node} />
+      <TheQuestion outline={node.outline} title={node.title} />
       <TheOptions detail={node.detail} onChoose={choose} />
 
-      {node.resolution && (
-        <div className="space-y-0.5">
-          <QuestionPartLabel>Answered</QuestionPartLabel>
-          <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
-        </div>
-      )}
-      <form action={action} className="space-y-2">
-        <input type="hidden" name="id" value={node.id} />
-        <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
-        <Textarea
-          id={field}
-          name="answer"
-          rows={2}
-          className="min-h-12"
-          autoFocus={autoFocus}
-          value={answer}
-          onChange={(event) => setAnswer(event.target.value)}
-          placeholder={
-            options.length > 0
-              ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
-              : 'What you decided, and enough of why that a session need not ask again.'
-          }
-        />
-        <FieldHint>This closes the question. Nothing is committed against it.</FieldHint>
-        <Button type="submit" size="sm" pending={pending}>
-          {node.resolution ? 'Record the new answer' : 'Answer'}
-        </Button>
-      </form>
+      {node.resolution && <TheAnswered resolution={node.resolution} />}
+      <AnswerBox
+        id={node.id}
+        detail={node.detail}
+        resolution={node.resolution}
+        action={action}
+        pending={pending}
+        answer={answer}
+        onAnswer={setAnswer}
+        autoFocus={autoFocus}
+        hint
+      />
     </div>
   );
 }
@@ -1125,35 +988,22 @@ function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles 
     {} as PlanActionState,
   );
   const [answering, setAnswering] = useState(false);
-  const [answer, setAnswer] = useState('');
   useSettled(answerState, () => setAnswering(false));
 
   const settled = isClosed(node.status);
   // Only ever rendered under the Dismissed view: everywhere else the row is
   // pruned before it gets here.
   const aside = isDismissed(node);
-  const field = `question-${node.id}`;
-
   /**
    * Pressing an option opens the box with that option in it.
    *
-   * Both halves matter. It writes rather than records, as it always has:
-   * an answer is read by every session that works beneath this feature from
-   * now on, so the last word before it is written down stays yours, and "b,
-   * but only for the shared lists" is the answer you most often actually
-   * want. And it opens the box itself, which is the half that was missing --
-   * the options were only clickable once you had already pressed Answer, so
+   * The options were only clickable once you had already pressed Answer, so
    * from the outside they were three things that looked like buttons and did
-   * nothing. Replaces rather than appends: pressing two of them means you
-   * changed your mind, not that you want both written down.
-   *
-   * The box is controlled rather than written through a ref, because it does
-   * not exist yet at the moment the option is pressed.
+   * nothing. `useAnswerDraft` writes the option into the box rather than
+   * recording it; the callback is what opens the box, which does not exist yet
+   * at the moment the option is pressed.
    */
-  const choose = (option: PlanOption) => {
-    setAnswer(optionAnswer(option));
-    setAnswering(true);
-  };
+  const { answer, setAnswer, choose } = useAnswerDraft(() => setAnswering(true));
 
   return (
     <li
@@ -1190,53 +1040,28 @@ function QuestionRow({ node, titles }: { node: PlanNode; titles?: PlanRefTitles 
             </p>
           ) : (
             <>
-              <TheQuestion node={node} />
+              <TheQuestion outline={node.outline} title={node.title} />
               <TheOptions detail={node.detail} onChoose={settled ? undefined : choose} />
             </>
           )}
 
-          {node.resolution && (
-            <div className="space-y-0.5">
-              <QuestionPartLabel>Answered</QuestionPartLabel>
-              <p className="whitespace-pre-wrap text-ui text-ink">{node.resolution}</p>
-            </div>
-          )}
+          {node.resolution && <TheAnswered resolution={node.resolution} />}
 
           {answering ? (
-            <form action={answerAction} className="space-y-2">
-              <input type="hidden" name="id" value={node.id} />
-              <Label htmlFor={field}>{node.resolution ? 'Change the answer' : 'Your answer'}</Label>
-              <Textarea
-                id={field}
-                name="answer"
-                rows={2}
-                className="min-h-12"
-                autoFocus
-                value={answer}
-                onChange={(event) => setAnswer(event.target.value)}
-                placeholder={
-                  planOptions(node.detail).length > 0
-                    ? 'Pick one above, or say it in your own words — and enough of why that a session need not ask again.'
-                    : 'What you decided, and enough of why that a session need not ask again.'
-                }
-              />
-              <div className="flex items-center gap-1">
-                <Button type="submit" size="sm" pending={answerPending}>
-                  {node.resolution ? 'Record the new answer' : 'Answer'}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setAnswer('');
-                    setAnswering(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
+            <AnswerBox
+              id={node.id}
+              detail={node.detail}
+              resolution={node.resolution}
+              action={answerAction}
+              pending={answerPending}
+              answer={answer}
+              onAnswer={setAnswer}
+              autoFocus
+              onCancel={() => {
+                setAnswer('');
+                setAnswering(false);
+              }}
+            />
           ) : (
             <div className="flex flex-wrap items-center gap-1">
               <Button type="button" size="sm" variant="ghost" onClick={() => setAnswering(true)}>

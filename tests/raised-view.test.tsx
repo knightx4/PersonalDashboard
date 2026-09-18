@@ -19,9 +19,13 @@ vi.mock('@/app/dev/raised/actions', () => {
   return { closeRaise: noop, decideRaise: noop, dismissRaise: noop, reopenRaise: noop };
 });
 
-// The plan's own action, for the same reason: the setup row's Done button
-// drives it, and the render only needs it to be a function.
-vi.mock('@/app/dev/plan/actions', () => ({ setPlanItemStatus: async () => ({}) }));
+// The plan's own actions, for the same reason: the setup row's Done button and
+// the question's answering box drive them, and the render only needs them to be
+// functions.
+vi.mock('@/app/dev/plan/actions', () => ({
+  setPlanItemStatus: async () => ({}),
+  answerPlanDecision: async () => ({}),
+}));
 
 const { RaisedView } = await import('@/app/dev/raised/raised-view');
 
@@ -83,6 +87,13 @@ function render(rows: RaisedRow[], waiting: WaitingRow[] = []): string {
   const queue = raisedQueueFrom(rows);
   return renderToStaticMarkup(<RaisedView queue={queue} groups={groupsFrom(waiting, queue.open)} />);
 }
+
+/** A question as the plan writes one: the options lettered, one to a line. */
+const QUESTION_DETAIL = [
+  'A — Approve all covers plan proposals only. A request keeps its own yes.',
+  'B — Approve all covers everything in the group and runs each action too.',
+  'Recommend A: the one that hands a step to a routine is the one you would least want to press by accident.',
+].join('\n');
 
 function waitingRow(over: Partial<WaitingRow> = {}): WaitingRow {
   return {
@@ -225,6 +236,58 @@ describe('a setup job on the page', () => {
     for (const health of ['blocked', 'unanswered', 'proposed'] as const) {
       const html = render([], [waitingRow({ health })]);
       expect(html).not.toContain('I have set this up');
+    }
+  });
+});
+
+/**
+ * #626: a question is answered here, with its options in front of you, rather
+ * than sending you to the plan page to find the row first.
+ */
+describe('a question on the page', () => {
+  const question = (over: Partial<WaitingRow> = {}) =>
+    waitingRow({
+      id: 'q1',
+      number: 630,
+      title: 'Does Approve all cover Claude\'s requests too?',
+      health: 'unanswered',
+      ask: QUESTION_DETAIL,
+      detail: QUESTION_DETAIL,
+      ...over,
+    });
+
+  it('draws the lettered options as options, and what each costs under the fold', () => {
+    const html = render([], [question()]);
+
+    expect(html).toContain('The options');
+    expect(html).toContain('Approve all covers plan proposals only');
+    expect(html).toContain('Approve all covers everything in the group');
+    expect(html).toContain('What each one costs');
+  });
+
+  it('offers the press that opens the answering box, and does not stand it open', () => {
+    const html = render([], [question()]);
+
+    expect(html).toContain('>Answer<');
+    // Law 14: the box is asked for, not standing open on every card in the
+    // list. Nothing to type in until the press.
+    expect(html).not.toContain('What you decided');
+    expect(html).not.toContain('<textarea');
+  });
+
+  it('shows an answer already recorded, and offers to change it', () => {
+    const html = render([], [question({ resolution: 'A, and say how many it will approve.' })]);
+
+    expect(html).toContain('Answered');
+    expect(html).toContain('A, and say how many it will approve.');
+    expect(html).toContain('Change the answer');
+  });
+
+  it('offers no answering box on the three kinds that are not questions', () => {
+    for (const health of ['blocked', 'setup', 'proposed'] as const) {
+      const html = render([], [waitingRow({ health })]);
+      expect(html).not.toContain('>Answer<');
+      expect(html).not.toContain('The options');
     }
   });
 });
