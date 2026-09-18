@@ -2377,6 +2377,8 @@ function PlanRow({
   // the button on the opened row and the row menu -- and one question in one
   // place is better than the same question drawn three times.
   const [confirmingSend, setConfirmingSend] = useState(false);
+  const substeps = node.children.filter((child) => child.kind !== 'decision');
+  const hasChildren = substeps.length > 0;
   // Every feature starts folded.
   //
   // It used to be only the closed ones, on the grounds that finished work is
@@ -2389,7 +2391,17 @@ function PlanRow({
   // A search is the exception, and the same one as before: the row is only on
   // the page because something inside it matched, and folding that away would
   // be answering the search with a closed drawer.
-  const [showChildren, setShowChildren] = useState(() => searching || unfolded);
+  //
+  // Fog folds too, and that is the whole of what the arrow is for on a row
+  // with no steps under it. #386 is fog and nothing else -- a feature real
+  // enough to name and not yet real enough to break up -- so gating the arrow
+  // on sub-steps alone left its one block of text pinned open with no control
+  // anywhere on the row. A leaf still starts unfolded, so scanning the plan
+  // shows the fog exactly as it did; what is new is being able to put it away.
+  const foldableFog = Boolean(node.fog) && (node.fogDismissedAt === null || view === 'dismissed');
+  const [showChildren, setShowChildren] = useState(
+    () => searching || unfolded || (!hasChildren && foldableFog),
+  );
 
   const [assignState, assignAction, assignPending] = useActionState(
     setPlanItemAssignee,
@@ -2434,10 +2446,8 @@ function PlanRow({
   // it, is how you end up answering neither. A decision at the top of a module
   // is nobody's question but its own and stays a row.
   const questions = node.children.filter((child) => child.kind === 'decision');
-  const substeps = node.children.filter((child) => child.kind !== 'decision');
   const unanswered = questions.filter((question) => !isClosed(question.status)).length;
 
-  const hasChildren = substeps.length > 0;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
@@ -2663,17 +2673,29 @@ function PlanRow({
 
           {/* The fold for the sub-steps. A spacer where there are none, so the
               titles at one depth line up. */}
-          {hasChildren ? (
+          {hasChildren || foldableFog ? (
             <button
               type="button"
               onClick={() => setShowChildren((value) => !value)}
               aria-expanded={showChildren}
               title={
-                showChildren
-                  ? `Fold the ${substeps.length} sub-steps`
-                  : `Unfold the ${substeps.length} sub-steps`
+                hasChildren
+                  ? showChildren
+                    ? `Fold the ${substeps.length} sub-steps`
+                    : `Unfold the ${substeps.length} sub-steps`
+                  : showChildren
+                    ? 'Fold what is not yet specified'
+                    : 'Unfold what is not yet specified'
               }
-              aria-label={showChildren ? 'Hide the sub-steps' : 'Show the sub-steps'}
+              aria-label={
+                hasChildren
+                  ? showChildren
+                    ? 'Hide the sub-steps'
+                    : 'Show the sub-steps'
+                  : showChildren
+                    ? 'Hide what is not yet specified'
+                    : 'Show what is not yet specified'
+              }
               className={cn(
                 LEVEL,
                 'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
@@ -3064,10 +3086,11 @@ function PlanRow({
           the row -- it is the part of it that is not a plan yet -- so a
           collapsed feature leaving its fog behind was one block outliving the
           thing it described. Only where there is an arrow to fold: on a leaf
-          `showChildren` is a state with no control, and gating on it alone
-          would hide fog on every closed step with no way back. */}
-      {node.fog && (node.fogDismissedAt === null || view === 'dismissed') &&
-        (!hasChildren || showChildren) && (
+          a leaf used to have no arrow at all, so gating on it alone hid fog on
+          every stepless feature with no way back -- which is what happened to
+          #386. The arrow above now appears for fog as well as for sub-steps,
+          so the fold is a control everywhere it is a state. */}
+      {foldableFog && showChildren && (
           <li style={inset} className="pb-1.5 pr-3">
             <div className="border-l-2 border-dashed border-border-strong pl-2.5">
               <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
