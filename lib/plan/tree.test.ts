@@ -3,6 +3,7 @@ import type { PlanDependency, PlanItem, PlanStatus } from '@/lib/plan/load';
 import {
   ancestorsOf,
   applyView,
+  blockRefusal,
   buildPlanTree,
   splitFinished,
   searchNodes,
@@ -1318,6 +1319,67 @@ describe('isWaitingOnThePerson', () => {
     // needsThePerson counts one; this does not. A proposal is excluded from a
     // hand-over on its own grounds.
     expect(isWaitingOnThePerson({ kind: 'build', status: 'proposed' })).toBe(false);
+  });
+});
+
+describe('blockRefusal', () => {
+  it('names the steps a block on steps is still waiting for', () => {
+    const sections = tree(
+      [
+        at('blocked', 'held', { number: 634, blockKind: 'steps' }),
+        at('not_started', 'first', { number: 601 }),
+        at('done', 'shipped', { number: 602 }),
+        at('in_progress', 'second', { number: 603 }),
+      ],
+      [dep('held', 'first'), dep('held', 'shipped'), dep('held', 'second')],
+    );
+    expect(blockRefusal(findNode(sections, 'held')!)).toBe(
+      '#634 is blocked on #601 and #603, which are still open. It clears itself when they close.',
+    );
+  });
+
+  it('reads as one step when only one is left open', () => {
+    const sections = tree(
+      [
+        at('blocked', 'held', { number: 634, blockKind: 'steps' }),
+        at('not_started', 'first', { number: 601 }),
+        at('done', 'shipped', { number: 602 }),
+      ],
+      [dep('held', 'first'), dep('held', 'shipped')],
+    );
+    expect(blockRefusal(findNode(sections, 'held')!)).toBe(
+      '#634 is blocked on #601, which is still open. It clears itself when that step closes.',
+    );
+  });
+
+  it('keeps the sentence it had for a block on something outside the plan', () => {
+    // The refusal #499 got every time, and the one direction this must not
+    // change: a token nobody has made is not a step that can close.
+    const sections = tree(
+      [
+        at('blocked', 'stuck', { number: 499, blockKind: 'outside' }),
+        at('done', 'shipped', { number: 498 }),
+      ],
+      [dep('stuck', 'shipped')],
+    );
+    expect(blockRefusal(findNode(sections, 'stuck')!)).toBe(
+      '#499 is blocked on something outside the repo. ' +
+        'Clear what it is waiting on first -- its note says what.',
+    );
+  });
+
+  it('reads a block with no kind recorded as one outside the plan', () => {
+    expect(blockRefusal({ number: 12, blockKind: null })).toBe(
+      '#12 is blocked on something outside the repo. ' +
+        'Clear what it is waiting on first -- its note says what.',
+    );
+  });
+
+  it('says so when a block on steps names no steps at all', () => {
+    expect(blockRefusal({ number: 12, blockKind: 'steps' })).toBe(
+      '#12 is blocked on other steps, and none are recorded against it. ' +
+        'Say what it is waiting for, or put it back to not started.',
+    );
   });
 });
 

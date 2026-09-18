@@ -24,6 +24,7 @@ import { planBrief } from './brief';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
 import {
+  blockRefusal,
   buildPlanTree,
   findNode,
   flatten,
@@ -98,12 +99,17 @@ export async function handStepToClaude(input: {
     return { ok: false, error: `#${node.number} is only a proposal. Approve it first.` };
   }
 
+  // A blocked step says which kind of block refused the press: the sentence
+  // is `blockRefusal`, so that a block naming steps names them rather than
+  // claiming the step waits on something outside the repo. Whether a block on
+  // steps should be refused at all is its own question; this is only what the
+  // refusal says.
   if (isWaitingOnThePerson(node)) {
     return {
       ok: false,
       error:
         node.status === 'blocked'
-          ? `#${node.number} is blocked on something outside the repo. Clear what it is waiting on first -- its note says what.`
+          ? blockRefusal(node)
           : `#${node.number} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
     };
   }
