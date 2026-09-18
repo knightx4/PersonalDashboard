@@ -1651,6 +1651,11 @@ function CheckMark({ check }: { check: CommitCheck | undefined }) {
   if (!word) return null;
 
   const failed = check?.conclusion === 'failed';
+  // A step closed against a commit main does not carry is at least as wrong as
+  // one closed against a red commit -- the work is nowhere, not merely broken
+  // -- so it is marked as loudly rather than sitting grey among the steps
+  // nobody has looked up yet. #637.
+  const alarming = failed || check?.conclusion === 'unmerged';
   const merge = check?.mergeSha ? check.mergeSha.slice(0, 7) : null;
   const title = failed
     ? `The checks failed on ${merge}, the merge that put this on main.`
@@ -1663,10 +1668,10 @@ function CheckMark({ check }: { check: CommitCheck | undefined }) {
       title={title}
       className={cn(
         'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 text-small font-semibold',
-        failed ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
+        alarming ? 'bg-caution-tint text-caution' : 'font-normal text-ink-ghost',
       )}
     >
-      {failed && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
+      {alarming && <CircleAlert className="size-3" strokeWidth={2} aria-hidden />}
       {word}
     </span>
   );
@@ -2961,7 +2966,8 @@ function PlanRow({
               {node.status === 'done' && node.commitSha && (
                 <span
                   className={
-                    commitChecks[node.commitSha]?.conclusion === 'failed'
+                    commitChecks[node.commitSha]?.conclusion === 'failed' ||
+                    commitChecks[node.commitSha]?.conclusion === 'unmerged'
                       ? 'text-caution'
                       : undefined
                   }

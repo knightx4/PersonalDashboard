@@ -25,6 +25,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ask, commitOnMain, readToken, REPO, REPO_KEY, refusalFor } from './github';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
 import {
   carriedBy,
@@ -40,13 +41,13 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
-const API = 'https://api.github.com';
-
-/** The repository the plan is built in. The app is the thing being checked. */
-export const REPO = { owner: 'knightx4', repo: 'PersonalDashboard', branch: 'main' };
-
-/** How `plan_main_checks` names that repository: its primary key. */
-export const REPO_KEY = `${REPO.owner}/${REPO.repo}`;
+/**
+ * The repository, the token, the headers and what a refusal means all moved to
+ * `github.ts`, so that `scripts/plan.ts` could ask GitHub whether a commit is
+ * on main without importing this `server-only` file. Re-exported here because
+ * the app imports them from this module.
+ */
+export { REPO, REPO_KEY, refusalFor };
 
 /** Commits per listing request, which is the most GitHub allows. */
 const PAGE_SIZE = 100;
@@ -57,91 +58,41 @@ const PAGE_CAP = 8;
 /** How many merges one call will read checks for. */
 const MERGE_BUDGET = 25;
 
+/**
+ * How many commits one call will ask about by comparison.
+ *
+ * The listing above answers most of them, so this is only ever the commits it
+ * did not reach: something closed minutes ago that is still on its branch, or
+ * something older than the page cap. Smaller than `MERGE_BUDGET` because one
+ * request answers one commit here, where one request answers every commit a
+ * merge carried.
+ */
+const LANDING_BUDGET = 10;
+
 /** How many of those are in flight at once. */
 const LANES = 5;
 
 type CommitRow = { sha: string; parents?: Array<{ sha?: string }> };
 
-/** The token that may read this repository's checks. Set in Vercel. */
-function readToken(): string | null {
-  return process.env.GITHUB_READ_TOKEN?.trim() || null;
-}
-
-/**
- * Which permission each endpoint here is refused for want of.
- *
- * A fine-grained token grants these separately, so a token that reads the
- * repository fine can still be refused the workflow runs -- which is exactly
- * the shape this failed in.
- *
- * Only the two this file is sure of are named. The activity listing falls
- * through to the unnamed form on purpose: sending someone to tick the wrong
- * box is worse than telling them a box is missing.
- */
-const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
-  ['/actions/runs', 'Actions: Read'],
-  ['/commits', 'Contents: Read'],
-];
-
-/**
- * What a refusal from GitHub means, said to the person who can fix it.
- *
- * This came back as a bug report reading "Could not read CI: GitHub answered
- * 403 for /repos/…/check-runs?per_page=100", with "I dont even know what this
- * means" under it -- which is fair, because the page was repeating HTTP at
- * somebody who never asked GitHub anything. Law 2 wants a source that failed
- * to say so in place; it does not want it said in status codes.
- *
- * A 403 or a 404 on these paths is neither a bug nor an outage. It is
- * GITHUB_READ_TOKEN missing one permission, or having expired, and both of
- * those are a sentence rather than a number. The status stays in the text
- * because it is the thing to search for if the sentence turns out wrong.
- */
-export function refusalFor(status: number, path: string): string {
-  if (status === 401) {
-    return `GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped. Set a new one in Vercel and redeploy.`;
-  }
-  if (status === 403 || status === 404) {
-    const permission = PERMISSION_FOR.find(([fragment]) => path.includes(fragment))?.[1];
-    const grant = permission
-      ? `Give it "${permission}" on ${REPO.owner}/${REPO.repo}`
-      : `Give it access to ${REPO.owner}/${REPO.repo}`;
-    return `GITHUB_READ_TOKEN is missing a permission (${status}). ${grant} in the token's settings, then redeploy.`;
-  }
-  return `GitHub answered ${status} for ${path}`;
-}
-
-async function ask<T>(path: string, token: string, doFetch: typeof globalThis.fetch): Promise<T> {
-  const res = await doFetch(`${API}${path}`, {
-    headers: {
-      accept: 'application/vnd.github+json',
-      authorization: `Bearer ${token}`,
-      'x-github-api-version': '2022-11-28',
-      'user-agent': 'personal-dashboard-plan',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new Error(refusalFor(res.status, path));
-  }
-  return (await res.json()) as T;
-}
-
 /**
  * Main's commits, newest first, until every commit asked about has been seen.
  *
- * `exhausted` says the walk reached the start of the history rather than the
- * page cap, which is what makes "not in here" mean "never reached main" rather
- * than "older than we looked".
+ * A commit the listing does not reach is not answered here, either way. It
+ * used to be: the walk reported whether it had read the whole history, and
+ * "not in here, and we read all of it" was taken for "never reached main".
+ * That reading could not be had at this repository's size -- main passed the
+ * cap's eight hundred commits, so the walk never reached the start of history
+ * again and `unmerged` stopped being written at all. `commitOnMain` asks the
+ * question exactly and at any depth instead, so the walk is left to do the one
+ * thing it is good at: naming the merge, for the commits it does reach.
  */
 async function listMain(
   wanted: ReadonlySet<string>,
   token: string,
   doFetch: typeof globalThis.fetch,
-): Promise<{ commits: CommitNode[]; exhausted: boolean }> {
+): Promise<CommitNode[]> {
   const commits: CommitNode[] = [];
   const outstanding = new Set(wanted);
-  let exhausted = false;
 
   for (let page = 1; page <= PAGE_CAP; page += 1) {
     const rows = await ask<CommitRow[]>(
@@ -155,14 +106,11 @@ async function listMain(
         if (row.sha.startsWith(sha)) outstanding.delete(sha);
       }
     }
-    if (rows.length < PAGE_SIZE) {
-      exhausted = true;
-      break;
-    }
+    if (rows.length < PAGE_SIZE) break;
     if (outstanding.size === 0) break;
   }
 
-  return { commits, exhausted };
+  return commits;
 }
 
 /**
@@ -347,25 +295,38 @@ export async function refreshCommitChecks(input: {
   if (wanted.size === 0) return { checked: 0, error: null };
 
   try {
-    const { commits, exhausted } = await listMain(wanted, token, doFetch);
-    const carrier = carriedBy(commits);
+    const carrier = carriedBy(await listMain(wanted, token, doFetch));
 
     // Which merge each commit needs an answer from, and which commits are
-    // answered by each merge.
-    const unmerged: string[] = [];
+    // answered by each merge. A commit the listing did not reach gets no merge
+    // and no answer from here; it is asked about below instead.
+    const missing: string[] = [];
     const byMerge = new Map<string, string[]>();
     for (const sha of wanted) {
       const merge = carrierFor(carrier, sha);
-      if (merge) {
-        const sharing = byMerge.get(merge);
-        if (sharing) sharing.push(sha);
-        else byMerge.set(merge, [sha]);
+      if (!merge) {
+        missing.push(sha);
         continue;
       }
-      // Only when the whole history was read. Otherwise nothing is known about
-      // this commit yet, and nothing is written.
-      if (exhausted) unmerged.push(sha);
+      const sharing = byMerge.get(merge);
+      if (sharing) sharing.push(sha);
+      else byMerge.set(merge, [sha]);
     }
+
+    // Whether main carries each of those, asked one comparison at a time.
+    // Only a definite no is written down: main carrying a commit the listing
+    // never reached says nothing about which merge ran the checks, and an
+    // answer GitHub would not give is not an answer. Both leave the commit
+    // unwritten and asked again next time, which reads as "not checked" --
+    // true, where "never reached main" would be a guess.
+    const unmerged = (
+      await inLanes(missing.slice(0, LANDING_BUDGET), async (sha) => ({
+        sha,
+        landing: await commitOnMain({ sha, fetch: doFetch }),
+      }))
+    )
+      .filter(({ landing }) => landing.onMain === false)
+      .map(({ sha }) => sha);
 
     const merges = [...byMerge.keys()].slice(0, MERGE_BUDGET);
     const conclusions = await inLanes(merges, (sha) => checkCommit(sha, token, doFetch));

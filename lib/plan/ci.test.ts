@@ -96,6 +96,9 @@ describe('listPushes', () => {
   });
 });
 
+/** Commits per listing request, as `ci.ts` asks for them. */
+const PAGE_SIZE = 100;
+
 /** One merge on main carrying one branch commit, which is what a step records. */
 const MERGE = 'a'.repeat(40);
 const BRANCH = 'b'.repeat(40);
@@ -201,6 +204,92 @@ describe('refreshCommitChecks', () => {
 
     expect(result.error).toBeNull();
     expect(written[0].conclusion).toBe('none');
+    vi.unstubAllEnvs();
+  });
+});
+
+/**
+ * A step closed against a commit main does not carry.
+ *
+ * This is the reading the plan page draws "Not on main" from, and for a while
+ * it could not be had at all: the answer used to be written only when the
+ * listing of main had reached the start of the history, and main outgrew the
+ * page cap, so the walk stopped reaching it and nothing was ever written. The
+ * commits below are eight full pages of them, which is what that looks like
+ * from here -- the walk never runs out, so an answer that waits for it never
+ * comes.
+ */
+describe('refreshCommitChecks on a commit the listing never reaches', () => {
+  /** What a step closed on its own branch records: nowhere in main's listing. */
+  const LOST = 'd'.repeat(7);
+
+  /** Main, longer than the page cap can read, and carrying none of the above. */
+  const filler = (page: number) =>
+    Array.from({ length: PAGE_SIZE }, (_, i) => {
+      const n = page * PAGE_SIZE + i;
+      return { sha: String(n).padStart(40, '0'), parents: [{ sha: String(n + 1).padStart(40, '0') }] };
+    });
+
+  async function refresh(compare: () => Response) {
+    const { supabase, upsert } = db([{ commit_sha: LOST }]);
+    const fetchFn = vi.fn(async (url: string) => {
+      const path = String(url);
+      if (path.includes('/compare/')) return compare();
+      if (path.includes('/actions/runs')) {
+        return new Response(JSON.stringify({ workflow_runs: [] }), { status: 200 });
+      }
+      const page = Number(/[?&]page=(\d+)/.exec(path)?.[1] ?? '1');
+      return new Response(JSON.stringify(filler(page)), { status: 200 });
+    });
+
+    const result = await refreshCommitChecks({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: Date.parse('2026-09-17T12:00:00Z'),
+      fetch: fetchFn as never,
+    });
+    const written = (upsert.mock.calls as unknown as unknown[][])[0]?.[0] as
+      | Array<{ commit_sha: string; merge_sha: string | null; conclusion: string }>
+      | undefined;
+    return { result, written, fetchFn };
+  }
+
+  it('marks it unmerged however deep main has grown', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { result, written, fetchFn } = await refresh(
+      () => new Response(JSON.stringify({ status: 'ahead' }), { status: 200 }),
+    );
+
+    expect(result).toEqual({ checked: 1, error: null });
+    expect(written).toEqual([
+      expect.objectContaining({ commit_sha: LOST, merge_sha: null, conclusion: 'unmerged' }),
+    ]);
+    // One comparison, against main, for the one commit the listing missed.
+    const compares = fetchFn.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes('/compare/'));
+    expect(compares).toHaveLength(1);
+    expect(compares[0]).toContain(`/compare/main...${LOST}`);
+    vi.unstubAllEnvs();
+  });
+
+  it('writes nothing when main turns out to carry it after all', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { result, written } = await refresh(
+      () => new Response(JSON.stringify({ status: 'behind' }), { status: 200 }),
+    );
+
+    expect(result).toEqual({ checked: 0, error: null });
+    expect(written).toBeUndefined();
+    vi.unstubAllEnvs();
+  });
+
+  it('writes nothing when GitHub will not say, rather than guessing unmerged', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { result, written } = await refresh(() => new Response('{}', { status: 404 }));
+
+    expect(result).toEqual({ checked: 0, error: null });
+    expect(written).toBeUndefined();
     vi.unstubAllEnvs();
   });
 });

@@ -28,6 +28,8 @@
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
+ *                                # refused unless GitHub says that commit is on
+ *                                # main, and refused if GitHub cannot be asked
  *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
  *   npx tsx scripts/plan.ts block <n> --ask "what it needs" [--note "the rest"]
  *                                [--on-steps]   # waiting on the steps it names,
@@ -58,6 +60,7 @@ import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
+import { closeRefusal, commitOnMain } from '../lib/plan/github';
 import { reshapeStamp } from '../lib/plan/origin';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import { storedReading } from '../lib/plan/run-end';
@@ -139,6 +142,34 @@ function currentCommit(): string | null {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
   } catch {
     return null;
+  }
+}
+
+/**
+ * Every branch this checkout knows that carries a commit, local and remote.
+ *
+ * Asked only to say where a commit that is not on main actually is. Git is the
+ * one that can answer it: a commit a session never pushed does not exist at
+ * GitHub at all, and that is the commonest way a step ends up closed against
+ * work nowhere but one machine. A sha this checkout has never seen makes git
+ * exit non-zero, and no branch is the honest answer to that.
+ */
+function branchesContaining(sha: string): string[] {
+  // Straight into a shell, so nothing but a sha goes in. The format string is
+  // quoted for the same shell: its brackets are syntax to bash, and unquoted
+  // it makes git exit non-zero, which reads here as "on no branch".
+  if (!/^[0-9a-f]{7,40}$/.test(sha)) return [];
+  try {
+    const out = execSync(`git branch -a --contains ${sha} --format='%(refname:short)'`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return out
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && line !== 'HEAD' && !line.startsWith('('));
+  } catch {
+    return [];
   }
 }
 
@@ -948,6 +979,25 @@ async function main(): Promise<void> {
       }
       const status: PlanStatus = command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
       const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
+
+      // The commit a closed step carries is the record of where the work went,
+      // and everything downstream trusts it: the page draws it, the CI mark
+      // reads its checks, and a person reading back through the plan takes it
+      // for shipped. A close against a commit that only ever existed on a
+      // branch makes all of that false, so it is refused here rather than
+      // noticed later. An answer GitHub would not give is refused too --
+      // `closeRefusal` says why -- because a check that passes when it could
+      // not ask is the check that let this through.
+      if (command === 'done' && commit) {
+        const landing = await commitOnMain({ sha: commit });
+        const refusal = closeRefusal({
+          sha: commit,
+          landing,
+          branches: branchesContaining(commit),
+        });
+        if (refusal) fail(refusal);
+      }
+
       const stamp = new Date().toISOString().slice(0, 10);
       const line = `${STATUS_WORD[status][0].toUpperCase()}${STATUS_WORD[status].slice(1)} ${stamp}: ${note}`;
       const comment = item.comment ? `${item.comment}\n\n${line}` : line;
