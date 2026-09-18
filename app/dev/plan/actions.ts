@@ -953,7 +953,18 @@ export async function sendPlanItemToClaude(
   // Every rule about what may be sent is in lib/plan/handover.ts, because a
   // comment can now ask for the same thing and the two ways in have to refuse
   // the same steps.
-  const sent = await handStepToClaude({ supabase, userId: user.id, id: id.data });
+  //
+  // `confirm` is the answer to the one refusal that is a question: a step whose
+  // run has gone quiet is asked about rather than turned away (#574). The page
+  // puts the question in front of the press, and the press that comes back
+  // carries this. It is read as a flag and nothing else, so a form that has
+  // never seen the question cannot set it by accident.
+  const sent = await handStepToClaude({
+    supabase,
+    userId: user.id,
+    id: id.data,
+    confirmQuiet: formData.get('confirm') === 'quiet',
+  });
   if (!sent.ok) return { error: sent.error };
   if (sent.changed) revalidatePlan();
 

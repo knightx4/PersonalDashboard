@@ -262,6 +262,44 @@ export async function endQuietRuns(input: {
   return { finished: finished.length, failed: ended.length, error: null };
 }
 
+/**
+ * Write off whatever is still running against a step, because it is being
+ * replaced.
+ *
+ * `endQuietRuns` above is the same write on a clock: a run nothing has been
+ * heard from for two hours is over whether or not anybody noticed. This is the
+ * other way a run ends -- you looked at it, saw it had gone quiet, and handed
+ * its step to a fresh session. Left alone, the row would go on reading
+ * `started` for the rest of those two hours, the page would draw the new
+ * session's claim over it, and `claimLiveness` would answer off the older of
+ * the two runs.
+ *
+ * Every started run on the step rather than one named row, because there is no
+ * sense in which one of two runs against the same step is the one being
+ * replaced -- the step is being taken off all of them.
+ *
+ * A failure here is logged and not raised. The send it belongs to is the thing
+ * that matters, and refusing to hand a step over because the record of the run
+ * it replaces could not be tidied would be the tail wagging the dog.
+ */
+export async function endRunsOnStep(input: {
+  supabase: Db;
+  userId: string;
+  stepId: string;
+  /** Why it ended, as `lastRunLine` will read it back. */
+  note: string;
+}): Promise<void> {
+  const { error } = await input.supabase
+    .from('plan_runs')
+    .update({ status: 'failed', error: input.note })
+    .eq('user_id', input.userId)
+    .eq('plan_item_id', input.stepId)
+    .eq('status', 'started');
+  if (error) {
+    console.error(`plan_runs could not be ended for a replaced run: ${error.message}`);
+  }
+}
+
 /** What the run behind one claimed step is doing. */
 export type StepRunReading = {
   runId: string;
