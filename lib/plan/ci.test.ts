@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { commitSubjects, listPushes, refreshCommitChecks, refusalFor } from '@/lib/plan/ci';
+import {
+  commitSubjects,
+  listPushes,
+  refreshCommitChecks,
+  refreshMainCheck,
+  refusalFor,
+} from '@/lib/plan/ci';
 
 describe('refusalFor', () => {
   it('names the permission a refused workflow-runs read is short of', () => {
@@ -32,7 +38,9 @@ describe('refusalFor', () => {
   });
 
   it('leaves a status it has nothing to say about as it found it', () => {
-    expect(refusalFor(500, '/repos/x/y/commits')).toBe('GitHub answered 500 for /repos/x/y/commits');
+    expect(refusalFor(500, '/repos/x/y/commits')).toBe(
+      'GitHub answered 500 for /repos/x/y/commits',
+    );
   });
 });
 
@@ -178,7 +186,7 @@ describe('refreshCommitChecks', () => {
     vi.unstubAllEnvs();
   });
 
-  it('is running while the merge\'s workflow has not finished', async () => {
+  it("is running while the merge's workflow has not finished", async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const { result, written } = await refreshAgainst([{ status: 'in_progress', conclusion: null }]);
 
@@ -193,6 +201,92 @@ describe('refreshCommitChecks', () => {
 
     expect(result.error).toBeNull();
     expect(written[0].conclusion).toBe('none');
+    vi.unstubAllEnvs();
+  });
+});
+
+/**
+ * Main's own head, read on every tick and stored for the status line.
+ *
+ * The properties are about what gets written down rather than what is
+ * returned: the dot is drawn from the row, so a tick that asked and was
+ * refused has to leave a row saying so, and a tick that asked and was answered
+ * has to leave the sha it asked about beside the answer.
+ */
+describe('refreshMainCheck', () => {
+  const NOW = Date.parse('2026-09-18T21:40:00.000Z');
+
+  function store() {
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    return {
+      upsert,
+      supabase: { from: () => ({ upsert }) } as never,
+    };
+  }
+
+  const written = (upsert: ReturnType<typeof vi.fn>) =>
+    (upsert.mock.calls as unknown as unknown[][])[0]?.[0] as Record<string, unknown>;
+
+  it("stores main's newest commit and what CI made of it", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn(async (url: string) =>
+      String(url).includes('/actions/runs')
+        ? new Response(
+            JSON.stringify({ workflow_runs: [{ status: 'completed', conclusion: 'failure' }] }),
+            { status: 200 },
+          )
+        : new Response(JSON.stringify([{ sha: MERGE, parents: [] }]), { status: 200 }),
+    );
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null });
+    expect(written(upsert)).toEqual({
+      repo: 'knightx4/PersonalDashboard',
+      head_sha: MERGE,
+      conclusion: 'failed',
+      checked_at: new Date(NOW).toISOString(),
+      error: null,
+    });
+
+    // One commit, not eight pages of them: the whole question is what is at the
+    // head of the branch.
+    const asked = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(asked[0]).toContain('/commits?sha=main&per_page=1');
+    expect(asked[1]).toContain(`/actions/runs?head_sha=${MERGE}`);
+    vi.unstubAllEnvs();
+  });
+
+  it('stores the refusal rather than throwing it, so silence is not mistaken for a pass', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 403 }));
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(result.conclusion).toBeNull();
+    expect(result.error).toContain('Contents: Read');
+    const row = written(upsert);
+    expect(row.conclusion).toBeNull();
+    expect(row.head_sha).toBeNull();
+    expect(row.error).toContain('Contents: Read');
+    // Still stamped: how long ago the app last tried is knowable even when the
+    // trying failed.
+    expect(row.checked_at).toBe(new Date(NOW).toISOString());
+    vi.unstubAllEnvs();
+  });
+
+  it('says there is no key rather than asking GitHub without one', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', '');
+    const { supabase, upsert } = store();
+    const fetchFn = vi.fn();
+
+    const result = await refreshMainCheck({ supabase, now: NOW, fetch: fetchFn as never });
+
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(result.error).toContain('GITHUB_READ_TOKEN');
+    expect(written(upsert).error).toContain('GITHUB_READ_TOKEN');
     vi.unstubAllEnvs();
   });
 });
@@ -230,9 +324,9 @@ describe('commitSubjects', () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const fetchFn = vi.fn(async () => new Response('{}', { status: 404 }));
 
-    await expect(
-      commitSubjects({ shas: ['abc1234'], fetch: fetchFn as never }),
-    ).resolves.toEqual({});
+    await expect(commitSubjects({ shas: ['abc1234'], fetch: fetchFn as never })).resolves.toEqual(
+      {},
+    );
     vi.unstubAllEnvs();
   });
 

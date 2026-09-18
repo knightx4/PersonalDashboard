@@ -45,6 +45,9 @@ const API = 'https://api.github.com';
 /** The repository the plan is built in. The app is the thing being checked. */
 export const REPO = { owner: 'knightx4', repo: 'PersonalDashboard', branch: 'main' };
 
+/** How `plan_main_checks` names that repository: its primary key. */
+export const REPO_KEY = `${REPO.owner}/${REPO.repo}`;
+
 /** Commits per listing request, which is the most GitHub allows. */
 const PAGE_SIZE = 100;
 
@@ -181,6 +184,85 @@ async function checkCommit(
     doFetch,
   );
   return conclusionFrom(body.workflow_runs ?? []);
+}
+
+/**
+ * What CI says about main's newest commit right now, written down for the
+ * shell to read.
+ *
+ * `refreshCommitChecks` below answers a different question and cannot answer
+ * this one: it asks about the commits closed steps recorded, which are last
+ * week's merges, and it only ever runs when somebody has /dev/plan open. Main
+ * sat red from 19:43 to 21:40 one night with two more merges landing on top of
+ * it and nothing anywhere said so, because nobody had that page open. So this
+ * is asked from the overnight tick, which runs every four minutes whether or
+ * not a night is running, and the answer is stored once for every page in the
+ * app to read (`lib/shell/main-check.ts`).
+ *
+ * Two requests: one commit from the branch listing, and that commit's workflow
+ * runs. The same `ask`, the same token and the same headers as everything else
+ * here, deliberately -- a second route to GitHub is a second thing to get
+ * wrong when the key is rotated.
+ *
+ * Nothing is thrown and nothing is skipped. A refusal is a row too: the
+ * sentence `refusalFor` writes goes in `error` beside a null conclusion, so
+ * "GitHub would not tell us" is stored as the different fact it is from "we
+ * have not asked". A tick that could not reach GitHub still leaves the row
+ * saying when it tried, which is what stops a green dot from yesterday
+ * standing in for an answer today.
+ */
+export async function refreshMainCheck(input: {
+  supabase: Db;
+  now?: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{ sha: string | null; conclusion: CheckConclusion | null; error: string | null }> {
+  const now = input.now ?? Date.now();
+  const doFetch = input.fetch ?? globalThis.fetch;
+  const token = readToken();
+
+  let sha: string | null = null;
+  let conclusion: CheckConclusion | null = null;
+  let error: string | null = null;
+
+  if (!token) {
+    error = `No GITHUB_READ_TOKEN is set, so ${REPO.branch}'s checks cannot be read.`;
+  } else {
+    try {
+      // One commit. The whole question is what is at the head of the branch,
+      // and `listMain`'s eight pages are for finding commits somebody named.
+      const rows = await ask<CommitRow[]>(
+        `/repos/${REPO.owner}/${REPO.repo}/commits?sha=${REPO.branch}&per_page=1`,
+        token,
+        doFetch,
+      );
+      sha = rows[0]?.sha ?? null;
+      if (!sha) {
+        error = `GitHub named no commits on ${REPO.branch}.`;
+      } else {
+        conclusion = await checkCommit(sha, token, doFetch);
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  const { error: writeError } = await input.supabase.from('plan_main_checks').upsert(
+    {
+      repo: REPO_KEY,
+      head_sha: sha,
+      conclusion,
+      checked_at: new Date(now).toISOString(),
+      error,
+    },
+    { onConflict: 'repo' },
+  );
+  // Logged rather than carried, like every other best-effort write on this
+  // path. A tick that could not store the reading still has a night to run.
+  if (writeError) {
+    console.error(`main's CI reading could not be stored: ${writeError.message}`);
+  }
+
+  return { sha, conclusion, error };
 }
 
 /** A few at a time, so a backlog does not become twenty-five round trips. */

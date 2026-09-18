@@ -1,0 +1,137 @@
+/**
+ * Whether main is green, as the status line draws it.
+ *
+ * The reading itself is taken by the overnight tick and stored in
+ * `plan_main_checks` (`lib/plan/ci.ts` `refreshMainCheck`). This file is the
+ * other half: what a stored row means, what colour it is, and what it says
+ * when you hover it. Pure and separate from `ci.ts` for the same reason
+ * `checks.ts` is -- the fetching is server-only and the dot is drawn in the
+ * browser.
+ *
+ * `CheckConclusion` is reused rather than a second enum being invented for
+ * main. Four of its five values can happen here; `unmerged` cannot, because it
+ * means "nothing on main carries this commit" and this commit *is* main.
+ */
+import type { CheckConclusion } from './checks';
+
+/** One stored reading of main's newest commit. */
+export type MainCheck = {
+  /** Main's newest commit when GitHub was asked. Null when GitHub would not say. */
+  sha: string | null;
+  /** What CI made of it. Null when the reading did not get that far. */
+  conclusion: CheckConclusion | null;
+  /** When GitHub was asked, ISO. Written on every attempt, answered or not. */
+  checkedAt: string;
+  /** Why GitHub refused, in the sentence `refusalFor` writes. Null when it answered. */
+  error: string | null;
+};
+
+/**
+ * The four states the dot can be in, which is fewer than the conclusions.
+ *
+ * `none` -- main's head ran no workflows at all -- collapses into `unknown`
+ * rather than into `passed`. `conclusionFrom` folds neutral and skipped runs
+ * into a pass because GitHub's own summary does, but "no checks exist" is not
+ * evidence that anything is well, and a green dot is a claim.
+ */
+export type MainDot = 'passed' | 'failed' | 'running' | 'unknown';
+
+/**
+ * How old a reading may be before the dot stops standing behind it.
+ *
+ * The tick runs every four minutes, all day and not only at night -- the
+ * pg_cron schedule in migration 0078 -- so an ordinary reading is somewhere
+ * between nought and four minutes old.
+ * Six is that plus a tick that took its time. Past it the dot goes grey and
+ * says how old the reading is, because a green dot left over from an hour ago
+ * is not a stale fact, it is a false one -- which is the exact failure this
+ * whole thing exists to stop: main was red for two hours and nothing said so.
+ */
+export const MAIN_CHECK_STALE_MINUTES = 6;
+
+/** Whether a reading is too old to draw a colour from. */
+export function mainCheckStale(check: MainCheck, now: number): boolean {
+  const at = new Date(check.checkedAt).getTime();
+  // An unparseable timestamp is not a fresh one. Better grey than a guess.
+  if (!Number.isFinite(at)) return true;
+  return (now - at) / 60_000 >= MAIN_CHECK_STALE_MINUTES;
+}
+
+/**
+ * The colour to draw, given what is stored and what time it is here.
+ *
+ * `now` is null before the component has mounted. Ages are the reader's own
+ * clock and the server has no business guessing at them, so pre-mount the
+ * stored conclusion is drawn as it stands and the staleness test is simply not
+ * applied yet -- which is the same shape `Timestamp` has always had in this
+ * bar, and it means the dot does not change size or position on hydration.
+ */
+export function mainDot(check: MainCheck | null, now: number | null): MainDot {
+  if (!check || !check.conclusion) return 'unknown';
+  if (now !== null && mainCheckStale(check, now)) return 'unknown';
+  switch (check.conclusion) {
+    case 'passed':
+      return 'passed';
+    case 'failed':
+      return 'failed';
+    case 'running':
+      return 'running';
+    default:
+      return 'unknown';
+  }
+}
+
+/** Seven characters, which is what a commit is called everywhere else here. */
+function short(sha: string): string {
+  return sha.slice(0, 7);
+}
+
+/** What each conclusion is called in the sentence below. */
+const SAYS: Record<CheckConclusion, string> = {
+  passed: 'passed its checks',
+  failed: 'failed its checks',
+  running: 'is still being checked',
+  none: 'ran no checks at all',
+  // Cannot happen for main's own head; here so the record is total and a sixth
+  // conclusion fails the typecheck rather than drawing as a blank.
+  unmerged: 'is not on main',
+};
+
+/**
+ * The sentence the dot carries: its hover title, and the word a screen reader
+ * is given for it.
+ *
+ * Colour is not a state, so this is the state. It names the commit and when it
+ * was read, which is what makes a dot worth trusting rather than merely worth
+ * looking at, and it is one sentence because it is a `title` -- nobody reads a
+ * paragraph out of a tooltip.
+ *
+ * `at` is the reading's time already formatted on the reader's machine, or
+ * null before mount. Formatting is left to the caller so nothing here has to
+ * know about locales or time zones, which is also what keeps it testable.
+ */
+export function mainCheckTitle(
+  check: MainCheck | null,
+  now: number | null,
+  at: string | null,
+): string {
+  if (!check) return 'CI on main has not been read yet.';
+
+  const when = at ? ` Read at ${at}.` : '';
+
+  if (check.error) {
+    // Already a sentence, and already addressed to the person who can fix it
+    // -- `refusalFor` is the #566 convention. Repeating it is the whole point.
+    return `Main's CI could not be read. ${check.error}${when}`;
+  }
+
+  const commit = check.sha ? `main ${short(check.sha)}` : 'main';
+  const said = SAYS[check.conclusion ?? 'none'];
+
+  if (now !== null && mainCheckStale(check, now)) {
+    const minutes = Math.max(1, Math.round((now - new Date(check.checkedAt).getTime()) / 60_000));
+    return `${commit} ${said}, but that was ${minutes} minutes ago and nothing has read it since.`;
+  }
+
+  return `${commit} ${said}.${when}`;
+}
