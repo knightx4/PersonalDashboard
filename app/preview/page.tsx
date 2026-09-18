@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getUser } from '@/lib/auth/server';
+import { isOwner } from '@/lib/dev/owner';
 import Link from 'next/link';
 import { SURFACES } from './surfaces';
 import { MAIN_BOX } from '@/components/shell/main-box';
@@ -28,14 +28,22 @@ export default async function PreviewPage({
 }: {
   searchParams: Promise<{ s?: string; w?: string }>;
 }) {
-  // Signed in, or the harness. It used to be UI_PREVIEW alone, which meant the
-  // gallery could not be reached from a deployment at all -- so the only person
-  // who could look at these surfaces was whoever was running the screenshot
-  // script, which is exactly backwards for a thing whose whole purpose is
-  // someone else looking at them. Nothing here reads a session or a database;
-  // the sign-in is there so it need not be public, not because it guards
-  // anything. See app/dev/surfaces, which frames these.
-  if (process.env.UI_PREVIEW !== '1' && !(await getUser())) notFound();
+  /**
+   * The owner, or the harness. It used to be UI_PREVIEW alone, which meant the
+   * gallery could not be reached from a deployment at all -- so the only person
+   * who could look at these surfaces was whoever was running the screenshot
+   * script, which is exactly backwards for a thing whose whole purpose is
+   * someone else looking at them. Then it was any signed-in account, which is
+   * the same check /dev used to make; now it is the one /dev makes.
+   *
+   * Still `notFound` rather than the permission message /dev shows. This is
+   * the workbench rather than a page of the app -- it is not linked from
+   * anywhere a stranger stands, and a route that says "does not exist" is the
+   * honest answer for a URL nobody was offered. The harness is checked first,
+   * because it cannot sign in and there is nothing behind here to protect
+   * from it: every surface is a typed fixture.
+   */
+  if (process.env.UI_PREVIEW !== '1' && !(await isOwner())) notFound();
 
   const { s } = await searchParams;
   const surface = SURFACES.find((entry) => entry.id === s);

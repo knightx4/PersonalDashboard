@@ -45,6 +45,20 @@ export type AppModule = {
    * what follows the theme, and that happens in module-mark.tsx.
    */
   key: MarkKey;
+  /**
+   * Only the owner of the app sees this workspace.
+   *
+   * Dev is the app looking at itself -- the build plan, the bug queue, the
+   * raises -- and three accounts sign in here. `modulesFor` below is what
+   * every list of workspaces goes through, so a module marked this way is
+   * absent from the switcher, from the home tiles and from the account page's
+   * checkboxes for everybody else, rather than present and refused when
+   * pressed.
+   *
+   * Absent means "everyone", which is the right default for a module: a new
+   * workspace is owner-only only if somebody says so.
+   */
+  ownerOnly?: true;
 };
 
 /**
@@ -184,6 +198,7 @@ export const MODULES: readonly AppModule[] = [
     // and a sixth hue on the same arc would have been the first pair anyone
     // confused -- teal and green side by side in the same switcher.
     key: { shape: 'terminal', from: '#94a3b8', to: '#475569' },
+    ownerOnly: true,
   },
 ] as const;
 
@@ -222,6 +237,54 @@ export const HOME_MARK = {
    */
   key: { shape: 'dash', from: '#6a82fb', mid: '#8b5cf6', to: '#ff6b9d' },
 } as const;
+
+/**
+ * The modules an account is allowed to see.
+ *
+ * Every list of workspaces in the app draws from this rather than from
+ * `MODULES` directly -- the switcher, the phone's sheet, the command palette,
+ * the home tiles and the account page's checkboxes -- so that "only the owner
+ * sees Dev" is one rule in one place instead of five lists that have to be
+ * remembered separately. The next owner-only module is a flag on the row
+ * above, and nothing else.
+ *
+ * The boolean is passed in rather than read here on purpose: the answer comes
+ * from `lib/dev/owner.ts`, which is server-only and costs a round trip, and
+ * half these callers are client components. The server reads it once per
+ * render and hands it down.
+ *
+ * Pure, so a caller that has no idea whether it is the owner should pass
+ * `false` -- that shows one workspace too few, which is a puzzle, rather than
+ * one too many, which is a leak.
+ */
+export function modulesFor(isOwner: boolean): readonly AppModule[] {
+  return isOwner ? MODULES : MODULES.filter((module) => !module.ownerOnly);
+}
+
+/** The same rule, as ids: for the places that store or compare them. */
+export function moduleIdsFor(isOwner: boolean): readonly ModuleId[] {
+  return modulesFor(isOwner).map((module) => module.id);
+}
+
+/**
+ * The workspaces the shell offers: the ones this account switched on, minus
+ * any it is not allowed to see at all.
+ *
+ * The switcher, the phone's sheet and the command palette are three lists of
+ * one thing, so the shell works this out once and hands all three the answer.
+ *
+ * `enabled` undefined means "all of them", because a shell rendered before the
+ * settings are known must not show an empty switcher -- a person whose
+ * workspaces vanished cannot tell a bug from a setting they do not remember
+ * changing. All of them still means all the ones this account may have.
+ */
+export function switchableModules(
+  enabled: readonly ModuleId[] | undefined,
+  isOwner: boolean,
+): readonly ModuleId[] {
+  const allowed = moduleIdsFor(isOwner);
+  return (enabled ?? allowed).filter((id) => allowed.includes(id));
+}
 
 export function moduleById(id: ModuleId | null): AppModule | null {
   if (id === null) return null;

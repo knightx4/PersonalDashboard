@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadMainCheck } from '@/lib/shell/main-check';
@@ -116,11 +117,12 @@ function CallRow({ row, timezone }: { row: SpendRow; timezone: string }) {
 
 export default async function SpendPage() {
   const user = await requireUser();
-  const [settings, counts, raised, mainCheck] = await Promise.all([
+  const [settings, counts, raised, mainCheck, owner] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
     loadMainCheck(),
+    isOwner({ user }),
   ]);
 
   const supabase = await createCoreClient();
@@ -142,6 +144,7 @@ export default async function SpendPage() {
         displayName={settings.displayName}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}

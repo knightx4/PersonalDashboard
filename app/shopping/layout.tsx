@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
@@ -32,17 +33,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox, settings, counts, activity, raised, mainCheck] =
-    await Promise.all([
-      supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-      countReviewItems(supabase, core, user.id),
-      loadInboxBannerState(user.id),
-      loadAccountSettings(user.id),
-      loadModuleCounts(user.id),
-      loadActivity(),
-      loadRaisedNotifications(user.id),
-      loadMainCheck(),
-    ]);
+  const [
+    { data: profile },
+    reviewCount,
+    inbox,
+    settings,
+    counts,
+    activity,
+    raised,
+    mainCheck,
+    owner,
+  ] = await Promise.all([
+    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
+    countReviewItems(supabase, core, user.id),
+    loadInboxBannerState(user.id),
+    loadAccountSettings(user.id),
+    loadModuleCounts(user.id),
+    loadActivity(),
+    loadRaisedNotifications(user.id),
+    loadMainCheck(),
+    isOwner({ user }),
+  ]);
 
   const brief = await loadShoppingBrief(user.id, settings.timezone, reviewCount);
 
@@ -75,6 +86,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         displayName={profile?.display_name ?? null}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
+        isOwner={owner}
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}
