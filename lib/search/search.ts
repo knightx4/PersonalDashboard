@@ -8,6 +8,7 @@ import {
   type SearchHit,
   type SearchSource,
 } from '@/lib/search/sources';
+import { inScope, type SearchScope } from '@/lib/search/scope';
 import type { ModuleId } from '@/lib/modules';
 
 /**
@@ -28,6 +29,10 @@ import type { ModuleId } from '@/lib/modules';
  *   **A source whose module is switched off never runs.** Turning a workspace
  *   off has to mean it stops appearing, and a search that quietly still
  *   reaches into it would make that setting a lie.
+ *
+ *   **A search asked for one workspace asks nobody else.** The bar at the
+ *   top of a workspace finds the things in that workspace, and a source in
+ *   another one has nothing it could contribute, so it is never read from.
  *
  *   **Caps per source and overall**, from rank.ts. One workspace with four
  *   hundred orders would otherwise fill a list that is meant to be read at a
@@ -53,6 +58,11 @@ export async function searchEverything(input: {
   sources: SearchSource[];
   /** Which workspaces are on. A source outside this never runs. */
   enabledModules: readonly ModuleId[];
+  /**
+   * One workspace, or everything you own. Left out means everything, which is
+   * what the command box has always searched.
+   */
+  scope?: SearchScope;
   /** Only these kinds. Left out means every kind, which is the palette. */
   kinds?: readonly HitKind[];
   perSourceLimit?: number;
@@ -64,10 +74,12 @@ export async function searchEverything(input: {
   const perSource = input.perSourceLimit ?? PER_SOURCE_LIMIT;
   const total = input.totalLimit ?? TOTAL_LIMIT;
   const wanted = input.kinds;
+  const scope = input.scope ?? 'everything';
 
   const active = input.sources.filter(
     (source) =>
       input.enabledModules.includes(source.module) &&
+      (scope === 'everything' || source.module === scope) &&
       (!wanted || source.kinds.some((kind) => wanted.includes(kind))),
   );
 
@@ -82,10 +94,11 @@ export async function searchEverything(input: {
     if (result.status === 'fulfilled') {
       // Capped and filtered again here rather than trusted: a source is a file
       // somebody else writes, and the promise this makes is about the list. A
-      // source that answers with a kind nobody asked for has it dropped.
-      const answered = wanted
-        ? result.value.filter((hit) => wanted.includes(hit.kind))
-        : result.value;
+      // source that answers with a kind nobody asked for, or with a hit
+      // stamped with some other workspace, has it dropped.
+      const answered = result.value.filter(
+        (hit) => inScope(hit, scope) && (!wanted || wanted.includes(hit.kind)),
+      );
       hits.push(...answered.slice(0, perSource));
     } else {
       failed.push(active[index].label);

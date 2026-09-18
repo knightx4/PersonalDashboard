@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { allSearchSources } from '@/lib/search/registry';
+import { parseScope, SCOPE_PARAM } from '@/lib/search/scope';
 import { searchEverything } from '@/lib/search/search';
 import { MIN_QUERY, type HitKind } from '@/lib/search/sources';
 import { QUIZ_HIT_KINDS } from '@/lib/learn/quiz/model';
@@ -24,6 +25,11 @@ export const dynamic = 'force-dynamic';
  *
  * No caching. A search over your own rows is as fresh as the rows, and a
  * cached one would show a thing you just deleted.
+ *
+ * `?in=` narrows the answer to one workspace, and is what the search bar at
+ * the top of a workspace sends. Left out, or naming a workspace this app does
+ * not have, the answer covers everything you own, which is what the command
+ * box asks for.
  *
  * `?for=` narrows the answer to what one caller can use: `link` is what a task
  * can be about, for the todo link picker, and `quiz` is what a quiz can be
@@ -54,6 +60,7 @@ export async function GET(request: Request) {
     query,
     sources: allSearchSources(),
     enabledModules: settings.enabledModules,
+    scope: parseScope(params.get(SCOPE_PARAM)),
     kinds: FOR[params.get('for') ?? ''],
   });
 
