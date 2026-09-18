@@ -721,7 +721,7 @@ async function main(): Promise<void> {
       const size = arg('--size');
       if (size && !isPlanSize(size)) fail('Size is s, m or l.');
       const kind = arg('--kind') ?? 'build';
-      if (!isPlanKind(kind)) fail('Kind is build or decision.');
+      if (!isPlanKind(kind)) fail('Kind is build, decision or setup.');
 
       const [last] = parent
         ? await sql<{ position: number }[]>`

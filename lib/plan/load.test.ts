@@ -3,6 +3,7 @@ import {
   DEFAULT_BLOCK_KIND,
   blockPatch,
   isPlanBlockKind,
+  isPlanKind,
   isPlanStatus,
   planItemFromRow,
 } from '@/lib/plan/load';
@@ -55,6 +56,19 @@ describe('planItemFromRow', () => {
     expect(item.kind).toBe('decision');
     expect(item.fog).toBe('How the export is shaped is not yet known.');
     expect(item.resolution).toBe('One file per month.');
+  });
+
+  it('round-trips a setup step as its own kind rather than as work to build', () => {
+    // 0084. A row the person has to act on reads back as `setup`; before the
+    // kind existed it fell through to `build` and looked like something a
+    // session could pick up.
+    const item = planItemFromRow({
+      ...row,
+      status: 'not_started',
+      kind: 'setup',
+      title: 'Add the Mailgun DNS records',
+    });
+    expect(item.kind).toBe('setup');
   });
 
   it('reads which kind of block a blocked step is carrying', () => {
@@ -159,5 +173,16 @@ describe('isPlanBlockKind', () => {
     expect(isPlanBlockKind('outside')).toBe(true);
     expect(isPlanBlockKind('blocked')).toBe(false);
     expect(isPlanBlockKind('')).toBe(false);
+  });
+});
+
+describe('isPlanKind', () => {
+  it('names three kinds and nothing else', () => {
+    expect(isPlanKind('build')).toBe(true);
+    expect(isPlanKind('decision')).toBe(true);
+    expect(isPlanKind('setup')).toBe(true);
+    // The word the database refuses, and the one nothing writes.
+    expect(isPlanKind('question')).toBe(false);
+    expect(isPlanKind('')).toBe(false);
   });
 });

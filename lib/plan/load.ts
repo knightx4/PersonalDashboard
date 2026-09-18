@@ -144,11 +144,16 @@ export function isPlanAssignee(value: string): value is PlanAssignee {
  *
  * A `build` step closes on a commit. A `decision` closes on an answer: the
  * question and its real options are written by whoever shaped the feature,
- * and the person settles it on the page. It is a kind rather than a status
- * because it moves through exactly the states a build step moves through and
- * differs only in what finishing it looks like — see migration 0054.
+ * and the person settles it on the page. A `setup` step closes on the person
+ * doing the one thing only they can do — minting a token, opening an
+ * account, adding a DNS record — which a session can name and lay out but
+ * never supply.
+ *
+ * All three are kinds rather than statuses because each moves through exactly
+ * the states the others move through and differs only in what finishing it
+ * looks like — see migrations 0054 and 0084.
  */
-export const PLAN_KINDS = ['build', 'decision'] as const;
+export const PLAN_KINDS = ['build', 'decision', 'setup'] as const;
 export type PlanKind = (typeof PLAN_KINDS)[number];
 
 export function isPlanKind(value: string): value is PlanKind {
