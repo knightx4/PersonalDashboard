@@ -5,6 +5,7 @@ import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadPlan } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
@@ -27,12 +28,13 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [settings, counts, activity, raised, plan] = await Promise.all([
+  const [settings, counts, activity, raised, plan, mainCheck] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
     loadPlan(supabase, user.id),
+    loadMainCheck(),
   ]);
 
   /**
@@ -100,6 +102,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         theme={settings.theme}
         notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
       >
         {children}
       </AppShell>

@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { describeCount, loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
@@ -82,7 +83,7 @@ export default async function HomePage() {
     day: '2-digit',
   }).format(now);
 
-  const [counts, raised, agenda, shopping, core, jobs] = await Promise.all([
+  const [counts, raised, agenda, shopping, core, jobs, mainCheck] = await Promise.all([
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
     // The agenda reads three schemas; a failure in any of them must cost this
@@ -91,6 +92,7 @@ export default async function HomePage() {
     createShoppingClient(),
     createCoreClient(),
     createJobsClient(),
+    loadMainCheck(),
   ]);
 
   const enabled = MODULES.filter((module) => moduleEnabled(settings, module.id));
@@ -159,6 +161,7 @@ export default async function HomePage() {
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}
+        mainCheck={mainCheck}
       >
         <div className="mx-auto max-w-3xl">
           <header className="border-b border-border-strong pb-6 pt-2">

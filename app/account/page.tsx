@@ -3,6 +3,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { AccountView } from './view';
 
@@ -26,10 +27,11 @@ export const metadata = { title: 'Account' };
  */
 export default async function AccountPage() {
   const user = await requireUser();
-  const [settings, counts, raised] = await Promise.all([
+  const [settings, counts, raised, mainCheck] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
+    loadMainCheck(),
   ]);
 
   return (
@@ -44,6 +46,7 @@ export default async function AccountPage() {
         counts={switcherCounts(counts)}
         theme={settings.theme}
         notifications={raised}
+        mainCheck={mainCheck}
       >
         <div className="mx-auto max-w-3xl">
           <p className="text-body text-ink-muted">

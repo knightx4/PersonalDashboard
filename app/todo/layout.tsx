@@ -5,6 +5,7 @@ import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadTodoBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 
@@ -23,11 +24,12 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
   const user = await getUser();
   if (!user) redirect('/login');
 
-  const [settings, counts, activity, raised] = await Promise.all([
+  const [settings, counts, activity, raised, mainCheck] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
+    loadMainCheck(),
   ]);
 
   const brief = await loadTodoBrief(user.id, settings.timezone);
@@ -59,6 +61,7 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
         theme={settings.theme}
         notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
         brief={brief}
       >
         {children}
