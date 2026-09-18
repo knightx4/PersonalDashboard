@@ -19,7 +19,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { planRoutine } from '@/lib/feedback/routine';
-import { claimIsLive, runReplacedNote, sendOverClaim } from './liveness';
+import { claimIsLive, runReplacedNote, sendOverClaim, underwayRefusal } from './liveness';
 import { planBrief } from './brief';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
@@ -162,10 +162,25 @@ export async function handStepToClaude(input: {
     return { ok: false, error: own.ask, ...(own.confirmable ? { confirm: true as const } : {}) };
   }
 
+  // A different step under this feature is held, and #587 settled that a quiet
+  // run holds it exactly as a working one does: the press is refused rather
+  // than asked about, because the twenty-minute mark reads wrong on a session
+  // that is reading files and spending that reading here puts two sessions in
+  // the same files on different work. The step the quiet run was sent at is
+  // the one exception and it is `own` above, which asks. The refusal names how
+  // long the sibling has been silent, so the decision to put it back is made
+  // on the evidence rather than by opening the row.
   if (other) {
     return {
       ok: false,
-      error: `#${other.number} ${other.title} is underway under the same feature. Wait for it, or put it back to not started if its session is gone.`,
+      error: underwayRefusal({
+        press: 'step',
+        number: other.number,
+        title: other.title,
+        liveness: liveness[other.id] ?? null,
+        run: runs[other.id],
+        now,
+      }),
     };
   }
 
@@ -340,12 +355,20 @@ export async function handFeatureToClaude(input: {
   // run behind each claim rather than off the clock. A batch started on top of
   // a running session is the worse version of the same collision, since it
   // hands the whole feature to a second run.
-  const liveness = planLiveness(flatten([node]), await loadLastRuns(supabase, userId), now);
+  const runs = await loadLastRuns(supabase, userId);
+  const liveness = planLiveness(flatten([node]), runs, now);
   const running = flatten([node]).find((step) => claimIsLive(liveness[step.id] ?? null));
   if (running) {
     return {
       ok: false,
-      error: `#${running.number} ${running.title} is already underway. Wait for it, or put it back to not started if its session is gone.`,
+      error: underwayRefusal({
+        press: 'feature',
+        number: running.number,
+        title: running.title,
+        liveness: liveness[running.id] ?? null,
+        run: runs[running.id],
+        now,
+      }),
       refused: true,
     };
   }

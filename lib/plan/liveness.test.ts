@@ -19,6 +19,7 @@ import {
   sendOverClaim,
   silenceReads,
   SUBJECT_LIMIT,
+  underwayRefusal,
   type ActivityRow,
   type ClaimRun,
   type Push,
@@ -419,6 +420,7 @@ describe('claimIsLive', () => {
     expect(claimIsLive('working')).toBe(true);
     expect(claimIsLive('claimed')).toBe(true);
     // #574: quiet is re-sent by asking first, not by the guard giving way.
+    // #587: and it goes on refusing every other step under the same feature.
     expect(claimIsLive('quiet')).toBe(true);
     expect(claimIsLive('abandoned')).toBe(false);
     expect(claimIsLive(null)).toBe(false);
@@ -562,5 +564,89 @@ describe('sendOverClaim', () => {
     expect(verdict.send).toBe(false);
     if (verdict.send) throw new Error('unreachable');
     expect(verdict.confirmable).toBe(false);
+  });
+});
+
+describe('underwayRefusal', () => {
+  const quietRun = run({ createdAt: minutesAgo(90), reading: reading(1, 35) });
+
+  it('names the sibling holding the feature and how long it has been silent', () => {
+    expect(
+      underwayRefusal({
+        press: 'step',
+        number: 591,
+        title: 'Draw the run on the row',
+        liveness: 'quiet',
+        run: quietRun,
+        now: NOW,
+      }),
+    ).toBe(
+      '#591 Draw the run on the row is underway under the same feature. ' +
+        'Nothing has been pushed for 35m. The last was "A push". ' +
+        'Wait for it, or put it back to not started if its session is gone.',
+    );
+  });
+
+  it('says where the claim is differently when the whole feature was pressed', () => {
+    const said = underwayRefusal({
+      press: 'feature',
+      number: 591,
+      title: 'Draw the run on the row',
+      liveness: 'quiet',
+      run: quietRun,
+      now: NOW,
+    });
+    expect(said).toContain('#591 Draw the run on the row is already underway.');
+    expect(said).toContain('35m');
+    expect(said).not.toContain('under the same feature');
+  });
+
+  it('leaves a claim nothing has been read about reading exactly as it did', () => {
+    for (const press of ['step', 'feature'] as const) {
+      expect(
+        underwayRefusal({
+          press,
+          number: 591,
+          title: 'Draw it',
+          liveness: 'claimed',
+          run: null,
+          now: NOW,
+        }),
+      ).toBe(
+        press === 'step'
+          ? '#591 Draw it is underway under the same feature. ' +
+              'Wait for it, or put it back to not started if its session is gone.'
+          : '#591 Draw it is already underway. ' +
+              'Wait for it, or put it back to not started if its session is gone.',
+      );
+    }
+  });
+
+  it('says nothing about silence for a run that is still pushing', () => {
+    expect(
+      underwayRefusal({
+        press: 'step',
+        number: 591,
+        title: 'Draw it',
+        liveness: 'working',
+        run: run({ reading: reading(1, 2) }),
+        now: NOW,
+      }),
+    ).not.toContain('Nothing has been pushed');
+  });
+
+  it('is never a question, however quiet the run is', () => {
+    // #587's answer (b): quiet frees the step its run was sent at and nothing
+    // else, so this refusal has no confirmation behind it the way `sendOverClaim`
+    // does.
+    const said = underwayRefusal({
+      press: 'step',
+      number: 591,
+      title: 'Draw it',
+      liveness: 'quiet',
+      run: quietRun,
+      now: NOW,
+    });
+    expect(said).not.toContain('?');
   });
 });

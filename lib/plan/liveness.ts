@@ -566,3 +566,58 @@ export function sendOverClaim(input: {
     confirmable: false,
   };
 }
+
+/* -------------------------------------------------------------------------
+ * Another step under the same feature
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Which press was refused, since the two say where the claim is differently.
+ *
+ * `step` is a press on one step, refused because a different step under its
+ * feature is held. `feature` is a press on the whole feature, refused because
+ * something under it -- or the feature row itself -- is held, so there is no
+ * "other" to point at.
+ */
+export type UnderwayPress = 'step' | 'feature';
+
+/**
+ * Why a feature with a session in it will not take another one. #587.
+ *
+ * One session per feature at a time, and #587 settled that a quiet run holds
+ * its feature shut exactly as a working one does: the twenty-minute mark is
+ * known to read wrong on a session that is reading files, and spending that
+ * reading on the one collision the rule exists to prevent puts two sessions in
+ * the same files on different work. Re-sending the quiet step *itself* is the
+ * other half, #574, and it is `sendOverClaim` above -- so this is never a
+ * question, only a refusal.
+ *
+ * What it adds over the sentence the guard gave before is the evidence: a run
+ * that has pushed nothing for half an hour is the case where you want to know
+ * that before deciding whether to put its step back, and "is underway" on its
+ * own hides it behind opening the row. A claim with nothing read about it says
+ * nothing extra, which is the same as it read before.
+ *
+ * Both guards in `handover.ts` word it through here for the reason
+ * `sendOverClaim` is shared: two copies of a refusal drift, and the one that
+ * drifts is the one nobody presses.
+ */
+export function underwayRefusal(input: {
+  press: UnderwayPress;
+  /** The step holding the feature. */
+  number: number;
+  title: string;
+  /** What its claim reads as, from `claimLiveness`. */
+  liveness: ClaimLiveness | null;
+  run: QuietRun | null | undefined;
+  now: number;
+}): string {
+  const where =
+    input.press === 'step' ? 'is underway under the same feature' : 'is already underway';
+  const silence =
+    input.liveness === 'quiet' && input.run ? ` ${quietRunNote(input.run, input.now)}` : '';
+  return (
+    `#${input.number} ${input.title} ${where}.${silence} ` +
+    'Wait for it, or put it back to not started if its session is gone.'
+  );
+}
