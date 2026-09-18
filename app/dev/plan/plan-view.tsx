@@ -1839,13 +1839,14 @@ type Health = {
  * the todo list's, so a state here looks like the same state there. What is
  * left is the word, the tone and the fixed part of the tooltip.
  *
- * Seven of the thirteen are states the other dev queues have too, and those
+ * Seven of the fourteen are states the other dev queues have too, and those
  * words come from lib/dev/words.ts so a dropped step and a declined note read
- * alike. The other six are the plan's own refinements -- a question, a
+ * alike. The other seven are the plan's own refinements -- a question, a
  * question answered, a proposal, a step waiting on another step, a step nobody
- * has reached, and a claim whose run stopped -- and no other queue has
- * anything for them to disagree with. Why there are thirteen rather than fewer
- * is written where the set is, in lib/plan/tree.ts.
+ * has reached, a claim whose run stopped, and a setup job that is yours to do
+ * -- and no other queue has anything for them to disagree with. Why there are
+ * fourteen rather than fewer is written where the set is, in
+ * lib/plan/tree.ts.
  */
 const HEALTH: Record<PlanHealth, Health> = {
   unanswered: {
@@ -1887,6 +1888,14 @@ const HEALTH: Record<PlanHealth, Health> = {
     word: DEV_STATE_WORD.waiting,
     tone: 'caution',
     title: 'Stopped on something only you can settle. The note says what.',
+  },
+  // A job that was yours from the day it was written -- an account, a key, a
+  // switch. "Waiting on you" is what a blocked step says, and it says it about
+  // a build that ran into a wall; this one never was a build.
+  setup: {
+    word: 'Setup',
+    tone: 'caution',
+    title: 'Something only you can set up. The detail says what to do; mark it done when you have.',
   },
   // A step waiting on another step, which clears itself. Nothing else to say
   // "on you" about, and the plan is the only queue that has it.

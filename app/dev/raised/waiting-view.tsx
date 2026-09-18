@@ -14,10 +14,13 @@ const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
 /**
  * Stopped is the one that costs something. A question can sit a day and
  * nothing is worse for it, and a proposal costs nothing until you want it; a
- * step that has stopped is work already begun and not moving.
+ * step that has stopped is work already begun and not moving. A setup job
+ * takes the same tone as stopped, because it is the same cost seen a day
+ * earlier: something on the plan is waiting on it and only you can do it.
  */
 const TONE: Record<WaitingRow['health'], DevTone> = {
   blocked: 'caution',
+  setup: 'caution',
   unanswered: 'accent',
   proposed: 'quiet',
 };

@@ -69,17 +69,20 @@ describe('status glyphs', () => {
   });
 
   /**
-   * The plan draws all thirteen of its states in one column, so two of them on
+   * The plan draws all fourteen of its states in one column, so two of them on
    * one shape is two rows the column cannot tell apart by shape. That is
-   * allowed for exactly one group and is written down here, the way the
-   * pipeline's sharing is: the three readings of a claim are the same rung --
+   * allowed for exactly two groups and both are written down here, the way the
+   * pipeline's sharing is. The three readings of a claim are the same rung --
    * the step is claimed -- and what separates them is whether the session is
-   * still pushing, which the word and the tone carry. Anything else sharing a
-   * shape is a bug.
+   * still pushing, which the word and the tone carry. A blocked step and a
+   * setup job are the same fact about you -- stopped, and yours to clear --
+   * and what separates them is whether anybody was building when it stopped.
+   * Anything else sharing a shape is a bug.
    */
-  it('shares a plan shape only between the three readings of a claim', () => {
+  it('shares a plan shape only where the two states are the same fact', () => {
     expect(sharedBy(PLAN_HEALTH_GLYPHS)).toEqual({
       'three-quarters': ['in_progress', 'working', 'quiet'],
+      bar: ['blocked', 'setup'],
     });
   });
 
@@ -132,6 +135,11 @@ describe('status glyphs', () => {
       answered: ['task done'],
       dropped: ['withdrawn', 'task dropped'],
       blocked: ['role_closed'],
+      // A setup job borrows the same closed door, because it is the same
+      // thing to look at: work that cannot go anywhere until somebody outside
+      // it moves. A blocked step ran into that door; a setup job was written
+      // in front of it.
+      setup: ['role_closed'],
       waiting: ['ghosted'],
       // The one shape the plan brought with it. Nothing else in the app has a
       // state that waits on the person rather than on the work.

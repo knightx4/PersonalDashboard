@@ -16,7 +16,10 @@ import {
   leavesOf,
   healthOf,
   moveOf,
+  needsThePerson,
+  planBands,
   planLiveness,
+  PLAN_BAND_ORDER,
   tallyHealth,
   planProgress,
   subtreeIds,
@@ -962,6 +965,98 @@ describe('healthOf', () => {
     // 'c' records no kind, which reads as outside for the same reason.
     expect(healthOf(byId.get('b')!)).toBe('blocked');
     expect(healthOf(byId.get('c')!)).toBe('blocked');
+  });
+});
+
+describe('a setup step', () => {
+  // The whole point of the kind: a job that is yours reads as a job on your
+  // list, not as a build somebody got stuck on. Everything below is one line
+  // of #597's done-when.
+  const setup = (id: string, over: Partial<PlanItem> = {}) =>
+    item({ id, kind: 'setup', ...over });
+
+  const only = (sections: ReturnType<typeof tree>, id: string) =>
+    findNode(sections, id)!;
+
+  it('reports setup while it is open, whatever the status column says', () => {
+    const sections = tree([
+      setup('fresh'),
+      setup('claimed', { status: 'in_progress' }),
+      setup('offered', { status: 'proposed' }),
+    ]);
+
+    expect(healthOf(only(sections, 'fresh'))).toBe('setup');
+    // A claim on a setup job is somebody saying they will do it, not a session
+    // building it, so it is still the job it was.
+    expect(healthOf(only(sections, 'claimed'))).toBe('setup');
+    expect(healthOf(only(sections, 'offered'))).toBe('setup');
+  });
+
+  it('stops reporting setup once it is closed', () => {
+    const sections = tree([
+      setup('done', { status: 'done' }),
+      setup('cut', { status: 'dropped' }),
+    ]);
+
+    expect(healthOf(only(sections, 'done'))).toBe('done');
+    expect(healthOf(only(sections, 'cut'))).toBe('dropped');
+    expect(needsThePerson(only(sections, 'done'))).toBe(false);
+    expect(needsThePerson(only(sections, 'cut'))).toBe(false);
+  });
+
+  it('says blocked while it is blocked, because the ask is more specific', () => {
+    // Same exception a decision makes: the block carries the one sentence
+    // saying what the step needs right now.
+    const sections = tree([setup('stuck', { status: 'blocked', blockKind: 'outside' })]);
+    expect(healthOf(only(sections, 'stuck'))).toBe('blocked');
+  });
+
+  it('goes back to setup once a block on steps has gone stale', () => {
+    const sections = tree(
+      [at('done', 'first'), setup('after', { status: 'blocked', blockKind: 'steps' })],
+      [dep('after', 'first')],
+    );
+    // Without the setup rule this reads 'ready', which is the one thing it is
+    // not -- no session can pick it up.
+    expect(healthOf(only(sections, 'after'))).toBe('setup');
+  });
+
+  it('is on the person, and shows in the On you view', () => {
+    const sections = tree([setup('job'), item({ id: 'build' })]);
+
+    expect(needsThePerson(only(sections, 'job'))).toBe(true);
+    expect(isWaitingOnThePerson(only(sections, 'job'))).toBe(true);
+    const ids = flattenSections(applyView(sections, 'you')).map((node) => node.id);
+    expect(ids).toEqual(['job']);
+  });
+
+  it('is never handed to Claude, however it is assigned', () => {
+    // A routine that claimed one would sit in front of an account nobody has
+    // made and block itself to say so.
+    const sections = tree([
+      item({ id: 'work', assignee: 'claude' }),
+      setup('job', { assignee: 'claude' }),
+    ]);
+
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['work']);
+    expect(handedToClaude(sections).map((n) => n.id)).toEqual(['work']);
+    // Still ready, and still listed unfiltered, so the page shows it.
+    expect(only(sections, 'job').ready).toBe(true);
+    expect(workOrder(sections).map((n) => n.id)).toEqual(['work', 'job']);
+  });
+
+  it('is withheld from Claude even when nobody was assigned it', () => {
+    const sections = tree([setup('job', { assignee: null })]);
+    expect(workOrder(sections, { assignee: 'claude' })).toEqual([]);
+  });
+
+  it('is a band and a tally entry like any other live step', () => {
+    // Not `proposed`: an agreed setup job is in the denominator, so the bands
+    // have to be able to draw it or they stop summing to the count beside them.
+    expect(PLAN_BAND_ORDER).toContain('setup');
+    const section = shopping(tree([setup('job'), at('done', 'built')]));
+    expect(tallyHealth(section.nodes)).toMatchObject({ setup: 1, done: 1 });
+    expect(planBands(section.nodes)).toContainEqual({ health: 'setup', count: 1 });
   });
 });
 
