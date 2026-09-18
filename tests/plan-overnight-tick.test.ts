@@ -20,6 +20,7 @@ import {
   overnightRefusedReason,
   overnightTick,
   OVERNIGHT_NO_PROGRESS,
+  runOvernightTick,
   type OvernightPorts,
 } from '@/inngest/dev/overnight';
 import { buildPlanTree, findNode, type PlanSection } from '@/lib/plan/tree';
@@ -206,7 +207,12 @@ describe('chooseOvernightFire', () => {
   });
 
   it('still says nothing was ready when nothing was passed over', () => {
-    const choice = chooseOvernightFire(tree([item({ id: 'mine', assignee: 'me' })]), night(), MIDNIGHT, {});
+    const choice = chooseOvernightFire(
+      tree([item({ id: 'mine', assignee: 'me' })]),
+      night(),
+      MIDNIGHT,
+      {},
+    );
 
     expect(choice).toEqual({ act: 'end', reason: OVERNIGHT_NOTHING_READY });
   });
@@ -456,5 +462,76 @@ describe('overnightRefusedReason', () => {
       'Every feature left refused the send, so it stopped rather than retrying them. ' +
         '#640 is only a proposal. Approve it first. #651: That step no longer exists.',
     );
+  });
+});
+
+/**
+ * The CI reading, which is the one thing a tick does unconditionally.
+ *
+ * Everything else in this file is about restraint -- a tick with the runner off
+ * must not so much as read the plan. This is the exception and it is the point
+ * of #639: main sat red for two hours with nobody running a night and nobody
+ * on /dev/plan, so the app knew nothing. The read therefore sits in front of
+ * the `running` filter, not behind it.
+ */
+describe('runOvernightTick', () => {
+  const NOW = Date.parse('2026-09-18T21:40:00.000Z');
+  const HEAD = 'a405587bd91f0c3e2d4a6b8c9f1e2d3a4b5c6d7e';
+
+  /** No account is running, and the one write there is gets captured. */
+  function quietNight() {
+    const upsert = vi.fn(async () => ({ error: null as null }));
+    const accounts = { data: [] as Array<{ user_id: string }>, error: null };
+    const chain: Record<string, unknown> = {};
+    Object.assign(chain, {
+      select: () => chain,
+      eq: () => chain,
+      limit: () => Promise.resolve(accounts),
+      upsert,
+    });
+    return { upsert, supabase: { from: () => chain } as never };
+  }
+
+  const green = () =>
+    vi.fn(async (url: string) =>
+      String(url).includes('/actions/runs')
+        ? new Response(
+            JSON.stringify({ workflow_runs: [{ status: 'completed', conclusion: 'success' }] }),
+            { status: 200 },
+          )
+        : new Response(JSON.stringify([{ sha: HEAD, parents: [] }]), { status: 200 }),
+    );
+
+  it("reads and stores main's CI on a tick with no night running", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase, upsert } = quietNight();
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never });
+
+    expect(summary.accounts).toBe(0);
+    expect(summary.fired).toBe(0);
+    expect(summary.main).toEqual({ sha: HEAD, conclusion: 'passed', error: null });
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect((upsert.mock.calls as unknown as unknown[][])[0]?.[0]).toMatchObject({
+      repo: 'knightx4/PersonalDashboard',
+      head_sha: HEAD,
+      conclusion: 'passed',
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it('still runs the nights when the CI read is the thing that broke', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const refused = vi.fn(async () => new Response('{}', { status: 403 }));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: refused as never });
+
+    // The refusal is a stored reading, not a thrown one: the dot goes grey and
+    // says why, and the tick carries on to the accounts it came for.
+    expect(summary.main.conclusion).toBeNull();
+    expect(summary.main.error).toContain('GITHUB_READ_TOKEN');
+    expect(summary.accounts).toBe(0);
+    vi.unstubAllEnvs();
   });
 });

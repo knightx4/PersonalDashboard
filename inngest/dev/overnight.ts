@@ -3,8 +3,9 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { releaseStaleClaims } from '@/inngest/dev/claims';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
-import { listPushes } from '@/lib/plan/ci';
+import { listPushes, refreshMainCheck } from '@/lib/plan/ci';
 import { handFeatureToClaude } from '@/lib/plan/handover';
+import type { CheckConclusion } from '@/lib/plan/checks';
 import { lastPushSince, runLiveness, type RunLiveness } from '@/lib/plan/liveness';
 import { loadPlan } from '@/lib/plan/load';
 import {
@@ -561,25 +562,61 @@ export type OvernightTickSummary = {
   fired: number;
   /** What happened to each, by user id, so the response says why nothing did. */
   results: Record<string, OvernightTick>;
+  /**
+   * What CI said about main's newest commit, read on this tick whether or not
+   * anything was running. In the response so that a tick can be poked by hand
+   * and the reading it took read back from what it answers.
+   */
+  main: { sha: string | null; conclusion: CheckConclusion | null; error: string | null };
 };
 
 /**
- * The cron's entry point: every account mid-run, one feature at most each.
+ * The cron's entry point: main's CI, then every account mid-run, one feature
+ * at most each.
  *
- * Only the accounts with `running` set are read, which is what
- * `plan_overnight_runs_running_idx` is for -- on an ordinary night that is one
- * row or none, and a tick that found none did the cheapest possible thing.
+ * The CI reading comes first and happens on every tick, including the ones
+ * where no night is running and this function used to do nothing at all. That
+ * ordering is the point of #639 rather than a detail of it: main sat red from
+ * 19:43 to 21:40 with two more merges landing on top of it, and nobody was
+ * running a night, and nobody had /dev/plan open, so the app knew nothing and
+ * said nothing. A red main matters most exactly when nobody is watching, so
+ * the read cannot be behind the `running` filter -- and this tick is the only
+ * thing in the app that runs every four minutes and holds GITHUB_READ_TOKEN.
+ *
+ * It costs two requests and one upsert. A tick with no night running was one
+ * indexed select and is now one indexed select and that, which is still about
+ * as cheap as a scheduled job gets, and it is what puts a dot on every page in
+ * the app.
+ *
+ * Then the nights. Only the accounts with `running` set are read, which is
+ * what `plan_overnight_runs_running_idx` is for -- on an ordinary night that is
+ * one row or none.
  *
  * One account failing does not stop the next: the nights are independent and a
  * broken plan in one should not cost another its night.
  */
-export async function runOvernightTick(input: {
-  now?: number;
-  supabase?: Db;
-  fetch?: typeof globalThis.fetch;
-} = {}): Promise<OvernightTickSummary> {
+export async function runOvernightTick(
+  input: {
+    now?: number;
+    supabase?: Db;
+    fetch?: typeof globalThis.fetch;
+  } = {},
+): Promise<OvernightTickSummary> {
   const supabase = input.supabase ?? createServiceSupabase();
   const now = input.now ?? Date.now();
+
+  // Before anything is filtered on `running`, and stepped over if it breaks.
+  // `refreshMainCheck` already carries its own refusals back as a stored row
+  // rather than throwing, so only the write itself can land here -- and a tick
+  // that could not store a dot still has nights to run.
+  let main: OvernightTickSummary['main'] = { sha: null, conclusion: null, error: null };
+  try {
+    main = await refreshMainCheck({ supabase, now, fetch: input.fetch });
+  } catch (err) {
+    const said = err instanceof Error ? err.message : 'failed';
+    console.error(`main's CI could not be read on this tick: ${said}`);
+    main = { sha: null, conclusion: null, error: said };
+  }
 
   const { data, error } = await supabase
     .from('plan_overnight_runs')
@@ -602,5 +639,5 @@ export async function runOvernightTick(input: {
     }
   }
 
-  return { accounts: users.length, fired, results };
+  return { accounts: users.length, fired, results, main };
 }

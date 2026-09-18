@@ -5,6 +5,7 @@ import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
 import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadVaultBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 
@@ -24,12 +25,13 @@ export default async function VaultLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity, raised] = await Promise.all([
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
     loadRaisedNotifications(user.id),
+    loadMainCheck(),
   ]);
 
   const brief = await loadVaultBrief();
@@ -58,6 +60,7 @@ export default async function VaultLayout({ children }: { children: React.ReactN
         theme={settings.theme}
         notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
         brief={brief}
       >
         {children}
