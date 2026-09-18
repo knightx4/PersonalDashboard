@@ -33,7 +33,7 @@ export function CheckInboxNow({ accounts }: { accounts: readonly CheckableAccoun
   if (ready.length === 0) return null;
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className="mb-5 space-y-3">
       {ready.map((account) => (
         <div key={account.id}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
