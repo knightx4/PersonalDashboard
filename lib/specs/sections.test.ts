@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { anchorFor, splitSections } from '@/lib/specs/sections';
+import { SPECS, groupSpecs, type SpecDoc } from '@/lib/specs/registry';
 
 /**
  * The anchor is a key in the database. Change how one is derived and every
@@ -76,5 +77,45 @@ describe('splitSections', () => {
 
   it('returns nothing for an empty document', () => {
     expect(splitSections('')).toEqual([]);
+  });
+});
+
+describe('groupSpecs', () => {
+  const spec = (slug: string, module: SpecDoc['module']): SpecDoc => ({
+    slug,
+    title: slug,
+    blurb: '',
+    file: `${slug.toUpperCase()}.md`,
+    module,
+  });
+
+  it('follows MODULES order and puts the app-wide group last', () => {
+    const groups = groupSpecs([
+      spec('a', null),
+      spec('b', 'learn'),
+      spec('c', 'shopping'),
+    ]);
+    expect(groups.map((group) => group.module)).toEqual(['shopping', 'learn', null]);
+    expect(groups[2].label).toBe('The app as a whole');
+  });
+
+  it('leaves out a workspace with no spec', () => {
+    const groups = groupSpecs([spec('a', 'learn')]);
+    expect(groups.map((group) => group.module)).toEqual(['learn']);
+  });
+
+  it('sums the comments on a group, which is what the folded row shows', () => {
+    const groups = groupSpecs([spec('a', 'learn'), spec('b', 'learn')], { a: 3, b: 4 });
+    expect(groups[0].comments).toBe(7);
+  });
+
+  it('counts zero for specs nobody has commented on', () => {
+    const groups = groupSpecs([spec('a', 'learn')], { somethingElse: 9 });
+    expect(groups[0].comments).toBe(0);
+  });
+
+  it('groups every real spec, so none can go missing from the page', () => {
+    const grouped = groupSpecs(SPECS).flatMap((group) => group.specs);
+    expect(grouped).toHaveLength(SPECS.length);
   });
 });
