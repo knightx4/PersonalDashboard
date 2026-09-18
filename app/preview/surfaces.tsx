@@ -1622,6 +1622,30 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The box, open, which is the only state the send control can be looked at
+     * in: it is a trigger until it is pressed, so nothing in the app renders
+     * it standing open and `composerOpen` is the only way a shot reaches it.
+     * Empty, so the send control is in its disabled state and the line under
+     * the words says a note reaches nobody until it is tagged. */
+    id: 'dev-comment-thread-composer',
+    label: 'Comments · the box you send from',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <CommentThread
+          target="step"
+          id="00000000-0000-4000-8000-000000000414"
+          thread={commentThread}
+          composerOpen
+        />
+      </div>
+    ),
+  },
+  {
     /* The design language, held to itself. It is the one surface where being
      * wrong is self-refuting, and it is the surface most likely to drift,
      * because it is written in prose and prose does not fail a type check. */
