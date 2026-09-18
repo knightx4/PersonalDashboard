@@ -3,9 +3,8 @@ import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
-import { RememberedVaultTree } from '@/components/vault/vault-tree-remembered';
-import { SearchEmpty } from '@/components/shell/search-empty';
-import { SearchField } from '@/components/shell/search-field';
+import { VaultPanel } from '@/components/vault/vault-panel';
+import { VaultSheet } from '@/components/vault/vault-sheet';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadLinkTargets, loadNote, loadNotes } from '@/lib/vault/notes/load';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
@@ -38,6 +37,11 @@ export const dynamic = 'force-dynamic';
  * searches, so finding another note never costs you the one in front of you.
  * The query is `q` on this note's own URL, so a narrowed column is a link and
  * the search survives the back button; the note itself is not touched by it.
+ *
+ * Below `lg` there is no room for a column beside the note, so the same panel
+ * slides in over it from a button in the header row (#577). Column and sheet
+ * are one component, `components/vault/vault-panel.tsx`, so the search and the
+ * folds behave the same at both widths.
  */
 export default async function NotePage({
   params,
@@ -71,6 +75,10 @@ export default async function NotePage({
   const groups = groupByFolder(notes);
   const folder = folderOf(note.path);
 
+  // An empty vault keeps the column and the button away entirely; a search that
+  // matched nothing must not, or the box that got you there would go with it.
+  const hasVault = groups.length > 0 || Boolean(search);
+
   const user = await requireUser();
   const [{ timezone }, linkedTasks] = await Promise.all([
     loadAccountSettings(user.id),
@@ -79,46 +87,35 @@ export default async function NotePage({
 
   return (
     <div className="flex gap-8">
-      {/* Hidden below lg rather than stacked above the note: a phone gets the
-          same tree from a sheet instead, which is #577. An empty vault keeps
-          the column away entirely; a search that matched nothing must not, or
-          the box that got you there would go with it. */}
-      {(groups.length > 0 || search) && (
+      {/* Hidden below lg rather than stacked above the note: at that width the
+          same panel arrives as a sheet instead, from the button beside "All
+          notes" below. */}
+      {hasVault && (
         <aside aria-label="Vault" className="hidden w-60 shrink-0 lg:block">
           {/* At the offset the filter rail uses. The box is pinned and only the
               tree under it scrolls: a vault taller than the viewport must not
               make either the search or the bottom of the note reachable only by
               scrolling past a thousand titles. */}
-          <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-3">
-            <SearchField placeholder="Search your notes" />
-
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
-              {groups.length === 0 && search ? (
-                <SearchEmpty query={search} className="px-3 py-8" />
-              ) : (
-                // Searching opens every folder it left in the column: a match
-                // folded out of sight has not been reached. Anything else the
-                // reader left open is opened on top of that, never instead of
-                // it (#576).
-                <RememberedVaultTree
-                  groups={groups}
-                  currentPath={note.path}
-                  openAll={Boolean(search)}
-                />
-              )}
-            </div>
+          <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col">
+            <VaultPanel groups={groups} currentPath={note.path} search={search} />
           </div>
         </aside>
       )}
 
       <article className="mx-auto min-w-0 max-w-3xl flex-1">
-        <Link
-          href="/vault"
-          className="mb-4 inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
-        >
-          <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          All notes
-        </Link>
+        {/* The way back, and -- below lg, where the column is not drawn -- the
+            way into the same vault without leaving the note (#577). */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Link
+            href="/vault"
+            className="inline-flex items-center gap-1 text-ui font-medium text-ink-muted hover:text-ink"
+          >
+            <ChevronLeft className="size-3.5" strokeWidth={2} aria-hidden />
+            All notes
+          </Link>
+
+          {hasVault && <VaultSheet groups={groups} currentPath={note.path} search={search} />}
+        </div>
 
         <header className="mb-5">
           <h1 className="font-display text-title font-semibold tracking-tight text-ink">
