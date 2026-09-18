@@ -91,3 +91,43 @@ describe('the vault column', () => {
     expect(render('Money/Rent.md')).not.toContain('the first line of the body');
   });
 });
+
+/**
+ * Searching from inside a note (#476) narrows the column rather than sending
+ * you to the list, so what is left in it is the answer -- and an answer behind
+ * a shut fold has not been reached. That is the whole of `openAll`: #557's
+ * one-open rule is about the unasked-for vault, not about search results.
+ */
+describe('the column once a search has narrowed it', () => {
+  const MATCHES: VaultFolderGroup[] = [
+    { folder: 'Money', notes: [note('Money/Tax.md', 'Tax')] },
+    { folder: 'Recipes', notes: [note('Recipes/Soup.md', 'Soup')] },
+  ];
+
+  function searched(currentPath: string): string {
+    return renderToStaticMarkup(<VaultTree groups={MATCHES} currentPath={currentPath} openAll />);
+  }
+
+  it('opens every folder a match is left in', () => {
+    expect(folders(searched('Money/Rent.md')).map((folder) => folder.open)).toEqual([true, true]);
+  });
+
+  it('opens them even when the note being read matched nothing', () => {
+    // The reader's own folder need not be among the results at all, and the
+    // matches must not fold shut with it.
+    expect(folders(searched('Journal/Monday.md')).map((folder) => folder.open)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('still marks the note being read when the search kept it', () => {
+    const marked = searched('Money/Tax.md').match(/<a[^>]*aria-current="page"[^>]*>[^<]*/g) ?? [];
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toContain('Tax');
+  });
+
+  it('still folds without JavaScript', () => {
+    expect(searched('Money/Rent.md')).not.toContain('onclick');
+  });
+});

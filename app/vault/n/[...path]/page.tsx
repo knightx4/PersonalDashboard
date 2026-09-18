@@ -4,6 +4,8 @@ import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { VaultTree } from '@/components/vault/vault-tree';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadLinkTargets, loadNote, loadNotes } from '@/lib/vault/notes/load';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
@@ -27,11 +29,24 @@ export const dynamic = 'force-dynamic';
  * every folder, only the one you are reading in open, so the next note is one
  * click away rather than a trip back to the list. It is drawn here rather than
  * in `app/vault/layout.tsx` because a layout cannot read the address bar, and
- * the search box #476 puts at the top of the column has to.
+ * the search box at the top of the column has to.
+ *
+ * That box is #468's answer to searching the vault while reading a note: it
+ * narrows the column in place, against the same full-text index the note list
+ * searches, so finding another note never costs you the one in front of you.
+ * The query is `q` on this note's own URL, so a narrowed column is a link and
+ * the search survives the back button; the note itself is not touched by it.
  */
-export default async function NotePage({ params }: { params: Promise<{ path: string[] }> }) {
-  const { path: segments } = await params;
+export default async function NotePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ path: string[] }>;
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const [{ path: segments }, { q }] = await Promise.all([params, searchParams]);
   const path = segments.map(decodeURIComponent).join('/');
+  const search = q?.trim() ?? '';
 
   const supabase = await createVaultClient();
   const note = await loadNote(supabase, path);
@@ -41,8 +56,13 @@ export default async function NotePage({ params }: { params: Promise<{ path: str
   // The link targets are every note's path and title and deliberately no
   // bodies -- rendering one note must not load the text of every other one --
   // and the notes are what the column lists, which inherits the note list's
-  // first 500 by path; that cap is filed as an idea of its own.
-  const [targets, notes] = await Promise.all([loadLinkTargets(supabase), loadNotes(supabase)]);
+  // first 500 by path; that cap is filed as an idea of its own. A search
+  // narrows that second read and nothing else: the wikilinks in the note you
+  // are reading still have to resolve against the whole vault.
+  const [targets, notes] = await Promise.all([
+    loadLinkTargets(supabase),
+    loadNotes(supabase, search ? { search } : {}),
+  ]);
   const index = buildLinkIndex(targets);
   const markdown = toStandardMarkdown(note.body, { index, hrefFor: noteHref });
 
@@ -58,14 +78,27 @@ export default async function NotePage({ params }: { params: Promise<{ path: str
   return (
     <div className="flex gap-8">
       {/* Hidden below lg rather than stacked above the note: a phone gets the
-          same tree from a sheet instead, which is #577. */}
-      {groups.length > 0 && (
+          same tree from a sheet instead, which is #577. An empty vault keeps
+          the column away entirely; a search that matched nothing must not, or
+          the box that got you there would go with it. */}
+      {(groups.length > 0 || search) && (
         <aside aria-label="Vault" className="hidden w-60 shrink-0 lg:block">
-          {/* Its own scroll, at the offset the filter rail uses: a vault taller
-              than the viewport must not make the bottom of the note reachable
-              only by scrolling past a thousand titles. */}
-          <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain pr-1">
-            <VaultTree groups={groups} currentPath={note.path} />
+          {/* At the offset the filter rail uses. The box is pinned and only the
+              tree under it scrolls: a vault taller than the viewport must not
+              make either the search or the bottom of the note reachable only by
+              scrolling past a thousand titles. */}
+          <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col gap-3">
+            <SearchField placeholder="Search your notes" />
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+              {groups.length === 0 && search ? (
+                <SearchEmpty query={search} className="px-3 py-8" />
+              ) : (
+                // Searching opens every folder it left in the column: a match
+                // folded out of sight has not been reached.
+                <VaultTree groups={groups} currentPath={note.path} openAll={Boolean(search)} />
+              )}
+            </div>
           </div>
         </aside>
       )}

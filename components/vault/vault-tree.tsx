@@ -28,11 +28,19 @@ export type VaultFolderGroup = { folder: string; notes: NoteSummary[] };
 export function VaultTree({
   groups,
   currentPath,
+  openAll = false,
   className,
 }: {
   groups: VaultFolderGroup[];
   /** The note being read, so its folder opens and its row is marked. */
   currentPath: string;
+  /**
+   * Every folder open rather than just the one being read in. #557's one-open
+   * rule is about the whole vault sitting there unasked for; once the column
+   * has been narrowed by a search (#476) the groups *are* the answer, and a
+   * match folded out of sight has not been reached.
+   */
+  openAll?: boolean;
   className?: string;
 }) {
   const currentFolder = folderOf(currentPath);
@@ -45,7 +53,7 @@ export function VaultTree({
         return (
           <Disclosure
             key={group.folder || '(root)'}
-            defaultOpen={reading}
+            defaultOpen={openAll || reading}
             // Law 10's second half: the shut line says whether opening it is
             // worth it, and for a folder that is how much is inside.
             meta={group.notes.length}
