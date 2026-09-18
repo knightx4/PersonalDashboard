@@ -8,6 +8,7 @@ import {
   Briefcase,
   Bug,
   Building2,
+  FileText,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -77,6 +78,9 @@ export const NAV_ICONS = {
   changelog: History,
   ui: Shapes,
   surfaces: Frame,
+  // A specification is a document you read and argue with, so it gets the
+  // document glyph rather than another list icon.
+  specs: FileText,
   // Todo and vault
   //
   // Agenda is the list with something still unticked -- what needs you next,

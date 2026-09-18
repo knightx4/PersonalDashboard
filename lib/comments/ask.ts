@@ -27,8 +27,17 @@ import { startRoutineRun } from '@/lib/plan/runs';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 import { raisedRowFrom, RAISED_COLUMNS } from '@/lib/raised/load';
 import { carryOut } from './act';
-import { askMessage, ideaContext, noteContext, raiseContext, threadText } from './context';
-import { TARGET_COLUMN, type CommentTarget, type DevComment } from './load';
+import {
+  askMessage,
+  ideaContext,
+  noteContext,
+  raiseContext,
+  specContext,
+  threadText,
+} from './context';
+import { TARGET_COLUMN, threadFrom, type CommentTarget, type DevComment } from './load';
+import { readSpec, specBySlug } from '@/lib/specs/registry';
+import { splitSections } from '@/lib/specs/sections';
 import { replyToComment } from './reply';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,7 +71,7 @@ function apiKey(): string | null {
 }
 
 /**
- * The step, idea, raise or bug note written out.
+ * The step, idea, raise, bug note or spec section written out.
  *
  * A step goes through `planBrief`, which is the same text a session building
  * it would be handed: its done-when, where the feature is going, and every
@@ -105,6 +114,39 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
     if (!data) return null;
     const row = raisedRowFrom(data as unknown as Record<string, unknown>);
     return { context: raiseContext(row), thread: row.thread, label: row.title };
+  }
+
+  if (target === 'spec') {
+    const { data } = await supabase
+      .from('spec_sections')
+      .select('slug, anchor, heading, dev_comments (id, author, body, created_at)')
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+
+    const row = data as unknown as Record<string, unknown>;
+    const doc = specBySlug(String(row.slug));
+    if (!doc) return null;
+
+    const markdown = await readSpec(doc);
+    const section = markdown
+      ? splitSections(markdown).find((s) => s.anchor === row.anchor)
+      : undefined;
+
+    return {
+      context: specContext({
+        title: doc.title,
+        file: doc.file,
+        heading: String(row.heading),
+        // The heading may have been rewritten since the comment was filed, in
+        // which case the prose is gone and saying so beats answering from the
+        // heading alone.
+        body: section?.body ?? '(This section is no longer in the document.)',
+      }),
+      thread: threadFrom(row.dev_comments),
+      label: `${doc.title} — ${row.heading}`,
+    };
   }
 
   const { data } = await supabase

@@ -127,6 +127,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.dev_comments = raisedComment.id;
 
+  const [specSection] = await admin<{ id: string }[]>`
+    insert into spec_sections (user_id, slug, anchor, heading, position)
+    values (${userId}, 'learn-map', ${`${tag}-what-an-edge-is`}, 'What an edge is', 10)
+    returning id`;
+  ids.spec_sections = specSection.id;
+
   // Keyed by (user_id, target, row_id) rather than an id of its own, so what
   // goes in `ids` is the row the thread hangs off -- see ROW_KEY below.
   await admin`

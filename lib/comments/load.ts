@@ -1,11 +1,12 @@
 /**
  * Comments on the rows the dev pages show.
  *
- * One thread shape for an idea, a plan step, a raise and a bug note, because
- * the exchange is the same one wherever it happens: you write something on a
- * row, and a session can write back on the same row. `dev_comments` holds all
- * four (migrations 0062 and 0066), so the type, the column list and the
- * ordering live here rather than four times over in the four loaders.
+ * One thread shape for an idea, a plan step, a raise, a bug note and a section
+ * of a specification, because the exchange is the same one wherever it happens:
+ * you write something on a row, and a session can write back on the same row.
+ * `dev_comments` holds all five (migrations 0062, 0066 and 0085), so the type,
+ * the column list and the ordering live here rather than five times over in the
+ * five loaders.
  *
  * Nothing in here reads the database. The loaders embed `COMMENT_COLUMNS` in
  * their own select and hand the result to `threadFrom`; the CLI, which reads
@@ -14,7 +15,7 @@
  */
 
 /** Which row a comment is about. */
-export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note'] as const;
+export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note', 'spec'] as const;
 export type CommentTarget = (typeof COMMENT_TARGETS)[number];
 
 export function isCommentTarget(value: string): value is CommentTarget {
@@ -27,12 +28,13 @@ export function isCommentTarget(value: string): value is CommentTarget {
  */
 export const TARGET_COLUMN: Record<
   CommentTarget,
-  'idea_id' | 'plan_item_id' | 'raised_item_id' | 'feedback_item_id'
+  'idea_id' | 'plan_item_id' | 'raised_item_id' | 'feedback_item_id' | 'spec_section_id'
 > = {
   idea: 'idea_id',
   step: 'plan_item_id',
   raise: 'raised_item_id',
   note: 'feedback_item_id',
+  spec: 'spec_section_id',
 };
 
 /** The page each target is read on, which is what a write has to revalidate. */
@@ -41,6 +43,11 @@ export const TARGET_PATH: Record<CommentTarget, string> = {
   step: '/dev/plan',
   raise: '/dev/raised',
   note: '/dev/bugs',
+  // The list, not the document. A comment is written on one spec's page, and
+  // that page's own path is not knowable from the target alone -- the write
+  // revalidates the index, and the document's page is revalidated by the action
+  // that knows which one it was.
+  spec: '/dev/specs',
 };
 
 /**
