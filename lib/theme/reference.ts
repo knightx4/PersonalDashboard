@@ -116,6 +116,10 @@ export const REFERENCE_PALETTES: Record<
     '--c-status-ghosted-tint': '#fafaf9',
     '--c-sheet-outline': '#e8e5df',
     '--c-caution-fill-ink': '#14100a',
+    '--c-wash-near': '#3a74d6',
+    '--c-wash-mid': '#8260fa',
+    '--c-wash-far': '#dd78e6',
+    '--c-wash-floor': '#175cb0',
     '--c-fill-ink': '#ffffff',
     '--c-page-ground': '#f0ece2',
     '--c-page': '#f0ece2',
@@ -203,6 +207,10 @@ export const REFERENCE_PALETTES: Record<
     '--c-status-ghosted-tint': '#141516',
     '--c-sheet-outline': '#212225',
     '--c-caution-fill-ink': '#14100a',
+    '--c-wash-near': '#3a74d6',
+    '--c-wash-mid': '#8260fa',
+    '--c-wash-far': '#dd78e6',
+    '--c-wash-floor': '#175cb0',
     '--c-fill-ink': '#0f1011',
     '--c-page-ground': '#08090a',
     '--c-page': '#08090a',
@@ -290,6 +298,10 @@ export const REFERENCE_PALETTES: Record<
     '--c-status-ghosted-tint': '#1c1728',
     '--c-sheet-outline': '#2c2440',
     '--c-caution-fill-ink': '#14100a',
+    '--c-wash-near': '#3a74d6',
+    '--c-wash-mid': '#8260fa',
+    '--c-wash-far': '#dd78e6',
+    '--c-wash-floor': '#175cb0',
     '--c-fill-ink': '#191426',
     '--c-page-ground': '#110d1a',
     '--c-page': '#110d1a',
@@ -386,6 +398,10 @@ export const REFERENCE_PALETTES: Record<
     '--c-status-ghosted-tint': '#dfe5eb',
     '--c-sheet-outline': 'rgb(18 24 34 / 0.42)',
     '--c-caution-fill-ink': '#14100a',
+    '--c-wash-near': '#3a74d6',
+    '--c-wash-mid': '#8260fa',
+    '--c-wash-far': '#dd78e6',
+    '--c-wash-floor': '#175cb0',
     '--c-fill-ink': '#f7f9fc',
     '--c-page-ground': '#25374f',
     '--c-page': '#25374f',
@@ -473,6 +489,10 @@ export const REFERENCE_PALETTES: Record<
     '--c-status-ghosted-tint': '#1e2735',
     '--c-sheet-outline': 'rgb(150 178 224 / 0.22)',
     '--c-caution-fill-ink': '#14100a',
+    '--c-wash-near': '#3a74d6',
+    '--c-wash-mid': '#8260fa',
+    '--c-wash-far': '#dd78e6',
+    '--c-wash-floor': '#175cb0',
     '--c-fill-ink': '#111a2b',
     '--c-page-ground': '#25374f',
     '--c-page': '#25374f',
@@ -577,6 +597,13 @@ export const HUE_TOKENS: readonly string[] = [
  * tokens, so the generator cannot read them at all.
  */
 export const LIGHTBOX_HUE_TOKENS: readonly string[] = [
+  // The bench's pools. Named for where they sit, not what colour they are:
+  // they turn with everything else, and the point of turning all four by the
+  // same amount is that the sweep between them survives the move.
+  '--c-wash-near',
+  '--c-wash-mid',
+  '--c-wash-far',
+  '--c-wash-floor',
   // The bench, which is the page ground and the sidebar at the same value.
   '--c-page',
   '--c-shell',

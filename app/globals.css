@@ -155,6 +155,28 @@
   /* A wash laid over the page ground: soft, off-centre pools of colour that
    * give a flat ground somewhere to travel. Only a theme whose bench is large
    * and dark enough to look like a void needs one, so the default is none. */
+  /* The four colours the bench's pools are made of.
+   *
+   * Tokens rather than literals inside --page-wash, and that is the whole
+   * point: the generator rotates `--c-*` tokens and cannot see anything
+   * written inline in a gradient. They were literals, so picking a colour
+   * turned the bench and left the pools where they were -- a red room with a
+   * blue-and-pink wash lying on it, which reads as a tint applied to the
+   * theme rather than as the theme being that colour.
+   *
+   * Four rather than one, because the room is a sweep and not a hue. They sit
+   * about 50 degrees apart, and the generator moves all four by the same
+   * amount, so asking for red gives red into orange into magenta rather than
+   * four flat reds.
+   *
+   * Defined in every theme because the palette has to be uniform -- the token
+   * set is read off Paper and cleared by name -- but only the glass rooms
+   * paint with them; the solid rooms set --page-wash to none. */
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
   --page-wash: none;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
 
@@ -230,6 +252,11 @@
  * as one product.
  * ------------------------------------------------------------------------- */
 [data-theme='ink'] {
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
   --c-fill-ink: #0f1011;
   color-scheme: dark;
   --c-sheet-scheme: dark;
@@ -377,12 +404,29 @@
    * through them as grey. A ground with a single hue in it has nowhere to
    * travel, so nothing on top of it has anything to reveal.
    *
-   * So it runs the app's own ramp: blue at the top left, the brand violet
-   * through the middle, rose at the top right, and a deep blue holding the
-   * floor. Those are the three hexes the home mark has worn since before this
-   * app had modules -- the one gradient this product already owns -- and a
-   * card crossing the room now crosses from blue to violet to rose rather than
-   * sitting in a flat wash.
+   * So it runs the app's own ramp: near at the top left, mid through the
+   * middle, far at the top right, and floor holding the bottom. With no colour
+   * chosen those are blue, violet, orchid and a deep blue.
+   *
+   * Sixty-four degrees from near to far, and that ceiling is the point. They
+   * were a hundred and two apart, which at blue is the ramp this product has
+   * always worn -- blue into violet into rose -- and reads beautifully. But a
+   * rotation preserves the ANGLE and not the effect: the same hundred and two
+   * degrees asked for in red comes back red into orange into green, because
+   * the eye does not find every triple on the wheel equally happy. Pulled in
+   * to sixty-four it is an analogous sweep wherever it lands -- red into
+   * orange into yellow, green into teal into blue -- and the default gives up
+   * only the last step from orchid to rose to buy that.
+   *
+   * They are named for where they sit rather than for what colour they are,
+   * because the colour is not fixed: they are --c-* tokens in
+   * LIGHTBOX_HUE_TOKENS, so the generator turns all four by the same amount
+   * and the sweep survives. Ask for red and the room runs red into orange into
+   * magenta. They used to be literals written inside this gradient, where the
+   * generator could not see them at all, and picking a colour turned the bench
+   * and left the pools behind -- a red room with a blue-and-pink wash lying on
+   * it, which reads as a tint applied to a theme rather than as the theme
+   * being that colour.
    *
    * Every layer only ADDS light, and that is load-bearing rather than tidy: a
    * sheet is 20% bench, so a layer that darkens the bench darkens every sheet
@@ -393,33 +437,38 @@
    *
    * Fixed to the viewport at <body>, so it reads as depth the page slides over
    * rather than a pattern that scrolls. */
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
   --page-wash:
-    radial-gradient(105% 72% at 10% -8%, rgb(58 116 214 / 0.34), transparent 60%),
-    radial-gradient(82% 78% at 88% -2%, rgb(255 107 157 / 0.30), transparent 62%),
-    /* A fourth pool, mid-right, and a ramp under all of them.
-     *
-     * The three pools above sit top-left, top-right and bottom-centre, which
-     * is a sensible arrangement for a bench nobody sees much of -- and exactly
-     * the wrong one now the sheets are transparent, because the middle-right
-     * is where the page pane is and it was the flattest part of the room. A
-     * translucent card over a flat ground is not visibly translucent; it is
-     * just a slightly grey card.
-     *
-     * The ramp is what gives a card at the top of the page and a card at the
-     * bottom different ground to sit on. It only ever ADDS light, and it fades
-     * out rather than darkening the far corner: a sheet is 20% bench now, so
-     * anything that darkens the bench darkens every sheet on it and takes the
-     * ink down with it, in a place scripts/check-contrast.ts cannot see. Light
-     * is the direction that is free. */
-    radial-gradient(75% 62% at 78% 48%, rgb(139 92 246 / 0.26), transparent 64%),
+    radial-gradient(
+      105% 72% at 10% -8%,
+      color-mix(in oklab, var(--c-wash-near) 34%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      82% 78% at 88% -2%,
+      color-mix(in oklab, var(--c-wash-far) 30%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      75% 62% at 78% 48%,
+      color-mix(in oklab, var(--c-wash-mid) 26%, transparent),
+      transparent 64%
+    ),
     linear-gradient(
       155deg,
-      rgb(120 158 248 / 0.20) 0%,
-      rgb(178 126 226 / 0.13) 36%,
-      rgb(240 122 172 / 0.10) 62%,
+      color-mix(in oklab, var(--c-wash-near) 22%, transparent) 0%,
+      color-mix(in oklab, var(--c-wash-mid) 15%, transparent) 36%,
+      color-mix(in oklab, var(--c-wash-far) 12%, transparent) 62%,
       transparent 86%
     ),
-    radial-gradient(130% 110% at 42% 118%, rgb(26 92 176 / 0.34), transparent 68%);
+    radial-gradient(
+      130% 110% at 42% 118%,
+      color-mix(in oklab, var(--c-wash-floor) 34%, transparent),
+      transparent 68%
+    );
   --c-page-positive: #6fe0b0;
   --c-page-caution: #f5b459;
   --c-page-danger: #ff9d9d;
@@ -581,6 +630,11 @@
  * DUSK — plum-cast dark, softer edges, the same accent arc shifted warm.
  * ------------------------------------------------------------------------- */
 [data-theme='dusk'] {
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
+
   --c-fill-ink: #191426;
   color-scheme: dark;
   --c-sheet-scheme: dark;
@@ -700,18 +754,38 @@
   --c-page-caution: #f5b459;
   --c-page-danger: #ff9d9d;
 
+  --c-wash-near: #3a74d6;
+  --c-wash-mid: #8260fa;
+  --c-wash-far: #dd78e6;
+  --c-wash-floor: #175cb0;
   --page-wash:
-    radial-gradient(105% 72% at 10% -8%, rgb(58 116 214 / 0.34), transparent 60%),
-    radial-gradient(82% 78% at 88% -2%, rgb(255 107 157 / 0.30), transparent 62%),
-    radial-gradient(75% 62% at 78% 48%, rgb(139 92 246 / 0.26), transparent 64%),
+    radial-gradient(
+      105% 72% at 10% -8%,
+      color-mix(in oklab, var(--c-wash-near) 34%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      82% 78% at 88% -2%,
+      color-mix(in oklab, var(--c-wash-far) 30%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      75% 62% at 78% 48%,
+      color-mix(in oklab, var(--c-wash-mid) 26%, transparent),
+      transparent 64%
+    ),
     linear-gradient(
       155deg,
-      rgb(120 158 248 / 0.20) 0%,
-      rgb(178 126 226 / 0.13) 36%,
-      rgb(240 122 172 / 0.10) 62%,
+      color-mix(in oklab, var(--c-wash-near) 22%, transparent) 0%,
+      color-mix(in oklab, var(--c-wash-mid) 15%, transparent) 36%,
+      color-mix(in oklab, var(--c-wash-far) 12%, transparent) 62%,
       transparent 86%
     ),
-    radial-gradient(130% 110% at 42% 118%, rgb(26 92 176 / 0.34), transparent 68%);
+    radial-gradient(
+      130% 110% at 42% 118%,
+      color-mix(in oklab, var(--c-wash-floor) 34%, transparent),
+      transparent 68%
+    );
 
   --c-accent-base-lit: #a6b4ff;
   --c-accent-hover-lit: #bcc6ff;
@@ -824,6 +898,10 @@
     --c-sheet-scheme: dark;
 
     --c-fill-ink: #0f1011;
+    --c-wash-near: #3a74d6;
+    --c-wash-mid: #8260fa;
+    --c-wash-far: #dd78e6;
+    --c-wash-floor: #175cb0;
     --c-canvas: #08090a;
     --c-page-ground: #08090a;
     --c-page-ink-muted: var(--c-ink-muted);
