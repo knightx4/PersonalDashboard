@@ -531,11 +531,22 @@ steps. Done and dropped dependencies are out of the way; a dropped one is
 shown plainly rather than freezing the dependent forever.
 
 **Ready.** A step could be picked up now when it is not started, waits on
-nothing, has no open sub-steps, and nothing above it is blocked or dropped. A
+nothing, has no open sub-steps, and nothing above it is dropped, still
+proposed, or blocked on something outside the plan. A
 step blocked on the steps it names is ready once every one of them has closed;
 a step blocked on something outside the plan never is.
 A feature with open sub-steps is worked through them; the feature is what
 you close when they are all done — and at that point it is itself ready.
+
+A feature blocked on its own steps is the one block that does not carry down,
+settled by #638. A question on one step stops that step, and marking the
+feature blocked over it used to take every other step beneath it out of the
+runner's reach — #494 and #578 did that on the same day and hid five
+priority-one features. What a step really waits on is already a dependency and
+is inherited, so the steps genuinely held up stay held up without the parent's
+status standing in for all of them. The other direction is read from the steps
+instead: a feature whose every open step is blocked reports `blocked` itself,
+so nothing is lost by not marking it.
 
 **Roll-up.** A feature's progress is over the leaf steps beneath it, not the
 containers in between, and a module's progress is over its leaves, so a
@@ -581,10 +592,10 @@ behind it. `PLAN_HEALTHS` in `lib/plan/tree.ts` is the set, thirteen of them:
 | `working` | Claimed, and the run pushed something inside the twenty-minute mark. |
 | `quiet` | Claimed, and nothing pushed since. The guard counts it as live and #574 settled that re-sending it asks first. |
 | `abandoned` | Claimed, and the run ended without closing the step. Nobody is on it and it needs handing over again. The one claim reading that leaves the ladder, and it ranks with the stuck states rather than the underway ones. |
-| `blocked` | Stopped on something only the person can settle — `block_kind` of `outside`. It stays blocked however much else closes, and Send refuses it. |
+| `blocked` | Stopped on something only the person can settle — `block_kind` of `outside`. It stays blocked however much else closes, and Send refuses it. A feature reads it too, when every open step beneath it is blocked and so nothing under it can be picked up. |
 | `waiting` | Waits on another step, which clears itself when that step closes. The tooltip names which steps. |
 | `ready` | Not started, with nothing in the way. What the Send button takes, `workOrder` lists and the overnight chooser fires. |
-| `not_started` | Not started and not ready either: open sub-steps beneath it, or something above it blocked or dropped. The right-hand end of the progress bar — work not reached. |
+| `not_started` | Not started and not ready either: open sub-steps beneath it, or something above it dropped, proposed or blocked on something outside the plan. The right-hand end of the progress bar — work not reached. |
 | `done` | Closed against its done-when. The one state that carries a commit. |
 | `dropped` | Decided against, and out of the denominator with the proposals. |
 

@@ -361,6 +361,42 @@ describe('isReady', () => {
     expect(findNode(sections, 'under-maybe')!.ready).toBe(false);
     expect(findNode(sections, 'under-live')!.ready).toBe(true);
   });
+
+  it('is a step under a feature blocked on its own steps', () => {
+    // #494 and #578 were each marked blocked over a question on one step, and
+    // between them took five priority-one features out of the runner's reach.
+    // A feature waiting on the rows beneath it cannot also be what hides them.
+    const sections = tree([
+      at('blocked', 'feature', { blockKind: 'steps' }),
+      at('blocked', 'stuck', { parentId: 'feature', blockKind: 'outside' }),
+      item({ id: 'free', parentId: 'feature' }),
+    ]);
+    expect(findNode(sections, 'free')!.ready).toBe(true);
+    expect(findNode(sections, 'stuck')!.ready).toBe(false);
+  });
+
+  it('is not a step under a feature blocked on something outside the plan', () => {
+    // The feature is waiting on a credential, and so is everything under it.
+    const sections = tree([
+      at('blocked', 'feature', { blockKind: 'outside' }),
+      item({ id: 'step', parentId: 'feature' }),
+    ]);
+    expect(findNode(sections, 'step')!.ready).toBe(false);
+  });
+
+  it('keeps a step ready under a feature whose own dependencies are all open', () => {
+    // The feature's wait is inherited as a dependency, so a step under it is
+    // held by that and not by the parent's status column.
+    const sections = tree(
+      [
+        item({ id: 'other' }),
+        at('blocked', 'feature', { blockKind: 'steps' }),
+        item({ id: 'step', parentId: 'feature' }),
+      ],
+      [dep('feature', 'other')],
+    );
+    expect(findNode(sections, 'step')!.ready).toBe(false);
+  });
 });
 
 describe('applyView', () => {
@@ -619,6 +655,22 @@ describe('workOrder', () => {
     ]);
     expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual(['theirs']);
   });
+
+  it('still offers the steps of a feature blocked over one question beneath it', () => {
+    // What the overnight runner reaches for. A question on one step stops that
+    // step; the two beside it are work, and the feature being marked blocked
+    // over the question used to take them out of this list entirely.
+    const sections = tree([
+      at('blocked', 'feature', { blockKind: 'steps', assignee: 'claude' }),
+      at('blocked', 'asked', { parentId: 'feature', blockKind: 'outside', assignee: 'claude' }),
+      item({ id: 'next', parentId: 'feature', assignee: 'claude', position: 20 }),
+      item({ id: 'after', parentId: 'feature', assignee: 'claude', position: 30 }),
+    ]);
+    expect(workOrder(sections, { assignee: 'claude' }).map((n) => n.id)).toEqual([
+      'next',
+      'after',
+    ]);
+  });
 });
 
 describe('handedToClaude', () => {
@@ -784,7 +836,10 @@ describe('a block on steps whose dependencies have all closed', () => {
 
     expect(summarize(sections).waiting).toBe(1);
     expect(summarize(sections).ready).toBe(0);
-    expect(summarize(sections).onYou).toBe(1);
+    // Two: the step, and the feature above it, which has nothing left beneath
+    // it that anybody can pick up and so reads blocked itself. `waiting`
+    // counts the status column and stays at the one row that carries it.
+    expect(summarize(sections).onYou).toBe(2);
     // The feature is in the Waiting view as the container it is shown in; the
     // step itself is what the view matched.
     expect(flattenSections(applyView(sections, 'blocked')).filter((n) => n.matches).map((n) => n.id))
@@ -1347,6 +1402,39 @@ describe('healthOf, over a subtree that has started', () => {
 
   it('leaves a leaf step alone', () => {
     expect(healthOf(shopping(tree([at('not_started', 'a')])).nodes[0])).toBe('ready');
+  });
+
+  it('calls a feature blocked when every open step beneath it is', () => {
+    const sections = feature([
+      at('done', 's1', { parentId: 'f' }),
+      at('blocked', 's2', { parentId: 'f', blockKind: 'outside' }),
+      at('blocked', 's3', { parentId: 'f', blockKind: 'outside' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('blocked');
+  });
+
+  it('leaves it open while one step beneath it can still be worked', () => {
+    const sections = feature([
+      at('blocked', 's1', { parentId: 'f', blockKind: 'outside' }),
+      at('not_started', 's2', { parentId: 'f' }),
+    ]);
+    expect(healthOf(sections.nodes[0])).toBe('not_started');
+  });
+
+  it('does not call it blocked over a step whose named steps have all closed', () => {
+    // `isStaleBlock`: nothing on record is holding s2, so the feature has a
+    // step to offer and is not stopped.
+    const sections = shopping(
+      tree(
+        [
+          at('not_started', 'f'),
+          at('done', 's1', { parentId: 'f' }),
+          at('blocked', 's2', { parentId: 'f', blockKind: 'steps' }),
+        ],
+        [dep('s2', 's1')],
+      ),
+    );
+    expect(healthOf(sections.nodes[0])).toBe('in_progress');
   });
 });
 
