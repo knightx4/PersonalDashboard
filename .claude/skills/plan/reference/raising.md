@@ -64,13 +64,22 @@ main." — not "worth deciding whether the merge should run the gate."
 
 **`--consequence` is required too, and it is what a yes does.** Written as
 `<action>: <what it works on>`, using the same action names a comment
-instruction uses — `file_idea`, `reword`, `send_step`. Answering yes runs it,
-so the raise produces something rather than closing into a thread nobody reads
-back: `--consequence "file_idea: Refuse a second session on a step already
-being worked"`. A raise whose action you cannot name is one that is not ready
-to be asked. Where the answer is a piece of work rather than one of those three
-moves, name `file_idea` with what to do; it lands on the ideas page and is
-shaped from there.
+instruction uses — `file_idea`, `file_note`, `add_step`, `build_step`,
+`send_step`. Answering yes runs it, so the raise produces something rather than
+closing into a thread nobody reads back: `--consequence "file_idea: Refuse a
+second session on a step already being worked"`. A raise whose action you
+cannot name is one that is not ready to be asked.
+
+Where the answer is a piece of work, the two that write it are the ones to
+weigh. `add_step` leaves it on the plan as a proposal for them to approve and
+send — right when what to build still needs shaping, or is bigger than a
+sitting. `build_step` writes the step ready to be worked and hands it to a
+session in the same press — right when the raise already says what the work is
+and the only question left is whether to do it, which is exactly what a yes
+answers. Both take the step's name as the text; the paragraph under it is the
+raise's own detail, and the workspace is the raise's unless you name another.
+`send_step` is for work already on the plan, named by number: `--consequence
+"send_step: #342"`.
 
 **A session never answers or dismisses a raise**, the same rule as never
 answering its own decision. Two things it does do. Replying to an answer the

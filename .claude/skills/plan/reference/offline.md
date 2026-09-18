@@ -113,9 +113,13 @@ where id = '…';
 -- the CLI refuses a raise without one and doing the insert by hand does not
 -- make it optional.
 -- `consequence` is what a yes does, in the shape lib/comments/act.ts carries
--- out: {"name": "file_idea" | "reword" | "send_step", "text": "…",
--- "module": "…" | null, "field": null}. The CLI refuses a raise without one
--- and doing the insert by hand does not make it optional either.
+-- out: {"name": "file_idea" | "file_note" | "add_step" | "build_step" |
+-- "send_step" | "reword", "text": "…", "module": "…" | null, "field": null}.
+-- `add_step` leaves a proposal, `build_step` writes the step ready to be
+-- worked and puts a session on it in the same press, `send_step` takes a
+-- step already on the plan, named by number in "text" as "#342". The CLI
+-- refuses a raise without one and doing the insert by hand does not make it
+-- optional either.
 insert into raised_items (user_id, module, title, detail, ask, consequence, source, status)
 values ('…', 'dev', '…', '…', '…', '{"name": "file_idea", "text": "…"}'::jsonb,
         'plan #<n>', 'open')

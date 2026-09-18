@@ -26,6 +26,13 @@
  * changeable from a comment, so they are, and each lands in the state the
  * person still has the say over: a step arrives as a proposal, a note arrives
  * open, and neither is approved, assigned or prioritised by anything here.
+ *
+ * `build_step` is the one exception, and it is one the person makes rather
+ * than this file: told on a raise to do the work itself, the raise is the
+ * description of it and the comment is the approval, so #605 settled that the
+ * step is written ready to be worked and handed to a session in the same
+ * press. It is still not approved on this file's own judgement -- nothing
+ * here decides that a raise deserves a session; the instruction did.
  */
 import 'server-only';
 
@@ -142,8 +149,10 @@ function isReserved(name: string): boolean {
 /**
  * Carry out one instruction, or say why it was not carried out.
  *
- * Nothing is done twice and nothing is done part way: each action is a single
- * write, so a failure leaves the row as it was and the thread says so.
+ * Nothing is done twice and nothing is done part way: every action but one is
+ * a single write, so a failure leaves the row as it was and the thread says
+ * so. `build_step` is the one with two halves -- the row, then the session --
+ * and it says which of them happened rather than pretending both did.
  */
 export async function carryOut(input: ActInput): Promise<ActOutcome> {
   switch (input.action.name) {
@@ -157,6 +166,8 @@ export async function carryOut(input: ActInput): Promise<ActOutcome> {
       return reword(input);
     case 'send_step':
       return sendStep(input);
+    case 'build_step':
+      return buildStep(input);
     default:
       if (isReserved(input.action.name)) {
         return {
@@ -264,20 +275,36 @@ async function fileNote(input: ActInput): Promise<ActOutcome> {
 }
 
 /**
- * Add a plan row: a step under the one this comment is on, or a feature.
+ * Where a new plan row goes and what it says, before anything is written.
+ *
+ * Shared by the two actions that write one -- `add_step`, which stops there,
+ * and `build_step`, which hands what it wrote to a session -- because the
+ * three rules underneath it are the kind that are right in one copy and
+ * quietly wrong in the other: which row it hangs under, which workspace it
+ * lands in, and what the columns hold.
  *
  * A comment on a step means a step beneath that step, and it takes that step's
  * module -- a sub-step that claimed a different workspace would show up in
  * neither place anyone looked for it, the same rule the add form on the plan
  * page follows. A comment anywhere else has no step to hang one under, so what
- * it writes is a feature at the top of whichever workspace it named.
+ * it writes is a top-level row in whichever workspace was named.
  *
- * It arrives `proposed`, which is the whole of why this is safe to do on an
- * instruction. A proposal is not work: it is not sent to a session, it does not
- * count against the plan, and approving it is the person's move on the page.
- * Nothing here sets a status, an assignee or a priority for the same reason.
+ * On a raise, the workspace the raise is filed under is the fallback when the
+ * instruction named none. `carryOut` is handed the raise's id and nothing
+ * else, so this is a read rather than a field -- worth it, because a raise
+ * about the Dev pages whose step lands under "the app as a whole" is a step
+ * nobody finds. A module the action named wins: the comment is more specific
+ * than the row it was written on.
  */
-async function addStep(input: ActInput): Promise<ActOutcome> {
+type PlannedRow = {
+  title: string;
+  detail: string | null;
+  scope: ModuleId | null;
+  parentId: string | null;
+  position: number;
+};
+
+async function plannedRow(input: ActInput): Promise<{ ok: true; row: PlannedRow } | { ok: false; why: string }> {
   const title = input.action.text?.trim();
   if (!title) {
     return { ok: false, why: 'I could not tell what to call it, so no step was added.' };
@@ -304,27 +331,63 @@ async function addStep(input: ActInput): Promise<ActOutcome> {
     if (!data) return { ok: false, why: 'That step is not there any more, so nothing was added.' };
     const parent = (data as { module: string | null }).module;
     scope = parent && isModuleId(parent) ? parent : null;
+  } else if (!scope && input.target === 'raise') {
+    scope = await raiseModule(input);
   }
 
   const position = await nextPlanPosition(input.supabase, input.userId, scope, parentId);
+  return { ok: true, row: { title, detail, scope, parentId, position } };
+}
+
+/** The workspace a raise is filed under, when it is one this app has. */
+async function raiseModule(input: ActInput): Promise<ModuleId | null> {
+  const { data } = await input.supabase
+    .from('raised_items')
+    .select('module')
+    .eq('id', input.id)
+    .maybeSingle();
+  const named = (data as { module: string | null } | null)?.module ?? null;
+  return named && isModuleId(named) ? named : null;
+}
+
+/** Where a new row landed, in the words the thread uses. */
+function placeOf(row: PlannedRow): string {
+  return row.parentId ? 'under this one' : `at the top of ${labelOf(row.scope)}`;
+}
+
+/** The row's name and its paragraph, as the thread shows them back. */
+function wordingOf(row: PlannedRow): string {
+  return row.detail ? `${row.title}\n\n${row.detail}` : row.title;
+}
+
+/**
+ * Add a plan row: a step under the one this comment is on, or a feature.
+ *
+ * It arrives `proposed`, which is the whole of why this is safe to do on an
+ * instruction. A proposal is not work: it is not sent to a session, it does not
+ * count against the plan, and approving it is the person's move on the page.
+ * Nothing here sets a status, an assignee or a priority for the same reason.
+ */
+async function addStep(input: ActInput): Promise<ActOutcome> {
+  const planned = await plannedRow(input);
+  if (!planned.ok) return planned;
+  const row = planned.row;
+
   const { error } = await input.supabase.from('plan_items').insert({
     user_id: input.userId,
-    module: scope,
-    parent_id: parentId,
-    title,
-    detail,
+    module: row.scope,
+    parent_id: row.parentId,
+    title: row.title,
+    detail: row.detail,
     status: 'proposed',
     kind: 'build',
-    position,
+    position: row.position,
   });
   if (error) return { ok: false, why: `I could not add that step: ${error.message}` };
 
-  const where = parentId ? 'under this one' : `at the top of ${labelOf(scope)}`;
   return {
     ok: true,
-    said:
-      `Added ${where}, as a proposal for you to approve:\n\n${title}` +
-      (detail ? `\n\n${detail}` : ''),
+    said: `Added ${placeOf(row)}, as a proposal for you to approve:\n\n${wordingOf(row)}`,
     redraw: '/dev/plan',
   };
 }
@@ -492,5 +555,76 @@ async function sendStep(input: ActInput): Promise<ActOutcome> {
   return {
     ok: true,
     said: `Sent #${sent.number} ${sent.title} to be built${withThem}. ${sent.detail}`,
+  };
+}
+
+/**
+ * Write a step and put a session on it, in the one press.
+ *
+ * This is "just do it", said on a raise that already describes the work. The
+ * other way round it -- add_step, then approve, then send -- is three moves
+ * across two pages for something that was already decided when the raise was
+ * answered, and #605 settled that the comment is the approval: the raise names
+ * the work and the person said to do it, so the row is written ready to be
+ * worked rather than as a proposal. Taking it back is setting the row to not
+ * started, on the plan page, which is a move of theirs like any other.
+ *
+ * Two halves, and they can end differently. The row is written first and it
+ * stays written: the hand-over refuses a feature already being worked and a
+ * re-shape rewriting it, and both of those are about timing rather than about
+ * the step, so the step waits on the plan for a press instead of being rolled
+ * back. Which of the two happened is the sentence, with the number either way
+ * -- a thread saying a session is on it when nothing is would be worse than
+ * one saying nothing at all.
+ */
+async function buildStep(input: ActInput): Promise<ActOutcome> {
+  const planned = await plannedRow(input);
+  if (!planned.ok) return planned;
+  const row = planned.row;
+
+  // `not_started` rather than `proposed`, because `handStepToClaude` refuses a
+  // proposal -- rightly, since approving one is the person's move -- and a row
+  // written proposed here would be refused by the very next line of its own
+  // action. `assignee` is left alone: the hand-over sets it, so who is on the
+  // step is written in one place and only when a session really is.
+  const { data, error } = await input.supabase
+    .from('plan_items')
+    .insert({
+      user_id: input.userId,
+      module: row.scope,
+      parent_id: row.parentId,
+      title: row.title,
+      detail: row.detail,
+      status: 'not_started',
+      kind: 'build',
+      position: row.position,
+    })
+    .select('id, number')
+    .maybeSingle();
+  if (error) return { ok: false, why: `I could not add that step: ${error.message}` };
+
+  const written = data as { id: string; number: number } | null;
+  if (!written) return { ok: false, why: 'I could not add that step, so nothing was started.' };
+
+  const opening = `Added #${written.number} ${placeOf(row)}`;
+  const sent = await handStepToClaude({
+    supabase: input.supabase,
+    userId: input.userId,
+    id: written.id,
+  });
+  if (!sent.ok) {
+    return {
+      ok: true,
+      said:
+        `${opening}, but I did not start it: ${sent.error} It is on the plan, not started, to ` +
+        `send when that clears.\n\n${wordingOf(row)}`,
+      redraw: '/dev/plan',
+    };
+  }
+
+  return {
+    ok: true,
+    said: `${opening} and sent it to be built. ${sent.detail}\n\n${wordingOf(row)}`,
+    redraw: '/dev/plan',
   };
 }
