@@ -154,7 +154,8 @@ const INSTRUCTION_RULE =
   'queue in front of you, and what a comment asks for is nearly always something your skills ' +
   'already cover -- adding or re-shaping steps under a feature, writing something up as a bug ' +
   'note or an idea, rewording a row (put the old wording in the thread with the new), handing a ' +
-  'step over to be built. Use them. Six moves are theirs and stay theirs however it was ' +
+  'step over to be built, writing a step for work they have told you to do and starting it. ' +
+  'Use them. Six moves are theirs and stay theirs however it was ' +
   'phrased: approving a proposal, answering a question put to them, answering or dismissing a ' +
   'raise, setting a status, assigning a step, and deleting anything. Asked for one of those, ' +
   'change nothing and say in the thread that it is theirs and where on the page it is made. If ' +

@@ -105,8 +105,13 @@ export function consequenceSaid(action: DashAction, module: ModuleId | null): st
       return `Adds this to the plan as a proposal, about ${where}: ${text}`;
     case 'send_step':
       return `Hands ${text} to a session to be built.`;
+    case 'build_step':
+      return `Writes this on the plan, about ${where}, and hands it to a session to build now: ${text}`;
+    // A consequence is only ever run on a raise, and a raise has no wording of
+    // its own to rewrite: `reword` there writes a plan row instead (#604), so
+    // that is what a yes does and what this has to say.
     case 'reword':
-      return `Rewrites ${action.field?.trim() || 'the wording'}: ${text}`;
+      return `Adds this to the plan as a proposal, about ${where}: ${text}`;
     default:
       return text ? `${action.name}: ${text}` : action.name;
   }
