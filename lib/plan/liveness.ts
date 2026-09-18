@@ -441,3 +441,128 @@ export function runEndedNote(evidence: RunEvidence, now: number): string {
   }
   return `Nothing has been pushed for ${silence}. The last was ${evidence.lastPush.ref}.`;
 }
+
+/* -------------------------------------------------------------------------
+ * Sending a step again while its run is quiet
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Enough of a run to say what it last did.
+ *
+ * `LastRun` satisfies it, which is what the guard, the page and the menu all
+ * hand over. Narrower than `ClaimRun` because saying what a run pushed does
+ * not depend on whether it is still counted as going -- `claimLiveness` has
+ * already settled that by the time anything here is asked.
+ */
+export type QuietRun = Pick<ClaimRun, 'createdAt' | 'reading'>;
+
+/** A commit named short, the length everything else on this page names one. */
+const SHORT_SHA = 7;
+
+/**
+ * What a quiet run last did, in a sentence.
+ *
+ * Two facts, because they are the two somebody deciding whether to send the
+ * step again actually has: how long the silence has run, and what the last
+ * push was. A run that never pushed at all gets the silence counted from the
+ * press instead, which is the same rule `silentFor` reads the mark off -- so
+ * the sentence and the word above it cannot disagree about how long it has
+ * been.
+ *
+ * The subject when there is one, the short sha when the push was recorded
+ * without it, and nothing when neither was: a sentence trailing off into an
+ * empty pair of quotes says less than one that stops.
+ */
+export function quietRunNote(run: QuietRun, now: number): string {
+  const push = run.reading?.lastPush ?? null;
+  if (!push) {
+    return `Nothing has been pushed in the ${elapsedSince(run.createdAt, now)} since it started.`;
+  }
+
+  const silence = `Nothing has been pushed for ${elapsedSince(push.at, now)}.`;
+  if (push.subject) return `${silence} The last was "${push.subject}".`;
+  if (push.sha) return `${silence} The last was ${push.sha.slice(0, SHORT_SHA)}.`;
+  return silence;
+}
+
+/**
+ * The question put before a step whose run has gone quiet is sent again. #574.
+ *
+ * You chose to be asked rather than refused, so this is the asking, and it
+ * carries the evidence rather than only the verdict: the twenty-minute mark is
+ * known to read wrong on a session that is reading files or waiting on a
+ * build, and "its run is quiet" on its own gives you nothing to tell those two
+ * cases apart.
+ */
+export function quietSendAsk(number: number, run: QuietRun, now: number): string {
+  return (
+    `#${number} is underway and its run has gone quiet. ${quietRunNote(run, now)} ` +
+    'Hand it to a fresh session?'
+  );
+}
+
+/**
+ * The reason written on the run a confirmed send replaced.
+ *
+ * Without it the row goes on saying `started` until the two hours are up, so
+ * the page would draw a fresh session's claim over a run still reading as
+ * going and `claimLiveness` would read the older of the two. It says what was
+ * last seen of the run as well as that it was replaced, because that is the
+ * record of what the run managed before somebody gave up on it.
+ */
+export function runReplacedNote(run: QuietRun, now: number): string {
+  return `The step was handed to a fresh session while this run was quiet. ${quietRunNote(run, now)}`;
+}
+
+/**
+ * What pressing Send on a step does, given what its claim reads as.
+ *
+ * The whole of #574's answer, in one place, because the guard in
+ * `handover.ts`, the button on the plan page and the item in the row menu all
+ * have to agree about which press gets asked about: a page that arms a
+ * confirmation the guard then refuses outright, or sends without asking what
+ * the guard would have asked about, is worse than either rule on its own.
+ *
+ *  - Nothing claiming it, or a claim whose run has stopped, goes straight
+ *    through -- which is what happens today.
+ *  - A quiet run is asked about, and the same press carrying `confirmed` goes
+ *    through.
+ *  - Anything else is refused, and that is the refusal the button has always
+ *    given.
+ *
+ * A quiet reading with no run to describe cannot happen -- `claimLiveness`
+ * only answers `quiet` off a run's stored reading -- but it is refused rather
+ * than sent if it ever does, because an ask with no evidence in it is just a
+ * press with an extra step in front of it.
+ */
+export type SendOverClaim =
+  | { send: true }
+  | {
+      send: false;
+      /** What to say, whether it is a question or a refusal. */
+      ask: string;
+      /** Whether pressing again with `confirmed` would go through. */
+      confirmable: boolean;
+    };
+
+export function sendOverClaim(input: {
+  number: number;
+  liveness: ClaimLiveness | null;
+  run: QuietRun | null | undefined;
+  now: number;
+  confirmed: boolean;
+}): SendOverClaim {
+  const { liveness, run } = input;
+  if (!claimIsLive(liveness)) return { send: true };
+
+  if (liveness === 'quiet' && run) {
+    if (input.confirmed) return { send: true };
+    return { send: false, ask: quietSendAsk(input.number, run, input.now), confirmable: true };
+  }
+
+  return {
+    send: false,
+    ask: `#${input.number} is already underway. Put it back to not started first if the session that had it is gone.`,
+    confirmable: false,
+  };
+}

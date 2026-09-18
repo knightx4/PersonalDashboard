@@ -108,7 +108,7 @@ import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-
 import { reshapeOrigin } from '@/lib/plan/origin';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { elapsedSince } from '@/lib/plan/elapsed';
-import type { ClaimLiveness } from '@/lib/plan/liveness';
+import { quietSendAsk, type ClaimLiveness } from '@/lib/plan/liveness';
 import {
   isResolvingAnswers,
   lastRunLine,
@@ -1500,6 +1500,8 @@ function SendToClaude({
   reshapeAction,
   reshapePending,
   quiet,
+  quietAsk,
+  onAskQuiet,
   resolving,
 }: {
   node: PlanNode;
@@ -1515,6 +1517,13 @@ function SendToClaude({
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
+  /**
+   * The run behind this step has gone quiet, so Send asks before it hands the
+   * step over. Null when there is nothing to ask, which is most rows.
+   */
+  quietAsk: string | null;
+  /** Put that question on the row. The row owns it, not this button. */
+  onAskQuiet: () => void;
   /**
    * A re-shape is re-reading this feature right now.
    *
@@ -1538,20 +1547,37 @@ function SendToClaude({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <form action={action}>
-        <input type="hidden" name="id" value={node.id} />
+      {quietAsk ? (
+        // Nothing is submitted from here while the run is quiet. The press
+        // raises the question on the row, and answering it is what sends --
+        // one question in one place, however Send was reached.
         <Button
-          type="submit"
+          type="button"
           size="sm"
           variant="secondary"
-          pending={pending}
           disabled={resolving}
-          title={held}
+          title={held ?? quietAsk}
+          onClick={onAskQuiet}
         >
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Sending…' : sendLabel(node)}
+          {sendLabel(node)}
         </Button>
-      </form>
+      ) : (
+        <form action={action}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            pending={pending}
+            disabled={resolving}
+            title={held}
+          >
+            <Play className="size-3.5" aria-hidden />
+            {pending ? 'Sending…' : sendLabel(node)}
+          </Button>
+        </form>
+      )}
       {beneath > 0 && (
         <form action={batchAction}>
           <input type="hidden" name="id" value={node.id} />
@@ -2345,6 +2371,12 @@ function PlanRow({
   const [editing, setEditing] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const [answering, setAnswering] = useState(false);
+  // Send has been pressed on a step whose run went quiet, and the question is
+  // on the page waiting to be answered. Held by the row rather than by a
+  // button because there are three ways to press Send here -- the quick icon,
+  // the button on the opened row and the row menu -- and one question in one
+  // place is better than the same question drawn three times.
+  const [confirmingSend, setConfirmingSend] = useState(false);
   // Every feature starts folded.
   //
   // It used to be only the closed ones, on the grounds that finished work is
@@ -2434,6 +2466,14 @@ function PlanRow({
   // a feature the batch itself never claims, and that row is where somebody
   // looks for what the batch has done.
   const accountForRun = run !== undefined && (node.status === 'in_progress' || run.status === 'started');
+  // The question Send has to put first, or null when it has nothing to ask.
+  //
+  // A quiet run may still be working -- the twenty-minute mark reads wrong on
+  // a session that is reading files or waiting on a build -- so #574 settled
+  // that the press is taken with the evidence in front of you. Null before
+  // mount, since `runNow` is 0 there and no claim reads quiet at that instant,
+  // which is what keeps the server render and the first client one agreeing.
+  const quietAsk = claim === 'quiet' && run ? quietSendAsk(node.number, run, runNow) : null;
   const resolving = useResolving(lastRuns, runNow);
   // What a "#494" written in a comment on this page is called. The catalog is
   // already every step's number and title, so no page needs to hand it over.
@@ -2542,8 +2582,15 @@ function PlanRow({
             // Shut for the same reason the button beside it is: the menu is
             // the phone's copy of that button, not a way round it.
             disabled: beingResolved,
+            // A quiet run is asked about here with the menu's own confirm,
+            // which arms on the first press and does it on the second -- the
+            // same shape the question on the row takes, so the two doors ask
+            // the same thing. The flag rides on the item, because the menu
+            // sends the fields it is given and the guard refuses the press
+            // without it anyway.
+            ...(quietAsk ? { confirm: quietAsk } : {}),
             formAction: (formData: FormData) => sendPlanItemToClaude({}, formData),
-            formFields: { id: node.id },
+            formFields: quietAsk ? { id: node.id, confirm: 'quiet' } : { id: node.id },
           },
         ]),
     // The return trip, beside the two hand-overs. Only on a feature: a leaf
@@ -2896,14 +2943,24 @@ function PlanRow({
             are in the menu, which is how a phone reaches them. */}
         <div className="flex items-center justify-self-end">
           <div className="hidden items-center opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
-            {!closed && (
-              <form action={sendAction}>
-                <input type="hidden" name="id" value={node.id} />
-                <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
+            {!closed &&
+              (quietAsk ? (
+                // Nothing is sent from here while the run is quiet: the press
+                // puts the question on the row instead, and the answer to it
+                // is what sends. The icon has no room for a question of its
+                // own, and a confirmation that appeared under the pointer and
+                // vanished with it would be no confirmation at all.
+                <RowIconButton label={sendLabel(node)} onClick={() => setConfirmingSend(true)}>
                   <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                 </RowIconButton>
-              </form>
-            )}
+              ) : (
+                <form action={sendAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  <RowIconButton type="submit" label={sendLabel(node)} pending={sendPending}>
+                    <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  </RowIconButton>
+                </form>
+              ))}
             <form action={assignAction}>
               <input type="hidden" name="id" value={node.id} />
               <input type="hidden" name="assignee" value={handOver ? 'claude' : ''} />
@@ -2924,6 +2981,38 @@ function PlanRow({
           <ActionMenu label={`Actions for #${node.number}`} items={menu} />
         </div>
       </li>
+
+      {/* The question a quiet run puts in front of Send, wherever the press
+          came from. It sits where the result of that press will sit, so the
+          answer and what came back of it read as one exchange in one place.
+          Gone once something has come back, since the question has been
+          answered by then and the answer is what there is to read. */}
+      {confirmingSend && quietAsk && !sendState.error && !sendState.message && (
+        <li style={inset} className="pb-1.5 pr-3 text-small">
+          <p className="text-ink-muted">{quietAsk}</p>
+          <div className="mt-1 flex items-center gap-2">
+            {/* Cancel first and plain, because doing nothing is the safe half
+                of this and the press that sends should be the deliberate one. */}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmingSend(false)}
+            >
+              Cancel
+            </Button>
+            <form action={sendAction}>
+              <input type="hidden" name="id" value={node.id} />
+              {/* The answer, and the only thing that carries it. The guard
+                  refuses the press without it. */}
+              <input type="hidden" name="confirm" value="quiet" />
+              <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+                {sendPending ? 'Sending…' : 'Send it anyway'}
+              </Button>
+            </form>
+          </div>
+        </li>
+      )}
 
       {/* What the last action did, wherever it was started from. */}
       {(assignState.error ??
@@ -3156,6 +3245,8 @@ function PlanRow({
                   reshapeAction={reshapeAction}
                   reshapePending={reshapePending}
                   resolving={beingResolved}
+                  quietAsk={quietAsk}
+                  onAskQuiet={() => setConfirmingSend(true)}
                   quiet={
                     !sendState.error &&
                     !sendState.message &&

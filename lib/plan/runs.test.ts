@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_FEATURE_ROUTINE_ID } from '@/lib/feedback/routine';
 import {
   endQuietRuns,
+  endRunsOnStep,
   readRunLiveness,
   refreshRunReadings,
   runRowFor,
@@ -90,7 +91,9 @@ describe('startRoutineRun', () => {
 
   it('fires the routine and writes the run down', async () => {
     const { insert, supabase } = db();
-    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ run_id: 'run_9' }), { status: 200 }));
+    const fetchFn = vi.fn(
+      async () => new Response(JSON.stringify({ run_id: 'run_9' }), { status: 200 }),
+    );
 
     const result = await startRoutineRun({
       supabase: supabase as never,
@@ -390,7 +393,7 @@ describe('refreshRunReadings', () => {
     runs: Array<{ id: string; plan_item_id: string; created_at: string }>,
   ) {
     const writes: Array<{ values: Record<string, unknown>; ids: string[] }> = [];
-    const answered = <T,>(data: T) => Promise.resolve({ data, error: null });
+    const answered = <T>(data: T) => Promise.resolve({ data, error: null });
 
     const supabase = {
       from(table: string) {
@@ -428,10 +431,7 @@ describe('refreshRunReadings', () => {
   }
 
   /** GitHub answering the activity listing, and the message behind a commit. */
-  function github(
-    activity: Array<{ ref: string; minutes: number }>,
-    subject?: string,
-  ) {
+  function github(activity: Array<{ ref: string; minutes: number }>, subject?: string) {
     return vi.fn(async (url: string) => {
       if (String(url).includes('/activity')) {
         return new Response(
@@ -466,7 +466,10 @@ describe('refreshRunReadings', () => {
       supabase: supabase as never,
       userId: 'user-1',
       now: NOW,
-      fetch: github([{ ref: 'claude/one', minutes: 6 }], 'Read a step wanting an answer (plan #1)') as never,
+      fetch: github(
+        [{ ref: 'claude/one', minutes: 6 }],
+        'Read a step wanting an answer (plan #1)',
+      ) as never,
     });
 
     expect(result.error).toBeNull();
@@ -586,5 +589,81 @@ describe('refreshRunReadings', () => {
     expect(result).toEqual({ readings: {}, written: 0, error: null });
     expect(writes).toEqual([]);
     vi.unstubAllEnvs();
+  });
+});
+
+/**
+ * A client that records the update it was handed and the filters on it.
+ *
+ * `endRunsOnStep` is one write with three filters, and the filters are the
+ * whole of its correctness -- a missing one would write off another step's run
+ * or another person's.
+ */
+type UpdateChain = Promise<{ error: { message: string } | null }> & {
+  eq(column: string, value: string): UpdateChain;
+};
+
+function updateDb(error: { message: string } | null = null) {
+  const calls: Array<{
+    table: string;
+    values: Record<string, unknown>;
+    filters: Record<string, string>;
+  }> = [];
+
+  const supabase = {
+    from: (table: string) => ({
+      update: (values: Record<string, unknown>) => {
+        const filters: Record<string, string> = {};
+        calls.push({ table, values, filters });
+        const chain = Promise.resolve({ error }) as UpdateChain;
+        chain.eq = (column: string, value: string) => {
+          filters[column] = value;
+          return chain;
+        };
+        return chain;
+      },
+    }),
+  };
+
+  return { supabase, calls };
+}
+
+describe('endRunsOnStep', () => {
+  it('writes off every run still going against that one step, with the reason', async () => {
+    const { supabase, calls } = updateDb();
+
+    await endRunsOnStep({
+      supabase: supabase as never,
+      userId: 'user-1',
+      stepId: 'step-1',
+      note: 'The step was handed to a fresh session while this run was quiet.',
+    });
+
+    expect(calls).toEqual([
+      {
+        table: 'plan_runs',
+        values: {
+          status: 'failed',
+          error: 'The step was handed to a fresh session while this run was quiet.',
+        },
+        filters: { user_id: 'user-1', plan_item_id: 'step-1', status: 'started' },
+      },
+    ]);
+  });
+
+  it('logs a write it could not make rather than failing the send behind it', async () => {
+    const { supabase } = updateDb({ message: 'update refused' });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      endRunsOnStep({
+        supabase: supabase as never,
+        userId: 'user-1',
+        stepId: 'step-1',
+        note: 'Replaced.',
+      }),
+    ).resolves.toBeUndefined();
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 });
