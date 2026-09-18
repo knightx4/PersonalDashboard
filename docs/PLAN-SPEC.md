@@ -28,7 +28,7 @@ not read at runtime and are not kept in sync: the app is the working copy,
 and the two are expected to drift. Migration 0052 made the flat list a tree
 and gave a step the rest of what is described here. Migration 0054 added
 `kind`, `fog` and `resolution`, borrowed from the wayfinder planning skill —
-see *Decisions and fog*.
+see *Decisions, setup and fog*. Migration 0084 added the third kind.
 
 ## The model
 
@@ -45,7 +45,7 @@ beside them.
 | `title`, `detail` | What it is, and what it involves. |
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
 | `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step was written by a session from an idea and is waiting on the person; see *Proposals* below. |
-| `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on an answer. See *Decisions and fog* below. |
+| `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on an answer; a setup step is a job of the person's outside the repo and closes when they say they have done it, with no commit. See *Decisions, setup and fog* below. |
 | `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
 | `dismissed_at`, `fog_dismissed_at` | Put aside as not right now — the row, and the patch of fog on it, separately. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
 | `resolution` | The answer a decision closed with, in the person's words. Null on a build step and on a decision nobody has settled. |
@@ -184,7 +184,8 @@ belonging to another account. Deleting either step deletes the row.
 Waiting on another step is a relation rather than a status because it
 clears itself: the moment the other step is done, this one is ready, and
 nobody has to remember to come back and unblock it. `blocked` is for waiting
-on the outside world — an answer, an API key, a decision.
+on the person — an answer, a decision. An API key or an account is a setup
+step and therefore a dependency like any other; see *Setup steps*.
 
 Rows given both — blocked, and with dependencies naming what they wait for —
 record which they mean in `plan_items.block_kind`, settled by #525 and added
@@ -253,7 +254,7 @@ bottom of the page, out of every count above it and out of `plan.ts ideas`,
 which is what stops the next session offering it again. Bring back returns it
 to the list. Delete is still there for a row that should not exist at all.
 
-## Decisions and fog
+## Decisions, setup and fog
 
 ### When a re-shape starts
 
@@ -361,6 +362,45 @@ without being told again, and never asks the same question twice.
 **Out of scope** was considered as a sixth status and left out. It is
 `drop <n> --note "out of scope: …"`, which reads the same and costs no
 column.
+
+### Setup steps
+
+The third kind, added by migration 0084. A setup step is something only the
+person can supply — an API key, an account, a value in somebody else's
+dashboard — held as a row of theirs on the plan rather than as a sentence in
+the ask of the step that ran into it. It closes when they say they have done
+it, on `/dev/plan` or in the Dash tab's *Waiting on you*, and carries no
+commit.
+
+What it replaces: a session marked the step it was on `blocked`, wrote the
+request for the key into that row's ask, and the request then lived inside work
+the person was never going to open. Setting the key afterwards moved nothing,
+because a block on something outside the plan waits for somebody to clear it by
+hand.
+
+`scripts/plan.ts needs "<what to set>" --for <n>` writes both halves: the row,
+and the `plan_dependencies` edge from the stopped step to it. #599 settled
+where the row goes — under the parent of the step that is stopped, so it sits
+beside the work it is holding up, and two features needing the same key get a
+row each rather than sharing one somewhere else in the tree. A step that was
+`blocked` goes back to `not_started` with its ask cleared, since the edge now
+says what it waits for and a step saying it twice would need clearing twice.
+Closing the setup step frees the work on its own, because `isReady` already
+frees a step once everything it waits on is done. The title is the one-line
+summary and the detail is the instructions; the plan row and the Dash tab draw
+them in those two roles.
+
+No routine can pick one up. `healthOf` reads an open setup step as a health of
+its own, `isWaitingOnThePerson` covers it along with a live block and an open
+decision, and `workOrder` filters those out of `--claude`. `needs` refuses a
+step that is closed and refuses a setup step waiting on a setup step, which
+would say a job of theirs is stopping another job of theirs. The rules with no
+database in them are `lib/plan/needs.ts`, tested in `lib/plan/needs.test.ts`.
+
+**What stays a block.** Something the person has to decide or supply that is
+not an errand with a done state. The line between them is whether the
+instructions can be written: a setup step is a job that can be finished, a
+block is a question waiting on an answer.
 
 ## Not right now
 
@@ -723,15 +763,16 @@ show <n>            the brief
 ideas               ideas not yet shaped into the plan, dismissals left out
 idea "…" [--module <id>] [--from <n>]   a follow-on, filed as a suggestion
 add "…" --parent <n> [--done-when "…"] [--size s|m|l] [--claude] [--proposed] [--idea <id>]
-                    [--fog "…"] [--kind decision]
+                    [--fog "…"] [--kind decision|setup]
+needs "…" --for <n> [--detail "…"]   a setup job of the person's, and the edge to it
 approve <n>         a person's move: the step and the proposed steps beneath it
 answer <n> --note   a person's move: closes a decision on its answer, no commit
 start | done | block | drop | reopen | assign | priority | depends | undepend
 ```
 
 `done` records the HEAD commit and names the steps that became ready;
-`answer` does the same without a commit. `start` refuses a proposal and
-refuses a decision. `next` and `list` mark a decision `(?)` rather than with
+`answer` does the same without a commit. `start` refuses a proposal, and
+refuses a decision or a setup step, naming where each is closed instead. `next` and `list` mark a decision `(?)` rather than with
 a checkbox, and print a step's fog beneath it.
 
 **The brief.** `lib/plan/brief.ts` writes a step out for whoever is about

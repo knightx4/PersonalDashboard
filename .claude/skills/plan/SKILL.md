@@ -32,6 +32,10 @@ npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
                                                # saying what it needs, rewritten each time.
                                                # --on-steps: it clears itself when the steps it
                                                # names close; without it, it waits for you
+npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
+                                               # something only the person can supply — a key,
+                                               # an account. Writes a setup step of theirs under
+                                               # the same feature and makes <n> wait on it
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--from <n>]  # stamp: whose answer made this
@@ -75,6 +79,11 @@ If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
   decision** — not by running `answer`, not by writing the resolution into the
   row, and not by building as though it had been settled. A routine that can
   answer its own questions has no questions, only guesses with a paper trail.
+- A **setup step** is never yours either. It is something only the person can
+  supply — a key, an account, a value set somewhere a session cannot reach —
+  and it closes when they say they have done it, on the page or in the Dash
+  tab. `next --claude` does not list one and `start` refuses one. Writing one
+  is `needs "…" --for <the step that stopped>`, per `reference/building.md`.
 - A **dismissed** row is nobody's. The person has put it aside as not right
   now, and it is hidden from the page, from `next`, from `list` and from every
   brief. You will not normally see one; if you do, leave it exactly as it is.
@@ -190,7 +199,7 @@ Beside the status, two columns say what a step is rather than where it stands.
 
 | | Meaning |
 |---|---|
-| `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`. It is a kind and not a status because a decision moves through the same states — it can be not started, blocked, dropped — and differs only in what closing it means. |
+| `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`; a setup step closes when the person says they have done the thing outside the repo, and carries no commit. It is a kind and not a status because all three move through the same states — not started, blocked, dropped — and differ only in what closing them means. |
 | `dismissed_at`, `fog_dismissed_at` | Put aside by the person as not right now — the row itself, and the patch of fog on it. Hidden everywhere but the Dismissed view. Never written by a session. See `reference/dismissed.md`. |
 | `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. `reference/reshaping.md` is what does that clearing. |
 
