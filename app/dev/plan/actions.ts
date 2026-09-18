@@ -19,6 +19,7 @@ import {
   PLAN_ASSIGNEES,
   PLAN_KINDS,
   PLAN_PRIORITIES,
+  PLAN_PRIORITY_LABEL,
   PLAN_SIZES,
   PLAN_STATUSES,
   blockPatch,
@@ -651,6 +652,41 @@ export async function setPlanItemAssignee(
     message:
       (ids.length === 1 ? 'Handed to Dash.' : `Handed ${ids.length} steps to Dash.`) + left,
   };
+}
+
+/**
+ * Priority, set from the row.
+ *
+ * Note 3bfb2749: the word was a label you had to open the step and go through
+ * the edit form to change, which is three presses and a form for one of three
+ * values. The status beside it has been a word you click since the row was
+ * built, and this is the same move -- see the menu on the health.
+ *
+ * The one row, and nothing beneath it. A hand-over carries down because the
+ * steps under a feature are worked by whoever holds it; how soon you want a
+ * thing is decided per row, and a feature marked Next does not make every step
+ * under it Next.
+ */
+export async function setPlanItemPriority(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  const priority = priorityField.safeParse(field(formData, 'priority'));
+  if (!id.success || !priority.success) return { error: 'Missing step or priority.' };
+
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ priority: priority.data })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: `Set to ${PLAN_PRIORITY_LABEL[priority.data]}.` };
 }
 
 /**

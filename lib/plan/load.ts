@@ -119,6 +119,13 @@ export function isPlanPriority(value: number): value is PlanPriority {
   return (PLAN_PRIORITIES as readonly number[]).includes(value);
 }
 
+/** What each of the three is called, wherever one is shown or set. */
+export const PLAN_PRIORITY_LABEL: Record<PlanPriority, string> = {
+  1: 'Next',
+  2: 'Normal',
+  3: 'Someday',
+};
+
 /** Coarse on purpose: the question is "one sitting or not", not hours. */
 export const PLAN_SIZES = ['s', 'm', 'l'] as const;
 export type PlanSize = (typeof PLAN_SIZES)[number];
