@@ -401,6 +401,16 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.fx_rates = fxRate.id;
 
+  // Not anybody's row: whether main is green is a fact about the repository,
+  // so there is one reading per repository and every signed-in user reads the
+  // same one. Tagged per seed because `repo` is the primary key and the two
+  // calls would otherwise collide on it.
+  const [mainCheck] = await admin<{ repo: string }[]>`
+    insert into plan_main_checks (repo, head_sha, conclusion)
+    values (${`${tag}/PersonalDashboard`}, ${`${tag}-head-sha`}, 'passed')
+    returning repo`;
+  ids.plan_main_checks = mainCheck.repo;
+
   return ids;
 }
 
@@ -455,11 +465,17 @@ describe('RLS coverage', () => {
 });
 
 describe('cross-user reads', () => {
-  /** Shared market-data tables: every authenticated user may read every row. */
+  /**
+   * Tables holding no user's rows: every authenticated user may read every
+   * row. The first three are cached market data. `plan_main_checks` is the
+   * same shape for a different reason -- the status line draws what CI said
+   * about main, and that is one fact about one branch, not a fact per account.
+   */
   const SHARED_REFERENCE_TABLES = new Set([
     'fx_rates',
     'book_price_quotes',
     'game_price_quotes',
+    'plan_main_checks',
   ]);
 
   /**
@@ -521,6 +537,25 @@ describe('cross-user reads', () => {
       tx<{ id: string }[]>`select id from game_price_quotes where id = ${seedA.game_price_quotes}`,
     );
     expect(rows).toHaveLength(1);
+  });
+
+  it("lets every authenticated user read what CI said about main", async () => {
+    const rows = await asUser(userB, (tx) =>
+      tx<{ repo: string }[]>`
+        select repo from plan_main_checks where repo = ${seedA.plan_main_checks}`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets no authenticated user write what CI said about main', async () => {
+    // The status line draws this row on every page. A browser that could write
+    // it could paint main green while it is red, for the one reader who most
+    // needs to know otherwise.
+    await expect(
+      asUser(userB, (tx) =>
+        tx`update plan_main_checks set conclusion = 'passed' where repo = ${seedA.plan_main_checks}`,
+      ),
+    ).rejects.toThrow();
   });
 });
 
