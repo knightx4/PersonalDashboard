@@ -25,6 +25,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ask, readToken, REPO, REPO_KEY, refusalFor } from './github';
 import { pushesFrom, type ActivityRow, type Push } from './liveness';
 import {
   carriedBy,
@@ -40,13 +41,13 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
 
-const API = 'https://api.github.com';
-
-/** The repository the plan is built in. The app is the thing being checked. */
-export const REPO = { owner: 'knightx4', repo: 'PersonalDashboard', branch: 'main' };
-
-/** How `plan_main_checks` names that repository: its primary key. */
-export const REPO_KEY = `${REPO.owner}/${REPO.repo}`;
+/**
+ * The repository, the token, the headers and what a refusal means all moved to
+ * `github.ts`, so that `scripts/plan.ts` could ask GitHub whether a commit is
+ * on main without importing this `server-only` file. Re-exported here because
+ * the app imports them from this module.
+ */
+export { REPO, REPO_KEY, refusalFor };
 
 /** Commits per listing request, which is the most GitHub allows. */
 const PAGE_SIZE = 100;
@@ -61,71 +62,6 @@ const MERGE_BUDGET = 25;
 const LANES = 5;
 
 type CommitRow = { sha: string; parents?: Array<{ sha?: string }> };
-
-/** The token that may read this repository's checks. Set in Vercel. */
-function readToken(): string | null {
-  return process.env.GITHUB_READ_TOKEN?.trim() || null;
-}
-
-/**
- * Which permission each endpoint here is refused for want of.
- *
- * A fine-grained token grants these separately, so a token that reads the
- * repository fine can still be refused the workflow runs -- which is exactly
- * the shape this failed in.
- *
- * Only the two this file is sure of are named. The activity listing falls
- * through to the unnamed form on purpose: sending someone to tick the wrong
- * box is worse than telling them a box is missing.
- */
-const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
-  ['/actions/runs', 'Actions: Read'],
-  ['/commits', 'Contents: Read'],
-];
-
-/**
- * What a refusal from GitHub means, said to the person who can fix it.
- *
- * This came back as a bug report reading "Could not read CI: GitHub answered
- * 403 for /repos/…/check-runs?per_page=100", with "I dont even know what this
- * means" under it -- which is fair, because the page was repeating HTTP at
- * somebody who never asked GitHub anything. Law 2 wants a source that failed
- * to say so in place; it does not want it said in status codes.
- *
- * A 403 or a 404 on these paths is neither a bug nor an outage. It is
- * GITHUB_READ_TOKEN missing one permission, or having expired, and both of
- * those are a sentence rather than a number. The status stays in the text
- * because it is the thing to search for if the sentence turns out wrong.
- */
-export function refusalFor(status: number, path: string): string {
-  if (status === 401) {
-    return `GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped. Set a new one in Vercel and redeploy.`;
-  }
-  if (status === 403 || status === 404) {
-    const permission = PERMISSION_FOR.find(([fragment]) => path.includes(fragment))?.[1];
-    const grant = permission
-      ? `Give it "${permission}" on ${REPO.owner}/${REPO.repo}`
-      : `Give it access to ${REPO.owner}/${REPO.repo}`;
-    return `GITHUB_READ_TOKEN is missing a permission (${status}). ${grant} in the token's settings, then redeploy.`;
-  }
-  return `GitHub answered ${status} for ${path}`;
-}
-
-async function ask<T>(path: string, token: string, doFetch: typeof globalThis.fetch): Promise<T> {
-  const res = await doFetch(`${API}${path}`, {
-    headers: {
-      accept: 'application/vnd.github+json',
-      authorization: `Bearer ${token}`,
-      'x-github-api-version': '2022-11-28',
-      'user-agent': 'personal-dashboard-plan',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    throw new Error(refusalFor(res.status, path));
-  }
-  return (await res.json()) as T;
-}
 
 /**
  * Main's commits, newest first, until every commit asked about has been seen.
