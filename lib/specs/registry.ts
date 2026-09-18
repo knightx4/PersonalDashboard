@@ -26,6 +26,13 @@ export type SpecDoc = {
 
 export const SPECS: readonly SpecDoc[] = [
   {
+    slug: 'writing',
+    title: 'Professional writing guide',
+    blurb:
+      'The standard every document here is written to: what to reward, what to penalize, and the four failure modes that produce AI slop.',
+    file: 'WRITING-GUIDE.md',
+  },
+  {
     slug: 'learn-map',
     title: 'The map',
     blurb:

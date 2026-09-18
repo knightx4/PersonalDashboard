@@ -24,6 +24,18 @@ rows, rewriting data that cannot be recovered.
 
 Project ref: `asjztutnqxbecruvyrbj`.
 
+## Write to the writing guide
+
+[docs/WRITING-GUIDE.md](docs/WRITING-GUIDE.md) is the standard for everything
+written here: specs and other documents, commit messages, plan detail and
+acceptance criteria, comments on the dev pages, and replies from Dash.
+
+It began as a rubric for spotting AI slop after the fact, and it is more useful
+applied while writing. Read it before writing a document, and re-read a draft
+against its four failure modes before committing one. The most common offenders
+in this repository have been slogans used as section summaries, em dashes
+manufacturing rhythm, and inflated contrast of the "not X, it's Y" form.
+
 ## Secrets are the exception
 
 A value only the person has — an API token, a deployment secret — cannot be
