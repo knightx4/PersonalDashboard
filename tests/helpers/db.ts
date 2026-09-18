@@ -68,6 +68,9 @@ export async function truncateAll(): Promise<void> {
   // seeding.
   await admin`delete from book_price_quotes`;
   await admin`delete from game_price_quotes`;
+  // Keyed by repository for the same reason: whether main is green is a fact
+  // about a branch, not about an account, so no user cascades it away.
+  await admin`delete from plan_main_checks`;
 }
 
 export async function closeDb(): Promise<void> {
