@@ -9,6 +9,7 @@ import {
   type ActionState,
 } from '@/app/shopping/inventory/actions';
 import { Button } from '@/components/ui/button';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { CardSection, cardVariants } from '@/components/ui/card';
 import { Field, FieldError, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -196,9 +197,11 @@ export function ItemListsForm({
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
-          <Button type="button" size="sm" variant="secondary" onClick={() => setCreating(true)}>
-            New list
-          </Button>
+          {/* A trigger for a compose surface, not a button competing with the
+              list above it (law 14): the form it opens is the point, and a
+              bordered control standing in for one is the empty box again
+              wearing a different shape. */}
+          <AddTrigger label="New list" onClick={() => setCreating(true)} />
           {createState.message && (
             <p className="text-body text-positive">{createState.message}</p>
           )}

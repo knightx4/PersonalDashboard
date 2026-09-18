@@ -3042,10 +3042,10 @@ function InterviewCard({
         {/* Prep and the debrief are one each -- they are fields on the round,
             not a list -- so each offers itself only while it is not already
             there. A custom note has no such limit. */}
-        {/* No caption over them. "Create note" above three buttons reading
-            "+ Prep", "+ Interview" and "+ Custom" is the heading explained
-            underneath itself (law 15) -- it is read once and skipped forever,
-            and the buttons already say what they make. */}
+        {/* No caption over them. "Create note" above three triggers reading
+            Prep, Interview and Custom is the heading explained underneath
+            itself (law 15) -- it is read once and skipped forever, and the
+            triggers already say what they make. */}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           {!showPrep && <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />}
           {!showDebrief && (
@@ -3125,16 +3125,19 @@ function InterviewCard({
 /**
  * One of the kinds of note a round can be given.
  *
- * A button, so it is drawn as one. It used to spell its own box -- a container
- * hairline around a control, at a height nothing else on the row shared -- and
- * three of them in a line read as three little cards rather than as a choice.
+ * `AddTrigger`, the same line that opens every other compose surface in this
+ * file -- "Add a to-do" on the to-dos panel, "Paste the questions" on the
+ * answers one. It was a bordered secondary button with a typed "+" in front of
+ * the label, and three of those in a row inside the interview card, inside the
+ * round card, read as three little boxes competing with the round itself.
+ *
+ * That is law 14 rather than a matter of taste: what these open is a compose
+ * surface, and a bordered button standing in for one is the empty box again
+ * wearing a different shape. The trigger is an offer, so it is drawn as an
+ * offer -- ink-ghost, no border, no ground until it is pointed at.
  */
 function NoteKindButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <Button type="button" variant="secondary" size="sm" onClick={onClick}>
-      + {label}
-    </Button>
-  );
+  return <AddTrigger label={label} onClick={onClick} />;
 }
 
 /** A labeled section that opens and closes, stacked rather than side by side. */
