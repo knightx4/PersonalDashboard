@@ -13,7 +13,11 @@
  *                                [--priority 1|2|3] [--size s|m|l] [--claude]
  *                                [--detail "…"] [--done-when "…"] [--fog "…"]
  *                                [--proposed] [--idea <id prefix>]
- *                                [--kind decision] [--from <n>]
+ *                                [--kind decision|setup] [--from <n>]
+ *   npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
+ *                                # something only the person can supply: one
+ *                                # setup job of theirs, under the feature that
+ *                                # ran into it, and #<n> waits on it
  *   npx tsx scripts/plan.ts ideas                       # ideas not yet shaped into the plan
  *   npx tsx scripts/plan.ts idea "<body>" [--module <id>] [--from <n>]
  *                                # file one follow-on, marked as your suggestion
@@ -61,6 +65,15 @@ import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas
 import { MODULES, isModuleId } from '../lib/modules';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import {
+  needsLines,
+  needsRefusal,
+  releasesBlock,
+  SETUP_ASSIGNEE,
+  SETUP_KIND,
+  setupHome,
+  setupStartRefusal,
+} from '../lib/plan/needs';
 import { reshapeStamp } from '../lib/plan/origin';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import { storedReading } from '../lib/plan/run-end';
@@ -738,8 +751,18 @@ async function main(): Promise<void> {
 
       // A decision is never assigned to Claude, whatever --claude said. The
       // whole guarantee is that a session cannot pick up its own question, and
-      // it is worth more enforced here than remembered at the call site.
-      const assignee = kind === 'decision' ? null : has('--claude') ? 'claude' : null;
+      // it is worth more enforced here than remembered at the call site. A
+      // setup job is the same guarantee from the other side: it is the
+      // person's by definition, so it is written as theirs rather than left
+      // unassigned for somebody to wonder about.
+      const assignee =
+        kind === 'decision'
+          ? null
+          : kind === SETUP_KIND
+            ? SETUP_ASSIGNEE
+            : has('--claude')
+              ? 'claude'
+              : null;
 
       // Where the row came from, when it did not come from a person. The gist
       // is read off the decision's own answer rather than retyped by whoever
@@ -781,10 +804,106 @@ async function main(): Promise<void> {
       }
 
       console.log(
-        `#${row.number} ${kind === 'decision' ? 'asked' : proposed ? 'proposed' : 'added'}${
+        `#${row.number} ${
+          kind === 'decision'
+            ? 'asked'
+            : kind === SETUP_KIND
+              ? 'for you to set up'
+              : proposed
+                ? 'proposed'
+                : 'added'
+        }${
           parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`
         }${ideaPrefix ? ` from idea ${ideaPrefix}` : ''}.`,
       );
+      return;
+    }
+
+    /**
+     * Something only the person can supply, written as a job of theirs.
+     *
+     * The move this replaces: mark the step you are on `blocked`, put the
+     * request for the key in its ask, and hope somebody reads it. That buries
+     * the ask inside work the person was never going to do, and setting the
+     * key afterwards moves nothing, because a block on something outside the
+     * plan waits for a person to clear it by hand.
+     *
+     * One command instead, doing both halves in one go: a setup step under
+     * the feature that ran into it -- decision #599, option A -- and the
+     * `plan_dependencies` row from the stopped work to it. After that the
+     * plan says the true thing in both directions: the person has a job with
+     * a summary and instructions, on /dev/plan and on the Dash tab, and the
+     * work reads as waiting on that job rather than as a session stuck.
+     * Closing the job is then the whole of freeing the work, since
+     * `isReady` already frees a step once everything it waits on is done.
+     *
+     * The title is the one-line summary and `--detail` is what to actually
+     * go and do: #598 draws them in exactly those two roles, so writing the
+     * instructions as the title leaves the box labelled "What to set up"
+     * saying nothing more than the heading above it.
+     */
+    if (command === 'needs') {
+      const title = target?.trim();
+      if (!title) {
+        fail(
+          'needs "<what to set>" --for <n> [--detail "…"]. The title is the one-line summary — ' +
+            '"Set GITHUB_TOKEN in Vercel" — and --detail is what to actually go and do.',
+        );
+      }
+      const forNumber = arg('--for');
+      if (!forNumber) {
+        fail(
+          'needs … --for <n>: say which step is waiting on this, so the edge gets written. A ' +
+            'setup job nothing waits on is a note, and the work goes on reading as stuck.',
+        );
+      }
+      const waiting = await byNumber(sql, userId, forNumber);
+      const refusal = needsRefusal(waiting);
+      if (refusal) fail(refusal);
+
+      // The whole plan rather than a query per question: it is tens of rows,
+      // and it answers the parent, the module and the last position at once.
+      const data = await loadData(sql, userId);
+      const parent = data.items.find((row) => row.id === waiting.parentId) ?? null;
+      const home = setupHome(waiting, parent);
+      const position =
+        data.items
+          .filter((row) => row.parentId === home.id)
+          .reduce((highest, row) => Math.max(highest, row.position), 0) + 10;
+
+      const detail = arg('--detail')?.trim() || null;
+      const [row] = await sql<{ id: string; number: number }[]>`
+        insert into plan_items (user_id, module, parent_id, title, detail, kind, priority,
+                                assignee, status, position)
+        values (${userId}, ${home.module}, ${home.id}, ${title}, ${detail}, ${SETUP_KIND}, 2,
+                ${SETUP_ASSIGNEE}, 'not_started', ${position})
+        returning id, number`;
+
+      await sql`
+        insert into plan_dependencies (user_id, item_id, depends_on_id)
+        values (${userId}, ${waiting.id}, ${row.id})
+        on conflict (item_id, depends_on_id) do nothing`;
+
+      // A step that was blocked on this very thing stops being blocked: the
+      // dependency now says what it is waiting for, and a step that says it
+      // twice would need clearing twice.
+      const released = releasesBlock(waiting.status);
+      if (released) {
+        await sql`
+          update plan_items set status = 'not_started', block_ask = null, block_kind = null
+          where id = ${waiting.id} and user_id = ${userId}`;
+      }
+
+      for (const line of needsLines({
+        setupNumber: row.number,
+        title,
+        parentNumber: home.number,
+        waitingNumber: waiting.number,
+        released,
+        hasDetail: detail !== null,
+      })) {
+        console.log(line);
+      }
       return;
     }
 
@@ -824,6 +943,14 @@ async function main(): Promise<void> {
             `person: on /dev/plan, or with plan.ts answer ${item.number} --note "…".`,
         );
       }
+      // And the same refusal for a setup job, for the same reason: the row
+      // is there because a session cannot do it. Claiming one would put a
+      // session in front of the wall the row was written to describe, and
+      // the honest end of that is the step blocked again with the ask it
+      // already had. Where it is closed is part of the refusal -- see
+      // lib/plan/needs.ts.
+      if (item.kind === SETUP_KIND) fail(setupStartRefusal(item.number));
+
       // Claimed, and in Claude's queue if it was in nobody's.
       //
       // `in_progress` means a session has this step in hand, and the daily
