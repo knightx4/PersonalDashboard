@@ -16,6 +16,7 @@ export type CategoryActionState = {
 };
 
 /** Revoke Google's grant and remove the email_accounts row (cascades sync data). */
+// latency: pending
 export async function disconnectInbox(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
@@ -61,6 +62,7 @@ export async function disconnectInbox(formData: FormData): Promise<void> {
  * Deletes email-sourced orders created from this inbox (and cascaded inventory),
  * clears ingested_messages / sync cursor, and leaves the Gmail connection intact.
  */
+// latency: pending
 export async function resetInboxImport(accountId: string): Promise<{
   ok: boolean;
   deletedOrders: number;
@@ -188,6 +190,7 @@ export async function resetInboxImport(accountId: string): Promise<{
  * inbox. Re-fetches Gmail bodies and updates orders in place — does not delete
  * orders or reset the sync cursor.
  */
+// latency: pending
 export async function reparseInboxOrders(accountId: string): Promise<{
   ok: boolean;
   considered: number;
@@ -269,6 +272,7 @@ const createCategorySchema = z.object({
   name: z.string().trim().min(2).max(40),
 });
 
+// latency: pending
 export async function createCustomCategory(
   _prev: CategoryActionState,
   formData: FormData,
@@ -315,6 +319,7 @@ export async function createCustomCategory(
   return { message: 'Category added. New imports can use it automatically.' };
 }
 
+// latency: pending
 export async function renameCustomCategory(
   _prev: CategoryActionState,
   formData: FormData,
@@ -348,6 +353,7 @@ export async function renameCustomCategory(
   return { message: 'Category renamed.' };
 }
 
+// latency: pending
 export async function deleteCustomCategory(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
@@ -371,6 +377,7 @@ const createListSchema = z.object({
   name: z.string().trim().min(2).max(40),
 });
 
+// latency: pending
 export async function createItemList(
   _prev: ListActionState,
   formData: FormData,
@@ -414,6 +421,7 @@ export async function createItemList(
   return { message: 'List created. Add items from any inventory detail page.' };
 }
 
+// latency: pending
 export async function renameItemList(
   _prev: ListActionState,
   formData: FormData,
@@ -445,6 +453,7 @@ export async function renameItemList(
   return { message: 'List renamed.' };
 }
 
+// latency: pending
 export async function deleteItemList(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });
@@ -457,6 +466,7 @@ export async function deleteItemList(formData: FormData): Promise<void> {
   revalidatePath('/shopping/inventory');
 }
 
+// latency: pending
 export async function deleteItemTag(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get('id') });

@@ -93,7 +93,7 @@ function Toaster({
   // the shell, above anything with a transform, so `fixed` means the viewport.
   return (
     <div
-      className="pointer-events-none fixed inset-x-4 bottom-20 z-[70] flex flex-col items-start gap-2 sm:left-6 sm:right-auto lg:bottom-10"
+      className="pointer-events-none fixed inset-x-4 bottom-20 z-toast flex flex-col items-start gap-2 sm:left-6 sm:right-auto lg:bottom-10"
       role="status"
       aria-live="polite"
     >
@@ -151,7 +151,7 @@ function ToastItem({
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       className={cn(
-        'toast-in sheet pointer-events-auto flex w-full sm:w-auto sm:max-w-md items-center gap-3 rounded-lg border bg-raised py-2 pl-3 pr-1.5 font-mono text-micro text-ink shadow-lg',
+        'popover-panel toast-in pointer-events-auto flex w-full sm:w-auto sm:max-w-md items-center gap-3 rounded-lg border border-border bg-raised py-2 pl-3 pr-1.5 font-mono text-micro text-ink shadow-lg',
         toast.state === 'failed' && 'text-danger',
       )}
     >

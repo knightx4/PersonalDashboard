@@ -1,8 +1,10 @@
 import {
   addDays,
   bucketFor,
+  childrenByParent,
   dueDay,
   isSnoozed,
+  openCount,
   rankOf,
   todayIn,
   UNPLACED,
@@ -30,6 +32,15 @@ export interface AgendaEntry {
   item?: AgendaItem;
   /** The label of what this is about, when the caller resolved one. */
   anchor?: { label: string; href: string } | null;
+  /**
+   * The smaller todos written under this task, ticked ones included, in the
+   * order they were written. Empty for a task nothing sits under.
+   */
+  children: Task[];
+  /** How many of those are still to do. */
+  openChildren: number;
+  /** How many there are altogether, which is what the count is out of. */
+  totalChildren: number;
 }
 
 export interface AgendaPile {
@@ -86,15 +97,27 @@ export function mergeAgenda(input: MergeInput): AgendaPile[] {
     piles.set(bucket, pile);
   };
 
+  // The items under a task are reached through the task and never pushed into
+  // a pile themselves, so a snoozed task takes its list with it and an item
+  // due on its own day does not surface on that day. #260 settled that: an
+  // item shows under its task and nowhere else.
+  const children = childrenByParent(input.tasks);
+
   for (const task of input.tasks) {
     if (task.status !== 'open') continue;
+    if (task.parentId !== null) continue;
     if (isSnoozed(task, now)) continue;
+
+    const mine = children.get(task.id) ?? [];
 
     push(bucketOf(dueDay(task, timezone), today, horizon), {
       kind: 'task',
       key: `task:${task.id}`,
       task,
       anchor: input.anchors?.get(task.id) ?? null,
+      children: mine,
+      openChildren: openCount(mine),
+      totalChildren: mine.length,
     });
   }
 
@@ -105,6 +128,9 @@ export function mergeAgenda(input: MergeInput): AgendaPile[] {
       kind: 'item',
       key: `item:${item.key}`,
       item,
+      children: [],
+      openChildren: 0,
+      totalChildren: 0,
     });
   }
 

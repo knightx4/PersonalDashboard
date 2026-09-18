@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 
 /**
@@ -41,6 +42,75 @@ export function isClosed(status: PlanStatus): boolean {
   return status === 'done' || status === 'dropped';
 }
 
+/**
+ * Which of two things a blocked step is waiting for — see migration 0081.
+ *
+ * `blocked` was one status covering two situations that want opposite
+ * treatment, and #525 settled which is which. A block on `steps` is waiting
+ * on rows in `plan_dependencies`, and those close on their own, so the block
+ * goes with them. A block on something `outside` the plan — a key, an
+ * account, a DNS record, an answer — is waiting on the person, and no amount
+ * of work on the plan produces it, so it stays until somebody says otherwise.
+ *
+ * Two values and no more: the question the column answers is who clears this,
+ * and there are two people who can.
+ */
+export const PLAN_BLOCK_KINDS = ['steps', 'outside'] as const;
+
+export type PlanBlockKind = (typeof PLAN_BLOCK_KINDS)[number];
+
+export function isPlanBlockKind(value: string): value is PlanBlockKind {
+  return (PLAN_BLOCK_KINDS as readonly string[]).includes(value);
+}
+
+/**
+ * What a block is taken to be when whoever wrote it did not say.
+ *
+ * `outside` is the safe way to be wrong. A block recorded as `outside` that
+ * was really about steps sits there until somebody looks at it; one recorded
+ * as `steps` that was really about a credential quietly reads as ready the
+ * next time an unrelated step closes, and hands a session the afternoon three
+ * of them already lost on #499. The page's Blocked control has always meant
+ * this one — "the step needs something outside the repo" is what it says
+ * about itself.
+ */
+export const DEFAULT_BLOCK_KIND: PlanBlockKind = 'outside';
+
+/**
+ * The block columns to write when a step's status changes.
+ *
+ * Every path that moves a step through `blocked` writes both of them, so this
+ * is the one place that decides what they hold: the kind, which the database
+ * requires whenever the status is `blocked`, and the ask, which is cleared on
+ * the way out. Off blocked, both go null — a sentence saying what a step needs
+ * and a word saying who can supply it stop being true the moment the step
+ * moves.
+ */
+export function blockPatch(
+  status: PlanStatus,
+  kind?: PlanBlockKind | null,
+): { block_kind: PlanBlockKind | null; block_ask?: null } {
+  if (status !== 'blocked') return { block_kind: null, block_ask: null };
+  return { block_kind: kind ?? DEFAULT_BLOCK_KIND };
+}
+
+/**
+ * Put aside as "not right now" — see migration 0062.
+ *
+ * Not a status, because nothing about the row has been settled: a dismissed
+ * question is still unanswered and a dismissed step is still unbuilt. It says
+ * only that you do not want to be asked again, so everything that asks —
+ * the page, the counts, a brief, a re-shape — reads this and leaves it out.
+ */
+export function isDismissed(item: { dismissedAt: string | null }): boolean {
+  return item.dismissedAt !== null;
+}
+
+/** Fog that is still being raised: written, and not put aside. */
+export function hasLiveFog(item: { fog: string | null; fogDismissedAt: string | null }): boolean {
+  return item.fog !== null && item.fogDismissedAt === null;
+}
+
 /** 1 next, 2 normal, 3 someday — the same three the notes queue uses. */
 export const PLAN_PRIORITIES = [1, 2, 3] as const;
 export type PlanPriority = (typeof PLAN_PRIORITIES)[number];
@@ -48,6 +118,13 @@ export type PlanPriority = (typeof PLAN_PRIORITIES)[number];
 export function isPlanPriority(value: number): value is PlanPriority {
   return (PLAN_PRIORITIES as readonly number[]).includes(value);
 }
+
+/** What each of the three is called, wherever one is shown or set. */
+export const PLAN_PRIORITY_LABEL: Record<PlanPriority, string> = {
+  1: 'Next',
+  2: 'Normal',
+  3: 'Someday',
+};
 
 /** Coarse on purpose: the question is "one sitting or not", not hours. */
 export const PLAN_SIZES = ['s', 'm', 'l'] as const;
@@ -74,11 +151,16 @@ export function isPlanAssignee(value: string): value is PlanAssignee {
  *
  * A `build` step closes on a commit. A `decision` closes on an answer: the
  * question and its real options are written by whoever shaped the feature,
- * and the person settles it on the page. It is a kind rather than a status
- * because it moves through exactly the states a build step moves through and
- * differs only in what finishing it looks like — see migration 0054.
+ * and the person settles it on the page. A `setup` step closes on the person
+ * doing the one thing only they can do — minting a token, opening an
+ * account, adding a DNS record — which a session can name and lay out but
+ * never supply.
+ *
+ * All three are kinds rather than statuses because each moves through exactly
+ * the states the others move through and differs only in what finishing it
+ * looks like — see migrations 0054 and 0084.
  */
-export const PLAN_KINDS = ['build', 'decision'] as const;
+export const PLAN_KINDS = ['build', 'decision', 'setup'] as const;
 export type PlanKind = (typeof PLAN_KINDS)[number];
 
 export function isPlanKind(value: string): value is PlanKind {
@@ -107,8 +189,36 @@ export type PlanItem = {
   fog: string | null;
   /** The answer a decision closed with, in the person's words. */
   resolution: string | null;
+  /**
+   * When you said "not right now" to this row. A dismissed question is not
+   * answered and not withdrawn: it is out of sight, off every count and out
+   * of every re-shape, and the Dismissed view is where it can be found and
+   * brought back. Null on everything you have not put aside.
+   */
+  dismissedAt: string | null;
+  /** The same for the fog patch alone, which outlives the row it sits on. */
+  fogDismissedAt: string | null;
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
+  /**
+   * What a blocked step needs, in one sentence. Rewritten every time it is
+   * blocked and cleared when it stops being blocked, so it says what is wanted
+   * now; the dated record of every block it has had stays in `comment`.
+   */
+  blockAsk: string | null;
+  /**
+   * Which kind of block it is carrying: `steps`, which clears itself when the
+   * steps it names close, or `outside`, which waits for the person. Null on
+   * every step that is not blocked, and the database refuses a blocked row
+   * without it.
+   */
+  blockKind: PlanBlockKind | null;
+  /**
+   * What has been said about it, oldest first: your notes and a session's
+   * replies. Not a column — it is read alongside the row — and empty on the
+   * paths that do not ask for it, the CLI's direct connection among them.
+   */
+  thread: DevComment[];
   priority: PlanPriority;
   size: PlanSize | null;
   assignee: PlanAssignee | null;
@@ -119,6 +229,12 @@ export type PlanItem = {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /**
+   * The last write to this row, kept by a trigger. What the working views
+   * order features by: the feature you touched last is the one you are on,
+   * and a step closing counts as touching the feature above it.
+   */
+  updatedAt: string;
 };
 
 /** `itemId` cannot start until `dependsOnId` is done. */
@@ -133,9 +249,12 @@ export type PlanData = {
   dependencies: PlanDependency[];
 };
 
-const ITEM_COLUMNS =
+/** Every column the app reads off a plan row. Shared with the changelog. */
+export const ITEM_COLUMNS =
   'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
-  'comment, priority, size, assignee, commit_sha, position, started_at, completed_at, created_at';
+  'comment, block_ask, block_kind, priority, size, assignee, commit_sha, position, ' +
+  'started_at, completed_at, ' +
+  'created_at, updated_at, dismissed_at, fog_dismissed_at';
 
 /**
  * Every row of the account's plan, in one read. The whole tree is what the
@@ -151,7 +270,11 @@ export async function loadPlan(
   const [{ data: rows }, { data: deps }] = await Promise.all([
     supabase
       .from('plan_items')
-      .select(ITEM_COLUMNS)
+      // The thread is read with the row rather than as a second query, the
+      // same as on a raise. It is not in ITEM_COLUMNS because an embedded
+      // select is PostgREST's and the CLI reads these columns over a direct
+      // connection.
+      .select(`${ITEM_COLUMNS}, thread:dev_comments(${COMMENT_COLUMNS})`)
       .eq('user_id', userId)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true }),
@@ -187,6 +310,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     value instanceof Date ? value.toISOString() : value == null ? null : String(value);
   const status = String(row.status ?? '');
   const kind = String(row.kind ?? '');
+  const blockKind = row.block_kind as string | null;
   const size = row.size as string | null;
   const assignee = row.assignee as string | null;
   const priority = Number(row.priority ?? 2);
@@ -203,7 +327,12 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     kind: isPlanKind(kind) ? kind : 'build',
     fog: (row.fog as string | null) ?? null,
     resolution: (row.resolution as string | null) ?? null,
+    dismissedAt: stamp(row.dismissed_at),
+    fogDismissedAt: stamp(row.fog_dismissed_at),
     comment: (row.comment as string | null) ?? null,
+    blockAsk: (row.block_ask as string | null) ?? null,
+    blockKind: blockKind && isPlanBlockKind(blockKind) ? blockKind : null,
+    thread: threadFrom(row.thread),
     priority: isPlanPriority(priority) ? priority : 2,
     size: size && isPlanSize(size) ? size : null,
     assignee: assignee && isPlanAssignee(assignee) ? assignee : null,
@@ -212,5 +341,20 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     startedAt: stamp(row.started_at),
     completedAt: stamp(row.completed_at),
     createdAt: stamp(row.created_at) ?? '',
+    updatedAt: stamp(row.updated_at) ?? stamp(row.created_at) ?? '',
   };
+}
+
+/**
+ * What each step is called, by number, for the hover text on a reference.
+ *
+ * Off the raw items rather than the tree: a reference can name a step that is
+ * closed, dropped or dismissed, and the reader wants to know what it was
+ * either way. `lib/comments/refs.ts` says what the label is made of; this is
+ * just the lookup it reads.
+ */
+export function planRefTitles(data: PlanData): Record<number, string> {
+  const titles: Record<number, string> = {};
+  for (const item of data.items) titles[item.number] = item.title;
+  return titles;
 }

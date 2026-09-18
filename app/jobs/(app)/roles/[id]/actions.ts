@@ -9,10 +9,13 @@ import { linkMessage } from '@/app/jobs/(app)/review/actions';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { findUnlinkedMessages, type UnlinkedMessage } from '@/lib/jobs/inbox/link-candidates';
 import { INTERVIEW_KINDS } from '@/lib/jobs/interview-kinds';
-import type { Requirement } from '@/lib/jobs/jd/requirements';
+import { extractRequirements, type Requirement } from '@/lib/jobs/jd/requirements';
 import { matchRequirements } from '@/lib/jobs/evidence/match';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { shortlistEvidence } from '@/lib/jobs/evidence/shortlist';
+import { buildPrepContext } from '@/lib/jobs/interview/prep-context';
+import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
+import { writePrepNote } from '@/lib/jobs/interview/prep';
 
 /**
  * Notes attach to exactly one parent, enforced by a check constraint in the
@@ -35,6 +38,7 @@ const noteSchema = z
     { message: 'A note attaches to exactly one thing.' },
   );
 
+// latency: pending
 export async function addNote(input: {
   body: string;
   companyId?: string;
@@ -88,6 +92,7 @@ export async function addNote(input: {
  * is being written on, it already knows which role it is, and a note that is
  * saved but does not reappear until a hard reload is a note you write twice.
  */
+// latency: pending
 export async function updateNote(input: {
   noteId: string;
   roleId: string;
@@ -126,6 +131,7 @@ const renameRoleSchema = z.object({
  * not read at all are left as "Role from email" -- both are worth overriding
  * by hand rather than living with.
  */
+// latency: pending
 export async function renameRole(roleId: string, title: string): Promise<{ error: string | null }> {
   const parsed = renameRoleSchema.safeParse({ roleId, title });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -165,6 +171,7 @@ const moveRoleSchema = z.object({
  * The company is resolved by name the same way creating a role resolves it, so
  * a company that is not on file yet is created rather than blocking the move.
  */
+// latency: pending
 export async function moveRoleToCompany(
   roleId: string,
   companyName: string,
@@ -224,6 +231,7 @@ const unlinkSchema = z.object({
  * status derived from mail this role no longer claims. The pair is remembered
  * as declined so the same suggestion does not immediately offer itself again.
  */
+// latency: pending
 export async function unlinkMessage(
   messageId: string,
   applicationId: string,
@@ -296,6 +304,7 @@ const reminderSchema = z.object({
  * ones — `rule_key` stays null, which is what tells the sweep this one is
  * not its to manage, so it will not touch or re-fire it.
  */
+// latency: pending
 export async function addReminder(input: {
   applicationId: string;
   body: string;
@@ -341,6 +350,7 @@ const reminderPatchSchema = z.object({
  * The sweep's own reminders are edited here as freely as hand-written ones:
  * `rule_key` is what stops it re-firing, and it is not touched.
  */
+// latency: pending
 export async function updateReminder(input: {
   reminderId: string;
   body: string;
@@ -384,6 +394,7 @@ const reminderMessageSchema = z.object({
  * usually arrives first and the to-do is written from it -- and because the
  * one you want is often not the one you were looking at.
  */
+// latency: pending
 export async function linkReminderMessage(input: {
   reminderId: string;
   messageId: string | null;
@@ -453,6 +464,7 @@ const interviewPatchSchema = z.object({
  * The round number is not here. It belongs to the round now, and is set
  * through `saveInterviewGroup`.
  */
+// latency: pending
 export async function saveInterview(
   interviewId: string,
   patch: {
@@ -567,6 +579,7 @@ async function positionInRound(
  * follow" is a real round worth putting on the board, and so is a day agreed
  * without an hour. Either can be filled in later through `saveInterview`.
  */
+// latency: pending
 export async function addInterview(input: {
   applicationId: string;
   kind: string;
@@ -623,6 +636,7 @@ const participantSchema = z.object({
  * one on the contacts page -- so it carries the title, the LinkedIn and every
  * touch, instead of being a second, unlinked copy of a person.
  */
+// latency: pending
 export async function addInterviewer(input: {
   interviewId: string;
   contactId: string;
@@ -678,6 +692,7 @@ const newInterviewerSchema = z.object({
  * They land on the company the pursuit is at, so the name on the round is a
  * real contact record with a page of its own rather than a loose string.
  */
+// latency: pending
 export async function addInterviewerByName(input: {
   interviewId: string;
   name: string;
@@ -751,6 +766,7 @@ export async function addInterviewerByName(input: {
   return { error: null };
 }
 
+// latency: pending
 export async function removeInterviewer(input: {
   interviewId: string;
   contactId: string;
@@ -791,6 +807,7 @@ const groupSchema = z.object({
  * behind are swept up: an empty round the user never made and cannot see the
  * purpose of is litter, and the next visit would offer to gather it again.
  */
+// latency: pending
 export async function groupInterviews(input: {
   applicationId: string;
   interviewIds: string[];
@@ -895,6 +912,7 @@ const newRoundSchema = z.object({
  * the inbox and some by hand. So the container comes first and fills up, which
  * is the way round the user actually works.
  */
+// latency: pending
 export async function createInterviewRound(input: {
   applicationId: string;
   label?: string;
@@ -946,6 +964,7 @@ export async function createInterviewRound(input: {
  * empty" a rule with teeth behind it rather than a nicety, and it is enforced
  * below as well as in the card.
  */
+// latency: pending
 export async function deleteInterviewRound(groupId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(groupId);
   if (!parsed.success) return { error: 'That is not a round.' };
@@ -990,6 +1009,7 @@ const groupPatchSchema = z.object({
  * that is first or second or final, and the four conversations of a superday
  * are all the same round however they are ordered within the day.
  */
+// latency: pending
 export async function saveInterviewGroup(
   groupId: string,
   patch: { label?: string; notes?: string; roundNumber?: number | null },
@@ -1034,6 +1054,7 @@ const roundMessageSchema = z.object({
  * never reaches across pursuits — it is only ever saying which of the emails
  * on this role belong to which round of it.
  */
+// latency: pending
 export async function linkRoundMessage(input: {
   groupId: string;
   messageId: string;
@@ -1075,6 +1096,7 @@ export async function linkRoundMessage(input: {
  * linked to the pursuit and keeps its place on the timeline — this is the
  * round being corrected, not the mail being unlinked.
  */
+// latency: pending
 export async function unlinkRoundMessage(input: {
   groupId: string;
   messageId: string;
@@ -1107,6 +1129,7 @@ export async function unlinkRoundMessage(input: {
  * because an empty round is a real state; `deleteInterviewRound` is how one
  * goes.
  */
+// latency: pending
 export async function ungroupInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);
   if (!parsed.success) return { error: 'That is not an interview.' };
@@ -1143,6 +1166,7 @@ export async function ungroupInterview(interviewId: string): Promise<{ error: st
 }
 
 /** The inbox read one scheduling thread as two rounds; this is how you say so. */
+// latency: pending
 export async function deleteInterview(interviewId: string): Promise<{ error: string | null }> {
   const parsed = z.string().uuid().safeParse(interviewId);
   if (!parsed.success) return { error: 'That is not an interview.' };
@@ -1164,6 +1188,7 @@ export async function deleteInterview(interviewId: string): Promise<{ error: str
 }
 
 /** Approve a suggested match, or one found through "add other": the same manual link the review queue writes. */
+// latency: pending
 export async function linkCandidateMessage(
   messageId: string,
   applicationId: string,
@@ -1183,6 +1208,7 @@ const declineSchema = z.object({
  * coming back — the message itself is untouched and can still be linked
  * elsewhere, or found again through "add other" if this was a mistake.
  */
+// latency: pending
 export async function declineCandidateMessage(
   messageId: string,
   applicationId: string,
@@ -1208,6 +1234,7 @@ export async function declineCandidateMessage(
 }
 
 /** The "add other" search: any unlinked mail naming the search term, not just the company. */
+// latency: pending
 export async function searchUnlinkedMessages(
   applicationId: string,
   term: string,
@@ -1239,6 +1266,63 @@ export async function searchUnlinkedMessages(
  */
 const matchSchema = z.object({ roleId: z.string().uuid() });
 
+/**
+ * Read the description again and rebuild the requirement map from it.
+ *
+ * The map used to be built only where a description was written -- pasting
+ * one, or the nightly board lookup finding one -- which is right until the
+ * parser improves or the description was one it could not read. Then the role
+ * sits there with six thousand characters of posting and an empty map, and
+ * nothing on the page will try again. This is the button that tries again.
+ *
+ * It is not a match: matching costs a model call and is asked for separately.
+ * This is the free half, and it says how many lines it found so that a
+ * description the parser genuinely cannot read says so rather than looking
+ * like a button that did nothing.
+ */
+// latency: pending
+export async function rebuildRequirementMap(
+  input: z.input<typeof matchSchema>,
+): Promise<{ requirements: Requirement[] | null; error: string | null }> {
+  const parsed = matchSchema.safeParse(input);
+  if (!parsed.success) return { requirements: null, error: parsed.error.issues[0].message };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: role, error: roleError } = await supabase
+    .from('roles')
+    .select('id, jd_text')
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (roleError) return { requirements: null, error: roleError.message };
+  if (!role) return { requirements: null, error: 'That role is not yours.' };
+
+  const text = ((role.jd_text as string | null) ?? '').trim();
+  if (!text) {
+    return { requirements: null, error: 'There is no description to read.' };
+  }
+
+  const requirements = extractRequirements(text);
+
+  const { error } = await supabase
+    .from('roles')
+    .update({
+      requirements,
+      requirements_extracted_at: new Date().toISOString(),
+    })
+    .eq('id', parsed.data.roleId)
+    .eq('user_id', user.id);
+
+  if (error) return { requirements: null, error: error.message };
+
+  revalidatePath(`/jobs/roles/${parsed.data.roleId}`);
+  return { requirements, error: null };
+}
+
+// latency: pending
 export async function matchRoleRequirements(
   input: z.input<typeof matchSchema>,
 ): Promise<{ matches: RequirementMatch[] | null; error: string | null }> {
@@ -1341,6 +1425,7 @@ const shareSchema = z.object({
   body: z.string().trim().max(8000).optional(),
 });
 
+// latency: pending
 export async function shareCasePage(
   input: z.input<typeof shareSchema>,
 ): Promise<{ slug: string | null; expiresAt: string | null; error: string | null }> {
@@ -1416,6 +1501,7 @@ export async function shareCasePage(
  * both and a row with a live expiry and no slug is a row one careless update
  * away from being public again.
  */
+// latency: pending
 export async function unshareCasePage(
   applicationId: string,
 ): Promise<{ error: string | null }> {
@@ -1434,4 +1520,310 @@ export async function unshareCasePage(
   if (error) return { error: error.message };
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
+}
+
+/* -------------------------------------------------------------------------- */
+/* The prep note                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Rows as the joins hand them back, before the context step trims them. */
+type PrepContactJoin = {
+  id: string;
+  full_name: string;
+  title: string | null;
+  relationship: string | null;
+  how_we_connect: string | null;
+  notes: string | null;
+  linkedin_url: string | null;
+};
+
+type PrepConversationJoin = {
+  id: string;
+  kind: string;
+  scheduled_at: string | null;
+  time_known: boolean | null;
+  duration_minutes: number | null;
+  format: string | null;
+  interview_participants: { role: string; contacts: PrepContactJoin | null }[] | null;
+};
+
+type PrepPriorJoin = {
+  id: string;
+  kind: string;
+  scheduled_at: string | null;
+  questions_asked: string[] | null;
+  notes: string | null;
+  applications: { roles: { title: string } | null } | null;
+};
+
+/** How far back a company's earlier rounds are worth reading. */
+const PREP_PRIOR_LOOKBACK = 24;
+
+const prepNoteSchema = z.object({
+  interviewId: z.string().uuid(),
+  /** An explicit press of Regenerate. Without it a current note is left alone. */
+  regenerate: z.boolean().optional(),
+});
+
+/**
+ * Write the prep note for the round one conversation belongs to.
+ *
+ * Modelled on matchRoleRequirements above, and the same refusals apply for the
+ * same reasons: no key in the environment, an interview that is not yours, and
+ * nothing to ground on. That last one matters most — a note written with no
+ * description and an empty bank is a note about interviews in general, and it
+ * would read exactly like one written from a full posting.
+ *
+ * The note belongs to the round rather than to the conversation the button was
+ * pressed on, per the decision on #64. It is stored on the round's earliest
+ * conversation and every conversation in the round reads that one, which is
+ * what a superday needs: one note about the day, not four about its quarters.
+ *
+ * A second press is free. The key fingerprints what the note was written
+ * against, so pressing again returns the stored note untouched until one of
+ * those facts changes or the person explicitly regenerates. Without that, a
+ * button on a page anybody visits twice is a model call anybody pays for
+ * twice.
+ */
+// latency: pending
+export async function writeRoundPrepNote(
+  input: z.input<typeof prepNoteSchema>,
+): Promise<{ note: PrepNote | null; error: string | null }> {
+  const parsed = prepNoteSchema.safeParse(input);
+  if (!parsed.success) return { note: null, error: parsed.error.issues[0].message };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { note: null, error: 'Prep is not configured.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: interview, error: interviewError } = await supabase
+    .from('interviews')
+    .select(
+      `id, group_id,
+       applications!inner (
+         role_id,
+         roles!inner (
+           id, title, seniority, location, work_mode, jd_text, jd_hash, requirements,
+           requirement_matches,
+           companies!inner ( id, name, industry, stage, headcount_band, research, priority )
+         )
+       )`,
+    )
+    .eq('id', parsed.data.interviewId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (interviewError) return { note: null, error: interviewError.message };
+  if (!interview) return { note: null, error: 'That round is not yours.' };
+
+  const application = interview.applications as unknown as {
+    role_id: string;
+    roles: {
+      id: string;
+      title: string;
+      seniority: string | null;
+      location: string | null;
+      work_mode: string | null;
+      jd_text: string | null;
+      jd_hash: string | null;
+      requirements: Requirement[] | null;
+      requirement_matches: RequirementMatch[] | null;
+      companies: {
+        id: string;
+        name: string;
+        industry: string | null;
+        stage: string | null;
+        headcount_band: string | null;
+        research: string | null;
+        priority: string | null;
+      };
+    };
+  };
+  const role = application.roles;
+  const company = role.companies;
+  const groupId = (interview.group_id as string | null) ?? null;
+
+  // The conversations of this round: all of them when it is a superday, the
+  // one it was pressed on when there is no group row -- which is most rounds.
+  const conversationQuery = supabase
+    .from('interviews')
+    .select(
+      `id, kind, scheduled_at, time_known, duration_minutes, format,
+       interview_participants (
+         role,
+         contacts ( id, full_name, title, relationship, how_we_connect, notes, linkedin_url )
+       )`,
+    )
+    .eq('user_id', user.id);
+
+  const since = new Date(Date.now() - PREP_PRIOR_LOOKBACK * 30 * 24 * 3600 * 1000).toISOString();
+
+  const [
+    { data: conversationRows, error: conversationError },
+    { data: group },
+    { data: priorRows },
+    { data: bank, error: bankError },
+    { data: profile },
+  ] = await Promise.all([
+    groupId
+      ? conversationQuery.eq('group_id', groupId)
+      : conversationQuery.eq('id', parsed.data.interviewId),
+    groupId
+      ? supabase
+          .from('interview_groups')
+          .select('label, round_number, notes')
+          .eq('id', groupId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Earlier rounds anywhere at this company, this pursuit or an older one.
+    // What the screen asked last month is prep whichever role it was for.
+    supabase
+      .from('interviews')
+      .select(
+        'id, kind, scheduled_at, questions_asked, notes, applications!inner ( roles!inner ( title, company_id ) )',
+      )
+      .eq('user_id', user.id)
+      .eq('applications.roles.company_id', company.id)
+      .lt('scheduled_at', new Date().toISOString())
+      .gt('scheduled_at', since)
+      .order('scheduled_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('evidence_items')
+      .select('id, title, body, context, metrics, skills, strength')
+      .eq('user_id', user.id),
+    supabase
+      .from('profiles')
+      .select('target_titles, timezone, writing_style_notes, banned_constructions')
+      .eq('id', user.id)
+      .maybeSingle(),
+  ]);
+
+  if (conversationError) return { note: null, error: conversationError.message };
+  if (bankError) return { note: null, error: bankError.message };
+
+  const conversations = ((conversationRows ?? []) as unknown as PrepConversationJoin[]).map(
+    (row) => ({
+      id: row.id,
+      kind: row.kind,
+      scheduledAt: row.scheduled_at,
+      timeKnown: row.time_known ?? true,
+      durationMinutes: row.duration_minutes,
+      format: row.format,
+      participants: (row.interview_participants ?? []).map((participant) => ({
+        role: participant.role,
+        contact: participant.contacts
+          ? {
+              id: participant.contacts.id,
+              fullName: participant.contacts.full_name,
+              title: participant.contacts.title,
+              relationship: participant.contacts.relationship,
+              howWeConnect: participant.contacts.how_we_connect,
+              notes: participant.contacts.notes,
+              linkedinUrl: participant.contacts.linkedin_url,
+            }
+          : null,
+      })),
+    }),
+  );
+
+  const items = (bank ?? []).map((item) => ({
+    id: item.id as string,
+    title: item.title as string,
+    body: item.body as string,
+    context: (item.context as string) ?? null,
+    metrics: (item.metrics as string) ?? null,
+    skills: (item.skills as string[]) ?? [],
+    strength: item.strength as number,
+  }));
+
+  const context = buildPrepContext({
+    conversations,
+    round: group
+      ? {
+          label: (group.label as string) ?? null,
+          roundNumber: (group.round_number as number) ?? null,
+          notes: (group.notes as string) ?? null,
+        }
+      : null,
+    role: {
+      title: role.title,
+      seniority: role.seniority,
+      location: role.location,
+      workMode: role.work_mode,
+      jdText: role.jd_text,
+      requirements: role.requirements,
+      requirementMatches: role.requirement_matches,
+    },
+    company: {
+      name: company.name,
+      industry: company.industry,
+      stage: company.stage,
+      headcountBand: company.headcount_band,
+      research: company.research,
+      priority: company.priority,
+    },
+    priorRounds: ((priorRows ?? []) as unknown as PrepPriorJoin[]).map((row) => ({
+      id: row.id,
+      roleTitle: row.applications?.roles?.title ?? null,
+      kind: row.kind,
+      scheduledAt: row.scheduled_at,
+      questionsAsked: row.questions_asked ?? [],
+      notes: row.notes,
+    })),
+    bank: items,
+    profile: {
+      targetTitles: (profile?.target_titles as string[]) ?? [],
+      timezone: (profile?.timezone as string) ?? 'UTC',
+      writingStyleNotes: (profile?.writing_style_notes as string) ?? null,
+    },
+  });
+
+  // The round's earliest conversation carries the note for the whole round.
+  const leadId = context.round.conversations[0]?.id ?? parsed.data.interviewId;
+  const key = prepKey({
+    jdHash: role.jd_hash,
+    bank: items,
+    conversations: context.round.conversations,
+    contactIds: context.interviewers.map((person) => person.contactId),
+  });
+
+  const { data: stored, error: storedError } = await supabase
+    .from('interviews')
+    .select('prep_note, prep_note_key')
+    .eq('id', leadId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (storedError) return { note: null, error: storedError.message };
+
+  if (!parsed.data.regenerate && stored?.prep_note && stored.prep_note_key === key) {
+    return { note: stored.prep_note as PrepNote, error: null };
+  }
+
+  const result = await writePrepNote(
+    { apiKey },
+    { context, banned: (profile?.banned_constructions as string[]) ?? [] },
+  );
+  if (!result.ok) return { note: null, error: result.error };
+
+  const { error: writeError } = await supabase
+    .from('interviews')
+    .update({
+      prep_note: result.note,
+      prep_note_at: new Date().toISOString(),
+      prep_note_key: key,
+    })
+    .eq('id', leadId)
+    .eq('user_id', user.id);
+
+  if (writeError) return { note: null, error: writeError.message };
+
+  revalidatePath(`/jobs/roles/${application.role_id}`);
+  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/today');
+  return { note: result.note, error: null };
 }

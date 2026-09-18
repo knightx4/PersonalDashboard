@@ -12,18 +12,26 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardCheck,
+  Frame,
+  History,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
-  ListChecks,
+  List,
   ListTodo,
+  Mail,
   Map,
+  Network,
+  PencilLine,
+  MessageCircleQuestion,
   MessageSquareText,
   Receipt,
   Share2,
   Shapes,
   StickyNote,
   Tag,
+  Target,
+  Timer,
   Undo2,
   Users,
 } from 'lucide-react';
@@ -63,18 +71,40 @@ export const NAV_ICONS = {
   activity: Activity,
   // Dev
   bugs: Bug,
+  raised: MessageCircleQuestion,
   ideas: Lightbulb,
   plan: Map,
+  changelog: History,
   ui: Shapes,
+  surfaces: Frame,
   // Todo and vault
-  agenda: ListChecks,
+  //
+  // Agenda is the list with something still unticked -- what needs you next,
+  // which is exactly what an unticked box says. All is a plain list with no
+  // boxes at all: it is everything there is, finished included, so ticks would
+  // be claiming something about it. The two were ListChecks and ListTodo, near
+  // enough that the only way to tell the rows apart was to read the labels.
+  agenda: ListTodo,
   calendar: CalendarDays,
-  tasks: ListTodo,
+  tasks: List,
   notes: StickyNote,
 
   // Learn
   tracks: BookOpen,
   readNow: BookOpenCheck,
+  know: Network,
+  learnNext: Target,
+  // The five-minute session. A clock rather than a question mark: what
+  // separates it from Read now is how long it takes, and the question mark is
+  // already the dev workspace's raised tab.
+  fiveMinutes: Timer,
+  // A quiz is answered in writing, which is the whole of what separates it
+  // from being asked to recognise something, so it gets the pencil.
+  quiz: PencilLine,
+  // News. An envelope, the same object the workspace's own mark draws, because
+  // the tab and the mark name the same thing and picking a second object for
+  // it would say there are two.
+  newsletters: Mail,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
 } as const;

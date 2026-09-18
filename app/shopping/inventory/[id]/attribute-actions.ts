@@ -84,6 +84,7 @@ async function loadItem(
  * within that category" half of the ask. Values are keyed, not positional, so
  * renaming a field's label keeps the values already recorded under it.
  */
+// latency: pending
 export async function saveCategoryTemplate(
   _prev: AttributeActionState,
   formData: FormData,
@@ -139,6 +140,7 @@ export async function saveCategoryTemplate(
  * other category does yet, and saying so plainly beats a button that looks
  * live and does nothing.
  */
+// latency: pending
 export async function lookupItemAttributes(
   _prev: AttributeActionState,
   formData: FormData,

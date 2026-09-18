@@ -12,6 +12,7 @@ const memberSchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+// latency: pending
 export async function acceptFamily(input: {
   slug: string;
   name: string;
@@ -46,6 +47,7 @@ export async function acceptFamily(input: {
  * come back on the next visit. That is the difference between a suggestion
  * engine people use and one they learn to ignore.
  */
+// latency: pending
 export async function dismissFamily(input: {
   slug: string;
   name: string;

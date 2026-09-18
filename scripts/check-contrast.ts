@@ -6,89 +6,61 @@
  * the real values out of app/globals.css rather than a copy, so a token edited
  * without re-running it fails here rather than in someone's eyes.
  *
+ * Since #424 it measures the generated themes as well. Once any colour on the
+ * circle can be picked there is no longer a list of themes anybody could look
+ * at, so the script walks the circle instead: every mode at fifteen-degree
+ * steps, the same pairs, the same thresholds. A hue that fails is the
+ * generator's to fix -- by clamping chroma or moving lightness -- and never
+ * the threshold's.
+ *
  *   npx tsx scripts/check-contrast.ts
  *
  * Thresholds are WCAG 2.2 AA: 4.5:1 for text under 18px (which is every piece
  * of text in this app), 3:1 for icons, meaningful borders and focus rings.
+ *
+ * Since #471 it measures one thing that is not a contrast ratio: how far the
+ * app's own accent lands from the three colours that carry a meaning. A link
+ * the same colour as the delete button is perfectly readable, and still wrong.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PAPER_SELECTOR, readTheme, THEME_SELECTORS, type Vars } from '../lib/theme/css';
+import { generatePalette, MEANING_FLOOR, meaningGaps } from '../lib/theme/palette';
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
 const TEXT = 4.5;
 const NON_TEXT = 3;
 
-type Vars = Record<string, string>;
+const PAPER = readTheme(CSS, PAPER_SELECTOR);
 
-/** The declarations inside one selector block, by variable name. */
-function blockFor(selector: string): Vars {
-  const start = CSS.indexOf(selector);
-  if (start === -1) throw new Error(`No block for ${selector}`);
-  const open = CSS.indexOf('{', start);
-  let depth = 0;
-  let end = open;
-  for (let i = open; i < CSS.length; i += 1) {
-    if (CSS[i] === '{') depth += 1;
-    if (CSS[i] === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        end = i;
-        break;
-      }
-    }
-  }
-  const body = CSS.slice(open + 1, end);
-  const vars: Vars = {};
-  for (const match of body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
-    vars[match[1]] = match[2].trim();
-  }
-  return vars;
-}
+const WRITTEN: Record<string, Vars> = Object.fromEntries(
+  Object.entries(THEME_SELECTORS).map(([name, selector]) => [name, readTheme(CSS, selector)]),
+);
 
 /**
- * Follow `var(--x)` chains until a literal comes out.
+ * How far apart the hues walked are.
  *
- * The scope tokens are written as references -- `--c-page-ink: var(--c-ink)`
- * in every theme that does not need a page palette of its own -- so a theme's
- * table has to be flattened before anything in it can be measured. Resolving
- * per theme is the point: the same declaration lands on a different literal in
- * each one, which is exactly what makes those defaults free.
+ * Fifteen degrees is twenty-four of them per mode, which is enough to catch a
+ * band of the circle going bad and cheap enough to run on every push. A
+ * failure between two steps is a failure at one of them as well: nothing in
+ * the generator changes faster than that, because every token moves by the
+ * same number of degrees.
  */
-function resolve(vars: Vars): Vars {
-  const out: Vars = {};
-  for (const name of Object.keys(vars)) {
-    let value = vars[name];
-    // Deep enough for any chain this file has a reason to contain, and a hard
-    // stop rather than a hang if someone writes a loop.
-    for (let hop = 0; hop < 10 && value.startsWith('var('); hop += 1) {
-      const referenced = value.slice(4, -1).trim();
-      const next = vars[referenced];
-      if (next === undefined) throw new Error(`${name} points at undefined ${referenced}`);
-      value = next;
-    }
-    if (value.startsWith('var(')) throw new Error(`${name} does not settle on a value`);
-    out[name] = value;
-  }
-  return out;
-}
+const HUE_STEP = 15;
 
-const PAPER = resolve(blockFor(":root,\n[data-theme='paper']"));
+const MODES = ['light', 'dark', 'lightbox', 'darkroom'] as const;
 
-/** A theme inherits every value it does not itself declare from Paper. */
-function theme(selector: string): Vars {
-  // Merged before resolving, so a theme that overrides --c-ink also moves
-  // every default that was written as var(--c-ink) -- which is the whole
-  // mechanism the scopes rely on.
-  return resolve({ ...blockFor(":root,\n[data-theme='paper']"), ...blockFor(selector) });
-}
+const GENERATED: Record<string, Vars> = Object.fromEntries(
+  MODES.flatMap((mode) =>
+    Array.from({ length: 360 / HUE_STEP }, (_, step) => {
+      const hue = step * HUE_STEP;
+      return [`${mode} ${hue}°`, generatePalette(mode, hue) as Vars] as const;
+    }),
+  ),
+);
 
-const THEMES: Record<string, Vars> = {
-  paper: PAPER,
-  ink: theme("[data-theme='ink']"),
-  lightbox: theme("[data-theme='lightbox']"),
-  dusk: theme("[data-theme='dusk']"),
-};
+const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED };
 
 type Rgb = [number, number, number];
 type Rgba = { rgb: Rgb; alpha: number };
@@ -180,6 +152,7 @@ const CHECKS: Check[] = [
   { ink: '--c-w-todo', grounds: [...GROUNDS, '--c-w-todo-tint'], min: TEXT, why: 'todo accent' },
   { ink: '--c-w-vault', grounds: [...GROUNDS, '--c-w-vault-tint'], min: TEXT, why: 'vault accent' },
   { ink: '--c-w-learn', grounds: [...GROUNDS, '--c-w-learn-tint'], min: TEXT, why: 'learn accent' },
+  { ink: '--c-w-news', grounds: [...GROUNDS, '--c-w-news-tint'], min: TEXT, why: 'news accent' },
   { ink: '--c-w-dev', grounds: [...GROUNDS, '--c-w-dev-tint'], min: TEXT, why: 'dev accent' },
   { ink: '--c-positive', grounds: [...GROUNDS, '--c-positive-tint'], min: TEXT, why: 'refunds and savings' },
   { ink: '--c-caution', grounds: [...GROUNDS, '--c-caution-tint'], min: TEXT, why: 'needs attention' },
@@ -244,6 +217,7 @@ CHECKS.push(
   { ink: '--c-w-todo-lit', grounds: PAGE, min: TEXT, why: 'todo accent on the page ground' },
   { ink: '--c-w-vault-lit', grounds: PAGE, min: TEXT, why: 'vault accent on the page ground' },
   { ink: '--c-w-learn-lit', grounds: PAGE, min: TEXT, why: 'learn accent on the page ground' },
+  { ink: '--c-w-news-lit', grounds: PAGE, min: TEXT, why: 'news accent on the page ground' },
   { ink: '--c-w-dev-lit', grounds: PAGE, min: TEXT, why: 'dev accent on the page ground' },
 );
 
@@ -262,17 +236,18 @@ for (const hue of [
   '--c-w-todo',
   '--c-w-vault',
   '--c-w-learn',
+  '--c-w-news',
   '--c-w-dev',
 ] as const) {
   CHECKS.push({
-    ink: '--c-surface',
+    ink: '--c-fill-ink',
     grounds: [hue],
     min: TEXT,
     why: `${hue.replace('--c-w-', '')} button label on its solid fill`,
   });
 }
 CHECKS.push({
-  ink: '--c-surface',
+  ink: '--c-fill-ink',
   grounds: ['--c-accent-base'],
   min: TEXT,
   why: 'primary button label on the app accent',
@@ -322,9 +297,48 @@ for (const [name, vars] of Object.entries(THEMES)) {
   }
 }
 
+/**
+ * Every degree of the circle, not every fifteenth.
+ *
+ * The stretches where the accent has to step off a meaning colour are narrow
+ * -- 17 hues of the 360 in light, 25 in dark, 29 on Lightbox -- so the walk
+ * above would step over most of them. This measurement is two colours and a
+ * subtraction, so it can afford to be done properly.
+ */
+const SEPARATION_STEP = 1;
+
+let separations = 0;
+
+for (const mode of MODES) {
+  for (let hue = 0; hue < 360; hue += SEPARATION_STEP) {
+    const palette = generatePalette(mode, hue);
+    for (const { accent, meaning, gap } of meaningGaps(palette)) {
+      separations += 1;
+      if (gap < MEANING_FLOOR) {
+        failures += 1;
+        console.error(
+          `✗ ${mode} ${hue}°: ${accent} is ${gap.toFixed(3)} from ${meaning} in OKLab, ` +
+            `needs ${MEANING_FLOOR} — the app's accent must not wear a meaning colour`,
+        );
+      }
+    }
+  }
+}
+
 if (failures > 0) {
-  console.error(`\n${failures} contrast failure${failures === 1 ? '' : 's'} across ${checked} pairs.`);
+  console.error(
+    `\n${failures} failure${failures === 1 ? '' : 's'} across ${checked} contrast pairs ` +
+      `and ${separations} accent separations.`,
+  );
   process.exit(1);
 }
 
-console.log(`✓ ${checked} text and non-text pairs clear WCAG AA across ${Object.keys(THEMES).length} themes.`);
+console.log(
+  `✓ ${checked} text and non-text pairs clear WCAG AA across ` +
+    `${Object.keys(WRITTEN).length} written themes and ` +
+    `${Object.keys(GENERATED).length} generated ones, every ${HUE_STEP}° of the circle.`,
+);
+console.log(
+  `✓ ${separations} accent-to-meaning distances clear the ${MEANING_FLOOR} floor, ` +
+    `every ${SEPARATION_STEP}° of the circle in ${MODES.length} modes.`,
+);

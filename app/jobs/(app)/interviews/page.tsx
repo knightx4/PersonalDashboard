@@ -4,8 +4,8 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatInterviewWhen } from '@/lib/jobs/applications/load';
+import { RoundsTable, interviewHref, type RoundView } from './rounds-table';
 import { interviewKindLabel } from '@/lib/jobs/interview-kinds';
 import { roundLabel, roundsOf } from '@/lib/jobs/interview-groups';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
@@ -13,17 +13,10 @@ import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
 export const metadata = { title: 'Interviews' };
 
 /**
- * The interview itself, not just the pursuit it belongs to.
- *
- * An interview has no page of its own -- it lives on the role's interviews
- * tab, which scrolls to it and highlights it when named in the query. That
- * link already existed and was used from This week and from the agenda; this
- * page, the one actually called Interviews, sent every click to the top of the
- * role instead, so finding the round you had clicked on meant hunting for it.
+ * The interview itself, not just the pursuit it belongs to. The link and the
+ * table both live in `rounds-table.tsx`; this page is the loading and the
+ * splitting into upcoming, past, and still owing a debrief.
  */
-function interviewHref(roleId: string, interviewId: string): string {
-  return `/jobs/roles/${roleId}?tab=interviews&interview=${interviewId}`;
-}
 
 export default async function InterviewsPage() {
   const user = await requireUser();
@@ -166,32 +159,13 @@ export default async function InterviewsPage() {
         </Banner>
       )}
 
-      <Section title="Upcoming" rows={upcoming} timezone={timezone} />
-      <Section title="Past" rows={past} timezone={timezone} />
+      <RoundsTable title="Upcoming" rows={upcoming} timezone={timezone} />
+      <RoundsTable title="Past" rows={past} timezone={timezone} />
     </>
   );
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** A round as this page draws it: one line, whatever is inside it. */
-type RoundView = {
-  key: string;
-  /** The conversation a link lands on: the first of the round. */
-  leadId: string;
-  roleId: string;
-  companyName: string;
-  roleTitle: string;
-  /** When the round starts. Null where nothing in it is scheduled yet. */
-  scheduledAt: string | null;
-  timeKnown: boolean;
-  /** When the last of it is over, as an instant. Null when unscheduled. */
-  endsAt: number | null;
-  round: string | null;
-  kind: string;
-  /** Anything written up about the round, from the round or from inside it. */
-  notes: string | null;
-};
 
 /**
  * When one interview is, and until when.
@@ -235,67 +209,4 @@ function splitByTime<T extends { endsAt: number | null; notes: string | null }>(
     (row) => !row.notes && row.endsAt !== null && row.endsAt >= debriefWindowStart,
   );
   return { upcoming, past, needDebrief };
-}
-
-function Section({
-  title,
-  rows,
-  timezone,
-}: {
-  title: string;
-  rows: RoundView[];
-  timezone: string;
-}) {
-  if (rows.length === 0) return null;
-
-  return (
-    <section className="mb-6">
-      <h2 className="mb-2 text-ui font-semibold text-ink">{title}</h2>
-      <Table>
-        <THead>
-          <TR>
-            <TH>When</TH>
-            <TH>Company</TH>
-            <TH>Role</TH>
-            <TH>Round</TH>
-            <TH>Kind</TH>
-            <TH>Debrief</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {rows.map((row) => (
-            /* The round, and the role, as two separate destinations.
-               Both are things you might want from this table and only one
-               of them was reachable. The row goes to the round; the role
-               cell keeps its own link, lifted above the row link with `relative`. */
-            <TR key={row.key} href={interviewHref(row.roleId, row.leadId)}>
-              <TD primary className="tabular">
-                {formatInterviewWhen(row.scheduledAt, row.timeKnown, timezone)}
-              </TD>
-              <TD label="Company" muted>
-                {row.companyName}
-              </TD>
-              <TD label="Role" muted>
-                <Link
-                  href={`/jobs/roles/${row.roleId}`}
-                  className="relative transition-colors duration-150 hover:text-accent"
-                >
-                  {row.roleTitle}
-                </Link>
-              </TD>
-              <TD label="Round" muted>
-                {row.round ?? '—'}
-              </TD>
-              <TD label="Kind" muted>
-                {row.kind}
-              </TD>
-              <TD label="Debrief" muted>
-                {row.notes ? 'written' : '—'}
-              </TD>
-            </TR>
-          ))}
-        </TBody>
-      </Table>
-    </section>
-  );
 }

@@ -22,19 +22,88 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatTheme, parseTheme, type Theme } from '../lib/theme';
+import { themeAttribute, themeStyle } from '../lib/theme/apply';
 
 const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PORT = process.env.PREVIEW_PORT ?? '3400';
 const OUT = join(process.cwd(), '.preview-shots');
 const PROBE = 9500;
 
+/**
+ * What a full-page capture can survive, measured rather than looked up.
+ *
+ * `captureBeyondViewport` past the browser's limits does not fail -- it never
+ * answers, and a hung capture wedges the CDP session for good, so every shot
+ * after it hangs too and the script sits there printing nothing. It looks
+ * exactly like a dead server, which is how it cost an hour.
+ *
+ * Two limits, both real, found by measuring this app's own longest page:
+ * 780x21024 hung on the height, and 2560x12776 hung with both sides well under
+ * that, so area binds first. The largest capture known to work here is
+ * 2560x5262 = 13.5Mpx, so the budget is 14. Anything over drops to 1x, which
+ * is a smaller picture of the whole page rather than no picture at all.
+ */
+const MAX_SIDE = 16_384;
+const MAX_AREA = 14_000_000;
+
 const WIDTHS = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'laptop', width: 1280, height: 900 },
 ] as const;
 
-/** Paper and Ink: the two poles. A surface right in both is right in Dusk. */
-const THEMES = ['paper', 'ink'] as const;
+/**
+ * Light and dark with no colour by default: the two poles, and a surface right
+ * in both is right in a coloured one. Shooting more doubles a run for a
+ * difference that is usually nothing.
+ *
+ * Any stored theme value works, because these are read the way the app reads
+ * them -- a written theme's name, a mode, or a mode and a hue:
+ *
+ *   SHOOT_THEMES=lightbox npm run shoot -- <surface>
+ *   SHOOT_THEMES=light,dark:284 npm run shoot -- <surface>
+ *
+ * A theme nobody can photograph is a theme nobody can judge, and since #420
+ * the set of them is the whole circle.
+ */
+const THEMES = (process.env.SHOOT_THEMES ?? 'light,dark')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+  .map((value) => {
+    const theme = parseTheme(value);
+    if (theme.kind === 'system') {
+      throw new Error(`SHOOT_THEMES: ${value} is not a theme this app can read`);
+    }
+    return theme;
+  });
+
+/** A theme's name, safe to put in a filename: `dark:284` is `dark-284`. */
+function slug(theme: Theme): string {
+  return (formatTheme(theme) ?? 'system').replace(':', '-');
+}
+
+/**
+ * The expression that puts a theme on the page, built here rather than there.
+ *
+ * The browser has no module loader in a CDP evaluate, so the palette is
+ * generated in Node and the values travel as literals. Same two halves the
+ * root layout writes: the attribute for the polarity, the tokens for the
+ * colour.
+ */
+function applyExpression(theme: Theme): string {
+  const attribute = themeAttribute(theme);
+  const style = themeStyle(theme) ?? {};
+  const declarations = Object.entries(style)
+    .map(([token, value]) => `${token}:${value}`)
+    .join(';');
+
+  return [
+    'var r=document.documentElement;',
+    attribute ? `r.setAttribute('data-theme','${attribute}');` : "r.removeAttribute('data-theme');",
+    `r.setAttribute('style',${JSON.stringify(declarations)});`,
+  ].join('');
+}
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -69,13 +138,25 @@ async function main() {
     CHROME,
     [
       '--headless=new',
+      // The browser's locale, not the page's. A `type="date"` input takes its
+      // format from the browser UI language and ignores `<html lang>` -- so a
+      // default headless Chromium drew every date field as `mm/dd/yyyy` and
+      // sent a reader hunting for a US-format bug in an app that has none.
+      // en-GB is where this app is used; it makes the shots honest.
+      '--lang=en-GB',
       `--remote-debugging-port=${PROBE}`,
       '--no-sandbox',
       '--disable-gpu',
       '--hide-scrollbars',
       'about:blank',
     ],
-    { stdio: 'ignore' },
+    // `--lang` alone is not enough on Linux: Chromium reads the locale off the
+    // environment as well, and a date input drawn `mm/dd/yyyy` under a shot of
+    // an app used in London is a bug report about nothing.
+    {
+      stdio: 'ignore',
+      env: { ...process.env, LANG: 'en_GB.UTF-8', LANGUAGE: 'en_GB' },
+    },
   );
   await wait(3500);
 
@@ -87,7 +168,10 @@ async function main() {
   let id = 0;
   const pending = new Map<number, (value: unknown) => void>();
   ws.onmessage = (event) => {
-    const data = JSON.parse(String(event.data)) as { id?: number; result?: unknown };
+    const data = JSON.parse(String(event.data)) as {
+      id?: number;
+      result?: unknown;
+    };
     if (data.id && pending.has(data.id)) {
       pending.get(data.id)!(data.result);
       pending.delete(data.id);
@@ -115,17 +199,45 @@ async function main() {
           deviceScaleFactor: 2,
           mobile: size.name === 'phone',
         });
-        await send('Page.navigate', { url: `http://localhost:${PORT}/preview?s=${surfaceId}` });
+        await send('Page.navigate', {
+          url: `http://localhost:${PORT}/preview?s=${surfaceId}`,
+        });
         await wait(2200);
         await send('Runtime.evaluate', {
-          expression: `document.documentElement.setAttribute('data-theme','${theme}')`,
+          expression: applyExpression(theme),
         });
         await wait(400);
+
+        // Measure before capturing, and drop to 1x if a 2x shot would exceed
+        // what this browser can allocate. See MAX_SIDE / MAX_AREA above: over
+        // either, the capture never returns and takes the whole run with it.
+        const measured = await send('Runtime.evaluate', {
+          expression: 'document.documentElement.scrollHeight',
+          returnByValue: true,
+        });
+        const pageHeight = Number(
+          (measured as unknown as { result?: { value?: number } }).result?.value ?? size.height,
+        );
+        const fits = (factor: number) =>
+          size.width * factor <= MAX_SIDE &&
+          pageHeight * factor <= MAX_SIDE &&
+          size.width * factor * pageHeight * factor <= MAX_AREA;
+        const scale = fits(2) ? 2 : 1;
+        if (scale === 1) {
+          await send('Emulation.setDeviceMetricsOverride', {
+            width: size.width,
+            height: size.height,
+            deviceScaleFactor: 1,
+            mobile: size.name === 'phone',
+          });
+          console.log(`  (${surfaceId} is ${pageHeight}px tall — shooting at 1x)`);
+        }
+
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
           captureBeyondViewport: true,
         });
-        const name = `${surfaceId}--${size.name}-${theme}.png`;
+        const name = `${surfaceId}--${size.name}-${slug(theme)}.png`;
         writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));
         console.log(`  ${name}`);
         shot += 1;

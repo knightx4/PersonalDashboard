@@ -116,11 +116,19 @@ vi.mock('@/inngest/vault/sync', () => ({
     failed: [],
   })),
 }));
+vi.mock('@/inngest/dev/claims', () => ({
+  runClaimSweep: vi.fn(async () => ({ released: 2, steps: [42, 43] })),
+}));
+vi.mock('@/inngest/dev/digest', () => ({
+  runDevDigest: vi.fn(async () => ({ written: 1, skipped: 0 })),
+}));
 
 const { GET } = await import('@/app/api/cron/daily/route');
 const { runJobSweep } = await import('@/inngest/jobs/cron/sweep');
 const { runJdBackfill } = await import('@/inngest/jobs/cron/jd-backfill');
 const { runVaultSyncForAll } = await import('@/inngest/vault/sync');
+const { runClaimSweep } = await import('@/inngest/dev/claims');
+const { runDevDigest } = await import('@/inngest/dev/digest');
 
 function cronRequest(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -170,9 +178,17 @@ describe('the daily cron route', () => {
     });
     expect(body.results['inbox']).toEqual({ error: 'inbox exploded' });
 
-    // Same again for the vault, which is last and therefore the stage most
-    // easily lost to an earlier failure.
     expect(runVaultSyncForAll).toHaveBeenCalled();
     expect(body.results['vault']).toMatchObject({ synced: 1, notesWritten: 4 });
+
+    // The claim sweep runs before the digest, so the summary reports the rows
+    // it has already corrected rather than the ones it is about to.
+    expect(runClaimSweep).toHaveBeenCalled();
+    expect(body.results['plan-claims']).toEqual({ released: 2, steps: [42, 43] });
+
+    // Same again for the digest, which is last and therefore the stage most
+    // easily lost to an earlier failure.
+    expect(runDevDigest).toHaveBeenCalled();
+    expect(body.results['dev-digest']).toEqual({ written: 1, skipped: 0 });
   });
 });

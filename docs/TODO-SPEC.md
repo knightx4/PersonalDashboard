@@ -123,7 +123,10 @@ deliberately not chosen yet, and the source is not built in v1.
 Listing these because they will otherwise get invented.
 
 - **Not a project manager.** No projects, no boards, no assignees, no
-  dependencies, no subtasks. One account, one person.
+  dependencies. One account, one person. A task can be broken into smaller
+  todos -- one level, added and ticked in place on the agenda -- and that is
+  as far as it goes: an item cannot hold a list of its own, and there is
+  nothing here that schedules one piece of work against another.
 - **No priority field.** A P1/P2/P3 column is a decoration that becomes noise
   within a week: everything is P1 by March. The ordering is the due date, and
   `pinned` (which `job_search.notes` already uses) is the one manual override.
@@ -132,6 +135,11 @@ Listing these because they will otherwise get invented.
 - **No writing to the vault, ever.** Not a `- [x]`, not a new note, not an
   `outbox/` folder. If app-authored notes ever happen, that is the vault's
   decision to make, in its own spec, and not a side effect of a todo list.
+- **Nothing is ever written back to a calendar you subscribe to.** The
+  subscription is read-only in the strongest sense: no appointment is created,
+  edited, cancelled or acknowledged at the other end, and an appointment that
+  arrived through one cannot be edited here either. Nor can a task point at
+  one — the next refresh may drop the row it would point at.
 - **No notifications, email or push, in v1.** The daily cron already exists and
   the agenda already exists; deciding to interrupt someone is a separate
   decision with its own failure mode.
@@ -224,10 +232,19 @@ create table todo.tasks (
   -- The "Later" half, exactly as the dismissal tables use it.
   snoozed_until timestamptz,
 
+  -- The task this one sits under, or null for a task of its own. An item IS a
+  -- task, which is why this is a column and not a second table: tick, drop,
+  -- defer, search and link all keep working on it for free. One level only --
+  -- a trigger refuses a task that holds a list from being filed under another,
+  -- and refuses a parent that belongs to somebody else, which a foreign key
+  -- cannot do. Cascades, so deleting a task takes its list with it.
+  parent_id uuid references todo.tasks (id) on delete cascade,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
   constraint tasks_title_ck check (title <> '' and length(title) <= 500),
+  constraint tasks_parent_not_self_ck check (parent_id is distinct from id),
   constraint tasks_one_due_ck check (num_nonnulls(due_on, due_at) <= 1),
   -- The database stamps these, it does not merely check them. See below.
   constraint tasks_completed_ck check (
@@ -246,6 +263,8 @@ create index tasks_user_due_on_idx on todo.tasks (user_id, due_on)
 create index tasks_user_due_at_idx on todo.tasks (user_id, due_at)
   where status = 'open' and due_at is not null;
 create index tasks_user_status_idx on todo.tasks (user_id, status, created_at desc);
+-- The read the column exists for: the items under these tasks, for this account.
+create index tasks_user_parent_idx on todo.tasks (user_id, parent_id);
 ```
 
 There is no `source` column and no key pointing at where a task came from. Both
@@ -293,9 +312,13 @@ refactor.
 
 ### `todo.task_links`
 
-What the task is about. Real foreign keys, into four schemas, because they are
-all in one database and a cross-schema foreign key costs nothing and buys the
-cascade for free: delete the role and its tasks' links go with it.
+What the task is about. Real foreign keys, into four other schemas, because
+they are all in one database and a cross-schema foreign key costs nothing and
+buys the cascade for free: delete the role and its tasks' links go with it.
+
+Six of the twelve targets arrived later, in `migrations-todo/0004`, so that
+linking from /todo could offer everything the search finds rather than only the
+things the job side and the vault happen to hold.
 
 ```sql
 create type todo.link_relation as enum ('about', 'source');
@@ -305,17 +328,25 @@ create table todo.task_links (
   task_id uuid not null references todo.tasks (id) on delete cascade,
   relation todo.link_relation not null default 'about',
 
-  application_id uuid references job_search.applications (id) on delete cascade,
-  role_id        uuid references job_search.roles (id) on delete cascade,
-  company_id     uuid references job_search.companies (id) on delete cascade,
-  contact_id     uuid references job_search.contacts (id) on delete cascade,
-  interview_id   uuid references job_search.interviews (id) on delete cascade,
-  note_id        uuid references obsidian.notes (id) on delete cascade,
+  application_id    uuid references job_search.applications (id) on delete cascade,
+  role_id           uuid references job_search.roles (id) on delete cascade,
+  company_id        uuid references job_search.companies (id) on delete cascade,
+  contact_id        uuid references job_search.contacts (id) on delete cascade,
+  interview_id      uuid references job_search.interviews (id) on delete cascade,
+  note_id           uuid references obsidian.notes (id) on delete cascade,
+  order_id          uuid references public.orders (id) on delete cascade,
+  inventory_item_id uuid references public.inventory_items (id) on delete cascade,
+  saved_item_id     uuid references public.saved_items (id) on delete cascade,
+  reading_id        uuid references learn.readings (id) on delete cascade,
+  track_id          uuid references learn.tracks (id) on delete cascade,
+  subject_id        uuid references learn.subjects (id) on delete cascade,
 
   created_at timestamptz not null default now(),
 
   constraint task_links_exactly_one_ck check (
-    num_nonnulls(application_id, role_id, company_id, contact_id, interview_id, note_id) = 1
+    num_nonnulls(application_id, role_id, company_id, contact_id, interview_id,
+                 note_id, order_id, inventory_item_id, saved_item_id, reading_id,
+                 track_id, subject_id) = 1
   )
 );
 
@@ -325,8 +356,9 @@ create unique index task_links_about_key on todo.task_links (task_id)
 ```
 
 The "exactly one parent from N" shape is lifted straight from `job_search.notes`,
-which takes one parent from five, and adding a seventh target later is one
-column and one edited check constraint.
+which takes one parent from five, and adding a thirteenth target is one column,
+one edited check constraint, one arm in the trigger below and one line in
+`lib/todo/links/model.ts`. That is what `0004` did, six times over.
 
 `relation` distinguishes *what this is about* from *where it came from*. Only
 `about` is used in v1; `source` is what a task copied out of a note will carry
@@ -352,7 +384,7 @@ create or replace function todo.task_link_target_is_owned()
 returns trigger
 language plpgsql
 security definer
-set search_path = todo, job_search, obsidian, public
+set search_path = todo, job_search, obsidian, learn, public
 as $$
 declare
   owner uuid;
@@ -361,12 +393,18 @@ begin
   select user_id into task_owner from todo.tasks where id = new.task_id;
 
   select case
-    when new.application_id is not null then (select user_id from job_search.applications where id = new.application_id)
-    when new.role_id        is not null then (select user_id from job_search.roles        where id = new.role_id)
-    when new.company_id     is not null then (select user_id from job_search.companies    where id = new.company_id)
-    when new.contact_id     is not null then (select user_id from job_search.contacts     where id = new.contact_id)
-    when new.interview_id   is not null then (select user_id from job_search.interviews   where id = new.interview_id)
-    when new.note_id        is not null then (select user_id from obsidian.notes          where id = new.note_id)
+    when new.application_id    is not null then (select user_id from job_search.applications where id = new.application_id)
+    when new.role_id           is not null then (select user_id from job_search.roles        where id = new.role_id)
+    when new.company_id        is not null then (select user_id from job_search.companies    where id = new.company_id)
+    when new.contact_id        is not null then (select user_id from job_search.contacts     where id = new.contact_id)
+    when new.interview_id      is not null then (select user_id from job_search.interviews   where id = new.interview_id)
+    when new.note_id           is not null then (select user_id from obsidian.notes          where id = new.note_id)
+    when new.order_id          is not null then (select user_id from public.orders           where id = new.order_id)
+    when new.inventory_item_id is not null then (select user_id from public.inventory_items  where id = new.inventory_item_id)
+    when new.saved_item_id     is not null then (select user_id from public.saved_items      where id = new.saved_item_id)
+    when new.reading_id        is not null then (select user_id from learn.readings          where id = new.reading_id)
+    when new.track_id          is not null then (select user_id from learn.tracks            where id = new.track_id)
+    when new.subject_id        is not null then (select user_id from learn.subjects          where id = new.subject_id)
   end into owner;
 
   if owner is null or task_owner is null or owner <> task_owner then
@@ -397,7 +435,7 @@ how it came to be written down as "not needed" in the first draft.
 
 #### Foreign keys across schemas: a decision, not an accident
 
-These keys tie `todo`, `job_search`, `obsidian` and `public` together at the
+These keys tie `todo`, `job_search`, `obsidian`, `learn` and `public` together at the
 database level. That is the point — a task about a role that survives the role
 being deleted is a dangling reference, and the database preventing that is worth
 more than any amount of application code trying to.
@@ -637,7 +675,71 @@ order. They are not tasks and cannot be completed — the deadline stops
 mattering when the return exists or the date passes, and both of those are facts
 the shopping side already derives.
 
-`saved_items.cooldown_until` is Phase 2 on the shopping side and waits for it.
+`saved_items.cooldown_until` belongs to the anti-spending layer on the shopping
+side ([BUILD-ORDER.md](BUILD-ORDER.md) step 19) and waits for it.
+
+## Integration: a calendar you keep somewhere else
+
+You paste the private address of a calendar you already keep — Google, Apple, a
+work one — give it a name, and its appointments appear on this calendar and in
+the agenda's day context beside your own. Built as plan #275.
+
+**It reads one way only.** Nothing typed here is ever sent to that address, an
+appointment that arrived through a subscription cannot be edited or deleted in
+this app, and no task may point at one. That last rule is not squeamishness: a
+link has to point at a row that stays put, and the next refresh can drop any of
+these.
+
+**The appointments are a copy, and are treated as one.** `todo.calendar_feeds`
+holds one row per subscription; `todo.feed_events` holds one row per occurrence
+of one appointment, with the same two pairs of when-columns and the same
+constraints `todo.events` has, so everything that draws a calendar asks a
+subscribed appointment exactly the date questions it asks one you typed. A
+refresh deletes what that subscription contributed last time and writes what
+came back — the file is the truth, and an appointment deleted in Google has to
+disappear here too.
+
+This is the one place the module's own rule — *an obligation is displayed by
+whoever needs to show it and written by whoever owns it* — is bent, and the
+reason it does not break is that nothing here is an obligation. A subscribed
+appointment is never completed, deferred or dismissed, so there is no second
+place a state about it could disagree. Reading the file while the page renders
+was the alternative, and it means the calendar waits on somebody else's server
+to draw a month.
+
+**The address is a credential.** Anyone holding a private Google link can read
+the whole calendar, so it is encrypted at rest by `lib/crypto/tokens.ts` — the
+same helper and the same key the mailbox tokens use — a check constraint
+refuses anything that did not come out of `encryptToken()`, and settings shows
+only the host and the last four characters.
+
+**What the two questions settled:**
+
+- **#276 — read the file with a library.** `ical.js` does the parsing.
+  Repeating appointments are most of a real calendar and the rules behind them
+  have thirty years of edge cases in them. Its bugs are this app's now, so the
+  library is fenced into `lib/todo/feeds/` by an eslint boundary with a case in
+  `tests/lint-boundaries.test.ts`, the same containment the email and vault
+  providers have.
+- **#277 — freshness comes from the page, not a job.** Opening the calendar
+  re-reads any subscription whose copy is more than an hour old, before it
+  draws. There is no cron entry: a calendar nobody opens costs nothing to keep
+  fresh. `refreshing_since` is the claim that stops two tabs fetching the same
+  address at once, and a page render gets a shorter fetch timeout than the
+  Refresh now button does.
+
+A failed read never empties the page. `last_read_at` moves only on a good read,
+`last_error` carries the reason, and the appointments from the last good read
+stay exactly where they are: a calendar that has quietly gone empty is a worse
+lie than one that is a day stale.
+
+The address is somebody else's URL, so it is fetched under the same rules the
+learn module's fetcher obeys — https only, the resolved host checked on every
+redirect hop against `lib/net/public-address.ts`, a ceiling on the bytes read,
+a timeout, and an HTML answer refused rather than read as a calendar with
+nothing in it. That last one is a sign-in page, and reading it as an empty
+calendar would record "no appointments" instead of "this address needs
+renewing".
 
 ## Account settings, and module settings
 
@@ -897,6 +999,22 @@ confident and the code disagreed.
 - **`countOpenTasks` is imported dynamically on `/home`.** A static import
   pulled the todo client into a page that must still render when the module is
   switched off.
+- **Subtasks stopped being a non-goal.** Breaking one task into smaller todos
+  was listed above as something this module would not have, and it was built
+  anyway, as `parent_id` on `todo.tasks`. Three questions were settled before
+  it was:
+  - *Can an item hold a list of its own?* No. One level, refused by a trigger
+    rather than by the app, so a third level cannot arrive by another route.
+  - *Where does an item show besides under its task?* Nowhere. Its own due
+    date is text on its row; it never gets a row in a pile of its own, on the
+    agenda or on the calendar. A task broken into six things due today would
+    otherwise fill Today with seven rows.
+  - *What happens to the items when the task is ticked?* They are ticked with
+    it, and one undo puts back exactly the ones that tick took down -- items
+    already done stay done.
+
+  The archive is the one list that stays flat: it is a history, so an item
+  there says which task it came out of instead of being nested under it.
 
 ## What this unlocks (not v1)
 

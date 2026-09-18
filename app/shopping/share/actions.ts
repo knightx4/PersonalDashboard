@@ -29,6 +29,7 @@ export interface ShareActionState {
 
 const uuid = z.string().uuid();
 
+// latency: pending
 export async function createShare(
   _prev: ShareActionState,
   formData: FormData,
@@ -88,6 +89,7 @@ export async function createShare(
  * Revoking rather than deleting, so the answers she already gave survive and
  * the event log still says which link they came through.
  */
+// latency: pending
 export async function revokeShareToken(tokenId: string): Promise<ShareActionState> {
   if (!uuid.safeParse(tokenId).success) return { error: 'That is not a link.' };
 
@@ -117,6 +119,7 @@ export async function revokeShareToken(tokenId: string): Promise<ShareActionStat
 }
 
 /** A fresh link for the same share. The old one keeps working until revoked. */
+// latency: pending
 export async function issueShareToken(
   shareId: string,
   label?: string,
@@ -143,6 +146,7 @@ export async function issueShareToken(
   return { message: 'New link issued.' };
 }
 
+// latency: pending
 export async function archiveShare(shareId: string): Promise<ShareActionState> {
   if (!uuid.safeParse(shareId).success) return { error: 'That is not a share.' };
 
@@ -160,6 +164,7 @@ export async function archiveShare(shareId: string): Promise<ShareActionState> {
 }
 
 /** Put specific items on a share. The "I found another one" path. */
+// latency: pending
 export async function addToShare(input: {
   shareId: string;
   inventoryItemIds: string[];
@@ -196,6 +201,7 @@ export async function addToShare(input: {
  * Put everything matching a filter on a share. The "put all the board games
  * in" path, and the one an instruction turns into.
  */
+// latency: pending
 export async function addToShareByFilter(input: {
   shareId: string;
   filter: ShareFilter;
@@ -223,6 +229,7 @@ export async function addToShareByFilter(input: {
   }
 }
 
+// latency: pending
 export async function removeFromShare(input: {
   shareId: string;
   inventoryItemIds: string[];
@@ -245,6 +252,7 @@ export async function removeFromShare(input: {
 }
 
 /** Recompute the cached grouping, moving answers that can be moved. */
+// latency: pending
 export async function regroup(shareId: string): Promise<ShareActionState> {
   if (!uuid.safeParse(shareId).success) return { error: 'That is not a share.' };
 
@@ -277,6 +285,7 @@ export async function regroup(shareId: string): Promise<ShareActionState> {
  * few minutes old -- and "sell 2" clicked against a group she has since
  * changed to "sell 1" would dispose of a box nobody asked about.
  */
+// latency: pending
 export async function applyDecision(input: {
   shareId: string;
   groupKey: string;

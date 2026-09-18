@@ -23,6 +23,9 @@ export default function Loading() {
       </Card>
 
       <div className="mt-6 space-y-6">
+        {/* ui-ok: card-per-row -- the map is over two piles, not two rows, and
+          * the Card inside is padding="none" with divide-y: this is law 13's
+          * correct shape, which the rule cannot tell from its opposite. */}
         {[3, 2].map((rows, pile) => (
           <div key={pile}>
             <Skeleton className="h-3.5 w-24" />

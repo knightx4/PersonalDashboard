@@ -3,16 +3,10 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
-import {
-  loadReviewQueue,
-  parseReviewView,
-  REVIEW_VIEWS,
-  type SearchableRole,
-} from '@/lib/jobs/review/load';
+import { loadReviewQueue, parseReviewView, type SearchableRole } from '@/lib/jobs/review/load';
 import { loadCompanies, loadLinkCandidates } from '@/lib/jobs/inbox/link-candidates';
 import { scoreCandidate, type LinkInput } from '@/lib/jobs/email/link';
-import { ReviewList } from './list';
+import { ReviewQueue } from './list';
 
 export const metadata = { title: 'Review' };
 
@@ -48,10 +42,14 @@ export default async function ReviewPage({
   const withCandidates = rows.map((row) => {
     if (row.kind !== 'message') return row;
 
+    // Everything the held message still has. The four below it are genuinely
+    // gone -- bodies are never stored and the extractor's output is not
+    // persisted -- but the thread id and reply-to are on the row, and scoring
+    // without them offered worse suggestions than the mailbox supports.
     const input: LinkInput = {
-      threadId: null,
+      threadId: row.threadId,
       fromAddress: row.fromAddress,
-      replyToAddress: null,
+      replyToAddress: row.replyToAddress,
       subject: row.subject,
       bodyPreview: null,
       receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
@@ -136,39 +134,13 @@ export default async function ReviewPage({
   }
 
   return (
-    <>
-      <PageHeader
-        title="Review"
-        description={`${counts.all} waiting. Holding rather than guessing is what keeps the funnel worth reading.`}
-      />
-
-      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
-        <LeftRail>
-          <RailGroup label="Kind">
-            {REVIEW_VIEWS.map((entry) => (
-              <RailItem
-                key={entry.id}
-                label={entry.label}
-                href={entry.id === 'all' ? '/jobs/review' : `/jobs/review?view=${entry.id}`}
-                active={view === entry.id}
-                count={counts[entry.id]}
-              />
-            ))}
-          </RailGroup>
-          <p className="px-1 text-small leading-relaxed text-ink-muted">
-            Bodies are never stored, so each row links out to Gmail for the full message.
-          </p>
-        </LeftRail>
-
-        <div className="min-w-0 flex-1">
-          <ReviewList
-            rows={filtered}
-            timezone={(profile?.timezone as string) ?? 'UTC'}
-            companyNames={companies.map((company) => company.name).sort()}
-            allRoles={allRoles}
-          />
-        </div>
-      </div>
-    </>
+    <ReviewQueue
+      rows={filtered}
+      counts={counts}
+      view={view}
+      timezone={(profile?.timezone as string) ?? 'UTC'}
+      companyNames={companies.map((company) => company.name).sort()}
+      allRoles={allRoles}
+    />
   );
 }

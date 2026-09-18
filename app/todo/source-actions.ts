@@ -40,29 +40,49 @@ function done(): void {
   revalidatePath('/home');
 }
 
-export async function completeItem(sourceId: string, key: string): Promise<void> {
-  if (!isSourceId(sourceId)) return;
-  const source = sourceById(sourceId);
-  if (!source?.complete) return;
+/**
+ * Why a verb did not happen, in words a row can show.
+ *
+ * A source that has no `complete` is the honest case -- a return deadline is a
+ * date and cannot be ticked off -- and an id no source answers to is a request
+ * from a page that has gone stale. Both used to be a bare `return`, which a
+ * caller could not tell from a write that worked.
+ */
+function refuse(sourceId: string, verb: string): { error: string } {
+  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
+  if (!source) return { error: 'That is not a source this list knows about.' };
+  return { error: `${source.label}: nothing here can ${verb} that.` };
+}
+
+// latency: optimistic -- the agenda row ticks and strikes through at once
+export async function completeItem(
+  sourceId: string,
+  key: string,
+): Promise<{ error: string | null }> {
+  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
+  if (!source?.complete) return refuse(sourceId, 'finish');
 
   await source.complete(await context(), key);
   done();
+  return { error: null };
 }
 
-export async function deferItem(sourceId: string, key: string): Promise<void> {
-  if (!isSourceId(sourceId)) return;
-  const source = sourceById(sourceId);
-  if (!source?.defer) return;
+// latency: optimistic -- the agenda row fades at once
+export async function deferItem(sourceId: string, key: string): Promise<{ error: string | null }> {
+  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
+  if (!source?.defer) return refuse(sourceId, 'put off');
 
   await source.defer(await context(), key);
   done();
+  return { error: null };
 }
 
-export async function dismissItem(sourceId: string, key: string): Promise<void> {
-  if (!isSourceId(sourceId)) return;
-  const source = sourceById(sourceId);
-  if (!source?.dismiss) return;
+// latency: optimistic -- the agenda row fades at once
+export async function dismissItem(sourceId: string, key: string): Promise<{ error: string | null }> {
+  const source = isSourceId(sourceId) ? sourceById(sourceId) : undefined;
+  if (!source?.dismiss) return refuse(sourceId, 'dismiss');
 
   await source.dismiss(await context(), key);
   done();
+  return { error: null };
 }

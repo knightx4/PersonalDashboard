@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { BookOpen, Plus } from 'lucide-react';
+import { BookOpen, CornerDownRight, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadTracks, type TrackProgress } from '@/lib/learn/tracks/load';
+import { nestTracks } from '@/lib/learn/tracks/tree';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -16,6 +17,10 @@ export const dynamic = 'force-dynamic';
  * Newest first, because a reading queue is a stack of current interests rather
  * than a library: the thing you started on Tuesday is the thing you are most
  * likely to want on Wednesday.
+ *
+ * A track kept out of a broad topic, or branched off one step of a route, is
+ * drawn under the one it came from and inset. Ten rows that are really three
+ * subjects and seven parts of them read as ten unrelated topics otherwise.
  */
 
 function ProgressBar({ progress }: { progress: TrackProgress }) {
@@ -24,7 +29,7 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        className="h-1.5 w-28 overflow-hidden rounded-pill bg-canvas"
+        className="h-1.5 w-28 overflow-hidden rounded-pill bg-sunken"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
@@ -43,6 +48,7 @@ function ProgressBar({ progress }: { progress: TrackProgress }) {
 export default async function LearnPage() {
   const supabase = await createLearnClient();
   const tracks = await loadTracks(supabase);
+  const rows = nestTracks(tracks);
 
   return (
     <>
@@ -66,14 +72,24 @@ export default async function LearnPage() {
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-          {tracks.map((track) => (
+          {rows.map(({ track, depth, rolled }) => (
             <li key={track.id}>
               <Link
                 href={`/learn/t/${track.id}`}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3.5 transition-colors duration-150 hover:bg-canvas"
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3.5 pr-4 transition-colors duration-150 hover:bg-canvas"
+                style={{ paddingLeft: `${1 + depth * 1.25}rem` }}
               >
                 <span className="min-w-0">
-                  <span className="block text-body font-medium text-ink">{track.title}</span>
+                  <span className="block text-body font-medium text-ink">
+                    {depth > 0 && (
+                      <CornerDownRight
+                        className="mr-1.5 inline size-3.5 shrink-0 align-[-0.15em] text-ink-muted"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                    )}
+                    {track.title}
+                  </span>
                   {track.question && (
                     // The question, not a summary of the track. It is what you
                     // were actually stuck on, and it is what makes this row
@@ -81,7 +97,7 @@ export default async function LearnPage() {
                     <span className="mt-0.5 block text-ui text-ink-muted">{track.question}</span>
                   )}
                 </span>
-                <ProgressBar progress={track.progress} />
+                <ProgressBar progress={rolled} />
               </Link>
             </li>
           ))}

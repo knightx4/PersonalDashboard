@@ -24,6 +24,7 @@ const profileSchema = z.object({
   bannedConstructions: z.string().trim().optional(),
 });
 
+// latency: pending
 export async function updateProfile(
   _prev: SettingsState,
   formData: FormData,
@@ -83,6 +84,7 @@ export async function updateProfile(
  * Deleting our row without revoking leaves a live grant on the user's Google
  * account that they have no way to see from here. Revoke first, then delete.
  */
+// latency: pending
 export async function disconnectInbox(accountId: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const core = await createCoreClient();

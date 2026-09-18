@@ -7,6 +7,10 @@ import {
   sanitiseResolution,
   type ResolvedSource,
 } from '@/lib/learn/import/resolve-payload';
+import { isRooted, type Rooting } from '@/lib/learn/graph/rooting';
+import type { KnowledgeState } from '@/lib/learn/graph/model';
+import type { Aim } from '@/lib/learn/graph/aim';
+import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 /**
  * Finding something to read about a subject you wrote down.
@@ -74,18 +78,121 @@ FOR EACH ONE
 
 IF THE SUBJECT IS TOO VAGUE to search usefully -- "business", "history" -- set
 too_vague true and return no sources. Guessing at what somebody meant and
-handing back a reading list for it wastes more of their time than saying so.`;
+handing back a reading list for it wastes more of their time than saying so.
+
+WHEN YOU ARE TOLD WHICH CLAIM THEY ARE STUCK ON
+Some of these searches name the one claim the reading is for, and where the
+person stands on it. When that is there, the subject is only where the claim
+sits -- aim at the claim.
+
+Shaky means they have met this claim already and it did not land. Find the
+thing that teaches the claim itself. An introduction to the area around it is
+what they read the first time, and returning one spends an evening getting
+them back to where they already are.
+
+A named wrong belief is stronger than not knowing: something is steering them
+wrong, and a source that never mentions it leaves it where it is. Prefer one
+that takes that belief on directly -- names it, or argues against the position
+it comes from -- and say in the why field how it does.
+
+WHEN YOU ARE TOLD WHAT THEY ALREADY KNOW
+Some of these searches come with two lists: the claims this person has settled
+in the subject, and the claims they are ready to take on next. When they are
+there, two more rules apply and they are the point of the lists.
+
+Nothing whose whole content is a settled claim. An introduction to something
+they have already got is a wasted evening, and "it never hurts to revise" is
+how a reading queue fills up with things nobody opens. A source that covers
+settled ground on the way somewhere new is fine; one that only covers it is
+not.
+
+Nothing that opens by assuming a claim that is not settled. Anything absent
+from the settled list is not established, whatever the field usually takes for
+granted -- so a paper that starts three steps past where they are goes back on
+the shelf, however good it is. Say in the why field what the source builds on that
+they already have.
+
+The lists are what this subject's graph holds, not the whole of what they know,
+so treat them as evidence rather than as a complete account.`;
 
 export type SuggestResult =
   | { ok: true; sources: ResolvedSource[] }
   | { ok: false; reason: 'too-vague' | 'nothing-good' | 'error'; detail: string };
 
-function buildPrompt(subject: string, question: string | null): string {
+/** How each state reads in a prompt. The word alone does not carry it. */
+const STANDING: Record<KnowledgeState, string> = {
+  unknown: 'They have not met this claim yet.',
+  shaky: 'They have met this claim and it did not land.',
+  recognised: 'They can pick this claim out of a list and have not yet used it.',
+  known: 'They have settled this claim and are reading past it.',
+  sharp: 'They have settled this claim and defended it against the objection to it.',
+  misconception: 'Something is actively steering them wrong here.',
+};
+
+/**
+ * The claim, and where they stand on it.
+ *
+ * Left out entirely for a search with no graph behind it, which is every
+ * subject somebody typed for themselves. The misconception is a separate line
+ * rather than folded into the claim so the prompt's rule about taking a belief
+ * on directly has something to fire on.
+ */
+function aimLines(aim: Aim): string[] {
+  const lines = [
+    '',
+    `The claim they are stuck on: ${aim.claim}`,
+    `Where they stand on it: ${STANDING[aim.state]}`,
+  ];
+  if (aim.misconception) {
+    lines.push(`What they believe instead: ${aim.misconception}`);
+  }
+  lines.push('Aim at that claim, not at the subject around it.');
+  return lines;
+}
+
+/**
+ * The two lists, when there are two lists.
+ *
+ * Left out entirely when nothing is settled. An empty "already settled"
+ * heading reads as a claim that they know nothing, which is a different and
+ * much stronger statement than the graph is making -- it holds no evidence
+ * either way.
+ */
+function rootingLines(rooting: Rooting): string[] {
+  if (!isRooted(rooting)) return [];
+
+  const lines = ['', 'What they have already settled in this subject:'];
+  for (const claim of rooting.settled) lines.push(`- ${claim}`);
+  if (rooting.settledOmitted > 0) {
+    lines.push(`- …and ${rooting.settledOmitted} more, left out to keep this short.`);
+  }
+
+  if (rooting.frontier.length > 0) {
+    lines.push('', 'What they are ready to take on next:');
+    for (const claim of rooting.frontier) lines.push(`- ${claim}`);
+  }
+
+  lines.push(
+    '',
+    'Apply the two rules for this: nothing whose whole content is a settled',
+    'claim, and nothing that opens by assuming a claim that is not on that list.',
+  );
+  return lines;
+}
+
+function buildPrompt(
+  subject: string,
+  question: string | null,
+  aim: Aim | null,
+  rooting: Rooting | null,
+): string {
   const lines = [`Subject: ${subject}`];
   if (question) {
     lines.push('', `The larger question they are working on: ${question}`);
     lines.push('Aim these at that, not at the subject in general.');
   }
+  if (aim) lines.push(...aimLines(aim));
+  if (rooting) lines.push(...rootingLines(rooting));
   lines.push('', `Search, then call ${TOOL_NAME}.`);
   return lines.join('\n');
 }
@@ -100,8 +207,20 @@ function buildPrompt(subject: string, question: string | null): string {
 export async function suggestSources(input: {
   subject: string;
   question?: string | null;
+  /**
+   * The claim this search is for, when it came from a gap in a graph. Null for
+   * a subject you typed, which is about a topic and not about a claim.
+   */
+  aim?: Aim | null;
+  /**
+   * What the subject's graph holds, when this search came from a gap in one.
+   * Null for a subject you typed, which has no graph behind it.
+   */
+  rooting?: Rooting | null;
   anthropicApiKey: string;
   client?: Anthropic;
+  /** Told what the call cost, before anything is made of what it returned. */
+  onSpend?: SpendSink;
 }): Promise<SuggestResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
@@ -161,7 +280,17 @@ export async function suggestSources(input: {
           },
         },
       ],
-      messages: [{ role: 'user', content: buildPrompt(input.subject, input.question ?? null) }],
+      messages: [
+        {
+          role: 'user',
+          content: buildPrompt(
+            input.subject,
+            input.question ?? null,
+            input.aim ?? null,
+            input.rooting ?? null,
+          ),
+        },
+      ],
     });
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) {
@@ -173,6 +302,10 @@ export async function suggestSources(input: {
       detail: error instanceof Error ? error.message : 'The search failed.',
     };
   }
+
+  // Before the response is judged. A search that came back useless still cost
+  // what it cost, and those are the calls worth seeing on the spend screen.
+  input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
   const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
   if (!block || block.type !== 'tool_use') {

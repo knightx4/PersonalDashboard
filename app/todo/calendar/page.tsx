@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadCalendar } from '@/lib/todo/calendar/load';
 import { isMonth } from '@/lib/todo/calendar/month';
@@ -14,10 +14,18 @@ import {
 import { cn } from '@/lib/cn';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { loadEvent } from '@/lib/todo/events/load';
+import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
+import { eventFields } from '@/lib/todo/events/model';
+import { nextHourSlot } from '@/lib/todo/time';
 import { CalendarMonthGrid, Pill } from '@/components/todo/calendar-month';
 import { CalendarTimeGrid } from '@/components/todo/calendar-time-grid';
+import { EventForm, type EventDraft } from '@/components/todo/event-form';
+import { FeedEventCard } from '@/components/todo/feed-event-card';
+import { CalendarPicker } from '@/components/todo/calendar-picker';
 
 export const metadata = { title: 'Calendar' };
 
@@ -36,7 +44,14 @@ export const metadata = { title: 'Calendar' };
 export default async function TodoCalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; month?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    date?: string;
+    month?: string;
+    new?: string;
+    event?: string;
+    feedEvent?: string;
+  }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -53,8 +68,59 @@ export default async function TodoCalendarPage({
         ? `${params.month}-01`
         : undefined;
 
-  const calendar = await loadCalendar(user.id, view, anchor);
+  // The subscriptions, for the Calendars button: which of them the page is
+  // drawing is a stored choice, so nothing about it is in the URL.
+  const [calendar, feeds] = await Promise.all([
+    loadCalendar(user.id, view, anchor),
+    loadFeeds(user.id),
+  ]);
   const nothing = calendar.days.every((day) => day.entries.length === 0);
+
+  // `?new=<day>` opens an empty form on that day and `?event=<id>` opens a
+  // stored one. Both are query params like the view and the date beside them,
+  // so every control that opens the form is a link and the page still holds no
+  // state of its own.
+  const composing = params.new && isDay(params.new) ? params.new : null;
+  // An id that is not yours, or is not there, comes back null and the page is
+  // simply the calendar. Nothing was found, which is not an error.
+  const editing = params.event ? await loadEvent(user.id, params.event) : null;
+  // `?feedEvent=<id>` opens a subscribed appointment the same way, and it only
+  // reads: the row came from somebody else's calendar and a refresh replaces
+  // it, so there is nothing here to edit or delete.
+  const reading = params.feedEvent ? await loadFeedEvent(user.id, params.feedEvent) : null;
+
+  // What "New event" means with nothing else said: today when you can see it,
+  // and otherwise the day the view is anchored on.
+  const defaultDay = calendar.days.find((day) => day.isToday)?.day ?? calendar.anchor;
+  const newHref = (day: string) =>
+    `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, new: day })}`;
+  const eventHref = (id: string) =>
+    `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, event: id })}`;
+  const feedEventHref = (id: string) =>
+    `/todo/calendar?${new URLSearchParams({ view: calendar.view, date: calendar.anchor, feedEvent: id })}`;
+
+  const slot = nextHourSlot(new Date(), calendar.timezone);
+  const draft: EventDraft | null = editing
+    ? {
+        id: editing.id,
+        title: editing.title,
+        body: editing.body ?? '',
+        location: editing.location ?? '',
+        ...eventFields(editing, calendar.timezone),
+      }
+    : composing
+      ? {
+          id: null,
+          title: '',
+          body: '',
+          location: '',
+          allDay: false,
+          startDay: composing,
+          endDay: '',
+          startTime: slot.start,
+          endTime: slot.end,
+        }
+      : null;
 
   return (
     // No width of its own: a calendar is a grid, and seven columns want every
@@ -63,9 +129,14 @@ export default async function TodoCalendarPage({
       <PageHeader title="Calendar" description="Everything with a date on it, laid out." />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-body font-semibold text-ink">{title(calendar.view, calendar.days)}</h2>
-
-        <nav className="flex items-center gap-1" aria-label={`Change ${calendar.view}`}>
+        {/* The arrows sit either side of the thing they move, the way every
+            calendar sets this: they step the month, so they bracket the month.
+            Around "Today" they read as stepping through todays. */}
+        <div
+          role="group"
+          aria-label={`Change ${calendar.view}`}
+          className="flex items-center gap-1"
+        >
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, -1)}
@@ -73,12 +144,9 @@ export default async function TodoCalendarPage({
           >
             <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
           </StepLink>
-          <Link
-            href={{ pathname: '/todo/calendar', query: { view: calendar.view } }}
-            className="rounded-lg px-3 py-1.5 text-ui font-medium text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
-          >
-            Today
-          </Link>
+          <h2 className="px-1 text-body font-semibold whitespace-nowrap text-ink">
+            {title(calendar.view, calendar.days)}
+          </h2>
           <StepLink
             view={calendar.view}
             date={shiftAnchor(calendar.view, calendar.anchor, 1)}
@@ -86,7 +154,26 @@ export default async function TodoCalendarPage({
           >
             <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
           </StepLink>
-        </nav>
+        </div>
+
+        {/* Its own control, not the middle of the stepper. It is a jump rather
+            than a step -- the one place in this row that ignores where you are. */}
+        <Link
+          href={{ pathname: '/todo/calendar', query: { view: calendar.view } }}
+          className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+        >
+          Today
+        </Link>
+
+        <Link href={newHref(defaultDay)} className={buttonVariants({ size: 'sm' })}>
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+          New event
+        </Link>
+
+        {/* Nothing at all until there is a subscription to switch off. */}
+        <CalendarPicker
+          calendars={feeds.map((feed) => ({ id: feed.id, name: feed.name, shown: feed.shown }))}
+        />
 
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
@@ -121,10 +208,33 @@ export default async function TodoCalendarPage({
         </Banner>
       )}
 
+      {draft && <EventForm draft={draft} view={calendar.view} anchor={calendar.anchor} />}
+
+      {reading && (
+        <FeedEventCard
+          detail={reading}
+          view={calendar.view}
+          anchor={calendar.anchor}
+          timezone={calendar.timezone}
+        />
+      )}
+
       {calendar.view === 'month' ? (
-        <CalendarMonthGrid days={calendar.days} timezone={calendar.timezone} />
+        <CalendarMonthGrid
+          days={calendar.days}
+          timezone={calendar.timezone}
+          newEventHref={newHref}
+          eventHref={eventHref}
+          feedEventHref={feedEventHref}
+        />
       ) : (
-        <CalendarTimeGrid days={calendar.days} timezone={calendar.timezone} />
+        <CalendarTimeGrid
+          days={calendar.days}
+          timezone={calendar.timezone}
+          newEventHref={newHref}
+          eventHref={eventHref}
+          feedEventHref={feedEventHref}
+        />
       )}
 
       {/* A day or a week with nothing in it is a grid of empty hours, which
@@ -136,7 +246,8 @@ export default async function TodoCalendarPage({
           icon={CalendarDays}
           title={`Nothing this ${calendar.view}`}
           description="Anything with a date on it lands on its hour here."
-          action={{ label: 'Add a task', href: '/todo' }}
+          action={{ label: 'New event', href: newHref(defaultDay) }}
+          secondaryAction={{ label: 'Add a task', href: '/todo' }}
         />
       )}
 

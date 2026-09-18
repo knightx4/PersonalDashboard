@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Two jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into proposed steps, dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -27,14 +27,42 @@ npx tsx scripts/plan.ts show <n>               # the brief: destination, decisio
 npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses a decision
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
-npx tsx scripts/plan.ts block <n> --note "…"   # cannot proceed; say what is needed
+npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
+                                               # cannot proceed; the ask is the one sentence
+                                               # saying what it needs, rewritten each time.
+                                               # --on-steps: it clears itself when the steps it
+                                               # names close; without it, it waits for you
+npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
+                                               # something only the person can supply — a key,
+                                               # an account. Writes a setup step of theirs under
+                                               # the same feature and makes <n> wait on it
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
+                                               [--from <n>]  # stamp: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
+npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
+                                               # finishing this feature, one patch;
+                                               # --clear once it can be seen
+npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
+                                               # file a follow-on on /dev/ideas; it lands
+                                               # marked as your suggestion, under the
+                                               # user's own ideas. --from names the step
+                                               # you were on when you thought of it. One
+                                               # close to an idea already filed is refused
+                                               # and names what it matched. Two an hour
+                                               # is the most a session can file.
+npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
+npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
+                                [--detail "…"] [--module <id>] [--from <n>]
+                                               # ask the person something. Never answered by you.
+npx tsx scripts/plan.ts raises                 # open raises, and answers no session has replied to
+                                               # a closed one is finished with and is not listed
 ```
 
 Steps are named by number — the `#12` on the page. Numbers are never reused.
+
+If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 
 ## Which steps are yours
 
@@ -51,6 +79,15 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
   decision** — not by running `answer`, not by writing the resolution into the
   row, and not by building as though it had been settled. A routine that can
   answer its own questions has no questions, only guesses with a paper trail.
+- A **setup step** is never yours either. It is something only the person can
+  supply — a key, an account, a value set somewhere a session cannot reach —
+  and it closes when they say they have done it, on the page or in the Dash
+  tab. `next --claude` does not list one and `start` refuses one. Writing one
+  is `needs "…" --for <the step that stopped>`, per `reference/building.md`.
+- A **dismissed** row is nobody's. The person has put it aside as not right
+  now, and it is hidden from the page, from `next`, from `list` and from every
+  brief. You will not normally see one; if you do, leave it exactly as it is.
+  Dismissing something and bringing it back are both their moves.
 - Anything else, ask before starting. A step nobody has handed over may be one
   the user wants to do themselves, or is still thinking about.
 
@@ -59,203 +96,84 @@ sub-steps are still open, and nothing above it is blocked or dropped. A feature
 with open sub-steps is worked through its sub-steps; the feature itself is what
 you close when they are all done.
 
-## The loop
+## Building
 
-One step at a time. Do not start the next until the current one is closed.
+**One step, on its own** — "do #12", or one step named in a brief. Read
+`reference/building.md` and follow it yourself. A subagent for a single step is
+pure overhead.
 
-1. **Claim it first.** `start <n>`, before reading anything. Two routines can
-   be awake at once, and the seconds spent reading a brief are exactly the
-   window in which the other one takes the same step. `start` refuses a
-   proposal and refuses a decision, so claiming first is also the cheapest way
-   to find out the step is not yours.
-2. **Read the brief.** `show <n>`. Read the "Done when" section twice; it is
-   what the work is checked against. If there is none, write one from the
-   detail and the parent's context before starting, and say so in the note.
-   The brief also carries **Destination** — the feature's own done-when — and
-   **Decided so far**, every question already settled beneath that feature.
-   Build against those: they are the answers you would otherwise ask for
-   again.
-3. **Check what it waits on.** A brief that says "waits on #9 (still open)" is
-   not ready, whatever `next` said a minute ago. Put it back — `reopen <n>` —
-   and stop.
-4. **Break it down if it is large.** A step sized `l`, or one whose brief
-   describes more than one sitting of work, gets sub-steps first
-   (`add "…" --parent <n>`), each with its own done-when. Then work those. The
-   plan is more useful with the breakdown in it than with the breakdown in
-   your head.
-5. **Make the change.** The smallest change that meets the done-when. Follow
-   the repo's rules (`README.md` "Rules", the module's spec in `docs/`). Do not
-   fold unrelated cleanup into a step's commit.
-6. **Verify before closing.** All four, every time:
-   - `npx tsc --noEmit -p tsconfig.json`
+**A feature, or more than one step** — you are the orchestrator, not the
+builder. Send each step to its own subagent and keep your own context for the
+batch.
+
+This is the difference between a batch that finishes and one that stops
+halfway. A session that builds nine steps itself carries everything it read for
+step 1 through every turn of step 9, and runs out of room around step 3. A
+session that sends each step out keeps a paragraph per step instead of forty
+thousand tokens, and gets to the end.
+
+1. **Read the raises first.** `raises`, before claiming anything. An open raise
+   is the person still waiting to be asked; an answered one carries a reply
+   written while nothing was awake, and that answer is what to build against
+   from then on.
+2. **Work out the order.** `show <the feature>` gives the tree, the done-whens
+   and what waits on what. List the steps you are going to build, in dependency
+   order. Steps that wait on nothing come first; a step whose dependency is
+   still open is not in this batch.
+3. **Send each step to a subagent, one at a time.** The prompt is short:
+
+   > Build plan step #N. Read `.claude/skills/plan/reference/building.md` and
+   > follow it exactly. Do not push.
+   >
+   > What earlier steps in this batch worked out: <the carry-forward, below>
+
+   **Do not read the step's source files yourself, and do not make the edit.**
+   Every file you open is a file you carry for the rest of the batch. Reading
+   "just to check" is how the batch runs out of room.
+4. **Keep the carry-forward.** Each subagent reports what the next step needs
+   to know. Append it to a running list and pass it into the next prompt. That
+   list is the whole memory of the batch, and it is the reason the steps do not
+   re-derive each other's findings. Keep it to what is load-bearing; drop a
+   line once the steps it was for are closed.
+5. **Stop when the plan says stop.** A subagent that reports a block has
+   written a decision and blocked its step. Do not build around it and do not
+   send a later step that depends on it. Other steps in the batch that do not
+   depend on it are still yours to send.
+6. **Run the gate once, at the end.** After the last step closes, before
+   pushing:
    - `npx eslint app lib components scripts --max-warnings 0`
    - `npx vitest run lib` (two FX tests fail without network — that is
      pre-existing, everything else must pass)
-   - `npx next build` when routes, pages, or server actions changed
-   Then check the done-when line by line. If a line is not met, it is not
-   done.
-7. **Commit the step on its own.** One step per commit. End the subject with
-   the step: `Add the anonymous share page (plan #14)`.
-8. **Close it.** `done <n> --note "what changed, in one sentence"`. The commit
-   is recorded from HEAD, so close after committing. The output names any
-   steps that became ready as a result — mention them in the report.
-9. **Push once per batch**, then report: every step closed **by number and
-   title**, what became ready, and what is blocked and on what. A report that
-   says "closed four steps" makes the person go and look.
+   - `npx next build`
 
-### When you reach something you should not decide
+   These are the checks the subagents were told to skip, because running them
+   after every step costs minutes a step and catches nothing this will not.
+   Anything that fails here belongs to whichever step broke it: fix it, and
+   amend or add a commit against that step's number.
+7. **Push once**, then report: every step closed **by number and title**, what
+   became ready, what is blocked and on what, and anything raised on
+   `/dev/raised`, by title. A report that says "closed four steps" makes the
+   person go and look.
 
-A design choice with two real answers, a cost worth somebody's opinion, a
-thing the brief did not say — do not pick one and build on it. Guessing is
-cheap in the moment and expensive later, because a guess built on looks
-exactly like a decision from the outside.
+If the batch ends before the steps do — something blocked, or you are running
+short — say exactly which steps are left and that they are still handed over.
+Do not close what was not built, and do not leave a step `in_progress` behind
+you.
 
-Write it down instead, and stop:
+## The other jobs
 
-```
-npx tsx scripts/plan.ts add "Which shape for the export?" --parent <the feature> \
-  --kind decision --detail "<the question, the two or three real options, what
-  each costs, and which you would choose and why>"
-npx tsx scripts/plan.ts depends <your step> --on <the decision>
-npx tsx scripts/plan.ts block <your step> --note "Waiting on #<the decision>."
-```
+Each is one file. Read the one you were sent for; do not read the others.
 
-The recommendation is part of the job: a question with no proposed answer
-makes the person do the reading you already did. What you must not do is act
-on your own recommendation before they have agreed to it.
-
-Writing a decision means writing rows outside your own step, which is the one
-place "one step at a time" gives way — and only for this. A decision, its
-dependency edge, and the block on your own step: nothing else.
-
-A step that turns out to need something else from the user — an API key, an
-account, a thing outside the repo — is `block <n> --note "the question"`, with
-the exact question. A step that should not be done is `drop <n> --note "why"`;
-say "out of scope: …" when that is the reason, since there is no status for
-it. Never delete a step; deleting is the user's.
-
-## Shaping an idea
-
-The other job. An idea on the ideas page is a sentence; the plan needs a
-feature with steps, and writing that well takes knowing the code. So when the
-user says "shape idea …", or a routine is fired from the *Shape into a plan*
-button with an idea in its brief, the job is to write a **proposal** — and
-nothing else.
-
-1. **Read the idea.** `ideas` lists the ones not yet shaped, with their id
-   prefix. The brief a routine was fired with carries the full text.
-2. **Read the code it touches.** The module's spec in `docs/`, the routes and
-   lib directories it would change, the tests that would need to grow. Decide
-   what already exists, what has to be added, and in what order.
-3. **Write the feature.** One top-level step for the idea, in its module:
-
-   ```
-   npx tsx scripts/plan.ts add "<the feature>" --module <id> --proposed --idea <prefix> \
-     --size l --detail "<what it is, in two or three sentences>" \
-     --done-when "<what being finished means, from the user's side>"
-   ```
-
-   `--idea` links the idea to the feature, which is what turns the idea's
-   button into "in the plan as #n". Do this on the feature, not a step.
-4. **Write the steps beneath it**, each `--parent <n>` and each with a
-   `--done-when` and a `--size`. Steps under a proposed feature are proposed
-   automatically. Three to eight steps is the usual shape; a step sized `l`
-   should be split. Order them the way they would be built, and add
-   `depends <n> --on <m>` where one genuinely cannot start before another.
-   Put migrations and schema first, the page last, and the tests inside the
-   step they test rather than as a step of their own.
-
-   **Do not pad to a step count.** Three real steps and an honest gap beat
-   six, three of which were invented to look complete. What goes in the gap
-   is a decision or fog, and the test for which is one question:
-
-   > **Can the question be phrased sharply, right now?**
-   >
-   > Yes → it is a **decision**. Write it as a step:
-   > `add "…?" --parent <n> --kind decision --detail "<the question, the two
-   > or three real options, what each costs, your recommendation>"`, and
-   > `depends` the steps that cannot start until it is settled.
-   >
-   > No → it is **fog**. Put it on the feature: `--fog "<what is not yet
-   > known, and what would have to be found out>"`. It graduates into steps
-   > once somebody can see far enough to write them, and is cleared then.
-
-   The test is *not* whether you can answer the question. A question you
-   could answer yourself is still a decision if it is the person's to make;
-   a question nobody can answer yet is still a decision if it is sharp.
-5. **Say what you are unsure of** in the feature's `--detail` as well: the
-   costs, the trade-offs, the thing the idea did not say. A proposal that
-   hides its open questions gets approved with them still open. A decision
-   is the sharp end of that; the detail is for what does not fit the shape.
-6. **Stop.** Do not `start`, do not `approve`, do not `answer` your own
-   decisions, do not assign anything to Claude, do not write code. Report the
-   feature and its steps **by number and title**, and the questions. The
-   person approves on `/dev/plan`, and only then does the building loop above
-   apply.
-
-If the idea is already in the plan (`ideas` does not list it), say so and
-stop rather than shaping it twice. If the idea is really a bug or a one-line
-request, say that it belongs in the notes queue instead, and stop.
-
-## When the CLI cannot run
-
-`DATABASE_URL` is not set in Claude Code on the web, so `scripts/plan.ts`
-exits immediately there. Fall back to the **`Supabase`** connector against
-`plan_items` and `plan_dependencies` (both in `public`; project ref
-`asjztutnqxbecruvyrbj`), and do not spend the session diagnosing it. The
-brief a routine was fired with is the plan as it stood; trust it, and re-read
-the row before closing it.
-
-The reading rules are in `lib/plan/tree.ts` and are what the page uses; when
-working by hand, apply the same ones:
-
-```sql
--- the open steps, in reading order
-select number, parent_id, title, status, priority, size, assignee, acceptance, comment
-from plan_items
-where user_id = '…' and status not in ('done', 'dropped')
-order by module nulls last, position, created_at;
-
--- what a step waits on
-select d.depends_on_id, p.number, p.title, p.status
-from plan_dependencies d join plan_items p on p.id = d.depends_on_id
-where d.item_id = '…';
-
--- a proposal, when shaping (steps beneath: same, with parent_id set)
-insert into plan_items (user_id, module, title, detail, acceptance, size, status, position)
-values ('…', 'shopping', '…', '…', '…', 'l', 'proposed', 10)
-returning id, number;
-update ideas set plan_item_id = '<the feature id>' where id = '<the idea id>';
-
--- a decision, when shaping: the question, its options, your recommendation.
--- Fog goes in the `fog` column of the feature the same insert creates.
-insert into plan_items (user_id, module, parent_id, title, detail, kind, status, position)
-values ('…', 'shopping', '<the feature id>', '…?', '…', 'decision', 'proposed', 20);
-
--- start (never on a proposed step, never on a decision)
-update plan_items set status = 'in_progress' where id = '…';
-
--- done (after committing, so HEAD is the commit that did it)
-update plan_items
-set status = 'done', commit_sha = '…',
-    comment = coalesce(comment || E'\n\n', '') || 'Done <date>: …'
-where id = '…';
-
--- answer: the person's move, never a session's. Here to be recognised, not run.
-update plan_items
-set status = 'done', resolution = '<their words>', commit_sha = null,
-    comment = coalesce(comment || E'\n\n', '') || 'Answered <date>: …'
-where id = '…';
-
--- block: not finished, so no commit
-update plan_items
-set status = 'blocked',
-    comment = coalesce(comment || E'\n\n', '') || 'Blocked <date>: <the question>'
-where id = '…';
-```
-
-`started_at` and `completed_at` are kept by a trigger from the status; do not
-write them. A step is never closed without a note.
+| | |
+|---|---|
+| `reference/building.md` | Building one step, start to close. What a subagent reads. |
+| `reference/shaping.md` | Turning an idea into a proposed feature. |
+| `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
+| `reference/comments.md` | Answering a comment that tags `@dash`. |
+| `reference/writing.md` | How to write a title and a detail. Read before writing any row. |
+| `reference/raising.md` | The four places something a session has to say can go. |
+| `reference/dismissed.md` | What the person has put aside, and why you never bring it back. |
+| `reference/offline.md` | The SQL to use when `DATABASE_URL` is missing. |
 
 ## Statuses
 
@@ -281,8 +199,9 @@ Beside the status, two columns say what a step is rather than where it stands.
 
 | | Meaning |
 |---|---|
-| `kind` | `build` or `decision`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`. It is a kind and not a status because a decision moves through the same states — it can be not started, blocked, dropped — and differs only in what closing it means. |
-| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Cleared once the steps that dispel it exist. |
+| `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`; a setup step closes when the person says they have done the thing outside the repo, and carries no commit. It is a kind and not a status because all three move through the same states — not started, blocked, dropped — and differ only in what closing them means. |
+| `dismissed_at`, `fog_dismissed_at` | Put aside by the person as not right now — the row itself, and the patch of fog on it. Hidden everywhere but the Dismissed view. Never written by a session. See `reference/dismissed.md`. |
+| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. `reference/reshaping.md` is what does that clearing. |
 
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,

@@ -3,11 +3,14 @@ import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadLearnBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
+import { countNext } from '@/lib/learn/graph/load';
 
 /**
  * Shell for the learn workspace.
@@ -24,11 +27,13 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login');
 
   const supabase = await createClient();
-  const [{ data: profile }, settings, counts, activity] = await Promise.all([
+  const [{ data: profile }, settings, counts, activity, raised, mainCheck] = await Promise.all([
     supabase.from('profiles').select('display_name').eq('id', user.id).single(),
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
+    loadRaisedNotifications(user.id),
+    loadMainCheck(),
   ]);
 
   const brief = await loadLearnBrief();
@@ -44,7 +49,11 @@ export default async function LearnLayout({ children }: { children: React.ReactN
    * make. The badge is the count, so the tab answers "is there anything" from
    * the column.
    */
-  const readNow = await countReadNow(await createLearnClient());
+  const learnClient = await createLearnClient();
+  const [readNow, learnNext] = await Promise.all([
+    countReadNow(learnClient),
+    countNext(learnClient),
+  ]);
 
   const sections: NavSection[] = [
     {
@@ -61,11 +70,55 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       badge: readNow,
     },
+    // Five minutes is the other end of Read now: the same module asked for
+    // when there is no time to read anything. No badge, because there is
+    // always a question waiting and a number that never goes down is not
+    // information.
+    {
+      href: '/learn/today',
+      label: 'Five minutes',
+      icon: 'fiveMinutes',
+      exact: true,
+    },
+    // Learn next earns a tab on the same argument Read now does: it is not a
+    // deeper view of a subject, it is every subject's next thing on one
+    // screen, and the badge answers "is there anything" from the column. The
+    // count is the rows the page would draw, so tapping the tab never finds a
+    // different number of them.
+    {
+      href: '/learn/next',
+      label: 'Learn next',
+      icon: 'learnNext',
+      exact: true,
+      badge: learnNext,
+    },
+    // Quizzes are not a deeper view of anything else here: they are over
+    // material you chose out of the vault rather than over a subject the graph
+    // holds, and they are where you go when there is a date in the diary. One
+    // quiz and the screen you answer it on are both reached through the list.
+    {
+      href: '/learn/quiz',
+      label: 'Quizzes',
+      icon: 'quiz',
+      exact: true,
+      alsoMatches: ['/learn/quiz/'],
+    },
+    // The other half of the module. A subject is reached through here, and a
+    // single concept through a subject, so both are alsoMatches rather than
+    // tabs of their own.
+    {
+      href: '/learn/know',
+      label: 'What you know',
+      icon: 'know',
+      exact: true,
+      alsoMatches: ['/learn/s/', '/learn/c/'],
+    },
   ];
 
   return (
     <div data-workspace="learn">
       <AppShell
+        account={user.id}
         module="learn"
         sections={sections}
         displayName={profile?.display_name ?? null}
@@ -73,7 +126,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
         brief={brief}
       >
         {children}

@@ -91,7 +91,7 @@ export function serverEnv() {
       CLAUDE_FEATURE_ROUTINE_ID: z.string().min(1).optional(),
       /** The routine "Run Feature Routine" fires -- the notes queue. */
       CLAUDE_NOTES_ROUTINE_ID: z.string().min(1).optional(),
-      /** The routine "Send to Claude" and "Shape into a plan" fire. */
+      /** The routine "Send to Dash" and "Shape into a plan" fire. */
       CLAUDE_PLAN_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the notes routine. Scoped to it, not to the account. */
       CLAUDE_NOTES_ROUTINE_TOKEN: z.string().min(1).optional(),
@@ -112,6 +112,14 @@ export function serverEnv() {
       EBAY_DELETION_ENDPOINT_URL: z.string().url().optional(),
       INNGEST_EVENT_KEY: z.string().optional(),
       INNGEST_SIGNING_KEY: z.string().optional(),
+      /**
+       * Optional. The domain Mailgun receives newsletters on, e.g.
+       * `in.example.com`. Without it the News workspace has no address to
+       * show and nothing can be delivered. docs/SETUP.md has the DNS.
+       */
+      NEWS_MAIL_DOMAIN: z.string().min(3).optional(),
+      /** Optional. Mailgun's HTTP webhook signing key. Not the API key. */
+      MAILGUN_SIGNING_KEY: z.string().min(1).optional(),
     })
     .parse(process.env);
 }

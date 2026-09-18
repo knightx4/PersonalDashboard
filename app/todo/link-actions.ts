@@ -24,6 +24,7 @@ export interface LinkedTaskState {
  * created from a role page and silently not attached to it is worse than no
  * task, because it is invisible from the place you were looking.
  */
+// latency: pending
 export async function addLinkedTask(
   _prev: LinkedTaskState,
   formData: FormData,
@@ -59,6 +60,7 @@ export async function addLinkedTask(
   return { message: 'Added.' };
 }
 
+// latency: pending
 export async function detachTask(
   taskId: string,
   target: string,

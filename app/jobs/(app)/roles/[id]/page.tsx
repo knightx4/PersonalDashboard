@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
-import { cardVariants } from '@/components/ui/card';
 import { requestOrigin } from '@/lib/auth/origin';
 import { PageHeader } from '@/components/shell/page-header';
+import { DetailLayout, Property, PropertyList } from '@/components/shell/detail-layout';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
@@ -23,6 +23,15 @@ import {
 } from '@/lib/jobs/pipeline';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
+import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
+
+/** The columns of an interview row the prep key is computed from. */
+type PrepInterviewRow = {
+  id: string;
+  group_id: string | null;
+  scheduled_at: string | null;
+  interview_participants: { contacts: { id: string } | null }[] | null;
+};
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
@@ -101,90 +110,88 @@ export default async function RoleDetailPage({
     { data: caseLetter },
     { data: allCompanies },
   ] = await Promise.all([
-      supabase
-        .from('application_events')
-        .select(
-          'id, kind, occurred_at, source, summary, payload, needs_review, ingested_message_id',
-        )
-        .eq('application_id', current.id)
-        .order('occurred_at', { ascending: false }),
-      supabase
-        .from('interviews')
-        // Participants come back embedded: who is in the room is part of
-        // reading a round, and the contact carries the LinkedIn and the title
-        // that make the name worth clicking.
-        .select(
-          `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
-           questions_asked, group_id,
+    supabase
+      .from('application_events')
+      .select('id, kind, occurred_at, source, summary, payload, needs_review, ingested_message_id')
+      .eq('application_id', current.id)
+      .order('occurred_at', { ascending: false }),
+    supabase
+      .from('interviews')
+      // Participants come back embedded: who is in the room is part of
+      // reading a round, and the contact carries the LinkedIn and the title
+      // that make the name worth clicking.
+      .select(
+        `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
+           questions_asked, group_id, prep_note, prep_note_at, prep_note_key,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
-        )
-        .eq('application_id', current.id)
-        // `round` is the interview's place inside its own round now, so it
-        // says nothing across the pursuit. The clock does.
-        .order('scheduled_at', { ascending: true, nullsFirst: false })
-        .order('round', { ascending: true }),
-      supabase
-        .from('application_answers')
-        .select(
-          'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!inner ( id, text, kind, canonical_answer, times_seen )',
-        )
-        .eq('application_id', current.id),
-      supabase
-        .from('notes')
-        .select('id, body, pinned, created_at')
-        .eq('role_id', id)
-        .order('created_at', { ascending: false }),
-      // The occasions several rounds belong to -- a superday and its
-      // impression of the day as a whole. Empty for almost every pursuit.
-      supabase
-        .from('interview_groups')
-        .select('id, label, notes, round_number')
-        .eq('application_id', current.id)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('inbox_messages')
-        // provider_message_id, thread_id and email_address are what the Gmail
-        // deep link is built from. The view carries the address so this does
-        // not need a second query for the mailbox.
-        .select(
-          'id, subject, from_address, received_at, classification, link_method, link_confidence, provider_message_id, thread_id, email_address',
-        )
-        .eq('resulting_application_id', current.id)
-        .order('received_at', { ascending: false }),
-      supabase.from('profiles').select('timezone').eq('id', user.id).single(),
-      supabase
-        .from('reminders')
-        .select('id, body, due_at, ingested_message_id')
-        .eq('application_id', current.id)
-        .is('completed_at', null)
-        .order('due_at', { ascending: true }),
-      findUnlinkedMessages(supabase, user.id, {
-        applicationId: current.id as string,
-        term: company.name,
-      }),
-      // Everyone already known at this company, so naming an interviewer is a
-      // pick rather than a retype -- and so the name on the round is the same
-      // record as the one on the contacts page.
-      supabase
-        .from('contacts')
-        .select('id, full_name, title')
-        .eq('user_id', user.id)
-        .eq('company_id', company.id)
-        .order('full_name'),
-      // Only what the staleness key is computed from. A stored match stays put
-      // until the description or the bank changes; without this the page
-      // cannot tell a current map from one computed before you added the item
-      // that answers its biggest gap.
-      supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
-      supabase
-        .from('cover_letters')
-        .select('body, public_slug, public_expires_at')
-        .eq('application_id', current.id)
-        .eq('user_id', user.id)
-        .maybeSingle(),
-      // Every company on file, to move this role to the right one by name.
-      supabase.from('companies').select('name').eq('user_id', user.id).order('name'),
-    ]);
+      )
+      .eq('application_id', current.id)
+      // `round` is the interview's place inside its own round now, so it
+      // says nothing across the pursuit. The clock does.
+      .order('scheduled_at', { ascending: true, nullsFirst: false })
+      .order('round', { ascending: true }),
+    supabase
+      .from('application_answers')
+      .select(
+        'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!inner ( id, text, kind, canonical_answer, times_seen )',
+      )
+      .eq('application_id', current.id),
+    supabase
+      .from('notes')
+      .select('id, body, pinned, created_at')
+      .eq('role_id', id)
+      .order('created_at', { ascending: false }),
+    // The occasions several rounds belong to -- a superday and its
+    // impression of the day as a whole. Empty for almost every pursuit.
+    supabase
+      .from('interview_groups')
+      .select('id, label, notes, round_number')
+      .eq('application_id', current.id)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('inbox_messages')
+      // provider_message_id, thread_id and email_address are what the Gmail
+      // deep link is built from. The view carries the address so this does
+      // not need a second query for the mailbox.
+      .select(
+        'id, subject, from_address, received_at, classification, link_method, link_confidence, provider_message_id, thread_id, email_address',
+      )
+      .eq('resulting_application_id', current.id)
+      .order('received_at', { ascending: false }),
+    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    supabase
+      .from('reminders')
+      .select('id, body, due_at, ingested_message_id')
+      .eq('application_id', current.id)
+      .is('completed_at', null)
+      .order('due_at', { ascending: true }),
+    findUnlinkedMessages(supabase, user.id, {
+      applicationId: current.id as string,
+      term: company.name,
+    }),
+    // Everyone already known at this company, so naming an interviewer is a
+    // pick rather than a retype -- and so the name on the round is the same
+    // record as the one on the contacts page.
+    supabase
+      .from('contacts')
+      .select('id, full_name, title')
+      .eq('user_id', user.id)
+      .eq('company_id', company.id)
+      .order('full_name'),
+    // Only what the staleness key is computed from. A stored match stays put
+    // until the description or the bank changes; without this the page
+    // cannot tell a current map from one computed before you added the item
+    // that answers its biggest gap.
+    supabase.from('evidence_items').select('id, strength, skills').eq('user_id', user.id),
+    supabase
+      .from('cover_letters')
+      .select('body, public_slug, public_expires_at')
+      .eq('application_id', current.id)
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    // Every company on file, to move this role to the right one by name.
+    supabase.from('companies').select('name').eq('user_id', user.id).order('name'),
+  ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
 
@@ -225,7 +232,10 @@ export default async function RoleDetailPage({
         .order('created_at', { ascending: false })
     : { data: [] };
 
-  const notesByInterview = new Map<string, Array<{ id: string; body: string; createdAt: string }>>();
+  const notesByInterview = new Map<
+    string,
+    Array<{ id: string; body: string; createdAt: string }>
+  >();
   for (const note of (interviewNotes ?? []) as Array<Record<string, unknown>>) {
     const key = note.interview_id as string;
     notesByInterview.set(key, [
@@ -251,6 +261,42 @@ export default async function RoleDetailPage({
   const coverageLabel = formatCoverage(coverage);
   const currentMatchKey = matchKey(role.jd_hash as string | null, evidence);
 
+  /**
+   * The prep note each round would be written against right now.
+   *
+   * Computed here rather than asked of the model: the key is a fingerprint of
+   * the description, the bank, the round's conversations and who is named on
+   * them, so comparing it with the stored one says whether a note is still the
+   * note for this round without a call. Keyed per round rather than per
+   * conversation because the note belongs to the round -- a superday has one.
+   */
+  const roundConversations = new Map<string, PrepInterviewRow[]>();
+  for (const interview of (interviews ?? []) as unknown as PrepInterviewRow[]) {
+    const roundId = interview.group_id ?? interview.id;
+    const conversations = roundConversations.get(roundId) ?? [];
+    conversations.push(interview);
+    roundConversations.set(roundId, conversations);
+  }
+  const currentPrepKey = new Map<string, string>();
+  for (const conversations of roundConversations.values()) {
+    const contactIds = new Set<string>();
+    for (const conversation of conversations) {
+      for (const participant of conversation.interview_participants ?? []) {
+        if (participant.contacts) contactIds.add(participant.contacts.id);
+      }
+    }
+    const key = prepKey({
+      jdHash: role.jd_hash as string | null,
+      bank: evidence,
+      conversations: conversations.map((conversation) => ({
+        id: conversation.id,
+        scheduledAt: conversation.scheduled_at,
+      })),
+      contactIds: [...contactIds],
+    });
+    for (const conversation of conversations) currentPrepKey.set(conversation.id, key);
+  }
+
   // Timeline events name the message they came from, and the linked mail is
   // already loaded, so the same deep link can hang off both without a second
   // query. An event with no message (a status you set by hand) has no link.
@@ -266,140 +312,144 @@ export default async function RoleDetailPage({
   );
 
   return (
-    <>
-      <PageHeader
-        leading={
-          <CompanyAvatar
-            company={{
-              name: company.name,
-              logoUrl: company.logo_url,
-              domains: company.domains ?? [],
-              website: company.website,
-              careersUrl: company.careers_url,
-            }}
-            className="size-11 rounded-xl"
-            imageClassName="size-7"
-          />
-        }
-        title={<RoleTitle roleId={role.id as string} title={role.title as string} />}
-        description={
-          <>
-            <RoleCompany
-              roleId={role.id as string}
-              name={company.name}
-              slug={company.slug}
-              companies={(allCompanies ?? []).map((row) => row.name as string)}
-            />
-            {role.location ? ` · ${role.location}` : ''}
-            {role.work_mode ? ` · ${role.work_mode}` : ''}
-            {role.seniority ? ` · ${role.seniority}` : ''}
-          </>
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            {coverageLabel && (
-              <Link
-                href={`/jobs/roles/${role.id}?tab=posting`}
-                className={cn(
-                  'tabular rounded-full px-2 py-0.5 text-small',
-                  coverage.gaps > 0
-                    ? 'bg-caution-tint text-ink'
-                    // Not the offer hue: full coverage is a good answer, not a
-                    // stage of the pipeline, and law 4 gives those five colours
-                    // one meaning each. Amber still carries the gaps, where
-                    // "something is wrong and only you can fix it" is true.
-                    : 'bg-sunken text-ink-muted',
+    <DetailLayout
+      header={
+        <>
+          <PageHeader
+            leading={
+              <CompanyAvatar
+                company={{
+                  name: company.name,
+                  logoUrl: company.logo_url,
+                  domains: company.domains ?? [],
+                  website: company.website,
+                  careersUrl: company.careers_url,
+                }}
+                className="size-11 rounded-xl"
+                imageClassName="size-7"
+              />
+            }
+            title={<RoleTitle roleId={role.id as string} title={role.title as string} />}
+            description={
+              <>
+                <RoleCompany
+                  roleId={role.id as string}
+                  name={company.name}
+                  slug={company.slug}
+                  companies={(allCompanies ?? []).map((row) => row.name as string)}
+                />
+                {role.location ? ` · ${role.location}` : ''}
+                {role.work_mode ? ` · ${role.work_mode}` : ''}
+                {role.seniority ? ` · ${role.seniority}` : ''}
+              </>
+            }
+            actions={
+              <div className="flex items-center gap-2">
+                {coverageLabel && (
+                  <Link
+                    href={`/jobs/roles/${role.id}?tab=posting`}
+                    className={cn(
+                      'tabular rounded-full px-2 py-0.5 text-small',
+                      coverage.gaps > 0
+                        ? 'bg-caution-tint text-ink'
+                        : // Not the offer hue: full coverage is a good answer, not a
+                          // stage of the pipeline, and law 4 gives those five colours
+                          // one meaning each. Amber still carries the gaps, where
+                          // "something is wrong and only you can fix it" is true.
+                          'bg-sunken text-ink-muted',
+                    )}
+                    title={
+                      coverage.gaps > 0
+                        ? `${coverage.gaps} must-have${coverage.gaps === 1 ? '' : 's'} your bank does not cover`
+                        : 'Every must-have covered by your evidence'
+                    }
+                  >
+                    {coverageLabel}
+                  </Link>
                 )}
-                title={
-                  coverage.gaps > 0
-                    ? `${coverage.gaps} must-have${coverage.gaps === 1 ? '' : 's'} your bank does not cover`
-                    : 'Every must-have covered by your evidence'
-                }
-              >
-                {coverageLabel}
-              </Link>
-            )}
-            <StatusPicker
-              applicationId={current.id as string}
-              status={current.status as ApplicationStatus}
-              submittedAt={current.submitted_at as string | null}
-            />
-            {role.jd_url && (
-              <a
-                href={role.jd_url as string}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-ui text-ink-muted underline underline-offset-2 hover:text-ink"
-              >
-                Original posting
-              </a>
-            )}
-          </div>
-        }
-      />
+                <StatusPicker
+                  applicationId={current.id as string}
+                  status={current.status as ApplicationStatus}
+                  submittedAt={current.submitted_at as string | null}
+                />
+                {role.jd_url && (
+                  <a
+                    href={role.jd_url as string}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-ui text-ink-muted underline underline-offset-2 hover:text-ink"
+                  >
+                    Original posting
+                  </a>
+                )}
+              </div>
+            }
+          />
 
-      {/* The shared Banner, and `warn` is exactly what it means: something is
-        * wrong with this record and only you can fix it. It was a hand-rolled
-        * tinted paragraph -- the same tint, without the glyph, the role or the
-        * live region, which is the part that matters to a screen reader. */}
-      {current.needs_review && (
-        <Banner tone="warn" className="mb-4">
-          {current.created_by === 'email_inferred'
-            ? 'This was created from a confirmation email nobody logged. Check the role and the date, then clear the flag from the review queue.'
-            : 'Flagged for review.'}
-        </Banner>
-      )}
-
-      {/* The card's own frame, with `bg-border` in place of its fill so the
-        * 1px grid gaps between the facts are the ground showing through. The
-        * same shape the activity highlights use, and hand-written in both
-        * until the sweep. */}
-      <dl
-        className={cn(
-          cardVariants(),
-          'mb-6 grid gap-px overflow-hidden bg-border text-ui sm:grid-cols-4',
-        )}
-      >
-        <Fact label="Applied" value={formatDate(current.submitted_at as string | null, timezone)} />
-        <Fact
-          label="Confirmed"
-          value={formatDate(current.confirmation_received_at as string | null, timezone)}
-        />
-        <Fact
-          label="First human reply"
-          value={formatDate(current.first_human_response_at as string | null, timezone)}
-          hint="Automated confirmations never set this."
-        />
-        <Fact
-          label="Source"
-          value={SOURCE_LABELS[current.source as ApplicationSource] ?? (current.source as string)}
-        />
-        <Fact
-          label="Comp band"
-          value={formatCompBand(role.comp_min_cents as number | null, role.comp_max_cents as number | null) ?? '—'}
-          hint={role.comp_source ? `From the ${role.comp_source}` : undefined}
-        />
-        <Fact label="Posting" value={(role.posting_status as string) ?? 'unknown'} />
-        <Fact label="ATS" value={company.ats_type === 'unknown' ? '—' : company.ats_type} />
-        <Fact
-          label="Outcome"
-          value={
-            current.outcome
-              ? `${current.outcome}${
-                  current.rejection_stage_override || current.rejection_stage
-                    ? ` at ${(current.rejection_stage_override ?? current.rejection_stage) as string}`
-                    : ''
-                }`
-              : '—'
-          }
-        />
-      </dl>
-
-      {/* What has to happen about this role, from the todo module. Here rather
-          than inside the panels because it is not one of the tabs: it is the
-          thing you write down while reading the page, and a note you have to
-          go looking for a tab to write is a note that does not get written. */}
-      <div className="mb-6">
+          {/* The shared Banner, and `warn` is exactly what it means: something is
+           * wrong with this record and only you can fix it. It was a hand-rolled
+           * tinted paragraph -- the same tint, without the glyph, the role or the
+           * live region, which is the part that matters to a screen reader. */}
+          {current.needs_review && (
+            <Banner tone="warn" className="mb-4">
+              {current.created_by === 'email_inferred'
+                ? 'This was created from a confirmation email nobody logged. Check the role and the date, then clear the flag from the review queue.'
+                : 'Flagged for review.'}
+            </Banner>
+          )}
+        </>
+      }
+      properties={
+        <PropertyList>
+          <Property
+            label="Applied"
+            value={formatDate(current.submitted_at as string | null, timezone)}
+          />
+          <Property
+            label="Confirmed"
+            value={formatDate(current.confirmation_received_at as string | null, timezone)}
+          />
+          <Property
+            label="First human reply"
+            value={formatDate(current.first_human_response_at as string | null, timezone)}
+            hint="Automated confirmations never set this."
+          />
+          <Property
+            label="Source"
+            value={SOURCE_LABELS[current.source as ApplicationSource] ?? (current.source as string)}
+          />
+          <Property
+            label="Comp band"
+            value={
+              formatCompBand(
+                role.comp_min_cents as number | null,
+                role.comp_max_cents as number | null,
+              ) ?? '—'
+            }
+            hint={role.comp_source ? `From the ${role.comp_source}` : undefined}
+          />
+          <Property label="Posting" value={(role.posting_status as string) ?? 'unknown'} />
+          <Property label="ATS" value={company.ats_type === 'unknown' ? '—' : company.ats_type} />
+          <Property
+            label="Outcome"
+            value={
+              current.outcome
+                ? `${current.outcome}${
+                    current.rejection_stage_override || current.rejection_stage
+                      ? ` at ${(current.rejection_stage_override ?? current.rejection_stage) as string}`
+                      : ''
+                  }`
+                : '—'
+            }
+          />
+        </PropertyList>
+      }
+    >
+      <div className="space-y-6">
+        {/* What has to happen about this role, from the todo module. Here rather
+            than inside the panels because it is not one of the tabs: it is the
+            thing you write down while reading the page, and a note you have to
+            go looking for a tab to write is a note that does not get written. */}
         <LinkedTasks
           target="role"
           targetId={role.id as string}
@@ -407,178 +457,187 @@ export default async function RoleDetailPage({
           tasks={linkedTasks}
           timezone={timezone}
         />
-      </div>
 
-      <RoleDetailPanels
-        roleId={role.id as string}
-        applicationId={current.id as string}
-        jdText={(role.jd_text as string) ?? ''}
-        jdLookupNote={(role.jd_lookup_note as string) ?? null}
-        jdUrl={(role.jd_url as string) ?? null}
-        atsJobId={(role.ats_job_id as string) ?? null}
-        compMinCents={(role.comp_min_cents as number) ?? null}
-        compMaxCents={(role.comp_max_cents as number) ?? null}
-        compSource={(role.comp_source as string) ?? null}
-        requirements={requirements}
-        requirementMatches={requirementMatches}
-        requirementMatchesAt={(role.requirement_matches_at as string) ?? null}
-        // Stale rather than absent: the map still reads, it is just no longer
-        // the map for this description and this bank.
-        requirementMatchesStale={
-          requirementMatches !== null &&
-          (role.requirement_matches_key as string | null) !== currentMatchKey
-        }
-        bankSize={evidence.length}
-        caseStatement={(caseLetter?.body as string) ?? ''}
-        // A slug with a live expiry is what the read function accepts, so a
-        // slug alone is not "shared" and must not read as it.
-        caseSlug={
-          caseLetter?.public_slug && caseLetter?.public_expires_at
-            ? (caseLetter.public_slug as string)
-            : null
-        }
-        caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
-        // The live host rather than NEXT_PUBLIC_APP_URL: a case-page link is
-        // sent to a hiring manager, and an env var that still holds its
-        // localhost default would hand them a link only the sender can open.
-        appOrigin={await requestOrigin()}
-        timezone={timezone}
-        initialTab={tab === 'interviews' ? 'interviews' : undefined}
-        focusInterviewId={focusInterviewId ?? null}
-        events={(events ?? []).map((event) => ({
-          id: event.id as string,
-          kind: event.kind as string,
-          occurredAt: event.occurred_at as string,
-          source: event.source as string,
-          summary: (event.summary as string) ?? null,
-          needsReview: event.needs_review as boolean,
-          gmailHref:
-            gmailHrefByMessage.get(event.ingested_message_id as string) ?? null,
-        }))}
-        interviews={(interviews ?? []).map((interview) => ({
-          id: interview.id as string,
-          kind: interview.kind as string,
-          scheduledAt: interview.scheduled_at as string | null,
-          timeKnown: (interview.time_known as boolean | null) ?? true,
-          debriefDue: debriefDue(interview.scheduled_at as string | null),
-          format: interview.format as string | null,
-          status: interview.status as string,
-          prepNotes: (interview.prep_notes as string) ?? '',
-          notes: (interview.notes as string) ?? '',
-          customNotes: notesByInterview.get(interview.id as string) ?? [],
-          groupId: (interview.group_id as string | null) ?? null,
-          questionsAsked: (interview.questions_asked as string[]) ?? [],
-          participants: (
-            (interview.interview_participants ?? []) as unknown as Array<{
-              role: string;
-              contacts: { id: string; full_name: string; title: string | null } | null;
+        <RoleDetailPanels
+          roleId={role.id as string}
+          applicationId={current.id as string}
+          jdText={(role.jd_text as string) ?? ''}
+          jdLookupNote={(role.jd_lookup_note as string) ?? null}
+          jdUrl={(role.jd_url as string) ?? null}
+          atsJobId={(role.ats_job_id as string) ?? null}
+          compMinCents={(role.comp_min_cents as number) ?? null}
+          compMaxCents={(role.comp_max_cents as number) ?? null}
+          compSource={(role.comp_source as string) ?? null}
+          requirements={requirements}
+          requirementMatches={requirementMatches}
+          requirementMatchesAt={(role.requirement_matches_at as string) ?? null}
+          // Stale rather than absent: the map still reads, it is just no longer
+          // the map for this description and this bank.
+          requirementMatchesStale={
+            requirementMatches !== null &&
+            (role.requirement_matches_key as string | null) !== currentMatchKey
+          }
+          bankSize={evidence.length}
+          caseStatement={(caseLetter?.body as string) ?? ''}
+          // A slug with a live expiry is what the read function accepts, so a
+          // slug alone is not "shared" and must not read as it.
+          caseSlug={
+            caseLetter?.public_slug && caseLetter?.public_expires_at
+              ? (caseLetter.public_slug as string)
+              : null
+          }
+          caseExpiresAt={(caseLetter?.public_expires_at as string) ?? null}
+          // The live host rather than NEXT_PUBLIC_APP_URL: a case-page link is
+          // sent to a hiring manager, and an env var that still holds its
+          // localhost default would hand them a link only the sender can open.
+          appOrigin={await requestOrigin()}
+          timezone={timezone}
+          initialTab={tab === 'interviews' ? 'interviews' : undefined}
+          focusInterviewId={focusInterviewId ?? null}
+          events={(events ?? []).map((event) => ({
+            id: event.id as string,
+            kind: event.kind as string,
+            occurredAt: event.occurred_at as string,
+            source: event.source as string,
+            summary: (event.summary as string) ?? null,
+            needsReview: event.needs_review as boolean,
+            gmailHref: gmailHrefByMessage.get(event.ingested_message_id as string) ?? null,
+          }))}
+          interviews={(interviews ?? []).map((interview) => ({
+            id: interview.id as string,
+            kind: interview.kind as string,
+            scheduledAt: interview.scheduled_at as string | null,
+            timeKnown: (interview.time_known as boolean | null) ?? true,
+            debriefDue: debriefDue(interview.scheduled_at as string | null),
+            format: interview.format as string | null,
+            status: interview.status as string,
+            prepNotes: (interview.prep_notes as string) ?? '',
+            notes: (interview.notes as string) ?? '',
+            customNotes: notesByInterview.get(interview.id as string) ?? [],
+            groupId: (interview.group_id as string | null) ?? null,
+            questionsAsked: (interview.questions_asked as string[]) ?? [],
+            prepNote: (interview.prep_note as PrepNote | null) ?? null,
+            prepNoteAt: (interview.prep_note_at as string) ?? null,
+            // Stale rather than absent, the same as the requirement map: the
+            // note still reads, it is just no longer the note for this round.
+            prepNoteStale:
+              interview.prep_note !== null &&
+              (interview.prep_note_key as string | null) !==
+                currentPrepKey.get(interview.id as string),
+            participants: (
+              (interview.interview_participants ?? []) as unknown as Array<{
+                role: string;
+                contacts: { id: string; full_name: string; title: string | null } | null;
+              }>
+            )
+              .filter((participant) => participant.contacts !== null)
+              .map((participant) => ({
+                contactId: participant.contacts!.id,
+                name: participant.contacts!.full_name,
+                title: participant.contacts!.title,
+                role: participant.role,
+              })),
+          }))}
+          companyContacts={(
+            (companyContacts ?? []) as unknown as Array<{
+              id: string;
+              full_name: string;
+              title: string | null;
             }>
-          )
-            .filter((participant) => participant.contacts !== null)
-            .map((participant) => ({
-              contactId: participant.contacts!.id,
-              name: participant.contacts!.full_name,
-              title: participant.contacts!.title,
-              role: participant.role,
-            })),
-        }))}
-        companyContacts={((companyContacts ?? []) as unknown as Array<{
-          id: string;
-          full_name: string;
-          title: string | null;
-        }>).map((contact) => ({
-          id: contact.id,
-          name: contact.full_name,
-          title: contact.title,
-        }))}
-        answers={(answers ?? []).map((answer) => {
-          const question = answer.questions as unknown as {
-            id: string;
-            text: string;
-            kind: string;
-            canonical_answer: string | null;
-            times_seen: number;
-          };
-          return {
-            id: answer.id as string,
-            answer: (answer.answer as string) ?? '',
-            status: answer.status as string,
-            questionId: question.id,
-            questionText: question.text,
-            questionKind: question.kind,
-            canonicalAnswer: question.canonical_answer,
-            timesSeen: question.times_seen,
-            // Persisted, so the claims you have to check survive the reload
-            // between drafting an answer and submitting it.
-            evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
-            unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
-          };
-        })}
-        notes={(notes ?? []).map((note) => ({
-          id: note.id as string,
-          body: note.body as string,
-          pinned: note.pinned as boolean,
-          createdAt: note.created_at as string,
-        }))}
-        interviewGroups={(interviewGroups ?? []).map((group) => ({
-          id: group.id as string,
-          label: (group.label as string | null) ?? null,
-          roundNumber: (group.round_number as number | null) ?? null,
-          notes: (group.notes as string | null) ?? '',
-          messageIds: messageIdsByGroup.get(group.id as string) ?? [],
-        }))}
-        todos={(reminders ?? []).map((reminder) => {
-          // The mail a to-do points at is already loaded for the Linked mail
-          // tab, so the subject and the deep link come from there rather than
-          // from a second query.
-          const messageId = (reminder.ingested_message_id as string) ?? null;
-          const linked = messageId
-            ? ((messages ?? []).find((message) => message.id === messageId) ?? null)
-            : null;
-          return {
-            id: reminder.id as string,
-            body: reminder.body as string,
-            dueAt: reminder.due_at as string,
-            message: linked
-              ? {
-                  id: linked.id as string,
-                  subject: (linked.subject as string) ?? null,
-                  gmailHref: gmailHrefByMessage.get(linked.id as string) ?? null,
-                }
-              : messageId
-                // Linked to mail this pursuit no longer carries. Saying so is
-                // better than the link silently not being there.
-                ? { id: messageId, subject: null, gmailHref: null }
-                : null,
-          };
-        })}
-        messages={(messages ?? []).map((message) => ({
-          id: message.id as string,
-          subject: (message.subject as string) ?? null,
-          fromAddress: (message.from_address as string) ?? null,
-          receivedAt: (message.received_at as string) ?? null,
-          classification: message.classification as string,
-          linkMethod: (message.link_method as string) ?? null,
-          linkConfidence: (message.link_confidence as number) ?? null,
-          gmailHref: gmailOpenUrl({
-            emailAddress: (message.email_address as string) ?? null,
-            threadId: (message.thread_id as string) ?? null,
-            messageId: (message.provider_message_id as string) ?? null,
-          }),
-        }))}
-        companyName={company.name}
-        matchCandidates={matchCandidates}
-        otherAttempts={(applications ?? []).slice(1).map((attempt) => ({
-          id: attempt.id as string,
-          attempt: attempt.attempt as number,
-          status: attempt.status as ApplicationStatus,
-          submittedAt: attempt.submitted_at as string | null,
-          outcome: (attempt.outcome as string) ?? null,
-          rejectionStage:
-            ((attempt.rejection_stage_override ?? attempt.rejection_stage) as string) ?? null,
-        }))}
-      />
-    </>
+          ).map((contact) => ({
+            id: contact.id,
+            name: contact.full_name,
+            title: contact.title,
+          }))}
+          answers={(answers ?? []).map((answer) => {
+            const question = answer.questions as unknown as {
+              id: string;
+              text: string;
+              kind: string;
+              canonical_answer: string | null;
+              times_seen: number;
+            };
+            return {
+              id: answer.id as string,
+              answer: (answer.answer as string) ?? '',
+              status: answer.status as string,
+              questionId: question.id,
+              questionText: question.text,
+              questionKind: question.kind,
+              canonicalAnswer: question.canonical_answer,
+              timesSeen: question.times_seen,
+              // Persisted, so the claims you have to check survive the reload
+              // between drafting an answer and submitting it.
+              evidenceItemIds: (answer.evidence_item_ids as string[]) ?? [],
+              unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
+            };
+          })}
+          notes={(notes ?? []).map((note) => ({
+            id: note.id as string,
+            body: note.body as string,
+            pinned: note.pinned as boolean,
+            createdAt: note.created_at as string,
+          }))}
+          interviewGroups={(interviewGroups ?? []).map((group) => ({
+            id: group.id as string,
+            label: (group.label as string | null) ?? null,
+            roundNumber: (group.round_number as number | null) ?? null,
+            notes: (group.notes as string | null) ?? '',
+            messageIds: messageIdsByGroup.get(group.id as string) ?? [],
+          }))}
+          todos={(reminders ?? []).map((reminder) => {
+            // The mail a to-do points at is already loaded for the Linked mail
+            // tab, so the subject and the deep link come from there rather than
+            // from a second query.
+            const messageId = (reminder.ingested_message_id as string) ?? null;
+            const linked = messageId
+              ? ((messages ?? []).find((message) => message.id === messageId) ?? null)
+              : null;
+            return {
+              id: reminder.id as string,
+              body: reminder.body as string,
+              dueAt: reminder.due_at as string,
+              message: linked
+                ? {
+                    id: linked.id as string,
+                    subject: (linked.subject as string) ?? null,
+                    gmailHref: gmailHrefByMessage.get(linked.id as string) ?? null,
+                  }
+                : messageId
+                  ? // Linked to mail this pursuit no longer carries. Saying so is
+                    // better than the link silently not being there.
+                    { id: messageId, subject: null, gmailHref: null }
+                  : null,
+            };
+          })}
+          messages={(messages ?? []).map((message) => ({
+            id: message.id as string,
+            subject: (message.subject as string) ?? null,
+            fromAddress: (message.from_address as string) ?? null,
+            receivedAt: (message.received_at as string) ?? null,
+            classification: message.classification as string,
+            linkMethod: (message.link_method as string) ?? null,
+            linkConfidence: (message.link_confidence as number) ?? null,
+            gmailHref: gmailOpenUrl({
+              emailAddress: (message.email_address as string) ?? null,
+              threadId: (message.thread_id as string) ?? null,
+              messageId: (message.provider_message_id as string) ?? null,
+            }),
+          }))}
+          companyName={company.name}
+          matchCandidates={matchCandidates}
+          otherAttempts={(applications ?? []).slice(1).map((attempt) => ({
+            id: attempt.id as string,
+            attempt: attempt.attempt as number,
+            status: attempt.status as ApplicationStatus,
+            submittedAt: attempt.submitted_at as string | null,
+            outcome: (attempt.outcome as string) ?? null,
+            rejectionStage:
+              ((attempt.rejection_stage_override ?? attempt.rejection_stage) as string) ?? null,
+          }))}
+        />
+      </div>
+    </DetailLayout>
   );
 }
 
@@ -593,15 +652,4 @@ function debriefDue(iso: string | null): boolean {
   const scheduledAt = new Date(iso).getTime();
   const now = Date.now();
   return scheduledAt < now && scheduledAt >= now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
-}
-
-function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="bg-surface px-3 py-2.5">
-      <dt className="text-micro uppercase tracking-wider text-ink-muted">{label}</dt>
-      <dd className="tabular mt-0.5 truncate text-ink" title={hint}>
-        {value}
-      </dd>
-    </div>
-  );
 }

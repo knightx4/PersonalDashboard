@@ -31,6 +31,7 @@ export function AccountView({
       <YouSection email={email} settings={settings} />
       <ModulesSection enabled={settings.enabledModules} />
       <ModuleSettingsSection enabled={settings.enabledModules} />
+      <SpendSection />
       <SessionSection />
       <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
     </div>
@@ -202,6 +203,35 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
 
 
 /**
+ * What the models have cost.
+ *
+ * An account concern rather than a module one, on the same test as everything
+ * else here: it survives every module being switched off, and several of them
+ * spend. The screen itself is a page rather than a panel because it is a
+ * ledger -- rows you scroll -- and this page is settings.
+ */
+function SpendSection() {
+  return (
+    <section className={cardVariants({ padding: 'standard' })}>
+      <h2 className="text-body font-semibold text-ink">Spend</h2>
+      <p className="mt-0.5 text-ui text-ink-muted">
+        Every model call this app makes, what it was doing, and what it cost.
+      </p>
+      <ul className="mt-4 divide-y divide-border">
+        <li>
+          <a href="/account/spend" className="block py-2.5 hover:text-accent">
+            <span className="block text-ui font-medium text-ink">Model spend</span>
+            <span className="block text-small text-ink-muted">
+              This month and all time, by module and operation
+            </span>
+          </a>
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+/**
  * Signing out is an account action, so it lives on the account page.
  *
  * It used to exist in exactly one place -- Shopping settings -- which meant a
@@ -288,6 +318,10 @@ function DangerSection({ vaultEnabled }: { vaultEnabled: boolean }) {
                 body: JSON.stringify({ confirm }),
               });
               if (response.ok) {
+                // The account is gone, so the router cache and every rendered
+                // tree holding its rows have to go with it. router.push()
+                // keeps both, which is what this rule would have us use.
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 window.location.href = '/';
                 return;
               }

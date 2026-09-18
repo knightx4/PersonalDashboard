@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { publicEnv } from '@/lib/env';
 import { APP_SCHEMA } from '@/lib/jobs/db/schema-name';
+import { sessionUser, type SessionUser } from '@/lib/auth/session-user';
 
 /**
  * Supabase client for Server Components, Server Actions and Route Handlers.
@@ -46,17 +47,15 @@ export async function createClient() {
 /**
  * The authenticated user, or null.
  *
- * Always calls getUser(), never getSession(): getSession reads the cookie
- * without verifying it against the auth server, so it can be spoofed. Never
- * take a user id from a request body or query param either -- it comes from
- * here or it does not exist.
+ * getClaims() rather than getUser(), so the token is verified here instead of
+ * at the auth server; see the comment on the same function in lib/auth/server.ts
+ * for why that is safe and what it gives up.
+ *
+ * Never take a user id from a request body or query param either -- it comes
+ * from here or it does not exist.
  */
-export async function getUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+export async function getUser(): Promise<SessionUser | null> {
+  return sessionUser(await createClient());
 }
 
 /** getUser(), but throws instead of returning null. For routes past middleware. */

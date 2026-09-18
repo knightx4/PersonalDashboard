@@ -112,6 +112,46 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.ideas = idea.id;
 
+  const [raised] = await admin<{ id: string }[]>`
+    insert into raised_items (user_id, module, title, detail, source)
+    values (
+      ${userId}, 'dev', ${`${tag} needs an answer`},
+      ${`${tag} found something while building`}, ${`${tag}'s routine, plan #1`}
+    )
+    returning id`;
+  ids.raised_items = raised.id;
+
+  const [raisedComment] = await admin<{ id: string }[]>`
+    insert into dev_comments (user_id, raised_item_id, author, body)
+    values (${userId}, ${raised.id}, 'me', ${`${tag} answered it`})
+    returning id`;
+  ids.dev_comments = raisedComment.id;
+
+  // Keyed by (user_id, target, row_id) rather than an id of its own, so what
+  // goes in `ids` is the row the thread hangs off -- see ROW_KEY below.
+  await admin`
+    insert into dev_comment_reads (user_id, target, row_id)
+    values (${userId}, 'idea', ${idea.id})`;
+  ids.dev_comment_reads = idea.id;
+
+  const [uiReview] = await admin<{ id: string }[]>`
+    insert into ui_reviews (user_id, module, commit_sha, violations, note)
+    values (
+      ${userId}, 'vault', ${`${tag}c0ffee`}, 0,
+      ${`${tag} left the settings page alone`}
+    )
+    returning id`;
+  ids.ui_reviews = uiReview.id;
+
+  const [uiFinding] = await admin<{ id: string }[]>`
+    insert into ui_findings (user_id, review_id, file, line, law, surface, body)
+    values (
+      ${userId}, ${uiReview.id}, 'app/vault/page.tsx', 12, '11', 'vault-note',
+      ${`${tag} saw a frame around a frame`}
+    )
+    returning id`;
+  ids.ui_findings = uiFinding.id;
+
   const [planItem] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, module, title, detail, status, position)
     values (
@@ -132,11 +172,53 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_dependencies = planDependency.id;
 
+  const [planRun] = await admin<{ id: string }[]>`
+    insert into plan_runs (user_id, plan_item_id, job, routine_id, external_id, http_status, response)
+    values (
+      ${userId}, ${planItem.id}, 'step', ${`trig_${tag}`}, ${`run_${tag}`}, 200,
+      ${admin.json({ run_id: `run_${tag}` })}::jsonb
+    )
+    returning id`;
+  ids.plan_runs = planRun.id;
+
+  const [commitCheck] = await admin<{ id: string }[]>`
+    insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
+    values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
+    returning id`;
+  ids.plan_commit_checks = commitCheck.id;
+
+  const [overnight] = await admin<{ id: string }[]>`
+    insert into plan_overnight_runs (
+      user_id, running, paused, features_budget, features_left, stop_by, started_at
+    )
+    values (${userId}, true, false, 6, 6, now() + interval '8 hours', now())
+    returning id`;
+  ids.plan_overnight_runs = overnight.id;
+
   const [seedImport] = await admin<{ id: string }[]>`
     insert into plan_seed_imports (user_id, step_key)
     values (${userId}, ${`learn:${tag} already offered this step`})
     returning id`;
   ids.plan_seed_imports = seedImport.id;
+
+  const [digest] = await admin<{ id: string }[]>`
+    insert into dev_digests (user_id, day, since, happened, attention)
+    values (
+      ${userId}, current_date, now() - interval '1 day',
+      ${admin.json([
+        {
+          kind: 'step',
+          title: `${tag} shipped a step`,
+          ref: '#1',
+          commit: null,
+          note: null,
+          at: '2026-03-02T09:00:00Z',
+        },
+      ])}::jsonb,
+      '[]'::jsonb
+    )
+    returning id`;
+  ids.dev_digests = digest.id;
 
   const [bookQuote] = await admin<{ id: string }[]>`
     insert into book_price_quotes (isbn_13, source, quoted_cents, vendor_name)
@@ -319,6 +401,16 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.fx_rates = fxRate.id;
 
+  // Not anybody's row: whether main is green is a fact about the repository,
+  // so there is one reading per repository and every signed-in user reads the
+  // same one. Tagged per seed because `repo` is the primary key and the two
+  // calls would otherwise collide on it.
+  const [mainCheck] = await admin<{ repo: string }[]>`
+    insert into plan_main_checks (repo, head_sha, conclusion)
+    values (${`${tag}/PersonalDashboard`}, ${`${tag}-head-sha`}, 'passed')
+    returning repo`;
+  ids.plan_main_checks = mainCheck.repo;
+
   return ids;
 }
 
@@ -373,12 +465,26 @@ describe('RLS coverage', () => {
 });
 
 describe('cross-user reads', () => {
-  /** Shared market-data tables: every authenticated user may read every row. */
+  /**
+   * Tables holding no user's rows: every authenticated user may read every
+   * row. The first three are cached market data. `plan_main_checks` is the
+   * same shape for a different reason -- the status line draws what CI said
+   * about main, and that is one fact about one branch, not a fact per account.
+   */
   const SHARED_REFERENCE_TABLES = new Set([
     'fx_rates',
     'book_price_quotes',
     'game_price_quotes',
+    'plan_main_checks',
   ]);
+
+  /**
+   * Where a table's identity is not an `id` column, the column that stands in
+   * for one. `dev_comment_reads` is a primary key of (user_id, target,
+   * row_id) -- one row per conversation per person -- so the question "can B
+   * see A's row" is asked of the row the thread hangs off.
+   */
+  const ROW_KEY: Record<string, string> = { dev_comment_reads: 'row_id' };
 
   it('shows user B zero rows belonging to user A, in every table', async () => {
     const leaks: string[] = [];
@@ -386,8 +492,12 @@ describe('cross-user reads', () => {
     for (const table of tables) {
       if (SHARED_REFERENCE_TABLES.has(table)) continue;
       const id = seedA[table];
+      const key = ROW_KEY[table] ?? 'id';
       const [row] = await asUser(userB, (tx) =>
-        tx.unsafe<{ count: string }[]>(`select count(*)::int as count from ${table} where id = $1`, [id]),
+        tx.unsafe<{ count: string }[]>(
+          `select count(*)::int as count from ${table} where ${key} = $1`,
+          [id],
+        ),
       );
       if (Number(row.count) !== 0) leaks.push(table);
     }
@@ -427,6 +537,25 @@ describe('cross-user reads', () => {
       tx<{ id: string }[]>`select id from game_price_quotes where id = ${seedA.game_price_quotes}`,
     );
     expect(rows).toHaveLength(1);
+  });
+
+  it("lets every authenticated user read what CI said about main", async () => {
+    const rows = await asUser(userB, (tx) =>
+      tx<{ repo: string }[]>`
+        select repo from plan_main_checks where repo = ${seedA.plan_main_checks}`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('lets no authenticated user write what CI said about main', async () => {
+    // The status line draws this row on every page. A browser that could write
+    // it could paint main green while it is red, for the one reader who most
+    // needs to know otherwise.
+    await expect(
+      asUser(userB, (tx) =>
+        tx`update plan_main_checks set conclusion = 'passed' where repo = ${seedA.plan_main_checks}`,
+      ),
+    ).rejects.toThrow();
   });
 });
 

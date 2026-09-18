@@ -2,6 +2,9 @@ import 'server-only';
 
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadAllTasks } from '@/lib/todo/tasks/load';
+import { loadEventsInWindow } from '@/lib/todo/events/load';
+import { loadFeedEventsInWindow } from '@/lib/todo/feeds/load';
+import { refreshStaleFeeds } from '@/lib/todo/feeds/refresh';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { allSources } from '@/lib/todo/agenda/registry';
@@ -42,6 +45,12 @@ export async function loadCalendar(
   const shown = anchor ?? todayIn(account.timezone, now);
   const window = viewWindow(view, shown);
 
+  // #277: a subscribed calendar is re-read when this page is opened and the
+  // copy is more than an hour old. Before the reads below rather than beside
+  // them, because the point is to draw what came back. A subscription that is
+  // fresh, failing or already being read by another tab costs nothing here.
+  await refreshStaleFeeds(userId, now, account.timezone);
+
   const ctx: SourceContext = {
     userId,
     timezone: account.timezone,
@@ -56,7 +65,16 @@ export async function loadCalendar(
       moduleEnabled(account, source.module),
   );
 
-  const [items, context, failed] = await runSources(active, ctx);
+  // The events you typed are read over the same window the sources are asked
+  // for, so a month you page forward to holds the appointments that are in it.
+  const [events, feedEvents, [items, context, failed]] = await Promise.all([
+    loadEventsInWindow(userId, window, account.timezone),
+    // The calendars you subscribe to, over the same window. Read from the copy
+    // rather than fetched here: the page must not wait on somebody else's
+    // server to draw a month.
+    loadFeedEventsInWindow(userId, window, account.timezone),
+    runSources(active, ctx),
+  ]);
   const dismissals = active.length > 0 ? await loadDismissals(userId) : new Map();
 
   return {
@@ -64,6 +82,8 @@ export async function loadCalendar(
       view,
       anchor: shown,
       tasks,
+      events,
+      feedEvents,
       items,
       context,
       dismissals,

@@ -2,12 +2,15 @@ import 'server-only';
 
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadOpenTasks } from '@/lib/todo/tasks/load';
+import { loadEventsInWindow } from '@/lib/todo/events/load';
+import { loadFeedEventsInWindow } from '@/lib/todo/feeds/load';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { allSources } from '@/lib/todo/agenda/registry';
+import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
 
@@ -55,7 +58,19 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
       moduleEnabled(account, source.module),
   );
 
-  const [items, context, failed] = await runSources(active, ctx);
+  // Events are this module's own, so they are read here beside the tasks
+  // rather than through a source. A source is for an obligation another
+  // workspace owns; there is no switch to give an event and nothing to
+  // reconcile. Only from today forward: the merge drops day context dated
+  // before today, because a meeting you have been to is over, not overdue.
+  const [[items, context, failed], events, feedEvents] = await Promise.all([
+    runSources(active, ctx),
+    loadEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone),
+    // The calendars you subscribe to, read from the stored copy over the same
+    // days. An appointment somebody else scheduled is context like any other
+    // event: it is on your day and there is nothing to tick.
+    loadFeedEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone),
+  ]);
 
   const links = await loadLinksForTasks(tasks.map((task) => task.id));
   const anchors = await resolveAnchors(links);
@@ -68,7 +83,11 @@ export async function loadAgenda(userId: string, now: Date = new Date()): Promis
     piles: mergeAgenda({
       tasks,
       items,
-      context,
+      context: [
+        ...context,
+        ...eventContext(events, account.timezone, today),
+        ...subscribedContext(feedEvents, account.timezone, today),
+      ],
       dismissals,
       anchors,
       timezone: account.timezone,

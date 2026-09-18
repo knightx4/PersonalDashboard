@@ -36,6 +36,7 @@ export type EbayCheckState = {
  * Reads the credentials on the server and returns only the verdict, so the
  * page can say what is wrong without either key going near the browser.
  */
+// latency: pending
 export async function testEbayConnection(): Promise<EbayCheckState> {
   // Gated on a signed-in user: the result names the failing stage, which is
   // more than an anonymous visitor should learn about the deployment.
@@ -47,6 +48,7 @@ export async function testEbayConnection(): Promise<EbayCheckState> {
   return { result };
 }
 
+// latency: pending
 export async function updateSellSettings(
   _prev: SellActionState,
   formData: FormData,
@@ -87,6 +89,7 @@ export async function updateSellSettings(
   return { message: 'Sell settings saved.' };
 }
 
+// latency: pending
 export async function noteListingIntent(
   _prev: SellActionState,
   formData: FormData,
@@ -132,6 +135,7 @@ export async function noteListingIntent(
  * With no ids it walks the whole for-sale list, filling in what has no price
  * unless `rescan` says to price it all again.
  */
+// latency: pending
 export async function priceSellItems(
   _prev: SellActionState,
   formData: FormData,
@@ -195,6 +199,7 @@ export async function priceSellItems(
  * other: an unconfirmed edition is cached against the item, and this used to
  * refuse to price it at all.
  */
+// latency: pending
 export async function priceOneItem(
   _prev: SellActionState,
   formData: FormData,
@@ -270,6 +275,7 @@ export type PriceSearchState = SellActionState & {
  * whose edition is not settled, and hands the number back for the user to
  * accept rather than filing it against an identity nobody has confirmed.
  */
+// latency: pending
 export async function searchItemPrice(
   _prev: PriceSearchState,
   formData: FormData,
@@ -349,6 +355,7 @@ export async function searchItemPrice(
  * action rather than three, because the page it is used from no longer knows
  * or cares which of the three a row happens to be.
  */
+// latency: pending
 export async function setSellPrice(
   _prev: SellActionState,
   formData: FormData,

@@ -31,6 +31,7 @@ function safeNext(value: FormDataEntryValue | null): string {
   return next.startsWith('/') && !next.startsWith('//') ? next : '/onboarding';
 }
 
+// latency: pending
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = credentials.safeParse({
     email: formData.get('email'),
@@ -53,6 +54,7 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   redirect(safeNext(formData.get('next')));
 }
 
+// latency: pending
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = credentials.safeParse({
     email: formData.get('email'),
@@ -75,6 +77,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   return { message: 'Check your email to confirm your address, then sign in.' };
 }
 
+// latency: pending
 export async function signInWithGoogle(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const next = safeNext(formData.get('next'));
@@ -95,6 +98,7 @@ export async function signInWithGoogle(formData: FormData): Promise<void> {
   redirect(data.url);
 }
 
+// latency: pending
 export async function requestPasswordReset(
   _prev: AuthState,
   formData: FormData,
@@ -112,6 +116,7 @@ export async function requestPasswordReset(
   return { message: 'If that address has an account, a reset link is on its way.' };
 }
 
+// latency: pending
 export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();

@@ -7,6 +7,7 @@ import { CategoryGlyph } from '@/lib/categories/icons';
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
+import { scrim } from '@/components/ui/popover';
 
 /**
  * Contextual filters. Contents change per section, so each page passes its own
@@ -68,12 +69,12 @@ export function LeftRail({
 
       {/* Rendered only when open, so it costs nothing at rest. */}
       {open && (
-        <div className="fixed inset-0 z-50 xl:hidden">
+        <div className="fixed inset-0 z-overlay xl:hidden">
           <button
             type="button"
             aria-label="Close filters"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink/25"
+            className={scrim}
           />
           <aside
             className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col border-r border-border bg-surface"

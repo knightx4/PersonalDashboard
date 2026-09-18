@@ -7,7 +7,7 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Kbd } from '@/components/shell/key-hints';
-import { Popover } from '@/components/ui/popover';
+import { Popover, scrim } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 
@@ -238,7 +238,7 @@ export function WorkspaceSwitcher({
         <ModuleMark module={current} size="md" />
         <span
           className={cn(
-            'font-display min-w-0 flex-1 truncate text-left text-lead font-semibold tracking-tight',
+            'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
             onShell ? 'text-shell-ink' : 'text-ink',
             compact && 'sr-only',
           )}
@@ -390,18 +390,18 @@ export function WorkspaceSheet({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
+    <div className="fixed inset-0 z-overlay lg:hidden">
       <button
         type="button"
         aria-label="Close the workspace list"
         onClick={onClose}
-        className="absolute inset-0 bg-black/40"
+        className={scrim}
       />
       <div
         role="menu"
         aria-label="Workspaces"
         /* ui-ok: a sheet against the foot of the screen, not a card -- it is rounded and bordered only on the one edge that meets the page */
-        className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
+        className="popover-panel absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-card border-t border-border bg-raised p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-lg"
       >
         {rows.map((row) => {
           const isCurrent = row.id === current;

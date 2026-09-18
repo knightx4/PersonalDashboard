@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FeedbackButton } from '@/components/shell/feedback-button';
-import { NotificationsButton } from '@/components/shell/notifications-button';
+import { NotificationsButton, type Notification } from '@/components/shell/notifications-button';
 import { ThemePicker } from '@/components/shell/theme-picker';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
+import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
 import { ToastProvider } from '@/components/ui/toast';
+import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
+import { MAIN_BOX } from '@/components/shell/main-box';
 import {
   WorkspaceSheet,
   WorkspaceSwitcher,
@@ -20,8 +23,9 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, type ModuleId } from '@/lib/modules';
-import type { ThemeChoice } from '@/lib/theme';
+import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
+import type { MainCheck } from '@/lib/plan/main-check';
 import type { Brief } from '@/lib/shell/brief';
 
 const NAV_COLLAPSED_KEY = 'pt_nav_collapsed';
@@ -45,7 +49,8 @@ export type NavSection = {
   /**
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
-   * wrong. Nothing else in this app has.
+   * wrong -- and Raised has, because an unread question is a session that
+   * guessed and built on the guess. Nothing else in this app has.
    */
   badge?: number;
 };
@@ -68,6 +73,7 @@ export type NavSection = {
  * props. Neither is worth doing in the same change as this one.
  */
 export function AppShell({
+  account,
   module,
   sections,
   settingsHref,
@@ -81,8 +87,12 @@ export function AppShell({
   banner,
   brief,
   activity = [],
+  mainCheck = null,
+  notifications = [],
   children,
 }: {
+  /** The signed-in user's id. ⌘K stamps the list it holds with it. */
+  account: string;
   module: ModuleId | null;
   sections: readonly NavSection[];
   settingsHref?: string;
@@ -92,17 +102,26 @@ export function AppShell({
   email: string;
   enabledModules?: readonly ModuleId[];
   counts?: SwitcherCounts;
-  theme: ThemeChoice;
+  theme: Theme;
   /** Rendered above the page, inside the content column. */
   banner?: React.ReactNode;
   /** The one thing this workspace would say if it could say only one thing. */
   brief?: Brief | null;
   /** What the system did while nobody was looking. */
   activity?: ActivityLine[];
+  /**
+   * Whether main is green, as the last overnight tick read it. The status line
+   * draws it as a dot; null is "nothing has been read", which is a state of its
+   * own rather than a reason to draw nothing.
+   */
+  mainCheck?: MainCheck | null;
+  /** What is waiting on you, wherever you are standing. Today: open raises. */
+  notifications?: Notification[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const paneRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState(false);
   const [switcher, setSwitcher] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -124,6 +143,18 @@ export function AppShell({
       /* Blocked storage simply means the column starts open every time. */
     }
   }, []);
+
+  /**
+   * A new page starts at the top of the page.
+   *
+   * The router scrolls `window` on navigation, and from lg up the window is
+   * not the thing that scrolls -- the pane is. Without this, opening a role
+   * from halfway down the pipeline lands you halfway down the role. Below lg
+   * the pane is not a scroll container and this is a no-op.
+   */
+  useEffect(() => {
+    paneRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   function toggleCollapsed() {
     setCollapsed((was) => {
@@ -308,7 +339,7 @@ export function AppShell({
           the section list rather than in it: settings are not a tenth place to
           work, and a rule keeps them from reading as one. */}
       {settingsHref && (
-        <div className="border-t border-shell-border px-2 py-2">
+        <div className="px-2 py-2">
           {navRow({
             href: settingsHref,
             label: settingsLabel ?? 'Settings',
@@ -345,7 +376,8 @@ export function AppShell({
   const tabs = sections.slice(0, overflow ? 3 : 4);
 
   const dockKey = (moduleById(module) ?? HOME_MARK).key.from;
-  const dockItem = 'press flex w-full flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium';
+  const dockItem =
+    'press flex w-full flex-col items-center gap-0.5 px-1 pb-2 pt-2.5 text-micro font-medium';
 
   const dockTabs = tabs.map((section) => {
     const Icon = section.icon ? NAV_ICONS[section.icon] : null;
@@ -425,16 +457,26 @@ export function AppShell({
 
   return (
     <ToastProvider>
-    <KeyHintsProvider />
-    <div
-      className={cn(
-        'min-h-dvh lg:grid',
-        collapsed ? 'lg:grid-cols-[3.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]',
-      )}
-    >
-      {/* The column, from lg up.
+      <KeyHintsProvider />
+      <CaptureProvider>
+        <div
+          className={cn(
+            // The ground, not a container: the sidebar and the page pane are both
+            // laid on it, and it carries the workspace's wash. See `.shell-ground`
+            // in globals.css.
+            'shell-ground min-h-dvh lg:grid lg:h-dvh lg:overflow-hidden',
+            // The inset the page pane floats in. Six pixels of ground showing on
+            // every side is what turns two panels butted together into an object
+            // laid on a surface.
+            'lg:gap-1.5 lg:p-1.5',
+            collapsed
+              ? 'lg:grid-cols-[3.5rem_minmax(0,1fr)]'
+              : 'lg:grid-cols-[13.5rem_minmax(0,1fr)]',
+          )}
+        >
+          {/* The column, from lg up.
 
-          z-40 rather than nothing: `sticky` makes this element a stacking
+          z-chrome rather than nothing: `sticky` makes this element a stacking
           context, so the workspace switcher's menu cannot escape it however
           high its own z-index goes. Without a z-index here the column lands in
           the auto layer, which every positioned element in the page column --
@@ -442,65 +484,65 @@ export function AppShell({
           how a company logo and a filter chip ended up in front of an open
           switcher menu. Level with the top bar, below the palette and the
           sheets that are meant to cover the whole shell. */}
-      <aside className="sticky top-0 z-40 hidden h-dvh flex-col border-r border-shell-border bg-shell lg:flex">
-        {sidebarInner(collapsed)}
+          <aside className="sticky top-1.5 z-chrome hidden h-[calc(100dvh-0.75rem)] flex-col lg:flex">
+            {sidebarInner(collapsed)}
 
-        {/* Narrow it when the page needs the width, without losing the way
+            {/* Narrow it when the page needs the width, without losing the way
             out: the workspace switcher stays at the top of the rail as its
             mark, so switching module is still one click from here. Below the
             settings rule, because it is a thing you do to the column rather
             than a place you can go. */}
-        <div className="border-t border-shell-border px-2 py-2">
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
-            aria-pressed={collapsed}
-            className={cn(
-              'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-150 hover:bg-shell-hover/60 hover:text-shell-ink',
-              collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
-            )}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-            ) : (
-              <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-            )}
-            <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
-              {collapsed ? 'Expand' : 'Collapse'}
-            </span>
-          </button>
-        </div>
-      </aside>
-
-      {/* The drawer, below lg. */}
-      {drawer && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close navigation"
-            onClick={() => setDrawer(false)}
-            className="absolute inset-0 bg-black/40"
-          />
-          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
-            <div className="flex justify-end px-2 pt-2">
+            <div className="border-t border-shell-border px-2 py-2">
               <button
                 type="button"
-                onClick={() => setDrawer(false)}
-                className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                onClick={toggleCollapsed}
+                title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
+                aria-pressed={collapsed}
+                className={cn(
+                  'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-150 hover:bg-shell-hover/60 hover:text-shell-ink',
+                  collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
+                )}
               >
-                <X className="size-4" strokeWidth={2} aria-hidden />
-                <span className="sr-only">Close navigation</span>
+                {collapsed ? (
+                  <PanelLeftOpen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                ) : (
+                  <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                )}
+                <span className={cn('flex-1 text-left', collapsed && 'sr-only')}>
+                  {collapsed ? 'Expand' : 'Collapse'}
+                </span>
               </button>
             </div>
-            {/* Never narrow: a drawer you opened on purpose has no width to
-                save, and it closes the moment you pick something. */}
-            {sidebarInner(false)}
           </aside>
-        </div>
-      )}
 
-      {/* A column, so the status line can be held against the foot of the
+          {/* The drawer, below lg. */}
+          {drawer && (
+            <div className="fixed inset-0 z-overlay lg:hidden">
+              <button
+                type="button"
+                aria-label="Close navigation"
+                onClick={() => setDrawer(false)}
+                className={scrim}
+              />
+              <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
+                <div className="flex justify-end px-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDrawer(false)}
+                    className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                  >
+                    <X className="size-4" strokeWidth={2} aria-hidden />
+                    <span className="sr-only">Close navigation</span>
+                  </button>
+                </div>
+                {/* Never narrow: a drawer you opened on purpose has no width to
+                save, and it closes the moment you pick something. */}
+                {sidebarInner(false)}
+              </aside>
+            </div>
+          )}
+
+          {/* A column, so the status line can be held against the foot of the
           window on a page too short to reach it.
 
           `sticky bottom-0` only pins an element that would otherwise be below
@@ -509,164 +551,171 @@ export function AppShell({
           it. Making this a full-height flex column and letting `main` take the
           slack puts the line at the bottom of the window when the page is
           short, and `sticky` keeps doing its job when the page is long. */}
-      <div className="flex min-h-dvh min-w-0 flex-col">
-        {/* The top bar is chrome, not page: it takes the shell's ground and
+          <div ref={paneRef} className="page-pane flex min-h-dvh min-w-0 flex-col lg:min-h-0">
+            {/* The top bar is chrome, not page: it takes the shell's ground and
             the shell's ink, the same as the column beside it. In three themes
             the shell is a near-neighbour of the surface it used to use, so
             this reads as the bar picking up its own sidebar's tone. In
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
-        <header className="sticky top-0 z-40 border-b border-shell-border bg-shell/85 backdrop-blur">
-          <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
-            <button
-              type="button"
-              onClick={() => setDrawer(true)}
-              className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-              aria-label="Open navigation"
-            >
-              <Menu className="size-4" strokeWidth={1.75} aria-hidden />
-            </button>
+            <header className="sticky top-0 z-chrome bg-page/85 backdrop-blur">
+              <div className="flex h-14 items-center gap-2 px-3 sm:px-5">
+                <button
+                  type="button"
+                  onClick={() => setDrawer(true)}
+                  className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                  aria-label="Open navigation"
+                >
+                  <Menu className="size-4" strokeWidth={1.75} aria-hidden />
+                </button>
 
-            {/* The mark in the bar is the switcher, not a picture of one.
+                {/* The mark in the bar is the switcher, not a picture of one.
                 From lg up the column carries it -- and still does when the
                 column is collapsed, as its mark. Below lg there is no column
                 until you open the drawer, and this icon sat there looking
                 exactly like the thing that switches workspaces while doing
                 nothing, which made changing module a drawer away. */}
-            <span className="lg:hidden">
-              <WorkspaceSwitcher
-                current={module}
-                enabled={enabledModules}
-                counts={counts}
-                onShell
-                compact
-              />
-            </span>
+                <span className="lg:hidden">
+                  <WorkspaceSwitcher
+                    current={module}
+                    enabled={enabledModules}
+                    counts={counts}
+                    onShell
+                    compact
+                  />
+                </span>
 
-            <h2 className="font-display shrink-0 truncate text-lead font-semibold tracking-tight text-shell-ink">
-              {title}
-            </h2>
+                <h2 className="font-display shrink-0 truncate text-body font-semibold tracking-tight text-shell-ink">
+                  {title}
+                </h2>
 
-            {/* The middle of the bar was empty. It now carries the one thing
+                {/* The middle of the bar was empty. It now carries the one thing
                 this workspace would say if it could say only one -- read on
                 arrival, not watched. Hidden on a phone, where there is no
                 middle. */}
-            {brief && (
-              <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex">
-                {brief.href ? (
-                  <Link
-                    href={brief.href}
-                    className={cn(
-                      'truncate rounded-full px-2.5 py-1 transition-colors',
-                      // Dimming on hover rather than thinning the tint: the
-                      // pill is a lit chip in dark chrome under Lightbox, and
-                      // a translucent tint there stops being a lit chip while
-                      // its text carries on assuming it is one.
-                      brief.tone === 'caution'
-                        ? 'bg-caution-tint text-caution hover:opacity-90'
-                        : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
+                {brief && (
+                  <p className="hidden min-w-0 flex-1 justify-center truncate px-4 text-center text-ui sm:flex">
+                    {brief.href ? (
+                      <Link
+                        href={brief.href}
+                        className={cn(
+                          'truncate rounded-full px-2.5 py-1 transition-colors',
+                          // Dimming on hover rather than thinning the tint: the
+                          // pill is a lit chip in dark chrome under Lightbox, and
+                          // a translucent tint there stops being a lit chip while
+                          // its text carries on assuming it is one.
+                          brief.tone === 'caution'
+                            ? 'bg-caution-tint text-caution hover:opacity-90'
+                            : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
+                        )}
+                      >
+                        {brief.text}
+                      </Link>
+                    ) : (
+                      <span className="truncate px-2.5 py-1 text-shell-muted">{brief.text}</span>
                     )}
-                  >
-                    {brief.text}
-                  </Link>
-                ) : (
-                  <span className="truncate px-2.5 py-1 text-shell-muted">{brief.text}</span>
+                  </p>
                 )}
-              </p>
-            )}
-            {/* The gap that puts the account controls in the right corner.
+                {/* The gap that puts the account controls in the right corner.
                 From sm up the brief is the flexible middle of the bar and does
                 that job itself, so the spacer stands down. Below sm the brief
                 is `display: none` and takes no part in the layout at all --
                 which is how, on a phone, the theme, notification, feedback and
                 account icons ended up bunched against the page title instead
                 of in the corner. */}
-            <span className={cn('min-w-0 flex-1', brief && 'sm:hidden')} />
+                <span className={cn('min-w-0 flex-1', brief && 'sm:hidden')} />
 
-            {/* What is left here belongs to the person, not to the workspace:
+                {/* What is left here belongs to the person, not to the workspace:
                 their theme, their notifications, their feedback, their
                 account. The workspace's own settings moved into its column --
                 see sidebarInner. */}
-            <div className="flex shrink-0 items-center gap-0.5">
-              <ThemePicker value={theme} />
-              <NotificationsButton />
-              <FeedbackButton allHref={feedbackHref} />
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <CaptureButton />
+                  <ThemePicker value={theme} />
+                  <NotificationsButton notifications={notifications} />
+                  <FeedbackButton allHref={feedbackHref} />
 
-              <Link
-                href="/account"
-                className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
-                title={displayName ?? email}
-              >
-                {initial}
-                <span className="sr-only">Account</span>
-              </Link>
-            </div>
-          </div>
-        </header>
+                  <Link
+                    href="/account"
+                    className="press flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-tint text-ui font-semibold text-accent"
+                    title={displayName ?? email}
+                  >
+                    {initial}
+                    <span className="sr-only">Account</span>
+                  </Link>
+                </div>
+              </div>
+            </header>
 
-        {/* Below sm the brief has no middle of the bar to live in, so it gets
+            {/* Below sm the brief has no middle of the bar to live in, so it gets
             its own line under the bar. Read on arrival, same as on a desktop. */}
-        {brief && (
-          <p className="border-b border-shell-border bg-shell px-4 py-1.5 text-center text-small sm:hidden">
-            {brief.href ? (
-              <Link
-                href={brief.href}
-                className={cn(
-                  'truncate',
-                  brief.tone === 'caution' ? 'font-medium text-caution' : 'text-shell-muted',
+            {brief && (
+              <p className="bg-page px-4 py-1.5 text-center text-small sm:hidden">
+                {brief.href ? (
+                  <Link
+                    href={brief.href}
+                    className={cn(
+                      'truncate',
+                      brief.tone === 'caution' ? 'font-medium text-caution' : 'text-shell-muted',
+                    )}
+                  >
+                    {brief.text}
+                  </Link>
+                ) : (
+                  <span className="text-shell-muted">{brief.text}</span>
                 )}
-              >
-                {brief.text}
-              </Link>
-            ) : (
-              <span className="text-shell-muted">{brief.text}</span>
+              </p>
             )}
-          </p>
-        )}
 
-        {banner}
-        <main
-          className={cn(
-            // `w-full` because a flex item's width comes from its content
-            // rather than from the line box: without it a narrow page would
-            // shrink-wrap instead of filling up to the max-width.
-            'mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6',
-            // Takes the leftover height, so the status line below it is held
-            // against the foot of the window rather than the foot of the text.
-            'flex-1',
-            // Room for the tab bar, which is fixed over the foot of the page.
-            'pb-24 lg:pb-6',
-          )}
-        >
-          {children}
-        </main>
-        <StatusLine lines={activity} />
+            {banner}
+            <main
+              className={cn(
+                // The width and the gutter, shared with the anatomy surfaces on
+                // /dev/ui so a drawing of a page is made in the box a page gets.
+                MAIN_BOX,
+                // Takes the leftover height, so the status line below it is held
+                // against the foot of the window rather than the foot of the text.
+                'flex-1',
+                // Room for the tab bar, which is fixed over the foot of the page.
+                'pb-24 lg:pb-6',
+              )}
+            >
+              {children}
+            </main>
+            <StatusLine lines={activity} main={mainCheck} />
 
-        <nav
-          // Named for what is actually in it: on home and the account page it
-          // holds no sections at all, and a landmark called "Sections" that
-          // contains one workspace switcher is a lie to anyone listing them.
-          aria-label={tabs.length > 0 ? 'Sections' : 'Workspace'}
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
-        >
-          {/* With no sections the switcher is the only cell, so it takes the
+            <nav
+              // Named for what is actually in it: on home and the account page it
+              // holds no sections at all, and a landmark called "Sections" that
+              // contains one workspace switcher is a lie to anyone listing them.
+              aria-label={tabs.length > 0 ? 'Sections' : 'Workspace'}
+              className="fixed inset-x-0 bottom-0 z-chrome border-t border-shell-border bg-shell/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+            >
+              {/* With no sections the switcher is the only cell, so it takes the
               width. Its contents are centred either way, which is what "in the
               middle" means here -- the mark and its label land where they land
               on every other page, with a wider target under them. */}
-          <ul className="grid auto-cols-fr grid-flow-col">{dock}</ul>
-        </nav>
-      </div>
+              <ul className="grid auto-cols-fr grid-flow-col">{dock}</ul>
+            </nav>
+          </div>
 
-      <WorkspaceSheet
-        current={module}
-        enabled={enabledModules}
-        counts={counts}
-        open={switcher}
-        onClose={() => setSwitcher(false)}
-      />
+          <WorkspaceSheet
+            current={module}
+            enabled={enabledModules}
+            counts={counts}
+            open={switcher}
+            onClose={() => setSwitcher(false)}
+          />
 
-      <CommandPalette module={module} sections={sections} enabledModules={enabledModules} />
-    </div>
+          <CommandPalette
+            account={account}
+            module={module}
+            sections={sections}
+            enabledModules={enabledModules}
+            theme={theme}
+          />
+        </div>
+      </CaptureProvider>
     </ToastProvider>
   );
 }

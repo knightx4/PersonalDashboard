@@ -9,7 +9,7 @@ import {
   type PrepInput,
   type PrepPriorRoundRow,
 } from './prep-context';
-import { MAX_NOTE_PRIOR_QUESTIONS, parsePrepPayload } from './prep-payload';
+import { MAX_NOTE_PRIOR_QUESTIONS, parsePrepPayload, prepKey } from './prep-payload';
 
 function contact(id: string) {
   return {
@@ -353,5 +353,56 @@ describe('parsePrepPayload', () => {
     expect(result.note.missing).toEqual([
       'Nobody is named on this round yet, so who you are meeting is unknown.',
     ]);
+  });
+});
+
+describe('prepKey', () => {
+  const bank = [{ id: 'e1', strength: 4, skills: ['fpna'] }];
+  const base = {
+    jdHash: 'abc',
+    bank,
+    conversations: [{ id: 'c1', scheduledAt: '2026-03-02T14:00:00Z' }],
+    contactIds: ['p1'],
+  };
+
+  it('is stable across order and repeated calls', () => {
+    expect(prepKey(base)).toBe(prepKey(base));
+    expect(
+      prepKey({
+        ...base,
+        conversations: [
+          { id: 'c2', scheduledAt: '2026-03-02T15:00:00Z' },
+          { id: 'c1', scheduledAt: '2026-03-02T14:00:00Z' },
+        ],
+        contactIds: ['p2', 'p1'],
+      }),
+    ).toBe(
+      prepKey({
+        ...base,
+        conversations: [
+          { id: 'c1', scheduledAt: '2026-03-02T14:00:00Z' },
+          { id: 'c2', scheduledAt: '2026-03-02T15:00:00Z' },
+        ],
+        contactIds: ['p1', 'p2'],
+      }),
+    );
+  });
+
+  it('changes when the description, the bank, the schedule or the room changes', () => {
+    const current = prepKey(base);
+    expect(prepKey({ ...base, jdHash: 'def' })).not.toBe(current);
+    expect(prepKey({ ...base, bank: [{ id: 'e1', strength: 5, skills: ['fpna'] }] })).not.toBe(
+      current,
+    );
+    expect(
+      prepKey({ ...base, conversations: [{ id: 'c1', scheduledAt: '2026-03-09T14:00:00Z' }] }),
+    ).not.toBe(current);
+    expect(prepKey({ ...base, contactIds: ['p2'] })).not.toBe(current);
+  });
+
+  it('does not treat an unscheduled round as a scheduled one', () => {
+    expect(prepKey({ ...base, conversations: [{ id: 'c1', scheduledAt: null }] })).not.toBe(
+      prepKey(base),
+    );
   });
 });

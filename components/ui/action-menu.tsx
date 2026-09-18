@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -31,6 +32,15 @@ export type ActionMenuItem = {
   /** When false, keep the menu open after selecting (for multi-step menus). Default true. */
   closeOnSelect?: boolean;
   onSelect?: () => void;
+  /**
+   * Somewhere to go rather than something to do. The item is drawn as a link,
+   * so it can be opened in a new tab or copied the way the thing it replaced
+   * could -- a view moved off a chip row into a menu is still a link worth
+   * keeping. Ignored when `formAction` or `onSelect` is set.
+   */
+  href?: string;
+  /** Marks the link as the page you are already on. */
+  current?: boolean;
 };
 
 type MenuPosition = { top: number; left: number; minWidth: number };
@@ -242,7 +252,7 @@ export function ActionMenu({
             role="menu"
             aria-label={label}
             style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
-            className="fixed z-50 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg"
+            className="popover-panel fixed z-overlay overflow-hidden rounded-lg border border-border bg-raised py-1 shadow-lg"
           >
             {items.map((item) => {
               if (armed === item.id) {
@@ -291,6 +301,21 @@ export function ActionMenu({
                   : 'text-ink hover:bg-canvas',
                 (item.disabled || pending) && 'pointer-events-none opacity-40',
               );
+
+              if (item.href && !item.formAction && !item.onSelect) {
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    role="menuitem"
+                    aria-current={item.current ? 'page' : undefined}
+                    className={cn(itemClass, item.current && 'font-medium text-accent')}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              }
 
               return (
                 <button

@@ -3,6 +3,7 @@
  *
  *   npm run check:ui                  # check
  *   npm run check:ui -- --list        # check, and print every violation
+ *   npm run check:ui -- --module vault  # check one workspace's files only
  *   npm run check:ui -- --update      # re-record the baseline
  *
  * Written after an audit found eighty-six hand-rolled boxes and one bug that
@@ -40,6 +41,8 @@
  */
 import { readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { MODULE_IDS, isModuleId, type ModuleId } from '../lib/modules';
+import { scopeForFile, UI_SCOPES } from '../lib/ui-review/scope';
 
 const ROOT = process.cwd();
 const BASELINE = join(ROOT, 'scripts/ui-baseline.json');
@@ -99,9 +102,100 @@ type Rule = {
   law: string;
   says: string;
   instead: string;
+  /**
+   * Paths this one rule does not ask about. Absent means everywhere under
+   * ROOTS, which is what nearly every rule wants.
+   *
+   * Separate from EXEMPT above, which excuses the primitives from every rule
+   * at once. This is for a rule whose subject has a home: the place the thing
+   * is *defined* has to be allowed to write it, or there is nothing for
+   * everywhere else to use instead.
+   */
+  skip?: RegExp;
+  /**
+   * Paths this rule asks about, and no others. Absent means everywhere under
+   * ROOTS.
+   *
+   * The inverse of `skip`, for a rule whose subject only exists in one kind of
+   * file: a server action lives in an actions file, and a rule about actions
+   * asked of every component would be a rule about nothing.
+   */
+  only?: RegExp;
   /** Every offending span on this line, or nothing. */
-  find: (line: string) => string[];
+  find: (line: string, context: RuleContext) => string[];
 };
+
+/**
+ * What a rule can see besides the line it is on.
+ *
+ * Most rules need nothing here: a hex or an off-scale size is settled by the
+ * line it is written on. The shape rules are not. A card drawn per row opens on
+ * the `.map(` and names `<Card` three lines down; a composer left open is
+ * recognised by what is *not* above it. Both are still line-anchored -- the hit
+ * is reported where the offending markup starts -- they just need to look
+ * around before deciding.
+ */
+type RuleContext = {
+  /** The six lines below, for a shape that opens on one line and lands on another. */
+  after: string[];
+  /** Every line above, for walking out to what encloses this one. */
+  before: string[];
+  /** The whole file, for asking what kind of surface this is. */
+  source: string;
+};
+
+/** A condition that can keep the markup beneath it off the screen. */
+const GATE = /\{\s*\w[\w.]*\s*&&|\?\s*\(|\)\s*:\s*\(|\{editing|\{open|\{isOpen|\{show/;
+
+/** `if (!composing) return …` -- a guard beside the JSX rather than around it. */
+const EARLY_RETURN = /\bif\s*\(![\w.]+\)\s*(?:\{|return)/;
+
+/** Where a block ends, for the walk below: the function this line lives in. */
+const FUNCTION_START = /^\s*(?:export\s+)?(?:default\s+)?function\s|^\s*const\s+\w+\s*=\s*\(/;
+
+/** How deep a line is indented, which stands in for how deeply it is nested. */
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+/**
+ * Whether any block enclosing this line matches `pattern`.
+ *
+ * Walks outward by indentation: each successively shallower line above is an
+ * ancestor of this one, near enough, in a codebase formatted this consistently.
+ * Stops at the enclosing function, because past that the question is about a
+ * different component and the answer would be a coincidence.
+ */
+function encloses(line: string, before: string[], pattern: RegExp): boolean {
+  let level = indentOf(line);
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    const candidate = before[i]!;
+    if (!candidate.trim() || indentOf(candidate) >= level) continue;
+    level = indentOf(candidate);
+    if (pattern.test(candidate)) return true;
+    if (FUNCTION_START.test(candidate)) return false;
+  }
+  return false;
+}
+
+/**
+ * Whether a trimmed line is comment text.
+ *
+ * `{/*` is in the list because JSX comments open that way, and leaving it out
+ * silently broke the valve for every rule that fires on markup rather than on a
+ * class string: the marker sat directly above the offending line, the walker
+ * did not recognise the line it was on as a comment, and stopped before
+ * reading it. Found by trying to excuse a card-per-row that was genuinely
+ * right and being unable to.
+ */
+function isCommentLine(trimmed: string): boolean {
+  return (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('*') ||
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('{/*')
+  );
+}
 
 /**
  * `border` on its own. `border-t` is a rule drawn between things rather than a
@@ -218,8 +312,135 @@ const RULES: Rule[] = [
     id: 'off-scale-text',
     law: '-',
     says: 'a font size outside the named scale',
-    instead: 'text-micro | text-small | text-ui | text-body | text-lead | text-title | text-figure',
+    instead: 'text-micro | text-small | text-ui | text-body | text-title | text-figure',
     find: (line) => [...line.matchAll(/\btext-\[[\d.]+(?:px|rem|em)\]/g)].map((m) => m[0]),
+  },
+  {
+    id: 'card-per-row',
+    law: '13',
+    says: 'a Card drawn once per item in a list',
+    instead: 'one surface with divide-y between rows, so a row costs 36px instead of 95',
+    /**
+     * A `.map(` in JSX with a `<Card` a few lines under it.
+     *
+     * Two lines of context rather than one, because the pattern is spread over
+     * both -- and the map has to be inside JSX, or `new Map(people.map(...))`
+     * and a `days.map()` filter both report as lists of cards. Requiring the
+     * `{` in front dropped exactly those two from eleven candidates to nine,
+     * and all nine were real.
+     *
+     * This rule is fuzzier than the other five, which is what the baseline and
+     * the valve are for: a chooser of four cards side by side is law 13 obeyed,
+     * not broken, and says so on the line.
+     */
+    find: (line, { after }) => {
+      if (!/\{\s*[\w.[\]()\s,...]*\.map\(/.test(line)) return [];
+      return after.some((next) => /<Card\b/.test(next)) ? ['<Card> per mapped row'] : [];
+    },
+  },
+  {
+    id: 'stage-tint-without-glyph',
+    law: '4',
+    says: 'a stage tint painted as the ground of a chip, where the shape should be saying the state',
+    instead: 'StatusGlyph in the stage ink, which still says the state in a greyscale screenshot',
+    /**
+     * `bg-status-*-tint`, anywhere but where the stage chip is drawn.
+     *
+     * Eleven statuses were told apart by hue alone until the glyphs landed,
+     * which meant anybody who cannot separate amber from red read the same
+     * chip for "in process" and "rejected". The glyph is what carries the
+     * state now, and StatusBadge is the only thing that draws it — so a tint
+     * appearing anywhere else is a surface that copied a class list from an
+     * older one and left the shape behind.
+     *
+     * Three places are allowed to write it: components/ui, which is exempt
+     * from every rule and is where the glyph itself lives; the badge, which is
+     * the one map from a status to a colour; and /dev/ui, which is the page
+     * showing the reader what the tints are.
+     */
+    skip: /^(?:components\/jobs\/ui\/status-badge\.tsx|app\/dev\/ui\/)/,
+    find: (line) => [...line.matchAll(/\bbg-status-[\w-]+-tint\b/g)].map((m) => m[0]),
+  },
+  {
+    id: 'composer-always-open',
+    law: '14',
+    says: 'a compose box standing open in a section that lists what is already there',
+    instead: 'AddTrigger, and render the composer when it is pressed',
+    /**
+     * A `Textarea` or `ComposeBody` with nothing above it that could be hiding
+     * it, in a component that also renders a list.
+     *
+     * The list is what makes this checkable. A create form is allowed to open
+     * in edit mode -- law 14 says so, and a new-role page is nothing but a
+     * form -- so a rule that only asked "is this composer ungated" reported 27
+     * sites of which a third were creates doing the right thing. Requiring the
+     * component to also render existing items narrows it to the case AddTrigger
+     * was written for: a section whose job is to show what you have written,
+     * leading with an empty box for writing more. That is 19, of which about
+     * four are still creates that happen to list something, and those say so on
+     * the line.
+     *
+     * "Nothing above it that could be hiding it" walks the enclosing blocks by
+     * indentation rather than reading a fixed window, which is the difference
+     * between a rule worth having and one worth ignoring. The window version
+     * read fourteen lines up and was wrong seven times out of nine: the settings
+     * page hides five composers behind one `{!editing ? (` fifty lines above
+     * them, and a rule that cannot see that reports the page every time it is
+     * already right.
+     *
+     * Two signals, because a composer is hidden in two different shapes:
+     *
+     *   - An ancestor holds a condition -- `&&`, either half of a ternary, or a
+     *     state name this codebase uses for open-ness. Found by walking out to
+     *     each successively shallower line until the enclosing function.
+     *   - The function returns early -- `if (!composing) return <AddTrigger …>`.
+     *     That guard is a sibling of the JSX, not an ancestor of it, so the walk
+     *     steps straight past. Scanned for separately.
+     *
+     * Still not a parse. It cannot see across a component boundary: a form
+     * component rendered only when editing looks bare from inside, which is
+     * what the plan view's two are. Excuse those where they stand.
+     */
+    find: (line, { before, source }) => {
+      if (!/<(?:Textarea|ComposeBody)\b/.test(line)) return [];
+      if (!/\{\s*[\w.[\]()]*\.map\(/.test(source)) return [];
+      if (encloses(line, before, GATE) || before.some((l) => EARLY_RETURN.test(l))) return [];
+      return ['composer open on arrival'];
+    },
+  },
+  {
+    id: 'action-without-tier',
+    law: '-',
+    says: 'an action with no latency tier',
+    instead: '// latency: instant | optimistic | pending directly above it',
+    /**
+     * An exported action with no `// latency:` line above it.
+     *
+     * /dev/ui gives every write one of three tiers and the app predated the
+     * table, so a tier that lives anywhere but beside the action drifts from it
+     * -- which is why it is a comment on the function (#171) and why this is
+     * what makes somebody write one. The gate can only see that a tier is
+     * there; whether it is the right one is a reading, not a grep.
+     *
+     * The tag has to be in the comment block directly above, which is where
+     * the eye looks and the only place that cannot end up describing a
+     * different function. A blank line between the tag and the export breaks
+     * the block, so the tag has to be the line above -- after any doc comment,
+     * not before it.
+     */
+    only: /actions\.tsx?$/,
+    find: (line, { before }) => {
+      const declared = /^export async function (\w+)\(/.exec(line);
+      if (!declared) return [];
+
+      for (let above = before.length - 1; above >= 0; above -= 1) {
+        const previous = before[above]!.trim();
+        if (!isCommentLine(previous)) break;
+        if (/^\/\/\s*latency:\s*(?:instant|optimistic|pending)\b/.test(previous)) return [];
+      }
+
+      return [`${declared[1]}() has no tier`];
+    },
   },
 ];
 
@@ -235,12 +456,13 @@ function files(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-function scan(): Hit[] {
+function scan(target: ModuleId | null): Hit[] {
   const hits: Hit[] = [];
   for (const root of ROOTS) {
     for (const path of files(join(ROOT, root))) {
       const file = relative(ROOT, path);
       if (EXEMPT.some((prefix) => file.startsWith(prefix))) continue;
+      if (target && scopeForFile(file) !== target) continue;
       const source = readFileSync(path, 'utf8');
       const lines = source.split('\n');
       const excused = new Set(
@@ -254,13 +476,38 @@ function scan(): Hit[] {
         // comments are the two shapes that carry prose; a real declaration
         // never starts a line with `*`.
         const trimmed = line.trimStart();
-        if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) return;
+        if (isCommentLine(trimmed)) return;
 
-        // The valve: on this line, or on the one above it.
-        if (line.includes('ui-ok:') || (index > 0 && lines[index - 1]!.includes('ui-ok:'))) return;
+        // The valve: on this line, or anywhere in the comment block directly
+        // above it.
+        //
+        // It used to read exactly one line up, which quietly made the valve
+        // unusable for the reasons this codebase actually writes. Every
+        // justification here is a paragraph -- that is the house style and the
+        // point of it -- so a four-line explanation put `ui-ok:` on its first
+        // line and the marker fell out of range. The only way to be excused
+        // was to give a one-line reason, which is the opposite of what the
+        // valve is for.
+        if (line.includes('ui-ok:')) return;
+        let above = index - 1;
+        while (above >= 0) {
+          const previous = lines[above]!.trim();
+          if (!isCommentLine(previous)) break;
+          if (previous.includes('ui-ok:')) return;
+          above -= 1;
+        }
         for (const rule of RULES) {
           if (excused.has(rule.id)) continue;
-          for (const text of rule.find(line)) hits.push({ file, line: index + 1, rule, text });
+          if (rule.skip?.test(file)) continue;
+          if (rule.only && !rule.only.test(file)) continue;
+          const context: RuleContext = {
+            after: lines.slice(index + 1, index + 7),
+            before: lines.slice(0, index),
+            source,
+          };
+          for (const text of rule.find(line, context)) {
+            hits.push({ file, line: index + 1, rule, text });
+          }
         }
       });
     }
@@ -278,11 +525,37 @@ function tally(hits: Hit[]): Record<string, number> {
   return counts;
 }
 
+/**
+ * The workspace this run is about, from `--module <id>`.
+ *
+ * A run narrowed to one module scans that module's files, compares them
+ * against their own baseline entries and fails on a new violation there, so
+ * "is the vault in line" is a question with an answer rather than a share of
+ * one number for the whole app.
+ */
+function targetModule(): ModuleId | null {
+  const at = process.argv.indexOf('--module');
+  if (at === -1) return null;
+  const id = process.argv[at + 1];
+  if (!id || !isModuleId(id)) {
+    console.error(`--module takes one of: ${MODULE_IDS.join(', ')}`);
+    process.exit(1);
+  }
+  return id;
+}
+
 // -- The report -------------------------------------------------------------
-const hits = scan();
+const target = targetModule();
+const hits = scan(target);
 const counts = tally(hits);
 
 if (process.argv.includes('--update')) {
+  // A narrowed run has only looked at one module, so recording it would drop
+  // every other module's entry and quietly reset the ratchet.
+  if (target) {
+    console.error('--update records the whole baseline, so it cannot be narrowed to --module.');
+    process.exit(1);
+  }
   const ordered = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)));
   writeFileSync(BASELINE, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`Recorded ${hits.length} violations across ${Object.keys(ordered).length} file/rule pairs.`);
@@ -315,7 +588,9 @@ if (regressions.length > 0) {
     console.error(`    ${hit.text}`);
     if (!explained.has(hit.rule.id)) {
       explained.add(hit.rule.id);
-      console.error(`    law ${hit.rule.law}: ${hit.rule.says}`);
+      // The id as well as the law, because the id is what a file-wide
+      // exemption has to name and there is nowhere else to read it off.
+      console.error(`    law ${hit.rule.law} · ${hit.rule.id}: ${hit.rule.says}`);
       console.error(`    use ${hit.rule.instead}`);
     }
     console.error('');
@@ -325,15 +600,33 @@ if (regressions.length > 0) {
   process.exit(1);
 }
 
+/** `  ·  name`, or the count if there is one. */
+function standing(n: number, name: string): string {
+  return `  ${n === 0 ? '  ·' : String(n).padStart(3)}  ${name}`;
+}
+
 // Per-rule standings, so the number that is meant to fall is visible.
 const byRule = new Map<string, number>();
 for (const hit of hits) byRule.set(hit.rule.id, (byRule.get(hit.rule.id) ?? 0) + 1);
-for (const rule of RULES) {
-  const n = byRule.get(rule.id) ?? 0;
-  console.log(`  ${n === 0 ? '  ·' : String(n).padStart(3)}  ${rule.id}`);
+for (const rule of RULES) console.log(standing(byRule.get(rule.id) ?? 0, rule.id));
+
+// Per-module standings, which is what says where the work is. Every scope is
+// listed, including the ones at zero: a module missing from the list reads as
+// a module nobody has counted.
+const byScope = new Map<string, number>();
+for (const hit of hits) {
+  const scope = scopeForFile(hit.file);
+  byScope.set(scope, (byScope.get(scope) ?? 0) + 1);
+}
+console.log('');
+for (const scope of target ? [target] : UI_SCOPES) {
+  console.log(standing(byScope.get(scope) ?? 0, scope));
 }
 
-const known = Object.values(baseline).reduce((sum, n) => sum + n, 0);
+// What the baseline says about the files this run actually looked at.
+const known = Object.entries(baseline)
+  .filter(([key]) => !target || scopeForFile(key.slice(key.indexOf(' ') + 1)) === target)
+  .reduce((sum, [, n]) => sum + n, 0);
 const fixed = known - hits.length;
 if (fixed > 0) {
   console.log(`\n✓ No new violations, and ${fixed} fewer than the baseline.`);

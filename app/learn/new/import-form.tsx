@@ -282,6 +282,8 @@ export function ImportForm() {
         id="text"
         hint="A reply from a chat, a syllabus, a footnote, a friend's text message. Anything."
       >
+        {/* ui-ok: composer-always-open -- the create. The pasted text is the
+          * whole point of the page and there is nothing to read before it. */}
         <Textarea id="text" name="text" rows={10} required />
       </Field>
 

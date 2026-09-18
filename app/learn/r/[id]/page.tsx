@@ -1,16 +1,18 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
-import { openReading } from './actions';
+import { goDeeper, openReading } from './actions';
 import { FindSources } from './find-sources';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { removeFromTrack } from '../../t/[id]/actions';
 import { NoteForm } from './note-form';
+import { NoteToGraph } from './note-to-graph';
+import { loadSubjects } from '@/lib/learn/graph/load';
 import { StatusButtons } from './status-buttons';
 import { ReadNowButton } from './read-now-button';
 import { cardVariants } from '@/components/ui/card';
@@ -31,6 +33,10 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
 
   const supabase = await createLearnClient();
   const reading = await loadReading(supabase, id);
+  // For the note-to-graph offer below. A subject is the container that
+  // accumulates and nothing creates one silently, so this is a list to pick
+  // from rather than a name to invent.
+  const subjects = await loadSubjects(supabase);
   if (!reading) notFound();
 
   // Only meaningful when there is a source to have read somewhere else.
@@ -79,9 +85,11 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         // failure rather than as a step you have not taken.
         <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5 border-dashed')}>
           <h2 className="mb-2 text-ui font-semibold text-ink-muted">No source yet</h2>
-          <p className="mb-4 text-body text-ink-muted">
-            You wrote this down yourself. Nothing has been found to read for it yet.
-          </p>
+          {/* The row's own basis rather than a fixed sentence: a subject can
+              get here by being typed or by being proposed for a topic, and
+              telling you the wrong one of those is the small dishonesty this
+              module is built to avoid. */}
+          <p className="mb-4 text-body text-ink-muted">{reading.locatorBasis}</p>
           <FindSources readingId={reading.id} />
         </section>
       ) : (
@@ -165,9 +173,30 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         </p>
       </section>
 
+      {/* The other direction from Find sources, which finds more to read about
+          this subject as it stands. This breaks the subject into parts. */}
+      <section className="mb-5">
+        <h2 className="mb-2 text-ui font-semibold text-ink-muted">Go deeper</h2>
+        <form action={goDeeper}>
+          <input type="hidden" name="readingId" value={reading.id} />
+          <Button type="submit" variant="secondary" size="md">
+            <GitBranch className="size-4" strokeWidth={2} aria-hidden />
+            Go deeper on this
+          </Button>
+        </form>
+        <p className="mt-1.5 text-small text-ink-muted">
+          Opens this one subject up as a topic of its own, planned when you get there. This step
+          stays where it is.
+        </p>
+      </section>
+
       <section>
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">What you took from it</h2>
         <NoteForm readingId={reading.id} note={reading.note} />
+
+        {/* The note is written anyway, so this asks nothing new of you: it is
+            where a reading gets to change what the graph thinks you know. */}
+        {reading.note?.trim() && <NoteToGraph readingId={reading.id} subjects={subjects} />}
       </section>
 
       {/*

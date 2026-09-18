@@ -68,6 +68,78 @@ describe('extractRequirements', () => {
   it('returns nothing rather than noise for prose with no structure', () => {
     expect(extractRequirements('We are hiring a finance person. Email us.')).toEqual([]);
   });
+
+  it('does not take a single sentence under a heading for a list', () => {
+    // "About the role" above is a recognised heading with one line of prose
+    // under it. A parser that counted bare lines without counting how many
+    // would file that sentence as a responsibility.
+    const responsibilities = requirements.filter((r) => r.kind === 'responsibility');
+    expect(responsibilities.some((r) => /join the team/.test(r.text))).toBe(false);
+  });
+});
+
+/**
+ * The posting that had six thousand characters of description and an empty
+ * requirement map: curled apostrophes in its headings, and a list whose bullet
+ * characters did not survive being copied out of the page.
+ */
+const PASTED = `Who We Are:
+
+Galaxy is a global leader in digital assets, growing the economy that runs on code.
+
+What You’ll Do:
+
+Review quarterly and annual fund NAVs and capital account allocations
+Manage the capital activity lifecycle, capital calls and distribution notices
+Coordinate the annual audit with fund administrators, auditors and tax preparers
+
+What We’re Looking For:
+
+3-7 years of experience with a strong background in accounting
+Experience coordinating with third party fund administrators
+A working knowledge of limited partnership agreements and waterfall provisions
+
+Bonus Points:
+
+Experience in digital assets and crypto currencies
+Experience with SPVs and co-investment vehicles
+Experience in client service or communicating directly with stakeholders
+
+What We Offer:
+
+Competitive base salary and discretionary bonus
+Flexible Time Off (paid)
+Free daily snacks and weekly breakfasts
+
+Base Salary Range
+
+$125,000 - $180,000 USD`;
+
+describe('extractRequirements on a description pasted without its bullets', () => {
+  const requirements = extractRequirements(PASTED);
+  const of = (kind: string) => requirements.filter((r) => r.kind === kind).map((r) => r.text);
+
+  it('reads a heading whose apostrophe was curled by the board', () => {
+    // "What You’ll Do:" is "What you'll do". Before this the heading matched
+    // nothing, so every line under it fell outside any section and the whole
+    // description came back empty.
+    expect(of('responsibility')).toHaveLength(3);
+  });
+
+  it('reads the lists whose bullets were lost on the way in', () => {
+    expect(of('must_have')).toEqual([
+      '3-7 years of experience with a strong background in accounting',
+      'Experience coordinating with third party fund administrators',
+      'A working knowledge of limited partnership agreements and waterfall provisions',
+    ]);
+    expect(of('nice_to_have')).toHaveLength(3);
+  });
+
+  it('stops at the heading it does not recognise, so the perks are not requirements', () => {
+    // "What We Offer:" is not a requirement heading, and everything under it
+    // would otherwise have been read as more of the bonus points above it.
+    expect(requirements.some((r) => /snacks|Time Off|base salary/i.test(r.text))).toBe(false);
+  });
 });
 
 describe('jdHash', () => {

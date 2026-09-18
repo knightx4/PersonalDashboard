@@ -10,6 +10,7 @@ import { resolveOneReference } from '@/lib/learn/import/resolve';
 import type { ReferenceCandidate } from '@/lib/learn/import/parse-heuristic';
 import { resolvedSourceSchema, type ResolvedSource } from '@/lib/learn/import/resolve-payload';
 import { createTrack, saveImport, type SaveRow } from '@/lib/learn/tracks/save';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 
 /**
  * Bringing a reading list in.
@@ -82,8 +83,9 @@ export type ParseState = { error?: string; parsed?: ParsedImport };
  * that resolved eight citations end to end is one long request that a platform
  * eventually cuts off, and when it does you lose all eight.
  */
+// latency: pending
 export async function parseImport(_prev: ParseState, formData: FormData): Promise<ParseState> {
-  await requireUser();
+  const user = await requireUser();
 
   const parsed = PreviewInput.safeParse({
     question: formData.get('question') ?? '',
@@ -97,7 +99,9 @@ export async function parseImport(_prev: ParseState, formData: FormData): Promis
   const { question, text, sourceHint } = parsed.data;
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
 
-  const candidates = await parseReferences(text, { anthropicApiKey: apiKey });
+  const spend = collectSpend();
+  const candidates = await parseReferences(text, { anthropicApiKey: apiKey, onSpend: spend.sink });
+  await recordLearnSpend(user.id, 'parse-references', spend.reports);
   if (candidates.length === 0) {
     return { error: 'Nothing in that paste looked like something to read.' };
   }
@@ -124,11 +128,12 @@ export async function parseImport(_prev: ParseState, formData: FormData): Promis
  * that cannot be placed comes back carrying its reason, because one line
  * saying so is what stops you assuming the list was complete.
  */
+// latency: pending
 export async function resolveCandidate(input: {
   candidate: ReferenceCandidate;
   question: string | null;
 }): Promise<PreviewRow> {
-  await requireUser();
+  const user = await requireUser();
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -149,10 +154,13 @@ export async function resolveCandidate(input: {
     };
   }
 
+  const spend = collectSpend();
   const row = await resolveOneReference(input.candidate, {
     anthropicApiKey: apiKey,
     question: input.question,
+    onSpend: spend.sink,
   });
+  await recordLearnSpend(user.id, 'resolve-reference', spend.reports);
 
   return {
     raw: row.candidate.raw,
@@ -179,6 +187,7 @@ const NewTrackInput = z.object({
   question: z.string().trim().max(2000),
 });
 
+// latency: pending
 export async function startTrack(
   _prev: NewTrackState,
   formData: FormData,
@@ -215,6 +224,7 @@ const ConfirmInput = z.object({
   sourceHint: z.string().trim().max(100),
 });
 
+// latency: pending
 export async function confirmImport(
   _prev: NewTrackState,
   formData: FormData,

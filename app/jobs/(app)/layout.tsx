@@ -5,7 +5,9 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadInboxBannerState } from '@/lib/core/inbox/banner';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadJobsBrief } from '@/lib/shell/brief';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { InboxSyncBanner } from '@/components/shell/inbox-sync-banner';
@@ -35,14 +37,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/jobs/onboarding');
   }
 
-  const [{ data: profile }, reviewCount, inbox, settings, counts, activity] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-    countReviewItems(supabase, core, user.id),
-    loadInboxBannerState(user.id),
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadActivity(),
-  ]);
+  const [{ data: profile }, reviewCount, inbox, settings, counts, activity, raised, mainCheck] =
+    await Promise.all([
+      supabase.from('profiles').select('display_name').eq('id', user.id).single(),
+      countReviewItems(supabase, core, user.id),
+      loadInboxBannerState(user.id),
+      loadAccountSettings(user.id),
+      loadModuleCounts(user.id),
+      loadActivity(),
+      loadRaisedNotifications(user.id),
+      loadMainCheck(),
+    ]);
 
   const brief = await loadJobsBrief(user.id, reviewCount);
 
@@ -70,6 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div data-workspace="jobs">
       <AppShell
+        account={user.id}
         module="jobs"
         sections={sections}
         settingsHref="/jobs/settings"
@@ -80,7 +86,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
         brief={brief}
         banner={<InboxSyncBanner accountIds={accountIds} initialJob={initialJob} />}
       >

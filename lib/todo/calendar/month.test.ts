@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addMonths, buildMonth, isMonth, monthDays, monthWindow } from '@/lib/todo/calendar/month';
 import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
+import type { Event } from '@/lib/todo/events/model';
 import type { Task } from '@/lib/todo/tasks/model';
 
 const NOW = new Date('2026-03-10T09:00:00.000Z');
@@ -18,6 +19,22 @@ function task(over: Partial<Task> = {}): Task {
     completedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     position: null,
+    parentId: null,
+    ...over,
+  };
+}
+
+function event(over: Partial<Event> = {}): Event {
+  return {
+    id: 'event-1',
+    title: 'An event',
+    body: null,
+    location: null,
+    startsOn: null,
+    endsOn: null,
+    startsAt: null,
+    endsAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
     ...over,
   };
 }
@@ -53,6 +70,7 @@ function build(over: Partial<Parameters<typeof buildMonth>[0]> = {}) {
   return buildMonth({
     month: '2026-03',
     tasks: [],
+    events: [],
     items: [],
     context: [],
     dismissals: new Map(),
@@ -202,8 +220,189 @@ describe('buildMonth', () => {
     ]);
   });
 
+  it('puts a timed event on its day, with the hours it runs', () => {
+    const month = build({
+      events: [
+        event({
+          title: 'Dentist',
+          startsAt: '2026-03-10T15:00:00.000Z',
+          endsAt: '2026-03-10T15:30:00.000Z',
+        }),
+      ],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries).toEqual([
+      expect.objectContaining({
+        kind: 'event',
+        title: 'Dentist',
+        at: '2026-03-10T15:00:00.000Z',
+        end: '2026-03-10T15:30:00.000Z',
+      }),
+    ]);
+    expect(dayIn(month, '2026-03-11').entries).toEqual([]);
+  });
+
+  it('puts an all-day event on its day with no clock on it', () => {
+    // No `at`, which is what puts it in the all-day row of the day and week
+    // views rather than in an hour.
+    const month = build({
+      events: [event({ title: 'Bank holiday', startsOn: '2026-03-10', endsOn: '2026-03-10' })],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries).toEqual([
+      expect.objectContaining({ kind: 'event', at: null, end: null }),
+    ]);
+  });
+
+  it('puts an event running over three days on each of them', () => {
+    const month = build({
+      events: [event({ title: 'Half term', startsOn: '2026-03-10', endsOn: '2026-03-12' })],
+    });
+
+    for (const day of ['2026-03-10', '2026-03-11', '2026-03-12']) {
+      expect(dayIn(month, day).entries.map((entry) => entry.title)).toEqual(['Half term']);
+    }
+    expect(dayIn(month, '2026-03-13').entries).toEqual([]);
+  });
+
+  it('holds each day only the part of an event that is on it', () => {
+    // A meeting that runs into the small hours is on both days, and neither
+    // day is drawn as holding the whole of it.
+    const month = build({
+      events: [
+        event({
+          title: 'Night shift',
+          startsAt: '2026-03-10T23:00:00.000Z',
+          endsAt: '2026-03-11T01:00:00.000Z',
+        }),
+      ],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries).toEqual([
+      expect.objectContaining({ at: '2026-03-10T23:00:00.000Z', end: '2026-03-11T00:00:00.000Z' }),
+    ]);
+    expect(dayIn(month, '2026-03-11').entries).toEqual([
+      expect.objectContaining({ at: '2026-03-11T00:00:00.000Z', end: '2026-03-11T01:00:00.000Z' }),
+    ]);
+  });
+
+  it('files an evening event under the day it is on for this reader', () => {
+    const evening = event({
+      title: 'Late call',
+      startsAt: '2026-03-10T23:30:00.000Z',
+      endsAt: '2026-03-10T23:45:00.000Z',
+    });
+
+    expect(dayIn(build({ events: [evening] }), '2026-03-10').entries).toHaveLength(1);
+    expect(
+      dayIn(build({ events: [evening], timezone: 'Asia/Tokyo' }), '2026-03-11').entries,
+    ).toHaveLength(1);
+    expect(
+      dayIn(build({ events: [evening], timezone: 'Asia/Tokyo' }), '2026-03-10').entries,
+    ).toEqual([]);
+  });
+
+  it('reads an event before a task at the same time', () => {
+    const month = build({
+      tasks: [task({ title: 'Nine sharp', dueAt: '2026-03-10T09:00:00.000Z' })],
+      events: [
+        event({
+          title: 'Standup',
+          startsAt: '2026-03-10T09:00:00.000Z',
+          endsAt: '2026-03-10T09:15:00.000Z',
+        }),
+      ],
+    });
+
+    expect(dayIn(month, '2026-03-10').entries.map((entry) => entry.title)).toEqual([
+      'Standup',
+      'Nine sharp',
+    ]);
+  });
+
   it('ignores anything outside the grid rather than crowding an edge square', () => {
     const month = build({ tasks: [task({ dueOn: '2026-05-01' })] });
     expect(month.weeks.flat().every((cell) => cell.entries.length === 0)).toBe(true);
+  });
+  it('draws a subscribed appointment beside one of your own on the same day', () => {
+    const month = build({
+      events: [
+        event({
+          id: 'mine',
+          title: 'Dentist',
+          startsAt: '2026-03-10T09:00:00.000Z',
+          endsAt: '2026-03-10T09:30:00.000Z',
+        }),
+      ],
+      feedEvents: [
+        event({
+          id: 'theirs',
+          title: 'Sprint review',
+          startsAt: '2026-03-10T14:00:00.000Z',
+          endsAt: '2026-03-10T15:00:00.000Z',
+        }),
+      ],
+    });
+
+    const cell = dayIn(month, '2026-03-10');
+    expect(cell.entries.map((entry) => [entry.kind, entry.title])).toEqual([
+      ['event', 'Dentist'],
+      ['feed', 'Sprint review'],
+    ]);
+  });
+
+  it('offers to read a subscribed appointment, never to edit one', () => {
+    // eventId is what the page turns into a link to the edit form, and a
+    // subscribed appointment is somebody else's row: this app writes nothing
+    // back to it. feedEventId is the other door -- the card that only reads.
+    const month = build({
+      feedEvents: [
+        event({
+          id: 'theirs',
+          startsAt: '2026-03-10T14:00:00.000Z',
+          endsAt: '2026-03-10T15:00:00.000Z',
+        }),
+      ],
+    });
+
+    const [entry] = dayIn(month, '2026-03-10').entries;
+    expect(entry.eventId).toBeNull();
+    expect(entry.feedEventId).toBe('theirs');
+    // The pure model names no URLs; the page is what turns an id into one.
+    expect(entry.href).toBeNull();
+  });
+
+  it('puts a subscribed appointment that crosses midnight on both days', () => {
+    const month = build({
+      feedEvents: [
+        event({
+          id: 'theirs',
+          title: 'Night shift',
+          startsAt: '2026-03-12T23:00:00.000Z',
+          endsAt: '2026-03-13T01:00:00.000Z',
+        }),
+      ],
+    });
+
+    // The first day holds it from when it starts; the second from midnight,
+    // so neither square draws anything outside the day it is.
+    const first = dayIn(month, '2026-03-12').entries[0];
+    const second = dayIn(month, '2026-03-13').entries[0];
+
+    expect(first.at).toBe('2026-03-12T23:00:00.000Z');
+    expect(first.end).toBe('2026-03-13T00:00:00.000Z');
+    expect(second.at).toBe('2026-03-13T00:00:00.000Z');
+    expect(second.end).toBe('2026-03-13T01:00:00.000Z');
+  });
+
+  it('gives a whole-day subscribed appointment every day it covers', () => {
+    const month = build({
+      feedEvents: [event({ id: 'theirs', startsOn: '2026-03-16', endsOn: '2026-03-18' })],
+    });
+
+    for (const day of ['2026-03-16', '2026-03-17', '2026-03-18']) {
+      expect(dayIn(month, day).entries.map((entry) => entry.kind)).toEqual(['feed']);
+    }
+    expect(dayIn(month, '2026-03-19').entries).toEqual([]);
   });
 });

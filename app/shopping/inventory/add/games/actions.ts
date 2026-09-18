@@ -200,6 +200,7 @@ async function persistGame(
   return { id: bundle.inventory.id };
 }
 
+// latency: pending
 export async function searchGame(
   _prev: GameActionState,
   formData: FormData,
@@ -252,6 +253,7 @@ export async function searchGame(
   };
 }
 
+// latency: pending
 export async function saveGame(
   _prev: GameActionState,
   formData: FormData,
@@ -288,6 +290,7 @@ export async function saveGame(
   return { message: 'Added to your collection.', savedIds: [result.id], game };
 }
 
+// latency: pending
 export async function saveManualGame(
   _prev: GameActionState,
   formData: FormData,
@@ -350,6 +353,7 @@ export async function saveManualGame(
  * sighting — resolved, unsure, or unresolved — plus the count of boxes the
  * model could see but not identify, so the gap is visible rather than implied.
  */
+// latency: pending
 export async function extractGamesFromPhoto(
   prev: GameActionState,
   formData: FormData,
@@ -438,6 +442,7 @@ async function readShelfPhoto(formData: FormData): Promise<GameActionState> {
 }
 
 /** Save the rows the user ticked from a photo import. */
+// latency: pending
 export async function saveGameBatch(
   _prev: GameActionState,
   formData: FormData,
@@ -496,6 +501,7 @@ export async function saveGameBatch(
 }
 
 /** Clear the confirm gate on a game already in the collection. */
+// latency: pending
 export async function confirmGameEdition(
   _prev: GameActionState,
   formData: FormData,
@@ -525,6 +531,7 @@ export async function confirmGameEdition(
 }
 
 /** Swap a game onto one of the runner-up BGG entries. */
+// latency: pending
 export async function switchGameEdition(
   _prev: GameActionState,
   formData: FormData,
@@ -594,6 +601,7 @@ export async function switchGameEdition(
  * Any other barcode: keep the product name and file it as plain inventory.
  * Not every scan is a book or a game, and a named row beats a dead end.
  */
+// latency: pending
 export async function saveScannedProduct(
   _prev: GameActionState,
   formData: FormData,
@@ -643,6 +651,7 @@ export async function saveScannedProduct(
  * manual rows with no BGG id — searchable and sellable-by-hand, and a later
  * lookup can fill in the identity.
  */
+// latency: pending
 export async function saveUnmatchedGames(
   _prev: GameActionState,
   formData: FormData,

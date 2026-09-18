@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
 import { Select } from '@/components/ui/field';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { statusLabel } from '@/lib/jobs/status-label';
 import { APPLICATION_STATUSES, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { moveApplication } from '@/app/jobs/(app)/pipeline/actions';
@@ -43,11 +43,18 @@ export function StatusPicker({
   submittedAt?: string | null;
   className?: string;
 }) {
-  const [busy, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   // Optimistic, so the select does not snap back to the old value while the
-  // server round trip and the revalidation happen.
-  const [shown, setShown] = useState<ApplicationStatus>(displayStatus(status));
+  // server round trip and the revalidation happen. A status the action refuses
+  // -- ghosted, or one the board cannot set -- puts the select back on the
+  // status the page was rendered with, marks it, and says why in a toast.
+  const { shown, run, pending, failed } = useOptimisticWrite<
+    ApplicationStatus,
+    ApplicationStatus
+  >({
+    value: displayStatus(status),
+    apply: (_current, next) => next,
+    write: (next) => moveApplication(applicationId, next),
+  });
   const everSubmitted = submittedAt !== null;
 
   return (
@@ -55,21 +62,12 @@ export function StatusPicker({
       {/* The primitive, shrunk to the row it sits in: a status is chrome, not a form field. */}
       <Select
         value={shown}
-        disabled={busy}
+        disabled={pending}
         aria-label="Status"
-        onChange={(event) => {
-          const next = event.target.value as ApplicationStatus;
-          const previous = shown;
-          setShown(next);
-          setError(null);
-          startTransition(async () => {
-            const result = await moveApplication(applicationId, next);
-            if (result.error) {
-              setShown(previous);
-              setError(result.error);
-            }
-          });
-        }}
+        aria-invalid={failed}
+        onChange={(event) => run(event.target.value as ApplicationStatus)}
+        // The field primitive already draws aria-invalid in the danger colour,
+        // so the mark on a refused status is the flag rather than a class here.
         className="h-7 w-auto px-1.5 text-small"
       >
         {SETTABLE.map((option) => (
@@ -78,11 +76,6 @@ export function StatusPicker({
           </option>
         ))}
       </Select>
-      {error && (
-        <span role="alert" className="text-small text-danger">
-          {error}
-        </span>
-      )}
     </span>
   );
 }

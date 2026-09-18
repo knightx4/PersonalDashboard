@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { NavSection } from '@/components/shell/app-shell';
+import { SYSTEM_THEME } from '@/lib/theme';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
@@ -22,12 +23,13 @@ const { AppShell } = await import('@/components/shell/app-shell');
 function render(sections: NavSection[], settingsHref?: string) {
   return renderToStaticMarkup(
     <AppShell
+      account="11111111-1111-4111-8111-111111111111"
       module={null}
       sections={sections}
       settingsHref={settingsHref}
       displayName="Sam"
       email="sam@example.com"
-      theme={null}
+      theme={SYSTEM_THEME}
     >
       <p>The page</p>
     </AppShell>,
@@ -71,5 +73,32 @@ describe('the bottom bar', () => {
   it('leaves room under the page for it, whether or not there are sections', () => {
     expect(render([])).toContain('pb-24');
     expect(render([{ href: '/todo', label: 'Agenda' }])).toContain('pb-24');
+  });
+});
+
+/**
+ * The way into capture.
+ *
+ * One of them, in the header beside the theme picker, at every width. There
+ * was a second below `sm` -- an accent circle floating over the foot of every
+ * page -- and it read as the app insisting rather than offering, so it went.
+ * Nothing is pinned over the page now, and the header control is no longer
+ * hidden on a phone.
+ */
+describe('capture', () => {
+  it('offers a way in from the header, with its shortcut on it', () => {
+    const html = render([]);
+    expect(html).toContain('title="Capture something (⌥C)"');
+    expect(html).toContain('>⌥C<');
+  });
+
+  it('pins nothing over the page', () => {
+    expect(render([])).not.toContain('bottom-[calc(4.5rem+env(safe-area-inset-bottom))]');
+  });
+
+  it('is present on a page with no workspace at all', () => {
+    // The panel mounts with the shell, not with a module, so "from anywhere"
+    // includes home and the account page.
+    expect(render([]).match(/>Capture something</g)?.length).toBe(1);
   });
 });

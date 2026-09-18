@@ -27,6 +27,7 @@ export type ItemActionState = {
  * check works, and no detail row, which is what makes `manual_expected_price`
  * the price the sell page reads for it.
  */
+// latency: pending
 export async function saveManualItem(
   _prev: ItemActionState,
   formData: FormData,

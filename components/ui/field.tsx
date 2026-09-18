@@ -56,11 +56,7 @@ const control =
 /** Height and inset from the dial, so an input, a select and a button agree. */
 const controlBox = 'h-(--control-h) px-(--control-px)';
 
-export const Input = function Input({
-  className,
-  ref,
-  ...props
-}: React.ComponentProps<'input'>) {
+export const Input = function Input({ className, ref, ...props }: React.ComponentProps<'input'>) {
   return <input ref={ref} className={cn(control, controlBox, className)} {...props} />;
 };
 
@@ -83,18 +79,14 @@ export const Input = function Input({
  * `aria-label` -- there is no visible label by construction, which is the
  * point of it and also the one way it can go wrong.
  */
-export function InlineInput({
-  className,
-  ref,
-  ...props
-}: React.ComponentProps<'input'>) {
+export function InlineInput({ className, ref, ...props }: React.ComponentProps<'input'>) {
   return (
     <input
       ref={ref}
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
         'w-full rounded-control border border-transparent bg-transparent px-1 py-0.5 text-base text-ink sm:text-ui',
-        'hover:border-border hover:bg-sunken',
+        'hover:bg-sunken',
         'focus:border-accent focus:bg-surface focus:outline-none focus:ring-1 focus:ring-accent/40',
         'placeholder:text-ink-ghost aria-invalid:border-danger',
         'disabled:cursor-not-allowed disabled:opacity-50',
@@ -150,7 +142,7 @@ export function ComposeTitle({ className, ref, ...props }: React.ComponentProps<
       ref={ref}
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
-        'w-full border-0 bg-transparent p-0 text-base font-medium text-ink outline-none sm:text-lead',
+        'w-full border-0 bg-transparent p-0 text-base font-medium text-ink outline-none sm:text-body',
         'placeholder:font-normal placeholder:text-ink-ghost',
         className,
       )}
@@ -159,16 +151,40 @@ export function ComposeTitle({ className, ref, ...props }: React.ComponentProps<
   );
 }
 
-export function ComposeBody({
-  className,
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function ComposeBody({ className, ref, ...props }: React.ComponentProps<'textarea'>) {
   return (
     <textarea
+      ref={ref}
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
         'field-sizing-content max-h-64 w-full resize-none border-0 bg-transparent p-0 text-base text-ink outline-none sm:text-ui',
         'placeholder:text-ink-ghost',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/**
+ * The border a compose surface wears when it is a box you send from.
+ *
+ * What goes inside is a ComposeBody and a row of controls under it, both
+ * borderless, so the words and the control that sends them read as one object
+ * instead of a field with buttons standing beneath it. The ring is
+ * `focus-within` for the same reason: the caret is in the textarea, but what
+ * lights up is the box.
+ *
+ * Same border, radius and inset as the `control` above, because it is the same
+ * kind of thing. Only what sits inside it differs.
+ */
+export function ComposeBox({ className, ref, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'rounded-control border border-control bg-surface px-(--control-px) py-1.5',
+        'focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40',
         className,
       )}
       {...props}
@@ -223,7 +239,7 @@ export function ChipSelect({
       className={cn(
         'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
         'border border-transparent px-1.5 py-0.5 text-ui',
-        'hover:border-border hover:bg-sunken',
+        'hover:bg-sunken',
         'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
         className,
       )}
@@ -244,36 +260,92 @@ export function ChipSelect({
         {...props}
       />
       {/* The caret is not decoration and is not optional.
-        *
-        * A chip in a row of chips is obviously interactive because everything
-        * beside it is; a chip standing among static facts is not, and that is
-        * where this first went wrong. On an item page the condition chip sat
-        * in a list reading "Publisher / Avery", "Year / 2018", "Condition /
-        * Good" -- three facts, one of them secretly a control, and nothing on
-        * it saying so until the pointer arrived. `appearance-none` had taken
-        * the platform's own caret away and put nothing back.
-        *
-        * So it is drawn here, ghosted at rest and muted on hover: enough to
-        * say "this opens" without becoming a box. A select that gives no hint
-        * it is a select is not a quiet control, it is a hidden one. */}
+       *
+       * A chip in a row of chips is obviously interactive because everything
+       * beside it is; a chip standing among static facts is not, and that is
+       * where this first went wrong. On an item page the condition chip sat
+       * in a list reading "Publisher / Avery", "Year / 2018", "Condition /
+       * Good" -- three facts, one of them secretly a control, and nothing on
+       * it saying so until the pointer arrived. `appearance-none` had taken
+       * the platform's own caret away and put nothing back.
+       *
+       * So it is drawn here, ghosted at rest and muted on hover: enough to
+       * say "this opens" without becoming a box. A select that gives no hint
+       * it is a select is not a quiet control, it is a hidden one. */}
       <svg
         aria-hidden
         viewBox="0 0 10 6"
         className="pointer-events-none -ml-0.5 size-2.5 shrink-0 text-ink-ghost group-hover/chip:text-ink-muted"
       >
-        <path d="M1 1.5 5 5l4-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M1 1.5 5 5l4-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     </span>
   );
 }
 
-export function Textarea({
+/**
+ * The same chip, around an `<input>` rather than a select.
+ *
+ * For the one property a select cannot express: a date. A `type="date"` in a
+ * `Input` box is the worst control in the app -- a full-height bordered field
+ * printing "dd/mm/yyyy" in ghost text, as wide as a sentence, sitting there
+ * empty next to the thing you are actually typing. In a compose surface that
+ * is three quarters of the chrome for one twelfth of the content (law 9).
+ *
+ * As a chip it is the width of the date, borderless until pointed at, and says
+ * what it is with a glyph instead of a caption. No caret: unlike a select, the
+ * browser draws its own picker affordance inside a date input, and a second
+ * one beside it is two arrows for one control.
+ */
+export function ChipInput({
   className,
+  icon,
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: React.InputHTMLAttributes<HTMLInputElement> & { icon?: React.ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'group/chip press inline-flex max-w-full items-center gap-1.5 rounded-control',
+        'border border-transparent px-1.5 py-0.5 text-ui',
+        'hover:bg-sunken',
+        'focus-within:border-accent focus-within:bg-surface focus-within:ring-1 focus-within:ring-accent/40',
+        className,
+      )}
+    >
+      {icon ? (
+        <span aria-hidden className="shrink-0 text-ink-ghost group-hover/chip:text-ink-muted">
+          {icon}
+        </span>
+      ) : null}
+      <input
+        className={cn(
+          'field-sizing-content min-w-0 cursor-pointer bg-transparent',
+          // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
+          'text-base text-ink outline-none sm:text-ui',
+          'placeholder:text-ink-ghost',
+        )}
+        {...props}
+      />
+    </span>
+  );
+}
+
+export function Textarea({ className, ref, ...props }: React.ComponentProps<'textarea'>) {
   return (
     <textarea
-      className={cn(control, 'field-sizing-content max-h-64 min-h-16 px-(--control-px) py-1.5', className)}
+      ref={ref}
+      className={cn(
+        control,
+        'field-sizing-content max-h-64 min-h-16 px-(--control-px) py-1.5',
+        className,
+      )}
       {...props}
     />
   );
@@ -337,8 +409,7 @@ export function Field({
     ? cloneElement(children, {
         'aria-invalid': error ? true : children.props['aria-invalid'],
         'aria-describedby':
-          [children.props['aria-describedby'], describedBy].filter(Boolean).join(' ') ||
-          undefined,
+          [children.props['aria-describedby'], describedBy].filter(Boolean).join(' ') || undefined,
       })
     : children;
 

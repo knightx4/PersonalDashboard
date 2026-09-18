@@ -15,6 +15,15 @@
  * reader is concerned, and the mark is decoration for a name that is already
  * being read out.
  *
+ * `bulk` is the page's own verbs for a selection -- Confirm 4 orders, Dismiss
+ * 2 emails. It is rendered by SelectionActionBar, which draws nothing at all
+ * while nothing is selected and takes the header's place when something is.
+ * The bar sits over the heading rather than above or below it, so a selection
+ * never moves the page: both are in the same grid cell, the heading keeps its
+ * space and goes invisible while the bar is up. The cell is as tall as the
+ * taller of the two, so a bar that wraps on a phone grows the header instead
+ * of spilling over the list.
+ *
  * The actions are pushed right by an auto margin rather than by
  * `justify-between`. Justification only distributes space between items that
  * share a line, so on a narrow screen -- where a header carrying a mark, a long
@@ -28,20 +37,26 @@ export function PageHeader({
   description,
   actions,
   leading,
+  bulk,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
   leading?: React.ReactNode;
+  /** What can be done to a selection, wrapped in SelectionActionBar. */
+  bulk?: React.ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start gap-3">
-      {leading}
-      <div className="min-w-0">
-        <h1 className="font-display text-title tracking-tight text-ink">{title}</h1>
-        {description && <p className="mt-0.5 text-body text-ink-muted">{description}</p>}
+    <div className="group/header mb-5 grid">
+      <div className="col-start-1 row-start-1 flex flex-wrap items-start gap-3 group-has-[[data-selection-bar]]/header:invisible">
+        {leading}
+        <div className="min-w-0">
+          <h1 className="font-display text-title tracking-tight text-ink">{title}</h1>
+          {description && <p className="mt-0.5 text-body text-ink-muted">{description}</p>}
+        </div>
+        {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+      {bulk}
     </div>
   );
 }

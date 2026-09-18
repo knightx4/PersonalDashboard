@@ -53,7 +53,7 @@ export function notesRoutine(): RoutineTarget {
   };
 }
 
-/** The routine that works the plan -- "Send to Claude" and "Shape into a plan". */
+/** The routine that works the plan -- "Send to Dash" and "Shape into a plan". */
 export function planRoutine(): RoutineTarget {
   return {
     id: firstSet(process.env.CLAUDE_PLAN_ROUTINE_ID, process.env.CLAUDE_FEATURE_ROUTINE_ID),
@@ -61,13 +61,111 @@ export function planRoutine(): RoutineTarget {
   };
 }
 
+/**
+ * The routine that reviews one module's interface -- the button on
+ * /dev/ui/review.
+ *
+ * No fallback to the shared id, unlike the two above. A review pass is a
+ * different job from working the notes queue and from building the plan, and a
+ * button pointed at either of those would not fail: it would quietly work the
+ * wrong queue, which is the failure the split ids exist to prevent. With no id
+ * set the page says so and starts nothing.
+ */
+export function reviewRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_REVIEW_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_REVIEW_ROUTINE_TOKEN, process.env.CLAUDE_API_KEY),
+  };
+}
+
 /** The beta header the routine API requires, as documented. */
 const ROUTINE_BETA = 'experimental-cc-routine-2026-04-01';
 const ANTHROPIC_VERSION = '2023-06-01';
 
+/**
+ * What a press produced, kept rather than reduced to a sentence.
+ *
+ * The result used to be a message for the toast and nothing else, so the app
+ * threw away the only evidence it ever gets that a run exists. `body` is what
+ * Anthropic answered with -- parsed when it is JSON, the raw text when it is
+ * not, null when there was none -- and `runId` is whatever in it looks like a
+ * name for the run. Both are recorded by `lib/plan/runs.ts`; a failure carries
+ * them too, because the body of a refusal is the half that says why.
+ */
 export type FireRoutineResult =
-  | { ok: true; detail: string }
-  | { ok: false; error: string };
+  | { ok: true; detail: string; status: number; body: unknown; runId: string | null }
+  | { ok: false; error: string; status: number | null; body: unknown };
+
+/** The keys a run's own identifier has turned up under, most specific first. */
+const RUN_ID_KEYS = [
+  'claude_code_session_id',
+  'run_id',
+  'routine_run_id',
+  'session_id',
+  'conversation_id',
+  'id',
+] as const;
+
+/** Where an identifier hides when the body wraps it, rather than at the top. */
+const RUN_ID_CONTAINERS = ['run', 'routine_run', 'session', 'data', 'result'] as const;
+
+/**
+ * The identifier of the run that was just started, if the body carries one.
+ *
+ * The real body is now known, from the rows #498 started keeping:
+ * `{"type": "routine_fire", "claude_code_session_id": "cse_...",
+ * "claude_code_session_url": "https://claude.ai/code/cse_..."}`. So
+ * `claude_code_session_id` is read first, and the keys below it stay because
+ * they cost nothing and the endpoint is a beta whose shape may move.
+ *
+ * Null rather than a guess when none of them is there. The body is recorded
+ * beside the id, so a shape this misses is a question of reading the stored
+ * row, not of firing another run to find out.
+ */
+export function runIdFrom(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const record = body as Record<string, unknown>;
+
+  for (const key of RUN_ID_KEYS) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+
+  for (const container of RUN_ID_CONTAINERS) {
+    const nested = record[container];
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      for (const key of RUN_ID_KEYS) {
+        const value = (nested as Record<string, unknown>)[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The routine a press actually fires: the one set, or the built-in default.
+ *
+ * Exported because the run record names the routine that took the work, and
+ * recording the unset id rather than the one the request went to would make the
+ * record wrong in exactly the case it exists for.
+ */
+export function resolveRoutineId(routineId?: string | null): string {
+  return routineId?.trim() || DEFAULT_FEATURE_ROUTINE_ID;
+}
+
+/** The response body as something storable: JSON when it parses, else the text. */
+function bodyOf(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    // Not JSON. The text is still evidence, and still worth keeping.
+    return trimmed.slice(0, 4000);
+  }
+}
 
 export async function fireFeatureRoutine(options: {
   apiKey: string | null;
@@ -82,10 +180,12 @@ export async function fireFeatureRoutine(options: {
       error:
         'No token for this routine on the deployment, so it cannot be started. ' +
         'Set CLAUDE_PLAN_ROUTINE_TOKEN or CLAUDE_NOTES_ROUTINE_TOKEN (or CLAUDE_API_KEY for both).',
+      status: null,
+      body: null,
     };
   }
 
-  const routineId = options.routineId?.trim() || DEFAULT_FEATURE_ROUTINE_ID;
+  const routineId = resolveRoutineId(options.routineId);
   const fetchFn = options.fetch ?? globalThis.fetch;
   const url = `https://api.anthropic.com/v1/claude_code/routines/${routineId}/fire`;
 
@@ -105,15 +205,30 @@ export async function fireFeatureRoutine(options: {
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'The request never reached Anthropic.',
+      status: null,
+      body: null,
     };
   }
 
+  const text = await response.text().catch(() => '');
+  const body = bodyOf(text);
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    return { ok: false, error: `Anthropic answered ${response.status}. ${summarize(body)}`.trim() };
+    return {
+      ok: false,
+      error: `Anthropic answered ${response.status}. ${summarize(text)}`.trim(),
+      status: response.status,
+      body,
+    };
   }
 
-  return { ok: true, detail: 'The routine is running. Its commits will land on their own.' };
+  return {
+    ok: true,
+    detail: 'The routine is running. Its commits will land on their own.',
+    status: response.status,
+    body,
+    runId: runIdFrom(body),
+  };
 }
 
 /** The useful half of an error body, short enough to put in a toast. */

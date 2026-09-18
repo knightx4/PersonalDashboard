@@ -72,22 +72,34 @@ Reading a message *with* a workspace's verdict goes through that schema's
 `inbox_messages` view, which joins the two — PostgREST cannot embed across
 schemas, so the join has to be in the database.
 
-### The one step that is not in this repository
+### Exposed schemas
 
-In the Supabase dashboard, under **Settings → API → Exposed schemas**, the list
-must include **`job_search`, `core`, `obsidian` and `todo`** alongside `public`.
+PostgREST only serves the schemas it has been told to serve. The list must
+include **`job_search`, `core`, `obsidian`, `todo`, `learn` and `news`**
+alongside `public` and `graphql_public`. A schema that is missing gets
+`PGRST106 Invalid schema: …` on every request, which reaches the browser as
+*"This page couldn't load — a server error occurred"*.
 
-Without it PostgREST refuses every request against the missing schema with
-*"The schema must be one of the following"*, and because it is a dashboard
-setting rather than a migration it is the step that gets forgotten after a
-project restore or when setting up a second environment. Three things have to
-agree — the migrations, the `db: { schema }` option on every client, and this
-setting — and only the first two are in version control.
+This used to be a dashboard setting only — **Settings → API → Exposed
+schemas** — and being the one thing outside version control is exactly what
+went wrong: `news` shipped with its migration, its clients and its pages, and
+nobody ticked the box, so /news was a server error from the day it landed.
+`supabase/migrations-news/0002_expose_news_to_postgrest.sql` moves the setting
+into the database, where PostgREST also reads its configuration from
+(`pgrst.db_schemas` on the `authenticator` role, which wins over the config
+file). It appends rather than assigns, so it adds `news` without opinion about
+what else is exposed, and running it twice does nothing.
 
-`todo` is the newest and therefore the one most likely to be missing: the
-symptom is a Todo workspace that reports an empty list on an account that has
-one, and — because the account settings live in `core` — a timezone that
-silently reverts to UTC everywhere if that one is missing too.
+A new schema should do the same: one migration that adds its own name, not a
+note asking someone to remember. The dashboard still shows and edits the list,
+and editing it there overwrites what the migration set — so if a schema goes
+missing again after someone has been in Settings → API, re-running that
+migration is the fix.
+
+`todo` is the one whose absence is quietest: the symptom is a Todo workspace
+that reports an empty list on an account that has one, and — because the
+account settings live in `core` — a timezone that silently reverts to UTC
+everywhere if that one is missing too.
 
 **Never add `vault` to that list.** That schema is Supabase's own — Supabase
 Vault, the encrypted secrets store — and `vault.secrets` carries no RLS
@@ -96,20 +108,22 @@ called Vault and lives in `obsidian` for exactly this reason.
 
 ### Migrations
 
-Four directories, and the order is **not** directory by directory:
+Six directories, and the order is **not** directory by directory:
 
 | Directory | Schema | Versions |
 |---|---|---|
 | `supabase/migrations` | `public`, and `core` from 0029 | `0001`–`0037` |
 | `supabase/migrations-job-search` | `job_search` | `0001`–`0018` |
 | `supabase/migrations-vault` | `obsidian` | `0001` |
-| `supabase/migrations-todo` | `todo` | `0001`–`0002` |
+| `supabase/migrations-learn` | `learn` | `0001`–`0007` |
+| `supabase/migrations-news` | `news` | `0001` |
+| `supabase/migrations-todo` | `todo` | `0001`–`0004` |
 
-`migrations-todo` goes **last**, after all three of the others. Its
-`task_links` table carries foreign keys into `job_search` and `obsidian`, so
-applying it earlier fails on a table that does not exist yet.
-`scripts/db-reset.sh` already sequences the directories this way; a fresh
-project must be migrated in the same order.
+`migrations-todo` goes **last**, after all five of the others. Its
+`task_links` table carries foreign keys into `job_search` and `obsidian` from
+`0001`, and into `public` and `learn` from `0004`, so applying it earlier fails
+on a table that does not exist yet. `scripts/db-reset.sh` already sequences the
+directories this way; a fresh project must be migrated in the same order.
 
 They are separate because the sets were numbered independently from `0001`, and
 the `job_search` versions are already recorded remotely under exactly those
@@ -324,6 +338,90 @@ turns the assessment into paperwork rather than remediation.
 
 ---
 
+## Newsletters — Mailgun and the DNS behind it
+
+Mail sent to your newsletter address is received by Mailgun and posted to this
+app as a form. Nothing is read out of a mailbox, and this is the only way an
+issue is ever written. Twenty minutes of work, plus however long your DNS takes
+to propagate. #457 chose Mailgun because it is the one inbound service that
+receives on a free plan; #461 settled that the address sits on a subdomain of a
+domain you already own.
+
+**1. Pick the subdomain.** `in.example.com`, say. A subdomain rather than the
+domain itself: the MX records below say where mail for that name goes, and on
+the root name they would take your own email with them.
+
+**2. Add it to Mailgun.** Domains → Add New Domain, with the subdomain as the
+name. Mailgun then shows the DNS records for that domain, which are the
+authority on the exact values — the table below is what they look like.
+
+**3. Put the records in your DNS.**
+
+| Type | Name | Value | Why |
+|---|---|---|---|
+| MX | `in.example.com` | `mxa.mailgun.org`, priority 10 | Where mail for the subdomain is delivered. |
+| MX | `in.example.com` | `mxb.mailgun.org`, priority 10 | The second one. Both, or delivery has one place to fail. |
+| TXT | `in.example.com` | `v=spf1 include:mailgun.org ~all` | SPF. Some publishers check the domain before they will send to it. |
+| TXT | `<selector>._domainkey.in.example.com` | the key Mailgun shows | DKIM, for the same reason. The selector is Mailgun's. |
+
+Verification takes minutes to a few hours. Mailgun's domain page says whether it
+has seen them.
+
+**The MX records are the ones that get missed.** Mailgun's DNS page lists the
+*sending* records (SPF, DKIM, and a `email.` CNAME for tracking) in one block
+and the two *receiving* MX records in another, and a domain with the first
+block and not the second looks verified, passes a spot check, and takes no mail
+whatever. Nothing in this app can see it: the address renders, the settings
+page is happy, and every message sent to it bounces at the sender before
+Mailgun is ever involved. That is exactly what happened here on
+`in.selveyknight.com` — SPF, DKIM and the CNAME all present, no MX at all, two
+newsletter signups and a test message lost to it.
+
+So check the MX explicitly, not the green tick:
+
+```bash
+dig +short MX in.example.com
+# must print two lines: mxa.mailgun.org and mxb.mailgun.org
+```
+
+An empty answer means no mail can ever arrive, no matter what the rest of this
+section says.
+
+**4. Point the mail at the app.** Receiving → Routes → Create Route. Expression
+`catch_all()`, actions `forward("https://<your app>/api/news/inbound")` and
+`stop()`, priority 0. Every message sent to the domain is then posted to that
+endpoint, whatever the local part — which is what lets an address be replaced
+without touching Mailgun. Mail addressed to a local part nobody owns is dropped
+there with a 200 and no bounce, so a stranger cannot learn which addresses
+exist.
+
+**5. Copy the signing key.** Sending → Webhooks, where Mailgun keeps the HTTP
+webhook signing key. Not the API key. Every post to the endpoint is checked
+against it — timestamp and token, HMAC-SHA256 — and a post that does not match
+is answered 401 and stored nowhere.
+
+**6. Set the two variables** in the Vercel project settings, and in `.env.local`
+for a local run:
+
+```
+NEWS_MAIL_DOMAIN=in.example.com
+MAILGUN_SIGNING_KEY=<the signing key>
+```
+
+Both are optional. With neither set the app builds and runs, and it says so
+rather than pretending: News settings names whichever of the two is missing,
+the News page says "Nothing can arrive yet" instead of inviting you to sign up
+for something, and the inbound endpoint refuses everything that reaches it.
+Setting the domain without the key is the one combination that used to look
+healthy — an address on the page, a promise under it, and a 500 on every
+delivery. `lib/news/inbound/readiness.ts` is what closed that.
+
+**7. Send it something.** Open News settings, copy the address, and mail it from
+anywhere. It appears in News within a minute. If it does not, Mailgun's Logs
+show whether the message reached the route and what the endpoint answered.
+
+---
+
 ## Environment variables
 
 `.env.example` is the full list. You paste three values in total:
@@ -337,6 +435,13 @@ openssl rand -base64 32
 ```
 
 It must not be the anon key or the service role key.
+
+The newsletter workspace adds two of its own, both optional:
+
+| Variable | What it is | Where it comes from |
+|---|---|---|
+| `NEWS_MAIL_DOMAIN` | The domain Mailgun receives newsletters on, e.g. `in.example.com`. Every account's address is a random local part on it. | You choose it, in step 1 above. |
+| `MAILGUN_SIGNING_KEY` | The HTTP webhook signing key every inbound post is checked against. Not the API key. | Mailgun, Sending → Webhooks. |
 
 ---
 
@@ -430,10 +535,13 @@ environment you are actually visiting.
 
 ## Cron
 
-`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs two
-things in order: the inbox sync — one pass over the mailbox, offered to both
-workspaces — and then the job sweep that re-derives ghosted status and
-generates reminders.
+`vercel.json` schedules one job, `/api/cron/daily` at 12:00 UTC. It runs its
+stages in order: the inbox sync — one pass over the mailbox, offered to both
+workspaces — then the job sweep that re-derives ghosted status and generates
+reminders, the JD backfill, the vault sync, the plan's claim sweep, and the
+dev digest. The claim sweep puts a plan step whose session died back to not
+started; it is before the digest so the morning summary reports the corrected
+rows.
 
 **One route rather than three, because the Hobby plan caps cron jobs per
 project.** The order is not incidental either — a message that arrives in the
@@ -449,6 +557,51 @@ running one stage by hand.
 All of them require `Authorization: Bearer $CRON_SECRET`. Vercel Cron sends it
 automatically once `CRON_SECRET` is set; if it is unset, `TOKEN_ENCRYPTION_KEY`
 is accepted as a local fallback so you can curl the routes in development.
+
+### The overnight tick — two Vault secrets you must add by hand
+
+The overnight runner needs a second, much more frequent clock:
+`/api/cron/overnight` looks at what the runner is doing and, if the last
+feature it fired has finished, fires the next one. Once a day is useless for
+that, and sub-daily cron on Vercel needs Pro — so this one clock lives in the
+database instead. `supabase/migrations/0078_overnight_tick_cron.sql` enables
+`pg_cron` and `pg_net` (both already available on the project, both free) and
+schedules a job named `overnight-tick` that POSTs to the route **every four
+minutes**, in UTC, which is the timezone Supabase runs its databases in.
+
+The job cannot know the origin to post to or the secret to post with — those
+are deployment facts, and the secret must never be in the repository — so it
+reads both out of Supabase Vault every time it fires. **Until you add them, the
+job runs on schedule and posts nowhere.** Applying the migration warns when
+they are missing; nothing else will tell you.
+
+In the Supabase dashboard, **Project Settings → Vault → Add new secret**, twice.
+The names are exact — the job looks them up by name:
+
+| Name | What it holds |
+|---|---|
+| `app_origin` | The deployed origin of this app: scheme and host, no trailing slash, no path — e.g. `https://your-app.vercel.app` |
+| `cron_secret` | The exact value of `CRON_SECRET` in the Vercel environment (or of `TOKEN_ENCRYPTION_KEY` if `CRON_SECRET` is unset, since that is the fallback the routes accept) |
+
+In order: set `CRON_SECRET` in Vercel and deploy, then add the two secrets to
+Vault, then apply the migration (`npx supabase db push`) — or apply it first and
+add the secrets after, which also works; the job re-reads Vault on every tick,
+so rotating the secret or moving the deployment needs no second migration.
+
+To check it afterwards:
+
+```sql
+select jobname, schedule, active from cron.job where jobname = 'overnight-tick';
+select id, status_code, error_msg, created
+  from net._http_response order by created desc limit 5;
+```
+
+(`pg_net` keeps those replies for a few hours and then drops them, so look the
+morning after, not the week after.)
+
+A `200` there is a tick that ran. A `401` means `cron_secret` does not match
+`CRON_SECRET` — which is also the protection this route has instead of a login,
+since anything on the internet can reach it.
 
 ---
 

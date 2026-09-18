@@ -13,6 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * an insert that collides is a no-op, so a deleted reminder would come straight
  * back on the next sweep. A completed one stays out of the way for good.
  */
+// latency: pending -- should be optimistic: a tick that waits for the round trip
 export async function completeReminder(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -34,6 +35,7 @@ export async function completeReminder(id: string): Promise<{ error: string | nu
 }
 
 /** Not now. Pushes the nudge out rather than deciding anything about it. */
+// latency: pending -- should be optimistic: a snooze that waits for the round trip
 export async function snoozeReminder(id: string): Promise<{ error: string | null }> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -80,10 +82,12 @@ async function dismissWaiting(
   return { error: null };
 }
 
+// latency: pending -- should be optimistic: a tick that waits for the round trip
 export async function completeWaiting(eventId: string): Promise<{ error: string | null }> {
   return dismissWaiting(eventId, null);
 }
 
+// latency: pending -- should be optimistic: a snooze that waits for the round trip
 export async function snoozeWaiting(eventId: string): Promise<{ error: string | null }> {
   return dismissWaiting(eventId, new Date(Date.now() + SNOOZE_DAYS * DAY_MS).toISOString());
 }

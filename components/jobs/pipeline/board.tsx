@@ -7,12 +7,12 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
-import { FieldError } from '@/components/ui/field';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
@@ -27,14 +27,31 @@ import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actio
  * put things, and giving it a column would invite people to drag cards into it.
  *
  * A column is a recessed lane, not a frame. It used to be `border border-border
- * bg-canvas` holding bordered cards -- a border inside a border, which law 11
- * calls almost always a mistake, and worse here than usual because in three of
- * the four themes `canvas` *is* the page colour, so the hairline was doing all
- * of the grouping and the fill none of it. On `sunken` the ground does the
- * grouping the law asks it to and the only edges left on the board are the ones
- * around the cards you can pick up. Drag-over is the accent tint alone for the
- * same reason: the lane lighting up is louder than a line around it going
- * purple, and it is legible on a phone where the border never was.
+ * bg-canvas` holding bordered cards, where the fill was the page colour and the
+ * hairline was doing all of the grouping. Moving the fill to `sunken` fixed that
+ * in the light themes, where the lane reads as a proper well and the white cards
+ * sit on it.
+ *
+ * In the dark themes it did not, and the hairline was gone by then, so the lanes
+ * disappeared entirely: Ink's canvas is #08090a and its `sunken` is #050506, one
+ * and a half per cent apart and well under what an eye resolves. Law 11 wants
+ * space, alignment or a shared ground to do the grouping before a border does,
+ * but on a near-black page there is no ground *beneath* a surface card to group
+ * with -- the only step left is upward, and that is where the cards already are.
+ * `sunken` cannot be lightened into the gap either: it is the chip and
+ * meter-track fill in about forty other places, all of them sitting *on* a card
+ * rather than under one, and lifting it to clear the canvas would sink it into
+ * the surface everywhere else.
+ *
+ * So the hairline comes back, as the last resort law 11 describes rather than in
+ * place of a ground: the fill still does the grouping wherever it can be seen,
+ * and the border is what carries the lane's extent where it cannot. It is the
+ * same hairline the Closed fold below is drawn with, which is the shape the rest
+ * of the app uses for a section holding cards.
+ *
+ * Drag-over stays the accent tint alone: the lane lighting up is louder than a
+ * line around it going purple, and it is legible on a phone where the border
+ * never was.
  */
 /**
  * `submitted` and `acknowledged` share a column, labeled by the later one:
@@ -81,14 +98,31 @@ export function PipelineBoard({
   rows: PipelineRow[];
   view?: PipelineView;
 }) {
-  const [optimistic, setOptimistic] = useState<Record<string, ApplicationStatus>>({});
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<ApplicationStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
 
-  const statusOf = (row: PipelineRow): ApplicationStatus =>
-    optimistic[row.applicationId] ?? row.status;
+  /**
+   * The moved card, drawn in its new column before the server agrees.
+   *
+   * The change is written into a copy of the rows rather than kept in a map
+   * beside them, so everything on the board -- the columns, the counts, the
+   * closed fold, the badge on a card -- reads one status per pursuit. A refused
+   * move leaves the rows the server rendered, which is the card back in the
+   * column it came from, and the hook's toast says why: there is no second
+   * sentence on the board itself, because the card that moved back is what the
+   * person is looking at.
+   */
+  const { shown, run } = useOptimisticWrite<
+    PipelineRow[],
+    { applicationId: string; status: ApplicationStatus }
+  >({
+    value: rows,
+    apply: (current, change) =>
+      current.map((row) =>
+        row.applicationId === change.applicationId ? { ...row, status: change.status } : row,
+      ),
+    write: (change) => moveApplication(change.applicationId, change.status),
+  });
 
   function drop(status: ApplicationStatus) {
     const applicationId = dragging;
@@ -96,26 +130,13 @@ export function PipelineBoard({
     setDragging(null);
     if (!applicationId) return;
 
-    const row = rows.find((r) => r.applicationId === applicationId);
-    if (!row || statusOf(row) === status) return;
+    const row = shown.find((r) => r.applicationId === applicationId);
+    if (!row || row.status === status) return;
 
-    setOptimistic((prev) => ({ ...prev, [applicationId]: status }));
-    setError(null);
-
-    startTransition(async () => {
-      const result = await moveApplication(applicationId, status);
-      if (result.error) {
-        setError(result.error);
-        setOptimistic((prev) => {
-          const next = { ...prev };
-          delete next[applicationId];
-          return next;
-        });
-      }
-    });
+    run({ applicationId, status });
   }
 
-  const closedRows = rows.filter((row) => CLOSED.includes(statusOf(row)));
+  const closedRows = shown.filter((row) => CLOSED.includes(row.status));
 
   // The kanban board is a horizontal scroll through one and a half columns
   // on a phone, whatever view the user picked for desktop — so a phone
@@ -123,7 +144,7 @@ export function PipelineBoard({
   // decides what sm-and-up sees.
   const renderColumns = (mode: PipelineView) =>
     COLUMNS.map((column) => {
-      const columnRows = rows.filter((row) => column.statuses.includes(statusOf(row)));
+      const columnRows = shown.filter((row) => column.statuses.includes(row.status));
 
       if (mode === 'list') {
         return (
@@ -209,8 +230,6 @@ export function PipelineBoard({
 
   return (
     <div className="space-y-4">
-      <FieldError>{error}</FieldError>
-
       <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
       <div
         className={cn(
@@ -297,20 +316,69 @@ function PipelineCard({
           >
             {row.roleTitle}
           </Link>
-          <p className="truncate text-small text-ink-muted">
-            {row.companyName}
-            {row.attempt > 1 && (
-              <span className="ml-1 text-ink-muted">· attempt {row.attempt}</span>
-            )}
-          </p>
+          {/*
+            * The company and the card's numbers share a line.
+            *
+            * They used to be two: the company, then a row of its own holding
+            * an empty `<span />` on the left purely to push a coverage
+            * fraction and a two-character age to the right. That is a whole
+            * line per card spent on alignment, and eleven cards' worth of it
+            * is most of a phone screen. Both are micro type; they sit beside
+            * the company with room over.
+            */}
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="truncate text-small text-ink-muted">
+              {row.companyName}
+              {row.attempt > 1 && (
+                <span className="ml-1 text-ink-muted">· attempt {row.attempt}</span>
+              )}
+            </p>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {coverage && (
+                <span
+                  className={cn(
+                    'tabular text-micro',
+                    row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
+                  )}
+                  title={`${coverage} covered by your evidence`}
+                >
+                  {row.coverage.covered}/{row.coverage.total}
+                </span>
+              )}
+              {row.needsReview && (
+                <AlertTriangle
+                  className="size-3.5 text-caution"
+                  strokeWidth={1.75}
+                  aria-label="Needs review"
+                />
+              )}
+              <span
+                className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
+                title="Time since the last thing that happened"
+              >
+                {age}
+              </span>
+            </div>
+          </div>
         </div>
         {row.excitement !== null && (
           <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
             {'★'.repeat(row.excitement)}
           </span>
         )}
+        {/*
+          * Gone below `sm`, not merely invisible.
+          *
+          * These two are `opacity-0` until the card is hovered, and a phone
+          * has no hover -- so on a phone they were sixty-four unreachable
+          * pixels held open on every card, and the title was truncated to pay
+          * for them: "Forward Deployed Eng...", "Backend Engineer, Pay...".
+          * The one thing a card exists to say was the first thing cut, for two
+          * buttons nobody on that device could reach. Both actions are still
+          * on the role's own page, which is one tap away.
+          */}
         {!muted && (
-          <span className="flex shrink-0 items-center gap-0.5">
+          <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
             <QuickReject row={row} />
             <Dismiss row={row} />
           </span>
@@ -324,35 +392,13 @@ function PipelineCard({
         </p>
       )}
 
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        {muted ? (
+      {/* Only a closed card still needs a row of its own, and only for the
+          badge that says which kind of closed it is. */}
+      {muted && (
+        <div className="mt-1.5">
           <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
-        ) : (
-          <span />
-        )}
-        <div className="flex items-center gap-1.5">
-          {coverage && (
-            <span
-              className={cn(
-                'tabular text-micro',
-                row.coverage.gaps > 0 ? 'text-caution' : 'text-ink-muted',
-              )}
-              title={`${coverage} covered by your evidence`}
-            >
-              {row.coverage.covered}/{row.coverage.total}
-            </span>
-          )}
-          {row.needsReview && (
-            <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-label="Needs review" />
-          )}
-          <span
-            className={cn('tabular text-micro', stale ? 'text-caution' : 'text-ink-muted')}
-            title="Time since the last thing that happened"
-          >
-            {age}
-          </span>
         </div>
-      </div>
+      )}
     </article>
   );
 }

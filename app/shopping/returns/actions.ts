@@ -27,6 +27,7 @@ function revalidateReturnSurfaces(itemId: string, orderId?: string) {
 }
 
 /** Toggle whether an owned inventory unit is planned for return. */
+// latency: pending
 export async function setReturnPlanned(
   _prev: ActionState,
   formData: FormData,
@@ -76,6 +77,7 @@ export async function setReturnPlanned(
 }
 
 /** Form-action friendly wrapper for list-row icon buttons. */
+// latency: pending -- should be optimistic: a toggle that waits for the round trip
 export async function toggleReturnPlannedForm(formData: FormData): Promise<void> {
   const result = await setReturnPlanned({}, formData);
   if (result.error) throw new Error(result.error);
@@ -88,6 +90,7 @@ export async function toggleReturnPlannedForm(formData: FormData): Promise<void>
  * over a set of ids, so marking twenty items costs one round trip and either
  * all of them move or none do.
  */
+// latency: pending
 export async function setItemsReturnPlanned(
   _prev: ActionState,
   formData: FormData,
@@ -133,6 +136,7 @@ export async function setItemsReturnPlanned(
  * Inserts a refunded `returns` row; sync_order_state moves the unit to returned.
  * Refund defaults to landed cost.
  */
+// latency: pending
 export async function markItemReturned(
   _prev: ActionState,
   formData: FormData,
@@ -189,6 +193,7 @@ export async function markItemReturned(
 /**
  * Undo a return: delete the refunded returns row so sync_order_state restores owned.
  */
+// latency: pending
 export async function undoItemReturned(
   _prev: ActionState,
   formData: FormData,
@@ -254,6 +259,7 @@ export async function undoItemReturned(
  * - Empty input without reset: sets override to null (no window for this user).
  * - Number: sets that many days.
  */
+// latency: pending
 export async function saveMerchantReturnPolicy(
   _prev: ActionState,
   formData: FormData,
@@ -345,6 +351,7 @@ export async function saveMerchantReturnPolicy(
  * Create a user-scoped merchant and set its return window in one step.
  * Used when the retailer isn't already in the catalog.
  */
+// latency: pending
 export async function createMerchantReturnPolicy(
   _prev: ActionState,
   formData: FormData,

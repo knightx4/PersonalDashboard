@@ -1,7 +1,9 @@
-import { Receipt, Search } from 'lucide-react';
+import { Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
+import { redirect } from 'next/navigation';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 
 type OrderSourceMessage = {
@@ -14,16 +16,27 @@ type OrderSourceMessage = {
 import { OrderRow } from '@/components/orders/order-row';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
+import { SearchEmpty } from '@/components/shell/search-empty';
+import { SearchField } from '@/components/shell/search-field';
 import { FilterChips, type FilterChip } from '@/components/shell/filter-chips';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { Input } from '@/components/ui/field';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
 import { loadUserMerchants, parseMerchantId } from '@/lib/merchants/user-merchants';
 import { formatMoney, periodFor, type PresetRange } from '@/lib/money';
+import { DEFAULT_ORDERS_GROUP, ordersDisplay } from '@/lib/orders/list-display';
+import {
+  groupRows,
+  listDisplayMenu,
+  NO_GROUP,
+  parseListDisplay,
+  sortRows,
+} from '@/lib/list-display';
+import { DisplayMenu } from '@/components/shell/display-menu';
+import { GroupHeader } from '@/components/shell/group-header';
 import {
   matchingItemHint,
   orderHasTagId,
@@ -54,30 +67,6 @@ const STATUSES = [
   { id: 'cancelled', label: 'Cancelled' },
 ] as const;
 
-function monthKey(orderDate: string): string {
-  return orderDate.slice(0, 7);
-}
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
-
-function monthLabel(key: string): string {
-  const [year, month] = key.split('-').map(Number);
-  return `${MONTH_NAMES[month - 1]} ${year}`;
-}
-
 function hrefFor(opts: {
   range: PresetRange;
   status?: string;
@@ -85,6 +74,9 @@ function hrefFor(opts: {
   tag?: string;
   q?: string;
   person?: string;
+  sort?: string;
+  group?: string;
+  hide?: readonly string[];
 }): string {
   const params = new URLSearchParams({ range: opts.range });
   if (opts.status) params.set('status', opts.status);
@@ -92,6 +84,11 @@ function hrefFor(opts: {
   if (opts.tag) params.set('tag', opts.tag);
   if (opts.q) params.set('q', opts.q);
   if (opts.person) params.set('person', opts.person);
+  // The arrangement rides along, so changing a filter does not put the sort,
+  // the grouping and the hidden lines back to their defaults.
+  if (opts.sort && opts.sort !== 'newest') params.set('sort', opts.sort);
+  if (opts.group && opts.group !== DEFAULT_ORDERS_GROUP) params.set('group', opts.group);
+  if (opts.hide && opts.hide.length > 0) params.set('hide', opts.hide.join(','));
   return `/shopping/orders?${params.toString()}`;
 }
 
@@ -105,6 +102,9 @@ export default async function OrdersPage({
     tag?: string;
     q?: string;
     person?: string;
+    sort?: string;
+    group?: string;
+    hide?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -219,19 +219,48 @@ export default async function OrdersPage({
         )
       : [];
 
-  const grouped = new Map<string, typeof orders>();
-  for (const order of orders) {
-    const key = monthKey(order.order_date);
-    const bucket = grouped.get(key) ?? [];
-    bucket.push(order);
-    grouped.set(key, bucket);
-  }
 
-  const filteredEmpty =
-    orders.length === 0 && Boolean(q || status || activeMerchant || activeTag);
   const displayById = new Map(
     orders.map((order, index) => [order.id, displayTotals[index] ?? order.total_cents]),
   );
+
+  // One row shape for the arrangement to work on, with the total already in the
+  // display currency: sorting a mix of native totals would put a 50,000 yen
+  // order above a 400 dollar one, and a group subtotal would add them up.
+  const arrangeable = orders.map((order) => {
+    const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
+    const status = STATUSES.find((entry) => entry.id === order.status);
+    return {
+      order,
+      orderDate: order.order_date as string,
+      displayTotalCents: displayById.get(order.id) ?? order.total_cents,
+      merchantName: merchant?.name ?? 'Unknown merchant',
+      status: (order.status as string) ?? '',
+      statusLabel: status?.label ?? 'Unknown',
+      statusRank: STATUSES.findIndex((entry) => entry.id === order.status),
+      personName: showPeople ? (byPerson.get(order.person_id)?.name ?? null) : null,
+    };
+  });
+
+  const displaySpec = ordersDisplay<(typeof arrangeable)[number]>({ withPeople: showPeople });
+  const display = parseListDisplay(displaySpec, params);
+  const savedViews = await savedViewsFor(core, displaySpec.pathname);
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+  const menu = listDisplayMenu(displaySpec, params, savedViews);
+
+  /** A filter link that keeps the arrangement, since changing one is not changing the other. */
+  const filterHref = (opts: Parameters<typeof hrefFor>[0]) =>
+    hrefFor({ sort: display.sort, group: display.group, hide: display.hidden, ...opts });
+
+  const sections = groupRows(sortRows(arrangeable, display), display.groupBy, (rows) =>
+    rows.reduce((sum, row) => sum + row.displayTotalCents, 0),
+  );
+
+  // A search that matched nothing is the shared empty state; this is the other
+  // kind of nothing, where a filter rather than a search emptied the list.
+  const filteredEmpty =
+    orders.length === 0 && Boolean(status || activeMerchant || activeTag);
 
   /** What is narrowing this page, said out loud above the results. */
   const chips: FilterChip[] = [];
@@ -239,7 +268,7 @@ export default async function OrdersPage({
     chips.push({
       label: 'Search',
       value: q,
-      clearHref: hrefFor({ range, status, merchant: activeMerchant, tag: activeTag, person: personId ?? undefined }),
+      clearHref: filterHref({ range, status, merchant: activeMerchant, tag: activeTag, person: personId ?? undefined }),
     });
   }
   if (activeMerchant) {
@@ -248,7 +277,7 @@ export default async function OrdersPage({
       chips.push({
         label: 'Merchant',
         value: merchant.name,
-        clearHref: hrefFor({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
+        clearHref: filterHref({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
       });
     }
   }
@@ -258,7 +287,7 @@ export default async function OrdersPage({
       chips.push({
         label: 'Tag',
         value: tag.name,
-        clearHref: hrefFor({ range, status, merchant: activeMerchant, q: q || undefined, person: personId ?? undefined }),
+        clearHref: filterHref({ range, status, merchant: activeMerchant, q: q || undefined, person: personId ?? undefined }),
       });
     }
   }
@@ -268,7 +297,7 @@ export default async function OrdersPage({
       chips.push({
         label: 'Status',
         value: entry.label,
-        clearHref: hrefFor({ range, merchant: activeMerchant, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
+        clearHref: filterHref({ range, merchant: activeMerchant, tag: activeTag, q: q || undefined, person: personId ?? undefined }),
       });
     }
   }
@@ -278,7 +307,7 @@ export default async function OrdersPage({
       chips.push({
         label: 'Whose',
         value: person.name,
-        clearHref: hrefFor({ range, status, merchant: activeMerchant, tag: activeTag, q: q || undefined }),
+        clearHref: filterHref({ range, status, merchant: activeMerchant, tag: activeTag, q: q || undefined }),
       });
     }
   }
@@ -292,7 +321,7 @@ export default async function OrdersPage({
               key={entry.id}
               label={entry.label}
               active={entry.id === range}
-              href={hrefFor({
+              href={filterHref({
                 range: entry.id,
                 status,
                 merchant: activeMerchant,
@@ -306,7 +335,7 @@ export default async function OrdersPage({
             <RailItem
               label="Everyone"
               active={!personId}
-              href={hrefFor({
+              href={filterHref({
                 range,
                 status,
                 merchant: activeMerchant,
@@ -319,7 +348,7 @@ export default async function OrdersPage({
                 key={person.id}
                 label={person.name}
                 active={personId === person.id}
-                href={hrefFor({
+                href={filterHref({
                   range,
                   status,
                   merchant: activeMerchant,
@@ -336,14 +365,14 @@ export default async function OrdersPage({
           <RailItem
             label="Any"
             active={!activeMerchant}
-            href={hrefFor({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined })}
+            href={filterHref({ range, status, tag: activeTag, q: q || undefined, person: personId ?? undefined })}
           />
           {merchants.map((merchant) => (
             <RailItem
               key={merchant.id}
               label={merchant.name}
               active={merchant.id === activeMerchant}
-              href={hrefFor({
+              href={filterHref({
                 range,
                 status,
                 merchant: merchant.id,
@@ -357,7 +386,7 @@ export default async function OrdersPage({
             <RailItem
               label="Any"
               active={!activeTag}
-              href={hrefFor({
+              href={filterHref({
                 range,
                 status,
                 merchant: activeMerchant,
@@ -368,7 +397,7 @@ export default async function OrdersPage({
                 key={tag.id}
                 label={tag.name}
                 active={tag.id === activeTag}
-                href={hrefFor({
+                href={filterHref({
                   range,
                   status,
                   merchant: activeMerchant,
@@ -382,7 +411,7 @@ export default async function OrdersPage({
           <RailItem
             label="Any"
             active={!status}
-            href={hrefFor({
+            href={filterHref({
               range,
               merchant: activeMerchant,
               tag: activeTag,
@@ -393,7 +422,7 @@ export default async function OrdersPage({
               key={entry.id}
               label={entry.label}
               active={entry.id === status}
-              href={hrefFor({
+              href={filterHref({
                 range,
                 status: entry.id,
                 merchant: activeMerchant,
@@ -417,30 +446,23 @@ export default async function OrdersPage({
 
         <FilterChips chips={chips} clearAllHref="/shopping/orders" />
 
-        <form className="mb-5" action="/shopping/orders" method="get">
-          <input type="hidden" name="range" value={range} />
-          {status && <input type="hidden" name="status" value={status} />}
-          {activeMerchant && (
-            <input type="hidden" name="merchant" value={activeMerchant} />
-          )}
-          {activeTag && <input type="hidden" name="tag" value={activeTag} />}
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <Input
-              name="q"
-              defaultValue={q}
-              placeholder="Search merchant, item, tag, order #, inbox…"
-              aria-label="Search orders"
-              className="pl-9"
-            />
-          </div>
-        </form>
+        {/* Directly above the list it narrows, under the chips that say what
+            is already in force. The range, the status, the merchant, the tag,
+            whose it is and the arrangement are all on the URL, and the field
+            carries them, so searching from a narrowed list stays narrowed. */}
+        <div className="mb-5">
+          <SearchField placeholder="Search merchant, item, tag, order #, inbox…" />
 
-        {orders.length === 0 ? (
+          {/* The list was locked into months and had no sort control at all.
+              Same control, same place, as the one above the inventory list. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <DisplayMenu menu={menu} align="start" />
+          </div>
+        </div>
+
+        {orders.length === 0 && q ? (
+          <SearchEmpty query={q} />
+        ) : orders.length === 0 ? (
           <EmptyState
             icon={Receipt}
             title={filteredEmpty ? 'No matching orders' : 'No orders yet'}
@@ -451,7 +473,7 @@ export default async function OrdersPage({
             }
             action={
               filteredEmpty
-                ? { label: 'Clear filters', href: hrefFor({ range: 'last_12_months', person: personId ?? undefined }) }
+                ? { label: 'Clear filters', href: filterHref({ range: 'last_12_months', person: personId ?? undefined }) }
                 : { label: 'Add an order', href: '/shopping/orders/new' }
             }
             secondaryAction={
@@ -460,63 +482,61 @@ export default async function OrdersPage({
           />
         ) : (
           <div className="space-y-8">
-            {[...grouped.entries()].map(([key, monthOrders]) => {
-              const monthTotal = monthOrders.reduce(
-                (sum, order) => sum + (displayById.get(order.id) ?? order.total_cents),
-                0,
-              );
-              return (
-                <section key={key}>
-                  <div className="mb-3 flex items-baseline justify-between gap-3 px-0.5">
-                    <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-                      {monthLabel(key)}
-                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-muted">
-                        {monthOrders.length}
-                      </span>
-                    </h2>
-                    <p className="tabular text-small text-ink-muted">
-                      {formatMoney(monthTotal, displayCurrency)}
-                    </p>
-                  </div>
-                  <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
-                    {monthOrders.map((order) => {
-                      const merchant = Array.isArray(order.merchants)
-                        ? order.merchants[0]
-                        : order.merchants;
-                      const itemsSummary = orderItemsSummary(order);
-                      const itemHint = q ? matchingItemHint(order, q) : null;
-                      const inbox = showInbox ? orderInboxAddress(order) : null;
-                      const displayTotal = displayById.get(order.id) ?? order.total_cents;
-                      const nativeDiffers =
-                        normalizeCurrencyCode(order.currency) !==
-                        normalizeCurrencyCode(displayCurrency);
-                      return (
-                        <OrderRow
-                          key={order.id}
-                          order={{
-                            id: order.id,
-                            order_date: order.order_date,
-                            total_cents: displayTotal,
-                            currency: displayCurrency,
-                            native_total_cents: nativeDiffers ? order.total_cents : undefined,
-                            native_currency: nativeDiffers ? order.currency : undefined,
-                            status: order.status,
-                            external_order_number: order.external_order_number,
-                            merchant_name: merchant?.name ?? 'Unknown merchant',
-                            merchant_logo_url: merchant?.logo_url ?? null,
-                            merchant_domains: merchant?.domains ?? null,
-                            items_label: itemsSummary.label,
-                            item_hint: itemHint,
-                            inbox,
-                            person: showPeople ? byPerson.get(order.person_id) : null,
-                          }}
-                        />
-                      );
-                    })}
-                  </ul>
-                </section>
-              );
-            })}
+            {sections.map((section) => (
+              <section key={section.key}>
+                {display.group !== NO_GROUP && (
+                  <GroupHeader
+                    label={section.label}
+                    count={section.count}
+                    subtotal={formatMoney(section.subtotal ?? 0, displayCurrency)}
+                    className="mb-3 px-0.5"
+                  />
+                )}
+                <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
+                  {section.rows.map((row) => {
+                    const order = row.order;
+                    const merchant = Array.isArray(order.merchants)
+                      ? order.merchants[0]
+                      : order.merchants;
+                    const itemsSummary = orderItemsSummary(order);
+                    const itemHint = q ? matchingItemHint(order, q) : null;
+                    const inbox = showInbox && !display.hidden.includes('inbox')
+                      ? orderInboxAddress(order)
+                      : null;
+                    const nativeDiffers =
+                      normalizeCurrencyCode(order.currency) !==
+                      normalizeCurrencyCode(displayCurrency);
+                    return (
+                      <OrderRow
+                        key={order.id}
+                        order={{
+                          id: order.id,
+                          order_date: order.order_date,
+                          total_cents: row.displayTotalCents,
+                          currency: displayCurrency,
+                          native_total_cents: nativeDiffers ? order.total_cents : undefined,
+                          native_currency: nativeDiffers ? order.currency : undefined,
+                          status: order.status,
+                          external_order_number: display.hidden.includes('number')
+                            ? null
+                            : order.external_order_number,
+                          merchant_name: merchant?.name ?? 'Unknown merchant',
+                          merchant_logo_url: merchant?.logo_url ?? null,
+                          merchant_domains: merchant?.domains ?? null,
+                          items_label: display.hidden.includes('items') ? '' : itemsSummary.label,
+                          item_hint: itemHint,
+                          inbox,
+                          person:
+                            showPeople && !display.hidden.includes('person')
+                              ? byPerson.get(order.person_id)
+                              : null,
+                        }}
+                      />
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
           </div>
         )}
       </div>

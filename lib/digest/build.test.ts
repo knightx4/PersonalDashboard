@@ -1,0 +1,417 @@
+import { describe, expect, it } from 'vitest';
+import {
+  MAX_HAPPENED,
+  MAX_READY,
+  groupHappened,
+  oneLine,
+  whatHappened,
+  whatIsReady,
+  withSuggestions,
+  type DigestEvent,
+  type DigestPointer,
+} from '@/lib/digest/build';
+import type { FeedbackRow } from '@/lib/feedback/load';
+import type { PlanData, PlanItem } from '@/lib/plan/load';
+
+const SINCE = '2026-03-02T00:00:00Z';
+
+let counter = 0;
+
+function step(over: Partial<PlanItem> & { id: string }): PlanItem {
+  counter += 1;
+  return {
+    number: counter,
+    module: 'dev',
+    parentId: null,
+    title: `Step ${over.id}`,
+    detail: null,
+    acceptance: null,
+    status: 'done',
+    kind: 'build',
+    fog: null,
+    fogDismissedAt: null,
+    dismissedAt: null,
+    resolution: null,
+    thread: [],
+    comment: null,
+    blockAsk: null,
+    blockKind: null,
+    priority: 2,
+    size: null,
+    assignee: null,
+    commitSha: null,
+    position: counter * 10,
+    startedAt: null,
+    completedAt: '2026-03-02T09:00:00Z',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...over,
+  };
+}
+
+function note(over: Partial<FeedbackRow> & { id: string }): FeedbackRow {
+  return {
+    kind: 'bug',
+    body: `Note ${over.id}`,
+    pagePath: null,
+    status: 'done',
+    priority: 2,
+    resolutionNote: null,
+    commitSha: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    completedAt: '2026-03-02T09:00:00Z',
+    thread: [],
+    ...over,
+  };
+}
+
+function plan(items: PlanItem[]): PlanData {
+  return { items, dependencies: [] };
+}
+
+describe('oneLine', () => {
+  it('flattens the whitespace a bug report was typed with', () => {
+    expect(oneLine('  two\n\nlines  ')).toBe('two lines');
+  });
+
+  it('cuts at a word and marks that it cut', () => {
+    expect(oneLine('alpha bravo charlie delta', 16)).toBe('alpha bravo…');
+  });
+});
+
+describe('whatHappened', () => {
+  it('carries the commit of a step that shipped in the window', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'a', number: 42, commitSha: 'abc1234def', title: 'The panel' })]),
+      notes: [],
+      since: SINCE,
+    });
+
+    expect(events).toEqual([
+      {
+        kind: 'step',
+        title: 'The panel',
+        ref: '#42',
+        commit: 'abc1234',
+        note: null,
+        at: '2026-03-02T09:00:00Z',
+        feature: null,
+        module: 'dev',
+      },
+    ]);
+  });
+
+  it('leaves out what closed before the window opened', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'a', completedAt: '2026-03-01T09:00:00Z' })]),
+      notes: [note({ id: 'n', completedAt: '2026-03-01T23:59:00Z' })],
+      since: SINCE,
+    });
+
+    expect(events).toEqual([]);
+  });
+
+  it('reports a note by what was done about it', () => {
+    const [event] = whatHappened({
+      plan: plan([]),
+      notes: [note({ id: 'n', body: 'The total was wrong', resolutionNote: 'Rounded once.' })],
+      since: SINCE,
+    });
+
+    expect(event).toMatchObject({ kind: 'note', title: 'The total was wrong', ref: null, note: 'Rounded once.' });
+  });
+
+  it('reports an answered question with the answer, and no commit', () => {
+    const [event] = whatHappened({
+      plan: plan([
+        step({
+          id: 'd',
+          number: 7,
+          kind: 'decision',
+          title: 'Which shape for the export?',
+          resolution: 'b — JSON',
+        }),
+      ]),
+      notes: [],
+      since: SINCE,
+    });
+
+    expect(event).toMatchObject({ kind: 'decision', ref: '#7', commit: null, note: 'b — JSON' });
+  });
+
+  it('leaves out a dropped step and a declined note, which shipped nothing', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'a', status: 'dropped' })]),
+      notes: [note({ id: 'n', status: 'declined' })],
+      since: SINCE,
+    });
+
+    expect(events).toEqual([]);
+  });
+
+  it('puts the newest first', () => {
+    const events = whatHappened({
+      plan: plan([
+        step({ id: 'early', title: 'Early', completedAt: '2026-03-02T08:00:00Z' }),
+        step({ id: 'late', title: 'Late', completedAt: '2026-03-02T20:00:00Z' }),
+      ]),
+      notes: [],
+      since: SINCE,
+    });
+
+    expect(events.map((event) => event.title)).toEqual(['Late', 'Early']);
+  });
+});
+
+describe('the feature a closed row belongs to', () => {
+  it('names the feature above a step, not the step above it', () => {
+    const feature = step({ id: 'f', number: 430, title: 'One tab for your day' });
+    const middle = step({ id: 'm', number: 435, title: 'A middle step', parentId: 'f' });
+    const leaf = step({ id: 'l', number: 439, title: 'Gather the conversations', parentId: 'm' });
+
+    const [event] = whatHappened({ plan: plan([feature, middle, leaf]), notes: [], since: SINCE }).filter(
+      (row) => row.ref === '#439',
+    );
+
+    expect(event.feature).toEqual({ ref: '#430', title: 'One tab for your day' });
+  });
+
+  it('names it on an answered question too', () => {
+    const feature = step({ id: 'f', number: 430, title: 'One tab for your day' });
+    const decision = step({
+      id: 'd',
+      number: 431,
+      kind: 'decision',
+      title: 'What should this tab be called?',
+      parentId: 'f',
+      resolution: 'A — Dash',
+    });
+
+    const [event] = whatHappened({ plan: plan([feature, decision]), notes: [], since: SINCE }).filter(
+      (row) => row.kind === 'decision',
+    );
+
+    expect(event.feature).toEqual({ ref: '#430', title: 'One tab for your day' });
+  });
+
+  it('leaves a note and a feature of its own with none', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'f', number: 430, title: 'A feature' })]),
+      notes: [note({ id: 'n' })],
+      since: SINCE,
+    });
+
+    expect(events.every((event) => event.feature === null)).toBe(true);
+  });
+});
+
+// The written account of the day says where the work was — note 8d08f577 —
+// and it can only say that if every closed row knows which workspace it was in.
+describe('the workspace a closed row belongs to', () => {
+  it('takes the feature\'s where a step has none of its own', () => {
+    const feature = step({ id: 'f', number: 430, module: 'learn', title: 'Take a quiz' });
+    const leaf = step({ id: 'l', number: 439, module: null, parentId: 'f' });
+
+    const [event] = whatHappened({ plan: plan([feature, leaf]), notes: [], since: SINCE }).filter(
+      (row) => row.ref === '#439',
+    );
+
+    expect(event.module).toBe('learn');
+  });
+
+  it('keeps a step\'s own workspace over the feature\'s', () => {
+    const feature = step({ id: 'f', number: 430, module: 'learn' });
+    const leaf = step({ id: 'l', number: 439, module: 'vault', parentId: 'f' });
+
+    const [event] = whatHappened({ plan: plan([feature, leaf]), notes: [], since: SINCE }).filter(
+      (row) => row.ref === '#439',
+    );
+
+    expect(event.module).toBe('vault');
+  });
+
+  it('places a note by the page it was filed from', () => {
+    const events = whatHappened({
+      plan: plan([]),
+      notes: [note({ id: 'n', pagePath: '/vault/n/recipes' })],
+      since: SINCE,
+    });
+
+    expect(events[0].module).toBe('vault');
+  });
+
+  it('leaves a row that belongs to no workspace with none', () => {
+    const events = whatHappened({
+      plan: plan([step({ id: 'a', module: null })]),
+      notes: [],
+      since: SINCE,
+    });
+
+    expect(events[0].module).toBeNull();
+  });
+
+  it('carries it on an answered question, from the feature above it', () => {
+    const feature = step({ id: 'f', number: 430, module: 'learn' });
+    const decision = step({
+      id: 'd',
+      number: 431,
+      kind: 'decision',
+      module: null,
+      parentId: 'f',
+      resolution: 'A',
+    });
+
+    const [event] = whatHappened({ plan: plan([feature, decision]), notes: [], since: SINCE }).filter(
+      (row) => row.kind === 'decision',
+    );
+
+    expect(event.module).toBe('learn');
+  });
+});
+
+describe('groupHappened', () => {
+  function event(over: Partial<DigestEvent>): DigestEvent {
+    return {
+      kind: 'step',
+      title: 'A step',
+      ref: '#1',
+      commit: null,
+      note: null,
+      at: '2026-03-02T09:00:00Z',
+      feature: null,
+      module: null,
+      ...over,
+    };
+  }
+
+  const under430 = { ref: '#430', title: 'One tab for your day' };
+
+  it('puts the steps of one feature under one heading', () => {
+    const { groups } = groupHappened([
+      event({ ref: '#441', feature: under430 }),
+      event({ ref: '#440', feature: under430 }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ label: 'One tab for your day', ref: '#430' });
+    expect(groups[0].events.map((row) => row.ref)).toEqual(['#441', '#440']);
+  });
+
+  it('puts the closed feature in with its own steps', () => {
+    const { groups } = groupHappened([
+      event({ ref: '#430', title: 'One tab for your day' }),
+      event({ ref: '#441', feature: under430 }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].events).toHaveLength(2);
+  });
+
+  it('gathers every note under one heading', () => {
+    const { groups } = groupHappened([
+      event({ kind: 'note', ref: null, title: 'The total was wrong' }),
+      event({ kind: 'note', ref: null, title: 'The button did nothing' }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ label: 'Bugs and requests', ref: null });
+  });
+
+  it('orders the headings by when their newest row landed', () => {
+    const { groups } = groupHappened([
+      event({ ref: '#441', feature: under430 }),
+      event({ kind: 'note', ref: null, title: 'A bug' }),
+      event({ ref: '#442', feature: under430 }),
+    ]);
+
+    expect(groups.map((group) => group.ref)).toEqual(['#430', null]);
+  });
+
+  it('shows fifteen and says how many more there were', () => {
+    const many = Array.from({ length: MAX_HAPPENED + 9 }, (_, index) =>
+      event({ ref: `#${index}`, feature: { ref: `#f${index}`, title: `Feature ${index}` } }),
+    );
+
+    const { groups, more } = groupHappened(many);
+
+    expect(groups).toHaveLength(MAX_HAPPENED);
+    expect(more).toBe(9);
+  });
+
+  it('has nothing more to report on a short day', () => {
+    expect(groupHappened([event({})]).more).toBe(0);
+    expect(groupHappened([])).toEqual({ groups: [], more: 0 });
+  });
+});
+
+describe('whatIsReady', () => {
+  it('puts a question waiting on the person above the steps', () => {
+    const pointers = whatIsReady(
+      plan([
+        step({ id: 'a', number: 1, status: 'not_started', completedAt: null, title: 'Build it' }),
+        step({
+          id: 'q',
+          number: 2,
+          kind: 'decision',
+          status: 'not_started',
+          completedAt: null,
+          title: 'Which shape?',
+        }),
+      ]),
+    );
+
+    expect(pointers).toEqual([
+      { kind: 'decision', title: 'Which shape?', ref: '#2', detail: null },
+      { kind: 'ready', title: 'Build it', ref: '#1', detail: null },
+    ]);
+  });
+
+  it('leaves out what is not ready: proposals, work underway, and what waits on another step', () => {
+    const parent = step({ id: 'p', status: 'proposed', completedAt: null });
+    const items = [
+      parent,
+      step({ id: 'child', status: 'not_started', completedAt: null, parentId: 'p' }),
+      step({ id: 'underway', status: 'in_progress', completedAt: null }),
+      step({ id: 'waiting', status: 'not_started', completedAt: null }),
+      step({ id: 'open', status: 'not_started', completedAt: null }),
+    ];
+    const waiting = items[3];
+    const open = items[4];
+
+    const pointers = whatIsReady({
+      items,
+      dependencies: [{ id: 'd1', itemId: waiting.id, dependsOnId: open.id }],
+    });
+
+    expect(pointers.map((pointer) => pointer.ref)).toEqual([`#${open.number}`]);
+  });
+
+  it('caps the ready steps so the list stays a list', () => {
+    const items = Array.from({ length: MAX_READY + 3 }, (_, index) =>
+      step({ id: `s${index}`, status: 'not_started', completedAt: null }),
+    );
+
+    expect(whatIsReady(plan(items))).toHaveLength(MAX_READY);
+  });
+});
+
+describe('withSuggestions', () => {
+  const ready: DigestPointer[] = [{ kind: 'ready', title: 'Build it', ref: '#1', detail: null }];
+
+  it('adds what the model noticed after what was computed', () => {
+    const pointers = withSuggestions(ready, [
+      { title: 'Two questions hold up #338', detail: 'Answer one and four steps open up.' },
+    ]);
+
+    expect(pointers[1]).toEqual({
+      kind: 'suggestion',
+      title: 'Two questions hold up #338',
+      ref: null,
+      detail: 'Answer one and four steps open up.',
+    });
+  });
+
+  it('drops an empty suggestion rather than rendering a blank row', () => {
+    expect(withSuggestions(ready, [{ title: '   ', detail: null }])).toEqual(ready);
+  });
+});

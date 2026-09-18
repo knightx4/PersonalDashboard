@@ -30,7 +30,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
   return (
     <Card padding="dense">
       <header className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lead font-semibold text-ink">{contact.fullName}</h1>
+        <h1 className="text-body font-semibold text-ink">{contact.fullName}</h1>
         {contact.title && <span className="text-ui text-ink-muted">{contact.title}</span>}
         <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
           {contact.relationship.replace(/_/g, ' ')}
@@ -134,16 +134,18 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
               </span>
               <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
               <span className="text-ink-muted">{touch.direction}</span>
-              {touch.message && (
-                <span className="min-w-0 flex-1 truncate text-ink-muted">{touch.message}</span>
-              )}
+              {/* `sm:order-last` puts the answer back at the end of the row
+                  where there is room for one; below `sm` it stays where the
+                  DOM has it, above the message, so the line that wraps is the
+                  message and not this. */}
               {touch.respondedAt ? (
-                <span className="text-ink">replied</span>
+                <span className="text-ink sm:order-last">replied</span>
               ) : touch.direction === 'outbound' ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
+                  className="sm:order-last"
                   disabled={pending}
                   onClick={() =>
                     startTransition(async () => {
@@ -155,6 +157,16 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
                   They replied
                 </Button>
               ) : null}
+              {/* Last in the row, so on a phone -- where it takes the whole of
+                  the next line -- the date, the channel and the answer stay
+                  together above it. As one more `flex-1 truncate` item on that
+                  row it came out as "S..": two characters of the only part of
+                  a send anybody writes by hand. */}
+              {touch.message && (
+                <span className="min-w-0 basis-full text-ink-muted sm:flex-1 sm:basis-auto sm:truncate">
+                  {touch.message}
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -265,6 +277,9 @@ function ContactEditForm({
         />
       </Field>
       <Field id={`notes-${contact.id}`} label="Notes">
+        {/* ui-ok: composer-always-open -- ContactEditForm renders only when
+          * `editing`, and that gate is in the parent component, which the rule
+          * cannot see across. Law 14 is obeyed. */}
         <Textarea
           id={`notes-${contact.id}`}
           value={notes}

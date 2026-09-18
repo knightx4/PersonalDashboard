@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CalendarClock } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -11,6 +12,8 @@ import { Banner } from '@/components/ui/banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { describeCount, loadModuleCounts } from '@/lib/modules/counts';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { BUCKET_LABELS } from '@/lib/todo/tasks/model';
@@ -80,14 +83,16 @@ export default async function HomePage() {
     day: '2-digit',
   }).format(now);
 
-  const [counts, agenda, shopping, core, jobs] = await Promise.all([
+  const [counts, raised, agenda, shopping, core, jobs, mainCheck] = await Promise.all([
     loadModuleCounts(user.id),
+    loadRaisedNotifications(user.id),
     // The agenda reads three schemas; a failure in any of them must cost this
     // page a section, not the whole front door.
     loadAgenda(user.id).catch(() => null),
     createShoppingClient(),
     createCoreClient(),
     createJobsClient(),
+    loadMainCheck(),
   ]);
 
   const enabled = MODULES.filter((module) => moduleEnabled(settings, module.id));
@@ -128,6 +133,15 @@ export default async function HomePage() {
     .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })))
     .slice(0, 5);
 
+  // What today already holds -- an event you typed, an interview -- above the
+  // things to do, and without a checkbox for the same reason the agenda gives
+  // it none. Today only: the merge already drops anything earlier, because an
+  // appointment in the past is over rather than late.
+  const happening = (agenda?.piles ?? [])
+    .filter((pile) => pile.bucket === 'today')
+    .flatMap((pile) => pile.context)
+    .slice(0, 5);
+
   const date = new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -138,6 +152,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-full">
       <AppShell
+        account={user.id}
         module={null}
         sections={[]}
         displayName={settings.displayName}
@@ -145,6 +160,8 @@ export default async function HomePage() {
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
+        mainCheck={mainCheck}
       >
         <div className="mx-auto max-w-3xl">
           <header className="border-b border-border-strong pb-6 pt-2">
@@ -156,6 +173,29 @@ export default async function HomePage() {
               {date}
             </h1>
           </header>
+
+          {/* The doors, as marks, right under the date.
+              The tiles at the foot of the page are the considered version --
+              each with its name and what is waiting in it -- and they stay,
+              because that is what you read when you are deciding where to go.
+              This row is for when you are not deciding: you came here to get
+              to one particular workspace, and it should not be a scroll away.
+              Marks only, named for a screen reader and on hover. */}
+          {enabled.length > 0 && (
+            <nav aria-label="Jump to a workspace" className="mt-4 flex flex-wrap items-center gap-2">
+              {enabled.map((module) => (
+                <Link
+                  key={module.id}
+                  href={module.home}
+                  title={module.label}
+                  className="press rounded-[8px] transition-opacity duration-150 hover:opacity-75"
+                >
+                  <ModuleMark module={module.id} size="md" />
+                  <span className="sr-only">{module.label}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
 
           {agenda === null && (
             <Banner tone="bad" className="mt-6">
@@ -172,12 +212,12 @@ export default async function HomePage() {
                   {brief.href ? (
                     <Link
                       href={brief.href}
-                      className="min-w-0 flex-1 truncate text-lead text-ink hover:text-accent"
+                      className="min-w-0 flex-1 truncate text-body text-ink hover:text-accent"
                     >
                       {brief.text}
                     </Link>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate text-lead text-ink">{brief.text}</span>
+                    <span className="min-w-0 flex-1 truncate text-body text-ink">{brief.text}</span>
                   )}
                   {brief.tone === 'caution' && (
                     <span className="size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />
@@ -196,7 +236,7 @@ export default async function HomePage() {
 
           {/* Nothing at all when there is nothing at all -- no "0 things due",
               no empty card. */}
-          {due.length > 0 && (
+          {(due.length > 0 || happening.length > 0) && (
             <Card padding="standard" className="mt-4">
               <div className="flex items-baseline justify-between gap-2">
                 <h2 className="text-ui font-semibold text-ink">Today</h2>
@@ -207,24 +247,70 @@ export default async function HomePage() {
                   The agenda
                 </Link>
               </div>
-              <ul className="mt-2 divide-y divide-border">
-                {due.map(({ bucket, entry }) => (
-                  <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
-                    {bucket === 'overdue' && (
-                      <span className="shrink-0 text-micro font-medium text-danger">
-                        {BUCKET_LABELS.overdue}
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1 truncate text-ui text-ink">
-                      {entry.task?.title ?? entry.item?.title}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {happening.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {happening.map((entry) => (
+                    <li
+                      key={entry.key}
+                      className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
+                    >
+                      <CalendarClock
+                        className="size-3.5 shrink-0 text-accent"
+                        strokeWidth={1.75}
+                        aria-hidden
+                      />
+                      {entry.at && (
+                        <span className="tabular font-medium">
+                          {new Intl.DateTimeFormat('en-GB', {
+                            timeZone: settings.timezone,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }).format(new Date(entry.at))}
+                        </span>
+                      )}
+                      {entry.link ? (
+                        <Link href={entry.link.href} className="font-medium hover:text-accent">
+                          {entry.label}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{entry.label}</span>
+                      )}
+                      {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {due.length > 0 && (
+                <ul className="mt-2 divide-y divide-border">
+                  {due.map(({ bucket, entry }) => (
+                    <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
+                      {bucket === 'overdue' && (
+                        <span className="shrink-0 text-micro font-medium text-danger">
+                          {BUCKET_LABELS.overdue}
+                        </span>
+                      )}
+                      {/* Each line goes where the thing itself lives: a task to
+                          its own row on the agenda, a source item to whatever it
+                          is about. They were plain text, which made the list
+                          something to read and then go and find by hand. */}
+                      <Link
+                        href={agendaHref(entry)}
+                        className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent"
+                      >
+                        {entry.task?.title ?? entry.item?.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Card>
           )}
 
-          <nav aria-label="Workspaces" className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <nav
+            aria-label="Workspaces in full"
+            className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {enabled.map((module) => (
               <ModuleCard
                 key={module.id}
@@ -239,6 +325,21 @@ export default async function HomePage() {
       </AppShell>
     </div>
   );
+}
+
+/**
+ * Where one line of "Today" goes when you click it.
+ *
+ * A task has no page of its own -- it is a row on the agenda, and that is the
+ * only place it can be ticked off, rescheduled or edited -- so it links to
+ * itself there by anchor. A source item is somebody else's row: a return
+ * deadline belongs to the order, a reminder to the application, and its own
+ * link says which. Anything a source did not give a link for falls back to the
+ * agenda, which is at least the page it was read from.
+ */
+function agendaHref(entry: { task?: { id: string }; item?: { link: { href: string } | null } }): string {
+  if (entry.task) return `/todo#task-${entry.task.id}`;
+  return entry.item?.link?.href ?? '/todo';
 }
 
 /**

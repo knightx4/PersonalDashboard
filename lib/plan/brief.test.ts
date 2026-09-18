@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planBrief, planQueueBrief } from '@/lib/plan/brief';
+import { dismissedUnder, planBrief, planQueueBrief } from '@/lib/plan/brief';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, findNode, handedToClaude } from '@/lib/plan/tree';
 
@@ -17,7 +17,12 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     kind: 'build',
     fog: null,
     resolution: null,
+    dismissedAt: null,
+    fogDismissedAt: null,
     comment: null,
+    blockAsk: null,
+    blockKind: null,
+    thread: [],
     priority: 2,
     size: null,
     assignee: null,
@@ -26,6 +31,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     startedAt: null,
     completedAt: null,
     createdAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
+    updatedAt: `2026-01-01T00:00:${String(counter).padStart(2, '0')}Z`,
     ...over,
   };
 }
@@ -241,5 +247,193 @@ describe('planQueueBrief', () => {
 
   it('counts one step as a step', () => {
     expect(planQueueBrief(sections, [queue[0]]).startsWith('# 1 plan step, in order\n')).toBe(true);
+  });
+});
+
+describe('planBrief on a step a re-shape wrote', () => {
+  it('names the answer that produced it, at the top rather than in the notes', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'f', title: 'Re-shaping' }),
+        item({
+          id: 'added',
+          title: 'The graduated step',
+          parentId: 'f',
+          status: 'proposed',
+          comment: "From #63's answer: On the server, not the client.",
+        }),
+      ],
+      dependencies: [],
+    });
+    const node = findNode(sections, 'added')!;
+    const brief = planBrief(sections, node);
+
+    expect(brief).toContain("From #63's answer: On the server, not the client.");
+    // Above the notes, which is where it would otherwise be buried.
+    expect(brief.indexOf("From #63's answer")).toBeLessThan(brief.indexOf('## Notes'));
+  });
+});
+
+
+describe('what has been put aside', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'feature',
+        title: 'Talking back',
+        acceptance: 'I can answer a session without leaving the app.',
+        fog: 'how a reply reaches a decision is not settled',
+        fogDismissedAt: '2026-09-13T00:00:00Z',
+      }),
+      item({
+        id: 'asked',
+        title: 'Which shape for the reply?',
+        parentId: 'feature',
+        kind: 'decision',
+        dismissedAt: '2026-09-13T00:00:00Z',
+      }),
+      item({ id: 'step', title: 'The thread itself', parentId: 'feature' }),
+    ],
+    dependencies: [],
+  });
+  const feature = findNode(sections, 'feature')!;
+
+  it('is left out of the brief a session builds from', () => {
+    const brief = planBrief(sections, feature);
+    expect(brief).not.toContain('Which shape for the reply?');
+    expect(brief).not.toContain('## Not yet specified');
+    expect(brief).toContain('The thread itself');
+  });
+
+  it('is named for the re-shape, so it is not written back', () => {
+    const written = dismissedUnder(feature, [{ body: 'A search box over the whole plan' }]);
+    expect(written).toContain('Which shape for the reply?');
+    expect(written).toContain('how a reply reaches a decision is not settled');
+    expect(written).toContain('A search box over the whole plan');
+  });
+
+  it('says nothing at all when nothing has been put aside', () => {
+    const clean = buildPlanTree({
+      items: [item({ id: 'plain', title: 'A feature with nothing put aside' })],
+      dependencies: [],
+    });
+    expect(dismissedUnder(findNode(clean, 'plain')!)).toBe('');
+  });
+});
+
+describe('the comments a hand-over carries', () => {
+  // The numbers below are asserted literally.
+  counter = 0;
+
+  function said(id: string, author: 'me' | 'claude', body: string, at: string) {
+    return { id, author, body, createdAt: `2026-02-01T0${at}:00:00Z` };
+  }
+
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'feature',
+        title: 'Share links',
+        acceptance: 'A link opens without an account.',
+        thread: [
+          said('c1', 'me', 'Keep the whole thing behind one token.', '1'),
+          said('c2', 'claude', 'Then the token is what the RLS policy reads.', '2'),
+        ],
+      }),
+      item({
+        id: 'page',
+        title: 'The anonymous page',
+        parentId: 'feature',
+        comment: 'Waiting on the RPC review.',
+        thread: [said('c3', 'me', 'No prices on this one.', '3')],
+      }),
+      item({ id: 'form', title: 'The form', parentId: 'feature' }),
+      item({
+        id: 'aside',
+        title: 'A question put aside',
+        parentId: 'feature',
+        kind: 'decision',
+        dismissedAt: '2026-02-02T00:00:00Z',
+        thread: [said('c4', 'me', 'Not now.', '4')],
+      }),
+    ],
+    dependencies: [],
+  });
+
+  const feature = findNode(sections, 'feature')!;
+  const page = findNode(sections, 'page')!;
+
+  it('says nothing about them unless the hand-over asks', () => {
+    expect(planBrief(sections, feature)).not.toContain('## Comments');
+    expect(planBrief(sections, page)).toBe(planBrief(sections, page, {}));
+  });
+
+  it('carries the comments on the step, oldest first and marked', () => {
+    const brief = planBrief(sections, page, { thread: true });
+    expect(brief).toContain('## Comments\n\nLeft on these rows, oldest first.');
+    expect(brief).toContain('On #2 The anonymous page:\n\n- The person: No prices on this one.');
+  });
+
+  it('carries the comments on the steps beneath it as well, grouped by row', () => {
+    const brief = planBrief(sections, feature, { thread: true });
+    expect(brief).toContain(
+      'On #1 Share links:\n\n- The person: Keep the whole thing behind one token.\n' +
+        '- Claude: Then the token is what the RLS policy reads.',
+    );
+    expect(brief).toContain('On #2 The anonymous page:\n\n- The person: No prices on this one.');
+  });
+
+  it('leaves out what has been put aside, the same as the checklist', () => {
+    expect(planBrief(sections, feature, { thread: true })).not.toContain('Not now.');
+  });
+
+  it('gives a step nobody has commented on the brief it had', () => {
+    const form = findNode(sections, 'form')!;
+    expect(planBrief(sections, form, { thread: true })).toBe(planBrief(sections, form));
+  });
+
+  it('puts them after the notes', () => {
+    const brief = planBrief(sections, page, { thread: true });
+    expect(brief.indexOf('## Comments')).toBeGreaterThan(brief.indexOf('## Notes'));
+  });
+
+  it('carries them through a queue as well', () => {
+    const queue = [page, feature];
+    expect(planQueueBrief(sections, queue, { thread: true })).toContain(
+      '- The person: No prices on this one.',
+    );
+    expect(planQueueBrief(sections, queue)).not.toContain('## Comments');
+  });
+});
+
+describe('planBrief, on a claimed step', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({ id: 'feature', title: 'Liveness' }),
+      item({ id: 'mine', title: 'The step being read', parentId: 'feature' }),
+      item({ id: 'other', title: 'Somebody else is on this', parentId: 'feature', status: 'in_progress' }),
+    ],
+    dependencies: [],
+  });
+  const feature = findNode(sections, 'feature')!;
+  const mine = findNode(sections, 'mine')!;
+
+  it('says the status column and nothing more without a reading', () => {
+    expect(planBrief(sections, mine)).toContain('Status: not started');
+    expect(planBrief(sections, feature)).toContain('(in progress)');
+  });
+
+  it('says what the run behind a claim is doing, in the status line', () => {
+    const brief = planBrief(sections, findNode(sections, 'other')!, {
+      liveness: { other: 'quiet' },
+    });
+    expect(brief).toContain('Status: in progress, its run quiet');
+  });
+
+  it('says it in the checklist too, so a batch can see which step is stopped', () => {
+    const brief = planBrief(sections, feature, { liveness: { other: 'abandoned' } });
+    expect(brief).toContain(
+      'Somebody else is on this (claimed by a run that ended without closing it)',
+    );
   });
 });

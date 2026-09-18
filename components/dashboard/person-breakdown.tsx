@@ -2,6 +2,7 @@ import { formatMoney, type CurrencyCode } from '@/lib/money';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { PERSON_DOT_CLASS, type Person } from '@/lib/people/load';
 import type { PersonSpend } from '@/lib/dashboard/load';
+import { Meter } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
 
 /**
@@ -40,7 +41,7 @@ export function PersonBreakdown({
           <ul className="space-y-3">
             {rows.map((row) => {
               const person = row.personId ? byId.get(row.personId) : null;
-              const width = max === 0 ? 0 : Math.round((row.netCents / max) * 100);
+              const name = person?.name ?? 'Not assigned';
               return (
                 <li key={row.personId ?? 'unattributed'}>
                   <div className="mb-1 flex items-baseline justify-between gap-3 text-ui">
@@ -58,22 +59,19 @@ export function PersonBreakdown({
                           real spending, and leaving it out would make the
                           parts stop summing to the headline above.
                         */}
-                        {person?.name ?? 'Not assigned'}
+                        {name}
                       </span>
                     </span>
                     <span className="tabular shrink-0 text-ink">
                       {formatMoney(row.netCents, currency)}
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-canvas">
-                    <div
-                      className={cn(
-                        'h-full rounded-full',
-                        person ? PERSON_DOT_CLASS[person.colour] : 'bg-border-strong',
-                      )}
-                      style={{ width: `${width}%` }}
-                    />
-                  </div>
+                  <Meter
+                    value={row.netCents}
+                    max={max}
+                    fill={person ? PERSON_DOT_CLASS[person.colour] : 'bg-border-strong'}
+                    label={`${name}: ${formatMoney(row.netCents, currency)} of ${formatMoney(max, currency)}, the most spent by one person`}
+                  />
                 </li>
               );
             })}

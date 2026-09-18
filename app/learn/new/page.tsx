@@ -34,7 +34,7 @@ export default function NewTrackPage() {
 
       <div className="max-w-2xl space-y-8">
         <section>
-          <h2 className="mb-3 text-lead font-semibold text-ink">Start a topic</h2>
+          <h2 className="mb-3 text-body font-semibold text-ink">Start a topic</h2>
           <StartForm />
         </section>
 
@@ -45,7 +45,7 @@ export default function NewTrackPage() {
         </div>
 
         <section>
-          <h2 className="mb-1 text-lead font-semibold text-ink">Paste a reading list</h2>
+          <h2 className="mb-1 text-body font-semibold text-ink">Paste a reading list</h2>
           <p className="mb-3 text-body text-ink-muted">
             Each item gets found, priced and pointed at the part worth reading.
           </p>

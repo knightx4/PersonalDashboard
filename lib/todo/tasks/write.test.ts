@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveDue, wallClockToInstant } from '@/lib/todo/tasks/write';
+import { itemInput, resolveDue } from '@/lib/todo/tasks/write';
 
 describe('resolveDue', () => {
   it('keeps a day with no time as a day', () => {
@@ -30,30 +30,27 @@ describe('resolveDue', () => {
   });
 });
 
-describe('wallClockToInstant', () => {
-  it('reads a wall clock in the given zone', () => {
-    expect(wallClockToInstant('2026-06-01', '09:00', 'UTC')).toBe('2026-06-01T09:00:00.000Z');
-    expect(wallClockToInstant('2026-06-01', '09:00', 'Asia/Tokyo')).toBe('2026-06-01T00:00:00.000Z');
-    expect(wallClockToInstant('2026-06-01', '09:00', 'America/Los_Angeles')).toBe(
-      '2026-06-01T16:00:00.000Z',
-    );
+describe('itemInput', () => {
+  it('takes a title and trims it', () => {
+    const parsed = itemInput.safeParse({ title: '  Pack the kitchen  ' });
+    expect(parsed.success && parsed.data.title).toBe('Pack the kitchen');
   });
 
-  it('gets the right side of a daylight saving change', () => {
-    // London goes forward at 01:00 on 2026-03-29. A single-pass offset
-    // measurement lands on the wrong side of the change and comes out an hour
-    // early, which is the reason the measurement is taken twice.
-    expect(wallClockToInstant('2026-03-28', '12:00', 'Europe/London')).toBe(
-      '2026-03-28T12:00:00.000Z',
-    );
-    expect(wallClockToInstant('2026-03-30', '12:00', 'Europe/London')).toBe(
-      '2026-03-30T11:00:00.000Z',
-    );
+  it('refuses an item with nothing in it', () => {
+    // The box under a list is one keystroke from empty, and a row with no
+    // title is a row you cannot tell from the next one.
+    expect(itemInput.safeParse({ title: '   ' }).success).toBe(false);
   });
 
-  it('handles a zone on a half-hour offset', () => {
-    expect(wallClockToInstant('2026-06-01', '09:00', 'Asia/Kolkata')).toBe(
-      '2026-06-01T03:30:00.000Z',
-    );
+  it('holds an item to the same title length a task is held to', () => {
+    expect(itemInput.safeParse({ title: 'x'.repeat(500) }).success).toBe(true);
+    expect(itemInput.safeParse({ title: 'x'.repeat(501) }).success).toBe(false);
+  });
+
+  it('asks for a title and nothing else', () => {
+    // An item is written mid-list. Anything else to fill in and it does not
+    // get written down.
+    const parsed = itemInput.safeParse({ title: 'Book the van' });
+    expect(parsed.success && parsed.data).toEqual({ title: 'Book the van' });
   });
 });

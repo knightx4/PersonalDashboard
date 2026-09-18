@@ -41,9 +41,27 @@ import { cn } from '@/lib/cn';
  * a panel hanging off a trigger, so it takes the shape and keeps its own
  * mechanics.
  */
-export const popoverSurface = 'rounded-card border border-border bg-raised shadow-lg';
+export const popoverSurface =
+  'popover-panel rise-in rounded-card border border-border bg-raised shadow-lg';
 
-const popover = cva(`${popoverSurface} z-50`, {
+/**
+ * The scrim: the ground an overlay is read against, and the button that
+ * closes it. Six overlays drew their own and three spellings had appeared --
+ * bg-black/40 with a 1px blur, bg-black/40 with none, and bg-ink/25 -- so
+ * which drawer dimmed the page more was an accident of who wrote it.
+ *
+ * The blur is a pixel, and it is what separates a dim from a scrim: text
+ * behind it stops being readable, so the eye stops trying. It costs a
+ * backdrop-filter over the whole viewport, which is real work on a phone; the
+ * layer is only mounted while the overlay is open, and one pixel is the least
+ * that does the job.
+ *
+ * It carries its own positioning because all six use it the same way: a
+ * full-bleed child of the overlay's fixed root.
+ */
+export const scrim = 'absolute inset-0 bg-black/40 backdrop-blur-[1px]';
+
+const popover = cva(`${popoverSurface} z-overlay`, {
   variants: {
     /**
      * Where it hangs.
@@ -65,6 +83,14 @@ const popover = cva(`${popoverSurface} z-50`, {
       'trigger-right':
         'fixed inset-x-4 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-10',
       'trigger-below': 'absolute left-0 top-full mt-1.5',
+      /**
+       * The same drop, hung from the trigger's right edge instead of its
+       * left. A panel wider than its button runs off the right of a phone
+       * when the button is at the end of a toolbar -- which is where a
+       * control that arranges the list below it belongs -- and nothing
+       * scrolls it back.
+       */
+      'trigger-below-end': 'absolute right-0 top-full mt-1.5',
     },
     /**
      * `menu` is a list of rows that carry their own padding, so the panel

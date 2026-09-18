@@ -89,6 +89,10 @@ describe('RLS coverage', () => {
     expect(rows.map((r) => r.tablename)).toEqual([]);
   });
 
+  // The graph half of the schema, and the quiz tables, are seeded and checked
+  // in rls-learn-graph.test.ts. They are listed here so this assertion keeps
+  // doing its job: a table that arrives with no isolation test anywhere breaks
+  // this line first.
   it('seeds every table, so a new one cannot skip the isolation check', async () => {
     const rows = await admin<{ tablename: string }[]>`
       select c.relname as tablename
@@ -97,9 +101,22 @@ describe('RLS coverage', () => {
       where n.nspname = 'learn' and c.relkind = 'r'
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
+      'concept_edges',
+      'concept_mentions',
+      'concept_state',
+      'concepts',
+      'goals',
       'imports',
+      'next_outcomes',
+      'opening_questions',
+      'opening_sweeps',
+      'probes',
+      'quiz_questions',
+      'quiz_sources',
+      'quizzes',
       'readings',
       'sources',
+      'subjects',
       'tracks',
     ]);
   });
@@ -401,6 +418,163 @@ describe('the rules the schema itself enforces', () => {
     expect(row.finished_at).not.toBeNull();
 
     await admin`delete from readings where id = ${id}`;
+  });
+});
+
+/**
+ * The link a gap-queued reading carries back to the concept it came from.
+ *
+ * It is what lets the source search read that subject's graph, so it is worth
+ * the same scrutiny as the other two parents: keyed on (concept_id, user_id),
+ * because a plain foreign key bypasses RLS and would take another account's
+ * concept without complaint.
+ */
+describe('a reading queued from a gap', () => {
+  async function seedConcept(userId: string, name: string): Promise<string> {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userId}, ${`${name} subject`})
+      returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userId}, ${subject.id}, ${name}, 'A claim you can be wrong about.',
+              'Written by hand for this test.')
+      returning id`;
+    return concept.id;
+  }
+
+  it('refuses a concept belonging to somebody else', async () => {
+    const conceptB = await seedConcept(userB, 'bob concept');
+
+    await expect(
+      admin`insert into readings (user_id, track_id, source_id, locator_basis, concept_id)
+            values (${userA}, ${trackA}, ${sourceA}, 'from a gap', ${conceptB})`,
+    ).rejects.toThrow();
+  });
+
+  it('survives the concept being deleted, with the link cleared', async () => {
+    // A reading lives in a track and is yours to read whatever happens to the
+    // graph it came from. Losing the rooting is the cost; losing the row would
+    // be the queue tidying itself away behind you.
+    const conceptA = await seedConcept(userA, 'alice concept');
+
+    const [row] = await admin<{ id: string }[]>`
+      insert into readings (user_id, track_id, source_id, locator_basis, concept_id)
+      values (${userA}, ${trackA}, ${sourceA}, 'from a gap', ${conceptA})
+      returning id`;
+
+    await admin`delete from concepts where id = ${conceptA}`;
+
+    const [after] = await admin<{ concept_id: string | null }[]>`
+      select concept_id from readings where id = ${row.id}`;
+    expect(after).toBeDefined();
+    expect(after.concept_id).toBeNull();
+
+    await admin`delete from readings where id = ${row.id}`;
+  });
+});
+
+describe('what you did with a row on Learn next', () => {
+  /** A claim of this user's own, in a subject of their own. */
+  async function seedOwnConcept(userId: string, name: string): Promise<string> {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userId}, ${`${name} subject`})
+      returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userId}, ${subject.id}, ${name}, 'A claim you can be wrong about.',
+              'Written by hand for this test.')
+      returning id`;
+    return concept.id;
+  }
+
+  it('does not let another user read what you have been getting through', async () => {
+    // What you have finished and what you have pushed aside is a record of
+    // what you are avoiding, which is closer to the misconception column than
+    // to a reading list.
+    const concept = await seedOwnConcept(userA, 'alice claim');
+    await admin`insert into next_outcomes (user_id, kind, concept_id, outcome)
+                values (${userA}, 'ready', ${concept}, 'answered')`;
+    await admin`insert into next_outcomes (user_id, kind, reading_id, outcome)
+                values (${userA}, 'reading', ${readingA}, 'not_now')`;
+
+    const mine = await asUser(userA, (tx) => tx`select id from next_outcomes`);
+    const theirs = await asUser(userB, (tx) => tx`select id from next_outcomes`);
+
+    expect(mine.length).toBeGreaterThan(0);
+    expect(theirs).toHaveLength(0);
+  });
+
+  it('does not let another user record something against your reading', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into next_outcomes (user_id, kind, reading_id, outcome)
+                   values (${userA}, 'reading', ${readingA}, 'read')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("refuses a row against another account's claim", async () => {
+    // The composite foreign key rather than the policy, and it fires on the
+    // admin connection that bypasses every policy.
+    const conceptB = await seedOwnConcept(userB, 'bob claim');
+
+    await expect(
+      admin`insert into next_outcomes (user_id, kind, concept_id, outcome)
+            values (${userA}, 'ready', ${conceptB}, 'answered')`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses a row that names both a claim and a reading', async () => {
+    const concept = await seedOwnConcept(userA, 'both claim');
+
+    await expect(
+      admin`insert into next_outcomes (user_id, kind, concept_id, reading_id, outcome)
+            values (${userA}, 'ready', ${concept}, ${readingA}, 'answered')`,
+    ).rejects.toThrow();
+  });
+
+  it('refuses an answer recorded against a reading', async () => {
+    // Answering is something you do to a claim. A kind and an outcome that
+    // disagree is a row nothing downstream could read.
+    await expect(
+      admin`insert into next_outcomes (user_id, kind, reading_id, outcome)
+            values (${userA}, 'reading', ${readingA}, 'answered')`,
+    ).rejects.toThrow();
+  });
+
+  it('counts a reading as finished once, however many times it is marked', async () => {
+    const reading = await seedReading(userA, trackA, sourceA, 'Finished twice.');
+
+    await admin`insert into next_outcomes (user_id, kind, reading_id, outcome)
+                values (${userA}, 'reading', ${reading}, 'read')`;
+    await expect(
+      admin`insert into next_outcomes (user_id, kind, reading_id, outcome)
+            values (${userA}, 'reading', ${reading}, 'read')`,
+    ).rejects.toThrow();
+
+    // Pushing the same row aside twice, months apart, is two separate things
+    // you did and is allowed.
+    await admin`insert into next_outcomes (user_id, kind, reading_id, outcome)
+                values (${userA}, 'reading', ${reading}, 'not_now')`;
+    await admin`insert into next_outcomes (user_id, kind, reading_id, outcome)
+                values (${userA}, 'reading', ${reading}, 'not_now')`;
+
+    const rows = await admin<{ id: string }[]>`
+      select id from next_outcomes where reading_id = ${reading}`;
+    expect(rows).toHaveLength(3);
+  });
+
+  it('goes when the claim it is about goes', async () => {
+    const concept = await seedOwnConcept(userA, 'deleted claim');
+    await admin`insert into next_outcomes (user_id, kind, concept_id, outcome)
+                values (${userA}, 'recheck', ${concept}, 'answered')`;
+
+    await admin`delete from concepts where id = ${concept}`;
+
+    const left = await admin<{ id: string }[]>`
+      select id from next_outcomes where concept_id = ${concept}`;
+    expect(left).toHaveLength(0);
   });
 });
 

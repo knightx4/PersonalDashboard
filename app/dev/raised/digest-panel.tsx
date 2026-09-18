@@ -1,0 +1,281 @@
+import Link from 'next/link';
+import { Moon } from 'lucide-react';
+import { OvernightState } from '@/components/dev/overnight-state';
+import { Card } from '@/components/ui/card';
+import { SectionFold } from '@/components/ui/disclosure';
+import { groupHappened, type DigestEvent, type DigestGroup, type DigestPointer } from '@/lib/digest/build';
+import type { Digest } from '@/lib/digest/load';
+import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
+
+/**
+ * The morning summary, at the top of the page.
+ *
+ * Written once a day by the cron and read here as it was written, so the two
+ * lists are the same all day however often the page is opened. Nothing on it
+ * is computed at render time -- see `inngest/dev/digest.ts` for why.
+ *
+ * Nothing is drawn at all before the first one is written. An empty summary
+ * would say "nothing happened" on a day nobody has looked at yet, which is a
+ * different and stronger claim than the page has any evidence for.
+ *
+ * What closed opens with the night the runner had, then the written account of
+ * the day, and is then grouped under the feature each row closed under,
+ * fifteen rows at most. Flat and uncapped it was fifty-four lines on a busy
+ * day, which is a list rather than a summary; the rest are on the changelog
+ * and the last line says how many.
+ *
+ * The night is first because it is the thing you went to bed wondering about:
+ * the runner worked while you were asleep and nothing else on the page says
+ * what it did. Every word of it is the runner's own -- the state word and the
+ * shape are the ones the control on the plan page draws, and the sentence
+ * saying why it stopped is the sentence the row carries, printed verbatim.
+ */
+
+const EVENT_LABEL: Record<DigestEvent['kind'], string> = {
+  step: 'Shipped',
+  note: 'Fixed',
+  decision: 'Answered',
+};
+
+const POINTER_LABEL: Record<DigestPointer['kind'], string> = {
+  decision: 'Your answer',
+  ready: 'Ready',
+  suggestion: 'Noticed',
+};
+
+/**
+ * UTC, because the day is the UTC date the run covered -- the same reason the
+ * changelog formats its headings that way.
+ *
+ * Always printed, and never as "today": a cron that failed overnight leaves
+ * the last summary on the page, and the date is how you tell.
+ */
+function formatDay(day: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="shrink-0 text-micro font-semibold uppercase tracking-wide text-ink-ghost">
+      {children}
+    </span>
+  );
+}
+
+function Ref({ value }: { value: string }) {
+  return <span className="tabular shrink-0 text-small text-ink-ghost">{value}</span>;
+}
+
+function Events({ events }: { events: DigestEvent[] }) {
+  return (
+    <ul className="space-y-1.5">
+      {events.map((event, index) => (
+        <li key={`${event.kind}-${event.ref ?? index}`} className="space-y-0.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <Label>{EVENT_LABEL[event.kind]}</Label>
+            {event.ref && <Ref value={event.ref} />}
+            <span className="min-w-0 flex-1 text-body text-ink">{event.title}</span>
+            {/* Short, because the line is a reminder of what shipped rather
+                than the place anybody pastes a sha from. The changelog prints
+                it whole. */}
+            {event.commit && (
+              <span className="font-mono shrink-0 text-micro text-ink-ghost">{event.commit}</span>
+            )}
+          </div>
+          {event.note && <p className="text-small text-ink-muted">{event.note}</p>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One feature and what closed under it. The heading is the feature rather than
+ * a line of its own, which is what stops six steps reading as six pieces of
+ * work.
+ */
+function Group({ group }: { group: DigestGroup }) {
+  return (
+    <section className="space-y-1">
+      <div className="flex flex-wrap items-baseline gap-2">
+        {group.ref && <Ref value={group.ref} />}
+        <h3 className="min-w-0 flex-1 text-body font-semibold text-ink">{group.label}</h3>
+      </div>
+      <div className="ml-0.5 border-l border-border pl-3">
+        <Events events={group.events} />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The night, above everything else that happened.
+ *
+ * One list rather than three, in the order the night made them: what it
+ * worked, what closed, what it left stopped. The same labelled rows the rest
+ * of the summary uses, because it is the same kind of fact -- a thing that
+ * happened, named by its number.
+ *
+ * The two silences are said out loud. A night that fired nothing and a night
+ * whose sessions closed nothing are the two outcomes worth getting out of bed
+ * for, and a report that just showed a short list would leave you counting.
+ *
+ * A blocked row carries the feature it stops, where one of the closed rows
+ * does not: the feature is already named above as worked, and the blocked step
+ * is the one you are about to do something about.
+ *
+ * Each list is cut at ten and says how many it cut, the same way the day's own
+ * rows are: the stored night holds all of them, and a busy night's thirty
+ * closed steps are a list rather than a report. The changelog has the rest.
+ */
+function Night({ night }: { night: DigestNight }) {
+  const worked = nightRows(night.features);
+  const closed = nightRows(night.closed);
+  const blocked = nightRows(night.blocked);
+
+  return (
+    <section aria-label="The overnight runner" className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
+          <Moon className="size-4 text-ink-muted" aria-hidden />
+          Overnight
+        </span>
+        <OvernightState standing={night.standing} />
+        <span className="tabular text-small text-ink-muted">{nightBudgetLine(night)}</span>
+      </div>
+
+      <p className="text-body text-ink">{nightLine(night)}</p>
+
+      <div className="ml-0.5 border-l border-border pl-3">
+        <ul className="space-y-1.5">
+          {worked.shown.map((feature) => (
+            <li key={`worked-${feature.ref}`} className="flex flex-wrap items-baseline gap-2">
+              <Label>Worked</Label>
+              <Ref value={feature.ref} />
+              <span className="min-w-0 flex-1 text-body text-ink">{feature.title}</span>
+            </li>
+          ))}
+          {closed.shown.map((step) => (
+            <li key={`closed-${step.ref}`} className="flex flex-wrap items-baseline gap-2">
+              <Label>Closed</Label>
+              <Ref value={step.ref} />
+              <span className="min-w-0 flex-1 text-body text-ink">{step.title}</span>
+            </li>
+          ))}
+          {blocked.shown.map((step) => (
+            <li key={`blocked-${step.ref}`} className="space-y-0.5">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Label>Blocked</Label>
+                <Ref value={step.ref} />
+                <span className="min-w-0 flex-1 text-body text-ink">{step.title}</span>
+                {step.feature && <Ref value={step.feature.ref} />}
+              </div>
+              {step.ask && <p className="text-small text-ink-muted">{step.ask}</p>}
+            </li>
+          ))}
+        </ul>
+
+        {night.features.length === 0 && (
+          <p className="text-body text-ink-muted">It fired nothing.</p>
+        )}
+        {night.features.length > 0 && night.closed.length === 0 && (
+          <p className="text-small text-ink-muted">No step closed.</p>
+        )}
+        {(worked.more > 0 || closed.more > 0 || blocked.more > 0) && (
+          <p className="text-small text-ink-muted">
+            {[
+              worked.more > 0 && `${worked.more} more worked`,
+              closed.more > 0 && `${closed.more} more closed`,
+              blocked.more > 0 && `${blocked.more} more blocked`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            .
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Attention({ pointers }: { pointers: DigestPointer[] }) {
+  return (
+    <ul className="space-y-1.5">
+      {pointers.map((pointer, index) => (
+        <li key={`${pointer.kind}-${pointer.ref ?? index}`} className="space-y-0.5">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <Label>{POINTER_LABEL[pointer.kind]}</Label>
+            {pointer.ref && <Ref value={pointer.ref} />}
+            <span className="min-w-0 flex-1 text-body text-ink">{pointer.title}</span>
+          </div>
+          {pointer.detail && <p className="text-small text-ink-muted">{pointer.detail}</p>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function DigestPanel({ digest }: { digest: Digest | null }) {
+  if (!digest) return null;
+
+  const { groups, more } = groupHappened(digest.happened);
+
+  return (
+    <div className="space-y-3">
+      {/* Folded by its own heading rather than drawn open forever. This is the
+          longest thing on the page -- an account of the day plus fifteen rows
+          grouped under their features -- and it is also the part you are done
+          with first: you read the summary, and then you want the questions
+          underneath it. The day is on the closed line, because a cron that
+          failed overnight leaves yesterday's summary here and the date is how
+          you tell. Law 10. */}
+      <Card padding="dense">
+        <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
+          <div className="space-y-3">
+            {digest.night && <Night night={digest.night} />}
+
+            {/* The account of the day, above the rows it is an account of. Absent
+                on a summary written before there was one, and on a day the model
+                call did not happen. */}
+            {digest.summary && (
+              <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
+            )}
+
+            {groups.length > 0 ? (
+              <div className="space-y-3">
+                {groups.map((group) => (
+                  <Group key={group.key} group={group} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-body text-ink-muted">Nothing closed.</p>
+            )}
+
+            {more > 0 && (
+              <p className="text-small text-ink-muted">
+                {more} more closed.{' '}
+                <Link href="/dev/changelog" className="underline underline-offset-2 hover:text-ink">
+                  See the changelog
+                </Link>
+                .
+              </p>
+            )}
+          </div>
+        </SectionFold>
+      </Card>
+
+      {digest.attention.length > 0 && (
+        <Card padding="dense">
+          <SectionFold title="Worth a look" count={digest.attention.length}>
+            <Attention pointers={digest.attention} />
+          </SectionFold>
+        </Card>
+      )}
+    </div>
+  );
+}

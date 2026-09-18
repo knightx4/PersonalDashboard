@@ -1,11 +1,12 @@
 'use server';
 
-import { timingSafeEqual } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { fireFeatureRoutine, notesRoutine } from '@/lib/feedback/routine';
+import { codeMatches } from '@/lib/feedback/code';
+import { notesRoutine } from '@/lib/feedback/routine';
 import { OUTSTANDING_STATUSES } from '@/lib/feedback/load';
+import { startRoutineRun } from '@/lib/plan/runs';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -17,29 +18,13 @@ export type FeedbackActionState = {
   message?: string;
 };
 
-/**
- * Shared submit code. Overridable with FEEDBACK_CODE so the value can live in
- * the environment rather than the repository; the fallback keeps the button
- * working out of the box.
- */
-function expectedCode(): string {
-  return process.env.FEEDBACK_CODE ?? '1612*';
-}
-
-/** Constant-time compare so the check cannot be probed character by character. */
-function codeMatches(given: string): boolean {
-  const a = Buffer.from(given);
-  const b = Buffer.from(expectedCode());
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
 const submitSchema = z.object({
   kind: z.enum(['bug', 'feature']),
   body: z.string().trim().min(3).max(4000),
   pagePath: z.string().max(300).nullable(),
 });
 
+// latency: pending
 export async function submitFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -86,6 +71,7 @@ const statusSchema = z.enum([
 ]);
 
 /** Triage from the list page. */
+// latency: pending
 export async function updateFeedbackStatus(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -133,6 +119,7 @@ const editSchema = z.object({
  * check is here rather than only in the list, because it is the rule and not
  * merely the presentation of it.
  */
+// latency: pending
 export async function editFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -170,6 +157,79 @@ export async function editFeedback(
   return { message: 'Saved.' };
 }
 
+const respondSchema = z.object({
+  id: z.string().uuid(),
+  body: z.string().trim().min(1, 'Write your answer first.').max(4000),
+});
+
+/**
+ * Answer a note that came back with a question.
+ *
+ * A run that cannot finish a note blocks it and writes the question in the
+ * resolution note, often with lettered options and a recommendation. This is
+ * the reply: the answer goes into the note's thread as a comment of yours, and
+ * the note goes back in the queue in the same press.
+ *
+ * It used to be appended to the note's own body, dated and labelled, because
+ * that was the only place a run read. #393 settled that it goes in the thread
+ * instead, now that there is one: the note stays the report you filed rather
+ * than growing a conversation inside it, and the card stops offering two boxes
+ * that look alike. The run reads the thread before it starts -- #395.
+ *
+ * Blocked and planned only. Those are the two pending states -- the ones that
+ * are waiting on the person rather than on a run -- and answering anything else
+ * would either race a run that has the note claimed or reopen something already
+ * settled.
+ */
+// latency: pending
+export async function respondToFeedback(
+  _prev: FeedbackActionState,
+  formData: FormData,
+): Promise<FeedbackActionState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const parsed = respondSchema.safeParse({
+    id: formData.get('id'),
+    body: String(formData.get('body') ?? ''),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { data: existing } = await supabase
+    .from('feedback_items')
+    .select('status')
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!existing) return { error: 'That note no longer exists.' };
+  const status = existing.status as string;
+  if (status !== 'blocked' && status !== 'planned') {
+    return { error: 'Only a blocked or planned note is waiting on an answer from you.' };
+  }
+
+  // The comment first: a note put back in the queue without the answer under it
+  // is a note the next run picks up and blocks again for the same reason.
+  const { error: unwritten } = await supabase.from('dev_comments').insert({
+    user_id: user.id,
+    feedback_item_id: parsed.data.id,
+    author: 'me',
+    body: parsed.data.body,
+  });
+  if (unwritten) return { error: unwritten.message };
+
+  const { error } = await supabase
+    .from('feedback_items')
+    .update({ status: 'open', completed_at: null })
+    .eq('id', parsed.data.id)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidateFeedback();
+  return { message: 'Answered, and back in the queue.' };
+}
+
+// latency: pending
 export async function deleteFeedback(
   _prev: FeedbackActionState,
   formData: FormData,
@@ -198,20 +258,74 @@ export async function deleteFeedback(
  * Signed-in only, and it carries no input from the browser: the routine has
  * its own instructions, and the button is a "go", not a prompt box.
  */
+// latency: pending
 export async function runFeatureRoutine(
   // Signature is fixed by useActionState; the button sends nothing.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _prev: FeedbackActionState, _formData: FormData,
 ): Promise<FeedbackActionState> {
-  await requireUser();
+  const user = await requireUser();
+  const supabase = await createClient();
 
-  const routine = notesRoutine();
-  const result = await fireFeatureRoutine({
-    apiKey: routine.token,
-    routineId: routine.id,
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'notes',
+    routine: notesRoutine(),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };
+}
+
+/**
+ * Whether a run is working the queue right now, and since when.
+ *
+ * There is no run table to ask, and there does not need to be: the queue
+ * already records this. A run claims exactly one note at a time and sets it
+ * `in_progress` before it starts, so an in-progress note is a run in flight and
+ * the row's `updated_at` is when it claimed it. Reading the state off the work
+ * itself means nothing to keep in step -- a run that dies cannot leave a
+ * "running" flag set behind it.
+ *
+ * What it can leave behind is the claimed note, which is why staleness is part
+ * of the answer rather than left for the reader to infer. Past the cutoff the
+ * honest reading flips: not "a run has been going for nine hours" but "a run
+ * stopped without closing this". A batch is minutes, so two hours is well clear
+ * of a slow one and well short of overnight.
+ */
+export type RoutineRun = {
+  /** The note being worked, trimmed for a single line. */
+  note: string;
+  /** When it was claimed. ISO. */
+  since: string;
+  /** Long enough that a run is likelier to have died than to still be going. */
+  stale: boolean;
+};
+
+const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
+
+// latency: instant -- a read for the button's badge, fetched without anything waiting
+export async function routineRun(): Promise<RoutineRun | null> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('feedback_items')
+    .select('body, updated_at')
+    .eq('user_id', user.id)
+    .eq('status', 'in_progress')
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  const row = data?.[0];
+  if (!row) return null;
+
+  const since = row.updated_at as string;
+  return {
+    note: row.body as string,
+    since,
+    stale: Date.now() - new Date(since).getTime() > STALE_AFTER_MS,
+  };
 }
 
 /**
@@ -222,6 +336,7 @@ export async function runFeatureRoutine(
  * baked into a cached layout would be wrong at exactly the moment someone is
  * deciding whether to press "Run Feature Routine".
  */
+// latency: instant -- a read for the header badge, fetched without anything waiting
 export async function openFeedbackCount(): Promise<number> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -235,6 +350,7 @@ export async function openFeedbackCount(): Promise<number> {
 }
 
 /** Reorder the queue by hand: 1 next, 2 normal, 3 someday. */
+// latency: pending
 export async function setFeedbackPriority(
   _prev: FeedbackActionState,
   formData: FormData,

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
+import { getUser } from '@/lib/auth/server';
 import Link from 'next/link';
 import { SURFACES } from './surfaces';
+import { MAIN_BOX } from '@/components/shell/main-box';
 
 /**
  * The surface gallery: the app's own components, on the app's own ground.
@@ -26,7 +28,14 @@ export default async function PreviewPage({
 }: {
   searchParams: Promise<{ s?: string; w?: string }>;
 }) {
-  if (process.env.UI_PREVIEW !== '1') notFound();
+  // Signed in, or the harness. It used to be UI_PREVIEW alone, which meant the
+  // gallery could not be reached from a deployment at all -- so the only person
+  // who could look at these surfaces was whoever was running the screenshot
+  // script, which is exactly backwards for a thing whose whole purpose is
+  // someone else looking at them. Nothing here reads a session or a database;
+  // the sign-in is there so it need not be public, not because it guards
+  // anything. See app/dev/surfaces, which frames these.
+  if (process.env.UI_PREVIEW !== '1' && !(await getUser())) notFound();
 
   const { s } = await searchParams;
   const surface = SURFACES.find((entry) => entry.id === s);
@@ -37,11 +46,19 @@ export default async function PreviewPage({
     return (
       <div data-workspace={surface.module} className="bg-page min-h-screen">
         {/* The width the thing is actually read at. A surface that only looks
-          * crowded at 390px and only looks empty at 1280px has been judged at
-          * neither, which is how a form nobody would draw on a phone gets
-          * drawn on a phone. */}
+         * crowded at 390px and only looks empty at 1280px has been judged at
+         * neither, which is how a form nobody would draw on a phone gets
+         * drawn on a phone.
+         *
+         * A whole page arrangement takes the shell's own box instead, since
+         * what it is drawing is the page, and a page is not centred in a
+         * column somebody chose for it. */}
         <div
-          className={`mx-auto px-4 py-6 ${surface.width === 'narrow' ? 'max-w-2xl' : 'max-w-4xl'}`}
+          className={
+            surface.width === 'page'
+              ? MAIN_BOX
+              : `mx-auto px-4 py-6 ${surface.width === 'narrow' ? 'max-w-2xl' : 'max-w-4xl'}`
+          }
         >
           {surface.render()}
         </div>

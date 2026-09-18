@@ -155,6 +155,9 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
           label="Job description"
           hint="Kept in full, unlike email. It is public text you fetched from a public page, it is what the requirement map reads, and refetching it later usually fails because the posting is gone."
         >
+          {/* ui-ok: composer-always-open -- this whole page is the create.
+            * Law 14 permits landing in edit mode for a new thing; there is
+            * nothing here to read yet. */}
           <Textarea
             name="jdText"
             rows={12}

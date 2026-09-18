@@ -38,6 +38,7 @@ function envKeys() {
   }
 }
 
+// latency: pending
 export async function previewReceiptPhoto(
   _prev: ReceiptActionState,
   formData: FormData,
@@ -86,6 +87,7 @@ export async function previewReceiptPhoto(
   };
 }
 
+// latency: pending
 export async function saveReceiptPhotoOrder(
   _prev: ReceiptActionState,
   formData: FormData,

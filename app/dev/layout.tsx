@@ -1,10 +1,15 @@
 import { redirect } from 'next/navigation';
-import { getUser } from '@/lib/auth/server';
+import { createClient, getUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { loadModuleCounts } from '@/lib/modules/counts';
+import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
+import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { loadPlan } from '@/lib/plan/load';
+import { buildPlanTree } from '@/lib/plan/tree';
+import { waitingOnYou } from '@/lib/plan/waiting';
 
 /**
  * Shell for the workspace the app keeps about itself.
@@ -22,34 +27,71 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const user = await getUser();
   if (!user) redirect('/login');
 
-  const [settings, counts, activity] = await Promise.all([
+  const supabase = await createClient();
+  const [settings, counts, activity, raised, plan, mainCheck] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadActivity(),
+    loadRaisedNotifications(user.id),
+    loadPlan(supabase, user.id),
+    loadMainCheck(),
   ]);
 
   /**
-   * Three lists, and the order is the point: what is wrong now, what was
+   * The badge is everything waiting on you, which is more than the raises.
+   *
+   * It used to be `raised.length`, so a step blocked on a credential added
+   * nothing to it: #499 sat blocked for a day behind a tab reading zero. The
+   * plan's half is derived the same way the Dash page derives the section it
+   * lands in -- `waitingOnYou` over the same tree -- rather than counted again
+   * here, because a badge that disagrees with the page it links to is worse
+   * than no badge.
+   */
+  const waiting = waitingOnYou(buildPlanTree(plan));
+
+  /**
+   * Dash is first because it is the page the day starts on: the summary of the
+   * last 24 hours, the questions a session needs answered before it can carry
+   * on, and every conversation you have had with Dash. A question nobody reads
+   * is a session that guessed.
+   *
+   * Then three lists, and the order is the point: what is wrong now, what was
    * decided and is being built, and what is only being thought about. A thing
    * moves up this list as it acquires commitment — an idea becomes a plan step
    * when it is decided on, and a bug is filed when something built is wrong.
    *
-   * UI sits below them because it is not a list of work; it is the standard
-   * the work is held to. It lives here rather than in a document because a
+   * UI sits below the three because it is not a list of work; it is the
+   * standard the work is held to, and Surfaces below that because it is where
+   * the standard gets checked against the thing: every surface framed at the width
+   * it is read at, with a box to say what is wrong. A note written there lands
+   * in the same queue as Bugs and requests, which is the point -- one inbox,
+   * not two. It lives here rather than in a document because a
    * document describing an interface goes stale the week after it is written,
    * and this one renders the real components from the real tokens: if a swatch
    * on that page is wrong, the app is wrong.
+   *
+   * The changelog is last, at the bottom of the list. Everything above it is
+   * something you go there to do; it is the one page you go to to look
+   * something up, and its lines are the closed rows of the three lists at the
+   * top. Finished work is consulted, not worked, so it sits at the end rather
+   * than in the middle of the things that still want doing.
    */
   const sections: NavSection[] = [
+    // The route stays /dev/raised, which keeps every link already written into
+    // a notification, a comment and an old summary working.
+    { href: '/dev/raised', label: 'Dash', icon: 'raised', badge: raised.length + waiting.length },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
+    { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
+    { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
   ];
 
   return (
     <div data-workspace="dev">
       <AppShell
+        account={user.id}
         module="dev"
         sections={sections}
         feedbackHref="/dev/bugs"
@@ -58,7 +100,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         enabledModules={settings.enabledModules}
         counts={switcherCounts(counts)}
         theme={settings.theme}
+        notifications={raised}
         activity={activity}
+        mainCheck={mainCheck}
       >
         {children}
       </AppShell>
