@@ -3,16 +3,21 @@ import { Moon } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
-import { groupHappened, type DigestEvent, type DigestGroup, type DigestPointer } from '@/lib/digest/build';
+import { groupHappened, type DigestEvent, type DigestGroup } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
 import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
 
 /**
  * The morning summary, at the top of the page.
  *
- * Written once a day by the cron and read here as it was written, so the two
- * lists are the same all day however often the page is opened. Nothing on it
- * is computed at render time -- see `inngest/dev/digest.ts` for why.
+ * Written once a day by the cron and read here as it was written, so it says
+ * the same thing all day however often the page is opened. Nothing on it is
+ * computed at render time -- see `inngest/dev/digest.ts` for why.
+ *
+ * It draws the day only. The stored summary also carries an attention list --
+ * what the night noticed about the board -- which used to be a second card
+ * here called "Worth a look". #623 moved those lines to the ideas page, so
+ * this file no longer reads `digest.attention`; the night still writes it.
  *
  * Nothing is drawn at all before the first one is written. An empty summary
  * would say "nothing happened" on a day nobody has looked at yet, which is a
@@ -39,12 +44,6 @@ const EVENT_LABEL: Record<DigestEvent['kind'], string> = {
   step: 'Shipped',
   note: 'Fixed',
   decision: 'Answered',
-};
-
-const POINTER_LABEL: Record<DigestPointer['kind'], string> = {
-  decision: 'Your answer',
-  ready: 'Ready',
-  suggestion: 'Noticed',
 };
 
 /**
@@ -207,105 +206,77 @@ function Night({ night }: { night: DigestNight }) {
   );
 }
 
-function Attention({ pointers }: { pointers: DigestPointer[] }) {
-  return (
-    <ul className="space-y-1.5">
-      {pointers.map((pointer, index) => (
-        <li key={`${pointer.kind}-${pointer.ref ?? index}`} className="space-y-0.5">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <Label>{POINTER_LABEL[pointer.kind]}</Label>
-            {pointer.ref && <Ref value={pointer.ref} />}
-            <span className="min-w-0 flex-1 text-body text-ink">{pointer.title}</span>
-          </div>
-          {pointer.detail && <p className="text-small text-ink-muted">{pointer.detail}</p>}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export function DigestPanel({ digest }: { digest: Digest | null }) {
   if (!digest) return null;
 
   const { groups, more } = groupHappened(digest.happened);
 
+  // Folded by its own heading rather than drawn open forever. This is the
+  // longest thing on the page -- an account of the day plus fifteen rows
+  // grouped under their features -- and it is also the part you are done with
+  // first: you read the summary, and then you want the questions underneath
+  // it. The day is on the closed line, because a cron that failed overnight
+  // leaves yesterday's summary here and the date is how you tell. Law 10.
   return (
-    <div className="space-y-3">
-      {/* Folded by its own heading rather than drawn open forever. This is the
-          longest thing on the page -- an account of the day plus fifteen rows
-          grouped under their features -- and it is also the part you are done
-          with first: you read the summary, and then you want the questions
-          underneath it. The day is on the closed line, because a cron that
-          failed overnight leaves yesterday's summary here and the date is how
-          you tell. Law 10. */}
-      <Card padding="dense">
-        <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
-          <div className="space-y-3">
-            {/* The paragraph, and nothing else above the fold. Absent on a
-                summary written before there was one, and on a day the model
-                call did not happen -- and then the fold is the whole card,
-                which is why it says what is in it on its closed line. */}
-            {digest.summary ? (
-              <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
-            ) : (
-              <p className="text-body text-ink-muted">No account was written for this day.</p>
-            )}
+    <Card padding="dense">
+      <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
+        <div className="space-y-3">
+          {/* The paragraph, and nothing else above the fold. Absent on a
+              summary written before there was one, and on a day the model
+              call did not happen -- and then the fold is the whole card,
+              which is why it says what is in it on its closed line. */}
+          {digest.summary ? (
+            <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
+          ) : (
+            <p className="text-body text-ink-muted">No account was written for this day.</p>
+          )}
 
-            {/* Everything the paragraph is an account of, folded (law 10). The
-                closed line carries the counts, so opening it is a choice
-                rather than a check: a night that fired two features and a day
-                that closed none are both legible without it. */}
-            <Disclosure
-              title="The detail"
-              meta={[
-                digest.night ? nightBudgetLine(digest.night) : null,
-                // `more` is the remainder past the cut, so `happened` is
-                // already the whole count and adding it would say it twice.
-                digest.happened.length > 0
-                  ? `${digest.happened.length} closed`
-                  : 'nothing closed',
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            >
-              <div className="space-y-3">
-                {digest.night && <Night night={digest.night} />}
+          {/* Everything the paragraph is an account of, folded (law 10). The
+              closed line carries the counts, so opening it is a choice
+              rather than a check: a night that fired two features and a day
+              that closed none are both legible without it. */}
+          <Disclosure
+            title="The detail"
+            meta={[
+              digest.night ? nightBudgetLine(digest.night) : null,
+              // `more` is the remainder past the cut, so `happened` is
+              // already the whole count and adding it would say it twice.
+              digest.happened.length > 0
+                ? `${digest.happened.length} closed`
+                : 'nothing closed',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          >
+            <div className="space-y-3">
+              {digest.night && <Night night={digest.night} />}
 
-                {groups.length > 0 ? (
-                  <div className="space-y-3">
-                    {groups.map((group) => (
-                      <Group key={group.key} group={group} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-body text-ink-muted">Nothing closed.</p>
-                )}
+              {groups.length > 0 ? (
+                <div className="space-y-3">
+                  {groups.map((group) => (
+                    <Group key={group.key} group={group} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-body text-ink-muted">Nothing closed.</p>
+              )}
 
-                {more > 0 && (
-                  <p className="text-small text-ink-muted">
-                    {more} more closed.{' '}
-                    <Link
-                      href="/dev/changelog"
-                      className="underline underline-offset-2 hover:text-ink"
-                    >
-                      See the changelog
-                    </Link>
-                    .
-                  </p>
-                )}
-              </div>
-            </Disclosure>
-          </div>
-        </SectionFold>
-      </Card>
-
-      {digest.attention.length > 0 && (
-        <Card padding="dense">
-          <SectionFold title="Worth a look" count={digest.attention.length}>
-            <Attention pointers={digest.attention} />
-          </SectionFold>
-        </Card>
-      )}
-    </div>
+              {more > 0 && (
+                <p className="text-small text-ink-muted">
+                  {more} more closed.{' '}
+                  <Link
+                    href="/dev/changelog"
+                    className="underline underline-offset-2 hover:text-ink"
+                  >
+                    See the changelog
+                  </Link>
+                  .
+                </p>
+              )}
+            </div>
+          </Disclosure>
+        </div>
+      </SectionFold>
+    </Card>
   );
 }
