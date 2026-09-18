@@ -400,9 +400,20 @@ export function CommentThread({
   // above it needed. The closed line carries the count and the last turn, so
   // opening it is a choice rather than a check -- law 10. Open by default,
   // because a comment you cannot see is a comment nobody answers.
+  //
+  // The fold sits on a recessed ground so you can see where the row stops and
+  // the conversation starts; before this it was text on the same background as
+  // everything above it. A ground and not a frame: all five callers --
+  // plan-view, ideas-view, raised-view, conversations-view, feedback-list --
+  // already draw this inside a card, and a border inside that border is what
+  // law 11 rules out. `bg-canvas` is the well inside a card rather than the
+  // page ground, which is what makes it recede in all four themes.
+  //
+  // The summary is inside the panel rather than over it, so the count and the
+  // last turn are the panel's heading instead of a line floating above it.
   return (
     <Disclosure
-      className="mt-1"
+      className="mt-1 rounded-lg bg-canvas card-pad-dense"
       defaultOpen
       title={`${shown.length} ${shown.length === 1 ? 'comment' : 'comments'}`}
       meta={
